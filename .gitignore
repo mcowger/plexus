@@ -1,0 +1,83 @@
+# -------------------------------------------------------
+# MONOREPO ROOT IGNORE
+# -------------------------------------------------------
+
+# Node
+node_modules/
+.pnpm-store/
+.pnpm/
+
+# Output / build artifacts
+dist/
+build/
+out/
+coverage/
+.tmp/
+temp/
+cache/
+.eslintcache
+.turbo/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# dotenv files
+.env
+.env.*
+!.env.example
+
+# IDE / Editor
+.vscode/
+.vscode-test/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PNPM specific
+.pnp.*
+.pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Storybook (if used)
+.storybook-out/
+storybook-static/
+
+# Jest
+jest-test-results.json
+jest-coverage/
+
+# Vitest
+.vitest/
+
+# Next.js (if any frontend packages use it)
+.next/
+.vercel/
+
+# React (CRA, Vite, etc.)
+*.cache/
+*.parcel-cache/
+*.rsbuild/
+
+# Temporary local files
+*.local
+*.secret
+*.bak
+*.tmp
+
+# Prisma (if used)
+prisma/migrations/*/steps.json
+
+# Docker
+docker-data/
+**/docker-data/
+

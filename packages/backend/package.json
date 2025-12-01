@@ -1,0 +1,20 @@
+{
+  "name": "@plexus/backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "pnpm --filter @plexus/types build && tsx --watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@plexus/types": "workspace:*",
+    "hono": "^4.10.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}
