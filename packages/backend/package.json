@@ -6,20 +6,27 @@
   "scripts": {
     "build": "tsc",
     "dev": "pnpm --filter @plexus/types build && tsx --watch src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.44",
     "@ai-sdk/openai": "^2.0.75",
     "@ai-sdk/openai-compatible": "^1.0.28",
     "@hono/node-server": "^1.19.6",
+    "@hono/zod-validator": "^0.7.5",
     "@openrouter/ai-sdk-provider": "^1.2.8",
     "@plexus/types": "workspace:*",
     "ai": "^5.0.104",
-    "hono": "^4.10.7"
+    "hono": "^4.10.7",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "typescript": "^5.9.3"
+    "@vitest/ui": "^4.0.14",
+    "jsdom": "^27.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
   }
 }
