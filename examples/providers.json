@@ -1,0 +1,40 @@
+{
+  "openai-primary": {
+    "type": "openai",
+    "apiKey": "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "baseURL": "https://api.openai.com/v1",
+    "model": "gpt-4-turbo-preview",
+    "temperature": 0.7,
+    "maxTokens": 4096
+  },
+  "openai-secondary": {
+    "type": "openai",
+    "apiKey": "sk-proj-yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "model": "gpt-3.5-turbo",
+    "temperature": 0.5,
+    "maxTokens": 2048
+  },
+  "anthropic-primary": {
+    "type": "anthropic",
+    "apiKey": "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "baseURL": "https://api.anthropic.com",
+    "model": "claude-3-opus-20240229",
+    "temperature": 0.7,
+    "maxTokens": 4096
+  },
+  "anthropic-sonnet": {
+    "type": "anthropic",
+    "apiKey": "sk-ant-api03-yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "model": "claude-3-sonnet-20240229",
+    "temperature": 0.5,
+    "maxTokens": 2048
+  },
+  "openrouter-primary": {
+    "type": "openrouter",
+    "apiKey": "sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "baseURL": "https://openrouter.ai/api/v1",
+    "model": "meta-llama/llama-3-70b-instruct",
+    "temperature": 0.7,
+    "maxTokens": 4096
+  }
+}
