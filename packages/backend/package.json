@@ -11,6 +11,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.53",
     "@ai-sdk/google": "^2.0.44",
     "@ai-sdk/openai": "^2.0.75",
     "@ai-sdk/openai-compatible": "^1.0.28",

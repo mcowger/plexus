@@ -4,15 +4,46 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { bearerAuth } from 'hono/bearer-auth';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { chatCompletionSchema } from '@plexus/types';
+import { 
+  chatCompletionSchema, 
+  VirtualKeyConfig, 
+  ProviderType 
+} from '@plexus/types';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
+import { RoutingEngine } from './routing/engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = new Hono();
 const port = 3000;
+
+// Initialize routing engine with virtual key configurations
+const virtualKeys = new Map<string, VirtualKeyConfig>([
+  ['virtual-key', {
+    key: 'virtual-key',
+    provider: 'openai' as ProviderType,
+    model: 'gpt-3.5-turbo',
+    priority: 1,
+    fallbackProviders: ['anthropic', 'openrouter']
+  }]
+]);
+
+const routingConfig = {
+  virtualKeys,
+  healthCheckInterval: 60000, // 1 minute
+  retryPolicy: {
+    maxRetries: 3,
+    backoffMultiplier: 2,
+    initialDelay: 100,
+    maxDelay: 1000,
+    retryableErrors: ['timeout', 'rate_limit', 'network_error']
+  },
+  fallbackEnabled: true
+};
+
+const routingEngine = new RoutingEngine(routingConfig);
 
 // Error handling middleware (must be first)
 app.onError((err, c) => {
@@ -41,35 +72,82 @@ app.use('*', async (c, next) => {
 const authMiddleware = bearerAuth({ token: 'virtual-key' });
 
 // Chat Completion Endpoint
-
 app.post('/v1/chat/completions', authMiddleware, zValidator('json', chatCompletionSchema), async (c) => {
   const { messages, model, temperature } = c.req.valid('json');
   
-  // Process the chat completion request
-  console.log('Received chat completion request:', { messages, model, temperature });
+  // Get virtual key from authentication token
+  const virtualKey = c.req.header('authorization')?.replace('Bearer ', '') || 'virtual-key';
   
-  // Return a mock response
-  return c.json({
-    id: 'chatcmpl-123',
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model: model || 'gpt-3.5-turbo',
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: 'This is a mock response from the chat completion endpoint.',
-        },
-        finish_reason: 'stop',
+  try {
+    // Route the request through the provider system
+    const routingResponse = await routingEngine.routeRequest({
+      virtualKey,
+      request: {
+        messages,
+        model,
+        temperature
       },
-    ],
-    usage: {
-      prompt_tokens: 10,
-      completion_tokens: 20,
-      total_tokens: 30,
-    },
-  });
+      userId: 'anonymous', // In a real app, you'd get this from auth
+      metadata: {
+        timestamp: new Date().toISOString(),
+        userAgent: c.req.header('user-agent'),
+      }
+    });
+
+    // Return the provider response
+    return c.json(routingResponse.response);
+  } catch (error) {
+    console.error('Chat completion error:', error);
+    
+    // Return error response
+    return c.json({
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: 'provider_error',
+        code: 'ROUTING_FAILED'
+      }
+    }, 500);
+  }
+});
+
+// Health check endpoint
+app.get('/health', async (c) => {
+  try {
+    const providerStatus = routingEngine.getProviderStatus();
+    const healthScores = routingEngine.getHealthScores();
+    
+    return c.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      providers: Object.fromEntries(providerStatus),
+      healthScores: Object.fromEntries(healthScores)
+    });
+  } catch (error) {
+    return c.json({
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
+});
+
+// Provider status endpoint
+app.get('/api/providers/status', async (c) => {
+  try {
+    const providerStatus = routingEngine.getProviderStatus();
+    const healthScores = routingEngine.getHealthScores();
+    
+    return c.json({
+      providers: Object.fromEntries(providerStatus),
+      healthScores: Object.fromEntries(healthScores),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    return c.json({
+      error: error instanceof Error ? error.message : 'Failed to get provider status',
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
 });
 
 // Serve frontend
