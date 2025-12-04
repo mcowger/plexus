@@ -11,9 +11,9 @@ export class AnthropicProviderClient implements ProviderClient {
     this.config = config;
     this.providerInstance = createAnthropic(
       {
-        baseURL: config.baseURL,
         apiKey: config.apiKey,
-        headers: config.headers
+        ...(config.baseURL && { baseURL: config.baseURL }),
+        ...(config.headers && { headers: config.headers })
       } as AnthropicProviderSettings
     )
   }

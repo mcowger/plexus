@@ -1,7 +1,7 @@
 
 import { ProviderType, ProviderConfig, ProviderClient, ChatCompletionRequest, ModelConfig} from '@plexus/types';
 import {GenerateTextResult, ToolSet, generateText} from 'ai'
-import { createOpenRouter, OpenRouterProvider, OpenRouterProviderSettings } from '@openrouter/ai-sdk-provider';
+import { createOpenRouter, OpenRouterProvider, OpenRouterProviderSettings,  } from '@openrouter/ai-sdk-provider';
 
 export class OpenRouterProviderClient implements ProviderClient {
   public readonly type: ProviderType = 'openai';
@@ -12,9 +12,9 @@ export class OpenRouterProviderClient implements ProviderClient {
     this.config = config;
     this.providerInstance = createOpenRouter(
       {
-        baseURL: config.baseURL,
         apiKey: config.apiKey,
-        headers: config.headers
+        ...(config.baseURL && { baseURL: config.baseURL }),
+        ...(config.headers && { headers: config.headers })
       } as OpenRouterProviderSettings
     )
   }

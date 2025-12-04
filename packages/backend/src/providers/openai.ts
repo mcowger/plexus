@@ -11,9 +11,9 @@ export class OpenAIProviderClient implements ProviderClient {
     this.config = config;
     this.providerInstance = createOpenAI(
       {
-        baseURL: config.baseURL,
         apiKey: config.apiKey,
-        headers: config.headers
+        ...(config.baseURL && { baseURL: config.baseURL }),
+        ...(config.headers && { headers: config.headers })
       } as OpenAIProviderSettings
     )
   }
