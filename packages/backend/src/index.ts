@@ -19,6 +19,7 @@ import { configLoader } from "./config/loader.js";
 import { registerV1ModelsRoutes } from "./routing/v1models.js";
 import { registerConfigRoutes } from "./routing/config.js";
 import { logger } from "./utils/logger.js";
+import { loggingMiddleware, enableDetailedLogging } from "./middleware/logging.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +30,10 @@ const port = 3000;
 
 async function initializeApp() {
   try {
+    // Enable detailed logging if needed
+    // Uncomment the following line to see full request/response details
+    enableDetailedLogging();
+
     // Load configuration
     const configSnapshot = await configLoader.loadConfiguration();
 
@@ -58,11 +63,10 @@ app.onError((err, c) => {
   return c.json({ error: "Internal Server Error" }, 500);
 });
 
-// Basic logging middleware
-app.use("*", async (c, next) => {
-  logger.debug(`${c.req.method} ${c.req.path}`);
-  await next();
-});
+// Logging middleware
+app.use("*", loggingMiddleware({
+  skipPaths: ["/favicon.ico", "/__vite_ping__"],
+}));
 
 // Authentication middleware for /v1/chat/completions
 const authMiddleware = bearerAuth({ token: "virtual-key" });
