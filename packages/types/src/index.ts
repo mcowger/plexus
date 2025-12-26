@@ -62,7 +62,7 @@ export type ProviderType = z.infer<typeof providerTypeSchema>;
 export const providerConfigSchema = z.object({
   type: providerTypeSchema,
   apiKey: z.string().min(1, 'API key is required'),
-  baseURL: z.string().url().optional(),
+  baseURL: z.url().optional(),
   headers: z.record(z.string(), z.string()).optional()
 });
 

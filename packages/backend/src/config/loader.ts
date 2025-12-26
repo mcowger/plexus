@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 import fs from 'fs/promises';
 import path from 'path';
+import { logger } from '../utils/logger.js';
 
 export interface ConfigurationSnapshot {
   providers: Map<string, ProviderConfig>;
@@ -43,7 +44,7 @@ export class ConfigurationLoader {
 
       return this.snapshot;
     } catch (error) {
-      console.error('Failed to load configuration:', error);
+      logger.error('Failed to load configuration:', error);
       throw new Error(`Configuration loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -123,7 +124,7 @@ export class ConfigurationLoader {
       return providers;
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-        console.warn('Provider configuration file not found, using empty configuration');
+        logger.warn('Provider configuration file not found, using empty configuration');
         return new Map();
       }
       throw error;
@@ -150,7 +151,7 @@ export class ConfigurationLoader {
       return virtualKeys;
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-        console.warn('Virtual key configuration file not found, using empty configuration');
+        logger.warn('Virtual key configuration file not found, using empty configuration');
         return new Map();
       }
       throw error;
@@ -177,7 +178,7 @@ export class ConfigurationLoader {
       return models;
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-        console.warn('Model configuration file not found, using empty configuration');
+        logger.warn('Model configuration file not found, using empty configuration');
         return new Map();
       }
       throw error;

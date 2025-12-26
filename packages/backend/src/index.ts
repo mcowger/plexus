@@ -18,6 +18,7 @@ import { zValidator } from "@hono/zod-validator";
 import { configLoader } from "./config/loader.js";
 import { registerV1ModelsRoutes } from "./routing/v1models.js";
 import { registerConfigRoutes } from "./routing/config.js";
+import { logger } from "./utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,18 +32,18 @@ async function initializeApp() {
     // Load configuration
     const configSnapshot = await configLoader.loadConfiguration();
 
-    console.log("Configuration loaded successfully");
-    console.log(`Loaded ${configSnapshot.providers.size} providers`);
-    console.log(`Loaded ${configSnapshot.virtualKeys.size} virtual keys`);
-    console.log(`Loaded ${configSnapshot.models.size} models`);
+    logger.info("Configuration loaded successfully");
+    logger.info(`Loaded ${configSnapshot.providers.size} providers`);
+    logger.info(`Loaded ${configSnapshot.virtualKeys.size} virtual keys`);
+    logger.info(`Loaded ${configSnapshot.models.size} models`);
   } catch (error) {
-    console.error("Failed to initialize application:", error);
+    logger.error("Failed to initialize application:", error);
   }
 }
 
 // Error handling middleware (must be first)
 app.onError((err, c) => {
-  console.error("Unhandled error:", err);
+  logger.error("Unhandled error:", err);
 
   // Handle Zod validation errors
   if (err instanceof z.ZodError) {
@@ -59,7 +60,7 @@ app.onError((err, c) => {
 
 // Basic logging middleware
 app.use("*", async (c, next) => {
-  console.log(`${c.req.method} ${c.req.path}`);
+  logger.debug(`${c.req.method} ${c.req.path}`);
   await next();
 });
 
@@ -97,9 +98,9 @@ initializeApp()
       port,
     });
 
-    console.log(`Server is running on http://localhost:${port}`);
+    logger.info(`Server is running on http://localhost:${port}`);
   })
   .catch((error) => {
-    console.error("Failed to start server:", error);
+    logger.error("Failed to start server:", error);
     process.exit(1);
   });

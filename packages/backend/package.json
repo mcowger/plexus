@@ -21,6 +21,7 @@
     "@plexus/types": "workspace:*",
     "ai": "^5.0.104",
     "hono": "^4.10.7",
+    "winston": "^3.19.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {

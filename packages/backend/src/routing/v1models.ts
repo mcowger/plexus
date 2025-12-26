@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { ModelConfig } from "@plexus/types";
 import { configLoader } from "../config/loader.js";
+import { logger } from "../utils/logger.js";
 
 // Helper function to transform ModelConfig to ModelInfo
 export function transformModelConfigForV1Models(
@@ -40,13 +41,13 @@ export async function handleModelsEndpoint(c: any) {
         );
         models.push(modelInfo);
       } catch (error) {
-        console.warn(`Failed to transform model ${modelName}:`, error);
+        logger.warn(`Failed to transform model ${modelName}:`, error);
       }
     }
 
     return c.json(models);
   } catch (error) {
-    console.error("Models endpoint error:", error);
+    logger.error("Models endpoint error:", error);
     return c.json(
       {
         error: error instanceof Error ? error.message : "Failed to get models",
