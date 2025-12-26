@@ -113,3 +113,8 @@ logger.warn(`Failed to transform model ${modelName}:`, error);
 logger.error("Failed to initialize application:", error);
 logger.error("Unhandled error:", err);
 ```
+
+
+## Sample Code
+
+Code from other applications that might be useful as references is kept in sample_code.  It can never e used unchanged, not should be compiled and considered a source of truth.  However, it may be useful as a reference.
