@@ -109,6 +109,7 @@ export class ConfigurationLoader {
    */
   private async loadProviderConfigs(): Promise<Map<string, ProviderConfig>> {
     const providersPath = path.join(this.configPath, 'providers.json');
+    logger.info(`Loading provider configurations from ${providersPath}`);
     
     try {
       const data = await fs.readFile(providersPath, 'utf-8');
@@ -136,6 +137,7 @@ export class ConfigurationLoader {
    */
   private async loadVirtualKeyConfigs(): Promise<Map<string, VirtualKeyConfig>> {
     const virtualKeysPath = path.join(this.configPath, 'virtual-keys.json');
+    logger.info(`Loading virtual key configurations from ${virtualKeysPath}`);
     
     try {
       const data = await fs.readFile(virtualKeysPath, 'utf-8');
@@ -163,6 +165,7 @@ export class ConfigurationLoader {
    */
   private async loadModelConfigs(): Promise<Map<string, ModelConfig>> {
     const modelsPath = path.join(this.configPath, 'models.json');
+    logger.info(`Loading model configurations from ${modelsPath}`);
     
     try {
       const data = await fs.readFile(modelsPath, 'utf-8');

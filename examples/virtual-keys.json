@@ -1,14 +1,5 @@
 {
   "vk-production-gpt4": {
-    "key": "vk-prod-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  },
-  "vk-development": {
-    "key": "vk-dev-yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
-  },
-  "vk-claude-high-priority": {
-    "key": "vk-claude-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
-  },
-  "vk-budget-tier": {
-    "key": "vk-budget-aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "key": "sk-test"
   }
 }

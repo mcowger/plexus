@@ -1,24 +1,13 @@
 {
-  "gpt-4-turbo-preview": {
-    "display_slug": "gpt-4-turbo-preview",
-    "canonical_slug": "gpt-4-turbo-preview",
-    "display_name": "GPT 4 Turbo",
-    "pricing_slug": "openai/gpt-4-turbo-preview",
-    "providerIds": ["openai-primary","openai-secondary"],
-    "maxTokens": 4096,
-    "contextWindow": 128000,
+  "gpt-5-mini": {
+    "display_slug": "gpt-5-mini",
+    "canonical_slug": "gpt-5-mini",
+    "display_name": "GPT 5 mini",
+    "pricing_slug": "openai/gpt-5-mini",
+    "providerIds": ["openai-primary"],
+    "maxTokens": 8192,
+    "contextWindow": 400000,
     "inputTokenPrice": 0.01,
     "outputTokenPrice": 0.03
-  },
-  "gpt-3.5-turbo": {
-    "display_slug": "gpt-3-turbo-preview",
-    "canonical_slug": "gpt-3-turbo-preview",
-    "display_name": "GPT 3 Slow",
-    "pricing_slug": "openai/gpt-3-turbo",
-    "providerIds": ["openai-secondary"],
-    "maxTokens": 8192,
-    "contextWindow": 300000,
-    "inputTokenPrice": 1.5,
-    "outputTokenPrice": 3.0
   }
 }

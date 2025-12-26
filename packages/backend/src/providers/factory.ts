@@ -1,7 +1,6 @@
 import { ProviderType, ProviderConfig, ProviderClient } from '@plexus/types';
 import { OpenAIProviderClient } from './openai.js';
 import { AnthropicProviderClient } from './anthropic.js';
-import { OpenRouterProviderClient } from './openrouter.js';
 
 export class ProviderFactory {
   private static instances: Map<string, ProviderClient> = new Map();
@@ -21,9 +20,6 @@ export class ProviderFactory {
         break;
       case 'anthropic':
         client = new AnthropicProviderClient(config);
-        break;
-      case 'openrouter':
-        client = new OpenRouterProviderClient(config);
         break;
       default:
         throw new Error(`Unsupported provider type: ${config.type}`);

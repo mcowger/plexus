@@ -4,9 +4,13 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
-    "dev": "pnpm -r --parallel dev"
+    "dev": "concurrently \"pnpm:dev:*\"",
+    "dev:types": "pnpm --filter @plexus/types build",
+    "dev:frontend": "pnpm --filter @plexus/frontend dev",
+    "dev:backend": "pnpm --filter @plexus/types build; PLEXUS_CONFIG_DIR=./config  tsx watch packages/backend/src/index.ts"
   },
   "devDependencies": {
+    "concurrently": "^9.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

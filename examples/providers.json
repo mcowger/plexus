@@ -1,15 +1,7 @@
 {
   "openai-primary": {
     "type": "openai",
-    "apiKey": "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "apiKey": "",
     "baseURL": "https://api.openai.com/v1"
-  },
-  "openai-secondary": {
-    "type": "openai",
-    "apiKey": "sk-proj-yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-    "model": "gpt-3.5-turbo",
-    "headers" : {
-      "SampleHeader": "My Value"
-    }
   }
 }
