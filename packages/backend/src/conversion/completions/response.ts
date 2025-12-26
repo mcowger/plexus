@@ -9,7 +9,6 @@ import { logger } from '../../utils/logger.js';
 export interface OpenAIChatCompletionResponse {
   id: string | null;
   created: number | null;
-  model: string | null;
   choices: Array<{
     message: {
       role: 'assistant' | null;
@@ -273,7 +272,6 @@ export function convertToOpenAIChatResponse(
   const response: OpenAIChatCompletionResponse = {
     id: result.response?.id || generateId(),
     created: Math.floor(Date.now() / 1000),
-    model: result.response?.model || result.request?.model || null,
     choices: [
       {
         message,
@@ -285,6 +283,6 @@ export function convertToOpenAIChatResponse(
     usage,
   };
 
-  logger.info(`Conversion completed successfully. Model: ${response.model || 'unknown'}, tool calls: ${toolCalls.length}`);
+  logger.info(`Conversion completed successfully. Tool calls: ${toolCalls.length}`);
   return response;
 }
