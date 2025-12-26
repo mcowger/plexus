@@ -82,3 +82,4 @@ docker-data/
 **/docker-data/
 
 config/*.json
+sample_code/*
