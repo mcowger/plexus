@@ -250,7 +250,7 @@ export function convertToAnthropicMessagesResponse(
               }
             : undefined,
         });
-        logger.debug(`Added tool use block for tool '${part.toolName}' with ID '${toolCallId}'`);
+        logger.silly(`Added tool use block for tool '${part.toolName}' with ID '${toolCallId}'`);
       }
       // Ignore: tool-result, file, source (handled via citations)
     }

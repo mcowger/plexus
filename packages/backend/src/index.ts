@@ -10,7 +10,7 @@ import { registerV1ModelsRoutes } from "./routing/v1/models.js";
 import { registerV1ChatCompletionsRoutes } from "./routing/v1/chat/completions.js";
 import { registerConfigRoutes } from "./routing/config.js";
 import { logger } from "./utils/logger.js";
-import { loggingMiddleware, enableDetailedLogging } from "./middleware/logging.js";
+import { loggingMiddleware } from "./middleware/logging.js";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -36,14 +36,15 @@ if (!configDir) {
   process.exit(1);
 }
 
+// Set logging level from LOG_LEVEL environment variable, default to 'info'
+const logLevel = process.env.LOG_LEVEL || 'info';
+logger.level = logLevel;
+logger.info(`Logging level set to: ${logLevel}`);
+
 logger.info(`Using config directory: ${path.resolve(process.cwd(), configDir)}`);
 
 async function initializeApp() {
   try {
-    // Enable detailed logging if needed
-    // Uncomment the following line to see full request/response details
-    enableDetailedLogging();
-
     // Set the config directory on the configLoader instance
     if (configDir) {
       configLoader['configPath'] = configDir;

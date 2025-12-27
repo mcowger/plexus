@@ -217,7 +217,7 @@ export function convertToOpenAIChatResponse(
             arguments: JSON.stringify(part.input || {}),
           },
         });
-        logger.debug(`Added tool call for '${part.toolName}' with ID '${toolCallId}'`);
+        logger.silly(`Added tool call for '${part.toolName}' with ID '${toolCallId}'`);
       }
       // Ignore: tool-result, file, source (sources handled separately)
     }

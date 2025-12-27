@@ -416,7 +416,7 @@ export function convertFromOpenAIChatRequest(
               ),
             };
             content.push(toolCallPart);
-            logger.debug(`Added tool call for '${toolCall.function.name}' with ID '${toolCall.id}'`);
+            logger.silly(`Added tool call for '${toolCall.function.name}' with ID '${toolCall.id}'`);
           }
         }
 
@@ -425,7 +425,7 @@ export function convertFromOpenAIChatRequest(
             role: "assistant",
             content,
           });
-          logger.debug(`Added assistant message with ${content.length} content part(s)`);
+          logger.silly(`Added assistant message with ${content.length} content part(s)`);
         }
         break;
       }
@@ -443,7 +443,7 @@ export function convertFromOpenAIChatRequest(
           role: "tool",
           content: [toolResultPart],
         });
-        logger.debug(`Added tool message for tool '${toolName}' with ID '${message.tool_call_id}'`);
+        logger.silly(`Added tool message for tool '${toolName}' with ID '${message.tool_call_id}'`);
         break;
       }
     }
@@ -500,7 +500,7 @@ export function convertFromOpenAIChatRequest(
     options.tools = new Array<LanguageModelV2FunctionTool>();
     logger.debug(`Converting ${request.tools.length} tool definition(s)`);
     for (const tool of request.tools) {
-      logger.debug(`Converting tool: ${tool.function.name}`);
+      logger.silly(`Converting tool: ${tool.function.name}`);
       
       // Ensure parameters have type: "object" - create a new object with the required fields
       const parameters = tool.function.parameters as Record<string, unknown>;
@@ -521,14 +521,14 @@ export function convertFromOpenAIChatRequest(
         inputSchema: inputSchema,
       };
       options.tools.push(convertedTool);
-      logger.debug(`Converted tool: ${convertedTool.name}`);
+      logger.silly(`Converted tool: ${convertedTool.name}`);
     }
     logger.debug(`Converted tools: ${request.tools.map(t => t.function.name).join(', ')}`);
   }
 
   // Convert tool choice
   if (request.tool_choice) {
-    logger.debug('Converting tool choice configuration');
+    logger.silly('Converting tool choice configuration');
     if (typeof request.tool_choice === "string") {
       switch (request.tool_choice) {
         case "auto":

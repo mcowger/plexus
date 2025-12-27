@@ -234,7 +234,7 @@ function convertUserContentPart(
       logger.warn(`Processing unexpected tool_result content in user message, tool_use_id: ${part.tool_use_id}`);
       
       if (typeof part.content === 'string') {
-        logger.debug(`Converting tool result as text content, length: ${part.content.length} characters`);
+        logger.silly(`Converting tool result as text content, length: ${part.content.length} characters`);
         return {
           type: 'text',
           text: part.content,
@@ -243,7 +243,7 @@ function convertUserContentPart(
         // Content array - convert first text part
         const textPart = part.content.find((p) => p.type === 'text');
         if (textPart && 'text' in textPart) {
-          logger.debug(`Converting tool result array, found text part with length: ${textPart.text.length} characters`);
+          logger.silly(`Converting tool result array, found text part with length: ${textPart.text.length} characters`);
           return {
             type: 'text',
             text: textPart.text,
@@ -366,7 +366,7 @@ export function convertFromAnthropicMessagesRequest(
               input: toolUsePart.input,
             };
             content.push(toolCallPart);
-            logger.debug(`Added tool call part for tool '${toolUsePart.name}' with ID '${toolUsePart.id}'`);
+            logger.silly(`Added tool call part for tool '${toolUsePart.name}' with ID '${toolUsePart.id}'`);
           }
         }
       }
@@ -417,7 +417,7 @@ export function convertFromAnthropicMessagesRequest(
     options.tools = new Array<LanguageModelV2FunctionTool>();
     logger.debug(`Converting ${request.tools.length} tool definition(s)`);
     for (const tool of request.tools) {
-      logger.debug(`Converting tool: ${tool.name}`);
+      logger.silly(`Converting tool: ${tool.name}`);
       
       // Ensure parameters have type: "object" - create a new object with the required fields
       const parameters = tool.input_schema as Record<string, unknown>;
@@ -438,7 +438,7 @@ export function convertFromAnthropicMessagesRequest(
         inputSchema: inputSchema,
       };
       options.tools.push(convertedTool);
-      logger.debug(`Converted tool: ${convertedTool.name}`);
+      logger.silly(`Converted tool: ${convertedTool.name}`);
     }
     logger.debug(`Converted tools: ${request.tools.map(t => t.name).join(', ')}`);
   }
@@ -457,7 +457,7 @@ export function convertFromAnthropicMessagesRequest(
 
   // Convert tool choice
   if (request.tool_choice) {
-    logger.debug('Converting tool choice configuration');
+    logger.silly('Converting tool choice configuration');
     if (typeof request.tool_choice === 'string') {
       switch (request.tool_choice) {
         case 'auto':

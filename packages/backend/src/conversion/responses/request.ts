@@ -816,7 +816,7 @@ export function convertFromOpenAIResponsesRequest(
     const functionTools = request.tools.filter((tool) => tool.type === "function");
     for (const tool of functionTools) {
       if (tool.type === "function") {
-        logger.debug(`Converting tool: ${tool.function.name}`);
+        logger.silly(`Converting tool: ${tool.function.name}`);
         
         // Ensure parameters have type: "object" - create a new object with the required fields
         const parameters = tool.function.parameters as Record<string, unknown>;
@@ -836,7 +836,7 @@ export function convertFromOpenAIResponsesRequest(
           description: tool.function.description,
           inputSchema: inputSchema,
         });
-        logger.debug(`Converted tool: ${tool.function.name}`);
+        logger.silly(`Converted tool: ${tool.function.name}`);
       }
     }
     
@@ -860,20 +860,20 @@ export function convertFromOpenAIResponsesRequest(
 
   // Convert tool choice
   if (request.tool_choice) {
-    logger.debug('Converting tool choice configuration');
+    logger.silly('Converting tool choice configuration');
     if (typeof request.tool_choice === "string") {
       switch (request.tool_choice) {
         case "auto":
           options.toolChoice = { type: "auto" };
-          logger.debug('Set tool choice to auto');
+          logger.silly('Set tool choice to auto');
           break;
         case "none":
           options.toolChoice = { type: "none" };
-          logger.debug('Set tool choice to none');
+          logger.silly('Set tool choice to none');
           break;
         case "required":
           options.toolChoice = { type: "required" };
-          logger.debug('Set tool choice to required');
+          logger.silly('Set tool choice to required');
           break;
       }
     } else {

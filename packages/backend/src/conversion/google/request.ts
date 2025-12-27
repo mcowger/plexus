@@ -360,7 +360,7 @@ export function convertFromGoogleGenerativeAIRequest(
             role: 'tool',
             content: [toolResultPart],
           });
-          logger.debug(`Added tool message for function response '${part.functionResponse.name}'`);
+          logger.silly(`Added tool message for function response '${part.functionResponse.name}'`);
         }
       }
     }
@@ -443,7 +443,7 @@ export function convertFromGoogleGenerativeAIRequest(
     for (const tool of request.tools) {
       if (tool.functionDeclarations) {
         for (const func of tool.functionDeclarations) {
-          logger.debug(`Converting tool: ${func.name}`);
+          logger.silly(`Converting tool: ${func.name}`);
           
           // Ensure parameters have type: "object" - create a new object with the required fields
           const parameters = func.parameters as Record<string, unknown>;
@@ -463,7 +463,7 @@ export function convertFromGoogleGenerativeAIRequest(
             description: func.description,
             inputSchema: inputSchema,
           });
-          logger.debug(`Converted tool: ${func.name}`);
+          logger.silly(`Converted tool: ${func.name}`);
         }
       }
     }
@@ -473,11 +473,11 @@ export function convertFromGoogleGenerativeAIRequest(
   // Convert tool config
   if (request.toolConfig?.functionCallingConfig) {
     const config = request.toolConfig.functionCallingConfig;
-    logger.debug('Converting tool configuration');
+    logger.silly('Converting tool configuration');
 
     if (config.mode === 'AUTO') {
       options.toolChoice = { type: 'auto' };
-      logger.debug('Set tool choice to auto');
+      logger.silly('Set tool choice to auto');
     } else if (config.mode === 'NONE') {
       options.toolChoice = { type: 'none' };
       logger.debug('Set tool choice to none');

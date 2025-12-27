@@ -76,7 +76,7 @@ export function loggingMiddleware(options?: {
         }
       }
 
-      logger.debug("Incoming request:", requestLog);
+      logger.silly("Incoming request:", requestLog);
     } else {
       // Basic request logging at normal levels
       const logMessage = query
@@ -134,7 +134,7 @@ export function loggingMiddleware(options?: {
         logData.body = responseBody;
       }
 
-      logger.debug(`${statusEmoji} Response sent:`, logData);
+      logger.silly(`${statusEmoji} Response sent:`, logData);
     } else {
       // Basic response logging at normal levels
       const statusMessage = `${status} ${statusEmoji}`;

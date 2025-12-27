@@ -101,7 +101,7 @@ export function convertLanguageModelToolsToToolSet(
       
       // Add tool to ToolSet with tool name as key
       toolSet[toolName] = aiTool;
-      logger.debug(`Added tool '${toolName}' to ToolSet using AI SDK tool() helper`);
+      logger.silly(`Added tool '${toolName}' to ToolSet using AI SDK tool() helper`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to convert tool '${toolName}': ${errorMessage}`);
@@ -116,7 +116,7 @@ export function convertLanguageModelToolsToToolSet(
     return undefined;
   }
 
-  logger.info(`Successfully converted ${toolSetKeys.length} tool(s) to ToolSet: ${toolSetKeys.join(", ")}`);
+  logger.info(`Successfully converted ${toolSetKeys.length} tool(s) to ToolSet`);
   return toolSet;
 }
 
