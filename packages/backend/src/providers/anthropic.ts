@@ -1,5 +1,5 @@
-import { ProviderType, ProviderConfig, ProviderClient, ChatCompletionRequest, ModelConfig} from '@plexus/types';
-import {generateText, GenerateTextResult, ToolSet, LanguageModel} from 'ai'
+import { ProviderType, ProviderConfig, ProviderClient } from '@plexus/types';
+import {LanguageModel} from 'ai'
 import { createAnthropic, AnthropicProvider, AnthropicProviderSettings } from '@ai-sdk/anthropic'
 
 export class AnthropicProviderClient implements ProviderClient {

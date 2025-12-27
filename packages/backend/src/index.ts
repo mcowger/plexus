@@ -4,17 +4,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { bearerAuth } from "hono/bearer-auth";
 import path from "path";
 import { fileURLToPath } from "url";
-import {
-  chatCompletionRequestSchema,
-  errorResponseSchema,
-  VirtualKeyConfig,
-  ProviderType,
-  ChatCompletionRequest,
-  ChatCompletionResponse,
-  ModelConfig,
-} from "@plexus/types";
 import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
 import { configLoader } from "./config/loader.js";
 import { registerV1ModelsRoutes } from "./routing/v1/models.js";
 import { registerV1ChatCompletionsRoutes } from "./routing/v1/chat/completions.js";

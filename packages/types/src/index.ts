@@ -2,48 +2,6 @@ import { z } from 'zod';
 import { LanguageModel, Provider } from 'ai';
 
 
-
-// Chat Message Schema
-const chatMessageSchema = z.object({
-  role: z.enum(['system', 'user', 'assistant']),
-  content: z.string().min(1, 'Message content cannot be empty'),
-});
-
-export type ChatMessage = z.infer<typeof chatMessageSchema>;
-
-// Chat Completion Request Schema
-export const chatCompletionRequestSchema = z.object({
-  messages: z.array(chatMessageSchema).min(1, 'At least one message is required'),
-  model: z.string(),
-  temperature: z.number().min(0).max(2).default(1.0),
-  max_tokens: z.number().min(1).max(128000).optional(),
-  stream: z.boolean().default(true),
-});
-
-export type ChatCompletionRequest = z.infer<typeof chatCompletionRequestSchema>;
-
-// Chat Completion Response Schema
-const chatCompletionResponseSchema = z.object({
-  id: z.string(),
-  object: z.literal('chat.completion'),
-  created: z.number(),
-  model: z.string(),
-  choices: z.array(
-    z.object({
-      index: z.number().gte(0),
-      message: chatMessageSchema,
-      finish_reason: z.enum(['stop', 'length', 'content_filter','tool_calls']),
-    })
-  ),
-  usage: z.object({
-    prompt_tokens: z.number(),
-    completion_tokens: z.number(),
-    total_tokens: z.number(),
-  }),
-});
-
-export type ChatCompletionResponse = z.infer<typeof chatCompletionResponseSchema>;
-
 // Error Response Schema
 export const errorResponseSchema = z.object({
   error: z.object({

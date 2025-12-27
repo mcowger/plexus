@@ -1,4 +1,4 @@
-import { ProviderType, ProviderConfig, ProviderClient, ChatCompletionRequest, ModelConfig} from '@plexus/types';
+import { ProviderType, ProviderConfig, ProviderClient} from '@plexus/types';
 import {LanguageModel} from 'ai'
 import { createOpenAI, OpenAIProvider, OpenAIProviderSettings } from '@ai-sdk/openai';
 
