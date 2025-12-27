@@ -31,20 +31,24 @@ export function selectProvider(
     );
   }
 
-  // Gather the provider IDs for this model
-  const providerIds = modelConfig.providerIds;
-  if (!providerIds || providerIds.length === 0) {
+  // Gather the provider IDs and their canonical slugs for this model
+  const providerMap = modelConfig.providers;
+  if (!providerMap || Object.keys(providerMap).length === 0) {
     throw new Error(
-      `No provider IDs configured for model '${convertedRequest.model}'`
+      `No providers configured for model '${convertedRequest.model}'`
     );
   }
 
-  // Gather the ProviderConfig objects that can serve this model
-  const availableProviders: ProviderConfig[] = [];
-  for (const providerId of providerIds) {
+  // Gather the ProviderConfig objects that can serve this model, with their canonical slugs
+  const availableProviders: Array<{ config: ProviderConfig; providerId: string; canonicalSlug: string }> = [];
+  for (const [providerId, canonicalSlug] of Object.entries(providerMap)) {
     const providerConfig = configSnapshot.providers.get(providerId);
     if (providerConfig) {
-      availableProviders.push(providerConfig);
+      availableProviders.push({
+        config: providerConfig,
+        providerId,
+        canonicalSlug
+      });
     }
   }
 
@@ -52,21 +56,20 @@ export function selectProvider(
     throw new Error(
       `No provider configurations found for model '${
         convertedRequest.model
-      }' with provider IDs: ${providerIds.join(", ")}`
+      }' with provider IDs: ${Object.keys(providerMap).join(", ")}`
     );
   }
 
   // Return a random entry from the set of available ProviderConfig objects
   const randomIndex = Math.floor(Math.random() * availableProviders.length);
-  const selectedProvider = availableProviders[randomIndex];
-  const canonicalModelSlug = modelConfig.canonical_slug || convertedRequest.model;
+  const selected = availableProviders[randomIndex];
   
   logger.info(
-    `Selected provider: ${selectedProvider.type} for model: ${convertedRequest.model} (canonical: ${canonicalModelSlug})`
+    `Selected provider: ${selected.config.type} (${selected.providerId}) for model: ${convertedRequest.model} (canonical: ${selected.canonicalSlug})`
   );
   
   return {
-    provider: selectedProvider,
-    canonicalModelSlug
+    provider: selected.config,
+    canonicalModelSlug: selected.canonicalSlug
   };
 }

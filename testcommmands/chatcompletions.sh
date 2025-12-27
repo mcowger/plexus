@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 # Check if model name is provided
 if [ -z "$1" ]; then
     echo "Usage: $0 <model-name>"
-    echo "Example: $0 gpt-4"
+    echo "Example: $0 gpt-5-mini"
     exit 1
 fi
 

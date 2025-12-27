@@ -7,18 +7,21 @@ import { logger } from "../../utils/logger.js";
 export function transformModelConfigForV1Models(
   modelConfig: ModelConfig
 ) {
+  // Convert provider map to an array of provider info
+  const providersList = Object.entries(modelConfig.providers).map(([providerId, canonicalSlug]) => ({
+    id: providerId,
+    canonical_slug: canonicalSlug
+  }));
+
   return {
     id: modelConfig.display_slug,
-    canonical_slug: modelConfig.canonical_slug, // Using the model name as canonical slug for now
     name: modelConfig.display_name,
     context_length: modelConfig.contextWindow,
     pricing: {
       prompt: modelConfig.inputTokenPrice?.toString() || "0.0",
       completion: modelConfig.outputTokenPrice?.toString() || "0.0",
     },
-    providers: [
-      modelConfig.providerIds
-    ]
+    providers: providersList
   };
 }
 

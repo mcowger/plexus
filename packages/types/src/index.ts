@@ -36,10 +36,12 @@ export type VirtualKeyConfig = z.infer<typeof virtualKeyConfigSchema>;
 
 export const modelSchema = z.object({
   display_slug: z.string('Model ID is required'),
-  canonical_slug: z.string().optional(),
   display_name: z.string().min(1, 'Model name is required'),
   pricing_slug: z.string().optional(),
-  providerIds: z.array(z.string()).nonempty('Must specify at least one provider id'),
+  providers: z.record(z.string(), z.string()).refine(
+    (obj) => Object.keys(obj).length > 0,
+    'Must specify at least one provider with its canonical slug'
+  ),
   maxTokens: z.number().int().min(1).max(32000).optional(),
   contextWindow: z.number().int().min(1).optional(),
   inputTokenPrice: z.number().min(0).optional(),
