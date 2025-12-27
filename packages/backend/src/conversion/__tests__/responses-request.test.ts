@@ -4,6 +4,7 @@ import { convertFromOpenAIResponsesRequest, OpenAIResponsesRequest } from '../re
 describe('convertFromOpenAIResponsesRequest', () => {
   it('should convert a basic user message', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4o',
       input: [
         {
           role: 'user',
@@ -12,9 +13,9 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
-    expect(result.model).toBe('gpt-4');
+    expect(result.model).toBe('gpt-4o');
     expect(result.options.prompt).toHaveLength(1);
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -24,6 +25,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert system messages', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'system',
@@ -36,7 +38,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt).toHaveLength(2);
     expect(result.options.prompt[0]).toMatchObject({
@@ -47,6 +49,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert developer role to system with warning', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'developer',
@@ -55,7 +58,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'system',
@@ -70,6 +73,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert assistant messages', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'assistant',
@@ -78,7 +82,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'assistant',
@@ -88,6 +92,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert input images with URL', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -98,7 +103,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -114,6 +119,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert input images with data URI', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -127,7 +133,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -143,6 +149,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert input images with file_id', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -151,7 +158,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -167,6 +174,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert input files with URL', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -177,7 +185,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -193,6 +201,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert input files with file_id', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -201,7 +210,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -217,6 +226,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert input files with filename and file_data', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -231,7 +241,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'user',
@@ -248,6 +258,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert function calls', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           type: 'function_call',
@@ -258,7 +269,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'assistant',
@@ -275,6 +286,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should handle invalid JSON in function call arguments', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           type: 'function_call',
@@ -285,7 +297,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.warnings).toHaveLength(1);
     expect(result.options.prompt[0].content[0]).toMatchObject({
@@ -296,6 +308,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert function call outputs with string', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           type: 'function_call',
@@ -311,11 +324,11 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     const toolMessage = result.options.prompt.find((m: any) => m.role === 'tool');
     expect(toolMessage).toBeTruthy();
-    expect(toolMessage.content[0]).toMatchObject({
+    expect(toolMessage!.content[0]).toMatchObject({
       type: 'tool-result',
       toolCallId: 'call_123',
       toolName: 'search',
@@ -328,6 +341,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert function call outputs with content array', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           type: 'function_call',
@@ -349,10 +363,10 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     const toolMessage = result.options.prompt.find((m: any) => m.role === 'tool');
-    expect(toolMessage.content[0].output).toMatchObject({
+    expect((toolMessage!.content[0] as any).output).toMatchObject({
       type: 'content',
       value: expect.arrayContaining([
         { type: 'text', text: 'Result text' },
@@ -363,6 +377,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert reasoning items', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           type: 'reasoning',
@@ -376,7 +391,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt[0]).toMatchObject({
       role: 'assistant',
@@ -391,6 +406,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should warn about encrypted reasoning content', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           type: 'reasoning',
@@ -401,7 +417,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.warnings).toContainEqual(
       expect.objectContaining({
@@ -426,10 +442,11 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
     for (const unsupportedInput of unsupportedTypes) {
       const request: OpenAIResponsesRequest = {
+        model: 'gpt-4',
         input: [unsupportedInput as any],
       };
 
-      const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+      const result = convertFromOpenAIResponsesRequest(request);
 
       expect(result.warnings).toContainEqual(
         expect.objectContaining({
@@ -441,6 +458,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert generation parameters', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -455,7 +473,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       seed: 12345,
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.maxOutputTokens).toBe(1024);
     expect(result.options.temperature).toBe(0.7);
@@ -467,6 +485,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert stop sequences from string', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -476,13 +495,14 @@ describe('convertFromOpenAIResponsesRequest', () => {
       stop: 'STOP',
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.stopSequences).toEqual(['STOP']);
   });
 
   it('should convert stop sequences from array', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -492,7 +512,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       stop: ['STOP', 'END'],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.stopSequences).toEqual(['STOP', 'END']);
   });
@@ -519,6 +539,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
     for (const format of formats) {
       const request: OpenAIResponsesRequest = {
+        model: 'gpt-4',
         input: [
           {
             role: 'user',
@@ -528,7 +549,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
         response_format: format.input,
       };
 
-      const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+      const result = convertFromOpenAIResponsesRequest(request);
 
       expect(result.options.responseFormat).toMatchObject(format.expected);
     }
@@ -536,6 +557,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should convert function tools', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -559,7 +581,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.tools).toHaveLength(1);
     expect(result.options.tools![0]).toMatchObject({
@@ -577,6 +599,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should warn about provider tools', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -589,7 +612,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.warnings).toContainEqual(
       expect.objectContaining({
@@ -612,6 +635,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
     for (const choice of choices) {
       const request: OpenAIResponsesRequest = {
+        model: 'gpt-4',
         input: [
           {
             role: 'user',
@@ -621,7 +645,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
         tool_choice: choice.input,
       };
 
-      const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+      const result = convertFromOpenAIResponsesRequest(request);
 
       expect(result.options.toolChoice).toMatchObject(choice.expected);
     }
@@ -629,6 +653,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should handle tools with missing type in parameters', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'user',
@@ -650,9 +675,9 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
-    expect(result.options.tools![0].inputSchema).toMatchObject({
+    expect((result.options.tools![0] as any).inputSchema).toMatchObject({
       type: 'object',
       properties: {
         param: { type: 'string' },
@@ -662,6 +687,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
 
   it('should handle complex input with multiple types', () => {
     const request: OpenAIResponsesRequest = {
+      model: 'gpt-4',
       input: [
         {
           role: 'system',
@@ -694,7 +720,7 @@ describe('convertFromOpenAIResponsesRequest', () => {
       ],
     };
 
-    const result = convertFromOpenAIResponsesRequest(request, 'gpt-4');
+    const result = convertFromOpenAIResponsesRequest(request);
 
     expect(result.options.prompt.length).toBeGreaterThan(0);
     expect(result.options.prompt.some((m: any) => m.role === 'system')).toBe(true);
