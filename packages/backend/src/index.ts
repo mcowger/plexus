@@ -8,6 +8,7 @@ import { z } from "zod";
 import { configLoader } from "./config/loader.js";
 import { registerV1ModelsRoutes } from "./routing/v1/models.js";
 import { registerV1ChatCompletionsRoutes } from "./routing/v1/chat/completions.js";
+import { registerV1ResponsesRoutes } from "./routing/v1/responses.js";
 import { registerConfigRoutes } from "./routing/config.js";
 import { logger } from "./utils/logger.js";
 import { loggingMiddleware } from "./middleware/logging.js";
@@ -95,6 +96,9 @@ registerV1ModelsRoutes(app);
 
 // Register chat completions routes
 registerV1ChatCompletionsRoutes(app);
+
+// Register responses routes
+registerV1ResponsesRoutes(app);
 
 // Register config routes
 registerConfigRoutes(app);

@@ -515,14 +515,16 @@ function convertFunctionCallOutputContent(
  * ```
  */
 export function convertFromOpenAIResponsesRequest(
-  request: OpenAIResponsesRequest,
-  model: string
+  request: OpenAIResponsesRequest
 ): ConvertedRequest {
   logger.info('Starting conversion from OpenAI Responses API request to LanguageModelV2 format');
   logger.debug(`Request contains ${request.input.length} input item(s)`);
 
   const warnings: Array<{ type: string; message: string }> = [];
   const messages: LanguageModelV2Prompt = [];
+  
+  // Extract model from request
+  const model = request.model || 'gpt-4o';
 
   // Build function name map for function output recovery
   logger.debug('Building function name map from function call items');
