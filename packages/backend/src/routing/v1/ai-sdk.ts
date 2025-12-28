@@ -5,6 +5,7 @@ import { selectProvider } from "../selector.js";
 import { ProviderFactory } from "../../providers/factory.js";
 import { logger } from "../../utils/logger.js";
 import { LanguageModelV2Prompt } from "@ai-sdk/provider";
+import { ConvertedRequest } from "../../conversion/index.js";
 
 // Type for the generateText request (model + CallSettings + Prompt)
 type GenerateTextRequest = CallSettings & {
@@ -13,9 +14,10 @@ type GenerateTextRequest = CallSettings & {
 };
 
 // Type guard to check if deserialized request is valid
-// We validate that it has the required fields and is an object
+// We validate that it has the required fields
 function isValidGenerateTextRequest(obj: unknown): obj is GenerateTextRequest {
-  if (typeof obj !== 'object' || obj === null) {
+  // Check that obj is an object before casting
+  if (!obj || typeof obj !== 'object') {
     return false;
   }
 
@@ -71,7 +73,7 @@ export async function handleAiSdkEndpoint(c: any) {
     }
 
     // Create a ConvertedRequest for provider selection with the prompt from the request
-    const convertedRequest = {
+    const convertedRequest: ConvertedRequest = {
       model: modelIdentifier,
       options: {
         prompt: deserializedRequest.prompt,
