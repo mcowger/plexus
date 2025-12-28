@@ -338,7 +338,7 @@ describe('AI SDK Endpoint', () => {
 
       expect(res.status).toBe(500);
       expect(responseBody).toHaveProperty('error');
-      expect(responseBody.error).toContain('No model specified');
+      expect(responseBody.error).toContain('Invalid request format');
     });
 
     it('should return error when model identifier cannot be determined', async () => {
@@ -365,7 +365,7 @@ describe('AI SDK Endpoint', () => {
 
       expect(res.status).toBe(500);
       expect(responseBody).toHaveProperty('error');
-      expect(responseBody.error).toContain('Unable to determine model identifier');
+      expect(responseBody.error).toContain('Invalid request format');
     });
 
     it('should return error when selectProvider throws', async () => {

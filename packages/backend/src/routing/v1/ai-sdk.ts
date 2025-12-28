@@ -5,6 +5,23 @@ import { selectProvider } from "../selector.js";
 import { ProviderFactory } from "../../providers/factory.js";
 import { logger } from "../../utils/logger.js";
 
+// Interface for the deserialized AI SDK request
+interface AiSdkRequest {
+  model: string | { modelId: string; [key: string]: any };
+  prompt?: any[];
+  [key: string]: any;
+}
+
+// Type guard to check if deserialized request is valid
+function isValidAiSdkRequest(obj: unknown): obj is AiSdkRequest {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'model' in obj &&
+    (typeof obj.model === 'string' || (typeof obj.model === 'object' && obj.model !== null && 'modelId' in obj.model))
+  );
+}
+
 // AI SDK route handler
 export async function handleAiSdkEndpoint(c: any) {
   try {
@@ -18,36 +35,24 @@ export async function handleAiSdkEndpoint(c: any) {
 
     logger.debug("Deserialized request:", deserializedRequest);
 
-    // Extract model from the deserialized request
-    if (!deserializedRequest || typeof deserializedRequest !== 'object') {
+    // Validate the deserialized request
+    if (!isValidAiSdkRequest(deserializedRequest)) {
       throw new Error("Invalid request format");
     }
 
-    const requestObj = deserializedRequest as any;
-
-    // The model parameter should be a LanguageModel instance in the serialized request
-    // We need to extract the model identifier to select a provider
-    // For now, we'll look for a model property that contains model information
-    if (!requestObj.model) {
-      throw new Error("No model specified in the request");
-    }
-
-    // Extract model identifier from the model object
-    // The model object should have metadata we can use to identify which model to use
+    // Extract model identifier from the request
     let modelIdentifier: string;
-    if (typeof requestObj.model === 'string') {
-      modelIdentifier = requestObj.model;
-    } else if (typeof requestObj.model === 'object' && requestObj.model.modelId) {
-      modelIdentifier = requestObj.model.modelId;
+    if (typeof deserializedRequest.model === 'string') {
+      modelIdentifier = deserializedRequest.model;
     } else {
-      throw new Error("Unable to determine model identifier from request");
+      modelIdentifier = deserializedRequest.model.modelId;
     }
 
     // Create a minimal ConvertedRequest for provider selection
     const convertedRequest = {
       model: modelIdentifier,
       options: {
-        prompt: requestObj.prompt || [],
+        prompt: deserializedRequest.prompt || [],
       },
     };
 
@@ -61,12 +66,12 @@ export async function handleAiSdkEndpoint(c: any) {
     const model: LanguageModel = providerClient.getModel(canonicalModelSlug);
 
     // Replace the model in the request with the selected provider's model
-    requestObj.model = model;
+    deserializedRequest.model = model;
 
     // Call generateText with the modified request
     logger.info("Calling generateText on provider client");
 
-    const result = await generateText(requestObj);
+    const result = await generateText(deserializedRequest);
 
     logger.info("Successfully generated text response");
 
