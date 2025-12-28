@@ -44,8 +44,13 @@ function isValidGenerateTextRequest(obj: unknown): obj is GenerateTextRequest {
     return false;
   }
 
-  // Must have prompt
-  if (!('prompt' in req) || !Array.isArray(req.prompt)) {
+  // Must have prompt (can be string or array)
+  if (!('prompt' in req)) {
+    return false;
+  }
+
+  // Prompt can be a string or an array
+  if (typeof req.prompt !== 'string' && !Array.isArray(req.prompt)) {
     return false;
   }
 
@@ -110,12 +115,8 @@ export async function handleAiSdkEndpoint(c: any) {
 
     // Return the serialized result as JSON (superjson.serialize returns {json, meta})
     // We return the whole serialized object, not double-encoded
-    return new Response(JSON.stringify(serializedResult), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    // Using consistent c.json() format for success response
+    return c.json(serializedResult);
   } catch (error) {
     logger.error("AI SDK endpoint error:", error);
 

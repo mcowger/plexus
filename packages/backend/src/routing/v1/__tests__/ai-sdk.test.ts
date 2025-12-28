@@ -298,6 +298,78 @@ describe('AI SDK Endpoint', () => {
       );
     });
 
+    it('should handle requests with string prompt', async () => {
+      // Mock provider selection
+      const mockProviderConfig = {
+        type: 'openai' as const,
+        apiKey: 'sk-test-key',
+      };
+
+      const mockModel = {
+        modelId: 'gpt-4',
+        provider: 'openai',
+      };
+
+      vi.mocked(selectProvider).mockReturnValue({
+        provider: mockProviderConfig,
+        canonicalModelSlug: 'gpt-4',
+      });
+
+      const mockProviderClient = {
+        getModel: vi.fn().mockReturnValue(mockModel),
+      };
+
+      vi.mocked(ProviderFactory.createClient).mockReturnValue(mockProviderClient as any);
+
+      // Mock generateText result
+      const mockGenerateTextResult = {
+        text: 'Response to string prompt',
+        finishReason: 'stop',
+        usage: {
+          promptTokens: 5,
+          completionTokens: 10,
+          totalTokens: 15,
+        },
+      };
+
+      vi.mocked(generateText).mockResolvedValue(mockGenerateTextResult as any);
+
+      // Create request with string prompt (valid alternative format)
+      const requestData = {
+        model: 'gpt-4',
+        prompt: 'This is a simple string prompt',
+        temperature: 0.7,
+      };
+
+      const serializedRequest = superjson.serialize(requestData);
+
+      // Make request to the endpoint
+      const req = new Request('http://localhost/v1/ai-sdk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serializedRequest),
+      });
+
+      const res = await app.fetch(req);
+      const responseBody = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(responseBody).toBeDefined();
+
+      // Deserialize the response
+      const deserializedResponse = superjson.deserialize(responseBody as any);
+      expect(deserializedResponse).toEqual(mockGenerateTextResult);
+
+      // Verify generateText was called with string prompt
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: mockModel,
+          prompt: 'This is a simple string prompt',
+          temperature: 0.7,
+        })
+      );
+    });
+
     it('should return error when request format is invalid', async () => {
       const invalidRequest = superjson.serialize(null);
 
