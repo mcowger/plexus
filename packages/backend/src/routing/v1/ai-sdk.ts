@@ -1,51 +1,38 @@
 import { Hono } from "hono";
-import { generateText, LanguageModel } from "ai";
+import { generateText, LanguageModel, CallSettings } from "ai";
 import superjson from "superjson";
 import { selectProvider } from "../selector.js";
 import { ProviderFactory } from "../../providers/factory.js";
 import { logger } from "../../utils/logger.js";
 import { LanguageModelV2Prompt } from "@ai-sdk/provider";
 
-// Interface for the deserialized AI SDK generateText request
-// This should match the parameters accepted by generateText()
-interface GenerateTextRequest {
+// Type for the generateText request (model + CallSettings + Prompt)
+type GenerateTextRequest = CallSettings & {
   model: string | LanguageModel;
   prompt: LanguageModelV2Prompt;
-  temperature?: number;
-  maxOutputTokens?: number;
-  topP?: number;
-  topK?: number;
-  presencePenalty?: number;
-  frequencyPenalty?: number;
-  seed?: number;
-  headers?: Record<string, string | undefined>;
-  tools?: Record<string, any>;
-  toolChoice?: any;
-  maxRetries?: number;
-  abortSignal?: AbortSignal;
-  experimental_telemetry?: any;
-}
+};
 
 // Type guard to check if deserialized request is valid
+// We validate that it has the required fields and is an object
 function isValidGenerateTextRequest(obj: unknown): obj is GenerateTextRequest {
   if (typeof obj !== 'object' || obj === null) {
     return false;
   }
 
-  const req = obj as any;
+  const req = obj as Partial<GenerateTextRequest>;
 
   // Must have model (string or LanguageModel object with modelId)
-  if (!('model' in req)) {
+  if (!req.model) {
     return false;
   }
 
   if (typeof req.model !== 'string' && 
-      (typeof req.model !== 'object' || req.model === null || !('modelId' in req.model))) {
+      (typeof req.model !== 'object' || !('modelId' in req.model))) {
     return false;
   }
 
   // Must have prompt (can be string or array)
-  if (!('prompt' in req)) {
+  if (!req.prompt) {
     return false;
   }
 
@@ -110,13 +97,16 @@ export async function handleAiSdkEndpoint(c: any) {
 
     logger.info("Successfully generated text response");
 
-    // Serialize the result with superjson
-    const serializedResult = superjson.serialize(result);
+    // Serialize the result with superjson and return as a string
+    const serializedResult = superjson.stringify(result);
 
-    // Return the serialized result as JSON (superjson.serialize returns {json, meta})
-    // We return the whole serialized object, not double-encoded
-    // Using consistent c.json() format for success response
-    return c.json(serializedResult);
+    // Return the serialized string directly without double encoding
+    return new Response(serializedResult, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   } catch (error) {
     logger.error("AI SDK endpoint error:", error);
 
