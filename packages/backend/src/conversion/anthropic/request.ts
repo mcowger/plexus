@@ -42,7 +42,7 @@ type AnthropicMessage = AnthropicUserMessage | AnthropicAssistantMessage;
 
 interface AnthropicUserMessage {
   role: 'user';
-  content: Array<
+  content: string | Array<
     | AnthropicTextContent
     | AnthropicImageContent
     | AnthropicDocumentContent
@@ -154,7 +154,7 @@ function parseDataUri(
 /**
  * Convert Anthropic content to LanguageModelV2 content parts.
  */
-function convertUserContentPart(
+function convertContentPart(
   part:
     | AnthropicTextContent
     | AnthropicImageContent
@@ -302,22 +302,50 @@ export function convertFromAnthropicMessagesRequest(
     
     logger.debug(`Processing ${systemContent.length} system message(s)`);
 
-    for (const sysItem of systemContent) {
-      if (sysItem.type === 'text') {
-        const textContent = sysItem as AnthropicTextContent;
-        messages.push({
-          role: 'system',
-          content: textContent.text,
-        });
-        logger.debug(`Added system message with ${textContent.text.length} characters`);
-      } else {
-        const warning = {
-          type: 'unsupported',
-          message: 'Non-text system content is not supported in V2 format',
-        };
-        warnings.push(warning);
-        logger.warn(warning.message);
-      }
+    // Check if all system content parts are text
+    const allText = systemContent.every((item) => item.type === 'text');
+
+    if (allText) {
+      // All text content - use simple string format
+      const combinedText = systemContent
+        .map((item) => (item as AnthropicTextContent).text)
+        .join('\n\n');
+      messages.push({
+        role: 'system',
+        content: combinedText,
+      });
+      logger.debug(`Added system message with ${combinedText.length} characters`);
+    } else {
+      // Mixed content (includes images/documents) - convert to text representation
+      const contentParts = systemContent.map((item) => {
+        switch (item.type) {
+          case 'text':
+            return (item as AnthropicTextContent).text;
+          case 'image': {
+            const imageItem = item as AnthropicImageContent;
+            if (imageItem.source.type === 'url') {
+              return `[Image from URL: ${imageItem.source.url}]`;
+            }
+            return `[Image: base64 data, type: ${imageItem.source.media_type}]`;
+          }
+          case 'document': {
+            const docItem = item as AnthropicDocumentContent;
+            const title = docItem.title ? `, title: ${docItem.title}` : '';
+            if (docItem.source.type === 'url') {
+              return `[Document from URL: ${docItem.source.url}${title}]`;
+            }
+            return `[Document: base64 data, type: ${docItem.source.media_type}${title}]`;
+          }
+          default:
+            return '[Unsupported content]';
+        }
+      });
+      const combinedText = contentParts.join('\n\n');
+      messages.push({
+        role: 'system',
+        content: combinedText,
+      });
+      logger.debug(`Added system message with ${combinedText.length} characters (converted non-text content)`);
     }
   }
 
@@ -328,12 +356,22 @@ export function convertFromAnthropicMessagesRequest(
     logger.debug(`Processing message ${i + 1} with role: ${message.role}`);
     
     if (message.role === 'user') {
-      const convertedContent = message.content.map((part) => convertUserContentPart(part));
+      let convertedContent: LanguageModelV2Prompt[0]['content'];
+      
+      if (typeof message.content === 'string') {
+        // Simple text content as string
+        convertedContent = [{ type: 'text', text: message.content }];
+        logger.debug(`Converted user message as simple text with ${message.content.length} characters`);
+      } else {
+        // Array of content parts
+        convertedContent = message.content.map((part) => convertContentPart(part));
+        logger.debug(`Converted user message with ${message.content.length} content part(s)`);
+      }
+      
       messages.push({
         role: 'user',
-        content: convertedContent,
+        content: convertedContent as LanguageModelV2TextPart[] | LanguageModelV2FilePart[],
       });
-      logger.debug(`Converted user message with ${message.content.length} content part(s)`);
     } else if (message.role === 'assistant') {
       const content: Array<
         | LanguageModelV2TextPart

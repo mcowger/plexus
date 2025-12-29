@@ -544,7 +544,7 @@ describe('convertFromGoogleGenerativeAIRequest', () => {
     const result = convertFromGoogleGenerativeAIRequest(request, 'gemini-1.5-pro');
 
     expect(result.options.tools).toHaveLength(1);
-    expect(result.options.tools![0].inputSchema).toMatchObject({
+    expect((result.options.tools![0] as { inputSchema: object }).inputSchema).toMatchObject({
       type: 'object',
       properties: {
         param: { type: 'string' },
@@ -633,7 +633,7 @@ describe('convertFromGoogleGenerativeAIRequest', () => {
     const result = convertFromGoogleGenerativeAIRequest(request, 'gemini-1.5-pro');
 
     const toolMessage = result.options.prompt.find((m: any) => m.role === 'tool');
-    expect(toolMessage?.content[0].output).toMatchObject({
+    expect((toolMessage?.content[0] as { output: object }).output).toMatchObject({
       type: 'text',
       value: 'plain text response',
     });

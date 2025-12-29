@@ -489,7 +489,7 @@ describe('convertFromAnthropicMessagesRequest', () => {
     const result = convertFromAnthropicMessagesRequest(request);
 
     expect(result.options.tools).toHaveLength(1);
-    expect(result.options.tools![0].inputSchema).toMatchObject({
+    expect((result.options.tools![0] as { inputSchema: object }).inputSchema).toMatchObject({
       type: 'object',
       properties: {
         param: { type: 'string' },

@@ -537,7 +537,7 @@ describe('convertFromOpenAIChatRequest', () => {
 
     const result = convertFromOpenAIChatRequest(request);
 
-    expect(result.options.tools![0].inputSchema).toMatchObject({
+    expect((result.options.tools![0] as { inputSchema: object }).inputSchema).toMatchObject({
       type: 'object',
       properties: {
         param: { type: 'string' },
@@ -644,6 +644,6 @@ describe('convertFromOpenAIChatRequest', () => {
       type: 'text',
       text: 'Let me check that for you.',
     });
-    expect(result.options.prompt[0].content[1].type).toBe('tool-call');
+    expect((result.options.prompt[0].content[1] as { type: string }).type).toBe('tool-call');
   });
 });
