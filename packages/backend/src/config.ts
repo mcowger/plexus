@@ -16,7 +16,7 @@ const ProviderConfigSchema = z.object({
   api_base_url: z.string().url(),
   api_key: z.string().optional(),
   models: z.array(z.string()).optional(),
-  transformer: TransformerConfigSchema.optional(),
+  headers: z.record(z.string()).optional(),
 });
 
 const ModelTargetSchema = z.object({
@@ -61,6 +61,22 @@ export function loadConfig(configPath?: string): PlexusConfig {
 
   try {
     currentConfig = PlexusConfigSchema.parse(parsed);
+    
+    // Log configuration stats
+    const providerCount = Object.keys(currentConfig.providers).length;
+    logger.info(`Loaded ${providerCount} Providers:`);
+    Object.entries(currentConfig.providers).forEach(([name, provider]) => {
+      const modelCount = provider.models ? provider.models.length : 0;
+      logger.info(`  - ${name}: ${modelCount} models`);
+    });
+
+    const aliasCount = Object.keys(currentConfig.models).length;
+    logger.info(`Loaded ${aliasCount} Model Aliases:`);
+    Object.entries(currentConfig.models).forEach(([name, alias]) => {
+      const targetCount = alias.targets.length;
+      logger.info(`  - ${name}: ${targetCount} targets`);
+    });
+
     logger.info('Configuration loaded successfully');
     return currentConfig;
   } catch (error) {

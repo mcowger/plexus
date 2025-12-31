@@ -28,11 +28,7 @@ describe("Dispatcher", () => {
         type: "OpenAI",
         api_base_url: "https://api.example.com/v1",
         api_key: "test-key",
-        transformer: {
-            use: [
-                ["headers", { "X-Custom-Header": "custom-value" }]
-            ]
-        }
+        headers: { "X-Custom-Header": "custom-value" }
     };
 
     const mockRoute = {

@@ -39,12 +39,8 @@ export class Dispatcher {
         }
         
         // TODO: Handle extra headers from config?
-        if (route.config.transformer?.use) {
-            for (const [key, value] of route.config.transformer.use) {
-                if (key === 'headers' && typeof value === 'object') {
-                    Object.assign(headers, value);
-                }
-            }
+        if (route.config.headers) {
+            Object.assign(headers, route.config.headers);
         }
 
         logger.info(`Dispatching to ${url} (Model: ${route.model})`);

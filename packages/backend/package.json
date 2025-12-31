@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
-    "test": "bun test"
+    "dev": "bun run --watch src/index.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
