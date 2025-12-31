@@ -1,0 +1,15 @@
+2025-12-31 15:14:51 [[32minfo[39m]: Loading configuration from /Users/matt.cowger/workspace/plexus2/config/plexus.yaml
+2025-12-31 15:14:51 [[32minfo[39m]: Loaded 4 Providers:
+2025-12-31 15:14:51 [[32minfo[39m]:   - openai: 1 models
+2025-12-31 15:14:51 [[32minfo[39m]:   - anthropic: 1 models
+2025-12-31 15:14:51 [[32minfo[39m]:   - synthetic: 1 models
+2025-12-31 15:14:51 [[32minfo[39m]:   - kilo: 8 models
+2025-12-31 15:14:51 [[32minfo[39m]: Loaded 1 Model Aliases:
+2025-12-31 15:14:51 [[32minfo[39m]:   - minimax-m2.1: 1 targets
+2025-12-31 15:14:51 [[32minfo[39m]: Configuration loaded successfully
+2025-12-31 15:14:51 [[32minfo[39m]: Watching configuration file: /Users/matt.cowger/workspace/plexus2/config/plexus.yaml
+2025-12-31 15:14:51 [[32minfo[39m]: Server starting on port 3000
+Started development server: http://localhost:3000
+2025-12-31 15:15:02 [[32minfo[39m]: POST /v1/chat/completions
+2025-12-31 15:15:02 [[32minfo[39m]: Dispatching to https://api.synthetic.new/openai/v1/chat/completions (Model: hf:MiniMaxAI/MiniMax-M2.1)
+2025-12-31 15:15:02 [[32minfo[39m]: Streaming response detected, transforming stream

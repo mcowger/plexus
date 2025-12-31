@@ -40,14 +40,70 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 // --- Loader ---
 
 let currentConfig: PlexusConfig | null = null;
+let configWatcher: fs.FSWatcher | null = null;
+
+function logConfigStats(config: PlexusConfig) {
+    const providerCount = Object.keys(config.providers).length;
+    logger.info(`Loaded ${providerCount} Providers:`);
+    Object.entries(config.providers).forEach(([name, provider]) => {
+      const modelCount = provider.models ? provider.models.length : 0;
+      logger.info(`  - ${name}: ${modelCount} models`);
+    });
+
+    const aliasCount = Object.keys(config.models).length;
+    logger.info(`Loaded ${aliasCount} Model Aliases:`);
+    Object.entries(config.models).forEach(([name, alias]) => {
+      const targetCount = alias.targets.length;
+      logger.info(`  - ${name}: ${targetCount} targets`);
+    });
+}
+
+function parseConfigFile(filePath: string): PlexusConfig {
+  const fileContents = fs.readFileSync(filePath, 'utf8');
+  const parsed = yaml.parse(fileContents);
+  const config = PlexusConfigSchema.parse(parsed);
+  logConfigStats(config);
+  return config;
+}
+
+function setupWatcher(filePath: string) {
+    if (configWatcher) return;
+    
+    logger.info(`Watching configuration file: ${filePath}`);
+    let debounceTimer: NodeJS.Timeout | null = null;
+
+    try {
+        configWatcher = fs.watch(filePath, (eventType) => {
+            if (eventType === 'change') {
+                if (debounceTimer) clearTimeout(debounceTimer);
+                
+                debounceTimer = setTimeout(() => {
+                    logger.info('Configuration file changed, reloading...');
+                    try {
+                        const newConfig = parseConfigFile(filePath);
+                        currentConfig = newConfig;
+                        logger.info('Configuration reloaded successfully');
+                    } catch (error) {
+                        logger.error('Failed to reload configuration', { error });
+                         if (error instanceof z.ZodError) {
+                             logger.error('Validation errors:', error.errors);
+                         }
+                    }
+                }, 100);
+            }
+        });
+    } catch (err) {
+        logger.error('Failed to setup config watcher', err);
+    }
+}
 
 export function loadConfig(configPath?: string): PlexusConfig {
   if (currentConfig) return currentConfig;
 
-  // Default path assumes running from packages/backend
-  // Adjust logic if needed for production builds
-  const defaultPath = path.resolve(process.cwd(), '../../config/plexus.yaml');
-  const finalPath = configPath || process.env.PLEXUS_CONFIG_PATH || defaultPath;
+  // Default path assumes running from packages/backend, but we want it relative to project root
+  const projectRoot = path.resolve(process.cwd(), '../../');
+  const defaultPath = path.resolve(projectRoot, 'config/plexus.yaml');
+  const finalPath = configPath || process.env.CONFIG_FILE || defaultPath;
   
   logger.info(`Loading configuration from ${finalPath}`);
 
@@ -56,28 +112,12 @@ export function loadConfig(configPath?: string): PlexusConfig {
     throw new Error(`Configuration file not found at ${finalPath}`);
   }
 
-  const fileContents = fs.readFileSync(finalPath, 'utf8');
-  const parsed = yaml.parse(fileContents);
-
   try {
-    currentConfig = PlexusConfigSchema.parse(parsed);
-    
-    // Log configuration stats
-    const providerCount = Object.keys(currentConfig.providers).length;
-    logger.info(`Loaded ${providerCount} Providers:`);
-    Object.entries(currentConfig.providers).forEach(([name, provider]) => {
-      const modelCount = provider.models ? provider.models.length : 0;
-      logger.info(`  - ${name}: ${modelCount} models`);
-    });
-
-    const aliasCount = Object.keys(currentConfig.models).length;
-    logger.info(`Loaded ${aliasCount} Model Aliases:`);
-    Object.entries(currentConfig.models).forEach(([name, alias]) => {
-      const targetCount = alias.targets.length;
-      logger.info(`  - ${name}: ${targetCount} targets`);
-    });
-
+    currentConfig = parseConfigFile(finalPath);
     logger.info('Configuration loaded successfully');
+    
+    setupWatcher(finalPath);
+    
     return currentConfig;
   } catch (error) {
     if (error instanceof z.ZodError) {

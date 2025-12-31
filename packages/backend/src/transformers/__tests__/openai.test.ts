@@ -113,4 +113,71 @@ describe("OpenAITransformer", () => {
         expect(result.choices[0].message.content).toBe("Final answer");
         expect(result.choices[0].message.reasoning_content).toBe("Thinking process");
     });
+
+    test("transformStream converts OpenAI chunks to unified chunks", async () => {
+        const encoder = new TextEncoder();
+        const chunks = [
+            'data: {"id":"1","choices":[{"delta":{"role":"assistant"}}]}\n\n',
+            'data: {"id":"1","choices":[{"delta":{"content":"Hello"}}]}\n\n',
+            'data: {"id":"1","choices":[{"delta":{"content":" world"}}]}\n\n',
+            'data: {"id":"1","choices":[{"finish_reason":"stop"}],"usage":{"total_tokens":10}}\n\n',
+            'data: [DONE]\n\n'
+        ];
+
+        const stream = new ReadableStream({
+            start(controller) {
+                chunks.forEach(c => controller.enqueue(encoder.encode(c)));
+                controller.close();
+            }
+        });
+
+        const transformedStream = transformer.transformStream!(stream);
+        const reader = transformedStream.getReader();
+        
+        const results = [];
+        while(true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            results.push(value);
+        }
+
+        expect(results).toHaveLength(4);
+        expect(results[0].delta.role).toBe("assistant");
+        expect(results[1].delta.content).toBe("Hello");
+        expect(results[2].delta.content).toBe(" world");
+        expect(results[3].finish_reason).toBe("stop");
+        expect(results[3].usage.total_tokens).toBe(10);
+    });
+
+    test("formatStream converts unified chunks to OpenAI event stream", async () => {
+        const unifiedChunks = [
+            { id: "1", model: "gpt-4", delta: { role: "assistant" } },
+            { id: "1", model: "gpt-4", delta: { content: "Hi" } },
+            { id: "1", model: "gpt-4", finish_reason: "stop" }
+        ];
+
+        const stream = new ReadableStream({
+            start(controller) {
+                unifiedChunks.forEach(c => controller.enqueue(c));
+                controller.close();
+            }
+        });
+
+        const formattedStream = transformer.formatStream!(stream);
+        const reader = formattedStream.getReader();
+        const decoder = new TextDecoder();
+        
+        let output = "";
+        while(true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            output += decoder.decode(value);
+        }
+
+        expect(output).toContain('data: {"id":"1"');
+        expect(output).toContain('"role":"assistant"');
+        expect(output).toContain('"content":"Hi"');
+        expect(output).toContain('"finish_reason":"stop"');
+        expect(output).toContain("data: [DONE]\n\n");
+    });
 });

@@ -15,4 +15,12 @@ export interface Transformer {
 
   // Convert Unified Response to Client Response (in this format)
   formatResponse(response: UnifiedChatResponse): Promise<any>;
+
+  // Convert Provider Stream to Unified Stream
+  // Takes a raw stream from provider, returns a stream of UnifiedChatStreamChunk
+  transformStream?(stream: ReadableStream): ReadableStream;
+
+  // Convert Unified Stream to Client Stream
+  // Takes a stream of UnifiedChatStreamChunk, returns a raw stream for the client
+  formatStream?(stream: ReadableStream): ReadableStream;
 }

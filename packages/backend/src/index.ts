@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { stream } from 'hono/streaming';
 import { logger } from './utils/logger';
 import { loadConfig } from './config';
 import { Dispatcher } from './services/dispatcher';
@@ -31,6 +32,29 @@ app.post('/v1/chat/completions', async (c) => {
         
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
+        if (unifiedResponse.stream) {
+            return stream(c, async (stream) => {
+                c.header('Content-Type', 'text/event-stream');
+                c.header('Cache-Control', 'no-cache');
+                c.header('Connection', 'keep-alive');
+                
+                const clientStream = transformer.formatStream ? 
+                                   transformer.formatStream(unifiedResponse.stream) : 
+                                   unifiedResponse.stream;
+
+                const reader = clientStream.getReader();
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        await stream.write(value);
+                    }
+                } finally {
+                    reader.releaseLock();
+                }
+            });
+        }
+
         const responseBody = await transformer.formatResponse(unifiedResponse);
         logger.debug('Outgoing OpenAI Response', responseBody);
         return c.json(responseBody);
@@ -50,6 +74,29 @@ app.post('/v1/messages', async (c) => {
         
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
+        if (unifiedResponse.stream) {
+            return stream(c, async (stream) => {
+                c.header('Content-Type', 'text/event-stream');
+                c.header('Cache-Control', 'no-cache');
+                c.header('Connection', 'keep-alive');
+                
+                const clientStream = transformer.formatStream ? 
+                                   transformer.formatStream(unifiedResponse.stream) : 
+                                   unifiedResponse.stream;
+
+                const reader = clientStream.getReader();
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        await stream.write(value);
+                    }
+                } finally {
+                    reader.releaseLock();
+                }
+            });
+        }
+
         const responseBody = await transformer.formatResponse(unifiedResponse);
         logger.debug('Outgoing Anthropic Response', responseBody);
         return c.json(responseBody);

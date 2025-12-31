@@ -258,6 +258,214 @@ export class AnthropicTransformer implements Transformer {
     };
   }
 
+  // --- 5. Provider Stream (Anthropic) -> Unified Stream ---
+  transformStream(stream: ReadableStream): ReadableStream {
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+    let buffer = "";
+
+    return new ReadableStream({
+        async start(controller) {
+            const reader = stream.getReader();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() || "";
+
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
+
+                        const dataStr = trimmedLine.slice(5).trim();
+                        if (dataStr === "[DONE]") continue;
+
+                        try {
+                            const data = JSON.parse(dataStr);
+                            let chunk: any = null;
+
+                            switch (data.type) {
+                                case 'message_start':
+                                    chunk = {
+                                        id: data.message.id,
+                                        model: data.message.model,
+                                        created: Math.floor(Date.now() / 1000),
+                                        delta: { role: 'assistant' }
+                                    };
+                                    break;
+                                case 'content_block_delta':
+                                    if (data.delta.type === 'text_delta') {
+                                        chunk = {
+                                            delta: { content: data.delta.text }
+                                        };
+                                    } else if (data.delta.type === 'thinking_delta') {
+                                        chunk = {
+                                            delta: { reasoning_content: data.delta.thinking }
+                                        };
+                                    } else if (data.delta.type === 'input_json_delta') {
+                                         chunk = {
+                                            delta: {
+                                                tool_calls: [{
+                                                    index: data.index,
+                                                    function: { arguments: data.delta.partial_json }
+                                                }]
+                                            }
+                                        };
+                                    }
+                                    break;
+                                case 'content_block_start':
+                                    if (data.content_block.type === 'tool_use') {
+                                        chunk = {
+                                            delta: {
+                                                tool_calls: [{
+                                                    index: data.index,
+                                                    id: data.content_block.id,
+                                                    type: 'function',
+                                                    function: {
+                                                        name: data.content_block.name,
+                                                        arguments: ""
+                                                    }
+                                                }]
+                                            }
+                                        };
+                                    }
+                                    break;
+                                case 'message_delta':
+                                    chunk = {
+                                        finish_reason: data.delta.stop_reason === 'end_turn' ? 'stop' : 
+                                                      data.delta.stop_reason === 'tool_use' ? 'tool_calls' : 
+                                                      data.delta.stop_reason,
+                                        usage: data.usage ? {
+                                            prompt_tokens: data.usage.input_tokens,
+                                            completion_tokens: data.usage.output_tokens,
+                                            total_tokens: data.usage.input_tokens + data.usage.output_tokens
+                                        } : undefined
+                                    };
+                                    break;
+                            }
+
+                            if (chunk) {
+                                controller.enqueue(chunk);
+                            }
+                        } catch (e) {
+                            logger.error('Error parsing Anthropic stream chunk', e);
+                        }
+                    }
+                }
+            } catch (e) {
+                controller.error(e);
+            } finally {
+                reader.releaseLock();
+                controller.close();
+            }
+        }
+    });
+  }
+
+  // --- 6. Unified Stream -> Client Stream (Anthropic) ---
+  formatStream(stream: ReadableStream): ReadableStream {
+    const encoder = new TextEncoder();
+    let hasSentStart = false;
+    let contentBlockIndex = 0;
+
+    return new ReadableStream({
+        async start(controller) {
+            const reader = stream.getReader();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = value as any;
+
+                    if (!hasSentStart) {
+                        const messageStart = {
+                            type: 'message_start',
+                            message: {
+                                id: chunk.id || 'msg_' + Date.now(),
+                                type: 'message',
+                                role: 'assistant',
+                                model: chunk.model,
+                                content: [],
+                                stop_reason: null,
+                                stop_sequence: null,
+                                usage: { input_tokens: 0, output_tokens: 0 }
+                            }
+                        };
+                        controller.enqueue(encoder.encode(`event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`));
+                        hasSentStart = true;
+                    }
+
+                    if (chunk.delta) {
+                        if (chunk.delta.content) {
+                            // Simplified: send as content_block_start + content_block_delta if first time, or just delta
+                            // For simplicity in this implementation, we'll just send text_delta
+                            // In a full implementation, you'd track content blocks
+                            const textDelta = {
+                                type: 'content_block_delta',
+                                index: 0,
+                                delta: { type: 'text_delta', text: chunk.delta.content }
+                            };
+                            
+                            // If it's the very first content, Anthropic usually sends content_block_start first
+                            // but many clients handle just deltas if index 0 is assumed.
+                            controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(textDelta)}\n\n`));
+                        }
+                        
+                        if (chunk.delta.reasoning_content) {
+                            const thinkingDelta = {
+                                type: 'content_block_delta',
+                                index: 0,
+                                delta: { type: 'thinking_delta', thinking: chunk.delta.reasoning_content }
+                            };
+                            controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(thinkingDelta)}\n\n`));
+                        }
+
+                        if (chunk.delta.tool_calls) {
+                            for (const tc of chunk.delta.tool_calls) {
+                                // Simplified tool call streaming
+                                const toolDelta = {
+                                    type: 'content_block_delta',
+                                    index: tc.index || 0,
+                                    delta: { type: 'input_json_delta', partial_json: tc.function?.arguments || "" }
+                                };
+                                controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(toolDelta)}\n\n`));
+                            }
+                        }
+                    }
+
+                    if (chunk.finish_reason) {
+                        const messageDelta = {
+                            type: 'message_delta',
+                            delta: {
+                                stop_reason: chunk.finish_reason === 'stop' ? 'end_turn' : 
+                                            chunk.finish_reason === 'tool_calls' ? 'tool_use' : 
+                                            chunk.finish_reason,
+                                stop_sequence: null
+                            },
+                            usage: chunk.usage ? {
+                                output_tokens: chunk.usage.completion_tokens
+                            } : undefined
+                        };
+                        controller.enqueue(encoder.encode(`event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`));
+                        
+                        const messageStop = { type: 'message_stop' };
+                        controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify(messageStop)}\n\n`));
+                    }
+                }
+            } catch (e) {
+                controller.error(e);
+            } finally {
+                reader.releaseLock();
+                controller.close();
+            }
+        }
+    });
+  }
+
   // Helpers
 
   private convertAnthropicContent(content: any[]): string | MessageContent[] {

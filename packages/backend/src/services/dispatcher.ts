@@ -59,7 +59,20 @@ export class Dispatcher {
         }
         
         // 5. Transform Response
-        // TODO: Handle Streaming
+        if (request.stream) {
+            logger.info('Streaming response detected, transforming stream');
+            const unifiedStream = transformer.transformStream ? 
+                                transformer.transformStream(response.body) : 
+                                response.body;
+
+            return {
+                id: 'stream-' + Date.now(),
+                model: request.model,
+                content: null,
+                stream: unifiedStream
+            };
+        }
+
         const responseBody = await response.json();
         logger.silly('Upstream Response Payload', responseBody);
         const unifiedResponse = await transformer.transformResponse(responseBody);

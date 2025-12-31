@@ -125,6 +125,7 @@ export interface UnifiedChatResponse {
     };
   }>;
   annotations?: Annotation[];
+  stream?: ReadableStream | any;
   
   // Streaming specific?
   // We might need a separate UnifiedChunk type if we handle streaming internally as objects
