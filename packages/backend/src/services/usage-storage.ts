@@ -66,7 +66,7 @@ export class UsageStorageService extends EventEmitter {
         }
 
         const dbPath = path.join(dbDir, "usage.sqlite");
-        logger.info(`Initializing usage database at ${dbPath}`);
+        logger.info(`Initializing database at ${dbPath}`);
         
         this.db = new Database(dbPath);
         this.init();
@@ -131,9 +131,9 @@ export class UsageStorageService extends EventEmitter {
                 this.db.run("ALTER TABLE debug_logs ADD COLUMN transformed_response_snapshot TEXT;");
             } catch (e) { /* ignore if exists */ }
             
-            logger.info("Usage storage initialized");
+            logger.info("Storage initialized");
         } catch (error) {
-            logger.error("Failed to initialize usage storage", error);
+            logger.error("Failed to initialize storage", error);
         }
     }
 
@@ -253,6 +253,30 @@ export class UsageStorageService extends EventEmitter {
         } catch (error) {
             logger.error(`Failed to get debug log for ${requestId}`, error);
             return null;
+        }
+    }
+
+    deleteDebugLog(requestId: string): boolean {
+        try {
+            const query = this.db.prepare(`
+                DELETE FROM debug_logs WHERE request_id = $requestId
+            `);
+            const result = query.run({ $requestId: requestId });
+            return result.changes > 0;
+        } catch (error) {
+            logger.error(`Failed to delete debug log for ${requestId}`, error);
+            return false;
+        }
+    }
+
+    deleteAllDebugLogs(): boolean {
+        try {
+            this.db.run("DELETE FROM debug_logs");
+            logger.info("Deleted all debug logs");
+            return true;
+        } catch (error) {
+            logger.error("Failed to delete all debug logs", error);
+            return false;
         }
     }
 

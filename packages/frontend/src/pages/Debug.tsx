@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import Editor from '@monaco-editor/react';
-import { RefreshCw, Clock, Database, ArrowRight, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { RefreshCw, Clock, Database, ArrowRight, ChevronDown, ChevronRight, Copy, Check, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
 
@@ -36,6 +36,35 @@ export const Debug: React.FC = () => {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!confirm("Are you sure you want to delete ALL debug logs?")) return;
+        setLoading(true);
+        try {
+            await api.deleteAllDebugLogs();
+            await fetchLogs();
+            setSelectedId(null);
+            setDetail(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (e: React.MouseEvent, requestId: string) => {
+        e.stopPropagation();
+        if (!confirm("Delete this log?")) return;
+        
+        try {
+            await api.deleteDebugLog(requestId);
+            setLogs(logs.filter(l => l.requestId !== requestId));
+            if (selectedId === requestId) {
+                setSelectedId(null);
+                setDetail(null);
+            }
+        } catch (e) {
+            console.error("Failed to delete log", e);
         }
     };
 
@@ -76,10 +105,16 @@ export const Debug: React.FC = () => {
                     <h1 className="page-title">Debug Traces</h1>
                     <p className="page-description">Inspect full request/response lifecycles</p>
                 </div>
-                <Button onClick={fetchLogs} variant="secondary" className="gap-2">
-                    <RefreshCw size={16} className={clsx(loading && "animate-spin")} />
-                    Refresh
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0}>
+                        <Trash2 size={16} />
+                        Delete All
+                    </Button>
+                    <Button onClick={fetchLogs} variant="secondary" className="flex items-center gap-2">
+                        <RefreshCw size={16} className={clsx(loading && "animate-spin")} />
+                        Refresh
+                    </Button>
+                </div>
             </header>
 
             <div className="debug-content">
@@ -96,18 +131,29 @@ export const Debug: React.FC = () => {
                                 key={log.requestId}
                                 onClick={() => setSelectedId(log.requestId)}
                                 className={clsx(
-                                    "debug-list-item",
+                                    "debug-list-item group",
                                     selectedId === log.requestId && "selected"
                                 )}
                             >
-                                <div className="debug-item-meta">
-                                    <Clock size={14} className="text-[var(--color-text-muted)]" />
-                                    <span className="debug-time">
-                                        {new Date(log.createdAt).toLocaleTimeString()}
-                                    </span>
-                                </div>
-                                <div className="debug-id">
-                                    {log.requestId.substring(0, 8)}...
+                                <div className="debug-item-content w-full">
+                                    <div className="debug-item-meta justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <Clock size={14} className="text-[var(--color-text-muted)]" />
+                                            <span className="debug-time">
+                                                {new Date(log.createdAt).toLocaleTimeString()}
+                                            </span>
+                                        </div>
+                                        <button 
+                                            onClick={(e) => handleDelete(e, log.requestId)}
+                                            className="debug-delete-btn group-hover-visible"
+                                            title="Delete log"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="debug-id mt-1">
+                                        {log.requestId.substring(0, 8)}...
+                                    </div>
                                 </div>
                             </div>
                         ))}

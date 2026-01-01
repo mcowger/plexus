@@ -888,7 +888,70 @@ body {
   z-index: 10;
 }
 
-.text-blue-400 { color: #60A5FA; }
 .text-purple-400 { color: #C084FC; }
+
 .text-orange-400 { color: #FB923C; }
+
 .text-green-400 { color: #4ADE80; }
+
+
+
+/* Utility Classes */
+
+.flex { display: flex; }
+
+.items-center { align-items: center; }
+
+.justify-between { justify-content: space-between; }
+
+.gap-2 { gap: 8px; }
+
+.w-full { width: 100%; }
+
+.mt-1 { margin-top: 4px; }
+
+.mr-2 { margin-right: 8px; }
+
+
+
+.group { position: relative; }
+
+.group-hover-visible { opacity: 0; transition: opacity 0.2s; }
+
+.group:hover .group-hover-visible { opacity: 1; }
+
+
+
+.debug-delete-btn {
+
+    background: transparent;
+
+    border: none;
+
+    color: var(--color-text-muted);
+
+    padding: 4px;
+
+    border-radius: 4px;
+
+    cursor: pointer;
+
+    transition: all 0.2s ease;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+}
+
+
+
+.debug-delete-btn:hover {
+
+    background: rgba(239, 68, 68, 0.1);
+
+    color: var(--color-danger);
+
+}

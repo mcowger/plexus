@@ -31,7 +31,11 @@ try {
 
 // Middleware for logging
 app.use('*', async (c, next) => {
-    logger.info(`${c.req.method} ${c.req.path}`);
+    if (c.req.method === 'GET' || c.req.method === 'POST') {
+        logger.debug(`${c.req.method} ${c.req.path}`);
+    } else {
+        logger.info(`${c.req.method} ${c.req.path}`);
+    }
     await next();
 });
 
@@ -336,11 +340,24 @@ app.get('/v0/management/debug/logs', (c) => {
     return c.json(usageStorage.getDebugLogs(limit, offset));
 });
 
+app.delete('/v0/management/debug/logs', (c) => {
+    const success = usageStorage.deleteAllDebugLogs();
+    if (!success) return c.json({ error: "Failed to delete logs" }, 500);
+    return c.json({ success: true });
+});
+
 app.get('/v0/management/debug/logs/:requestId', (c) => {
     const requestId = c.req.param('requestId');
     const log = usageStorage.getDebugLog(requestId);
     if (!log) return c.json({ error: "Log not found" }, 404);
     return c.json(log);
+});
+
+app.delete('/v0/management/debug/logs/:requestId', (c) => {
+    const requestId = c.req.param('requestId');
+    const success = usageStorage.deleteDebugLog(requestId);
+    if (!success) return c.json({ error: "Log not found or could not be deleted" }, 404);
+    return c.json({ success: true });
 });
 
 // Health check

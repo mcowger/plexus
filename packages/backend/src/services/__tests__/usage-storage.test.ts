@@ -185,4 +185,54 @@ describe("UsageStorageService", () => {
         expect(resSelected.total).toBe(1);
         expect(resSelected.data[0].requestId).toBe("req-1");
     });
+
+    test("should delete a debug log", () => {
+        const logRecord = {
+            requestId: "debug-req-1",
+            createdAt: Date.now(),
+            rawRequest: "{}",
+            transformedRequest: "{}",
+            rawResponse: "{}",
+            transformedResponse: "{}"
+        };
+
+        service.saveDebugLog(logRecord);
+
+        // Verify it exists
+        const savedLog = service.getDebugLog("debug-req-1");
+        expect(savedLog).not.toBeNull();
+
+        // Delete it
+        const deleted = service.deleteDebugLog("debug-req-1");
+        expect(deleted).toBe(true);
+
+        // Verify it's gone
+        const deletedLog = service.getDebugLog("debug-req-1");
+        expect(deletedLog).toBeNull();
+    });
+
+    test("should return false when deleting non-existent debug log", () => {
+        const deleted = service.deleteDebugLog("non-existent-id");
+        expect(deleted).toBe(false);
+    });
+
+    test("should delete all debug logs", () => {
+        service.saveDebugLog({
+            requestId: "req-1",
+            createdAt: Date.now(),
+            rawRequest: "{}", transformedRequest: "{}", rawResponse: "{}", transformedResponse: "{}"
+        });
+        service.saveDebugLog({
+            requestId: "req-2",
+            createdAt: Date.now(),
+            rawRequest: "{}", transformedRequest: "{}", rawResponse: "{}", transformedResponse: "{}"
+        });
+
+        expect(service.getDebugLogs().length).toBe(2);
+
+        const success = service.deleteAllDebugLogs();
+        expect(success).toBe(true);
+
+        expect(service.getDebugLogs().length).toBe(0);
+    });
 });
