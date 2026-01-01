@@ -7,6 +7,7 @@ import { Logs } from './pages/Logs';
 import { Providers } from './pages/Providers';
 import { Models } from './pages/Models';
 import { Config } from './pages/Config';
+import { Debug } from './pages/Debug';
 
 const App = () => {
   return (
@@ -18,6 +19,7 @@ const App = () => {
           <Route path="/providers" element={<Providers />} />
           <Route path="/models" element={<Models />} />
           <Route path="/config" element={<Config />} />
+          <Route path="/debug" element={<Debug />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     </MainLayout>

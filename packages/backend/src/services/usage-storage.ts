@@ -197,6 +197,47 @@ export class UsageStorageService extends EventEmitter {
         }
     }
 
+    getDebugLogs(limit: number = 50, offset: number = 0): { requestId: string, createdAt: number }[] {
+        try {
+            const query = this.db.prepare(`
+                SELECT request_id, created_at 
+                FROM debug_logs 
+                ORDER BY created_at DESC 
+                LIMIT $limit OFFSET $offset
+            `);
+            const results = query.all({ $limit: limit, $offset: offset }) as any[];
+            return results.map(row => ({
+                requestId: row.request_id,
+                createdAt: row.created_at
+            }));
+        } catch (error) {
+            logger.error("Failed to get debug logs", error);
+            return [];
+        }
+    }
+
+    getDebugLog(requestId: string): DebugLogRecord | null {
+        try {
+            const query = this.db.prepare(`
+                SELECT * FROM debug_logs WHERE request_id = $requestId
+            `);
+            const row = query.get({ $requestId: requestId }) as any;
+            if (!row) return null;
+
+            return {
+                requestId: row.request_id,
+                createdAt: row.created_at,
+                rawRequest: row.raw_request,
+                transformedRequest: row.transformed_request,
+                rawResponse: row.raw_response,
+                transformedResponse: row.transformed_response
+            };
+        } catch (error) {
+            logger.error(`Failed to get debug log for ${requestId}`, error);
+            return null;
+        }
+    }
+
     getUsage(filters: UsageFilters, pagination: PaginationOptions): { data: UsageRecord[], total: number } {
         let queryStr = "SELECT * FROM request_usage WHERE 1=1";
         let countQueryStr = "SELECT COUNT(*) as count FROM request_usage WHERE 1=1";

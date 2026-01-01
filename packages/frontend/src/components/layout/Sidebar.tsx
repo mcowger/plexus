@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug } from 'lucide-react';
+import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug, Database } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { Modal } from '../ui/Modal';
@@ -68,6 +68,10 @@ export const Sidebar: React.FC = () => {
 
         <div className="nav-section mt-auto">
             <h3 className="nav-section-title">System</h3>
+            <NavLink to="/debug" className={({ isActive }) => clsx('nav-item mb-2', isActive && 'active')}>
+                <Database size={20} />
+                <span>Debug Traces</span>
+            </NavLink>
             <button 
                 onClick={handleToggleClick}
                 className={clsx(

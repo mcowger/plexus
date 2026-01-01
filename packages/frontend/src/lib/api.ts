@@ -392,6 +392,28 @@ export const api = {
     }
   },
 
+  getDebugLogs: async (limit: number = 50, offset: number = 0): Promise<{ requestId: string, createdAt: number }[]> => {
+      try {
+          const res = await fetch(`${API_BASE}/v0/management/debug/logs?limit=${limit}&offset=${offset}`);
+          if (!res.ok) throw new Error('Failed to fetch debug logs');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getDebugLogs", e);
+          return [];
+      }
+  },
+
+  getDebugLogDetail: async (requestId: string): Promise<any> => {
+      try {
+          const res = await fetch(`${API_BASE}/v0/management/debug/logs/${requestId}`);
+          if (!res.ok) throw new Error('Failed to fetch debug log detail');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getDebugLogDetail", e);
+          return null;
+      }
+  },
+
   getDebugMode: async (): Promise<boolean> => {
       try {
           const res = await fetch(`${API_BASE}/v0/management/debug`);

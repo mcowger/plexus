@@ -330,6 +330,19 @@ app.post('/v0/management/debug', async (c) => {
     return c.json({ error: "Invalid body. Expected { enabled: boolean }" }, 400);
 });
 
+app.get('/v0/management/debug/logs', (c) => {
+    const limit = parseInt(c.req.query('limit') || '50');
+    const offset = parseInt(c.req.query('offset') || '0');
+    return c.json(usageStorage.getDebugLogs(limit, offset));
+});
+
+app.get('/v0/management/debug/logs/:requestId', (c) => {
+    const requestId = c.req.param('requestId');
+    const log = usageStorage.getDebugLog(requestId);
+    if (!log) return c.json({ error: "Log not found" }, 404);
+    return c.json(log);
+});
+
 // Health check
 app.get('/health', (c) => c.text('OK'));
 
