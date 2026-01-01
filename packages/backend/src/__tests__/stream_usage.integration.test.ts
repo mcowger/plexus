@@ -53,11 +53,12 @@ describe("Streaming Usage Integration", () => {
                     model: "test-model",
                     delta: {},
                     usage: {
-                        prompt_tokens: 10,
-                        completion_tokens: 5,
+                        input_tokens: 10,
+                        output_tokens: 5,
                         total_tokens: 15,
-                        prompt_tokens_details: { cached_tokens: 2 },
-                        completion_tokens_details: { reasoning_tokens: 1 }
+                        cached_tokens: 2,
+                        reasoning_tokens: 1,
+                        cache_creation_tokens: 0
                     }
                 });
                 controller.close();

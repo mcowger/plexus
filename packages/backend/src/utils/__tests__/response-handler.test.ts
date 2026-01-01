@@ -42,9 +42,12 @@ describe("handleResponse", () => {
                 apiType: "openai"
             },
             usage: {
-                prompt_tokens: 10,
-                completion_tokens: 20,
-                total_tokens: 30
+                input_tokens: 10,
+                output_tokens: 20,
+                total_tokens: 30,
+                reasoning_tokens: 0,
+                cached_tokens: 0,
+                cache_creation_tokens: 0
             }
         };
 

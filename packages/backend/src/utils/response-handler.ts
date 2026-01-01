@@ -35,10 +35,10 @@ export async function handleResponse(
                     
                     // Extract usage if present in the chunk
                     if (value && value.usage) {
-                        usageRecord.tokensInput = value.usage.prompt_tokens;
-                        usageRecord.tokensOutput = value.usage.completion_tokens;
-                        usageRecord.tokensCached = value.usage.prompt_tokens_details?.cached_tokens;
-                        usageRecord.tokensReasoning = value.usage.completion_tokens_details?.reasoning_tokens;
+                        usageRecord.tokensInput = value.usage.input_tokens;
+                        usageRecord.tokensOutput = value.usage.output_tokens;
+                        usageRecord.tokensCached = value.usage.cached_tokens;
+                        usageRecord.tokensReasoning = value.usage.reasoning_tokens;
                     }
                 }
                 usageRecord.responseStatus = 'success';
@@ -82,10 +82,10 @@ export async function handleResponse(
     
     // Populate usage stats
     if (unifiedResponse.usage) {
-        usageRecord.tokensInput = unifiedResponse.usage.prompt_tokens;
-        usageRecord.tokensOutput = unifiedResponse.usage.completion_tokens;
-        usageRecord.tokensCached = unifiedResponse.usage.prompt_tokens_details?.cached_tokens;
-        usageRecord.tokensReasoning = unifiedResponse.usage.completion_tokens_details?.reasoning_tokens;
+        usageRecord.tokensInput = unifiedResponse.usage.input_tokens;
+        usageRecord.tokensOutput = unifiedResponse.usage.output_tokens;
+        usageRecord.tokensCached = unifiedResponse.usage.cached_tokens;
+        usageRecord.tokensReasoning = unifiedResponse.usage.reasoning_tokens;
     }
 
     usageRecord.responseStatus = 'success';
