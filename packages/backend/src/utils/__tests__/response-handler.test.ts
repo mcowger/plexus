@@ -29,6 +29,7 @@ describe("handleResponse", () => {
     const mockContext = {
         json: mock((data) => data),
         header: mock(),
+        newResponse: mock((body) => ({ body })),
     } as unknown as Context;
 
     test("should process non-streaming response correctly", async () => {
@@ -105,5 +106,91 @@ describe("handleResponse", () => {
 
         expect(usageRecord.selectedModelName).toBe("fallback-model");
         expect(usageRecord.provider).toBe("provider-2");
+    });
+
+    describe("Usage Mapping Regression Tests", () => {
+        test("should correctly map all usage fields in non-streaming response", async () => {
+            const unifiedResponse: UnifiedChatResponse = {
+                id: "resp-3",
+                model: "model-3",
+                content: "Hello",
+                usage: {
+                    input_tokens: 111,
+                    output_tokens: 222,
+                    total_tokens: 333,
+                    reasoning_tokens: 44,
+                    cached_tokens: 55,
+                    cache_creation_tokens: 0
+                }
+            };
+
+            const usageRecord: Partial<UsageRecord> = {};
+            await handleResponse(
+                mockContext,
+                unifiedResponse,
+                mockTransformer,
+                usageRecord,
+                mockStorage,
+                Date.now(),
+                "openai"
+            );
+
+            expect(usageRecord.tokensInput).toBe(111);
+            expect(usageRecord.tokensOutput).toBe(222);
+            expect(usageRecord.tokensReasoning).toBe(44);
+            expect(usageRecord.tokensCached).toBe(55);
+            expect(mockStorage.saveRequest).toHaveBeenCalled();
+        });
+
+        test("should correctly map all usage fields in streaming response", async () => {
+            const usageData = {
+                input_tokens: 123,
+                output_tokens: 456,
+                total_tokens: 579,
+                reasoning_tokens: 78,
+                cached_tokens: 90,
+                cache_creation_tokens: 0
+            };
+
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue({ usage: usageData });
+                    controller.close();
+                }
+            });
+
+            const unifiedResponse: UnifiedChatResponse = {
+                id: "resp-stream-1",
+                model: "model-stream",
+                content: null,
+                stream: stream
+            };
+
+            const usageRecord: Partial<UsageRecord> = {};
+            
+            // For streaming, handleResponse returns a Hono stream response.
+            // We need to consume it to trigger the background usage recording.
+            const result = await handleResponse(
+                mockContext,
+                unifiedResponse,
+                mockTransformer,
+                usageRecord,
+                mockStorage,
+                Date.now(),
+                "openai"
+            );
+
+            // Mock the transformer's formatStream to just return the same stream for simplicity
+            // or assume handleResponse handles it.
+            
+            // In the real implementation, handleResponse tees the stream and processes one half.
+            // We need to wait for that background process.
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            expect(usageRecord.tokensInput).toBe(123);
+            expect(usageRecord.tokensOutput).toBe(456);
+            expect(usageRecord.tokensReasoning).toBe(78);
+            expect(usageRecord.tokensCached).toBe(90);
+        });
     });
 });
