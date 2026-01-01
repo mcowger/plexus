@@ -1,19 +1,57 @@
 # Plexus 2
 
-Plexus 2 is a high-performance, universal LLM API gateway and transformation layer. It allows you to interact with multiple AI providers (OpenAI, Anthropic, Gemini, etc.) using a single, unified API format, while also supporting provider-specific "passthrough" modes.
+**A High-Performance, Universal LLM API Gateway & Transformation Layer.**
 
-## Features
+Plexus 2 unifies interactions with multiple AI providers—OpenAI, Anthropic, Gemini, and more—under a single, standard API. It handles protocol translation, load balancing, and observability, allowing you to switch models and providers without rewriting your client code.
 
-- **Unified API**: Support for both OpenAI-compatible and Anthropic-compatible endpoints.
+![Dashboard Overview](docs/images/homepage.png)
+
+## Core Features
+
+- **Unified API**: Support for both OpenAI-compatible, Anthropic-compatible and Gemini endpoints.
+  - Tools like Gemini and ClaudeCode work flawlessly.
 - **Protocol Transformation**: Transparently convert requests and responses between different provider formats (e.g., send an OpenAI request to Anthropic Claude).
 - **Streaming Support**: Full streaming support with real-time transformation of event streams.
 - **Model Aliasing**: Define friendly model names that route to specific provider/model combinations.
-- **Load Balancing**: Distribute requests across multiple backends for the same model alias.
-- **Reasoning Support**: Unified handling of reasoning/thinking content from modern models.
+- **Load Balancing**: Distribute requests across multiple backends for the same model alias, with configurable selection & routing options.
+  - Automatic Cooldown for providers experiencing issues.
+- **Reasoning Support**: Unified handling of reasoning/thinking content from modern models, including Gemini `thoughtSignatures`.
+- **Deep Debugging**: Easy-to-use raw request and response capture, with detailed information of raw and transformed responses, as well as stream reconstruction.
 
-## API Documentation
+## The Plexus Dashboard
 
-For detailed information on the available API endpoints, including the Standard Inference APIs and the Management APIs, please refer to [API.md](API.md).
+Plexus 2 comes with a comprehensive, real-time dashboard for managing your AI gateway.
+
+### Observability & Debugging
+Gain deep insights into your LLM traffic. View request logs, analyze detailed traces, and debug raw payloads.
+
+| Request Logs | Deep Tracing |
+|:---:|:---:|
+| ![Request Logs](docs/images/request_logs.png) | ![Debug Traces](docs/images/debug_traces.png) |
+
+Use **Debug Mode** to inspect the raw input and output of every transformation step.
+
+![Debug Mode](docs/images/debug_mode.png)
+
+### Configuration Management
+Manage your providers and model aliases directly from the UI or via the YAML configuration editor.
+
+| Provider Management | Model Aliases |
+|:---:|:---:|
+| ![Providers](docs/images/providers.png) | ![Model Aliases](docs/images/model_aliases.png) |
+
+**YAML Config Editor** for power users:
+![Config Editor](docs/images/config_editor.png)
+
+### Usage Analytics
+Track your API usage and trends over time.
+
+![Usage Overview](docs/images/usage_overview.png)
+
+## Documentation
+
+- **[Configuration Guide](CONFIGURATION.md)**: Learn how to set up `plexus.yaml` to define providers, models, and routing rules.
+- **[API Documentation](docs/API.md)**: Detailed reference for the Standard Inference APIs and Management APIs.
 
 ## Installation
 
@@ -49,135 +87,31 @@ This single command orchestrates the following:
     -   Automatically rebuilds the UI on changes.
 
 ### Accessing the Dashboard
-Open your browser to:
-`http://localhost:4000`
+Open your browser to: `http://localhost:4000`
 
 ## Compiling to Standalone Executables
 
-Plexus 2 can be compiled into a single, self-contained binary that includes the Bun runtime, all backend logic, and the pre-built frontend dashboard. This allows you to distribute and run Plexus without needing Bun or Node.js installed on the target machine.
+Plexus 2 can be compiled into a single, self-contained binary that includes the Bun runtime, all backend logic, and the pre-built frontend dashboard.
 
 ### Build Commands
 
-The following commands will build the frontend and then compile the application:
-
-- **macOS (ARM64/Apple Silicon):**
-  ```bash
-  bun run compile:macos
-  ```
-- **Linux (x64):**
-  ```bash
-  bun run compile:linux
-  ```
-- **Windows (x64):**
-  ```bash
-  bun run compile:windows
-  ```
+- **macOS (ARM64/Apple Silicon):** `bun run compile:macos`
+- **Linux (x64):** `bun run compile:linux`
+- **Windows (x64):** `bun run compile:windows`
 
 The resulting executable will be named `plexus-macos` (or `plexus-linux` / `plexus.exe`) in the project root.
-
-### Running the Executable
-
-When running the standalone binary, you can specify your configuration file via the `CONFIG_FILE` environment variable:
-
-```bash
-CONFIG_FILE=./config/plexus.yaml ./plexus
-```
 
 ### VS Code Integration
 
 Pre-configured tasks and launch settings are available in the `.vscode` directory:
 
--   **Run Dev Stack:** Press `Cmd+Shift+B` (or `Ctrl+Shift+B`) and select `Bun: Dev Stack` to start the full environment.
--   **Debugging:** 
-    -   Select `Debug Backend` from the Run & Debug sidebar to debug the API server.
+-   **Run Dev Stack:** Press `Cmd+Shift+B` (or `Ctrl+Shift+B`) and select `Bun: Dev Stack`.
+-   **Debugging:** Select `Debug Backend` from the Run & Debug sidebar.
 -   **Note:** Requires the [Bun for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=Oven.bun-vscode) extension.
-
-### Making Requests
-
-You can use the provided test script to verify your setup:
-```bash
-bun testcommands/test_request.ts <model_alias> <json_file>
-```
-
-Example OpenAI-compatible request:
-```bash
-curl http://localhost:4000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "minimax-m2.1",
-    "messages": [{"role": "user", "content": "Hello!"}],
-    "stream": true
-  }'
-```
-
-## Configuration (plexus.yaml)
-
-Plexus is configured via a `config/plexus.yaml` file. This file defines your providers and model routing logic.
-
-### Example Configuration
-
-```yaml
-providers:
-  # Define your upstream providers
-  openai_direct:
-    type: OpenAI
-    api_base_url: https://api.openai.com/v1
-    api_key: your_openai_key
-    models:
-      - gpt-4o
-      - gpt-4o-mini
-
-  my_anthropic:
-    type: Anthropic
-    api_base_url: https://api.anthropic.com/v1
-    api_key: your_anthropic_key
-    models:
-      - claude-3-5-sonnet-latest
-
-models:
-  # Define aliases and where they route
-  fast-model:
-    targets:
-      - provider: openai_direct
-        model: gpt-4o-mini
-  
-  smart-model:
-    targets:
-      - provider: my_anthropic
-        model: claude-3-5-sonnet-latest
-        
-  balanced-model:
-    selector: random
-    targets:
-      - provider: openai_direct
-        model: gpt-4o
-      - provider: my_anthropic
-        model: claude-3-5-sonnet-latest
-```
-
-### Configuration Sections
-
-- **`providers`**:
-    - `type`: The transformer type to use (`OpenAI`, `Anthropic`, etc.).
-    - `api_base_url`: The root URL for the provider's API.
-    - `api_key`: Your authentication token.
-    - `models`: A list of raw model names available from this provider.
-    - `headers`: (Optional) Extra headers to send with every request to this provider.
-
-- **`models`**:
-    - Each key is a "Model Alias" that clients will use in their `model` field.
-    - `selector`: (Optional) The strategy to use for target selection (e.g., `random`). Defaults to `random`.
-    - `targets`: A list of provider/model pairs. If multiple targets are provided, Plexus will select one based on the configured `selector`.
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
