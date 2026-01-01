@@ -61,8 +61,9 @@ export function validateConfig(yamlContent: string): PlexusConfig {
   return PlexusConfigSchema.parse(parsed);
 }
 
-function parseConfigFile(filePath: string): PlexusConfig {
-  const fileContents = fs.readFileSync(filePath, 'utf8');
+async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
+  const file = Bun.file(filePath);
+  const fileContents = await file.text();
   const config = validateConfig(fileContents);
   logConfigStats(config);
   return config;
@@ -79,10 +80,10 @@ function setupWatcher(filePath: string) {
             if (eventType === 'change') {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 
-                debounceTimer = setTimeout(() => {
+                debounceTimer = setTimeout(async () => {
                     logger.info('Configuration file changed, reloading...');
                     try {
-                        const newConfig = parseConfigFile(filePath);
+                        const newConfig = await parseConfigFile(filePath);
                         currentConfig = newConfig;
                         logger.info('Configuration reloaded successfully');
                     } catch (error) {
@@ -99,8 +100,8 @@ function setupWatcher(filePath: string) {
     }
 }
 
-export function loadConfig(configPath?: string): PlexusConfig {
-  if (currentConfig) return currentConfig;
+export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
+  if (currentConfig && !configPath) return currentConfig;
 
   // Default path assumes running from packages/backend, but we want it relative to project root
   const projectRoot = path.resolve(process.cwd(), '../../');
@@ -109,13 +110,14 @@ export function loadConfig(configPath?: string): PlexusConfig {
   
   logger.info(`Loading configuration from ${finalPath}`);
 
-  if (!fs.existsSync(finalPath)) {
+  const file = Bun.file(finalPath);
+  if (!(await file.exists())) {
     logger.error(`Configuration file not found at ${finalPath}`);
     throw new Error(`Configuration file not found at ${finalPath}`);
   }
 
   try {
-    currentConfig = parseConfigFile(finalPath);
+    currentConfig = await parseConfigFile(finalPath);
     currentConfigPath = finalPath;
     logger.info('Configuration loaded successfully');
     
@@ -132,9 +134,7 @@ export function loadConfig(configPath?: string): PlexusConfig {
 
 export function getConfig(): PlexusConfig {
     if (!currentConfig) {
-        // Auto-load if not loaded? Or throw?
-        // Let's auto-load for convenience if possible
-        return loadConfig();
+        throw new Error("Configuration not loaded. Call loadConfig() first.");
     }
     return currentConfig;
 }

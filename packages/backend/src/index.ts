@@ -15,7 +15,7 @@ const usageStorage = new UsageStorageService();
 
 // Load config on startup
 try {
-    loadConfig();
+    await loadConfig();
 } catch (e) {
     logger.error('Failed to load config', e);
     process.exit(1);
@@ -253,12 +253,16 @@ app.post('/v1/responses', async (c) => {
 });
 
 // Management API
-app.get('/v0/management/config', (c) => {
+app.get('/v0/management/config', async (c) => {
     const configPath = getConfigPath();
-    if (!configPath || !fs.existsSync(configPath)) {
+    if (!configPath) {
+        return c.json({ error: "Configuration file path not found" }, 404);
+    }
+    const file = Bun.file(configPath);
+    if (!(await file.exists())) {
         return c.json({ error: "Configuration file not found" }, 404);
     }
-    const configContent = fs.readFileSync(configPath, 'utf8');
+    const configContent = await file.text();
     c.header('Content-Type', 'application/x-yaml');
     return c.body(configContent);
 });
@@ -283,11 +287,11 @@ app.post('/v0/management/config', async (c) => {
         }
 
         // Write to file
-        fs.writeFileSync(configPath, body, 'utf8');
+        await Bun.write(configPath, body);
         logger.info(`Configuration updated via API at ${configPath}`);
 
-        // Force reload (optional, as watcher should pick it up, but this ensures immediate consistency for the response if we were returning the object)
-        loadConfig(configPath);
+        // Force reload
+        await loadConfig(configPath);
         
         return c.body(body, 200, { 'Content-Type': 'application/x-yaml' });
     } catch (e: any) {
