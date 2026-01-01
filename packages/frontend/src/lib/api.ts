@@ -438,6 +438,30 @@ export const api = {
       }
   },
 
+  deleteUsageLog: async (requestId: string): Promise<boolean> => {
+      try {
+          const res = await fetch(`${API_BASE}/v0/management/usage/${requestId}`, {
+              method: 'DELETE'
+          });
+          return res.ok;
+      } catch (e) {
+          console.error("API Error deleteUsageLog", e);
+          return false;
+      }
+  },
+
+  deleteAllUsageLogs: async (): Promise<boolean> => {
+      try {
+          const res = await fetch(`${API_BASE}/v0/management/usage`, {
+              method: 'DELETE'
+          });
+          return res.ok;
+      } catch (e) {
+          console.error("API Error deleteAllUsageLogs", e);
+          return false;
+      }
+  },
+
   getDebugMode: async (): Promise<boolean> => {
       try {
           const res = await fetch(`${API_BASE}/v0/management/debug`);

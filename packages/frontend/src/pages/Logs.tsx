@@ -4,7 +4,8 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { api, UsageRecord } from '../lib/api';
-import { ChevronLeft, ChevronRight, Search, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2 } from 'lucide-react';
+import { clsx } from 'clsx';
 
 export const Logs = () => {
     const [logs, setLogs] = useState<UsageRecord[]>([]);
@@ -38,6 +39,30 @@ export const Logs = () => {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!confirm("Are you sure you want to delete ALL usage logs?")) return;
+        setLoading(true);
+        try {
+            await api.deleteAllUsageLogs();
+            // Reset to first page
+            setOffset(0);
+            await loadLogs();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (requestId: string) => {
+        if (!confirm("Delete this usage log?")) return;
+        try {
+            await api.deleteUsageLog(requestId);
+            setLogs(logs.filter(l => l.requestId !== requestId));
+            setTotal(prev => Math.max(0, prev - 1));
+        } catch (e) {
+            console.error("Failed to delete log", e);
         }
     };
 
@@ -99,11 +124,15 @@ export const Logs = () => {
 
     return (
         <div className="page-container">
-            <div className="header">
+            <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div className="header-left">
                     <h1 className="page-title">Logs</h1>
                     <Badge status="neutral">{total} Records</Badge>
                 </div>
+                <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0}>
+                    <Trash2 size={16} />
+                    Delete All
+                </Button>
             </div>
 
             <Card className="logs-card">
@@ -146,23 +175,24 @@ export const Logs = () => {
                                 <th style={{ padding: '12px' }}>Duration</th>
                                 <th style={{ padding: '12px' }}>Streamed</th>
                                 <th style={{ padding: '12px' }}>Status</th>
+                                <th style={{ padding: '12px', width: '40px' }}></th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={11} style={{ padding: '20px', textAlign: 'center' }}>Loading...</td>
+                                    <td colSpan={12} style={{ padding: '20px', textAlign: 'center' }}>Loading...</td>
                                 </tr>
                             ) : logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} style={{ padding: '20px', textAlign: 'center' }}>No logs found</td>
+                                    <td colSpan={12} style={{ padding: '20px', textAlign: 'center' }}>No logs found</td>
                                 </tr>
                             ) : (
                                 logs.map((log) => (
                                     <tr 
                                         key={log.requestId} 
                                         style={{ borderBottom: '1px solid var(--color-border-light)' }}
-                                        className={log.requestId === newestLogId ? 'animate-pulse-fade' : ''}
+                                        className={clsx("group", log.requestId === newestLogId && 'animate-pulse-fade')}
                                     >
                                         <td style={{ padding: '12px' }} title={log.requestId}>
                                             {log.requestId.substring(0, 8)}...
@@ -191,6 +221,15 @@ export const Logs = () => {
                                             <Badge status={log.responseStatus === 'success' ? 'connected' : 'error'}>
                                                 {log.responseStatus}
                                             </Badge>
+                                        </td>
+                                        <td style={{ padding: '12px' }}>
+                                            <button 
+                                                onClick={() => handleDelete(log.requestId)}
+                                                className="debug-delete-btn group-hover-visible"
+                                                title="Delete log"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))

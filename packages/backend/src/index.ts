@@ -282,6 +282,19 @@ app.get('/v0/management/usage', (c) => {
     }
 });
 
+app.delete('/v0/management/usage', (c) => {
+    const success = usageStorage.deleteAllUsageLogs();
+    if (!success) return c.json({ error: "Failed to delete usage logs" }, 500);
+    return c.json({ success: true });
+});
+
+app.delete('/v0/management/usage/:requestId', (c) => {
+    const requestId = c.req.param('requestId');
+    const success = usageStorage.deleteUsageLog(requestId);
+    if (!success) return c.json({ error: "Usage log not found or could not be deleted" }, 404);
+    return c.json({ success: true });
+});
+
 app.get('/v0/management/events', async (c) => {
     return streamSSE(c, async (stream) => {
         const listener = async (record: any) => {

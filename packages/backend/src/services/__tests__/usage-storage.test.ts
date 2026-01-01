@@ -186,6 +186,39 @@ describe("UsageStorageService", () => {
         expect(resSelected.data[0].requestId).toBe("req-1");
     });
 
+    test("should delete a usage log", () => {
+        service.saveRequest({
+            requestId: "del-req-1",
+            date: new Date().toISOString(),
+            startTime: Date.now(), durationMs: 100, isStreamed: false, responseStatus: "success"
+        });
+
+        expect(service.getUsage({}, { limit: 10, offset: 0 }).total).toBeGreaterThan(0);
+
+        const success = service.deleteUsageLog("del-req-1");
+        expect(success).toBe(true);
+        
+        // We might need to filter by ID to be sure, but getUsage doesn't filter by ID directly.
+        // But since we are using memory db and fresh inserts for some tests, let's rely on total count or check specific item logic if needed.
+        // Actually, let's rely on total count decremented if we knew the count.
+        // Or better, let's just assume if delete returns true, it deleted it. 
+        // But to be rigorous, let's try to delete it again, should return false.
+        const success2 = service.deleteUsageLog("del-req-1");
+        expect(success2).toBe(false);
+    });
+
+    test("should delete all usage logs", () => {
+        service.saveRequest({ requestId: "u-1", date: new Date().toISOString(), startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"});
+        service.saveRequest({ requestId: "u-2", date: new Date().toISOString(), startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"});
+        
+        expect(service.getUsage({}, { limit: 10, offset: 0 }).total).toBeGreaterThanOrEqual(2);
+
+        const success = service.deleteAllUsageLogs();
+        expect(success).toBe(true);
+
+        expect(service.getUsage({}, { limit: 10, offset: 0 }).total).toBe(0);
+    });
+
     test("should delete a debug log", () => {
         const logRecord = {
             requestId: "debug-req-1",

@@ -374,4 +374,28 @@ export class UsageStorageService extends EventEmitter {
             throw error;
         }
     }
+
+    deleteUsageLog(requestId: string): boolean {
+        try {
+            const query = this.db.prepare(`
+                DELETE FROM request_usage WHERE request_id = $requestId
+            `);
+            const result = query.run({ $requestId: requestId });
+            return result.changes > 0;
+        } catch (error) {
+            logger.error(`Failed to delete usage log for ${requestId}`, error);
+            return false;
+        }
+    }
+
+    deleteAllUsageLogs(): boolean {
+        try {
+            this.db.run("DELETE FROM request_usage");
+            logger.info("Deleted all usage logs");
+            return true;
+        } catch (error) {
+            logger.error("Failed to delete all usage logs", error);
+            return false;
+        }
+    }
 }
