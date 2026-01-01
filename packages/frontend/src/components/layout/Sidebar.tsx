@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import logo from '../../assets/plexus_logo_transparent.png';
 
 export const Sidebar: React.FC = () => {
   const [debugMode, setDebugMode] = useState(false);
@@ -32,7 +33,10 @@ export const Sidebar: React.FC = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h1 className="sidebar-title">Plexus Collector</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+          <img src={logo} alt="Plexus" style={{ width: '32px', height: '32px' }} />
+          <h1 className="sidebar-title">Plexus</h1>
+        </div>
         <p className="sidebar-subtitle">AI Infrastructure Management</p>
       </div>
 
