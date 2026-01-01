@@ -96,8 +96,18 @@ export class GeminiTransformer implements Transformer {
 
                     content.parts.forEach((part) => {
                         if (part.text) {
-                            contentParts.push({ type: 'text', text: part.text });
-                            textContent += part.text;
+                            // @ts-ignore - thought property exists on Part in newer SDK versions or raw JSON
+                            if (part.thought) {
+                                if (!message.thinking) message.thinking = { content: '' };
+                                message.thinking.content += part.text;
+                                // @ts-ignore - thoughtSignature
+                                if (part.thoughtSignature) {
+                                    message.thinking.signature = part.thoughtSignature;
+                                }
+                            } else {
+                                contentParts.push({ type: 'text', text: part.text });
+                                textContent += part.text;
+                            }
                         } else if (part.inlineData) {
                             contentParts.push({
                                 type: 'image_url',
@@ -124,6 +134,12 @@ export class GeminiTransformer implements Transformer {
                                     arguments: JSON.stringify(part.functionCall.args)
                                 }
                             });
+                            // Check for thoughtSignature on functionCall part
+                             // @ts-ignore - thoughtSignature
+                            if (part.thoughtSignature && !message.thinking?.signature) {
+                                if (!message.thinking) message.thinking = { content: '' }; // Content might be empty if just signature
+                                message.thinking.signature = part.thoughtSignature;
+                            }
                         }
                     });
 
@@ -209,8 +225,18 @@ export class GeminiTransformer implements Transformer {
             } else if (msg.role === 'user' || msg.role === 'assistant') {
                 role = msg.role === 'assistant' ? 'model' : 'user';
                 
+                if (msg.thinking?.content) {
+                    // @ts-ignore - thought property
+                    parts.push({ text: msg.thinking.content, thought: true });
+                }
+
                 if (typeof msg.content === 'string') {
-                    parts.push({ text: msg.content });
+                    const part: any = { text: msg.content };
+                    // Attach signature to text part if present and no tool calls (or first part)
+                    if (msg.thinking?.signature && !msg.tool_calls) {
+                        part.thoughtSignature = msg.thinking.signature;
+                    }
+                    parts.push(part);
                 } else if (Array.isArray(msg.content)) {
                     msg.content.forEach(c => {
                         if (c.type === 'text') {
@@ -247,13 +273,18 @@ export class GeminiTransformer implements Transformer {
                 }
 
                 if (msg.tool_calls) {
-                    msg.tool_calls.forEach(tc => {
-                        parts.push({
+                    msg.tool_calls.forEach((tc, index) => {
+                        const part: any = {
                             functionCall: {
                                 name: tc.function.name,
                                 args: JSON.parse(tc.function.arguments)
                             }
-                        });
+                        };
+                        // Attach signature to first function call if present
+                        if (index === 0 && msg.thinking?.signature) {
+                            part.thoughtSignature = msg.thinking.signature;
+                        }
+                        parts.push(part);
                     });
                 }
             } else if (msg.role === 'tool') {
@@ -347,6 +378,7 @@ export class GeminiTransformer implements Transformer {
         let content = '';
         let reasoning_content = '';
         const tool_calls: any[] = [];
+        let thoughtSignature: string | undefined;
 
         parts.forEach((part: any) => {
             if (part.text) {
@@ -366,6 +398,11 @@ export class GeminiTransformer implements Transformer {
                         arguments: JSON.stringify(part.functionCall.args)
                     }
                 });
+            }
+
+            // Capture signature
+            if (part.thoughtSignature) {
+                thoughtSignature = part.thoughtSignature;
             }
         });
 
@@ -402,6 +439,10 @@ export class GeminiTransformer implements Transformer {
             model: response.modelVersion || 'gemini-model',
             content: content || null,
             reasoning_content: reasoning_content || null,
+            thinking: thoughtSignature ? {
+                content: reasoning_content,
+                signature: thoughtSignature
+            } : undefined,
             tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
             usage
         };
@@ -413,7 +454,11 @@ export class GeminiTransformer implements Transformer {
         const parts: Part[] = [];
 
         if (response.reasoning_content) {
-            parts.push({ text: response.reasoning_content, thought: true } as any);
+            const part: any = { text: response.reasoning_content, thought: true };
+            if (response.thinking?.signature) {
+                part.thoughtSignature = response.thinking.signature;
+            }
+            parts.push(part);
         }
 
         if (response.content) {
@@ -421,13 +466,21 @@ export class GeminiTransformer implements Transformer {
         }
 
         if (response.tool_calls) {
-            response.tool_calls.forEach(tc => {
-                parts.push({
+            response.tool_calls.forEach((tc, index) => {
+                const part: any = {
                     functionCall: {
                         name: tc.function.name,
                         args: JSON.parse(tc.function.arguments)
                     }
-                });
+                };
+                // If signature wasn't on reasoning part (e.g. absent), maybe attach to first tool call?
+                // But usually it goes with thought part or first content part or first tool part.
+                // If we already added it to reasoning part, don't duplicate?
+                // The API seems to accept it on functionCall too.
+                if (index === 0 && response.thinking?.signature && !response.reasoning_content) {
+                    part.thoughtSignature = response.thinking.signature;
+                }
+                parts.push(part);
             });
         }
 

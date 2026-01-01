@@ -298,4 +298,81 @@ describe("GeminiTransformer", () => {
         expect(transformed.generationConfig!.thinkingConfig!.thinkingBudget).toBe(1024);
         expect(transformed.generationConfig!.maxOutputTokens).toBe(2048);
     });
+
+    test("parseRequest and transformRequest preserve thought parts (thinking content)", async () => {
+        const input = {
+            model: "gemini-2.0-flash-thinking",
+            contents: [
+                { 
+                    role: "model", 
+                    parts: [
+                        { text: "I should check the weather.", thought: true },
+                        { functionCall: { name: "get_weather", args: { location: "London" } } }
+                    ] 
+                }
+            ]
+        };
+
+        const unified = await transformer.parseRequest(input);
+        
+        expect(unified.messages).toHaveLength(1);
+        expect(unified.messages[0].role).toBe("assistant");
+        expect(unified.messages[0].thinking?.content).toBe("I should check the weather.");
+        expect(unified.messages[0].tool_calls).toHaveLength(1);
+        expect(unified.messages[0].tool_calls![0].function.name).toBe("get_weather");
+
+        const transformed = await transformer.transformRequest(unified);
+        
+        expect(transformed.contents).toHaveLength(1);
+        expect(transformed.contents[0].role).toBe("model");
+        expect(transformed.contents[0].parts).toHaveLength(2);
+        // @ts-ignore
+        expect(transformed.contents[0].parts[0].thought).toBe(true);
+        expect(transformed.contents[0].parts[0].text).toBe("I should check the weather.");
+        expect(transformed.contents[0].parts[1].functionCall).toBeDefined();
+    });
+
+    test("transformResponse and formatResponse preserve thought signature", async () => {
+        const geminiResponse = {
+            candidates: [{
+                content: {
+                    parts: [
+                        { text: "Thinking...", thought: true, thoughtSignature: "sig-123" },
+                        { text: "Answer" }
+                    ]
+                }
+            }]
+        };
+
+        const unified = await transformer.transformResponse(geminiResponse);
+        expect(unified.thinking?.content).toBe("Thinking...");
+        expect(unified.thinking?.signature).toBe("sig-123");
+        expect(unified.content).toBe("Answer");
+
+        const formatted = await transformer.formatResponse(unified);
+        // @ts-ignore
+        expect(formatted.candidates[0].content.parts[0].thought).toBe(true);
+        // @ts-ignore
+        expect(formatted.candidates[0].content.parts[0].thoughtSignature).toBe("sig-123");
+    });
+
+    test("transformRequest attaches thought signature to parts", async () => {
+        const unified: UnifiedChatRequest = {
+            model: "gemini-2.0-flash-thinking",
+            messages: [{
+                role: "assistant",
+                content: "Result",
+                thinking: {
+                    content: "Thought",
+                    signature: "sig-abc"
+                }
+            }]
+        };
+
+        const result = await transformer.transformRequest(unified);
+        // @ts-ignore
+        expect(result.contents[0].parts[1].text).toBe("Result");
+        // @ts-ignore
+        expect(result.contents[0].parts[1].thoughtSignature).toBe("sig-abc");
+    });
 });

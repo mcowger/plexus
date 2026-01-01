@@ -120,6 +120,10 @@ export interface UnifiedChatResponse {
       apiType?: string;
   };
   reasoning_content?: string | null;
+  thinking?: {
+    content: string;
+    signature?: string;
+  };
   usage?: UnifiedUsage;
   tool_calls?: Array<{
     id: string;
