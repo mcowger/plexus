@@ -14,8 +14,7 @@
     "compile:macos": "bun run build:frontend && bun build packages/backend/src/index.ts packages/frontend/dist/index.html packages/frontend/dist/main.js packages/frontend/dist/main.css --compile --target=bun-darwin-arm64 --outfile plexus-macos",
     "compile:linux": "bun run build:frontend && bun build packages/backend/src/index.ts packages/frontend/dist/index.html packages/frontend/dist/main.js packages/frontend/dist/main.css --compile --target=bun-linux-x64 --outfile plexus-linux",
     "compile:windows": "bun run build:frontend && bun build packages/backend/src/index.ts packages/frontend/dist/index.html packages/frontend/dist/main.js packages/frontend/dist/main.css --compile --target=bun-windows-x64 --outfile plexus.exe",
-    "install:all": "bun install && (cd llms && bun install) && (cd packages/backend && bun install) && (cd packages/frontend && bun install)",
-    "update-cassettes": "cd packages/backend && RECORD=1 bun test src/services/__tests__/e2e_vcr_*.test.ts"
+    "install:all": "bun install && (cd llms && bun install) && (cd packages/backend && bun install) && (cd packages/frontend && bun install)"
   },
   "peerDependencies": {
     "typescript": "^5"

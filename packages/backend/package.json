@@ -6,8 +6,7 @@
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
     "test": "bun test",
-    "test:watch": "bun test --watch",
-    "update-cassettes": "RECORD=1 bun test src/services/__tests__/e2e_vcr_*.test.ts"
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
@@ -19,9 +18,6 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@pollyjs/adapter-fetch": "^6.0.7",
-    "@pollyjs/core": "^6.0.6",
-    "@pollyjs/persister-fs": "^6.0.6",
     "@types/bun": "^1.3.5",
     "@types/node": "^22.0.0",
     "@types/winston": "^2.4.4"
