@@ -6,9 +6,6 @@ import { logger } from './utils/logger';
 
 // --- Zod Schemas ---
 
-const TransformerConfigSchema = z.object({
-  use: z.array(z.tuple([z.string(), z.any()])).optional(),
-});
 
 const ProviderConfigSchema = z.object({
   type: z.string(),

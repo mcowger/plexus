@@ -18,6 +18,9 @@ export class Router {
             const targets = alias.targets;
             if (targets && targets.length > 0) {
                 const target = targets[Math.floor(Math.random() * targets.length)];
+                if (!target) {
+                    throw new Error(`No target found for alias '${modelName}'`);
+                }
                 const providerConfig = config.providers[target.provider];
                 
                 if (!providerConfig) {

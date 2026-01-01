@@ -62,7 +62,7 @@ export class Dispatcher {
         if (request.stream) {
             logger.info('Streaming response detected, transforming stream');
             const unifiedStream = transformer.transformStream ? 
-                                transformer.transformStream(response.body) : 
+                                transformer.transformStream(response.body!) : 
                                 response.body;
 
             return {

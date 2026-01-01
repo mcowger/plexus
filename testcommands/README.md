@@ -1,58 +1,36 @@
 # Test Commands
 
-This directory contains utilities for testing the Plexus LLM server.
+Utilities for manually testing the Plexus gateway.
 
-## Files
+## test_request.ts
 
-- `test_request.ts`: A Bun script to send requests to the local server.
-- `input.json`: A template request body with a model placeholder.
+A helper script to send requests to the local running server using the unified test cases.
 
-## Usage
-
-Ensure the Plexus server is running (defaulting to `http://localhost:3000`).
-
-### Specifying Models
-
-Plexus supports three ways to route requests to models:
-
-1.  **Plexus Aliases (Recommended)**: Use a friendly name defined in `config/plexus.yaml`. This supports load balancing and transparent provider switching.
-    - Example: `gpt-4`, `coding-assistant`, `fast-model`
-2.  **Auto-resolution**: Specify just the model name. Plexus will automatically find and select a provider that supports that model.
-    - Example: `claude-3-5-sonnet-20240620`, `gpt-4o-mini`
-3.  **Explicit Provider Routing**: Directly specify the provider and model using a comma-separated format.
-    - Example: `openai,gpt-4o-mini`, `anthropic,claude-3-5-sonnet-20240620`
-
-### Running a Test Request
-
-Use `bun` to execute the script. You must provide the target model name and the path to a JSON input file.
+### Usage
 
 ```bash
-bun test_request.ts <model> <json_file>
+bun test_request.ts <model_alias> <case_path>
 ```
 
-**Example:**
+- **model_alias**: The model ID defined in your `plexus.yaml` (e.g., `minimax-m2.1`, `claude-haiku`).
+- **case_path**: The relative path to a test case in `packages/backend/src/services/__tests__/cases/`.
 
+### Examples
+
+**Test Chat API (OpenAI-style):**
 ```bash
-# From within the testcommands directory
-bun test_request.ts gpt-4o-mini input.json
-
-# From the project root
-bun testcommands/test_request.ts gpt-4o-mini testcommands/input.json
+bun test_request.ts minimax-m2.1 chat/basic
+bun test_request.ts minimax-m2.1 chat/tools-stream
 ```
 
-### JSON Input Format
-
-The script looks for a `model` field in the JSON file and replaces its value with the model name provided as a command-line argument.
-
-```json
-{
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ],
-  "model": "PLACEHOLDER_MODEL",
-  "stream": false
-}
+**Test Messages API (Anthropic-style):**
+```bash
+bun test_request.ts claude-haiku messages/basic
+bun test_request.ts claude-haiku messages/basic-stream
 ```
+
+### Features
+- **Automatic Discovery**: Looks for files in the backend `cases/` directory automatically.
+- **Smart Endpoints**: Automatically routes to `/v1/chat/completions` or `/v1/messages` based on whether the case path contains `messages/`.
+- **Extension Optional**: You can omit `.json` from the filename for brevity.
+- **Model Override**: Automatically replaces any `PLACEHOLDER_MODEL` in the JSON file with your specified model alias.

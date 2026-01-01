@@ -261,7 +261,6 @@ export class AnthropicTransformer implements Transformer {
   // --- 5. Provider Stream (Anthropic) -> Unified Stream ---
   transformStream(stream: ReadableStream): ReadableStream {
     const decoder = new TextDecoder();
-    const encoder = new TextEncoder();
     let buffer = "";
 
     return new ReadableStream({
@@ -369,7 +368,6 @@ export class AnthropicTransformer implements Transformer {
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     let hasSentStart = false;
-    let contentBlockIndex = 0;
 
     return new ReadableStream({
         async start(controller) {
@@ -473,6 +471,8 @@ export class AnthropicTransformer implements Transformer {
      for (const c of content) {
          if (c.type === 'text') parts.push({ type: 'text', text: c.text });
      }
+     if (!parts.length) return '';
+     if (!parts[0]) return '';
      if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
      return parts;
   }
