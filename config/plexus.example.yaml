@@ -52,6 +52,18 @@ providers:
       - claude-3-5-haiku-latest
       - claude-3-opus-latest
 
+  # Standard Google Gemini Configuration
+  gemini:
+    type: Gemini
+    display_name: Google Gemini
+    api_base_url: https://generativelanguage.googleapis.com
+    api_key: "your-gemini-api-key-here"
+    models:
+      - gemini-1.5-pro
+      - gemini-1.5-flash
+      - gemini-2.0-flash-exp
+
+
   # Example of an OpenAI-compatible provider (e.g. Together, DeepSeek, Groq)
   deepseek:
     type: OpenAI

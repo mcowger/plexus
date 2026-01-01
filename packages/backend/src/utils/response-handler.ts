@@ -13,7 +13,7 @@ export async function handleResponse(
     usageRecord: Partial<UsageRecord>,
     usageStorage: UsageStorageService,
     startTime: number,
-    apiType: 'openai' | 'anthropic'
+    apiType: 'openai' | 'anthropic' | 'gemini'
 ) {
     // Update record with selected model info if available
     usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model;
@@ -92,6 +92,7 @@ export async function handleResponse(
     usageRecord.durationMs = Date.now() - startTime;
     usageStorage.saveRequest(usageRecord as UsageRecord);
 
-    logger.debug(`Outgoing ${apiType === 'openai' ? 'OpenAI' : 'Anthropic'} Response`, responseBody);
+    const apiName = apiType === 'openai' ? 'OpenAI' : apiType === 'anthropic' ? 'Anthropic' : 'Gemini';
+    logger.debug(`Outgoing ${apiName} Response`, responseBody);
     return c.json(responseBody);
 }

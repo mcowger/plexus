@@ -16,6 +16,12 @@ Plexus 2 provides compatibility layers for major AI provider formats.
 - **Description:** Compatible with the Anthropic Messages API.
 - **Documentation:** See [Anthropic API Reference](https://docs.anthropic.com/en/api/messages) for request and response formats.
 
+### Gemini Compatible
+- **Endpoint:** `POST /v1beta/models/{model}:{action}`
+- **Description:** Compatible with the Google Generative Language API (Gemini).
+- **Supported Actions:** `generateContent`, `streamGenerateContent`.
+- **Documentation:** See [Gemini API Reference](https://ai.google.dev/api/rest/v1beta/models/generateContent) for request and response formats.
+
 ---
 
 ## Management APIs (`/v0/management`)

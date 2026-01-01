@@ -7,6 +7,9 @@ export interface Transformer {
   // Endpoint suffix (e.g. '/chat/completions', '/messages')
   readonly defaultEndpoint: string;
 
+  // Dynamically resolve endpoint if it depends on request parameters (like model in Gemini)
+  getEndpoint?(request: UnifiedChatRequest): string;
+
   // Convert Client Request (in this format) to Unified Request
   parseRequest(input: any): Promise<UnifiedChatRequest>;
 

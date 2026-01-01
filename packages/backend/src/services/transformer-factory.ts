@@ -1,11 +1,14 @@
 import { Transformer } from '../types/transformer';
-import { AnthropicTransformer, OpenAITransformer } from '../transformers';
+import { AnthropicTransformer, OpenAITransformer, GeminiTransformer } from '../transformers';
 
 export class TransformerFactory {
     static getTransformer(providerType: string): Transformer {
         switch (providerType.toLowerCase()) {
             case 'anthropic':
                 return new AnthropicTransformer();
+            case 'google':
+            case 'gemini':
+                return new GeminiTransformer();
             case 'openai':
             case 'openrouter':
             case 'deepseek':
@@ -17,3 +20,4 @@ export class TransformerFactory {
         }
     }
 }
+

@@ -3,12 +3,11 @@ import { streamSSE } from 'hono/streaming';
 import { logger } from './utils/logger';
 import { loadConfig, getConfig, getConfigPath, validateConfig } from './config';
 import { Dispatcher } from './services/dispatcher';
-import { AnthropicTransformer, OpenAITransformer } from './transformers';
+import { AnthropicTransformer, OpenAITransformer, GeminiTransformer } from './transformers';
 import { UsageStorageService } from './services/usage-storage';
 import { UsageRecord } from './types/usage';
 import { handleResponse } from './utils/response-handler';
 import { getClientIp } from './utils/ip';
-import fs from 'node:fs';
 import { z } from 'zod';
 import { CooldownManager } from './services/cooldown-manager';
 
@@ -125,6 +124,63 @@ app.post('/v1/messages', async (c) => {
         logger.error('Error processing Anthropic request', e);
         // Anthropic error format
         return c.json({ type: 'error', error: { type: 'api_error', message: e.message } }, 500);
+    }
+});
+
+// Gemini Compatible Endpoint
+app.post('/v1beta/models/:modelWithAction', async (c) => {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    let usageRecord: Partial<UsageRecord> = {
+        requestId,
+        date: new Date().toISOString(),
+        sourceIp: getClientIp(c),
+        incomingApiType: 'gemini',
+        startTime,
+        isStreamed: false,
+        responseStatus: 'pending'
+    };
+
+    try {
+        const body = await c.req.json();
+        const modelWithAction = c.req.param('modelWithAction');
+        // Extract model from "model-name:action"
+        const modelName = modelWithAction.split(':')[0];
+        usageRecord.incomingModelAlias = modelName;
+        
+        // API Key extraction
+        const apiKey = c.req.query('key') || c.req.header('x-goog-api-key');
+        usageRecord.apiKey = apiKey ? apiKey.substring(0, 8) + '...' : null;
+
+        logger.debug('Incoming Gemini Request', body);
+        const transformer = new GeminiTransformer();
+        const unifiedRequest = await transformer.parseRequest({ ...body, model: modelName });
+        unifiedRequest.incomingApiType = 'gemini';
+        
+        // Check if streaming based on action
+        if (modelWithAction.includes('streamGenerateContent')) {
+            unifiedRequest.stream = true;
+        }
+
+        const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+        
+        return await handleResponse(
+            c,
+            unifiedResponse,
+            transformer,
+            usageRecord,
+            usageStorage,
+            startTime,
+            'gemini'
+        );
+    } catch (e: any) {
+        usageRecord.responseStatus = 'error';
+        usageRecord.durationMs = Date.now() - startTime;
+        usageStorage.saveRequest(usageRecord as UsageRecord);
+
+        logger.error('Error processing Gemini request', e);
+        // Gemini error format (simplified)
+        return c.json({ error: { message: e.message, code: 500, status: "INTERNAL" } }, 500);
     }
 });
 

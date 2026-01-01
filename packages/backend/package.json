@@ -10,6 +10,7 @@
     "update-cassettes": "RECORD=1 bun test src/services/__tests__/e2e_vcr_*.test.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.34.0",
     "dotenv": "^17.2.3",
     "hono": "^4.11.3",
     "winston": "^3.19.0",

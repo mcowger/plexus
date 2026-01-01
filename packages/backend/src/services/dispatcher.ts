@@ -21,7 +21,9 @@ export class Dispatcher {
         // 4. Execute Request
         // Ensure api_base_url doesn't end with slash if endpoint starts with slash, or handle cleanly
         const baseUrl = route.config.api_base_url.replace(/\/$/, '');
-        const endpoint = transformer.defaultEndpoint; // e.g. /chat/completions
+        const endpoint = transformer.getEndpoint ? 
+                        transformer.getEndpoint(requestWithTargetModel) : 
+                        transformer.defaultEndpoint;
         const url = `${baseUrl}${endpoint}`;
         
         const headers: Record<string, string> = {
@@ -33,6 +35,8 @@ export class Dispatcher {
              if (type === 'anthropic') {
                  headers['x-api-key'] = route.config.api_key;
                  headers['anthropic-version'] = '2023-06-01'; 
+             } else if (type === 'gemini' || type === 'google') {
+                 headers['x-goog-api-key'] = route.config.api_key;
              } else {
                  // Default to Bearer for OpenAI and others
                  headers['Authorization'] = `Bearer ${route.config.api_key}`;
