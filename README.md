@@ -11,6 +11,10 @@ Plexus 2 is a high-performance, universal LLM API gateway and transformation lay
 - **Load Balancing**: Distribute requests across multiple backends for the same model alias.
 - **Reasoning Support**: Unified handling of reasoning/thinking content from modern models.
 
+## API Documentation
+
+For detailed information on the available API endpoints, including the Standard Inference APIs and the Management APIs, please refer to [API.md](API.md).
+
 ## Installation
 
 Plexus 2 is built with [Bun](https://bun.sh/).
