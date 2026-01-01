@@ -114,6 +114,8 @@ export interface UnifiedChatResponse {
     prompt_tokens_details?: {
         cached_tokens?: number;
         audio_tokens?: number;
+        text_tokens?: number;
+        image_tokens?: number;
     };
     completion_tokens_details?: {
         reasoning_tokens?: number;
@@ -162,6 +164,8 @@ export interface UnifiedChatStreamChunk {
         prompt_tokens_details?: {
             cached_tokens?: number;
             audio_tokens?: number;
+            text_tokens?: number;
+            image_tokens?: number;
         };
         completion_tokens_details?: {
             reasoning_tokens?: number;

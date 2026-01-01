@@ -219,4 +219,55 @@ describe("GeminiTransformer", () => {
         expect(output).toContain('"parts":[{"text":"Hi"}]');
         expect(output).toContain('"finishReason":"STOP"');
     });
+
+    test("transformResponse extracts detailed usage from Gemini response", async () => {
+        const geminiResponse = {
+            candidates: [{
+                content: { parts: [{ text: "Response" }] }
+            }],
+            usageMetadata: {
+                promptTokenCount: 104,
+                candidatesTokenCount: 25,
+                totalTokenCount: 439,
+                promptTokensDetails: [
+                    { modality: "TEXT", tokenCount: 104 },
+                    { modality: "IMAGE", tokenCount: 10 }
+                ],
+                thoughtsTokenCount: 310
+            }
+        };
+
+        const result = await transformer.transformResponse(geminiResponse);
+        expect(result.usage?.prompt_tokens).toBe(104);
+        expect(result.usage?.prompt_tokens_details?.text_tokens).toBe(104);
+        expect(result.usage?.prompt_tokens_details?.image_tokens).toBe(10);
+        expect(result.usage?.completion_tokens_details?.reasoning_tokens).toBe(310);
+    });
+
+    test("formatResponse includes detailed usage in Gemini format", async () => {
+        const unified: UnifiedChatResponse = {
+            id: "unified-123",
+            model: "gemini-pro",
+            content: "Response",
+            usage: {
+                prompt_tokens: 104,
+                completion_tokens: 25,
+                total_tokens: 439,
+                prompt_tokens_details: {
+                    text_tokens: 104,
+                    image_tokens: 0
+                },
+                completion_tokens_details: {
+                    reasoning_tokens: 310
+                }
+            }
+        };
+
+        const result = await transformer.formatResponse(unified);
+        expect(result.usageMetadata.promptTokenCount).toBe(104);
+        expect(result.usageMetadata.thoughtsTokenCount).toBe(310);
+        expect(result.usageMetadata.promptTokensDetails).toHaveLength(1);
+        expect(result.usageMetadata.promptTokensDetails[0].modality).toBe("TEXT");
+        expect(result.usageMetadata.promptTokensDetails[0].tokenCount).toBe(104);
+    });
 });
