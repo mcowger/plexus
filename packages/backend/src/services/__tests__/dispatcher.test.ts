@@ -27,7 +27,7 @@ describe("Dispatcher", () => {
     };
 
     const mockRouteConfig = {
-        type: "OpenAI",
+        type: "chat",
         api_base_url: "https://api.example.com/v1",
         api_key: "test-key",
         headers: { "X-Custom-Header": "custom-value" }
@@ -40,7 +40,7 @@ describe("Dispatcher", () => {
     };
 
     const mockTransformer = {
-        name: "OpenAI",
+        name: "chat",
         defaultEndpoint: "/chat/completions",
         transformRequest: mock(() => Promise.resolve({ transformed: "request" })),
         transformResponse: mock(() => Promise.resolve({ 
@@ -83,7 +83,7 @@ describe("Dispatcher", () => {
         expect(Router.resolve).toHaveBeenCalledWith("test-model");
 
         // Verify TransformerFactory call
-        expect(TransformerFactory.getTransformer).toHaveBeenCalledWith("OpenAI");
+        expect(TransformerFactory.getTransformer).toHaveBeenCalledWith("chat");
 
         // Verify transformRequest call
         expect(mockTransformer.transformRequest).toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe("Dispatcher", () => {
     test("handles Anthropic specific headers", async () => {
         const anthropicRoute = {
             ...mockRoute,
-            config: { ...mockRouteConfig, type: "Anthropic" }
+            config: { ...mockRouteConfig, type: "messages" }
         };
 
         spyOn(Router, "resolve").mockReturnValue(anthropicRoute as any);

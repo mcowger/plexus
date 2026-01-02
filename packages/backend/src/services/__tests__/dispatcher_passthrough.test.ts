@@ -45,7 +45,7 @@ describe("Dispatcher Pass-through Optimization", () => {
             provider: "test-provider",
             model: "test-model",
             config: {
-                type: "openai", // Matches incoming
+                type: "chat", // Matches incoming
                 api_base_url: "https://api.openai.com",
                 api_key: "sk-test"
             },
@@ -86,7 +86,7 @@ describe("Dispatcher Pass-through Optimization", () => {
             provider: "anthropic",
             model: "claude-3",
             config: {
-                type: "anthropic", // Mismatch
+                type: "messages", // Mismatch
                 api_base_url: "https://api.anthropic.com",
                 api_key: "sk-ant"
             },

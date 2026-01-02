@@ -74,10 +74,6 @@ export async function handleResponse(
     usageRecord.provider = unifiedResponse.plexus?.provider;
     
     let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
-    // Standardize API types
-    if (outgoingApiType === 'openai') outgoingApiType = 'chat';
-    else if (outgoingApiType === 'anthropic') outgoingApiType = 'messages';
-    else if (outgoingApiType === 'google') outgoingApiType = 'gemini';
     
     usageRecord.outgoingApiType = outgoingApiType;
     

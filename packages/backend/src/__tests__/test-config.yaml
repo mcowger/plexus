@@ -1,10 +1,11 @@
 providers:
   openai:
-    type: openai
+    type: chat
     api_base_url: https://api.openai.com/v1
-    api_key: sk-test-key
+    api_key: test-key
     models:
       - gpt-4
+      - gpt-3.5-turbo
 models:
   gpt-4:
     targets:

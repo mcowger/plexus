@@ -9,8 +9,8 @@ describe("Router", () => {
     
     const mockConfig = {
         providers: {
-            "openai": { type: "OpenAI", api_base_url: "https://api.openai.com/v1" },
-            "anthropic": { type: "Anthropic", api_base_url: "https://api.anthropic.com/v1" },
+            "openai": { type: "chat", api_base_url: "https://api.openai.com/v1" },
+            "anthropic": { type: "messages", api_base_url: "https://api.anthropic.com/v1" },
             "kilo": { type: "openrouter", api_base_url: "https://api.kilocode.ai/api/openrouter" }
         },
         models: {
@@ -46,7 +46,7 @@ describe("Router", () => {
         const route = Router.resolve("gpt-4");
         expect(route.provider).toBe("openai");
         expect(route.model).toBe("gpt-4-turbo");
-        expect(route.config.type).toBe("OpenAI");
+        expect(route.config.type).toBe("chat");
     });
 
     test("routes another aliased model correctly", () => {

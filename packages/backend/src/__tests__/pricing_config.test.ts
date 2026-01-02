@@ -6,7 +6,7 @@ describe("Config Pricing Schema", () => {
     const yamlContent = `
 providers:
   synthetic:
-    type: OpenAI
+    type: chat
     display_name: Synthetic
     api_base_url: https://api.synthetic.new/openai/v1
     models:
@@ -30,7 +30,7 @@ models:
     const yamlContent = `
 providers:
   synthetic:
-    type: OpenAI
+    type: chat
     display_name: Synthetic
     api_base_url: https://api.synthetic.new/openai/v1
     models:
@@ -63,7 +63,7 @@ models:
     const yamlContent = `
 providers:
   openai:
-    type: OpenAI
+    type: chat
     api_base_url: https://api.openai.com/v1
     models:
       - gpt-4
@@ -81,7 +81,7 @@ models:
     const yamlContent = `
 providers:
   synthetic:
-    type: OpenAI
+    type: chat
     api_base_url: https://api.synthetic.new/openai/v1
     models:
       hf:model:
@@ -96,7 +96,7 @@ models: {}
     const yamlContent = `
 providers:
   synthetic:
-    type: OpenAI
+    type: chat
     api_base_url: https://api.synthetic.new/openai/v1
     models:
       hf:model:

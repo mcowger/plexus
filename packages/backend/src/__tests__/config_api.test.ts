@@ -12,7 +12,7 @@ const MOCK_CONFIG_PATH = "/tmp/mock_plexus.yaml";
 const MOCK_YAML = `
 providers:
   test_provider:
-    type: openai
+    type: chat
     api_base_url: https://api.test.com
     api_key: 123
 models:
@@ -119,7 +119,7 @@ describe("Config Management API", () => {
         const newConfig = `
 providers:
   new_provider:
-    type: Anthropic
+    type: messages
     api_base_url: https://api.anthropic.com
 models: {}
 `;

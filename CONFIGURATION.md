@@ -10,17 +10,16 @@ The configuration file is YAML-based and sits at the heart of how Plexus routes 
 
 ```yaml
 providers:
-  # Define your upstream providers
   openai_direct:
-    type: OpenAI
+    type: chat
     api_base_url: https://api.openai.com/v1
     api_key: your_openai_key
     models:
       - gpt-4o
       - gpt-4o-mini
-
+      
   my_anthropic:
-    type: Anthropic
+    type: messages
     api_base_url: https://api.anthropic.com/v1
     api_key: your_anthropic_key
     models:

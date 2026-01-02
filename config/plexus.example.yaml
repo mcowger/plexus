@@ -10,7 +10,7 @@
 # Define your upstream AI providers here.
 #
 #   type:         The transformer architecture used by the provider. 
-#                 Common values: OpenAI, Anthropic, OpenRouter.
+#                 Common values: chat, messages, gemini.
 #   display_name: A friendly name for logging and metadata.
 #   api_base_url: The root endpoint for the provider's API.
 #   api_key:      Your authentication token for the provider.
@@ -33,7 +33,7 @@
 providers:
   # Standard OpenAI Configuration
   openai:
-    type: OpenAI
+    type: chat
     display_name: OpenAI
     api_base_url: https://api.openai.com/v1
     api_key: "your-openai-api-key-here"
@@ -44,7 +44,7 @@ providers:
 
   # Standard Anthropic Configuration
   anthropic:
-    type: Anthropic
+    type: messages
     display_name: Anthropic Claude
     api_base_url: https://api.anthropic.com/v1
     api_key: "your-anthropic-api-key-here"
@@ -55,7 +55,7 @@ providers:
 
   # Standard Google Gemini Configuration
   gemini:
-    type: Gemini
+    type: gemini
     display_name: Google Gemini
     api_base_url: https://generativelanguage.googleapis.com
     api_key: "your-gemini-api-key-here"
@@ -67,7 +67,7 @@ providers:
   # Example with Pricing Configuration
   # Pricing is per 1M tokens.
   openai_cost_tracked:
-    type: OpenAI
+    type: chat
     display_name: OpenAI (Tracked)
     api_base_url: https://api.openai.com/v1
     api_key: "your-openai-api-key-here"
@@ -86,7 +86,7 @@ providers:
   # Example with Tiered Pricing Configuration (Defined Strategy)
   # Pricing changes based on input token usage volume.
   tiered_pricing_example:
-    type: OpenAI
+    type: chat
     display_name: Tiered Pricing Provider
     api_base_url: https://api.example.com/v1
     api_key: "your-api-key"
@@ -108,7 +108,7 @@ providers:
 
   # Example of a Chat-compatible provider (e.g. Together, DeepSeek, Groq)
   deepseek:
-    type: OpenAI
+    type: chat
     display_name: DeepSeek
     api_base_url: https://api.deepseek.com
     api_key: "your-deepseek-api-key-here"
@@ -118,7 +118,7 @@ providers:
 
   # Example with custom headers and OpenRouter pricing lookup
   openrouter:
-    type: OpenAI
+    type: chat
     display_name: OpenRouter
     api_base_url: https://openrouter.ai/api/v1
     api_key: "your-openrouter-key-here"

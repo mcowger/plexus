@@ -40,7 +40,7 @@ describe("handleResponse", () => {
             plexus: {
                 provider: "provider-1",
                 model: "model-orig",
-                apiType: "openai"
+                apiType: "chat"
             },
             usage: {
                 input_tokens: 10,

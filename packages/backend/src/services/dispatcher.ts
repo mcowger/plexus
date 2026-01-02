@@ -28,9 +28,9 @@ export class Dispatcher {
         
         let isCompatible = false;
         if (incoming && outgoing) {
-             if (incoming === 'chat' && outgoing === 'openai') isCompatible = true;
-             else if (incoming === 'messages' && outgoing === 'anthropic') isCompatible = true;
-             else if (incoming === 'gemini' && (outgoing === 'google' || outgoing === 'gemini')) isCompatible = true;
+             if (incoming === 'chat' && outgoing === 'chat') isCompatible = true;
+             else if (incoming === 'messages' && outgoing === 'messages') isCompatible = true;
+             else if (incoming === 'gemini' && outgoing === 'gemini') isCompatible = true;
         }
 
         let bypassTransformation = false;
@@ -75,13 +75,13 @@ export class Dispatcher {
         
         if (route.config.api_key) {
              const type = route.config.type.toLowerCase();
-             if (type === 'anthropic') {
+             if (type === 'messages') {
                  headers['x-api-key'] = route.config.api_key;
                  headers['anthropic-version'] = '2023-06-01'; 
-             } else if (type === 'gemini' || type === 'google') {
+             } else if (type === 'gemini') {
                  headers['x-goog-api-key'] = route.config.api_key;
              } else {
-                 // Default to Bearer for OpenAI and others
+                 // Default to Bearer for Chat (OpenAI) and others
                  headers['Authorization'] = `Bearer ${route.config.api_key}`;
              }
         }
