@@ -29,8 +29,10 @@ export class UsageStorageService extends EventEmitter {
 
     constructor(connectionString?: string) {
         super();
-        if (connectionString) {
-            this.db = new Database(connectionString);
+        const effectiveConnectionString = connectionString || process.env.PLEXUS_DB_URL;
+        
+        if (effectiveConnectionString) {
+            this.db = new Database(effectiveConnectionString);
             this.init();
             return;
         }

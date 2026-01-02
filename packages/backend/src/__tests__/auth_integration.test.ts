@@ -39,6 +39,14 @@ mock.module('../utils/logger', () => ({
     }
 }));
 
+// Mock serveStatic from hono/bun to avoid depending on frontend build
+mock.module('hono/bun', () => ({
+    serveStatic: () => (c: any) => c.text('Mock Static', 200),
+    getConnInfo: () => ({ remote: { address: '127.0.0.1' } })
+}));
+
+process.env.PLEXUS_DB_URL = ':memory:';
+
 // Dynamic import to apply mocks
 const serverModule = await import('../index');
 const server = serverModule.default;

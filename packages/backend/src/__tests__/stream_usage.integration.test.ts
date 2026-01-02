@@ -3,37 +3,57 @@ import { Dispatcher } from "../services/dispatcher";
 import { UsageStorageService } from "../services/usage-storage";
 import path from 'path';
 import fs from 'node:fs';
-import os from 'node:os';
+
+const TEST_CONFIG_YAML = `
+providers:
+  openai:
+    type: chat
+    api_base_url: https://api.openai.com/v1
+    api_key: test-key
+    models:
+      - gpt-4
+      - gpt-3.5-turbo
+models:
+  gpt-4:
+    targets:
+      - provider: openai
+        model: gpt-4
+keys:
+  test-key:
+    secret: "sk-test-key"
+    comment: "Test Key"
+adminKey: "test-admin-key"
+`;
+
+// Mock Config
+mock.module('../config', () => {
+    // We need to keep some real functionality (like validateConfig) but mock loadConfig
+    const original = require('../config'); 
+    return {
+        ...original,
+        loadConfig: () => Promise.resolve({}), // No-op for initial load
+        getConfigPath: () => '/tmp/test-config.yaml',
+    };
+});
 
 describe("Streaming Usage Integration", () => {
     let dispatchSpy: any;
     let saveRequestSpy: any;
     let server: any;
-    let tempDir: string;
 
     beforeAll(async () => {
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plexus-test-'));
-        process.env.DATA_DIR = tempDir;
+        process.env.PLEXUS_DB_URL = ':memory:';
         process.env.BYPASS_AUTH_FOR_TESTING = 'true';
-
-        const configPath = path.resolve(__dirname, './test-config.yaml');
-        process.env.CONFIG_FILE = configPath;
         
         // Load the module
         const module = await import("../index");
         server = module.default;
         
         // Force reload of config in case it was cached without keys
-        const { loadConfig, setConfigForTesting, validateConfig } = await import("../config");
-        const configContent = fs.readFileSync(configPath, 'utf8');
-        const config = validateConfig(configContent);
+        // We import the mocked module again to use its exported functions
+        const { setConfigForTesting, validateConfig } = await import("../config");
+        const config = validateConfig(TEST_CONFIG_YAML);
         setConfigForTesting(config);
-    });
-
-    afterAll(() => {
-        if (tempDir) {
-            fs.rmSync(tempDir, { recursive: true, force: true });
-        }
     });
 
     beforeEach(() => {

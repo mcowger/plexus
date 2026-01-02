@@ -1,6 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, mock } from "bun:test";
 import { getClientIp } from "../ip";
 import { Context } from "hono";
+
+// Mock hono/bun to ensure clean state for this test suite
+mock.module("hono/bun", () => ({
+    getConnInfo: () => ({ remote: {} })
+}));
 
 // Helper to create a mock Hono Context
 function createMockContext(headers: Record<string, string>, socketAddress?: string): Context {
