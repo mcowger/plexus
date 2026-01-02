@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.3 - 2026-01-02
+
+### Under-the-Hood Polish
+
+### 🛠 Smaller Changes
+- Performed minor script adjustments and maintenance. (`1512b09`)
+
 ## v0.1.2 - 2026-01-02
 
 ### Minor Release
