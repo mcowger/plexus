@@ -82,7 +82,7 @@ interface PlexusConfig {
         type: string;
         api_key?: string;
         display_name?: string;
-        models?: string[];
+        models?: string[] | Record<string, any>;
         enabled?: boolean; // Custom field we might want to preserve if we could
     }>;
     models?: Record<string, any>;
@@ -111,7 +111,6 @@ export const api = {
 
   getStats: async (): Promise<Stat[]> => {
     try {
-        const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 7);
         
@@ -359,13 +358,23 @@ export const api = {
         if (config.providers) {
             Object.entries(config.providers).forEach(([pKey, pVal]) => {
                 if (pVal.models) {
-                    pVal.models.forEach(m => {
-                        models.push({
-                            id: m,
-                            name: m,
-                            providerId: pKey
+                    if (Array.isArray(pVal.models)) {
+                        pVal.models.forEach(m => {
+                            models.push({
+                                id: m,
+                                name: m,
+                                providerId: pKey
+                            });
                         });
-                    });
+                    } else if (typeof pVal.models === 'object') {
+                        Object.keys(pVal.models).forEach(m => {
+                            models.push({
+                                id: m,
+                                name: m,
+                                providerId: pKey
+                            });
+                        });
+                    }
                 }
             });
         }

@@ -55,14 +55,14 @@ The following environment variables are used during **Record Mode**:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `PLEXUS_TEST_API_KEY` | OpenAI-compatible API Key. | `scrubbed_key` |
-| `PLEXUS_TEST_ANTHROPIC_API_KEY` | Anthropic API Key. | `scrubbed_key` |
-| `PLEXUS_TEST_BASE_URL` | Base URL for OpenAI provider. | `https://api.upstream.mock/openai/v1` |
-| `PLEXUS_TEST_ANTHROPIC_BASE_URL` | Base URL for Anthropic provider. | `https://api.anthropic.com/v1` |
+| `PLEXUS_TEST_API_KEY` | Chat-compatible API Key. | `scrubbed_key` |
+| `PLEXUS_TEST_ANTHROPIC_API_KEY` | Messages API Key. | `scrubbed_key` |
+| `PLEXUS_TEST_BASE_URL` | Base URL for Chat provider. | `https://api.upstream.mock/openai/v1` |
+| `PLEXUS_TEST_ANTHROPIC_BASE_URL` | Base URL for Messages provider. | `https://api.anthropic.com/v1` |
 
 ## Adding New Test Cases
 
-1.  Add a new JSON request body to `cases/chat/` (for OpenAI-like) or `cases/messages/` (for Anthropic-like).
+1.  Add a new JSON request body to `cases/chat/` (for Chat-like) or `cases/messages/` (for Messages-like).
 2.  Run the **Record Mode** command above to capture the network interaction.
 3.  Commit the new case and its corresponding cassette in `__cassettes__/`.
 

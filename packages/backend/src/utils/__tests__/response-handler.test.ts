@@ -63,13 +63,13 @@ describe("handleResponse", () => {
             usageRecord,
             mockStorage,
             Date.now(),
-            "openai"
+            "chat"
         );
 
         // Verify Usage Record updates
         expect(usageRecord.selectedModelName).toBe("model-orig");
         expect(usageRecord.provider).toBe("provider-1");
-        expect(usageRecord.outgoingApiType).toBe("openai");
+        expect(usageRecord.outgoingApiType).toBe("chat");
         expect(usageRecord.tokensInput).toBe(10);
         expect(usageRecord.tokensOutput).toBe(20);
         expect(usageRecord.responseStatus).toBe("success");
@@ -101,7 +101,7 @@ describe("handleResponse", () => {
             usageRecord,
             mockStorage,
             Date.now(),
-            "anthropic"
+            "messages"
         );
 
         expect(usageRecord.selectedModelName).toBe("fallback-model");
@@ -132,7 +132,7 @@ describe("handleResponse", () => {
                 usageRecord,
                 mockStorage,
                 Date.now(),
-                "openai"
+                "chat"
             );
 
             expect(usageRecord.tokensInput).toBe(111);
@@ -177,7 +177,7 @@ describe("handleResponse", () => {
                 usageRecord,
                 mockStorage,
                 Date.now(),
-                "openai"
+                "chat"
             );
 
             // Mock the transformer's formatStream to just return the same stream for simplicity

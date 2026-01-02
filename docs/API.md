@@ -6,17 +6,17 @@ This document describes the API endpoints available in Plexus 2.
 
 Plexus 2 provides compatibility layers for major AI provider formats.
 
-### OpenAI Compatible
+### Chat Compatible (OpenAI)
 - **Endpoint:** `POST /v1/chat/completions`
 - **Description:** Compatible with the OpenAI Chat Completions API.
 - **Documentation:** See [OpenAI API Reference](https://platform.openai.com/docs/api-reference/chat) for request and response formats.
 
-### Anthropic Compatible
+### Messages Compatible (Anthropic)
 - **Endpoint:** `POST /v1/messages`
 - **Description:** Compatible with the Anthropic Messages API.
 - **Documentation:** See [Anthropic API Reference](https://docs.anthropic.com/en/api/messages) for request and response formats.
 
-### Gemini Compatible
+### Gemini Compatible (Google)
 - **Endpoint:** `POST /v1beta/models/{model}:{action}`
 - **Description:** Compatible with the Google Generative Language API (Gemini).
 - **Supported Actions:** `generateContent`, `streamGenerateContent`.
@@ -53,7 +53,7 @@ The Management APIs provide endpoints for inspecting the system configuration an
   - `offset` (optional): Number of records to skip (default: 0).
   - `startDate` (optional): ISO date string (e.g., `2023-01-01`).
   - `endDate` (optional): ISO date string.
-  - `incomingApiType` (optional): e.g., `openai`, `anthropic`.
+  - `incomingApiType` (optional): e.g., `chat`, `messages`.
   - `provider` (optional): The upstream provider name.
   - `incomingModelAlias` (optional): The model name requested by the client.
   - `selectedModelName` (optional): The actual upstream model name used.
@@ -71,11 +71,11 @@ The Management APIs provide endpoints for inspecting the system configuration an
         "date": "2025-12-31T23:59:59.000Z",
         "sourceIp": "127.0.0.1",
         "apiKey": "sk-...",
-        "incomingApiType": "openai",
+        "incomingApiType": "chat",
         "provider": "openai_direct",
         "incomingModelAlias": "fast-model",
         "selectedModelName": "gpt-4o-mini",
-        "outgoingApiType": "openai",
+        "outgoingApiType": "chat",
         "tokensInput": 150,
         "tokensOutput": 450,
         "tokensReasoning": 0,

@@ -35,12 +35,20 @@ export async function handleResponse(
     usageRecord: Partial<UsageRecord>,
     usageStorage: UsageStorageService,
     startTime: number,
-    apiType: 'openai' | 'anthropic' | 'gemini'
+    apiType: 'chat' | 'messages' | 'gemini'
 ) {
     // Update record with selected model info if available
     usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model;
     usageRecord.provider = unifiedResponse.plexus?.provider;
-    usageRecord.outgoingApiType = unifiedResponse.plexus?.apiType;
+    
+    let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
+    // Standardize API types
+    if (outgoingApiType === 'openai') outgoingApiType = 'chat';
+    else if (outgoingApiType === 'anthropic') outgoingApiType = 'messages';
+    else if (outgoingApiType === 'google') outgoingApiType = 'gemini';
+    
+    usageRecord.outgoingApiType = outgoingApiType;
+    
     usageRecord.isStreamed = !!unifiedResponse.stream;
     usageRecord.isPassthrough = unifiedResponse.bypassTransformation;
 
@@ -142,7 +150,6 @@ export async function handleResponse(
     usageRecord.durationMs = Date.now() - startTime;
     usageStorage.saveRequest(usageRecord as UsageRecord);
 
-    const apiName = apiType === 'openai' ? 'OpenAI' : apiType === 'anthropic' ? 'Anthropic' : 'Gemini';
-    logger.debug(`Outgoing ${apiName} Response`, responseBody);
+    logger.debug(`Outgoing ${apiType} Response`, responseBody);
     return c.json(responseBody);
 }

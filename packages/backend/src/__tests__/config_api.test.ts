@@ -12,7 +12,7 @@ const MOCK_CONFIG_PATH = "/tmp/mock_plexus.yaml";
 const MOCK_YAML = `
 providers:
   test_provider:
-    type: OpenAI
+    type: openai
     api_base_url: https://api.test.com
     api_key: 123
 models:

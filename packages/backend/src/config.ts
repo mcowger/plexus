@@ -178,7 +178,6 @@ export function getConfig(): PlexusConfig {
     if (!currentConfig) {
         throw new Error("Configuration not loaded. Call loadConfig() first.");
     }
-    console.log("getConfig called, currentConfig provider keys:", Object.keys(currentConfig.providers));
     return currentConfig;
 }
 

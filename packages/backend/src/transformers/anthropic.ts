@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 import { countTokens } from './utils'
 
 export class AnthropicTransformer implements Transformer {
-  name = 'Anthropic';
+  name = 'messages';
   defaultEndpoint = '/messages';
   
   // --- 1. Client (Anthropic) -> Unified ---

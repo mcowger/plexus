@@ -55,7 +55,7 @@ describe("Dispatcher Pass-through Optimization", () => {
         const request: UnifiedChatRequest = {
             model: "test-alias",
             messages: [],
-            incomingApiType: "openai",
+            incomingApiType: "chat",
             originalBody: { 
                 model: "test-alias", 
                 messages: [{ role: "user", content: "hello" }],
@@ -96,7 +96,7 @@ describe("Dispatcher Pass-through Optimization", () => {
         const request: UnifiedChatRequest = {
             model: "test-alias",
             messages: [],
-            incomingApiType: "openai", // Mismatch
+            incomingApiType: "chat", // Mismatch
             originalBody: { model: "test-alias" }
         };
 

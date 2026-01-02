@@ -20,12 +20,18 @@ export class Dispatcher {
         let providerPayload;
 
         // Pass-through Optimization
-        const isCompatible = (
-            request.incomingApiType && 
-            route.config.type && 
-            (request.incomingApiType.toLowerCase() === route.config.type.toLowerCase() || 
-             (request.incomingApiType === 'gemini' && route.config.type === 'google'))
-        );
+        // request.incomingApiType is now 'chat', 'messages', or 'gemini'
+        // route.config.type is 'OpenAI', 'Anthropic', or 'Gemini'/'Google'
+        
+        const incoming = request.incomingApiType?.toLowerCase();
+        const outgoing = route.config.type?.toLowerCase();
+        
+        let isCompatible = false;
+        if (incoming && outgoing) {
+             if (incoming === 'chat' && outgoing === 'openai') isCompatible = true;
+             else if (incoming === 'messages' && outgoing === 'anthropic') isCompatible = true;
+             else if (incoming === 'gemini' && (outgoing === 'google' || outgoing === 'gemini')) isCompatible = true;
+        }
 
         let bypassTransformation = false;
 
@@ -85,9 +91,7 @@ export class Dispatcher {
             Object.assign(headers, route.config.headers);
         }
 
-        const incomingApi = request.incomingApiType === 'openai' ? 'OpenAI' : 
-                           request.incomingApiType === 'anthropic' ? 'Anthropic' : 
-                           request.incomingApiType || 'Unknown';
+        const incomingApi = request.incomingApiType || 'unknown';
 
         logger.info(`Dispatching ${request.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`);
         logger.silly('Upstream Request Payload', providerPayload);

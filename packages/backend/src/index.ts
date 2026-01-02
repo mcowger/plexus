@@ -47,7 +47,7 @@ app.post('/v1/chat/completions', async (c) => {
         requestId,
         date: new Date().toISOString(),
         sourceIp: getClientIp(c),
-        incomingApiType: 'openai',
+        incomingApiType: 'chat',
         startTime,
         isStreamed: false,
         responseStatus: 'pending'
@@ -63,7 +63,7 @@ app.post('/v1/chat/completions', async (c) => {
         logger.debug('Incoming OpenAI Request', body);
         const transformer = new OpenAITransformer();
         const unifiedRequest = await transformer.parseRequest(body);
-        unifiedRequest.incomingApiType = 'openai';
+        unifiedRequest.incomingApiType = 'chat';
         unifiedRequest.originalBody = body;
         unifiedRequest.requestId = requestId;
         
@@ -78,7 +78,7 @@ app.post('/v1/chat/completions', async (c) => {
             usageRecord,
             usageStorage,
             startTime,
-            'openai'
+            'chat'
         );
     } catch (e: any) {
         usageRecord.responseStatus = 'error';
@@ -98,7 +98,7 @@ app.post('/v1/messages', async (c) => {
         requestId,
         date: new Date().toISOString(),
         sourceIp: getClientIp(c),
-        incomingApiType: 'anthropic',
+        incomingApiType: 'messages',
         startTime,
         isStreamed: false,
         responseStatus: 'pending'
@@ -114,7 +114,7 @@ app.post('/v1/messages', async (c) => {
         logger.debug('Incoming Anthropic Request', body);
         const transformer = new AnthropicTransformer();
         const unifiedRequest = await transformer.parseRequest(body);
-        unifiedRequest.incomingApiType = 'anthropic';
+        unifiedRequest.incomingApiType = 'messages';
         unifiedRequest.originalBody = body;
         unifiedRequest.requestId = requestId;
 
@@ -129,7 +129,7 @@ app.post('/v1/messages', async (c) => {
             usageRecord,
             usageStorage,
             startTime,
-            'anthropic'
+            'messages'
         );
     } catch (e: any) {
         usageRecord.responseStatus = 'error';

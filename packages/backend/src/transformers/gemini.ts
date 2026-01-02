@@ -30,9 +30,8 @@ export interface GenerateContentRequest {
 }
 
 export class GeminiTransformer implements Transformer {
-    name = 'Gemini';
-    defaultEndpoint = '/v1beta/models/:modelAndAction';
-
+  name = 'gemini';
+  defaultEndpoint = '/v1beta/models/:modelAndAction';
     getEndpoint(request: UnifiedChatRequest): string {
         const action = request.stream ? 'streamGenerateContent?alt=sse' : 'generateContent';
         // Map model name: ensure it doesn't have 'models/' prefix if already there, or add it

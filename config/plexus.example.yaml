@@ -83,7 +83,7 @@ providers:
           input: 0.15
           output: 0.60
 
-  # Example of an OpenAI-compatible provider (e.g. Together, DeepSeek, Groq)
+  # Example of a Chat-compatible provider (e.g. Together, DeepSeek, Groq)
   deepseek:
     type: OpenAI
     display_name: DeepSeek
@@ -112,7 +112,7 @@ models:
       - provider: anthropic
         model: claude-3-5-sonnet-latest
 
-  # Alias routing to an OpenAI-compatible backend
+  # Alias routing to a Chat-compatible backend
   fast-model:
     targets:
       - provider: openai

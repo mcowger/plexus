@@ -6,7 +6,8 @@ export class TransformerFactory {
         switch (providerType.toLowerCase()) {
             case 'anthropic':
                 return new AnthropicTransformer();
-            case 'google':
+            case 'google': // because I can never remember the exact provider name :)
+            case 'gemini':
                 return new GeminiTransformer();
             case 'openai':
                 return new OpenAITransformer();
