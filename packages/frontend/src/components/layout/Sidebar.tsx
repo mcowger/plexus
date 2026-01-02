@@ -75,11 +75,15 @@ export const Sidebar: React.FC = () => {
             <Settings size={20} />
             <span>Settings</span>
             </NavLink>
+            <NavLink to="/system-logs" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+            <FileText size={20} />
+            <span>System Logs</span>
+            </NavLink>
         </div>
 
         <div className="nav-section mt-auto">
             <h3 className="nav-section-title">System</h3>
-            <NavLink to="/debug" className={({ isActive }) => clsx('nav-item mb-2', isActive && 'active')}>
+            <NavLink to="/debug" className={({ isActive }) => clsx('nav-item', isActive && 'active')} style={{ marginBottom: '8px' }}>
                 <Database size={20} />
                 <span>Debug Traces</span>
             </NavLink>

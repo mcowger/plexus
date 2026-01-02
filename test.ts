@@ -97,18 +97,30 @@ if (apiType === "gemini") {
 }
 
 const PLEXUS_URL = process.env.PLEXUS_URL || "http://localhost:4000";
+const PLEXUS_API_KEY = process.env.PLEXUS_API_KEY;
 const url = `${PLEXUS_URL}${endpoint}`;
 
 console.log(`\n🚀 Sending request to ${url}`);
 console.log(`📦 Model: ${model}`);
 console.log(`🛠️  Tool enabled: ${includeTool}`);
 console.log(`🌊 Stream enabled: ${stream}`);
+if (PLEXUS_API_KEY) {
+  console.log(`🔑 Auth: Bearer ${PLEXUS_API_KEY.substring(0, 4)}...${PLEXUS_API_KEY.slice(-4)}`);
+}
 console.log(`-------------------------------------------\n`);
 
 try {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (PLEXUS_API_KEY) {
+    headers["Authorization"] = `Bearer ${PLEXUS_API_KEY}`;
+    // Also add as x-api-key and x-goog-api-key for compatibility if testing those specific behaviors through plexus
+    headers["x-api-key"] = PLEXUS_API_KEY;
+    headers["x-goog-api-key"] = PLEXUS_API_KEY;
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(requestBody),
   });
 

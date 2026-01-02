@@ -1,4 +1,8 @@
 import winston from 'winston';
+import { logEmitter, StreamTransport } from './log-base';
+
+// Re-export logEmitter and StreamTransport
+export { logEmitter, StreamTransport };
 
 const { combine, timestamp, printf, colorize, splat, json } = winston.format;
 
@@ -33,5 +37,6 @@ export const logger = winston.createLogger({
         consoleFormat
       ),
     }),
+    new StreamTransport()
   ],
 });

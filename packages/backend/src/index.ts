@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { bearerAuth } from 'hono/bearer-auth';
-import { logger } from './utils/logger';
+import { logger, logEmitter } from './utils/logger';
 import { loadConfig, getConfig, getConfigPath, validateConfig } from './config';
 import { Dispatcher } from './services/dispatcher';
 import { AnthropicTransformer, OpenAITransformer, GeminiTransformer } from './transformers';
@@ -438,6 +438,30 @@ app.delete('/v0/management/debug/logs/:requestId', (c) => {
     const success = usageStorage.deleteDebugLog(requestId);
     if (!success) return c.json({ error: "Log not found or could not be deleted" }, 404);
     return c.json({ success: true });
+});
+
+// System Logs Stream
+app.get('/v0/system/logs/stream', async (c) => {
+    return streamSSE(c, async (stream) => {
+        const listener = async (log: any) => {
+            await stream.writeSSE({
+                data: JSON.stringify(log),
+                event: 'syslog',
+                id: String(Date.now()),
+            });
+        };
+
+        logEmitter.on('log', listener);
+
+        stream.onAbort(() => {
+            logEmitter.off('log', listener);
+        });
+
+        // Keep connection alive
+        while (true) {
+            await stream.sleep(10000);
+        }
+    });
 });
 
 // Health check

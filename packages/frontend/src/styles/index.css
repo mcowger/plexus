@@ -975,3 +975,71 @@ body {
     color: var(--color-danger);
 
 }
+
+/* ===== System Logs ===== */
+.system-logs-container {
+  height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log-viewer-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: var(--space-md);
+  overflow: hidden;
+}
+
+.log-viewer-content {
+  flex: 1;
+  background-color: #0f172a;
+  padding: var(--space-md);
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.log-entry {
+  margin-bottom: 4px;
+  word-break: break-all;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.log-entry:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.log-timestamp {
+  color: var(--color-text-muted);
+  margin-right: 8px;
+}
+
+.log-level {
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.log-level.error { color: var(--color-danger); }
+.log-level.warn { color: var(--color-warning); }
+.log-level.debug { color: #60a5fa; }
+.log-level.info { color: var(--color-success); }
+
+.log-details {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  margin-left: 32px;
+  margin-top: 4px;
+}
+
+.log-waiting {
+    color: var(--color-text-muted);
+    font-style: italic;
+    text-align: center;
+    margin-top: 20px;
+}
+
