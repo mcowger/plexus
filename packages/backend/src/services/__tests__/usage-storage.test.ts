@@ -13,6 +13,36 @@ mock.module("../../utils/logger", () => ({
     }
 }));
 
+function createUsageRecord(overrides: Partial<UsageRecord>): UsageRecord {
+    return {
+        requestId: "default-req",
+        date: new Date().toISOString(),
+        sourceIp: null,
+        apiKey: null,
+        incomingApiType: "chat",
+        provider: null,
+        incomingModelAlias: null,
+        selectedModelName: null,
+        outgoingApiType: null,
+        tokensInput: 0,
+        tokensOutput: 0,
+        tokensReasoning: 0,
+        tokensCached: 0,
+        costInput: 0,
+        costOutput: 0,
+        costCached: 0,
+        costTotal: 0,
+        costSource: null,
+        costMetadata: null,
+        startTime: Date.now(),
+        durationMs: 0,
+        isStreamed: false,
+        responseStatus: "success",
+        isPassthrough: false,
+        ...overrides
+    };
+}
+
 describe("UsageStorageService", () => {
     let service: UsageStorageService;
 
@@ -34,12 +64,10 @@ describe("UsageStorageService", () => {
     });
 
     test("should save a usage record", () => {
-        const record: UsageRecord = {
+        const record = createUsageRecord({
             requestId: "test-request-id",
-            date: new Date().toISOString(),
             sourceIp: "127.0.0.1",
             apiKey: "sk-test",
-            incomingApiType: "chat",
             provider: "openai",
             incomingModelAlias: "gpt-4",
             selectedModelName: "gpt-4-0613",
@@ -48,11 +76,8 @@ describe("UsageStorageService", () => {
             tokensOutput: 20,
             tokensReasoning: 5,
             tokensCached: 2,
-            startTime: Date.now(),
-            durationMs: 150,
-            isStreamed: false,
-            responseStatus: "success"
-        };
+            durationMs: 150
+        });
 
         service.saveRequest(record);
 
@@ -70,9 +95,8 @@ describe("UsageStorageService", () => {
     });
 
     test("should handle null values correctly", () => {
-        const record: UsageRecord = {
+        const record = createUsageRecord({
             requestId: "test-nulls",
-            date: new Date().toISOString(),
             sourceIp: null,
             apiKey: null,
             incomingApiType: "messages",
@@ -84,11 +108,10 @@ describe("UsageStorageService", () => {
             tokensOutput: null,
             tokensReasoning: null,
             tokensCached: null,
-            startTime: Date.now(),
             durationMs: 100,
             isStreamed: true,
             responseStatus: "error"
-        };
+        });
 
         service.saveRequest(record);
 
@@ -103,25 +126,17 @@ describe("UsageStorageService", () => {
     });
 
     test("should retrieve usage with pagination", () => {
-        const baseRecord: UsageRecord = {
-            requestId: "",
-            date: new Date().toISOString(),
+        const baseRecord = createUsageRecord({
             sourceIp: "127.0.0.1",
             apiKey: "sk-test",
-            incomingApiType: "chat",
             provider: "openai",
             incomingModelAlias: "gpt-4",
             selectedModelName: "gpt-4-0613",
             outgoingApiType: "chat",
             tokensInput: 10,
             tokensOutput: 20,
-            tokensReasoning: 0,
-            tokensCached: 0,
-            startTime: Date.now(),
-            durationMs: 150,
-            isStreamed: false,
-            responseStatus: "success"
-        };
+            durationMs: 150
+        });
 
         for (let i = 0; i < 5; i++) {
             service.saveRequest({ ...baseRecord, requestId: `req-${i}`, date: new Date(Date.now() - i * 1000).toISOString() });
@@ -131,41 +146,34 @@ describe("UsageStorageService", () => {
         expect(result.total).toBe(5);
         expect(result.data.length).toBe(2);
         // Ordered by date DESC, so req-0 (newest) first
-        expect(result.data[0].requestId).toBe("req-0");
-        expect(result.data[1].requestId).toBe("req-1");
+        expect(result.data[0]!.requestId).toBe("req-0");
+        expect(result.data[1]!.requestId).toBe("req-1");
 
         const result2 = service.getUsage({}, { limit: 2, offset: 2 });
         expect(result2.data.length).toBe(2);
-        expect(result2.data[0].requestId).toBe("req-2");
+        expect(result2.data[0]!.requestId).toBe("req-2");
     });
 
     test("should filter usage with partial text match (LIKE)", () => {
-        const record1: UsageRecord = {
+        const record1 = createUsageRecord({
             requestId: "req-1",
-            date: new Date().toISOString(),
             sourceIp: "127.0.0.1",
             apiKey: "key",
-            incomingApiType: "chat",
             provider: "openai-production",
             incomingModelAlias: "gpt-4-turbo",
             selectedModelName: "gpt-4-0613",
             outgoingApiType: "chat",
             tokensInput: 10,
             tokensOutput: 20,
-            tokensReasoning: 0,
-            tokensCached: 0,
-            startTime: Date.now(),
-            durationMs: 100,
-            isStreamed: false,
-            responseStatus: "success"
-        };
-        const record2: UsageRecord = {
+            durationMs: 100
+        });
+        const record2 = createUsageRecord({
             ...record1,
             requestId: "req-2",
             provider: "anthropic-claude",
             incomingModelAlias: "claude-3-opus",
             selectedModelName: "claude-3-opus-20240229"
-        };
+        });
 
         service.saveRequest(record1);
         service.saveRequest(record2);
@@ -173,43 +181,37 @@ describe("UsageStorageService", () => {
         // Filter by partial provider
         const resProvider = service.getUsage({ provider: "openai" }, { limit: 10, offset: 0 });
         expect(resProvider.total).toBe(1);
-        expect(resProvider.data[0].requestId).toBe("req-1");
+        expect(resProvider.data[0]!.requestId).toBe("req-1");
 
         // Filter by partial model alias
         const resModel = service.getUsage({ incomingModelAlias: "claude" }, { limit: 10, offset: 0 });
         expect(resModel.total).toBe(1);
-        expect(resModel.data[0].requestId).toBe("req-2");
+        expect(resModel.data[0]!.requestId).toBe("req-2");
         
         // Filter by partial selected model
         const resSelected = service.getUsage({ selectedModelName: "0613" }, { limit: 10, offset: 0 });
         expect(resSelected.total).toBe(1);
-        expect(resSelected.data[0].requestId).toBe("req-1");
+        expect(resSelected.data[0]!.requestId).toBe("req-1");
     });
 
     test("should delete a usage log", () => {
-        service.saveRequest({
+        service.saveRequest(createUsageRecord({
             requestId: "del-req-1",
-            date: new Date().toISOString(),
-            startTime: Date.now(), durationMs: 100, isStreamed: false, responseStatus: "success"
-        });
+            durationMs: 100, responseStatus: "success"
+        }));
 
         expect(service.getUsage({}, { limit: 10, offset: 0 }).total).toBeGreaterThan(0);
 
         const success = service.deleteUsageLog("del-req-1");
         expect(success).toBe(true);
         
-        // We might need to filter by ID to be sure, but getUsage doesn't filter by ID directly.
-        // But since we are using memory db and fresh inserts for some tests, let's rely on total count or check specific item logic if needed.
-        // Actually, let's rely on total count decremented if we knew the count.
-        // Or better, let's just assume if delete returns true, it deleted it. 
-        // But to be rigorous, let's try to delete it again, should return false.
         const success2 = service.deleteUsageLog("del-req-1");
         expect(success2).toBe(false);
     });
 
     test("should delete all usage logs", () => {
-        service.saveRequest({ requestId: "u-1", date: new Date().toISOString(), startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"});
-        service.saveRequest({ requestId: "u-2", date: new Date().toISOString(), startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"});
+        service.saveRequest(createUsageRecord({ requestId: "u-1" }));
+        service.saveRequest(createUsageRecord({ requestId: "u-2" }));
         
         expect(service.getUsage({}, { limit: 10, offset: 0 }).total).toBeGreaterThanOrEqual(2);
 
@@ -224,18 +226,16 @@ describe("UsageStorageService", () => {
         const oneDay = 24 * 60 * 60 * 1000;
         
         // Log from 5 days ago
-        service.saveRequest({ 
+        service.saveRequest(createUsageRecord({ 
             requestId: "old-req", 
-            date: new Date(now - 5 * oneDay).toISOString(), 
-            startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"
-        });
+            date: new Date(now - 5 * oneDay).toISOString() 
+        }));
         
         // Log from 1 day ago
-        service.saveRequest({ 
+        service.saveRequest(createUsageRecord({ 
             requestId: "new-req", 
-            date: new Date(now - 1 * oneDay).toISOString(), 
-            startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"
-        });
+            date: new Date(now - 1 * oneDay).toISOString() 
+        }));
 
         // Delete logs older than 3 days ago
         const cutoffDate = new Date(now - 3 * oneDay);
@@ -243,25 +243,17 @@ describe("UsageStorageService", () => {
 
         const logs = service.getUsage({}, { limit: 10, offset: 0 });
         expect(logs.total).toBe(1);
-        expect(logs.data[0].requestId).toBe("new-req");
+        expect(logs.data[0]!.requestId).toBe("new-req");
     });
 
     test("should populate hasDebug flag", () => {
-        service.saveRequest({ 
-            requestId: "req-with-debug", 
-            date: new Date().toISOString(), 
-            startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"
-        });
+        service.saveRequest(createUsageRecord({ requestId: "req-with-debug" }));
         service.saveDebugLog({
             requestId: "req-with-debug",
             createdAt: Date.now()
         });
 
-        service.saveRequest({ 
-            requestId: "req-no-debug", 
-            date: new Date().toISOString(), 
-            startTime: 0, durationMs: 0, isStreamed: false, responseStatus: "ok"
-        });
+        service.saveRequest(createUsageRecord({ requestId: "req-no-debug" }));
 
         const result = service.getUsage({}, { limit: 10, offset: 0 });
         const withDebug = result.data.find(r => r.requestId === "req-with-debug");

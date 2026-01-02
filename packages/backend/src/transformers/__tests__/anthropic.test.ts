@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
 import { AnthropicTransformer } from "../anthropic";
-import { UnifiedChatRequest, UnifiedChatResponse } from "../../types/unified";
+import { UnifiedChatResponse } from "../../types/unified";
 
 describe("AnthropicTransformer", () => {
     const transformer = new AnthropicTransformer();
@@ -15,8 +15,8 @@ describe("AnthropicTransformer", () => {
         };
         const result = await transformer.parseRequest(input);
         expect(result.messages).toHaveLength(1);
-        expect(result.messages[0].role).toBe("user");
-        expect(result.messages[0].content).toBe("Hello");
+        expect(result.messages[0]!.role).toBe("user");
+        expect(result.messages[0]!.content).toBe("Hello");
         expect(result.model).toBe("claude-3");
     });
 
@@ -38,7 +38,7 @@ describe("AnthropicTransformer", () => {
         expect(result.id).toBe("msg_123");
         expect(result.role).toBe("assistant");
         expect(result.content).toBeInstanceOf(Array);
-        expect(result.content[0].text).toBe("Hi there");
+        expect((result.content as any)[0].text).toBe("Hi there");
         expect(result.usage.input_tokens).toBe(10);
     });
 
@@ -75,10 +75,10 @@ describe("AnthropicTransformer", () => {
         };
         const result = await transformer.formatResponse(unified);
         expect(result.content).toHaveLength(2);
-        expect(result.content[0].type).toBe("thinking");
-        expect(result.content[0].thinking).toBe("My internal thought");
-        expect(result.content[1].type).toBe("text");
-        expect(result.content[1].text).toBe("Hello!");
+        expect((result.content as any)[0].type).toBe("thinking");
+        expect((result.content as any)[0].thinking).toBe("My internal thought");
+        expect((result.content as any)[1].type).toBe("text");
+        expect((result.content as any)[1].text).toBe("Hello!");
     });
 
     test("usage details are mapped correctly", async () => {
@@ -124,12 +124,30 @@ describe("AnthropicTransformer", () => {
     test("transformStream converts Anthropic events to unified chunks", async () => {
         const encoder = new TextEncoder();
         const events = [
-            'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","model":"claude-3","usage":{"input_tokens":10}}}\n\n',
-            'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}\n\n',
-            'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I think"}}\n\n',
-            'event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}\n\n',
-            'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Hello"}}\n\n',
-            'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n'
+            `event: message_start
+data: {"type":"message_start","message":{"id":"msg_1","model":"claude-3","usage":{"input_tokens":10}}}
+
+`,
+            `event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}
+
+`,
+            `event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I think"}}
+
+`,
+            `event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
+
+`,
+            `event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Hello"}}
+
+`,
+            `event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}
+
+`
         ];
 
         const stream = new ReadableStream({

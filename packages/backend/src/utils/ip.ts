@@ -19,7 +19,7 @@ export function getClientIp(c: Context): string | null {
     const xForwardedFor = c.req.header('x-forwarded-for');
     if (xForwardedFor) {
         const ips = xForwardedFor.split(',').map(ip => ip.trim());
-        if (ips.length > 0) return ips[0];
+        if (ips.length > 0) return ips[0] || null;
     }
 
     // Other common headers

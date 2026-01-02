@@ -63,7 +63,7 @@ app.use('/v1/*', async (c, next) => {
     }
 
     const auth = bearerAuth({
-        verifyToken: async (token, c) => {
+        verifyToken: async (token, _c) => {
             const currentConfig = getConfig();
             if (!currentConfig.keys) return false;
             return Object.values(currentConfig.keys).some(k => k.secret === token);

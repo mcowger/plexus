@@ -1,9 +1,5 @@
-import { expect, test, describe, mock, beforeAll, afterAll } from "bun:test";
+import { expect, test, describe, mock } from "bun:test";
 import { Router } from "../router";
-import * as configModule from "../../config";
-
-// Mock the config module
-const originalGetConfig = configModule.getConfig;
 
 describe("Router", () => {
     

@@ -42,8 +42,8 @@ describe("Dispatcher", () => {
     const mockTransformer = {
         name: "chat",
         defaultEndpoint: "/chat/completions",
-        transformRequest: mock(() => Promise.resolve({ transformed: "request" })),
-        transformResponse: mock(() => Promise.resolve({ 
+        transformRequest: mock((_req: any) => Promise.resolve({ transformed: "request" })),
+        transformResponse: mock((_res: any) => Promise.resolve({ 
             id: "resp-1", 
             model: "target-model", 
             content: "response" 
@@ -75,7 +75,7 @@ describe("Dispatcher", () => {
         spyOn(TransformerFactory, "getTransformer").mockReturnValue(mockTransformer as any);
 
         // Mock fetch
-        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ raw: "response" }))));
+        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ raw: "response" })))) as any;
 
         await dispatcher.dispatch(mockRequest);
 
@@ -87,7 +87,7 @@ describe("Dispatcher", () => {
 
         // Verify transformRequest call
         expect(mockTransformer.transformRequest).toHaveBeenCalled();
-        const transformCallArg = mockTransformer.transformRequest.mock.calls[0][0];
+        const transformCallArg = mockTransformer.transformRequest.mock.calls[0]![0];
         expect(transformCallArg.model).toBe("target-model"); // Model should be overridden
 
         // Verify fetch call
@@ -115,7 +115,7 @@ describe("Dispatcher", () => {
 
         spyOn(Router, "resolve").mockReturnValue(anthropicRoute as any);
         spyOn(TransformerFactory, "getTransformer").mockReturnValue(mockTransformer as any);
-        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({}))));
+        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({})))) as any;
 
         await dispatcher.dispatch(mockRequest);
 
@@ -131,7 +131,7 @@ describe("Dispatcher", () => {
         spyOn(Router, "resolve").mockReturnValue(mockRoute as any);
         spyOn(TransformerFactory, "getTransformer").mockReturnValue(mockTransformer as any);
         
-        global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })));
+        global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 }))) as any;
 
         expect(dispatcher.dispatch(mockRequest)).rejects.toThrow("Provider failed: 500 Error");
     });
@@ -147,7 +147,7 @@ describe("Dispatcher", () => {
 
         spyOn(Router, "resolve").mockReturnValue(extraBodyRoute as any);
         spyOn(TransformerFactory, "getTransformer").mockReturnValue(mockTransformer as any);
-        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({}))));
+        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({})))) as any;
 
         await dispatcher.dispatch(mockRequest);
 

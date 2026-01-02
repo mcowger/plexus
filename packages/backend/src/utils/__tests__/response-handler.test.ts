@@ -19,6 +19,7 @@ describe("handleResponse", () => {
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {
+        name: "test-transformer",
         defaultEndpoint: "/test",
         parseRequest: mock(),
         transformRequest: mock(),
@@ -64,7 +65,7 @@ describe("handleResponse", () => {
             mockStorage,
             Date.now(),
             "chat"
-        );
+        ) as any;
 
         // Verify Usage Record updates
         expect(usageRecord.selectedModelName).toBe("model-orig");
@@ -170,7 +171,7 @@ describe("handleResponse", () => {
             
             // For streaming, handleResponse returns a Hono stream response.
             // We need to consume it to trigger the background usage recording.
-            const result = await handleResponse(
+            await handleResponse(
                 mockContext,
                 unifiedResponse,
                 mockTransformer,

@@ -7,6 +7,6 @@ export class RandomSelector extends Selector {
       return null;
     }
     const index = Math.floor(Math.random() * targets.length);
-    return targets[index];
+    return targets[index] || null;
   }
 }

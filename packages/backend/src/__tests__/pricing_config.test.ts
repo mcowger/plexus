@@ -19,8 +19,8 @@ keys: {}
 adminKey: "secret"
 `;
     const config = validateConfig(yamlContent);
-    expect(config.providers.synthetic.models).toBeDefined();
-    const models = config.providers.synthetic.models as any;
+    expect(config.providers.synthetic!.models).toBeDefined();
+    const models = config.providers.synthetic!.models as any;
     expect(models["hf:MiniMaxAI/MiniMax-M2.1"].pricing.source).toBe("openrouter");
   });
 
@@ -53,7 +53,7 @@ keys: {}
 adminKey: "secret"
 `;
     const config = validateConfig(yamlContent);
-    const models = config.providers.synthetic.models as any;
+    const models = config.providers.synthetic!.models as any;
     const ranges = models["hf:othermodel/model"].pricing.range;
     expect(ranges).toHaveLength(2);
     expect(ranges[1].upper_bound).toBe(Infinity);
@@ -76,7 +76,7 @@ keys: {}
 adminKey: "secret"
 `;
     const config = validateConfig(yamlContent);
-    expect(Array.isArray(config.providers.openai.models)).toBe(true);
+    expect(Array.isArray(config.providers.openai!.models)).toBe(true);
   });
 
   it("should fail if source is openrouter but slug is missing", () => {

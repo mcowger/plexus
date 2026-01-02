@@ -1,5 +1,4 @@
 import { getConfig, ProviderConfig } from '../config';
-import { logger } from '../utils/logger';
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
 

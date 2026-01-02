@@ -8,8 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  Area
+  Legend
 } from 'recharts';
 import { UsageData } from '../../lib/api';
 

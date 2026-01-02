@@ -1,8 +1,6 @@
-import { describe, expect, test, mock, beforeEach, afterEach, spyOn, beforeAll, afterAll } from "bun:test";
+import { describe, expect, test, mock, beforeEach, afterEach, spyOn, beforeAll } from "bun:test";
 import { Dispatcher } from "../services/dispatcher";
 import { UsageStorageService } from "../services/usage-storage";
-import path from 'path';
-import fs from 'node:fs';
 
 const TEST_CONFIG_YAML = `
 providers:

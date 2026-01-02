@@ -11,7 +11,7 @@ describe('RandomSelector', () => {
 
   it('should return the single target if only one exists', () => {
     const targets: ModelTarget[] = [{ provider: 'p1', model: 'm1' }];
-    expect(selector.select(targets)).toEqual(targets[0]);
+    expect(selector.select(targets)).toEqual(targets[0] || null);
   });
 
   it('should return a valid target from a list', () => {

@@ -20,7 +20,7 @@ describe("CooldownManager", () => {
         
         const filtered = manager.filterHealthyTargets(targets);
         expect(filtered).toHaveLength(1);
-        expect(filtered[0].provider).toBe("good-provider");
+        expect(filtered[0]!.provider).toBe("good-provider");
     });
 
     test("provider recovers after short duration", async () => {

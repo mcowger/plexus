@@ -116,8 +116,8 @@ export const Sidebar: React.FC = () => {
         title={debugMode ? "Disable Debug Mode?" : "Enable Debug Mode?"}
         footer={
             <>
-                <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
-                <Button variant={debugMode ? "default" : "danger"} onClick={confirmToggle}>
+                <Button variant="secondary" onClick={() => setShowConfirm(false)}>Cancel</Button>
+                <Button variant={debugMode ? "primary" : "danger"} onClick={confirmToggle}>
                     {debugMode ? "Disable" : "Enable"}
                 </Button>
             </>

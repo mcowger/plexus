@@ -315,7 +315,7 @@ export const Logs = () => {
                                         <td style={{ padding: '2px', alignContent: 'center', textAlign: 'center' }}>{log.isStreamed ? '✓' : ''}
                                         </td>
                                         <td style={{ padding: '2px', alignContent: 'center', textAlign: 'center' }}>
-                                            {log.isPassthrough ? <Zap size={14} className="text-yellow-500" title="Pass-through Optimization Active" /> : ''}
+                                            {log.isPassthrough ? <Zap size={14} className="text-yellow-500" /> : ''}
                                         </td>
                                         <td style={{ padding: '6px' }}>
                                             <Badge status={log.responseStatus === 'success' ? 'connected' : 'error'}>

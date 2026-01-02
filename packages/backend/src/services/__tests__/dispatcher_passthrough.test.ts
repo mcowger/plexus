@@ -32,7 +32,7 @@ describe("Dispatcher Pass-through Optimization", () => {
         } as any);
         
         // Mock global fetch
-        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ original: "response" }))));
+        global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ original: "response" })))) as any;
     });
 
     afterEach(() => {

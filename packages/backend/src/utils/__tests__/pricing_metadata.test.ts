@@ -19,6 +19,7 @@ describe("handleResponse - Pricing Metadata", () => {
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {
+        name: "test-transformer",
         defaultEndpoint: "/test",
         parseRequest: mock(),
         transformRequest: mock(),
@@ -32,6 +33,13 @@ describe("handleResponse - Pricing Metadata", () => {
         newResponse: mock((body) => ({ body })),
     } as unknown as Context;
 
+    const baseUsage = {
+        total_tokens: 200,
+        reasoning_tokens: 0,
+        cached_tokens: 0,
+        cache_creation_tokens: 0
+    };
+
     test("should set default source and metadata when no pricing is provided", async () => {
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-no-pricing",
@@ -44,6 +52,7 @@ describe("handleResponse - Pricing Metadata", () => {
                 // No pricing
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 100,
                 output_tokens: 100,
             }
@@ -85,6 +94,7 @@ describe("handleResponse - Pricing Metadata", () => {
                 pricing
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 100,
                 output_tokens: 100,
             }
@@ -126,6 +136,7 @@ describe("handleResponse - Pricing Metadata", () => {
                 pricing
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 100,
                 output_tokens: 100,
             }
@@ -147,8 +158,8 @@ describe("handleResponse - Pricing Metadata", () => {
         const metadata = JSON.parse(usageRecord.costMetadata || "{}");
         expect(metadata).toEqual({
             ...pricing,
-            input: pricing.range[0].input_per_m,
-            output: pricing.range[0].output_per_m,
+            input: pricing.range[0]!.input_per_m,
+            output: pricing.range[0]!.output_per_m,
             range: pricing.range[0]
         });
     });

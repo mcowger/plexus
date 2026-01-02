@@ -7,10 +7,7 @@ export function countTokens(text: string): number {
 
   // 1. Common sub-word fragments that usually count as separate tokens
   // in BPE (e.g., GPT-3/4).
-  const subwordPatterns = [
-    'ing', 'ed', 'ly', 'tion', 'ness', 'ment', 'able', 'ize', 'ish',
-    'pre', 'non', 'un', 're', 'anti'
-  ];
+  // const subwordPatterns = [...]; (removed unused)
 
   // 2. Initial split: words, punctuation, and spaces
   const baseTokens = text.match(/\w+|[^\w\s]|\s+/g) || [];

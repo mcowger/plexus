@@ -48,6 +48,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {
+        name: "test-transformer",
         defaultEndpoint: "/test",
         parseRequest: mock(),
         transformRequest: mock(),
@@ -61,6 +62,11 @@ describe("handleResponse - OpenRouter Pricing", () => {
         newResponse: mock((body) => ({ body })),
     } as unknown as Context;
 
+    const baseUsage = {
+        reasoning_tokens: 0,
+        cache_creation_tokens: 0
+    };
+
     beforeAll(async () => {
         // Load pricing from the test models.json file
         const modelsPath = path.resolve(process.cwd(), "packages/backend/src/__tests__/models.json");
@@ -68,12 +74,6 @@ describe("handleResponse - OpenRouter Pricing", () => {
     });
 
     test("should calculate costs for 'openrouter' pricing strategy (GPT-3.5 Turbo)", async () => {
-        // ID: openai/gpt-3.5-turbo (from first item in models.json, but wait, the provided file content in prompt had gpt-3.5-turbo, 
-        // let's check the actual file content I read earlier... 
-        // The file read showed "bytedance-seed/seed-1.6-flash" as first item.
-        // Let's use "minimax/minimax-m2.1" which has input_cache_read.
-        // pricing: prompt: "0.0000003", completion: "0.0000012", input_cache_read: "0.00000003"
-        
         const slug = "minimax/minimax-m2.1";
 
         const unifiedResponse: UnifiedChatResponse = {
@@ -90,6 +90,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 }
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
@@ -111,12 +112,6 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        // Expected Cost:
-        // Input: 1000 * 0.0000003 = 0.0003
-        // Output: 500 * 0.0000012 = 0.0006
-        // Cached: 1000 * 0.00000003 = 0.00003
-        // Total: 0.00093
-        
         expect(usageRecord.costInput).toBeCloseTo(0.0003, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.0006, 8);
         expect(usageRecord.costCached).toBeCloseTo(0.00003, 8);
@@ -124,11 +119,6 @@ describe("handleResponse - OpenRouter Pricing", () => {
     });
 
     test("should calculate costs for 'openrouter' pricing strategy (Missing Cache Rate)", async () => {
-        // Use a model that might not have cache rate or defaults to 0.
-        // "z-ai/glm-4.7" has prompt: "0.0000004", completion: "0.0000015", and no input_cache_read in the snippet provided?
-        // Let's verify with the file content read.
-        // z-ai/glm-4.7 pricing: prompt: "0.0000004", completion: "0.0000015". input_cache_read is MISSING in the snippet I saw.
-        
         const slug = "z-ai/glm-4.7";
 
         const unifiedResponse: UnifiedChatResponse = {
@@ -145,6 +135,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 }
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
@@ -166,12 +157,6 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        // Expected Cost:
-        // Input: 1000 * 0.0000004 = 0.0004
-        // Output: 500 * 0.0000015 = 0.00075
-        // Cached: 1000 * 0 = 0 (Default)
-        // Total: 0.00115
-        
         expect(usageRecord.costInput).toBeCloseTo(0.0004, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.00075, 8);
         expect(usageRecord.costCached).toBe(0);
@@ -193,8 +178,11 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 }
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 1000,
-                output_tokens: 500
+                output_tokens: 500,
+                total_tokens: 1500,
+                cached_tokens: 0
             }
         };
 
@@ -215,7 +203,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
     });
 
     test("should calculate costs for 'openrouter' pricing strategy with DISCOUNT", async () => {
-        const slug = "minimax/minimax-m2.1"; // prompt: 0.0000003, completion: 0.0000012, cached: 0.00000003
+        const slug = "minimax/minimax-m2.1";
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-or-discount",
@@ -232,6 +220,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 }
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
@@ -253,17 +242,6 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        // Base Costs:
-        // Input: 0.0003
-        // Output: 0.0006
-        // Cached: 0.00003
-        
-        // Discounted (0.9 multiplier):
-        // Input: 0.00027
-        // Output: 0.00054
-        // Cached: 0.000027
-        // Total: 0.000837
-        
         expect(usageRecord.costInput).toBeCloseTo(0.00027, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.00054, 8);
         expect(usageRecord.costCached).toBeCloseTo(0.000027, 8);
@@ -274,7 +252,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
     });
 
     test("should calculate costs for 'openrouter' pricing strategy with PROVIDER-LEVEL DISCOUNT", async () => {
-        const slug = "minimax/minimax-m2.1"; // prompt: 0.0000003, completion: 0.0000012, cached: 0.00000003
+        const slug = "minimax/minimax-m2.1";
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-or-provider-discount",
@@ -291,6 +269,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 providerDiscount: 0.2 // 20% global discount
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
@@ -312,17 +291,6 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        // Base Costs:
-        // Input: 0.0003
-        // Output: 0.0006
-        // Cached: 0.00003
-        
-        // Discounted (0.8 multiplier):
-        // Input: 0.00024
-        // Output: 0.00048
-        // Cached: 0.000024
-        // Total: 0.000744
-        
         expect(usageRecord.costInput).toBeCloseTo(0.00024, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.00048, 8);
         expect(usageRecord.costCached).toBeCloseTo(0.000024, 8);

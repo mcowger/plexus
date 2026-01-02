@@ -1,4 +1,4 @@
-import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, mock } from "bun:test";
 import { Hono } from 'hono';
 import fs from 'node:fs';
 import { z } from 'zod';
@@ -140,7 +140,7 @@ models: {}
         });
 
         expect(res.status).toBe(400);
-        const json = await res.json();
+        const json = await res.json() as any;
         expect(json.error).toBe("Invalid YAML or Schema");
     });
 });

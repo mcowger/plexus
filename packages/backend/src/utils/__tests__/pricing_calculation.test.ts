@@ -19,6 +19,7 @@ describe("handleResponse - Pricing Calculation", () => {
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {
+        name: "test-transformer",
         defaultEndpoint: "/test",
         parseRequest: mock(),
         transformRequest: mock(),
@@ -31,6 +32,12 @@ describe("handleResponse - Pricing Calculation", () => {
         header: mock(),
         newResponse: mock((body) => ({ body })),
     } as unknown as Context;
+
+    const baseUsage = {
+        reasoning_tokens: 0,
+        cached_tokens: 0,
+        cache_creation_tokens: 0
+    };
 
     test("should calculate costs for 'defined' pricing strategy (Range 1)", async () => {
         const unifiedResponse: UnifiedChatResponse = {
@@ -60,6 +67,7 @@ describe("handleResponse - Pricing Calculation", () => {
                 }
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 500,
                 output_tokens: 1000,
                 total_tokens: 1500,
@@ -117,6 +125,7 @@ describe("handleResponse - Pricing Calculation", () => {
                 }
             },
             usage: {
+                ...baseUsage,
                 input_tokens: 2000,
                 output_tokens: 1000,
                 total_tokens: 3000,

@@ -8,7 +8,7 @@ mock.module("hono/bun", () => ({
 }));
 
 // Helper to create a mock Hono Context
-function createMockContext(headers: Record<string, string>, socketAddress?: string): Context {
+function createMockContext(headers: Record<string, string>): Context {
     return {
         req: {
             header: (key: string) => headers[key.toLowerCase()] || undefined,

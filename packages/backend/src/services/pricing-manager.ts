@@ -44,14 +44,14 @@ export class PricingManager {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch pricing data: ${response.statusText}`);
                 }
-                data = await response.json();
+                data = await response.json() as OpenRouterResponse;
             } else {
                 // Assume file path for testing
                 const file = Bun.file(source);
                 if (!(await file.exists())) {
                     throw new Error(`Pricing file not found at ${source}`);
                 }
-                data = await file.json();
+                data = await file.json() as OpenRouterResponse;
             }
 
             this.pricingMap.clear();

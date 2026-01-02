@@ -111,7 +111,7 @@ export const Dashboard = () => {
                 title="Service Alerts" 
                 className="alert-card" 
                 style={{borderColor: 'var(--color-warning)'}}
-                headerAction={<button className="btn btn-sm btn-ghost" onClick={handleClearCooldowns} style={{color: 'var(--color-warning)'}}>Clear All</button>}
+                extra={<button className="btn btn-sm btn-ghost" onClick={handleClearCooldowns} style={{color: 'var(--color-warning)'}}>Clear All</button>}
               >
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                       {cooldowns.map(c => (

@@ -69,15 +69,16 @@ describe("GeminiTransformer", () => {
 
         const result = await transformer.parseRequest(input);
         expect(result.tools).toHaveLength(1);
-        expect(result.tools![0].function.name).toBe("get_weather");
+        expect(result.tools![0]!.function.name).toBe("get_weather");
         expect(result.tool_choice).toBe("auto");
 
         // Verify it also transforms back correctly
         const transformed = await transformer.transformRequest(result);
         expect(transformed.tools).toHaveLength(1);
         // @ts-ignore
-        expect(transformed.tools[0].functionDeclarations).toBeDefined();
-        expect(transformed.toolConfig.functionCallingConfig.mode).toBe("AUTO");
+        expect(transformed.tools![0].functionDeclarations).toBeDefined();
+        // @ts-ignore
+        expect(transformed.toolConfig!.functionCallingConfig.mode).toBe("AUTO");
     });
 
     test("transformRequest returns valid Gemini provider payload", async () => {
@@ -153,23 +154,21 @@ describe("GeminiTransformer", () => {
                 reasoning_tokens: 0,
                 cached_tokens: 0,
                 cache_creation_tokens: 0,
-                prompt_tokens: 10,
-                completion_tokens: 10,
             }
         };
 
         const result = await transformer.formatResponse(unified);
-        expect(result.candidates[0]!.content!.parts).toHaveLength(2);
-        expect(result.candidates[0]!.content!.parts![0]!.text).toBe("My thoughts");
-        expect(result.candidates[0]!.content!.parts![1]!.text).toBe("Hello world");
+        expect(result.candidates![0]!.content!.parts).toHaveLength(2);
+        expect(result.candidates![0]!.content!.parts![0]!.text).toBe("My thoughts");
+        expect(result.candidates![0]!.content!.parts![1]!.text).toBe("Hello world");
         expect(result.usageMetadata!.totalTokenCount).toBe(20);
     });
 
     test("transformStream converts Gemini chunks to unified chunks", async () => {
         const encoder = new TextEncoder();
         const chunks = [
-            'data: {"responseId":"1","modelVersion":"m1","candidates":[{"content":{"parts":[{"text":"Hel"}]}}]}', 
-            'data: {"responseId":"1","modelVersion":"m1","candidates":[{"content":{"parts":[{"text":"lo"}]}}]}', 
+            'data: {"responseId":"1","modelVersion":"m1","candidates":[{"content":{"parts":[{"text":"Hel"}]}}]}',
+            'data: {"responseId":"1","modelVersion":"m1","candidates":[{"content":{"parts":[{"text":"lo"}]}}]}',
             'data: {"responseId":"1","modelVersion":"m1","candidates":[{"finishReason":"STOP"}],"usageMetadata":{"totalTokenCount":10}}'
         ];
 
@@ -263,8 +262,8 @@ describe("GeminiTransformer", () => {
         };
 
         const result = await transformer.formatResponse(unified);
-        expect(result.usageMetadata.promptTokenCount).toBe(104);
-        expect(result.usageMetadata.thoughtsTokenCount).toBe(310);
+        expect(result.usageMetadata!.promptTokenCount).toBe(104);
+        expect(result.usageMetadata!.thoughtsTokenCount).toBe(310);
     });
 
     test("parseRequest and transformRequest preserve response format and thinking config", async () => {
@@ -303,7 +302,7 @@ describe("GeminiTransformer", () => {
         const input = {
             model: "gemini-2.0-flash-thinking",
             contents: [
-                { 
+                {
                     role: "model", 
                     parts: [
                         { text: "I should check the weather.", thought: true },
@@ -316,20 +315,22 @@ describe("GeminiTransformer", () => {
         const unified = await transformer.parseRequest(input);
         
         expect(unified.messages).toHaveLength(1);
-        expect(unified.messages[0].role).toBe("assistant");
-        expect(unified.messages[0].thinking?.content).toBe("I should check the weather.");
-        expect(unified.messages[0].tool_calls).toHaveLength(1);
-        expect(unified.messages[0].tool_calls![0].function.name).toBe("get_weather");
+        expect(unified.messages[0]!.role).toBe("assistant");
+        expect(unified.messages[0]!.thinking?.content).toBe("I should check the weather.");
+        expect(unified.messages[0]!.tool_calls).toHaveLength(1);
+        expect(unified.messages[0]!.tool_calls![0]!.function.name).toBe("get_weather");
 
         const transformed = await transformer.transformRequest(unified);
         
         expect(transformed.contents).toHaveLength(1);
-        expect(transformed.contents[0].role).toBe("model");
-        expect(transformed.contents[0].parts).toHaveLength(2);
+        expect(transformed.contents![0]!.role).toBe("model");
+        expect(transformed.contents![0]!.parts).toHaveLength(2);
         // @ts-ignore
-        expect(transformed.contents[0].parts[0].thought).toBe(true);
-        expect(transformed.contents[0].parts[0].text).toBe("I should check the weather.");
-        expect(transformed.contents[0].parts[1].functionCall).toBeDefined();
+        expect(transformed.contents![0]!.parts![0]!.thought).toBe(true);
+        // @ts-ignore
+        expect(transformed.contents![0]!.parts![0]!.text).toBe("I should check the weather.");
+        // @ts-ignore
+        expect(transformed.contents![0]!.parts![1]!.functionCall).toBeDefined();
     });
 
     test("transformResponse and formatResponse preserve thought signature", async () => {
@@ -351,9 +352,9 @@ describe("GeminiTransformer", () => {
 
         const formatted = await transformer.formatResponse(unified);
         // @ts-ignore
-        expect(formatted.candidates[0].content.parts[0].thought).toBe(true);
+        expect(formatted.candidates![0].content.parts![0].thought).toBe(true);
         // @ts-ignore
-        expect(formatted.candidates[0].content.parts[0].thoughtSignature).toBe("sig-123");
+        expect(formatted.candidates![0].content.parts![0].thoughtSignature).toBe("sig-123");
     });
 
     test("transformRequest attaches thought signature to parts", async () => {
@@ -371,8 +372,8 @@ describe("GeminiTransformer", () => {
 
         const result = await transformer.transformRequest(unified);
         // @ts-ignore
-        expect(result.contents[0].parts[1].text).toBe("Result");
+        expect(result.contents![0].parts![1].text).toBe("Result");
         // @ts-ignore
-        expect(result.contents[0].parts[1].thoughtSignature).toBe("sig-abc");
+        expect(result.contents![0].parts![1].thoughtSignature).toBe("sig-abc");
     });
 });
