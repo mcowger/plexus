@@ -6,9 +6,31 @@ Plexus can be run via Docker, as a standalone binary, or from source using Bun.
 
 - **Bun**: Plexus is built with [Bun](https://bun.sh/). If you are running from source or building binaries, you will need Bun installed.
 
-## Docker (Recommended)
+## Docker (Preferred)
 
-You can run Plexus using Docker. This is the recommended way for production deployments.
+The easiest way to run Plexus is using the pre-built Docker image.
+
+**Pull the image:**
+```bash
+docker pull ghcr.io/mcowger/plexus:latest
+```
+
+**Run the container:**
+```bash
+docker run -p 4000:4000 \
+  -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
+  -v plexus-data:/app/data \
+  -e LOG_LEVEL=info \
+  ghcr.io/mcowger/plexus:latest
+```
+
+-   Mount your configuration file to `/app/config/plexus.yaml`.
+-   Mount a volume to `/app/data` to persist usage logs and other data.
+-   Set `LOG_LEVEL` to control verbosity.
+
+## Building the Docker Image
+
+If you want to build the image yourself:
 
 **Build the image:**
 ```bash
@@ -18,15 +40,11 @@ docker build -t plexus .
 **Run the container:**
 ```bash
 docker run -p 4000:4000 \
-  -v $(pwd)/config/plexus.example.yaml:/app/config/plexus.yaml \
+  -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
   -v plexus-data:/app/data \
   -e LOG_LEVEL=info \
   plexus
 ```
-
--   Mount your configuration file to `/app/config/plexus.yaml`.
--   Mount a volume to `/app/data` to persist usage logs and other data.
--   Set `LOG_LEVEL` to control verbosity.
 
 ## Standalone Binary
 

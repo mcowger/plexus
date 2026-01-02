@@ -66,7 +66,16 @@ Track your API usage and trends over time.
 
 ## Installation
 
-Please refer to the [Installation Guide](docs/INSTALLATION.md) for detailed instructions on how to run Plexus via Docker, as a standalone binary, or from source.
+The quickest way to get started is using Docker:
+
+```bash
+docker run -p 4000:4000 \
+  -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
+  -v plexus-data:/app/data \
+  ghcr.io/mcowger/plexus:latest
+```
+
+Please refer to the [Installation Guide](docs/INSTALLATION.md) for detailed instructions on other methods (standalone binary, or from source).
 
 ## Contributing
 
