@@ -4,6 +4,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord } from '../lib/api';
 import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -174,6 +175,10 @@ export const Logs = () => {
 
     const totalPages = Math.ceil(total / limit);
     const currentPage = Math.floor(offset / limit) + 1;
+    const uploadEmoji = "🔺"
+    const downloadEmoji = "🔻"
+    const cachedEmoji = "📦"
+    const reasoningEmoji = "🧠"
 
     return (
         <div className="page-container">
@@ -260,26 +265,46 @@ export const Logs = () => {
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                 <span>{log.incomingModelAlias || '-'}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>{log.provider || '-'}:{log.selectedModelName || '-'}</span>
-                                            
+
                                             </div>
                                         </td>
                                         <td style={{ padding: '6px', alignContent: 'center', textAlign: 'center' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                <span style={{ fontWeight: '500' }}>⏶ {formatTokenCount(log.tokensInput || 0)} ⏷ {formatTokenCount(log.tokensOutput || 0)}</span>
+                                                <span style={{ fontWeight: '500' }}>{uploadEmoji} {formatTokenCount(log.tokensInput || 0)} {downloadEmoji} {formatTokenCount(log.tokensOutput || 0)} </span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                    R:{formatTokenCount(log.tokensReasoning || 0)} C:{formatTokenCount(log.tokensCached || 0)}
+                                                    {cachedEmoji} {formatTokenCount(log.tokensCached || 0)}
+                                                    {reasoningEmoji} {formatTokenCount(log.tokensReasoning || 0)}
                                                 </span>
                                             </div>
                                             {/* {log.tokensInput || 0} / {log.tokensOutput || 0} / {log.tokensReasoning || 0} / {log.tokensCached || 0} */}
                                         </td>
                                         <td style={{ padding: '6px', textAlign: 'right' }}>
-                                            {log.costTotal && log.costTotal > 0 ? (
+                                            {log.costTotal !== undefined && log.costTotal !== null ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                    <span style={{ fontWeight: '500' }}>
-                                                        ${log.costTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', justifyContent: 'space-between' }}>
+                                                        {log.costSource ? (
+                                                            <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
+                                                                <span style={{ cursor: 'help', fontSize: '0.9em' }}>
+                                                                    {log.costSource === 'simple' ? '⚪' : 
+                                                                     log.costSource === 'defined' ? '🧩' : 
+                                                                     log.costSource === 'openrouter' ? '🌐' : '❔'}
+                                                                </span>
+                                                            </CostToolTip>
+                                                        ) : <span />}
+                                                        <span style={{ fontWeight: '500' }}>
+                                                            ${log.costTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                                                        </span>
+                                                    </div>
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                                                        {uploadEmoji} ${(log.costInput || 0).toFixed(6)}
                                                     </span>
                                                     <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                        I:${(log.costInput || 0).toFixed(6)} O:${(log.costOutput || 0).toFixed(6)} C:${(log.costCached || 0).toFixed(6)}
+                                                        {downloadEmoji} ${(log.costOutput || 0).toFixed(6)}
+                                                    </span>
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                                                        {(log.costCached || 0) > 0 && (
+                                                            <>{cachedEmoji} ${log.costCached?.toFixed(6)}</>
+                                                        )}
                                                     </span>
                                                 </div>
                                             ) : (

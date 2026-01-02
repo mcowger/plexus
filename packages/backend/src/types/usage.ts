@@ -16,6 +16,8 @@ export interface UsageRecord {
     costOutput: number | null;
     costCached: number | null;
     costTotal: number | null;
+    costSource: string | null;
+    costMetadata: string | null;
     startTime: number; // timestamp
     durationMs: number;
     isStreamed: boolean;

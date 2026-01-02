@@ -9,8 +9,6 @@ import { DebugManager } from '../services/debug-manager';
 import { PricingManager } from '../services/pricing-manager';
 
 function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any) {
-    if (!pricing) return;
-
     const inputTokens = usageRecord.tokensInput || 0;
     const outputTokens = usageRecord.tokensOutput || 0;
     const cachedTokens = usageRecord.tokensCached || 0;
@@ -20,11 +18,20 @@ function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any) {
     let cachedCost = 0;
     let calculated = false;
 
+    // Default to 'default' source with 0-cost metadata
+    usageRecord.costSource = 'default';
+    usageRecord.costMetadata = JSON.stringify({ input: 0, output: 0, cached: 0 });
+
+    if (!pricing) return;
+
     if (pricing.source === 'simple') {
         inputCost = (inputTokens / 1_000_000) * pricing.input;
         outputCost = (outputTokens / 1_000_000) * pricing.output;
         cachedCost = (cachedTokens / 1_000_000) * (pricing.cached || 0);
         calculated = true;
+        
+        usageRecord.costSource = 'simple';
+        usageRecord.costMetadata = JSON.stringify(pricing);
     } else if (pricing.source === 'defined' && Array.isArray(pricing.range)) {
         const match = pricing.range.find((r: any) => {
             const lower = r.lower_bound ?? 0;
@@ -36,6 +43,14 @@ function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any) {
             inputCost = (inputTokens / 1_000_000) * match.input_per_m;
             outputCost = (outputTokens / 1_000_000) * match.output_per_m;
             calculated = true;
+            
+            usageRecord.costSource = 'defined';
+            usageRecord.costMetadata = JSON.stringify({
+                source: 'defined',
+                input: match.input_per_m,
+                output: match.output_per_m,
+                range: match
+            });
         }
     } else if (pricing.source === 'openrouter' && pricing.slug) {
         const openRouterPricing = PricingManager.getInstance().getPricing(pricing.slug);
@@ -49,6 +64,14 @@ function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any) {
             outputCost = outputTokens * completionRate;
             cachedCost = cachedTokens * cacheReadRate;
             calculated = true;
+            
+            usageRecord.costSource = 'openrouter';
+            usageRecord.costMetadata = JSON.stringify({
+                slug: pricing.slug,
+                prompt: promptRate,
+                completion: completionRate,
+                input_cache_read: cacheReadRate
+            });
         }
     }
 

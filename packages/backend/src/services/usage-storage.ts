@@ -98,6 +98,8 @@ export class UsageStorageService extends EventEmitter {
                     cost_output REAL,
                     cost_cached REAL,
                     cost_total REAL,
+                    cost_source TEXT,
+                    cost_metadata TEXT,
                     start_time INTEGER,
                     duration_ms INTEGER,
                     is_streamed INTEGER,
@@ -149,6 +151,12 @@ export class UsageStorageService extends EventEmitter {
             try {
                 this.db.run("ALTER TABLE request_usage ADD COLUMN is_passthrough INTEGER;");
             } catch (e) { /* ignore if exists */ }
+            try {
+                this.db.run("ALTER TABLE request_usage ADD COLUMN cost_source TEXT;");
+            } catch (e) { /* ignore if exists */ }
+            try {
+                this.db.run("ALTER TABLE request_usage ADD COLUMN cost_metadata TEXT;");
+            } catch (e) { /* ignore if exists */ }
             
             logger.info("Storage initialized");
         } catch (error) {
@@ -163,13 +171,13 @@ export class UsageStorageService extends EventEmitter {
                     request_id, date, source_ip, api_key, incoming_api_type,
                     provider, incoming_model_alias, selected_model_name, outgoing_api_type,
                     tokens_input, tokens_output, tokens_reasoning, tokens_cached,
-                    cost_input, cost_output, cost_cached, cost_total,
+                    cost_input, cost_output, cost_cached, cost_total, cost_source, cost_metadata,
                     start_time, duration_ms, is_streamed, response_status, is_passthrough
                 ) VALUES (
                     $requestId, $date, $sourceIp, $apiKey, $incomingApiType,
                     $provider, $incomingModelAlias, $selectedModelName, $outgoingApiType,
                     $tokensInput, $tokensOutput, $tokensReasoning, $tokensCached,
-                    $costInput, $costOutput, $costCached, $costTotal,
+                    $costInput, $costOutput, $costCached, $costTotal, $costSource, $costMetadata,
                     $startTime, $durationMs, $isStreamed, $responseStatus, $isPassthrough
                 )
             `);
@@ -192,6 +200,8 @@ export class UsageStorageService extends EventEmitter {
                 $costOutput: record.costOutput,
                 $costCached: record.costCached,
                 $costTotal: record.costTotal,
+                $costSource: record.costSource,
+                $costMetadata: record.costMetadata,
                 $startTime: record.startTime,
                 $durationMs: record.durationMs,
                 $isStreamed: record.isStreamed ? 1 : 0,
@@ -394,6 +404,8 @@ export class UsageStorageService extends EventEmitter {
                 costOutput: row.cost_output,
                 costCached: row.cost_cached,
                 costTotal: row.cost_total,
+                costSource: row.cost_source,
+                costMetadata: row.cost_metadata,
                 startTime: row.start_time,
                 durationMs: row.duration_ms,
                 isStreamed: !!row.is_streamed,
