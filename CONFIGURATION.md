@@ -102,14 +102,26 @@ Pricing is defined under the `pricing` key for a specific model.
     ```
 
 3.  **Defined (Tiered/Range) Pricing** (`source: defined`)
-    -   `range`: An array of pricing tiers based on token count (currently treated as a single tier for most simple cases, schema is extensible).
+    -   `range`: An array of pricing tiers based on input token usage.
+    -   `lower_bound`: (Optional, default 0) Minimum input tokens for this tier (inclusive).
+    -   `upper_bound`: (Optional, default Infinity) Maximum input tokens for this tier (inclusive). Use `.inf` for Infinity in YAML.
+    -   `input_per_m`: Cost per 1 million input tokens in this tier.
+    -   `output_per_m`: Cost per 1 million output tokens in this tier.
 
     ```yaml
     pricing:
       source: defined
       range:
-        - input_per_m: 1.0
-          output_per_m: 2.0
+        # First 1M tokens
+        - lower_bound: 0
+          upper_bound: 1000000
+          input_per_m: 5.00
+          output_per_m: 15.00
+        # Anything above 1M tokens
+        - lower_bound: 1000001
+          upper_bound: .inf
+          input_per_m: 4.00
+          output_per_m: 12.00
     ```
 
 #### `models`

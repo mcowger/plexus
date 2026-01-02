@@ -83,6 +83,29 @@ providers:
           input: 0.15
           output: 0.60
 
+  # Example with Tiered Pricing Configuration (Defined Strategy)
+  # Pricing changes based on input token usage volume.
+  tiered_pricing_example:
+    type: OpenAI
+    display_name: Tiered Pricing Provider
+    api_base_url: https://api.example.com/v1
+    api_key: "your-api-key"
+    models:
+      tiered-model-v1:
+        pricing:
+          source: defined
+          range:
+            # Tier 1: 0 - 1M tokens
+            - lower_bound: 0
+              upper_bound: 1000000
+              input_per_m: 5.00
+              output_per_m: 15.00
+            # Tier 2: > 1M tokens
+            - lower_bound: 1000001
+              upper_bound: .inf
+              input_per_m: 4.00
+              output_per_m: 12.00
+
   # Example of a Chat-compatible provider (e.g. Together, DeepSeek, Groq)
   deepseek:
     type: OpenAI
