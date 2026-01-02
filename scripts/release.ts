@@ -46,6 +46,15 @@ async function main() {
     // No tags found, start fresh
   }
 
+  const logRange = currentVersion === "v0.0.0" ? "HEAD" : `${currentVersion}..HEAD`;
+  const gitLog = await run(["git", "log", logRange, "--pretty=format:%h %s"]);
+  
+  if (!gitLog.trim()) {
+    console.log(`\n⚠️  No changes found since ${currentVersion}.`);
+    console.log("Aborting release process.");
+    process.exit(0);
+  }
+
   // Calculate next version
   let nextVersion = currentVersion;
   const match = currentVersion.match(/^v(\d+)\.(\d+)\.(\d+)$/);
@@ -57,6 +66,7 @@ async function main() {
 
   // 2. Ask questions
   const version = await ask("Version", nextVersion);
+  let headline = "";
 
   // AI Release Notes Generation
   let aiNotes = "";
@@ -66,8 +76,6 @@ async function main() {
     if (useAi.toLowerCase() === "y") {
       try {
         console.log("🤖 Generating release notes...");
-        const logRange = currentVersion === "v0.0.0" ? "HEAD" : `${currentVersion}..HEAD`;
-        const gitLog = await run(["git", "log", logRange, "--pretty=format:%h %s"]);
         
         const client = new GoogleGenAI({ 
             apiKey, 
@@ -76,12 +84,21 @@ async function main() {
         
         const response = await client.models.generateContent({
           model: "gemini-3-flash-preview",
-          contents: `Summarize the following git commit log into release notes. Call out main new features, as well as smaller changes and their commit hashes.\n\n${gitLog}`,
+          contents: `Summarize the following git commit log into release notes. Call out main new features, as well as smaller changes and their commit hashes. Also propose a short, catchy headline for the release. Format the output as JSON with keys "headline" and "notes".\n\n${gitLog}`,
+          config: { responseMimeType: "application/json" }
         });
         
         if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
-             aiNotes = response.candidates[0].content.parts[0].text;
+             const json = JSON.parse(response.candidates[0].content.parts[0].text);
+             aiNotes = json.notes;
+             const aiHeadline = json.headline;
+             console.log(`\n🤖 AI Proposed Headline: ${aiHeadline}`);
              console.log("\n🤖 AI Generated Notes:\n" + aiNotes + "\n");
+             
+             const useHeadline = await ask("Use AI headline? (Y/n)", "Y");
+             if (useHeadline.toLowerCase() === "y") {
+                 headline = aiHeadline;
+             }
         }
       } catch (error) {
         console.error("❌ Failed to generate AI notes:", error);
@@ -89,7 +106,9 @@ async function main() {
     }
   }
 
-  const headline = await ask("Headline");
+  if (!headline) {
+      headline = await ask("Headline");
+  }
   
   let notes = "";
   if (aiNotes) {
