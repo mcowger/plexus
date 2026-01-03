@@ -133,6 +133,9 @@ This section defines the "virtual" models or aliases that clients will use when 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
 - **`selector`**: (Optional) The strategy to use for target selection when multiple targets are defined.
     - `random`: (Default) Randomly selects a target.
+    - `cost`: Selects the target with the lowest estimated cost based on simulated token usage.
+    - `latency`: (Not yet implemented) Will select based on lowest latency.
+    - `usage`: (Not yet implemented) Will select based on usage patterns.
 - **`targets`**: A list of provider/model pairs that back this alias.
     - `provider`: Must match a key defined in the `providers` section.
     - `model`: The specific model name to use on that provider.

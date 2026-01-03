@@ -1,5 +1,6 @@
 import { Selector } from './base';
 import { RandomSelector } from './random';
+import { CostSelector } from './cost';
 
 export class SelectorFactory {
   static getSelector(type?: string): Selector {
@@ -9,8 +10,7 @@ export class SelectorFactory {
       case null:
         return new RandomSelector();
       case 'cost':
-        // Placeholder for future implementation
-        throw new Error("Selector 'cost' not implemented yet");
+        return new CostSelector();
       case 'latency':
         // Placeholder for future implementation
         throw new Error("Selector 'latency' not implemented yet");

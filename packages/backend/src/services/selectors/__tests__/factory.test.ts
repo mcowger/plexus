@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { SelectorFactory } from '../factory';
 import { RandomSelector } from '../random';
+import { CostSelector } from '../cost';
 
 describe('SelectorFactory', () => {
   it('should return RandomSelector for "random"', () => {
@@ -19,12 +20,16 @@ describe('SelectorFactory', () => {
     expect(selector).toBeInstanceOf(RandomSelector);
   });
 
+  it('should return CostSelector for "cost"', () => {
+    const selector = SelectorFactory.getSelector('cost');
+    expect(selector).toBeInstanceOf(CostSelector);
+  });
+
   it('should throw for unknown selector', () => {
     expect(() => SelectorFactory.getSelector('unknown')).toThrow("Unknown selector type: unknown");
   });
 
   it('should throw for unimplemented selectors', () => {
-     expect(() => SelectorFactory.getSelector('cost')).toThrow("Selector 'cost' not implemented yet");
      expect(() => SelectorFactory.getSelector('latency')).toThrow("Selector 'latency' not implemented yet");
      expect(() => SelectorFactory.getSelector('usage')).toThrow("Selector 'usage' not implemented yet");
   });

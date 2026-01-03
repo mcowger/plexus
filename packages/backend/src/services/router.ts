@@ -20,13 +20,23 @@ export class Router {
             const targets = alias.targets;
             if (targets && targets.length > 0) {
                 const healthyTargets = CooldownManager.getInstance().filterHealthyTargets(targets);
-                
+
                 if (healthyTargets.length === 0) {
                     throw new Error(`All providers for model alias '${modelName}' are currently on cooldown.`);
                 }
 
+                // Enrich targets with modelConfig for selectors that need pricing info
+                const enrichedTargets = healthyTargets.map(target => {
+                    const providerConfig = config.providers[target.provider];
+                    let modelConfig = undefined;
+                    if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
+                        modelConfig = providerConfig.models[target.model];
+                    }
+                    return { ...target, route: { modelConfig } };
+                });
+
                 const selector = SelectorFactory.getSelector(alias.selector);
-                const target = selector.select(healthyTargets);
+                const target = selector.select(enrichedTargets);
                 
                 if (!target) {
                     throw new Error(`No target selected for alias '${modelName}'`);

@@ -92,4 +92,46 @@ describe("Router", () => {
 
         expect(() => Router.resolve("gpt-3.5-turbo-direct")).toThrow(/not found/);
     });
+
+    test("cost selector prefers provider with no pricing (treated as $0)", () => {
+        const costSelectorConfig = {
+            providers: {
+                "expensive": { 
+                    type: "chat", 
+                    api_base_url: "https://api.expensive.com/v1",
+                    models: {
+                        "expensive-model": {
+                            pricing: {
+                                source: "simple",
+                                input: 10.0,
+                                output: 20.0
+                            }
+                        }
+                    }
+                },
+                "free": { 
+                    type: "chat", 
+                    api_base_url: "https://api.free.com/v1",
+                    models: ["free-model"]  // No pricing configured
+                }
+            },
+            models: {
+                "select-by-cost": {
+                    selector: "cost",
+                    targets: [
+                        { provider: "expensive", model: "expensive-model" },
+                        { provider: "free", model: "free-model" }
+                    ]
+                }
+            }
+        };
+        
+        mock.module("../../config", () => ({
+            getConfig: () => costSelectorConfig
+        }));
+
+        const route = Router.resolve("select-by-cost");
+        expect(route.provider).toBe("free");
+        expect(route.model).toBe("free-model");
+    });
 });
