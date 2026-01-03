@@ -35,6 +35,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 config/plexus.yaml
 config/usage.sqlite
 
+CLIProxyApi/
 llms/
 CAP-UI/
 CLIProxyApi/
