@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.5 - 2026-01-03
+
+### Precision Performance: New Latency & Speed Selectors
+
+### ✨ New Features
+- **Performance & Latency Selectors:** Added powerful new selection capabilities to fine-tune system metrics and optimize for speed and response times.
+
+### 🛠️ Improvements & Fixes
+- **Configuration Updates:** Refined configuration logic to support the new performance parameters (`994c13c`).
+- **Test Suite Enhancements:** Updated existing tests to ensure reliability across all new selector functionalities (`994c13c`).
+
 ## v0.2.2 - 2026-01-03
 
 ### Precision Performance: Smarter Metrics & Smoother Releases
