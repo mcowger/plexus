@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { bearerAuth } from 'hono/bearer-auth';
 import { logger, logEmitter } from './utils/logger';
 import { loadConfig, getConfig, getConfigPath, validateConfig } from './config';
 import { Dispatcher } from './services/dispatcher';
@@ -14,6 +13,7 @@ import { CooldownManager } from './services/cooldown-manager';
 import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
 import { SelectorFactory } from './services/selectors/factory';
+import { customAuth } from './middleware/auth';
 
 const app = new Hono();
 const dispatcher = new Dispatcher();
@@ -29,9 +29,6 @@ SelectorFactory.setUsageStorage(usageStorage);
 // Load config and pricing on startup
 try {
     await loadConfig();
-    // Start loading pricing in background or await it if critical. 
-    // Usually fetching external resources on startup might be better awaited to ensure readiness,
-    // or fired and forgot if we accept eventual consistency. Given requirement "download exactly once on startup", awaiting is safer.
     await PricingManager.getInstance().loadPricing();
 } catch (e) {
     logger.error('Failed to load config or pricing', e);
@@ -39,37 +36,11 @@ try {
 }
 
 // Middleware for logging
-app.use('*', async (c, next) => {
-    if (c.req.method === 'GET' || c.req.method === 'POST') {
-        logger.debug(`${c.req.method} ${c.req.path}`);
-    } else {
-        logger.info(`${c.req.method} ${c.req.path}`);
-    }
-    await next();
-});
-
+// Global Request Logger
+app.use('*', requestLogger);
+    
 // Auth Middleware
-app.use('/v1/*', async (c, next) => {
-    if (c.req.path === '/v1/models') {
-        await next();
-        return;
-    }
-
-    const config = getConfig();
-    if (!config.keys || Object.keys(config.keys).length === 0) {
-         return c.json({ error: { message: "Unauthorized: No API keys configured", type: "auth_error" } }, 401);
-    }
-
-    const auth = bearerAuth({
-        verifyToken: async (token, _c) => {
-            const currentConfig = getConfig();
-            if (!currentConfig.keys) return false;
-            return Object.values(currentConfig.keys).some(k => k.secret === token);
-        }
-    });
-
-    await auth(c, next);
-});
+app.use('/v1/*', customAuth);
 
 // OpenAI Compatible Endpoint
 app.post('/v1/chat/completions', async (c) => {
@@ -92,14 +63,14 @@ app.post('/v1/chat/completions', async (c) => {
         const authHeader = c.req.header('Authorization');
         usageRecord.apiKey = authHeader ? authHeader.replace('Bearer ', '').substring(0, 8) + '...' : null;
 
-        logger.debug('Incoming OpenAI Request', body);
+        logger.silly('Incoming OpenAI Request', body);
         const transformer = new OpenAITransformer();
         const unifiedRequest = await transformer.parseRequest(body);
         unifiedRequest.incomingApiType = 'chat';
         unifiedRequest.originalBody = body;
         unifiedRequest.requestId = requestId;
         
-        DebugManager.getInstance().startLog(requestId, body);
+        //DebugManager.getInstance().startLog(requestId, body);
 
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
@@ -144,7 +115,7 @@ app.post('/v1/messages', async (c) => {
         const authHeader = c.req.header('x-api-key');
         usageRecord.apiKey = authHeader ? authHeader.substring(0, 8) + '...' : null;
 
-        logger.debug('Incoming Anthropic Request', body);
+        logger.silly('Incoming Anthropic Request', body);
         const transformer = new AnthropicTransformer();
         const unifiedRequest = await transformer.parseRequest(body);
         unifiedRequest.incomingApiType = 'messages';
@@ -201,7 +172,7 @@ app.post('/v1beta/models/:modelWithAction', async (c) => {
         const apiKey = c.req.query('key') || c.req.header('x-goog-api-key');
         usageRecord.apiKey = apiKey ? apiKey.substring(0, 8) + '...' : null;
 
-        logger.debug('Incoming Gemini Request', body);
+        logger.silly('Incoming Gemini Request', body);
         const transformer = new GeminiTransformer();
         const unifiedRequest = await transformer.parseRequest({ ...body, model: modelName });
         unifiedRequest.incomingApiType = 'gemini';
@@ -493,6 +464,7 @@ app.get('/v0/system/logs/stream', async (c) => {
 app.get('/health', (c) => c.text('OK'));
 
 import { serveStatic } from 'hono/bun';
+import { requestLogger } from './middleware/log';
 
 app.use('/*', serveStatic({ root: '../frontend/dist' }));
 app.get('*', serveStatic({ path: '../frontend/dist/index.html' }));

@@ -19,6 +19,7 @@
       "dependencies": {
         "@google/genai": "^1.34.0",
         "dotenv": "^17.2.3",
+        "event-stream-parser": "^1.0.2",
         "hono": "^4.11.3",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",
@@ -214,6 +215,8 @@
     "enabled": ["enabled@2.0.0", "", {}, "sha512-AKrN98kuwOzMIdAizXGI86UFBoo26CL21UM763y1h/GMSJ4/OHU9k2YlsmBpyScFo/wbLzWQJBMCW4+IO3/+OQ=="],
 
     "es-toolkit": ["es-toolkit@1.43.0", "", {}, "sha512-SKCT8AsWvYzBBuUqMk4NPwFlSdqLpJwmy6AP322ERn8W2YLIB6JBXnwMI2Qsh2gfphT3q7EKAxKb23cvFHFwKA=="],
+
+    "event-stream-parser": ["event-stream-parser@1.0.2", "", {}, "sha512-1kjvYFXbllDc7ouFuFk6FhYA+B6Qk1dg7XpUU0Cmi11bf/ixijhoygVuXDRN7XeLUUwZ0GmF89VjNyOvlXEO5A=="],
 
     "eventemitter3": ["eventemitter3@5.0.1", "", {}, "sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA=="],
 
