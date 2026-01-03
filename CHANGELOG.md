@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.6 - 2026-01-03
+
+### Fortified Foundations
+
+### Main New Features
+
+*   **Security Hardening**: Re-engineered the authentication middleware to strictly enforce API key requirements, ensuring a more robust security posture.
+
+### Smaller Changes
+
+*   Removed legacy testing bypasses in the auth layer to prevent unauthorized access in production-like environments (129e18b).
+
 ## v0.1.5 - 2026-01-02
 
 ### Smarter Response Flow
