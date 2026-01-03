@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.1 - 2026-01-03
+
+### Precision Streams & Performance Insights
+
+### 🚀 Key Features
+
+- **Advanced Stream Management**: Implemented manual stream teeing to resolve locking issues and ensure safe chunk cloning for better data handling ([76fe496](https://github.com/example/repo/commit/76fe496)).
+- **Real-time Performance Metrics**: Added comprehensive tracking for Time to First Token (TTFB) and Tokens per Second (T/S) to monitor system efficiency ([acbc281](https://github.com/example/repo/commit/acbc281), [4146ccf](https://github.com/example/repo/commit/4146ccf)).
+- **Cost-Based Routing**: Introduced a new `CostSelector` and cost-based target selection logic for optimized resource allocation ([2ef1987](https://github.com/example/repo/commit/2ef1987)).
+- **Multi-Stage Token Analysis**: Enhanced the token counting engine to support sophisticated multi-stage processing ([429782b](https://github.com/example/repo/commit/429782b)).
+
+### 🛠 Minor Improvements & Fixes
+
+- **Stream Robustness**: Enhanced debug logging and added automated cleanup with abort detection ([fdf2457](https://github.com/example/repo/commit/fdf2457)).
+- **Connectivity**: Improved stability through better disconnect handling ([f599009](https://github.com/example/repo/commit/f599009)).
+- **CI/CD**: Switched to using `CHANGELOG.md` for release notes generation ([258e9c4](https://github.com/example/repo/commit/258e9c4)).
+
 ## 0.2.0 - 2026-01-03
 
 ### Performance Unleashed: Smart Streams & Cost-Aware Routing
