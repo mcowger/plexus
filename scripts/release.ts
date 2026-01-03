@@ -40,10 +40,20 @@ async function main() {
   // 1. Get current version
   let currentVersion = "v0.0.0";
   try {
-    const tags = await run(["git", "tag", "--list", "v*"]);
-    const sortedTags = tags.split("\n").filter(Boolean).sort((a, b) => {
-       return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-    });
+    const tags = await run(["git", "tag", "--list"]);
+    const versionRegex = /^v?(\d+)\.(\d+)\.(\d+)$/;
+    const sortedTags = tags.split("\n")
+      .filter(tag => versionRegex.test(tag))
+      .sort((a, b) => {
+        const matchA = a.match(versionRegex)!;
+        const matchB = b.match(versionRegex)!;
+        for (let i = 1; i <= 3; i++) {
+          const numA = parseInt(matchA[i]!);
+          const numB = parseInt(matchB[i]!);
+          if (numA !== numB) return numA - numB;
+        }
+        return 0;
+      });
     if (sortedTags.length > 0) {
       currentVersion = sortedTags[sortedTags.length - 1]!;
     }
@@ -62,15 +72,18 @@ async function main() {
 
   // Calculate next version
   let nextVersion = currentVersion;
-  const match = currentVersion.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+  const match = currentVersion.match(/^v?(\d+)\.(\d+)\.(\d+)$/);
   if (match) {
     nextVersion = `v${match[1]}.${match[2]}.${parseInt(match[3]!) + 1}`;
   } else {
-      nextVersion = "v0.0.1";
+    nextVersion = "v0.0.1";
   }
 
   // 2. Ask questions
-  const version = await ask("New Version", nextVersion);
+  let version = await ask("New Version", nextVersion);
+  if (!version.startsWith("v")) {
+    version = `v${version}`;
+  }
   let headline = "";
 
   // AI Release Notes Generation
