@@ -1,5 +1,6 @@
 import { Transformer } from '../types/transformer';
 import { UnifiedChatRequest, UnifiedChatResponse } from '../types/unified';
+import { extractOpenAIUsage } from './usage-extractors';
 
 export class OpenAITransformer implements Transformer {
   name = 'chat';
@@ -86,40 +87,65 @@ export class OpenAITransformer implements Transformer {
           transformStream(stream: ReadableStream): ReadableStream {
             const decoder = new TextDecoder();
             let buffer = "";
-        
-            return new ReadableStream({
-                async start(controller) {
-                    const reader = stream.getReader();
-                    try {
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-        
-                            buffer += decoder.decode(value, { stream: true });
-                            const lines = buffer.split("\n");
-                            buffer = lines.pop() || "";
-        
-                            for (const line of lines) {
-                                const trimmedLine = line.trim();
-                                if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
-        
-                                const dataStr = trimmedLine.slice(5).trim();
-                                if (dataStr === "[DONE]") continue;
-        
+            
+            // Use TransformStream for proper backpressure handling and stream lifecycle
+            const transformer = new TransformStream({
+                transform(chunk, controller) {
+                    const text = typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
+                    buffer += text;
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() || "";
+
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
+
+                        const dataStr = trimmedLine.slice(5).trim();
+                        if (dataStr === "[DONE]") continue;
+
+                        try {
+                            const data = JSON.parse(dataStr);
+                            const choice = data.choices?.[0];
+                            
+                            const usage = data.usage ? {
+                                input_tokens: data.usage.prompt_tokens || 0,
+                                output_tokens: data.usage.completion_tokens || 0,
+                                total_tokens: data.usage.total_tokens || 0,
+                                reasoning_tokens: data.usage.completion_tokens_details?.reasoning_tokens || 0,
+                                cached_tokens: data.usage.prompt_tokens_details?.cached_tokens || 0,
+                                cache_creation_tokens: 0
+                            } : undefined;
+
+                            const unifiedChunk = {
+                                id: data.id,
+                                model: data.model,
+                                created: data.created,
+                                delta: {
+                                    role: choice?.delta?.role,
+                                    content: choice?.delta?.content,
+                                    reasoning_content: choice?.delta?.reasoning_content,
+                                    tool_calls: choice?.delta?.tool_calls
+                                },
+                                finish_reason: choice?.finish_reason,
+                                usage
+                            };
+                            controller.enqueue(unifiedChunk);
+                        } catch (e) {
+                            // Ignore parse errors for non-JSON lines
+                        }
+                    }
+                },
+                flush(controller) {
+                    // Process any remaining buffer content
+                    if (buffer.trim()) {
+                        const trimmedLine = buffer.trim();
+                        if (trimmedLine.startsWith("data:")) {
+                            const dataStr = trimmedLine.slice(5).trim();
+                            if (dataStr !== "[DONE]") {
                                 try {
                                     const data = JSON.parse(dataStr);
                                     const choice = data.choices?.[0];
-                                    
-                                    const usage = data.usage ? {
-                                        input_tokens: data.usage.prompt_tokens || 0,
-                                        output_tokens: data.usage.completion_tokens || 0,
-                                        total_tokens: data.usage.total_tokens || 0,
-                                        reasoning_tokens: data.usage.completion_tokens_details?.reasoning_tokens || 0,
-                                        cached_tokens: data.usage.prompt_tokens_details?.cached_tokens || 0,
-                                        cache_creation_tokens: 0
-                                    } : undefined;
-
-                                    const chunk = {
+                                    controller.enqueue({
                                         id: data.id,
                                         model: data.model,
                                         created: data.created,
@@ -129,74 +155,65 @@ export class OpenAITransformer implements Transformer {
                                             reasoning_content: choice?.delta?.reasoning_content,
                                             tool_calls: choice?.delta?.tool_calls
                                         },
-                                        finish_reason: choice?.finish_reason,
-                                        usage
-                                    };
-                                    controller.enqueue(chunk);
+                                        finish_reason: choice?.finish_reason
+                                    });
                                 } catch (e) {
-                                    // Ignore parse errors for non-JSON lines
+                                    // Ignore
                                 }
                             }
                         }
-                    } catch (e) {
-                        controller.error(e);
-                    } finally {
-                        reader.releaseLock();
-                        controller.close();
                     }
                 }
             });
+            
+            return stream.pipeThrough(transformer);
           }
         
           // --- 6. Unified Stream -> Client Stream (OpenAI) ---
           formatStream(stream: ReadableStream): ReadableStream {
             const encoder = new TextEncoder();
-        
-            return new ReadableStream({
-                async start(controller) {
-                    const reader = stream.getReader();
-                    try {
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-        
-                            const unifiedChunk = value as any;
-                            const openAIChunk = {
-                                id: unifiedChunk.id || 'chatcmpl-' + Date.now(),
-                                object: 'chat.completion.chunk',
-                                created: unifiedChunk.created || Math.floor(Date.now() / 1000),
-                                model: unifiedChunk.model,
-                                choices: [
-                                    {
-                                        index: 0,
-                                        delta: unifiedChunk.delta,
-                                        finish_reason: unifiedChunk.finish_reason || null
-                                    }
-                                ],
-                                usage: unifiedChunk.usage ? {
-                                    prompt_tokens: unifiedChunk.usage.input_tokens,
-                                    completion_tokens: unifiedChunk.usage.output_tokens,
-                                    total_tokens: unifiedChunk.usage.total_tokens,
-                                    prompt_tokens_details: {
-                                        cached_tokens: unifiedChunk.usage.cached_tokens
-                                    },
-                                    completion_tokens_details: {
-                                        reasoning_tokens: unifiedChunk.usage.reasoning_tokens
-                                    }
-                                } : undefined
-                            };
-        
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIChunk)}\n\n`));
-                        }
-                        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                    } catch (e) {
-                        controller.error(e);
-                    } finally {
-                        reader.releaseLock();
-                        controller.close();
-                    }
+            
+            // Use TransformStream for proper backpressure handling
+            const transformer = new TransformStream({
+                transform(unifiedChunk: any, controller) {
+                    const openAIChunk = {
+                        id: unifiedChunk.id || 'chatcmpl-' + Date.now(),
+                        object: 'chat.completion.chunk',
+                        created: unifiedChunk.created || Math.floor(Date.now() / 1000),
+                        model: unifiedChunk.model,
+                        choices: [
+                            {
+                                index: 0,
+                                delta: unifiedChunk.delta,
+                                finish_reason: unifiedChunk.finish_reason || null
+                            }
+                        ],
+                        usage: unifiedChunk.usage ? {
+                            prompt_tokens: unifiedChunk.usage.input_tokens,
+                            completion_tokens: unifiedChunk.usage.output_tokens,
+                            total_tokens: unifiedChunk.usage.total_tokens,
+                            prompt_tokens_details: {
+                                cached_tokens: unifiedChunk.usage.cached_tokens
+                            },
+                            completion_tokens_details: {
+                                reasoning_tokens: unifiedChunk.usage.reasoning_tokens
+                            }
+                        } : undefined
+                    };
+
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIChunk)}\n\n`));
+                },
+                flush(controller) {
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 }
             });
+            
+            return stream.pipeThrough(transformer);
+          }
+
+          // --- 7. Extract usage from raw SSE chunk ---
+          extractUsage(input: string) {
+            return extractOpenAIUsage(input);
           }
         }
         

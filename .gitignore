@@ -37,4 +37,5 @@ config/usage.sqlite
 
 llms/
 CAP-UI/
+CLIProxyApi/
 gemini-client-error*

@@ -1,6 +1,6 @@
 import { UsageStorageService } from './usage-storage';
 import { logger } from '../utils/logger';
-import { StreamReconstructor } from '../utils/stream-reconstructor';
+import { parse as parseSSE } from 'event-stream-parser';
 
 export interface DebugLogRecord {
     requestId: string;
@@ -79,78 +79,146 @@ export class DebugManager {
         const log = this.pendingLogs.get(requestId);
         if (log) {
             log.transformedResponse = payload;
-            this.flush(requestId); // Assuming this is the last step
+            this.flush(requestId); // For non-streaming responses
         }
     }
     
-    // Create a TransformStream to observe and log data passing through
-    createDebugObserver(requestId: string, type: 'rawResponse' | 'transformedResponse'): TransformStream {
-        const decoder = new TextDecoder();
-        let accumulated = '';
-
-        return new TransformStream({
-            transform: (chunk, controller) => {
-                // Pass chunk through immediately
-                controller.enqueue(chunk);
-
-                if (!this.enabled) return;
+    /**
+     * Observe and capture a stream for debug logging.
+     * Returns a function that consumes the stream in the background.
+     * 
+     * @param stream - The stream to observe
+     * @param requestId - Request ID for logging
+     * @param type - Type of stream (rawResponse or transformedResponse)
+     * @returns Function that processes the stream in background
+     */
+    observeAndCapture(
+        stream: ReadableStream,
+        requestId: string,
+        type: 'rawResponse' | 'transformedResponse'
+    ): () => Promise<void> {
+        return async () => {
+            if (!this.enabled) return;
+            
+            let sseText = '';
+            const events: any[] = [];
+            
+            try {
+                // Parse SSE events properly (handles fragmentation)
+                const eventStream = await parseSSE(stream as ReadableStream<Uint8Array>);
+                const reader = eventStream.getReader();
                 
-                // Accumulate for logging
-                try {
-                    if (typeof chunk === 'string') {
-                        accumulated += chunk;
-                    } else if (chunk instanceof Uint8Array) {
-                        accumulated += decoder.decode(chunk, { stream: true });
-                    } else {
-                        // Try to stringify if it's an object
-                        try {
-                            accumulated += JSON.stringify(chunk) + '\n';
-                        } catch (e) {
-                            accumulated += String(chunk);
-                        }
+                while (true) {
+                    const { done, value: event } = await reader.read();
+                    if (done) break;
+                    
+                    // Reconstruct original SSE format for raw display
+                    sseText += `data: ${event.data}\n\n`;
+                    
+                    // Parse and collect event data for snapshot
+                    try {
+                        const eventData = JSON.parse(event.data);
+                        events.push(eventData);
+                    } catch (e) {
+                        // Ignore parse errors
                     }
-
-                    // Update pending log in memory
-                    const log = this.pendingLogs.get(requestId);
-                    if (log) {
-                        log[type] = accumulated;
-                    }
-                } catch (e) {
-                    // Ignore logging errors to prevent impacting the stream
                 }
-            },
-            flush: () => {
-                if (!this.enabled) return;
                 
-                // Final decode if there are trailing bytes
-                try {
-                    accumulated += decoder.decode();
-                    const log = this.pendingLogs.get(requestId);
-                    if (log) {
-                        log[type] = accumulated;
-                        if (type === 'transformedResponse') {
-                            this.flush(requestId);
-                        }
+                reader.releaseLock();
+                
+                // Store accumulated data and snapshot
+                const log = this.pendingLogs.get(requestId);
+                if (log) {
+                    log[type] = sseText;
+                    
+                    // Create snapshot by merging all events
+                    if (events.length > 0) {
+                        const snapshotKey = type === 'rawResponse' 
+                            ? 'rawResponseSnapshot' 
+                            : 'transformedResponseSnapshot';
+                        log[snapshotKey] = this.mergeEvents(events);
                     }
-                } catch (e) {
-                    logger.error(`Error finalizing debug stream for ${requestId}`, e);
+                    
+                    // Flush if this is the final capture
+                    if (type === 'transformedResponse') {
+                        this.flush(requestId);
+                    }
+                }
+            } catch (e: any) {
+                logger.error(`Debug capture error for ${requestId} (${type}): ${e.message}`);
+                // Store whatever we captured
+                const log = this.pendingLogs.get(requestId);
+                if (log && sseText) {
+                    log[type] = sseText;
                 }
             }
-        });
+        };
+    }
+
+    /**
+     * Merge multiple SSE events into a single reconstructed object.
+     * Similar to StreamReconstructor but works on already-parsed events.
+     */
+    private mergeEvents(events: any[]): any {
+        if (events.length === 0) return null;
+        if (events.length === 1) return events[0];
+        
+        // Deep merge all events
+        return events.reduce((acc, event) => this.deepMerge(acc, event), {});
+    }
+
+    private deepMerge(target: any, source: any): any {
+        if (target === null || target === undefined) return source;
+        if (source === null || source === undefined) return target;
+
+        const targetType = typeof target;
+        const sourceType = typeof source;
+
+        if (targetType !== sourceType) return source;
+
+        // Handle Array
+        if (Array.isArray(target) && Array.isArray(source)) {
+            const result = [...target];
+            source.forEach((item, index) => {
+                if (index < result.length) {
+                    result[index] = this.deepMerge(result[index], item);
+                } else {
+                    result.push(item);
+                }
+            });
+            return result;
+        }
+
+        // Handle Object
+        if (targetType === 'object' && !Array.isArray(target)) {
+            const result = { ...target };
+            for (const key in source) {
+                if (key in result) {
+                    result[key] = this.deepMerge(result[key], source[key]);
+                } else {
+                    result[key] = source[key];
+                }
+            }
+            return result;
+        }
+
+        // Handle String (Concatenate)
+        if (targetType === 'string') {
+            if (target !== source) {
+                return target + source;
+            }
+            return target;
+        }
+
+        // Default: Source overwrites
+        return source;
     }
 
     flush(requestId: string) {
         if (!this.storage) return;
         const log = this.pendingLogs.get(requestId);
         if (log) {
-            // Attempt to reconstruct streams if they exist and appear to be SSE
-            if (typeof log.rawResponse === 'string' && log.rawResponse.includes('data: ')) {
-                log.rawResponseSnapshot = StreamReconstructor.reconstruct(log.rawResponse);
-            }
-            if (typeof log.transformedResponse === 'string' && log.transformedResponse.includes('data: ')) {
-                log.transformedResponseSnapshot = StreamReconstructor.reconstruct(log.transformedResponse);
-            }
-
+            logger.debug(`[DebugManager] Flushing debug log for ${requestId}`);
             this.storage.saveDebugLog(log);
             this.pendingLogs.delete(requestId);
         }
