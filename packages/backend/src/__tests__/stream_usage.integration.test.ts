@@ -2,35 +2,39 @@ import { describe, expect, test, mock, beforeEach, afterEach, spyOn, beforeAll }
 import { Dispatcher } from "../services/dispatcher";
 import { UsageStorageService } from "../services/usage-storage";
 
-const TEST_CONFIG_YAML = `
-providers:
-  openai:
-    type: chat
-    api_base_url: https://api.openai.com/v1
-    api_key: test-key
-    models:
-      - gpt-4
-      - gpt-3.5-turbo
-models:
-  gpt-4:
-    targets:
-      - provider: openai
-        model: gpt-4
-keys:
-  test-key:
-    secret: "sk-test-key"
-    comment: "Test Key"
-adminKey: "test-admin-key"
-`;
-
 // Mock Config
 mock.module('../config', () => {
-    // We need to keep some real functionality (like validateConfig) but mock loadConfig
-    const original = require('../config'); 
+    const { z } = require('zod');
+    // Reconstruct the config object directly here since we want to ensure getConfig returns it
+    const testConfig = {
+        providers: {
+            openai: {
+                type: 'chat',
+                api_base_url: 'https://api.openai.com/v1',
+                api_key: 'test-key',
+                models: ['gpt-4', 'gpt-3.5-turbo']
+            }
+        },
+        models: {
+            'gpt-4': {
+                targets: [{ provider: 'openai', model: 'gpt-4' }]
+            }
+        },
+        keys: {
+            'test-key': {
+                secret: 'sk-test-key',
+                comment: 'Test Key'
+            }
+        },
+        adminKey: 'test-admin-key'
+    };
+
     return {
-        ...original,
-        loadConfig: () => Promise.resolve({}), // No-op for initial load
+        loadConfig: () => Promise.resolve(testConfig),
+        getConfig: () => testConfig,
         getConfigPath: () => '/tmp/test-config.yaml',
+        validateConfig: () => testConfig,
+        setConfigForTesting: () => {}
     };
 });
 
@@ -41,17 +45,10 @@ describe("Streaming Usage Integration", () => {
 
     beforeAll(async () => {
         process.env.PLEXUS_DB_URL = ':memory:';
-        process.env.BYPASS_AUTH_FOR_TESTING = 'true';
         
         // Load the module
         const module = await import("../index");
         server = module.default;
-        
-        // Force reload of config in case it was cached without keys
-        // We import the mocked module again to use its exported functions
-        const { setConfigForTesting, validateConfig } = await import("../config");
-        const config = validateConfig(TEST_CONFIG_YAML);
-        setConfigForTesting(config);
     });
 
     beforeEach(() => {
@@ -113,7 +110,8 @@ describe("Streaming Usage Integration", () => {
         }));
 
         if (res.status !== 200) {
-            console.log(await res.json());
+            console.log("Status:", res.status);
+            console.log("Body:", await res.text());
         }
         expect(res.status).toBe(200);
 

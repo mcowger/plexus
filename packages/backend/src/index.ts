@@ -47,18 +47,13 @@ app.use('*', async (c, next) => {
 
 // Auth Middleware
 app.use('/v1/*', async (c, next) => {
-    if (process.env.BYPASS_AUTH_FOR_TESTING === 'true') {
-        await next();
-        return;
-    }
-
     if (c.req.path === '/v1/models') {
         await next();
         return;
     }
 
     const config = getConfig();
-    if (!config.keys) {
+    if (!config.keys || Object.keys(config.keys).length === 0) {
          return c.json({ error: { message: "Unauthorized: No API keys configured", type: "auth_error" } }, 401);
     }
 
@@ -249,19 +244,12 @@ app.post('/v1/responses', async (c) => {
 
 // Admin Auth Middleware
 app.use('/v0/*', async (c, next) => {
-    // Bypass for testing
-    if (process.env.BYPASS_AUTH_FOR_TESTING === 'true') {
-        await next();
-        return;
-    }
-
     const config = getConfig();
-    // If adminKey is configured, enforce it
-    if (config.adminKey) {
-        const authHeader = c.req.header('x-admin-key');
-        if (!authHeader || authHeader !== config.adminKey) {
-            return c.json({ error: { message: "Unauthorized", type: "auth_error" } }, 401);
-        }
+    const authHeader = c.req.header('x-admin-key');
+
+    // Secure comparison: Admin key MUST be present in config and match header
+    if (!config.adminKey || !authHeader || authHeader !== config.adminKey) {
+        return c.json({ error: { message: "Unauthorized", type: "auth_error" } }, 401);
     }
     await next();
 });
