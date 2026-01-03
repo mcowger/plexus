@@ -171,7 +171,28 @@ export class UsageStorageService extends EventEmitter {
             try {
                 this.db.run("ALTER TABLE request_usage ADD COLUMN cost_metadata TEXT;");
             } catch (e) { /* ignore if exists */ }
-            
+
+            // Provider Performance Table - stores last 10 request latencies and throughput
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS provider_performance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    time_to_first_token_ms REAL,
+                    total_tokens INTEGER,
+                    duration_ms REAL,
+                    tokens_per_sec REAL,
+                    request_id TEXT
+                );
+            `);
+
+            // Create indexes for efficient querying
+            this.db.run(`
+                CREATE INDEX IF NOT EXISTS idx_provider_performance_lookup
+                ON provider_performance(provider, model, created_at DESC);
+            `);
+
             logger.info("Storage initialized");
         } catch (error) {
             logger.error("Failed to initialize storage", error);
@@ -530,6 +551,107 @@ export class UsageStorageService extends EventEmitter {
         } catch (error) {
             logger.error("Failed to delete usage logs", error);
             return false;
+        }
+    }
+
+    updatePerformanceMetrics(
+        provider: string,
+        model: string,
+        timeToFirstTokenMs: number | null,
+        totalTokens: number | null,
+        durationMs: number,
+        requestId: string
+    ) {
+        try {
+            // Calculate tokens per second if we have both values
+            let tokensPerSec: number | null = null;
+            if (totalTokens && durationMs > 0) {
+                tokensPerSec = (totalTokens / durationMs) * 1000;
+            }
+
+            // Insert new performance record
+            const insertQuery = this.db.prepare(`
+                INSERT INTO provider_performance (
+                    provider, model, created_at, time_to_first_token_ms, 
+                    total_tokens, duration_ms, tokens_per_sec, request_id
+                ) VALUES (
+                    $provider, $model, $createdAt, $ttft, 
+                    $totalTokens, $durationMs, $tokensPerSec, $requestId
+                )
+            `);
+
+            insertQuery.run({
+                $provider: provider,
+                $model: model,
+                $createdAt: Date.now(),
+                $ttft: timeToFirstTokenMs,
+                $totalTokens: totalTokens,
+                $durationMs: durationMs,
+                $tokensPerSec: tokensPerSec,
+                $requestId: requestId
+            });
+
+            // Keep only the last 10 records per provider+model combination
+            // Delete older records beyond the 10th
+            const deleteQuery = this.db.prepare(`
+                DELETE FROM provider_performance
+                WHERE provider = $provider AND model = $model
+                AND id NOT IN (
+                    SELECT id FROM provider_performance
+                    WHERE provider = $provider AND model = $model
+                    ORDER BY created_at DESC
+                    LIMIT 10
+                )
+            `);
+
+            deleteQuery.run({
+                $provider: provider,
+                $model: model
+            });
+
+            logger.debug(`Performance metrics updated for ${provider}:${model}`);
+        } catch (error) {
+            logger.error(`Failed to update performance metrics for ${provider}:${model}`, error);
+        }
+    }
+
+    getProviderPerformance(provider?: string, model?: string): any[] {
+        try {
+            let queryStr = `
+                SELECT 
+                    provider,
+                    model,
+                    AVG(time_to_first_token_ms) as avg_ttft_ms,
+                    MIN(time_to_first_token_ms) as min_ttft_ms,
+                    MAX(time_to_first_token_ms) as max_ttft_ms,
+                    AVG(tokens_per_sec) as avg_tokens_per_sec,
+                    MIN(tokens_per_sec) as min_tokens_per_sec,
+                    MAX(tokens_per_sec) as max_tokens_per_sec,
+                    COUNT(*) as sample_count,
+                    MAX(created_at) as last_updated
+                FROM provider_performance
+                WHERE 1=1
+            `;
+
+            const params: any = {};
+
+            if (provider) {
+                queryStr += " AND provider = $provider";
+                params.$provider = provider;
+            }
+
+            if (model) {
+                queryStr += " AND model = $model";
+                params.$model = model;
+            }
+
+            queryStr += " GROUP BY provider, model ORDER BY provider, model";
+
+            const query = this.db.prepare(queryStr);
+            return query.all(params) as any[];
+        } catch (error) {
+            logger.error("Failed to get provider performance", error);
+            return [];
         }
     }
 }

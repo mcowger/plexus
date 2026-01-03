@@ -23,7 +23,8 @@ mock.module("hono/streaming", () => ({
 describe("handleResponse", () => {
     const mockStorage = {
         saveRequest: mock(),
-        saveError: mock()
+        saveError: mock(),
+        updatePerformanceMetrics: mock()
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {

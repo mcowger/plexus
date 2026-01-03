@@ -119,6 +119,8 @@ export async function handleResponse(
 
     if (unifiedResponse.stream) {
         let finalClientStream: ReadableStream;
+        let timeToFirstToken: number | null = null;
+        let firstChunkReceived = false;
 
         if (unifiedResponse.bypassTransformation && unifiedResponse.rawStream) {
             // --- Case 1: Passthrough ---
@@ -133,6 +135,12 @@ export async function handleResponse(
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
+                        
+                        // Capture TTFT on first chunk
+                        if (!firstChunkReceived) {
+                            timeToFirstToken = Date.now() - startTime;
+                            firstChunkReceived = true;
+                        }
                         
                         if (value && value.usage) {
                             usageRecord.tokensInput = value.usage.input_tokens;
@@ -157,6 +165,13 @@ export async function handleResponse(
             const usageObserver = new TransformStream({
                 transform(chunk, controller) {
                     controller.enqueue(chunk);
+                    
+                    // Capture TTFT on first chunk
+                    if (!firstChunkReceived) {
+                        timeToFirstToken = Date.now() - startTime;
+                        firstChunkReceived = true;
+                    }
+                    
                     try {
                         if (chunk && chunk.usage) {
                             usageRecord.tokensInput = chunk.usage.input_tokens;
@@ -232,6 +247,19 @@ export async function handleResponse(
                 } catch (saveError: any) {
                     logger.error(`Failed to save usage record for ${usageRecord.requestId}: ${saveError.message}`);
                 }
+
+                // Update performance metrics
+                if (usageRecord.provider && usageRecord.selectedModelName) {
+                    const totalTokens = (usageRecord.tokensInput || 0) + (usageRecord.tokensOutput || 0);
+                    usageStorage.updatePerformanceMetrics(
+                        usageRecord.provider,
+                        usageRecord.selectedModelName,
+                        timeToFirstToken,
+                        totalTokens > 0 ? totalTokens : null,
+                        usageRecord.durationMs,
+                        usageRecord.requestId!
+                    );
+                }
             }
         });
     }
@@ -265,6 +293,20 @@ export async function handleResponse(
     usageRecord.responseStatus = 'success';
     usageRecord.durationMs = Date.now() - startTime;
     usageStorage.saveRequest(usageRecord as UsageRecord);
+
+    // Update performance metrics for non-streaming requests
+    if (usageRecord.provider && usageRecord.selectedModelName) {
+        // For non-streaming, TTFT is approximately the full duration
+        const totalTokens = (usageRecord.tokensInput || 0) + (usageRecord.tokensOutput || 0);
+        usageStorage.updatePerformanceMetrics(
+            usageRecord.provider,
+            usageRecord.selectedModelName,
+            usageRecord.durationMs, // TTFT = full duration for non-streaming
+            totalTokens > 0 ? totalTokens : null,
+            usageRecord.durationMs,
+            usageRecord.requestId!
+        );
+    }
 
     logger.debug(`Outgoing ${apiType} Response`, responseBody);
     return c.json(responseBody);

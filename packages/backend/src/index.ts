@@ -392,6 +392,17 @@ app.delete('/v0/management/cooldowns/:provider', (c) => {
 });
 
 // Debug API
+
+// Performance Metrics API
+app.get('/v0/management/performance', (c) => {
+    const provider = c.req.query('provider');
+    const model = c.req.query('model');
+    
+    const performance = usageStorage.getProviderPerformance(provider, model);
+    return c.json(performance);
+});
+
+
 app.get('/v0/management/debug', (c) => {
     return c.json({ enabled: DebugManager.getInstance().isEnabled() });
 });

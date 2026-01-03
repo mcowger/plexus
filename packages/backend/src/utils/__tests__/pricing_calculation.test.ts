@@ -15,7 +15,8 @@ mock.module("../logger", () => ({
 
 describe("handleResponse - Pricing Calculation", () => {
     const mockStorage = {
-        saveRequest: mock()
+        saveRequest: mock(),
+        updatePerformanceMetrics: mock()
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {

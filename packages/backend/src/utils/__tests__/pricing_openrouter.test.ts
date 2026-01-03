@@ -44,7 +44,8 @@ mock.module("../../services/pricing-manager", () => {
 
 describe("handleResponse - OpenRouter Pricing", () => {
     const mockStorage = {
-        saveRequest: mock()
+        saveRequest: mock(),
+        updatePerformanceMetrics: mock()
     } as unknown as UsageStorageService;
 
     const mockTransformer: Transformer = {
