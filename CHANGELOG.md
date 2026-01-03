@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.2 - 2026-01-03
+
+### Precision Performance: Smarter Metrics & Smoother Releases
+
+### Key Improvements
+- **Refined TPS Calculation**: Improved the accuracy of performance metrics by excluding input tokens from the Tokens Per Second (TPS) count, ensuring a more precise measurement of generation throughput.
+
+### Minor Changes & Fixes
+- Fix release automation scripts (`5d369d7`)
+- Resolve logic in TPS counting metrics (`fabdf55`)
+- Update internal testing suite in `test.ts` (`dd784c8`)
+
 ## 0.2.1 - 2026-01-03
 
 ### Precision Streams & Performance Insights
