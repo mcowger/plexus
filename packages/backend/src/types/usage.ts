@@ -22,6 +22,8 @@ export interface UsageRecord {
     durationMs: number;
     isStreamed: boolean;
     responseStatus: string; // "success", "error", or "HTTP <code"
+    ttftMs?: number | null;
+    tokensPerSec?: number | null;
     hasDebug?: boolean;
     hasError?: boolean;
     isPassthrough?: boolean;

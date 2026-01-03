@@ -207,7 +207,7 @@ export const Logs = () => {
                                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
                                 <th style={{ padding: '6px' }}>Tokens (I/O/R/C)</th>
                                 <th style={{ padding: '6px', textAlign: 'right' }}>Cost</th>
-                                <th style={{ padding: '6px' }}>Duration</th>
+                                <th style={{ padding: '6px' }}>Performance</th>
                                 <th style={{ padding: '6px' }}>Streamed</th>
                                 <th style={{ padding: '6px' }}>Direct</th>
                                 <th style={{ padding: '6px' }}>Status</th>
@@ -289,7 +289,15 @@ export const Logs = () => {
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '1.2em' }}>∅</span>
                                             )}
                                         </td>
-                                        <td style={{ padding: '6px', fontSize: '1.2em' }}>{log.durationMs > 10 ? `${(log.durationMs / 1000).toFixed(1)}s` : '∅'}</td>
+                                        <td style={{ padding: '6px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontWeight: '500' }}>{log.durationMs > 10 ? `${(log.durationMs / 1000).toFixed(1)}s` : '∅'}</span>
+                                                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+                                                    {log.ttftMs && log.ttftMs > 0 ? `${Math.round(log.ttftMs)}ms` : ''}
+                                                    {log.tokensPerSec && log.tokensPerSec > 0 ? ` • ${log.tokensPerSec.toFixed(1)}t/s` : ''}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td style={{ padding: '2px', alignContent: 'center', textAlign: 'center' }}>{log.isStreamed ? '✓' : ''}
                                         </td>
                                         <td style={{ padding: '2px', alignContent: 'center', textAlign: 'center' }}>

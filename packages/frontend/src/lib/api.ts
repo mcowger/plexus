@@ -100,6 +100,8 @@ export interface UsageRecord {
     durationMs: number;
     isStreamed: boolean;
     responseStatus: string;
+    ttftMs?: number;
+    tokensPerSec?: number;
     hasDebug?: boolean;
     hasError?: boolean;
     isPassthrough?: boolean;

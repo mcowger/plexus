@@ -270,6 +270,13 @@ export async function handleResponse(
                      usageRecord.responseStatus = 'unknown'; 
                 }
 
+                // Calculate performance metrics for the record
+                const totalTokens = (usageRecord.tokensInput || 0) + (usageRecord.tokensOutput || 0);
+                usageRecord.ttftMs = timeToFirstToken;
+                if (totalTokens > 0 && usageRecord.durationMs > 0) {
+                    usageRecord.tokensPerSec = (totalTokens / usageRecord.durationMs) * 1000;
+                }
+
                 calculateCosts(usageRecord, pricing, providerDiscount);
                 try {
                     usageStorage.saveRequest(usageRecord as UsageRecord);
@@ -322,6 +329,14 @@ export async function handleResponse(
     calculateCosts(usageRecord, pricing, providerDiscount);
     usageRecord.responseStatus = 'success';
     usageRecord.durationMs = Date.now() - startTime;
+    
+    // Performance metrics for non-streaming
+    const totalTokens = (usageRecord.tokensInput || 0) + (usageRecord.tokensOutput || 0);
+    usageRecord.ttftMs = usageRecord.durationMs; // TTFT = full duration for non-streaming
+    if (totalTokens > 0 && usageRecord.durationMs > 0) {
+        usageRecord.tokensPerSec = (totalTokens / usageRecord.durationMs) * 1000;
+    }
+
     usageStorage.saveRequest(usageRecord as UsageRecord);
 
     // Update performance metrics for non-streaming requests
