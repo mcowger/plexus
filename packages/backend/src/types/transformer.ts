@@ -30,10 +30,10 @@ export interface Transformer {
   // Takes a stream of UnifiedChatStreamChunk, returns a raw stream for the client
   formatStream?(stream: ReadableStream): ReadableStream;
 
-  // Extract usage information from a raw SSE chunk
-  // Used by the observer to parse usage data without full stream transformation
-  // Returns undefined if no usage data is present in this chunk
-  extractUsage?(chunk: Uint8Array | string): { 
+  // Extract usage information from SSE event data (JSON string)
+  // Used by the observer to parse usage data from complete SSE events
+  // Returns undefined if no usage data is present in this event
+  extractUsage?(eventData: string): { 
     input_tokens?: number;
     output_tokens?: number;
     cached_tokens?: number;

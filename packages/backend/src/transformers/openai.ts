@@ -212,8 +212,8 @@ export class OpenAITransformer implements Transformer {
           }
 
           // --- 7. Extract usage from raw SSE chunk ---
-          extractUsage(chunk: Uint8Array | string) {
-            return extractOpenAIUsage(chunk);
+          extractUsage(input: string) {
+            return extractOpenAIUsage(input);
           }
         }
         

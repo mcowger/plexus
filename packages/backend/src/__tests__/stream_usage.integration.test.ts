@@ -1,10 +1,9 @@
-import { describe, expect, test, mock, beforeEach, afterEach, spyOn, beforeAll } from "bun:test";
+import { describe, mock, beforeEach, afterEach, spyOn, beforeAll } from "bun:test";
 import { Dispatcher } from "../services/dispatcher";
 import { UsageStorageService } from "../services/usage-storage";
 
 // Mock Config
 mock.module('../config', () => {
-    const { z } = require('zod');
     // Reconstruct the config object directly here since we want to ensure getConfig returns it
     const testConfig = {
         providers: {

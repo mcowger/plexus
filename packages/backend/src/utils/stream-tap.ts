@@ -25,9 +25,13 @@ export function tapStream<T>(
   source: ReadableStream<T>,
   observerInstance: StreamObserver<T>
 ): ReadableStream<T> {
+  let chunkCount = 0;
+  
   return source.pipeThrough(
     new TransformStream<T, T>({
       transform(chunk, controller) {
+        chunkCount++;
+        
         // 1. Forward to client IMMEDIATELY
         // This ensures the consumer gets data as fast as possible
         controller.enqueue(chunk);
@@ -56,7 +60,11 @@ export function tapStream<T>(
         // 3. Fire-and-forget push to sidecar
         // This is non-blocking - observer processes asynchronously
         observerInstance.push(observationData);
+        console.debug(`[TapStream] Chunk ${chunkCount} forwarded and queued for observation`);
       },
+      flush() {
+        console.debug(`[TapStream] Stream flush() called after ${chunkCount} chunks`);
+      }
     })
   );
 }

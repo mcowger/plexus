@@ -6,7 +6,7 @@ import { UsageStorageService } from "../services/usage-storage";
 import { logger } from "./logger";
 import { DebugManager } from "../services/debug-manager";
 import { createUsageObserver } from "./usage-observer";
-import { tapStream } from "./stream-tap";
+import { observeStream } from "./stream-tap";
 import { calculateCosts } from "./calculate-costs";
 
 export async function handleResponse(
@@ -35,8 +35,8 @@ export async function handleResponse(
 
   // Is this a streaming response?
   if (unifiedResponse.stream) {
-    // Create observer for usage tracking - observes raw chunks
-    const { observer, onComplete } = createUsageObserver(
+    // Create observer that handles all the parsing and processing
+    const { observeAndProcess } = createUsageObserver(
       usageRecord,
       startTime,
       usageStorage,
@@ -45,24 +45,54 @@ export async function handleResponse(
       providerDiscount
     );
 
-    // Tap the raw stream to observe it (extracts usage without transformation)
-    const observedRawStream = tapStream(unifiedResponse.stream, observer);
+    // Split the raw stream: one for client, one for usage observation
+    const { clientStream: clientStream1, usageStream } = observeStream(unifiedResponse.stream);
 
-    // For passthrough mode, just send the observed raw stream
-    // For normal mode, transform to unified then format
+    // Start usage observation in background (fire-and-forget)
+    observeAndProcess(usageStream);
+
+    // Split again for debug capture if enabled
+    let clientStream = clientStream1;
+    if (usageRecord.requestId && DebugManager.getInstance().isEnabled()) {
+      const { clientStream: clientStream2, usageStream: debugStream } = observeStream(clientStream1);
+      clientStream = clientStream2;
+      
+      // Start debug capture in background (fire-and-forget)
+      const captureRaw = DebugManager.getInstance().observeAndCapture(
+        debugStream,
+        usageRecord.requestId,
+        'rawResponse'
+      );
+      captureRaw();
+    }
+
+    // Determine final client stream
     let finalClientStream: ReadableStream;
     if (unifiedResponse.bypassTransformation) {
-      // Passthrough: send raw stream directly
-      finalClientStream = observedRawStream;
+      // Passthrough: send raw stream directly to client
+      finalClientStream = clientStream;
     } else {
       // Normal: transform to unified, then format to client API
       const unifiedStream = transformer.transformStream
-        ? transformer.transformStream(observedRawStream)
-        : observedRawStream;
+        ? transformer.transformStream(clientStream)
+        : clientStream;
       
       finalClientStream = transformer.formatStream
         ? transformer.formatStream(unifiedStream)
         : unifiedStream;
+      
+      // Capture transformed response if debug enabled
+      if (usageRecord.requestId && DebugManager.getInstance().isEnabled()) {
+        const { clientStream: finalClient, usageStream: debugTransformed } = observeStream(finalClientStream);
+        finalClientStream = finalClient;
+        
+        const captureTransformed = DebugManager.getInstance().observeAndCapture(
+          debugTransformed,
+          usageRecord.requestId,
+          'transformedResponse'
+        );
+        captureTransformed();
+      }
     }
 
     // Set headers and return the stream directly
@@ -70,17 +100,9 @@ export async function handleResponse(
     c.header("Cache-Control", "no-cache");
     c.header("Connection", "keep-alive");
 
-    // Attach cleanup handler that fires when stream completes
-    const cleanupStream = finalClientStream.pipeThrough(
-      new TransformStream({
-        flush() {
-          usageRecord.responseStatus = "success";
-          onComplete();
-        },
-      })
-    );
+    usageRecord.responseStatus = "success";
 
-    return new Response(cleanupStream, {
+    return new Response(finalClientStream, {
       headers: c.res.headers,
     });
   } else {

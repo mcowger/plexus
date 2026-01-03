@@ -33,10 +33,11 @@ export class StreamObserver<T = any> {
    */
   public push(data: T): void {
     if (this.queue.length >= this.MAX_QUEUE_SIZE) {
-      console.warn(`Observer queue saturated (${this.MAX_QUEUE_SIZE} items). Dropping metadata packet.`);
+      console.warn(`[StreamObserver] Queue saturated (${this.MAX_QUEUE_SIZE} items). Dropping metadata packet.`);
       return;
     }
     this.queue.push(data);
+    console.debug(`[StreamObserver] Pushed item, queue size: ${this.queue.length}`);
     this.process();
   }
 
@@ -48,24 +49,31 @@ export class StreamObserver<T = any> {
   private async process(): Promise<void> {
     if (this.isProcessing) return;
     this.isProcessing = true;
+    // console.debug(`[StreamObserver] Starting processing, queue size: ${this.queue.length}`);
 
-    while (this.queue.length > 0) {
-      const item = this.queue.shift();
-      if (!item) continue;
+    try {
+      while (this.queue.length > 0) {
+        const item = this.queue.shift();
+        if (!item) continue;
 
-      try {
-        // Bun.sleep(0) yields to the event loop so the 
-        // ReadableStream can pump the next chunk if it's ready.
-        // This ensures the observer never blocks the stream flow.
-        await Bun.sleep(0);
-        await this.processor(item);
-      } catch (err) {
-        console.error("Observer processing error:", err);
-        // Continue processing remaining items even if one fails
+        try {
+          // Bun.sleep(0) yields to the event loop so the 
+          // ReadableStream can pump the next chunk if it's ready.
+          // This ensures the observer never blocks the stream flow.
+          await Bun.sleep(0);
+          await this.processor(item);
+        } catch (err) {
+          console.error("[StreamObserver] Processing error:", err);
+          // Continue processing remaining items even if one fails
+        }
       }
-    }
 
-    this.isProcessing = false;
+      console.debug(`[StreamObserver] Processing complete, queue now empty`);
+    } finally {
+      // CRITICAL: Set isProcessing to false in finally block
+      // This ensures drain() can detect completion even if there's an error
+      this.isProcessing = false;
+    }
   }
 
   /**
@@ -80,6 +88,27 @@ export class StreamObserver<T = any> {
    */
   public get isActive(): boolean {
     return this.isProcessing;
+  }
+
+  /**
+   * Wait for all queued items to be processed.
+   * Returns a promise that resolves when the queue is empty AND processing is complete.
+   */
+  public async drain(): Promise<void> {
+    let iterations = 0;
+    const maxIterations = 1000; // Prevent infinite loop (10 seconds max)
+    
+    // Wait until both queue is empty AND processing is done
+    while ((this.queue.length > 0 || this.isProcessing) && iterations < maxIterations) {
+      await Bun.sleep(10);
+      iterations++;
+    }
+    
+    if (iterations >= maxIterations) {
+      console.warn(`[StreamObserver] Drain timeout after ${iterations} iterations, queue size: ${this.queue.length}, active: ${this.isProcessing}`);
+    } else {
+      console.debug(`[StreamObserver] Drained successfully after ${iterations} iterations (${iterations * 10}ms)`);
+    }
   }
 }
 
