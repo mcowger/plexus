@@ -1,7 +1,8 @@
 import { Transformer } from '../types/transformer';
 import { UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, UnifiedTool, MessageContent } from '../types/unified';
 import { logger } from '../utils/logger';
-import { countTokens } from './utils'
+import { countTokens } from './utils';
+import { extractAnthropicUsage } from './usage-extractors';
 
 export class AnthropicTransformer implements Transformer {
   name = 'messages';
@@ -278,225 +279,197 @@ export class AnthropicTransformer implements Transformer {
   transformStream(stream: ReadableStream): ReadableStream {
     const decoder = new TextDecoder();
     let buffer = "";
+    let accumulatedText = "";
+    let seenThinking = false;
+    
+    // Use TransformStream for proper backpressure handling
+    const transformer = new TransformStream({
+        transform(chunk, controller) {
+            const text = typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
+            buffer += text;
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
 
-    return new ReadableStream({
-        async start(controller) {
-            let accumulatedText = "";
-            let seenThinking = false;
-            const reader = stream.getReader();
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-                    buffer = lines.pop() || "";
+                const dataStr = trimmedLine.slice(5).trim();
+                if (dataStr === "[DONE]") continue;
 
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
+                try {
+                    const data = JSON.parse(dataStr);
+                    let unifiedChunk: any = null;
 
-                        const dataStr = trimmedLine.slice(5).trim();
-                        if (dataStr === "[DONE]") continue;
-
-                        try {
-                            const data = JSON.parse(dataStr);
-                            let chunk: any = null;
-
-                            switch (data.type) {
-                                case 'message_start':
-                                    chunk = {
-                                        id: data.message.id,
-                                        model: data.message.model,
-                                        created: Math.floor(Date.now() / 1000),
-                                        delta: { role: 'assistant' }
-                                    };
-                                    break;
-                                case 'content_block_delta':
-                                    if (data.delta.type === 'text_delta') {
-                                        accumulatedText += data.delta.text;
-                                        chunk = {
-                                            delta: { content: data.delta.text }
-                                        };
-                                    } else if (data.delta.type === 'thinking_delta') {
-                                        seenThinking = true;
-                                        chunk = {
-                                            delta: { reasoning_content: data.delta.thinking }
-                                        };
-                                    } else if (data.delta.type === 'input_json_delta') {
-                                         chunk = {
-                                            delta: {
-                                                tool_calls: [{
-                                                    index: data.index,
-                                                    function: { arguments: data.delta.partial_json }
-                                                }]
+                    switch (data.type) {
+                        case 'message_start':
+                            unifiedChunk = {
+                                id: data.message.id,
+                                model: data.message.model,
+                                created: Math.floor(Date.now() / 1000),
+                                delta: { role: 'assistant' }
+                            };
+                            break;
+                        case 'content_block_delta':
+                            if (data.delta.type === 'text_delta') {
+                                accumulatedText += data.delta.text;
+                                unifiedChunk = {
+                                    delta: { content: data.delta.text }
+                                };
+                            } else if (data.delta.type === 'thinking_delta') {
+                                seenThinking = true;
+                                unifiedChunk = {
+                                    delta: { reasoning_content: data.delta.thinking }
+                                };
+                            } else if (data.delta.type === 'input_json_delta') {
+                                 unifiedChunk = {
+                                    delta: {
+                                        tool_calls: [{
+                                            index: data.index,
+                                            function: { arguments: data.delta.partial_json }
+                                        }]
+                                    }
+                                };
+                            }
+                            break;
+                        case 'content_block_start':
+                            if (data.content_block.type === 'tool_use') {
+                                unifiedChunk = {
+                                    delta: {
+                                        tool_calls: [{
+                                            index: data.index,
+                                            id: data.content_block.id,
+                                            type: 'function',
+                                            function: {
+                                                name: data.content_block.name,
+                                                arguments: ""
                                             }
-                                        };
+                                        }]
                                     }
-                                    break;
-                                case 'content_block_start':
-                                    if (data.content_block.type === 'tool_use') {
-                                        chunk = {
-                                            delta: {
-                                                tool_calls: [{
-                                                    index: data.index,
-                                                    id: data.content_block.id,
-                                                    type: 'function',
-                                                    function: {
-                                                        name: data.content_block.name,
-                                                        arguments: ""
-                                                    }
-                                                }]
-                                            }
-                                        };
-                                    }
-                                    break;
-                                case 'message_delta':
-                                    const inputTokens = data.usage?.input_tokens || 0;
-                                    const totalOutputTokens = data.usage?.output_tokens || 0;
-                                    
-                                    let realOutputTokens = totalOutputTokens;
-                                    let imputedThinkingTokens = 0;
+                                };
+                            }
+                            break;
+                        case 'message_delta':
+                            const inputTokens = data.usage?.input_tokens || 0;
+                            const totalOutputTokens = data.usage?.output_tokens || 0;
+                            
+                            let realOutputTokens = totalOutputTokens;
+                            let imputedThinkingTokens = 0;
 
-                                    if (seenThinking) {
-                                        realOutputTokens = countTokens(accumulatedText);
-                                        imputedThinkingTokens = Math.max(0, totalOutputTokens - realOutputTokens);
-                                    }
-
-                                    chunk = {
-                                        finish_reason: data.delta.stop_reason === 'end_turn' ? 'stop' : 
-                                                      data.delta.stop_reason === 'tool_use' ? 'tool_calls' : 
-                                                      data.delta.stop_reason,
-                                        usage: data.usage ? {
-                                            input_tokens: inputTokens,
-                                            output_tokens: realOutputTokens,
-                                            total_tokens: inputTokens + totalOutputTokens,
-                                            reasoning_tokens: imputedThinkingTokens,
-                                            cached_tokens: 0,
-                                            cache_creation_tokens: 0
-                                        } : undefined
-                                    };
-                                    break;
+                            if (seenThinking) {
+                                realOutputTokens = countTokens(accumulatedText);
+                                imputedThinkingTokens = Math.max(0, totalOutputTokens - realOutputTokens);
                             }
 
-                            if (chunk) {
-                                controller.enqueue(chunk);
-                            }
-                        } catch (e) {
-                            logger.error('Error parsing Anthropic stream chunk', e);
-                        }
+                            unifiedChunk = {
+                                finish_reason: data.delta.stop_reason === 'end_turn' ? 'stop' : 
+                                              data.delta.stop_reason === 'tool_use' ? 'tool_calls' : 
+                                              data.delta.stop_reason,
+                                usage: data.usage ? {
+                                    input_tokens: inputTokens,
+                                    output_tokens: realOutputTokens,
+                                    total_tokens: inputTokens + totalOutputTokens,
+                                    reasoning_tokens: imputedThinkingTokens,
+                                    cached_tokens: 0,
+                                    cache_creation_tokens: 0
+                                } : undefined
+                            };
+                            break;
                     }
+
+                    if (unifiedChunk) {
+                        controller.enqueue(unifiedChunk);
+                    }
+                } catch (e) {
+                    logger.error('Error parsing Anthropic stream chunk', e);
                 }
-            } catch (e) {
-                controller.error(e);
-            } finally {
-                reader.releaseLock();
-                controller.close();
             }
         }
     });
+    
+    return stream.pipeThrough(transformer);
   }
 
   // --- 6. Unified Stream -> Client Stream (Anthropic) ---
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     let hasSentStart = false;
-
-    return new ReadableStream({
-        async start(controller) {
-            const reader = stream.getReader();
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = value as any;
-
-                    if (!hasSentStart) {
-                        const messageStart = {
-                            type: 'message_start',
-                            message: {
-                                id: chunk.id || 'msg_' + Date.now(),
-                                type: 'message',
-                                role: 'assistant',
-                                model: chunk.model,
-                                content: [],
-                                stop_reason: null,
-                                stop_sequence: null,
-                                usage: { input_tokens: 0, output_tokens: 0 }
-                            }
-                        };
-                        controller.enqueue(encoder.encode(`event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`));
-                        hasSentStart = true;
+    
+    // Use TransformStream for proper backpressure handling
+    const transformer = new TransformStream({
+        transform(chunk: any, controller) {
+            if (!hasSentStart) {
+                const messageStart = {
+                    type: 'message_start',
+                    message: {
+                        id: chunk.id || 'msg_' + Date.now(),
+                        type: 'message',
+                        role: 'assistant',
+                        model: chunk.model,
+                        content: [],
+                        stop_reason: null,
+                        stop_sequence: null,
+                        usage: { input_tokens: 0, output_tokens: 0 }
                     }
+                };
+                controller.enqueue(encoder.encode(`event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`));
+                hasSentStart = true;
+            }
 
-                    if (chunk.delta) {
-                        if (chunk.delta.content) {
-                            // Simplified: send as content_block_start + content_block_delta if first time, or just delta
-                            // For simplicity in this implementation, we'll just send text_delta
-                            // In a full implementation, you'd track content blocks
-                            const textDelta = {
-                                type: 'content_block_delta',
-                                index: 0,
-                                delta: { type: 'text_delta', text: chunk.delta.content }
-                            };
-                            
-                            // If it's the very first content, Anthropic usually sends content_block_start first
-                            // but many clients handle just deltas if index 0 is assumed.
-                            controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(textDelta)}\n\n`));
-                        }
-                        
-                        if (chunk.delta.reasoning_content) {
-                            const thinkingDelta = {
-                                type: 'content_block_delta',
-                                index: 0,
-                                delta: { type: 'thinking_delta', thinking: chunk.delta.reasoning_content }
-                            };
-                            controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(thinkingDelta)}\n\n`));
-                        }
+            if (chunk.delta) {
+                if (chunk.delta.content) {
+                    const textDelta = {
+                        type: 'content_block_delta',
+                        index: 0,
+                        delta: { type: 'text_delta', text: chunk.delta.content }
+                    };
+                    controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(textDelta)}\n\n`));
+                }
+                
+                if (chunk.delta.reasoning_content) {
+                    const thinkingDelta = {
+                        type: 'content_block_delta',
+                        index: 0,
+                        delta: { type: 'thinking_delta', thinking: chunk.delta.reasoning_content }
+                    };
+                    controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(thinkingDelta)}\n\n`));
+                }
 
-                        if (chunk.delta.tool_calls) {
-                            for (const tc of chunk.delta.tool_calls) {
-                                // Simplified tool call streaming
-                                const toolDelta = {
-                                    type: 'content_block_delta',
-                                    index: tc.index || 0,
-                                    delta: { type: 'input_json_delta', partial_json: tc.function?.arguments || "" }
-                                };
-                                controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(toolDelta)}\n\n`));
-                            }
-                        }
-                    }
-
-                    if (chunk.finish_reason) {
-                        const messageDelta = {
-                            type: 'message_delta',
-                            delta: {
-                                stop_reason: chunk.finish_reason === 'stop' ? 'end_turn' : 
-                                            chunk.finish_reason === 'tool_calls' ? 'tool_use' : 
-                                            chunk.finish_reason,
-                                stop_sequence: null
-                            },
-                            usage: chunk.usage ? {
-                                output_tokens: chunk.usage.output_tokens,
-                                thinkingTokens: chunk.usage.reasoning_tokens
-                            } : undefined
+                if (chunk.delta.tool_calls) {
+                    for (const tc of chunk.delta.tool_calls) {
+                        const toolDelta = {
+                            type: 'content_block_delta',
+                            index: tc.index || 0,
+                            delta: { type: 'input_json_delta', partial_json: tc.function?.arguments || "" }
                         };
-                        controller.enqueue(encoder.encode(`event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`));
-                        
-                        const messageStop = { type: 'message_stop' };
-                        controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify(messageStop)}\n\n`));
+                        controller.enqueue(encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify(toolDelta)}\n\n`));
                     }
                 }
-            } catch (e) {
-                controller.error(e);
-            } finally {
-                reader.releaseLock();
-                controller.close();
+            }
+
+            if (chunk.finish_reason) {
+                const messageDelta = {
+                    type: 'message_delta',
+                    delta: {
+                        stop_reason: chunk.finish_reason === 'stop' ? 'end_turn' : 
+                                    chunk.finish_reason === 'tool_calls' ? 'tool_use' : 
+                                    chunk.finish_reason,
+                        stop_sequence: null
+                    },
+                    usage: chunk.usage ? {
+                        output_tokens: chunk.usage.output_tokens,
+                        thinkingTokens: chunk.usage.reasoning_tokens
+                    } : undefined
+                };
+                controller.enqueue(encoder.encode(`event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`));
+                
+                const messageStop = { type: 'message_stop' };
+                controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify(messageStop)}\n\n`));
             }
         }
     });
+    
+    return stream.pipeThrough(transformer);
   }
 
   // Helpers
@@ -529,5 +502,10 @@ export class AnthropicTransformer implements Transformer {
           description: t.function.description,
           input_schema: t.function.parameters
       }));
+  }
+
+  // --- 7. Extract usage from raw SSE chunk ---
+  extractUsage(chunk: Uint8Array | string) {
+    return extractAnthropicUsage(chunk);
   }
 }

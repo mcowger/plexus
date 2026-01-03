@@ -7,6 +7,7 @@ import {
     Tool, 
     FunctionDeclaration
 } from '@google/genai';
+import { extractGeminiUsage } from './usage-extractors';
 
 export interface GenerateContentRequest {
   contents: Content[];
@@ -511,189 +512,160 @@ export class GeminiTransformer implements Transformer {
     transformStream(stream: ReadableStream): ReadableStream {
         const decoder = new TextDecoder();
         let buffer = "";
+        
+        // Use TransformStream for proper backpressure handling
+        const transformer = new TransformStream({
+            transform(chunk, controller) {
+                const text = typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
+                buffer += text;
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
 
-        return new ReadableStream({
-            async start(controller) {
-                const reader = stream.getReader();
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
 
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split("\n");
-                        buffer = lines.pop() || "";
+                    const dataStr = trimmedLine.slice(5).trim();
+                    if (dataStr === "[DONE]") continue;
 
-                        for (const line of lines) {
-                            const trimmedLine = line.trim();
-                            if (!trimmedLine || !trimmedLine.startsWith("data:")) continue;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const candidate = data.candidates?.[0];
+                        if (!candidate) continue;
 
-                            const dataStr = trimmedLine.slice(5).trim();
-                            if (dataStr === "[DONE]") continue;
-
-                            try {
-                                const chunk = JSON.parse(dataStr);
-                                const candidate = chunk.candidates?.[0];
-                                if (!candidate) continue;
-
-                                const parts = candidate.content?.parts || [];
-                                
-                                // Handle parts
-                                for (const part of parts) {
-                                    if (part.text) {
-                                        if (part.thought) {
-                                             controller.enqueue({
-                                                id: chunk.responseId,
-                                                model: chunk.modelVersion,
-                                                delta: {
-                                                    role: 'assistant',
-                                                    reasoning_content: part.text
-                                                }
-                                            });
-                                        } else {
-                                            controller.enqueue({
-                                                id: chunk.responseId,
-                                                model: chunk.modelVersion,
-                                                delta: {
-                                                    role: 'assistant',
-                                                    content: part.text
-                                                }
-                                            });
+                        const parts = candidate.content?.parts || [];
+                        
+                        // Handle parts
+                        for (const part of parts) {
+                            if (part.text) {
+                                if (part.thought) {
+                                     controller.enqueue({
+                                        id: data.responseId,
+                                        model: data.modelVersion,
+                                        delta: {
+                                            role: 'assistant',
+                                            reasoning_content: part.text
                                         }
-                                    }
-                                    
-                                    if (part.functionCall) {
-                                        controller.enqueue({
-                                            id: chunk.responseId,
-                                            model: chunk.modelVersion,
-                                            delta: {
-                                                role: 'assistant',
-                                                tool_calls: [{
-                                                    id: part.functionCall.name, 
-                                                    type: 'function',
-                                                    function: {
-                                                        name: part.functionCall.name,
-                                                        arguments: JSON.stringify(part.functionCall.args)
-                                                    }
-                                                }]
-                                            }
-                                        });
-                                    }
-                                }
-
-                                if (candidate.finishReason) {
-                                    let text_tokens = 0;
-                                    let image_tokens = 0;
-                                    let audio_tokens = 0;
-
-                                    if (chunk.usageMetadata?.promptTokensDetails) {
-                                        chunk.usageMetadata.promptTokensDetails.forEach((detail: any) => {
-                                            if (detail.modality === 'TEXT') text_tokens += detail.tokenCount;
-                                            if (detail.modality === 'IMAGE') image_tokens += detail.tokenCount;
-                                            if (detail.modality === 'AUDIO') audio_tokens += detail.tokenCount;
-                                        });
-                                    }
-
-                                    const promptTokenCount = chunk.usageMetadata?.promptTokenCount || 0;
-                                    const candidatesTokenCount = chunk.usageMetadata?.candidatesTokenCount || 0;
-                                    const totalTokenCount = chunk.usageMetadata?.totalTokenCount || 0;
-                                    const thoughtsTokenCount = chunk.usageMetadata?.thoughtsTokenCount || 0;
-                                    const cachedContentTokenCount = chunk.usageMetadata?.cachedContentTokenCount || 0;
-
+                                    });
+                                } else {
                                     controller.enqueue({
-                                        id: chunk.responseId,
-                                        model: chunk.modelVersion,
-                                        finish_reason: candidate.finishReason.toLowerCase(),
-                                        usage: chunk.usageMetadata ? {
-                                            input_tokens: promptTokenCount,
-                                            output_tokens: candidatesTokenCount,
-                                            total_tokens: totalTokenCount,
-                                            reasoning_tokens: thoughtsTokenCount,
-                                            cached_tokens: cachedContentTokenCount,
-                                            cache_creation_tokens: 0
-                                        } : undefined
+                                        id: data.responseId,
+                                        model: data.modelVersion,
+                                        delta: {
+                                            role: 'assistant',
+                                            content: part.text
+                                        }
                                     });
                                 }
-
-                            } catch (e) {
-                                logger.error('Error parsing Gemini stream chunk', e);
+                            }
+                            
+                            if (part.functionCall) {
+                                controller.enqueue({
+                                    id: data.responseId,
+                                    model: data.modelVersion,
+                                    delta: {
+                                        role: 'assistant',
+                                        tool_calls: [{
+                                            id: part.functionCall.name, 
+                                            type: 'function',
+                                            function: {
+                                                name: part.functionCall.name,
+                                                arguments: JSON.stringify(part.functionCall.args)
+                                            }
+                                        }]
+                                    }
+                                });
                             }
                         }
+
+                        if (candidate.finishReason) {
+                            const promptTokenCount = data.usageMetadata?.promptTokenCount || 0;
+                            const candidatesTokenCount = data.usageMetadata?.candidatesTokenCount || 0;
+                            const totalTokenCount = data.usageMetadata?.totalTokenCount || 0;
+                            const thoughtsTokenCount = data.usageMetadata?.thoughtsTokenCount || 0;
+                            const cachedContentTokenCount = data.usageMetadata?.cachedContentTokenCount || 0;
+
+                            controller.enqueue({
+                                id: data.responseId,
+                                model: data.modelVersion,
+                                finish_reason: candidate.finishReason.toLowerCase(),
+                                usage: data.usageMetadata ? {
+                                    input_tokens: promptTokenCount,
+                                    output_tokens: candidatesTokenCount,
+                                    total_tokens: totalTokenCount,
+                                    reasoning_tokens: thoughtsTokenCount,
+                                    cached_tokens: cachedContentTokenCount,
+                                    cache_creation_tokens: 0
+                                } : undefined
+                            });
+                        }
+
+                    } catch (e) {
+                        logger.error('Error parsing Gemini stream chunk', e);
                     }
-                } catch (e) {
-                    controller.error(e);
-                } finally {
-                    reader.releaseLock();
-                    controller.close();
                 }
             }
         });
+        
+        return stream.pipeThrough(transformer);
     }
 
     // --- 6. Unified Stream -> Client Stream (Gemini SSE) ---
     formatStream(stream: ReadableStream): ReadableStream {
         const encoder = new TextEncoder();
+        
+        // Use TransformStream for proper backpressure handling
+        const transformer = new TransformStream({
+            transform(chunk: any, controller) {
+                const parts: Part[] = [];
 
-        return new ReadableStream({
-            async start(controller) {
-                const reader = stream.getReader();
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
+                if (chunk.delta?.content) {
+                    parts.push({ text: chunk.delta.content });
+                }
+                if (chunk.delta?.reasoning_content) {
+                    parts.push({ text: chunk.delta.reasoning_content, thought: true } as any);
+                }
+                if (chunk.delta?.tool_calls) {
+                    chunk.delta.tool_calls.forEach((tc: any) => {
+                        parts.push({
+                            functionCall: {
+                                name: tc.function.name,
+                                args: JSON.parse(tc.function.arguments || '{}')
+                            }
+                        });
+                    });
+                }
 
-                        const chunk = value as any;
-                        const parts: Part[] = [];
-
-                        if (chunk.delta?.content) {
-                            parts.push({ text: chunk.delta.content });
-                        }
-                        if (chunk.delta?.reasoning_content) {
-                            parts.push({ text: chunk.delta.reasoning_content, thought: true } as any);
-                        }
-                        if (chunk.delta?.tool_calls) {
-                            chunk.delta.tool_calls.forEach((tc: any) => {
-                                parts.push({
-                                    functionCall: {
-                                        name: tc.function.name,
-                                        args: JSON.parse(tc.function.arguments || '{}')
-                                    }
-                                });
-                            });
-                        }
-
-                        if (parts.length > 0 || chunk.finish_reason) {
-                            const geminiChunk = {
-                                candidates: [{
-                                    content: {
-                                        role: 'model',
-                                        parts
-                                    },
-                                    finishReason: chunk.finish_reason?.toUpperCase() || null,
-                                    index: 0
-                                }],
-                                usageMetadata: chunk.usage ? {
-                                    promptTokenCount: chunk.usage.input_tokens,
-                                    candidatesTokenCount: chunk.usage.output_tokens,
-                                    totalTokenCount: chunk.usage.total_tokens,
-                                    promptTokensDetails: [
-                                        { modality: 'TEXT', tokenCount: chunk.usage.input_tokens }
-                                    ],
-                                    thoughtsTokenCount: chunk.usage.reasoning_tokens
-                                } : undefined
-                            };
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(geminiChunk)}
-
-`));
-                        }
-                    }
-                } catch (e) {
-                    controller.error(e);
-                } finally {
-                    reader.releaseLock();
-                    controller.close();
+                if (parts.length > 0 || chunk.finish_reason) {
+                    const geminiChunk = {
+                        candidates: [{
+                            content: {
+                                role: 'model',
+                                parts
+                            },
+                            finishReason: chunk.finish_reason?.toUpperCase() || null,
+                            index: 0
+                        }],
+                        usageMetadata: chunk.usage ? {
+                            promptTokenCount: chunk.usage.input_tokens,
+                            candidatesTokenCount: chunk.usage.output_tokens,
+                            totalTokenCount: chunk.usage.total_tokens,
+                            promptTokensDetails: [
+                                { modality: 'TEXT', tokenCount: chunk.usage.input_tokens }
+                            ],
+                            thoughtsTokenCount: chunk.usage.reasoning_tokens
+                        } : undefined
+                    };
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(geminiChunk)}\n\n`));
                 }
             }
         });
+        
+        return stream.pipeThrough(transformer);
+    }
+
+    // --- 7. Extract usage from raw SSE chunk ---
+    extractUsage(chunk: Uint8Array | string) {
+        return extractGeminiUsage(chunk);
     }
 }
