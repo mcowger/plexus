@@ -55,6 +55,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Extract Release Notes
+        run: |
+          awk '/^## / { if (p) exit; p=1; next } p' CHANGELOG.md > RELEASE_NOTES.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -64,4 +68,4 @@ jobs:
             plexus.exe
           draft: false
           prerelease: false
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
