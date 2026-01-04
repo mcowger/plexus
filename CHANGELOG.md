@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 - 2026-01-04
+
+### Smooth Streams and Refined Stability
+
+### Highlights
+
+- **Improved Streaming Stability**: Addressed critical issues in the streaming interface to ensure a more reliable and consistent data flow ([5e4306b](https://github.com/example/repo/commit/5e4306b)).
+
+### Minor Changes & Maintenance
+
+- **Type Enhancements**: Applied several type fixes to improve code robustness and developer experience (`9ab12e6`).
+- **Documentation**: Updated project documentation for better clarity and alignment with recent changes (`1b6bc5b`).
+- **Housekeeping**: Refined project configuration by updating `.gitignore` (`c2b8c4c`).
+
 ## v0.2.5 - 2026-01-03
 
 ### Precision Performance: New Latency & Speed Selectors
