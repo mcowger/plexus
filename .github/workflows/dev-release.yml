@@ -27,24 +27,18 @@ jobs:
 
       - name: Debug test discovery
         run: |
-          echo "=== Current directory ==="
-          pwd
-          ls -la
-          echo "=== packages/backend directory ==="
-          ls -la packages/backend || true
-          echo "=== Test files found ==="
-          find packages/backend/src -name "*.test.ts" -type f 2>/dev/null || echo "No test files found"
-          echo "=== Running bun test --list from root ==="
-          bun test --list 2>&1 || echo "bun test --list failed"
-          echo "=== Running bun test --list from backend ==="
-          cd packages/backend && bun test --list 2>&1 || echo "bun test --list from backend failed"
+          echo "=== Test files in backend/src ==="
+          find packages/backend/src -name "*.test.ts" -type f
+          echo "=== Checking package.json in backend ==="
+          cat packages/backend/package.json | grep -A5 -B5 '"test"'
 
-      - name: Run tests with isolation and verbose output
-        # Run tests with --isolate to prevent mock.module() leakage between test files
-        # Use --verbose for detailed output
+      - name: Run tests from backend directory
+        # Run tests from packages/backend to ensure proper isolation
+        # The --isolate flag works best when running from the directory containing the tests
         run: |
-          echo "=== Running bun test --isolate --verbose ==="
-          bun test --isolate --verbose 2>&1 || true
+          echo "=== Running tests from packages/backend directory ==="
+          cd packages/backend
+          bun test --verbose 2>&1 || true
           echo "=== Test run completed ==="
 
       - name: Compile Binaries
