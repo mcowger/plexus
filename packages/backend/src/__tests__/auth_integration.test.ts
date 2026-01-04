@@ -1,24 +1,36 @@
-import { describe, it, expect, mock } from "bun:test";
+import { describe, it, expect, mock, afterAll } from "bun:test";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-// Mock Config
-const mockConfig = {
-    providers: {},
-    models: {},
-    keys: {
-        'test-key': {
-            secret: 'valid-secret',
-            comment: 'Test Key'
-        }
+// Setup Temp Config
+const TEMP_CONFIG_PATH = join(tmpdir(), `plexus-test-auth-${Date.now()}.yaml`);
+const MOCK_CONFIG_CONTENT = `
+providers: {}
+models: {}
+keys:
+  test-key:
+    secret: valid-secret
+    comment: Test Key
+adminKey: admin-secret
+`;
+
+// Write the file
+writeFileSync(TEMP_CONFIG_PATH, MOCK_CONFIG_CONTENT);
+
+// Set env var BEFORE importing index
+process.env.CONFIG_FILE = TEMP_CONFIG_PATH;
+process.env.PLEXUS_DB_URL = ':memory:';
+
+// Cleanup after tests
+afterAll(() => {
+    try {
+        unlinkSync(TEMP_CONFIG_PATH);
+    } catch (e) {
+        // ignore
     }
-};
-
-mock.module('../config', () => ({
-    loadConfig: () => Promise.resolve(mockConfig),
-    getConfig: () => mockConfig,
-    getConfigPath: () => '/tmp/test.yaml',
-    validateConfig: () => mockConfig,
-    setConfigForTesting: () => {}
-}));
+    delete process.env.CONFIG_FILE;
+});
 
 // Mock PricingManager
 mock.module('../services/pricing-manager', () => ({
@@ -35,7 +47,8 @@ mock.module('../utils/logger', () => ({
         info: () => {},
         error: () => {},
         debug: () => {},
-        warn: () => {}
+        warn: () => {},
+        silly: () => {}
     },
     logEmitter: {
         on: () => {},
@@ -51,8 +64,6 @@ mock.module('hono/bun', () => ({
     serveStatic: () => (c: any) => c.text('Mock Static', 200),
     getConnInfo: () => ({ remote: { address: '127.0.0.1' } })
 }));
-
-process.env.PLEXUS_DB_URL = ':memory:';
 
 // Dynamic import to apply mocks
 const serverModule = await import('../index');

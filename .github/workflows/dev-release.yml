@@ -25,20 +25,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Debug test discovery
-        run: |
-          echo "=== Test files in backend/src ==="
-          find packages/backend/src -name "*.test.ts" -type f
-          echo "=== Checking package.json in backend ==="
-          cat packages/backend/package.json | grep -A5 -B5 '"test"'
-
       - name: Run tests from backend directory
-        # Run tests from packages/backend to ensure proper isolation
-        # The --isolate flag works best when running from the directory containing the tests
         run: |
           echo "=== Running tests from packages/backend directory ==="
           cd packages/backend
-          bun test --verbose 2>&1 || true
+          bun test --verbose
           echo "=== Test run completed ==="
 
       - name: Compile Binaries
