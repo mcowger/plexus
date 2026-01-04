@@ -361,6 +361,10 @@ app.get('/v0/management/events', async (c) => {
 
         while (true) {
             await stream.sleep(10000);
+            await stream.writeSSE({
+                event: 'ping',
+                data: 'pong'
+            });
         }
     });
 });
@@ -472,6 +476,10 @@ app.get('/v0/system/logs/stream', async (c) => {
         // Keep connection alive
         while (true) {
             await stream.sleep(10000);
+            await stream.writeSSE({
+                event: 'ping',
+                data: 'pong'
+            });
         }
     });
 });

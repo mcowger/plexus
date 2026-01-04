@@ -13,9 +13,15 @@ interface LogEntry {
 export const SystemLogs: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const { adminKey } = useAuth();
   const logsEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Sync ref with state
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   useEffect(() => {
     connect();
@@ -66,16 +72,30 @@ export const SystemLogs: React.FC = () => {
 
         for (const block of lines) {
           const blockLines = block.split('\n');
+          let eventData = '';
+          let isSyslogEvent = false;
+
           for (const line of blockLines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (!isPaused) {
-                  setLogs(prev => [...prev.slice(-999), data]); // Keep last 1000 logs
-                }
-              } catch (e) {
-                // Ignore parse errors or keepalives
+            if (line.startsWith('event: syslog')) {
+              isSyslogEvent = true;
+            } else if (line.startsWith('event: ping')) {
+                // Ignore ping events
+                isSyslogEvent = false;
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6);
+            } else if (line.startsWith('data:')) { // Support no space after colon
+                eventData = line.slice(5);
+            }
+          }
+
+          if (isSyslogEvent && eventData) {
+            try {
+              const data = JSON.parse(eventData);
+              if (!isPausedRef.current) {
+                setLogs(prev => [...prev.slice(-999), data]); // Keep last 1000 logs
               }
+            } catch (e) {
+              // Ignore parse errors or keepalives
             }
           }
         }

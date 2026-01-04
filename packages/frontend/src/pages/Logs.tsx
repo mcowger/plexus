@@ -9,9 +9,11 @@ import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, AlertTriangle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Logs = () => {
     const navigate = useNavigate();
+    const { adminKey } = useAuth();
     const [logs, setLogs] = useState<UsageRecord[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -103,47 +105,98 @@ export const Logs = () => {
     }, [offset, limit]); // Refresh when page changes
 
     useEffect(() => {
-        if (offset !== 0) return;
+        if (offset !== 0 || !adminKey) return;
 
-        const es = new EventSource('/v0/management/events');
+        const controller = new AbortController();
 
-        es.addEventListener('log', (event: MessageEvent) => {
+        const connect = async () => {
             try {
-                const newLog = JSON.parse(event.data);
-                const currentFilters = filtersRef.current;
+                const response = await fetch('/v0/management/events', {
+                    headers: {
+                        'x-admin-key': adminKey
+                    },
+                    signal: controller.signal
+                });
 
-                // Client-side filtering to match server-side LIKE behavior
-                let matches = true;
-                if (currentFilters.incomingModelAlias &&
-                    !newLog.incomingModelAlias?.toLowerCase().includes(currentFilters.incomingModelAlias.toLowerCase())) {
-                    matches = false;
-                }
-                if (currentFilters.provider &&
-                    !newLog.provider?.toLowerCase().includes(currentFilters.provider.toLowerCase())) {
-                    matches = false;
+                if (!response.ok) {
+                    throw new Error(`Failed to connect: ${response.statusText}`);
                 }
 
-                if (matches) {
-                    setLogs(prev => {
-                        // Prevent duplicates if multiple events fire (though unlikely with unique IDs, simple check helps)
-                        if (prev.some(l => l.requestId === newLog.requestId)) return prev;
+                const reader = response.body?.getReader();
+                if (!reader) return;
 
-                        const updated = [newLog, ...prev];
-                        if (updated.length > limit) return updated.slice(0, limit);
-                        return updated;
-                    });
-                    setTotal(prev => prev + 1);
-                    setNewestLogId(newLog.requestId);
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n'); // SSE messages are separated by double newline
+                    buffer = lines.pop() || '';
+
+                    for (const block of lines) {
+                        const blockLines = block.split('\n');
+                        let eventData = '';
+                        let isLogEvent = false;
+
+                        for (const line of blockLines) {
+                            if (line.startsWith('event: log')) {
+                                isLogEvent = true;
+                            } else if (line.startsWith('event: ping')) {
+                                // Ignore ping events
+                                isLogEvent = false;
+                            } else if (line.startsWith('data: ')) {
+                                eventData = line.slice(6);
+                            }
+                        }
+
+                        if (isLogEvent && eventData) {
+                            try {
+                                const newLog = JSON.parse(eventData);
+                                const currentFilters = filtersRef.current;
+
+                                // Client-side filtering to match server-side LIKE behavior
+                                let matches = true;
+                                if (currentFilters.incomingModelAlias &&
+                                    !newLog.incomingModelAlias?.toLowerCase().includes(currentFilters.incomingModelAlias.toLowerCase())) {
+                                    matches = false;
+                                }
+                                if (currentFilters.provider &&
+                                    !newLog.provider?.toLowerCase().includes(currentFilters.provider.toLowerCase())) {
+                                    matches = false;
+                                }
+
+                                if (matches) {
+                                    setLogs(prev => {
+                                        if (prev.some(l => l.requestId === newLog.requestId)) return prev;
+                                        const updated = [newLog, ...prev];
+                                        if (updated.length > limit) return updated.slice(0, limit);
+                                        return updated;
+                                    });
+                                    setTotal(prev => prev + 1);
+                                    setNewestLogId(newLog.requestId);
+                                }
+                            } catch (e) {
+                                console.error("Failed to parse log event", e);
+                            }
+                        }
+                    }
                 }
-            } catch (e) {
-                console.error("Failed to process log event", e);
+            } catch (err: any) {
+                if (err.name !== 'AbortError') {
+                    console.error('Log stream error:', err);
+                }
             }
-        });
+        };
+
+        connect();
 
         return () => {
-            es.close();
+            controller.abort();
         };
-    }, [offset, limit]);
+    }, [offset, limit, adminKey]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
