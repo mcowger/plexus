@@ -2,8 +2,20 @@ import { spawn } from "bun";
 import { createInterface } from "node:readline";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { GoogleGenAI } from "@google/genai";
 import pc from "picocolors";
+
+const PROMPT_TEMPLATE = `You are a helpful assistant that generates release notes.
+
+Summarize the following git commit log into release notes. Call out main new features, as well as smaller changes and their commit hashes. Also propose a short headline for the release - use technical terms where appropriate, not marketing terms. 
+
+IMPORTANT: Your response must be a valid JSON object with EXACTLY these two keys:
+- "headline": a string containing a short technical headline
+- "notes": a markdown string containing the detailed release notes
+
+Do not include any other text or markdown formatting (like \`\`\`json) outside of the JSON object.
+
+Commit log:
+{{gitLog}}`;
 
 const rl = createInterface({
   input: process.stdin,
@@ -33,7 +45,39 @@ async function run(cmd: string[]) {
   return text.trim();
 }
 
+function parseAIResponse(content: string) {
+  try {
+    // Try direct parse
+    return JSON.parse(content.trim());
+  } catch (e) {
+    // Try to extract from markdown code blocks if present
+    const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match && match[1]) {
+      return JSON.parse(match[1].trim());
+    }
+    throw e;
+  }
+}
+
 async function main() {
+  const args = process.argv.slice(2);
+  const force = args.includes("--force");
+  
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`\n${pc.bold(pc.magenta("🚀 Plexus Release Script"))}`);
+    console.log(pc.dim("--------------------------"));
+    console.log("\nUsage:");
+    console.log(`  bun scripts/release.ts [options]`);
+    console.log("\nOptions:");
+    console.log(`  ${pc.cyan("--force")}    Continue even if no changes are detected since the last tag`);
+    console.log(`  ${pc.cyan("--help, -h")} Show this help message`);
+    console.log("\nEnvironment Variables:");
+    console.log(`  ${pc.cyan("AI_API_KEY")}   API key for AI release notes generation`);
+    console.log(`  ${pc.cyan("AI_API_BASE")}  Base URL for AI API (compatible with OpenAI)`);
+    console.log(`  ${pc.cyan("AI_MODEL")}     Model to use (default: gemini-3-flash-preview)\n`);
+    process.exit(0);
+  }
+
   console.log(`\n${pc.bold(pc.magenta("🚀 Plexus Release Process"))}`);
   console.log(pc.dim("--------------------------\n"));
 
@@ -64,10 +108,13 @@ async function main() {
   const logRange = currentVersion === "v0.0.0" ? "HEAD" : `${currentVersion}..HEAD`;
   const gitLog = await run(["git", "log", logRange, "--pretty=format:%h %s"]);
   
-  if (!gitLog.trim()) {
+  if (!gitLog.trim() && !force) {
     console.log(`\n${pc.yellow("⚠️  No changes found since")} ${pc.bold(currentVersion)}.`);
-    console.log(pc.dim("Aborting release process.\n"));
+    console.log(pc.dim("Use --force to proceed anyway.\n"));
     process.exit(0);
+  } else if (!gitLog.trim() && force) {
+     console.log(`\n${pc.yellow("⚠️  No changes found since")} ${pc.bold(currentVersion)}.`);
+     console.log(pc.green("Proceeding due to --force flag.\n"));
   }
 
   // Calculate next version
@@ -88,26 +135,53 @@ async function main() {
 
   // AI Release Notes Generation
   let aiNotes = "";
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey) {
+  const apiKey = process.env.AI_API_KEY;
+  const apiBase = process.env.AI_API_BASE;
+  const apiModel = process.env.AI_MODEL || "gemini-2.5-flash-lite";
+
+  if (!apiKey || !apiBase || !apiModel) {
+    console.log(pc.yellow("\n⚠️  AI_API_KEY, AI_API_BASE, or AI_MODEL not set. Skipping AI release notes generation."));
+    console.log(pc.dim("To enable AI notes, set AI_API_KEY, AI_API_BASE, and AI_MODEL (optional).\n"));
+  }
+
+  if (apiKey && apiBase && apiModel) {
     const useAi = await ask("Generate Release Notes with AI?", "y");
     if (useAi.toLowerCase() === "y") {
       try {
         console.log(`\n${pc.yellow("🤖 Generating release notes...")}`);
         
-        const client = new GoogleGenAI({ 
-            apiKey, 
-            httpOptions: process.env.GEMINI_API_BASE ? { baseUrl: process.env.GEMINI_API_BASE } : undefined 
+        const url = `${apiBase.replace(/\/+$/, "")}/chat/completions`;
+
+        console.log(`\n${pc.dim("Sending request to AI API...")}`);
+        console.log(`\n${pc.dim(`POST ${url}`)}`);
+        const requestBody = {
+            model: apiModel, 
+            messages: [
+                {
+                    role: "user",
+                    content: PROMPT_TEMPLATE.replace("{{gitLog}}", gitLog)
+                }
+            ]
+        };
+        console.log(`\n${pc.dim(`Request Body: ${JSON.stringify(requestBody, null, 2)}`)}`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(requestBody)
         });
+
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status} ${response.statusText} - ${await response.text()}`);
+        }
         
-        const response = await client.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: `Summarize the following git commit log into release notes. Call out main new features, as well as smaller changes and their commit hashes. Also propose a short, catchy headline for the release. Format the output as JSON with keys "headline" (string) and "notes" (markdown string). \n\n${gitLog}`,
-          config: { responseMimeType: "application/json" }
-        });
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
         
-        if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
-             const json = JSON.parse(response.candidates[0].content.parts[0].text);
+        if (content) {
+             const json = parseAIResponse(content);
              aiNotes = typeof json.notes === 'string' ? json.notes : JSON.stringify(json.notes, null, 2);
              const aiHeadline = json.headline;
 

@@ -22,7 +22,6 @@
     "typescript": "^5"
   },
   "devDependencies": {
-    "@google/genai": "^1.34.0",
     "bun-types": "^1.3.5",
     "picocolors": "^1.1.1"
   }
