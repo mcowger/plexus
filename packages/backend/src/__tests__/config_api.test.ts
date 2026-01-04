@@ -1,67 +1,54 @@
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, test, afterAll, beforeEach } from "bun:test";
 import { Hono } from 'hono';
 import fs from 'node:fs';
 import { z } from 'zod';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
-// Mock config module before importing index (which might import it)
-// We need to allow the real validateConfig to run or mock it effectively.
-// Given the complexity of mocking modules that are internal imports, 
-// we'll mock the specific functions we need from './config' via `mock.module`.
-
-const MOCK_CONFIG_PATH = "/tmp/mock_plexus.yaml";
+// Setup Temp Config
+const TEMP_CONFIG_PATH = join(tmpdir(), `plexus-test-api-${Date.now()}.yaml`);
 const MOCK_YAML = `
 providers:
   test_provider:
     type: chat
     api_base_url: https://api.test.com
-    api_key: 123
+    api_key: "123"
 models:
   test_model:
     targets:
       - provider: test_provider
         model: gpt-test
+keys: {}
+adminKey: secret
 `;
 
-mock.module("../config", () => {
-    return {
-        getConfigPath: () => MOCK_CONFIG_PATH,
-        loadConfig: () => ({}),
-        getConfig: () => ({}),
-        validateConfig: (yamlStr: string) => {
-            if (yamlStr.includes("INVALID")) throw new Error("Invalid YAML");
-            return {};
-        }
-    };
+// Write the initial file
+fs.writeFileSync(TEMP_CONFIG_PATH, MOCK_YAML);
+
+// Set env var to point to temp file
+process.env.CONFIG_FILE = TEMP_CONFIG_PATH;
+
+// Cleanup
+afterAll(() => {
+    try {
+        fs.unlinkSync(TEMP_CONFIG_PATH);
+    } catch (e) {
+        // ignore
+    }
 });
-
-// We also need to mock fs methods used in the route
-mock.module("node:fs", () => {
-    return {
-        default: {
-            existsSync: (path: string) => path === MOCK_CONFIG_PATH,
-            readFileSync: (path: string) => {
-                if (path === MOCK_CONFIG_PATH) return MOCK_YAML;
-                throw new Error("File not found");
-            },
-            writeFileSync: mock(),
-            watch: mock()
-        }
-    };
-});
-
-
-// Now import the app (or the route handler logic if we could isolate it)
-// Since index.ts starts the server immediately, importing it is tricky in Bun test if it has side effects.
-// Ideally, we should refactor index.ts to export the `app` for testing.
-// For now, I will recreate a minimal Hono app with the same route logic for testing purposes
-// to avoid the side effects of importing the main entry point which binds to a port.
 
 import { logger } from "../utils/logger";
+import { getConfigPath, validateConfig, loadConfig } from "../config";
+
+// Initialize config
+beforeEach(async () => {
+    await loadConfig(TEMP_CONFIG_PATH);
+});
 
 const app = new Hono();
 
 // Re-implement the routes exactly as they are in index.ts for unit testing logic
-import { getConfigPath, validateConfig, loadConfig } from "../config";
+// Note: We use the REAL functions now, so they will access the real TEMP_CONFIG_PATH
 
 app.get('/v0/management/config', (c) => {
     const configPath = getConfigPath();
@@ -96,7 +83,7 @@ app.post('/v0/management/config', async (c) => {
         fs.writeFileSync(configPath, body, 'utf8');
         
         // Force reload
-        loadConfig(configPath);
+        await loadConfig(configPath);
         
         return c.body(body, 200, { 'Content-Type': 'application/x-yaml' });
     } catch (e: any) {
@@ -119,9 +106,11 @@ describe("Config Management API", () => {
         const newConfig = `
 providers:
   new_provider:
-    type: messages
+    type: chat
     api_base_url: https://api.anthropic.com
 models: {}
+keys: {}
+adminKey: secret
 `;
         const res = await app.request('/v0/management/config', {
             method: 'POST',
@@ -129,11 +118,14 @@ models: {}
         });
 
         expect(res.status).toBe(200);
-        expect(fs.writeFileSync).toHaveBeenCalledWith(MOCK_CONFIG_PATH, newConfig, 'utf8');
+        
+        // Verify file content was updated
+        const content = fs.readFileSync(TEMP_CONFIG_PATH, 'utf8');
+        expect(content).toBe(newConfig);
     });
 
     test("POST /v0/management/config should reject invalid YAML", async () => {
-        const invalidConfig = "INVALID YAML CONTENT";
+        const invalidConfig = "INVALID YAML CONTENT"; // validateConfig will throw ZodError or generic error
         const res = await app.request('/v0/management/config', {
             method: 'POST',
             body: invalidConfig
@@ -141,6 +133,6 @@ models: {}
 
         expect(res.status).toBe(400);
         const json = await res.json() as any;
-        expect(json.error).toBe("Invalid YAML or Schema");
+        expect(json.error).toBe("Validation failed");
     });
 });
