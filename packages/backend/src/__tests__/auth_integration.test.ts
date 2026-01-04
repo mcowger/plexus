@@ -2,6 +2,7 @@ import { describe, it, expect, mock, afterAll } from "bun:test";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { loadConfig } from "../config";
 
 // Setup Temp Config
 const TEMP_CONFIG_PATH = join(tmpdir(), `plexus-test-auth-${Date.now()}.yaml`);
@@ -64,6 +65,9 @@ mock.module('hono/bun', () => ({
     serveStatic: () => (c: any) => c.text('Mock Static', 200),
     getConnInfo: () => ({ remote: { address: '127.0.0.1' } })
 }));
+
+// Ensure config is loaded correctly before server start
+await loadConfig(TEMP_CONFIG_PATH);
 
 // Dynamic import to apply mocks
 const serverModule = await import('../index');
