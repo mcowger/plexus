@@ -1,5 +1,6 @@
-import { expect, test, describe, mock } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import { Router } from "../router";
+import { setConfigForTesting } from "../../config";
 
 describe("Router", () => {
     
@@ -22,23 +23,13 @@ describe("Router", () => {
                     { provider: "anthropic", model: "claude-3-balanced" }
                 ]
             }
-        }
+        },
+        keys: {},
+        adminKey: "secret"
     };
 
-    // Override getConfig for this test suite
-    // Note: In Bun, we can mock module exports if we import * as ...
-    // But since Router imports { getConfig }, we might need to mock the module differently or rely on Router using the exported function.
-    // Let's try mocking the function directly on the module object if it's writable, or using mock.module
-    
-    // Simpler approach for Bun: 
-    // We can't easily mock ESM imports of other files without `mock.module` which mocks the whole file path.
-    // Let's use `mock.module`
-    
-    mock.module("../../config", () => ({
-        getConfig: () => mockConfig
-    }));
-
     test("routes aliased model to correct provider and target model", () => {
+        setConfigForTesting(mockConfig as any);
         const route = Router.resolve("gpt-4");
         expect(route.provider).toBe("openai");
         expect(route.model).toBe("gpt-4-turbo");
@@ -46,12 +37,14 @@ describe("Router", () => {
     });
 
     test("routes another aliased model correctly", () => {
+        setConfigForTesting(mockConfig as any);
         const route = Router.resolve("claude-3");
         expect(route.provider).toBe("anthropic");
         expect(route.model).toBe("claude-3-opus-20240229");
     });
 
     test("load balances between multiple targets", () => {
+        setConfigForTesting(mockConfig as any);
         // This is probabilistic, so we run it multiple times to ensure we see both at least once?
         // Or mock Math.random.
         const originalRandom = Math.random;
@@ -70,6 +63,7 @@ describe("Router", () => {
     });
 
     test("throws error for unknown model", () => {
+        setConfigForTesting(mockConfig as any);
         expect(() => Router.resolve("unknown-model")).toThrow(/not found/);
     });
 
@@ -86,9 +80,7 @@ describe("Router", () => {
             }
         };
         
-        mock.module("../../config", () => ({
-            getConfig: () => configWithDirectModel
-        }));
+        setConfigForTesting(configWithDirectModel as any);
 
         expect(() => Router.resolve("gpt-3.5-turbo-direct")).toThrow(/not found/);
     });
@@ -123,12 +115,12 @@ describe("Router", () => {
                         { provider: "free", model: "free-model" }
                     ]
                 }
-            }
+            },
+            keys: {},
+            adminKey: "secret"
         };
         
-        mock.module("../../config", () => ({
-            getConfig: () => costSelectorConfig
-        }));
+        setConfigForTesting(costSelectorConfig as any);
 
         const route = Router.resolve("select-by-cost");
         expect(route.provider).toBe("free");
