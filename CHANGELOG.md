@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.1 - 2026-01-04
+
+### Update to re-add /v1/models endpoint lost in refactor
+
+### 🚀 Main Features
+- **Models API Testing Suite**: Introduced a comprehensive testing framework for the Models API, featuring precise timestamp verification (`eeca1cb`).
+- **Developer Guidelines**: New documentation for testing best practices to ensure long-term code quality (`eeca1cb`).
+
+### 🛠 Improvements & Fixes
+- **API Restoration**: Fixed a critical issue where the `v1/models` endpoint was lost or inaccessible (`8e0ac0c`).
+- **Test Isolation**: Significantly refactored the test suite to prevent module leakage and improve environmental isolation (`d413691`, `75dd497`, `8b00fea`).
+- **Observability**: Added enhanced logging to facilitate easier debugging and monitoring (`94ff5ac`).
+- **Tooling**: Implemented a new dev builder for streamlined local development (`58ca61f`).
+- **Maintenance**: Cleaned up the repository by removing broken tests and applying general fixes to the test suite (`68bb84f`, `9ddfdec`, `e7d6369`).
+
 ## v0.3.0 - 2026-01-04
 
 ### Smooth Streams and Refined Stability
