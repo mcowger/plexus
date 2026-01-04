@@ -17,7 +17,7 @@ export class LatencySelector extends Selector {
     }
 
     if (targets.length === 1) {
-      return targets[0];
+      return targets[0] ?? null;
     }
 
     // Optimization: If we wanted to reduce DB calls, we could fetch all at once, 
@@ -48,11 +48,13 @@ export class LatencySelector extends Selector {
     if (validCandidates.length > 0) {
         validCandidates.sort((a, b) => a.avgTtft - b.avgTtft);
         const best = validCandidates[0];
-        logger.debug(`LatencySelector: Selected ${best.target.provider}/${best.target.model} with ${best.avgTtft.toFixed(2)}ms TTFT`);
-        return best.target;
+        if (best) {
+            logger.debug(`LatencySelector: Selected ${best.target.provider}/${best.target.model} with ${best.avgTtft.toFixed(2)}ms TTFT`);
+            return best.target;
+        }
     }
 
     // If no valid candidates (all have no data), fallback to first target
-    return targets[0];
+    return targets[0] ?? null;
   }
 }

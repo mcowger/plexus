@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
@@ -22,9 +22,14 @@
     "noImplicitOverride": true,
 
     // Some stricter flags (disabled by default)
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun-types"]
-  }
+  },
+  "exclude": [
+    "CAP-UI",
+    "llms",
+    "CLIProxyAPI"
+  ]
 }

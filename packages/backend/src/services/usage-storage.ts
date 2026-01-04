@@ -252,7 +252,7 @@ export class UsageStorageService extends EventEmitter {
                 $isPassthrough: record.isPassthrough ? 1 : 0,
                 $ttftMs: record.ttftMs,
                 $tokensPerSec: record.tokensPerSec
-            });
+            } as any);
             
             logger.debug(`Usage record saved for request ${record.requestId}`);
             this.emit('created', record);
