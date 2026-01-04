@@ -77,6 +77,7 @@ Track your API usage and trends over time.
 - **[Installation Guide](docs/INSTALLATION.md)**: Instructions for Docker, binary, and source installations.
 - **[Configuration Guide](docs/CONFIGURATION.md)**: Learn how to set up `plexus.yaml` to define providers, models, and routing rules.
 - **[API Documentation](docs/API.md)**: Detailed reference for the Standard Inference APIs and Management APIs.
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)**: Solutions for common issues, including API timeouts.
 
 ## Installation
 
