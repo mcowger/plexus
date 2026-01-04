@@ -9,9 +9,8 @@ const PROMPT_TEMPLATE = `You are a helpful assistant that generates release note
 Summarize the following git commit log into release notes. Call out main new features, as well as smaller changes and their commit hashes. Also propose a short headline for the release - use technical terms where appropriate, not marketing terms. 
 
 IMPORTANT: Your response must be a valid JSON object with EXACTLY these two keys:
-- "headline": a string containing a short technical headline
-- "notes": a markdown string containing the detailed release notes
-
+- "headline": a string containing a short technical headline.  This version is {{version}}
+- "notes": a markdown string containing the detailed release notes.  Make sure that commit hashes are included, and are linked properly with a base of https://github.com/mcowger/plexus/commit<hash>.  It should also include a mention at the very end that the docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 Do not include any other text or markdown formatting (like \`\`\`json) outside of the JSON object.
 
 Commit log:
@@ -148,7 +147,7 @@ async function main() {
     const useAi = await ask("Generate Release Notes with AI?", "y");
     if (useAi.toLowerCase() === "y") {
       try {
-        console.log(`\n${pc.yellow("🤖 Generating release notes...")}`);
+        console.log(`\n${pc.yellow("Generating release notes...")}`);
         
         const url = `${apiBase.replace(/\/+$/, "")}/chat/completions`;
 
@@ -159,7 +158,7 @@ async function main() {
             messages: [
                 {
                     role: "user",
-                    content: PROMPT_TEMPLATE.replace("{{gitLog}}", gitLog)
+                    content: PROMPT_TEMPLATE.replace("{{gitLog}}", gitLog).replace("{{version}}", version)
                 }
             ]
         };
