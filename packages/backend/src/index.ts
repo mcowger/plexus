@@ -38,6 +38,22 @@ try {
 // Middleware for logging
 // Global Request Logger
 app.use('*', requestLogger);
+
+// Models list endpoint (no auth required - matches OpenAI)
+app.get('/v1/models', (c) => {
+    const config = getConfig();
+    const models = Object.keys(config.models).map(id => ({
+        id,
+        object: 'model',
+        created: Date.now(),
+        owned_by: 'plexus'
+    }));
+    
+    return c.json({
+        object: 'list',
+        data: models
+    });
+});
     
 // Auth Middleware
 app.use('/v1/*', customAuth);
