@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.2 - 2026-01-04
+
+### v0.3.2 - SSE Ping Events for Log Streaming
+
+# Plexus Release v0.3.2
+
+This release introduces Server-Sent Events (SSE) ping events to prevent timeouts during log streaming and for system logs.
+
+## New Features
+
+*   **SSE Ping Events for Log Streaming:** Implemented SSE ping events to maintain active connections and avoid timeouts when streaming logs. ([dff6abd](https://github.com/mcowger/plexus/commit/dff6abd))
+
+## Smaller Changes
+
+*   **Suppress Builds for Non-Code Changes:** Builds will now be suppressed if only non-code changes are detected. ([2f05172](https://github.com/mcowger/plexus/commit/2f05172))
+*   **Release Script Prompt Updates:** Minor prompt updates in the release script for improved clarity. ([1d27dbf](https://github.com/mcowger/plexus/commit/1d27dbf))
+*   **Release Script Updates:** General updates to the release script. ([3f2103a](https://github.com/mcowger/plexus/commit/3f2103a))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest.
+
 ## v0.3.1 - 2026-01-04
 
 ### Update to re-add /v1/models endpoint lost in refactor
