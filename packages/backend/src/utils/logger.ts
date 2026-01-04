@@ -1,10 +1,23 @@
 import winston from 'winston';
-import { logEmitter, StreamTransport } from './log-base';
-
-// Re-export logEmitter and StreamTransport
-export { logEmitter, StreamTransport };
+import Transport from 'winston-transport';
+import { EventEmitter } from 'events';
 
 const { combine, timestamp, printf, colorize, splat, json } = winston.format;
+
+
+// Event emitter for streaming logs
+export const logEmitter = new EventEmitter();
+
+// Custom transport to emit logs
+export class StreamTransport extends Transport {
+  override log(info: any, callback: () => void) {
+    setImmediate(() => {
+      logEmitter.emit('log', info);
+    });
+    callback();
+  }
+}
+
 
 // Define custom format for console logging
 const consoleFormat = printf(({ level, message, timestamp, ...metadata }) => {

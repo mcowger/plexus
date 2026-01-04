@@ -4,9 +4,6 @@ import { Transformer } from "../types/transformer";
 import { UsageRecord } from "../types/usage";
 import { UsageStorageService } from "../services/usage-storage";
 import { logger } from "./logger";
-import { DebugManager } from "../services/debug-manager";
-import { createUsageObserver } from "./usage-observer";
-import { observeStream } from "./stream-tap";
 import { calculateCosts } from "./calculate-costs";
 
 export async function handleResponse(
@@ -35,38 +32,9 @@ export async function handleResponse(
 
   // Is this a streaming response?
   if (unifiedResponse.stream) {
-    // Create observer that handles all the parsing and processing
-    const { observeAndProcess } = createUsageObserver(
-      usageRecord,
-      startTime,
-      usageStorage,
-      pricing,
-      transformer,
-      providerDiscount
-    );
+   
+    let clientStream = unifiedResponse.stream;
 
-    // Split the raw stream: one for client, one for usage observation
-    const { clientStream: clientStream1, usageStream } = observeStream(unifiedResponse.stream);
-
-    // Start usage observation in background (fire-and-forget)
-    observeAndProcess(usageStream);
-
-    // Split again for debug capture if enabled
-    let clientStream = clientStream1;
-    if (usageRecord.requestId && DebugManager.getInstance().isEnabled()) {
-      const { clientStream: clientStream2, usageStream: debugStream } = observeStream(clientStream1);
-      clientStream = clientStream2;
-      
-      // Start debug capture in background (fire-and-forget)
-      const captureRaw = DebugManager.getInstance().observeAndCapture(
-        debugStream,
-        usageRecord.requestId,
-        'rawResponse'
-      );
-      captureRaw();
-    }
-
-    // Determine final client stream
     let finalClientStream: ReadableStream;
     if (unifiedResponse.bypassTransformation) {
       // Passthrough: send raw stream directly to client
@@ -80,19 +48,6 @@ export async function handleResponse(
       finalClientStream = transformer.formatStream
         ? transformer.formatStream(unifiedStream)
         : unifiedStream;
-      
-      // Capture transformed response if debug enabled
-      if (usageRecord.requestId && DebugManager.getInstance().isEnabled()) {
-        const { clientStream: finalClient, usageStream: debugTransformed } = observeStream(finalClientStream);
-        finalClientStream = finalClient;
-        
-        const captureTransformed = DebugManager.getInstance().observeAndCapture(
-          debugTransformed,
-          usageRecord.requestId,
-          'transformedResponse'
-        );
-        captureTransformed();
-      }
     }
 
     // Set headers and return the stream directly
@@ -119,15 +74,6 @@ export async function handleResponse(
     } else {
       responseBody = await transformer.formatResponse(unifiedResponse);
     }
-
-    if (usageRecord.requestId) {
-      DebugManager.getInstance().addTransformedResponse(
-        usageRecord.requestId,
-        responseBody
-      );
-      DebugManager.getInstance().flush(usageRecord.requestId);
-    }
-
     // Populate usage stats
     if (unifiedResponse.usage) {
       usageRecord.tokensInput = unifiedResponse.usage.input_tokens;

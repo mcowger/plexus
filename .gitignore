@@ -40,3 +40,6 @@ llms/
 CAP-UI/
 CLIProxyApi/
 gemini-client-error*
+
+.gemini/
+gha-creds-*.json
