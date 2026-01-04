@@ -71,3 +71,43 @@ Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
 - **Full Stack Dev:** Run `bun run scripts/dev.ts` from the root to start both the Backend (port 4000, watch mode) and Frontend Builder (watch mode).
 - **Backend Only:** Run `bun run dev:backend` (port 4000 default).
 - **Verification:** Use the scripts in `testcommands/test_request.ts` against `http://localhost:4000`.
+
+### 6.1 Testing Guidelines
+When writing tests for the backend, especially those involving configuration (`packages/backend/src/config.ts`), strict adherence to isolation principles is required to prevent "mock pollution" across tests.
+
+**Do NOT use `mock.module` to mock the configuration module globally.** 
+Bun's test runner can share state between test files, and hard-mocking the config module will cause other tests (like `pricing_config.test.ts` or `dispatcher.test.ts`) to fail unpredictably because they receive the mocked configuration instead of the real logic.
+
+**Preferred Approaches:**
+
+1.  **Unit Tests (Internal State):**
+    Use the `setConfigForTesting` helper exported from `config.ts` to inject a specific configuration state for the duration of a test.
+    ```typescript
+    import { setConfigForTesting } from "../../config";
+    
+    test("my route test", () => {
+        setConfigForTesting(myMockConfig);
+        // ... assertions ...
+    });
+    ```
+
+2.  **Integration Tests (Full Stack):**
+    For tests that load the entire application (e.g., importing `index.ts`), use a **temporary configuration file**.
+    - Create a temp file (e.g., `plexus-test-auth-123.yaml`).
+    - Set `process.env.CONFIG_FILE` to this path *before* importing the app.
+    - Explicitly call `loadConfig(path)` if necessary to ensure the state is refreshed.
+    - Clean up (delete the file and unset the env var) in `afterAll`.
+
+    ```typescript
+    // Example Setup
+    const TEMP_CONFIG_PATH = join(tmpdir(), `plexus-test-${Date.now()}.yaml`);
+    writeFileSync(TEMP_CONFIG_PATH, mockYamlContent);
+    process.env.CONFIG_FILE = TEMP_CONFIG_PATH;
+    
+    // ... run tests ...
+    
+    afterAll(() => {
+        unlinkSync(TEMP_CONFIG_PATH);
+        delete process.env.CONFIG_FILE;
+    });
+    ```

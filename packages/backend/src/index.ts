@@ -45,7 +45,7 @@ app.get('/v1/models', (c) => {
     const models = Object.keys(config.models).map(id => ({
         id,
         object: 'model',
-        created: Date.now(),
+        created: Math.floor(Date.now() / 1000),
         owned_by: 'plexus'
     }));
     
