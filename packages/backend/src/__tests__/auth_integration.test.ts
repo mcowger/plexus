@@ -36,7 +36,14 @@ mock.module('../utils/logger', () => ({
         error: () => {},
         debug: () => {},
         warn: () => {}
-    }
+    },
+    logEmitter: {
+        on: () => {},
+        off: () => {},
+        once: () => {},
+        emit: () => {}
+    },
+    StreamTransport: class {}
 }));
 
 // Mock serveStatic from hono/bun to avoid depending on frontend build
