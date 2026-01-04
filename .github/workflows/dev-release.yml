@@ -1,0 +1,76 @@
+name: Dev Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-and-release:
+    name: Test and Dev Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: bun test
+
+      - name: Compile Binaries
+        # compiling each platform separately
+        # Note: Each compile script in package.json runs build:frontend. 
+        # This is acceptable for correctness to ensure each binary is built with the latest assets.
+        run: |
+          bun run compile:linux
+          bun run compile:macos
+          bun run compile:windows
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=dev
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:dev
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Create dev pre-release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            plexus-linux
+            plexus-macos
+            plexus.exe
+          draft: false
+          prerelease: true
+          tag_name: dev-${{ github.sha }}
+          body: |
+            Development pre-release from commit ${{ github.sha }}
+            
+            Built from: `${{ github.ref }}` at `${{ github.sha }}`
