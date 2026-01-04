@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { CostSelector } from '../cost';
-import { ModelTarget } from '../../../config';
+import { EnrichedModelTarget } from '../base';
 
 describe('CostSelector', () => {
   const selector = new CostSelector();
@@ -10,7 +10,7 @@ describe('CostSelector', () => {
   });
 
   it('should return the single target if only one exists', () => {
-    const targets: ModelTarget[] = [{ 
+    const targets: EnrichedModelTarget[] = [{ 
       provider: 'p1', 
       model: 'm1',
       route: {
@@ -27,7 +27,7 @@ describe('CostSelector', () => {
   });
 
   it('should select the cheapest target with simple pricing', () => {
-    const targets: ModelTarget[] = [
+    const targets: EnrichedModelTarget[] = [
       { 
         provider: 'p1', 
         model: 'm1',
@@ -69,11 +69,11 @@ describe('CostSelector', () => {
       }
     ];
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[1]); // p2/m2 is cheapest
+    expect(selected).toBe(targets[1] ?? null); // p2/m2 is cheapest
   });
 
   it('should handle targets with no pricing information', () => {
-    const targets: ModelTarget[] = [
+    const targets: EnrichedModelTarget[] = [
       { 
         provider: 'p1', 
         model: 'm1',
@@ -93,11 +93,11 @@ describe('CostSelector', () => {
       }
     ];
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[1]); // p2/m2 has no pricing (cost 0)
+    expect(selected).toBe(targets[1] ?? null); // p2/m2 has no pricing (cost 0)
   });
 
   it('should handle default pricing', () => {
-    const targets: ModelTarget[] = [
+    const targets: EnrichedModelTarget[] = [
       { 
         provider: 'p1', 
         model: 'm1',
@@ -126,6 +126,6 @@ describe('CostSelector', () => {
       }
     ];
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[1]); // p2/m2 is cheaper
+    expect(selected).toBe(targets[1] ?? null); // p2/m2 is cheaper
   });
 });

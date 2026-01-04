@@ -1,5 +1,15 @@
 import { ModelTarget } from '../../config';
 
+/**
+ * EnrichedModelTarget extends ModelTarget with route information
+ * that is added by the Router during target enrichment
+ */
+export interface EnrichedModelTarget extends ModelTarget {
+  route?: {
+    modelConfig?: any;
+  };
+}
+
 export abstract class Selector {
   /**
    * Selects a target from a list of available targets.

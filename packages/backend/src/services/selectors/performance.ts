@@ -17,11 +17,8 @@ export class PerformanceSelector extends Selector {
     }
 
     if (targets.length === 1) {
-      return targets[0];
+      return targets[0] ?? null;
     }
-
-    let bestTarget: ModelTarget | null = null;
-    let maxTokensPerSec = -1;
 
     // If no performance data exists, we might want to fall back to random or first.
     // For now, let's assume we want to pick the one with highest known performance.
@@ -51,13 +48,15 @@ export class PerformanceSelector extends Selector {
 
     if (candidates.length > 0) {
         const best = candidates[0];
-        // If the best has 0 TPS (no data), and others also have 0, 
-        // strictly speaking they are equal. The sort is stable or undefined for equals.
-        // We pick the top one.
-        logger.debug(`PerformanceSelector: Selected ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS`);
-        return best.target;
+        if (best) {
+            // If the best has 0 TPS (no data), and others also have 0, 
+            // strictly speaking they are equal. The sort is stable or undefined for equals.
+            // We pick the top one.
+            logger.debug(`PerformanceSelector: Selected ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS`);
+            return best.target;
+        }
     }
 
-    return targets[0];
+    return targets[0] ?? null;
   }
 }

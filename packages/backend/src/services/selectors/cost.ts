@@ -1,4 +1,4 @@
-import { Selector } from './base';
+import { Selector, EnrichedModelTarget } from './base';
 import { ModelTarget } from '../../config';
 
 function calculatePriceForTarget(pricing: any, inputTokens: number, outputTokens: number, cachedTokens: number = 0): number {
@@ -28,7 +28,6 @@ function calculatePriceForTarget(pricing: any, inputTokens: number, outputTokens
         if (openRouterPricing) {
             const promptRate = parseFloat(openRouterPricing.prompt) || 0;
             const completionRate = parseFloat(openRouterPricing.completion) || 0;
-            const cacheReadRate = parseFloat(openRouterPricing.input_cache_read || '0') || 0;
             return (inputTokens * promptRate) + (outputTokens * completionRate);
         }
         return 0;
@@ -55,7 +54,8 @@ export class CostSelector extends Selector {
         let cheapestTarget: ModelTarget | null = null;
 
         for (const target of targets) {
-            const pricing = target.route?.modelConfig?.pricing;
+            const enrichedTarget = target as EnrichedModelTarget; // Targets are enriched with route by Router
+            const pricing = enrichedTarget.route?.modelConfig?.pricing;
             const cost = calculatePriceForTarget(pricing, simulatedInputTokens, simulatedOutputTokens);
 
             if (cost < lowestCost) {
