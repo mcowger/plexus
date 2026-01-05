@@ -37,10 +37,20 @@ export class Router {
             // Load balancing: pick target using selector
             const targets = alias.targets;
             if (targets && targets.length > 0) {
-                let healthyTargets = CooldownManager.getInstance().filterHealthyTargets(targets);
+                // Filter out disabled providers
+                const enabledTargets = targets.filter(target => {
+                    const providerConfig = config.providers[target.provider];
+                    return providerConfig && providerConfig.enabled !== false;
+                });
 
-                if (healthyTargets.length < targets.length) {
-                    const filteredCount = targets.length - healthyTargets.length;
+                if (enabledTargets.length === 0) {
+                    throw new Error(`All providers for model alias '${modelName}' are disabled.`);
+                }
+
+                let healthyTargets = CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
+
+                if (healthyTargets.length < enabledTargets.length) {
+                    const filteredCount = enabledTargets.length - healthyTargets.length;
                     logger.warn(`Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`);
                 }
 

@@ -7,6 +7,8 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Plus, Edit2, Trash2, AlertTriangle, ChevronDown, ChevronRight, X } from 'lucide-react';
 
+import { Switch } from '../components/ui/Switch';
+
 const KNOWN_APIS = ['chat', 'messages', 'gemini'];
 
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
@@ -106,6 +108,20 @@ export const Providers = () => {
     } finally {
         setIsSaving(false);
     }
+  };
+
+  const handleToggleEnabled = async (provider: Provider, newState: boolean) => {
+      const updated = providers.map(p => p.id === provider.id ? { ...p, enabled: newState } : p);
+      setProviders(updated);
+      
+      try {
+          const p = { ...provider, enabled: newState };
+          await api.saveProvider(p, provider.id);
+      } catch (e) {
+          console.error("Toggle error", e);
+          alert("Failed to update provider status: " + e);
+          loadData(); 
+      }
   };
 
   const toggleApi = (apiType: string) => {
@@ -241,6 +257,7 @@ export const Providers = () => {
                   <thead>
                       <tr>
                           <th style={{paddingLeft: '24px'}}>ID / Name</th>
+                          <th>Status</th>
                           <th>APIs</th>
                           <th style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
                       </tr>
@@ -253,6 +270,15 @@ export const Providers = () => {
                                       <Edit2 size={12} style={{opacity: 0.5}} />
                                       <div style={{fontWeight: 600}}>{p.id}</div>
                                       <div style={{fontSize: '12px', color: 'var(--color-text-secondary)'}}>( {p.name} )</div>
+                                  </div>
+                              </td>
+                              <td>
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                      <Switch 
+                                        checked={p.enabled !== false} 
+                                        onChange={(val) => handleToggleEnabled(p, val)} 
+                                        size="sm"
+                                      />
                                   </div>
                               </td>
                               <td>
@@ -310,7 +336,16 @@ export const Providers = () => {
                   />
               </div>
 
+              <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                   <label className="input-label" style={{marginBottom: 0, marginRight: '8px'}}>Enabled</label>
+                   <Switch 
+                      checked={editingProvider.enabled !== false}
+                      onChange={(checked) => setEditingProvider({...editingProvider, enabled: checked})}
+                   />
+              </div>
+
               <div className="input-wrapper">
+
                   <label className="input-label">Supported APIs & Base URLs</label>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--color-bg-subtle)', padding: '16px', borderRadius: 'var(--radius-md)'}}>
                       {KNOWN_APIS.map(apiType => {

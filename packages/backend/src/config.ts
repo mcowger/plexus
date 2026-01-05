@@ -56,6 +56,7 @@ const ProviderConfigSchema = z.object({
   display_name: z.string().optional(),
   api_base_url: z.union([z.string().url(), z.record(z.string())]),
   api_key: z.string().optional(),
+  enabled: z.boolean().default(true).optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
     z.array(z.string()),

@@ -180,11 +180,20 @@ export const Models = () => {
                                 </span>
                             </td>
                             <td style={{paddingRight: '24px'}}>
-                                {alias.targets.map((t, i) => (
-                                    <div key={i} style={{fontSize: '12px', color: 'var(--color-text-secondary)'}}>
-                                        {t.provider} &rarr; {t.model} 
-                                    </div>
-                                ))}
+                                {alias.targets.map((t, i) => {
+                                    const provider = providers.find(p => p.id === t.provider);
+                                    const isDisabled = provider?.enabled === false;
+                                    return (
+                                        <div key={i} style={{
+                                            fontSize: '12px', 
+                                            color: isDisabled ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                                            textDecoration: isDisabled ? 'line-through' : 'none',
+                                            opacity: isDisabled ? 0.7 : 1
+                                        }}>
+                                            {t.provider} &rarr; {t.model} {isDisabled && <span style={{textDecoration: 'none', display: 'inline-block', marginLeft: '4px', fontStyle: 'italic'}}>(provider disabled)</span>}
+                                        </div>
+                                    );
+                                })}
                             </td>
                         </tr>
                     ))}

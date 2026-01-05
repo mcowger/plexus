@@ -10,6 +10,9 @@ import { UsageRecord } from "../../types/usage";
 mock.module("../logger", () => ({
     logger: {
         debug: mock(),
+        info: mock(),
+        warn: mock(),
+        error: mock(),
     }
 }));
 

@@ -11,7 +11,8 @@ mock.module("../logger", () => ({
     logger: {
         debug: mock(),
         error: mock(),
-        warn: mock()
+        warn: mock(),
+        info: mock()
     }
 }));
 
