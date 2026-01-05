@@ -1,6 +1,7 @@
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
+import { encode } from 'eventsource-encoder';
 import path from 'path';
 import { logger, logEmitter } from './utils/logger';
 import { loadConfig, getConfig, getConfigPath, validateConfig } from './config';
@@ -8,7 +9,7 @@ import { Dispatcher } from './services/dispatcher';
 import { AnthropicTransformer, OpenAITransformer, GeminiTransformer } from './transformers';
 import { UsageStorageService } from './services/usage-storage';
 import { UsageRecord } from './types/usage';
-import { handleResponse } from './utils/response-handler';
+import { handleResponse } from './services/response-handler';
 import { getClientIp } from './utils/ip';
 import { z } from 'zod';
 import { CooldownManager } from './services/cooldown-manager';
@@ -76,18 +77,19 @@ fastify.setErrorHandler((error, request, reply) => {
 
     logger.error('Unhandled Fastify Error', error);
     
-    if (error.validation) {
+    if (error instanceof Error && 'validation' in error) {
         return reply.code(400).send({
             error: {
                 message: "Validation Error",
-                details: error.validation
+                details: (error as any).validation
             }
         });
     }
 
-    reply.code(error.statusCode || 500).send({
+    const err = error as any;
+    reply.code(err.statusCode || 500).send({
         error: {
-            message: error.message || "Internal Server Error",
+            message: err.message || "Internal Server Error",
             type: "api_error"
         }
     });
@@ -138,7 +140,7 @@ fastify.post('/v1/chat/completions', async (request, reply) => {
         const body = request.body as any;
         usageRecord.incomingModelAlias = body.model;
         const authHeader = request.headers.authorization;
-        usageRecord.apiKey = authHeader ? authHeader.replace('Bearer ', '').substring(0, 8) + '...' : null;
+        usageRecord.apiKey = authHeader
 
         logger.silly('Incoming OpenAI Request', body);
         const transformer = new OpenAITransformer();
@@ -150,6 +152,7 @@ fastify.post('/v1/chat/completions', async (request, reply) => {
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
         return await handleResponse(
+            request,
             reply,
             unifiedResponse,
             transformer,
@@ -190,7 +193,7 @@ fastify.post('/v1/messages', async (request, reply) => {
         const body = request.body as any;
         usageRecord.incomingModelAlias = body.model;
         const authHeader = request.headers['x-api-key'] as string;
-        usageRecord.apiKey = authHeader ? authHeader.substring(0, 8) + '...' : null;
+        usageRecord.apiKey = authHeader
 
         logger.silly('Incoming Anthropic Request', body);
         const transformer = new AnthropicTransformer();
@@ -204,6 +207,7 @@ fastify.post('/v1/messages', async (request, reply) => {
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
         return await handleResponse(
+            request,
             reply,
             unifiedResponse,
             transformer,
@@ -250,7 +254,7 @@ fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
         
         const query = request.query as any;
         const apiKey = query.key || request.headers['x-goog-api-key'];
-        usageRecord.apiKey = apiKey ? apiKey.substring(0, 8) + '...' : null;
+        usageRecord.apiKey = apiKey;
 
         logger.silly('Incoming Gemini Request', body);
         const transformer = new GeminiTransformer();
@@ -268,6 +272,7 @@ fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
         return await handleResponse(
+            request,
             reply,
             unifiedResponse,
             transformer,
@@ -399,11 +404,9 @@ fastify.delete('/v0/management/usage/:requestId', (request, reply) => {
     return reply.send({ success: true });
 });
 
-/**
- * handleSSE Helper
- * Standardizes the creation of Server-Sent Events streams for management dashboards.
- */
-const handleSSE = async (reply: FastifyReply, setup: (stream: { writeSSE: (msg: any) => Promise<void>, sleep: (ms: number) => Promise<void> }) => Promise<void>) => {
+
+
+fastify.get('/v0/management/events', async (request, reply) => {
     reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -411,43 +414,32 @@ const handleSSE = async (reply: FastifyReply, setup: (stream: { writeSSE: (msg: 
         'Access-Control-Allow-Origin': '*'
     });
 
-    const stream = {
-        writeSSE: async (msg: any) => {
-            if (reply.raw.destroyed) return;
-            reply.raw.write(`event: ${msg.event}\ndata: ${msg.data}\nid: ${msg.id}\n\n`);
-        },
-        sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    const listener = async (record: any) => {
+        if (reply.raw.destroyed) return;
+        reply.raw.write(encode({
+            data: JSON.stringify(record),
+            event: 'log',
+            id: String(Date.now()),
+        }));
     };
 
-    await setup(stream);
-};
+    usageStorage.on('created', listener);
 
-fastify.get('/v0/management/events', async (request, reply) => {
-    return handleSSE(reply, async (stream) => {
-        const listener = async (record: any) => {
-            await stream.writeSSE({
-                data: JSON.stringify(record),
-                event: 'log',
-                id: String(Date.now()),
-            });
-        };
+    request.raw.on('close', () => {
+        usageStorage.off('created', listener);
+    });
 
-        usageStorage.on('created', listener);
-
-        request.raw.on('close', () => {
-            usageStorage.off('created', listener);
-        });
-
-        // Keep connection alive with periodic pings
-        while (!request.raw.destroyed) {
-            await stream.sleep(10000);
-            await stream.writeSSE({
+    // Keep connection alive with periodic pings
+    while (!request.raw.destroyed) {
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        if (!reply.raw.destroyed) {
+            reply.raw.write(encode({
                 event: 'ping',
                 data: 'pong',
                 id: String(Date.now())
-            });
+            }));
         }
-    });
+    }
 });
 
 fastify.get('/v0/management/cooldowns', (request, reply) => {
@@ -541,30 +533,38 @@ fastify.delete('/v0/management/errors/:requestId', (request, reply) => {
 });
 
 fastify.get('/v0/system/logs/stream', async (request, reply) => {
-    return handleSSE(reply, async (stream) => {
-        const listener = async (log: any) => {
-            await stream.writeSSE({
-                data: JSON.stringify(log),
-                event: 'syslog',
-                id: String(Date.now()),
-            });
-        };
+    reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
 
-        logEmitter.on('log', listener);
+    const listener = async (log: any) => {
+        if (reply.raw.destroyed) return;
+        reply.raw.write(encode({
+            data: JSON.stringify(log),
+            event: 'syslog',
+            id: String(Date.now()),
+        }));
+    };
 
-        request.raw.on('close', () => {
-            logEmitter.off('log', listener);
-        });
+    logEmitter.on('log', listener);
 
-        while (!request.raw.destroyed) {
-            await stream.sleep(10000);
-            await stream.writeSSE({
+    request.raw.on('close', () => {
+        logEmitter.off('log', listener);
+    });
+
+    while (!request.raw.destroyed) {
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        if (!reply.raw.destroyed) {
+            reply.raw.write(encode({
                 event: 'ping',
                 data: 'pong',
                 id: String(Date.now())
-            });
+            }));
         }
-    });
+    }
 });
 
 // Health check endpoint for container orchestration

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, InferenceError } from '../lib/api';
 import Editor from '@monaco-editor/react';
-import { RefreshCw, Clock, AlertTriangle, ChevronDown, ChevronRight, Copy, Check, Trash2, Info } from 'lucide-react';
+import { RefreshCw, Clock, AlertTriangle, ChevronDown, ChevronRight, Copy, Check, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';

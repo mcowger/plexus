@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
-import { handleResponse } from "../response-handler";
-import { FastifyReply } from "fastify";
+import { handleResponse } from "../../services/response-handler";
+import { FastifyReply, FastifyRequest } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -28,6 +28,7 @@ describe("handleResponse", () => {
         parseRequest: mock(),
         transformRequest: mock(),
         transformResponse: mock(),
+        extractUsage: mock(),
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
     };
 
@@ -36,6 +37,10 @@ describe("handleResponse", () => {
         header: mock(function(this: any) { return this; }),
         code: mock(function(this: any) { return this; }),
     } as unknown as FastifyReply;
+
+    const mockRequest = {
+        id: "test-req-id"
+    } as unknown as FastifyRequest;
 
     test("should process non-streaming response correctly", async () => {
         const unifiedResponse: UnifiedChatResponse = {
@@ -62,6 +67,7 @@ describe("handleResponse", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -102,6 +108,7 @@ describe("handleResponse", () => {
         const usageRecord: Partial<UsageRecord> = {};
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -133,6 +140,7 @@ describe("handleResponse", () => {
 
             const usageRecord: Partial<UsageRecord> = {};
             await handleResponse(
+                mockRequest,
                 mockReply,
                 unifiedResponse,
                 mockTransformer,

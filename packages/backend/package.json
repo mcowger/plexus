@@ -5,6 +5,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
+    "check-types": "bun x tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch"
   },

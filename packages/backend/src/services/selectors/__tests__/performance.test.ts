@@ -5,7 +5,8 @@ import { ModelTarget } from '../../../config';
 
 describe('PerformanceSelector', () => {
   // Mock usage storage
-  const mockGetProviderPerformance = mock((provider?: string, model?: string) => []);
+  // Explicitly type the mock return to allow any array of objects
+  const mockGetProviderPerformance = mock((provider?: string, model?: string): any[] => []);
   const mockStorage = {
     getProviderPerformance: mockGetProviderPerformance
   } as unknown as UsageStorageService;
@@ -36,7 +37,7 @@ describe('PerformanceSelector', () => {
     ];
 
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[1]); // p2 is fastest
+    expect(selected).toEqual(targets[1]!); // p2 is fastest
   });
 
   it('should handle targets with no performance data (0 tps)', () => {
@@ -52,7 +53,7 @@ describe('PerformanceSelector', () => {
     ];
 
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[0]); // p1 has data
+    expect(selected).toEqual(targets[0]!); // p1 has data
   });
   
   it('should handle all targets having no data (first one wins)', () => {
@@ -64,6 +65,6 @@ describe('PerformanceSelector', () => {
       ];
   
       const selected = selector.select(targets);
-      expect(selected).toEqual(targets[0]);
+      expect(selected).toEqual(targets[0]!);
   });
 });

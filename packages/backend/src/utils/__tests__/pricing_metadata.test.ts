@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
-import { handleResponse } from "../response-handler";
-import { FastifyReply } from "fastify";
+import { handleResponse } from "../../services/response-handler";
+import { FastifyReply, FastifyRequest } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -26,6 +26,7 @@ describe("handleResponse - Pricing Metadata", () => {
         transformRequest: mock(),
         transformResponse: mock(),
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
+        extractUsage: mock()
     };
 
     const mockReply = {
@@ -33,6 +34,10 @@ describe("handleResponse - Pricing Metadata", () => {
         header: mock(function(this: any) { return this; }),
         code: mock(function(this: any) { return this; }),
     } as unknown as FastifyReply;
+
+    const mockRequest = {
+        id: "test-req-id"
+    } as unknown as FastifyRequest;
 
     const baseUsage = {
         total_tokens: 200,
@@ -62,6 +67,7 @@ describe("handleResponse - Pricing Metadata", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-1" };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -104,6 +110,7 @@ describe("handleResponse - Pricing Metadata", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-2" };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -146,6 +153,7 @@ describe("handleResponse - Pricing Metadata", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-3" };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,

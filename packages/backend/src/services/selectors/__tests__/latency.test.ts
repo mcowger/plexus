@@ -5,7 +5,8 @@ import { ModelTarget } from '../../../config';
 
 describe('LatencySelector', () => {
   // Mock usage storage
-  const mockGetProviderPerformance = mock((provider?: string, model?: string) => []);
+  // Explicitly type the mock return to allow any array of objects
+  const mockGetProviderPerformance = mock((provider?: string, model?: string): any[] => []);
   const mockStorage = {
     getProviderPerformance: mockGetProviderPerformance
   } as unknown as UsageStorageService;
@@ -36,7 +37,7 @@ describe('LatencySelector', () => {
     ];
 
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[1]); // p2 is fastest (lowest TTFT)
+    expect(selected).toEqual(targets[1]!); // p2 is fastest (lowest TTFT)
   });
 
   it('should prefer targets with data over targets with no data', () => {
@@ -52,7 +53,7 @@ describe('LatencySelector', () => {
     ];
 
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[0]); // p1 has data, so it wins
+    expect(selected).toEqual(targets[0]!); // p1 has data, so it wins
   });
   
   it('should handle all targets having no data (first one wins)', () => {
@@ -64,6 +65,6 @@ describe('LatencySelector', () => {
       ];
   
       const selected = selector.select(targets);
-      expect(selected).toEqual(targets[0]);
+      expect(selected).toEqual(targets[0]!);
   });
 });
