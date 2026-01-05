@@ -28,9 +28,15 @@ console.log(`✅ Backend serving at http://localhost:${BACKEND_PORT}`);
 console.log(`👀 Watching for changes...`);
 
 // Cleanup on exit
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   console.log("\n🛑 Stopping...");
-  backend.kill();
-  frontend.kill();
+  
+  // Send SIGINT to allow graceful shutdown
+  backend.kill("SIGINT");
+  frontend.kill("SIGINT");
+
+  // Wait for children to exit to prevent terminal artifacts
+  await Promise.all([backend.exited, frontend.exited]);
+  
   process.exit(0);
 });
