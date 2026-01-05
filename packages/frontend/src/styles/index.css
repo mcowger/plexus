@@ -980,6 +980,28 @@ body {
 
 }
 
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-primary);
+}
+
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
 /* ===== System Logs ===== */
 .system-logs-container {
   height: calc(100vh - 64px);

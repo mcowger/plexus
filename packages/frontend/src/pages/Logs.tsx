@@ -254,6 +254,7 @@ export const Logs = () => {
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
                                 <th style={{ padding: '6px' }}>Date</th>
+                                <th style={{ padding: '6px' }}>Key</th>
                                 <th style={{ padding: '6px' }}>Source IP</th>
                                 <th style={{ padding: '6px' }}>API (In/Out)</th>
                                 <th style={{ padding: '6px' }}>Model (In/Sel)</th>
@@ -271,11 +272,11 @@ export const Logs = () => {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={15} style={{ padding: '20px', textAlign: 'center' }}>Loading...</td>
+                                    <td colSpan={16} style={{ padding: '20px', textAlign: 'center' }}>Loading...</td>
                                 </tr>
                             ) : logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={15} style={{ padding: '20px', textAlign: 'center' }}>No logs found</td>
+                                    <td colSpan={16} style={{ padding: '20px', textAlign: 'center' }}>No logs found</td>
                                 </tr>
                             ) : (
                                 logs.map((log) => (
@@ -287,6 +288,7 @@ export const Logs = () => {
                                         <td style={{ padding: '6px', whiteSpace: 'nowrap' }}>
                                             {new Date(log.date).toLocaleString()}
                                         </td>
+                                        <td style={{ padding: '6px' }}>{log.apiKey || '-'}</td>
                                         <td style={{ padding: '6px' }}>{log.sourceIp || '-'}
                                         </td>
                                         <td style={{ padding: '6px' }}>

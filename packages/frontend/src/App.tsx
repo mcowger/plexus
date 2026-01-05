@@ -6,6 +6,7 @@ import { Usage } from './pages/Usage';
 import { Logs } from './pages/Logs';
 import { Providers } from './pages/Providers';
 import { Models } from './pages/Models';
+import { Keys } from './pages/Keys';
 import { Config } from './pages/Config';
 import { SystemLogs } from './pages/SystemLogs';
 import { Debug } from './pages/Debug';
@@ -58,6 +59,7 @@ const AppRoutes = () => {
                             <Route path="/logs" element={<Logs />} />
                             <Route path="/providers" element={<Providers />} />
                             <Route path="/models" element={<Models />} />
+                            <Route path="/keys" element={<Keys />} />
                             <Route path="/config" element={<Config />} />
                             <Route path="/system-logs" element={<SystemLogs />} />
                             <Route path="/debug" element={<Debug />} />
