@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug, Database, LogOut, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug, Database, LogOut, AlertTriangle, Key } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -70,6 +70,10 @@ export const Sidebar: React.FC = () => {
             <NavLink to="/models" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
             <Box size={20} />
             <span>Models</span>
+            </NavLink>
+            <NavLink to="/keys" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+            <Key size={20} />
+            <span>Keys</span>
             </NavLink>
              <NavLink to="/config" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
             <Settings size={20} />

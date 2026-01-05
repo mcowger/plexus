@@ -35,8 +35,8 @@ export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: 
             usageRecord.incomingModelAlias = modelName;
             
             const query = request.query as any;
-            const apiKey = query.key || request.headers['x-goog-api-key'];
-            usageRecord.apiKey = apiKey;
+            // Use the key name identified by the auth middleware, not the raw secret
+            usageRecord.apiKey = (request as any).keyName;
 
             logger.silly('Incoming Gemini Request', body);
             const transformer = new GeminiTransformer();

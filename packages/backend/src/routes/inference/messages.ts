@@ -29,8 +29,8 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
         try {
             const body = request.body as any;
             usageRecord.incomingModelAlias = body.model;
-            const authHeader = request.headers['x-api-key'] as string;
-            usageRecord.apiKey = authHeader
+            // Use the key name identified by the auth middleware, not the raw secret
+            usageRecord.apiKey = (request as any).keyName;
 
             logger.silly('Incoming Anthropic Request', body);
             const transformer = new AnthropicTransformer();

@@ -131,6 +131,13 @@ interface PlexusConfig {
         enabled?: boolean; // Custom field we might want to preserve if we could
     }>;
     models?: Record<string, any>;
+    keys?: Record<string, KeyConfig>;
+}
+
+export interface KeyConfig {
+    key: string; // The user-facing alias/name for the key (e.g. 'my-app')
+    secret: string; // The actual sk-uuid
+    comment?: string;
 }
 
 export const formatLargeNumber = (num: number): string => {
@@ -347,6 +354,65 @@ export const api = {
         const err = await res.json();
         throw new Error(err.error || 'Failed to save config');
     }
+  },
+
+  getKeys: async (): Promise<KeyConfig[]> => {
+      try {
+          const yamlStr = await api.getConfig();
+          const config = parse(yamlStr) as PlexusConfig;
+          if (!config.keys) return [];
+          
+          return Object.entries(config.keys).map(([key, val]) => ({
+              key,
+              secret: val.secret,
+              comment: val.comment
+          }));
+      } catch (e) {
+          console.error("API Error getKeys", e);
+          return [];
+      }
+  },
+
+  saveKey: async (keyConfig: KeyConfig, oldKeyName?: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          config = { providers: {}, models: {}, keys: {} };
+      }
+
+      if (!config) config = {};
+      if (!config.keys) config.keys = {};
+
+      // If key name changed, delete old key
+      if (oldKeyName && oldKeyName !== keyConfig.key && config.keys[oldKeyName]) {
+          delete config.keys[oldKeyName];
+      }
+
+      config.keys[keyConfig.key] = {
+          secret: keyConfig.secret,
+          comment: keyConfig.comment
+      };
+
+      const newYaml = stringify(config);
+      await api.saveConfig(newYaml);
+  },
+
+  deleteKey: async (keyName: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          return; // Nothing to delete
+      }
+
+      if (config && config.keys && config.keys[keyName]) {
+          delete config.keys[keyName];
+          const newYaml = stringify(config);
+          await api.saveConfig(newYaml);
+      }
   },
 
   getProviders: async (): Promise<Provider[]> => {
