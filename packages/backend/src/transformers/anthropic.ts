@@ -443,10 +443,6 @@ export class AnthropicTransformer implements Transformer {
               }
 
               if (unifiedChunk) {
-                logger.silly(
-                  `Anthropic Transformer: Enqueueing unified chunk`,
-                  unifiedChunk
-                );
                 controller.enqueue(unifiedChunk);
               }
             } catch (e) {

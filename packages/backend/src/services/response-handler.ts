@@ -39,6 +39,8 @@ export async function handleResponse(
 
   const pricing = unifiedResponse.plexus?.pricing;
   const providerDiscount = unifiedResponse.plexus?.providerDiscount;
+  // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
+  const providerApiType = (unifiedResponse.plexus?.apiType || "chat").toLowerCase();
 
   // --- Scenario A: Streaming Response ---
   if (unifiedResponse.stream) {
@@ -54,12 +56,6 @@ export async function handleResponse(
        * 1. providerTransformer.transformStream: Provider SSE (e.g. OpenAI) -> Unified internal chunks
        * 2. clientTransformer.formatStream: Unified internal chunks -> Client SSE format (e.g. Anthropic)
        */
-
-      // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
-      let providerApiType = (
-        unifiedResponse.plexus?.apiType || "chat"
-      ).toLowerCase();
-
       // Get the transformer for the outgoing provider's format
       const providerTransformer =
         TransformerFactory.getTransformer(providerApiType);
@@ -85,14 +81,14 @@ export async function handleResponse(
      * We avoid .tee() as it breaks backpressure and stability.
      * Instead, we use PassThrough streams ('inspectors') to 'tap' into the data.
      */
-    const logInspector = new DebugLoggingInspector(request.id).createInspector();
+    const rawLogInspector = new DebugLoggingInspector(request.id).createInspector(providerApiType);
     const usageInspector = new UsageInspector(request.id).createInspector();
 
     // Convert Web Stream to Node Stream for piping
     const nodeStream = Readable.fromWeb(finalClientStream as any);
 
-    // Pipeline: Source -> Logger -> Usage -> Client
-    const pipeline = nodeStream.pipe(logInspector).pipe(usageInspector);
+    // Pipeline: Source -> Raw Logger -> Usage -> Client
+    const pipeline = nodeStream.pipe(rawLogInspector).pipe(usageInspector);
 
     usageRecord.responseStatus = "success";
 
