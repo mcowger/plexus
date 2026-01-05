@@ -8,16 +8,6 @@ import { UsageRecord } from "../../types/usage";
 import { PricingManager } from "../../services/pricing-manager";
 import path from "path";
 
-// Mock Logger
-mock.module("../logger", () => ({
-    logger: {
-        debug: mock(),
-        info: mock(),
-        warn: mock(),
-        error: mock(),
-    }
-}));
-
 // Mock PricingManager
 mock.module("../../services/pricing-manager", () => {
     const pricingMap = new Map();

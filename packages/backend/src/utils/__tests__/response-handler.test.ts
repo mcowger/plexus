@@ -6,16 +6,6 @@ import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
 import { UsageRecord } from "../../types/usage";
 
-// Mock Logger
-mock.module("../logger", () => ({
-    logger: {
-        debug: mock(),
-        error: mock(),
-        warn: mock(),
-        info: mock()
-    }
-}));
-
 describe("handleResponse", () => {
     const mockStorage = {
         saveRequest: mock(),

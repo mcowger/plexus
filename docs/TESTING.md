@@ -16,6 +16,35 @@ The E2E tests are split by API type:
     -   In **Replay Mode**, the network is completely mocked using these saved JSON files.
 3.  **Validation**: The test verifies that the `Dispatcher` logic correctly transforms the upstream data into a valid Unified response.
 
+## Global Test Setup
+
+To ensure test isolation and prevent "mock pollution" in Bun's shared-worker environment, this project uses a global setup script.
+
+### `bunfig.toml` and `test/setup.ts`
+
+The root `bunfig.toml` is configured to preload `packages/backend/test/setup.ts` before any tests run. This script establishes "Gold Standard" mocks for global dependencies like the **Logger**.
+
+### Mocking Pattern: Shared Dependencies
+
+Bun's `mock.module` is a process-global operation. Once a module is mocked, it remains mocked for the duration of that worker thread, and `mock.restore()` does **not** reset it.
+
+To prevent crashes in other tests (e.g., `TypeError: logger.info is not a function`), follow these rules:
+
+1.  **Use the Global Setup:** Common modules like `src/utils/logger` should be mocked once in `setup.ts`.
+2.  **Robust Mocking:** If you must mock a module in a specific test file, your mock **MUST** implement the entire public interface of that module (including all log levels like `silly`, `debug`, etc.).
+3.  **Prefer Spying:** If you need to assert that a global dependency was called, use `spyOn` on the already-mocked global instance rather than re-mocking the module.
+
+```typescript
+import { logger } from "src/utils/logger";
+import { spyOn, expect, test } from "bun:test";
+
+test("my test", () => {
+    const infoSpy = spyOn(logger, "info");
+    // ... run code ...
+    expect(infoSpy).toHaveBeenCalled();
+});
+```
+
 ## Running Tests
 
 ### 1. Standard Run (Replay Mode)

@@ -76,38 +76,34 @@ Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
 When writing tests for the backend, especially those involving configuration (`packages/backend/src/config.ts`), strict adherence to isolation principles is required to prevent "mock pollution" across tests.
 
 **Do NOT use `mock.module` to mock the configuration module globally.** 
-Bun's test runner can share state between test files, and hard-mocking the config module will cause other tests (like `pricing_config.test.ts` or `dispatcher.test.ts`) to fail unpredictably because they receive the mocked configuration instead of the real logic.
+Bun's test runner can share state between test files, and hard-mocking the config module will cause other tests (like `pricing_config.test.ts` or `dispatcher.test.ts`) to fail unpredictably because they receive the mocked configuration instead of the real logic.  
 
-**Preferred Approaches:**
 
-1.  **Unit Tests (Internal State):**
-    Use the `setConfigForTesting` helper exported from `config.ts` to inject a specific configuration state for the duration of a test.
-    ```typescript
-    import { setConfigForTesting } from "../../config";
-    
-    test("my route test", () => {
-        setConfigForTesting(myMockConfig);
-        // ... assertions ...
-    });
-    ```
+## Global Test Setup
 
-2.  **Integration Tests (Full Stack):**
-    For tests that load the entire application (e.g., importing `index.ts`), use a **temporary configuration file**.
-    - Create a temp file (e.g., `plexus-test-auth-123.yaml`).
-    - Set `process.env.CONFIG_FILE` to this path *before* importing the app.
-    - Explicitly call `loadConfig(path)` if necessary to ensure the state is refreshed.
-    - Clean up (delete the file and unset the env var) in `afterAll`.
+To ensure test isolation and prevent "mock pollution" in Bun's shared-worker environment, this project uses a global setup script.
 
-    ```typescript
-    // Example Setup
-    const TEMP_CONFIG_PATH = join(tmpdir(), `plexus-test-${Date.now()}.yaml`);
-    writeFileSync(TEMP_CONFIG_PATH, mockYamlContent);
-    process.env.CONFIG_FILE = TEMP_CONFIG_PATH;
-    
-    // ... run tests ...
-    
-    afterAll(() => {
-        unlinkSync(TEMP_CONFIG_PATH);
-        delete process.env.CONFIG_FILE;
-    });
-    ```
+### `bunfig.toml` and `test/setup.ts`
+
+The root `bunfig.toml` is configured to preload `packages/backend/test/setup.ts` before any tests run. This script establishes "Gold Standard" mocks for global dependencies like the **Logger**.
+
+### Mocking Pattern: Shared Dependencies
+
+Bun's `mock.module` is a process-global operation. Once a module is mocked, it remains mocked for the duration of that worker thread, and `mock.restore()` does **not** reset it.
+
+To prevent crashes in other tests (e.g., `TypeError: logger.info is not a function`), follow these rules:
+
+1.  **Use the Global Setup:** Common modules like `src/utils/logger` should be mocked once in `setup.ts`.
+2.  **Robust Mocking:** If you must mock a module in a specific test file, your mock **MUST** implement the entire public interface of that module (including all log levels like `silly`, `debug`, etc.).
+3.  **Prefer Spying:** If you need to assert that a global dependency was called, use `spyOn` on the already-mocked global instance rather than re-mocking the module.
+
+```typescript
+import { logger } from "src/utils/logger";
+import { spyOn, expect, test } from "bun:test";
+
+test("my test", () => {
+    const infoSpy = spyOn(logger, "info");
+    // ... run code ...
+    expect(infoSpy).toHaveBeenCalled();
+});
+```
