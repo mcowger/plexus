@@ -1,53 +1,50 @@
-import { Context } from 'hono';
-import { getConnInfo } from 'hono/bun';
+import { FastifyRequest } from 'fastify';
 
-export function getClientIp(c: Context): string | null {
-    // Platform specific headers (high trust if present)
-    const cfIp = c.req.header('cf-connecting-ip');
-    if (cfIp) return cfIp;
+/**
+ * getClientIp
+ * 
+ * Safely extracts the client's original IP address from incoming headers.
+ * Implements a prioritized list of headers commonly used by proxies and CDNs.
+ */
+export function getClientIp(request: FastifyRequest): string | null {
+    const headers = request.headers;
 
-    const trueClientIp = c.req.header('true-client-ip');
-    if (trueClientIp) return trueClientIp;
+    // 1. Cloudflare prioritized connecting IP
+    const cfIp = headers['cf-connecting-ip'];
+    if (cfIp && typeof cfIp === 'string') return cfIp;
 
-    // Standard Proxy headers
-    // X-Real-IP is often set by the immediate reverse proxy to the client's IP
-    const xRealIp = c.req.header('x-real-ip');
-    if (xRealIp) return xRealIp;
+    // 2. Standard CDN/Proxy "True Client" headers
+    const trueClientIp = headers['true-client-ip'];
+    if (trueClientIp && typeof trueClientIp === 'string') return trueClientIp;
 
-    // X-Forwarded-For can contain multiple IPs. Standard practice is client, proxy1, proxy2...
-    // We usually want the first one (leftmost) as the original client IP.
-    const xForwardedFor = c.req.header('x-forwarded-for');
-    if (xForwardedFor) {
+    // 3. Common reverse proxy headers (X-Real-IP)
+    const xRealIp = headers['x-real-ip'];
+    if (xRealIp && typeof xRealIp === 'string') return xRealIp;
+
+    // 4. X-Forwarded-For chain: The leftmost IP is the original client.
+    const xForwardedFor = headers['x-forwarded-for'];
+    if (xForwardedFor && typeof xForwardedFor === 'string') {
         const ips = xForwardedFor.split(',').map(ip => ip.trim());
         if (ips.length > 0) return ips[0] || null;
     }
 
-    // Other common headers
-    const xClientIp = c.req.header('x-client-ip');
-    if (xClientIp) return xClientIp;
+    // 5. Secondary fallback headers
+    const xClientIp = headers['x-client-ip'];
+    if (xClientIp && typeof xClientIp === 'string') return xClientIp;
 
-    const fastlyClientIp = c.req.header('fastly-client-ip');
-    if (fastlyClientIp) return fastlyClientIp;
+    const fastlyClientIp = headers['fastly-client-ip'];
+    if (fastlyClientIp && typeof fastlyClientIp === 'string') return fastlyClientIp;
 
-    const xClusterClientIp = c.req.header('x-cluster-client-ip');
-    if (xClusterClientIp) return xClusterClientIp;
+    const xClusterClientIp = headers['x-cluster-client-ip'];
+    if (xClusterClientIp && typeof xClusterClientIp === 'string') return xClusterClientIp;
 
-    const forwarded = c.req.header('forwarded');
-    if (forwarded) {
-        // Parse 'for=1.2.3.4' from Forwarded header
+    // 6. RFC 7239 'Forwarded' header parsing
+    const forwarded = headers['forwarded'];
+    if (forwarded && typeof forwarded === 'string') {
         const match = forwarded.match(/for="?([^";,]+)"?/i);
         if (match && match[1]) return match[1];
     }
 
-    // Fallback to socket IP using Hono's Bun adapter helper
-    try {
-        const info = getConnInfo(c);
-        if (info.remote?.address) {
-            return info.remote.address;
-        }
-    } catch (e) {
-        // Ignore errors if getConnInfo fails or isn't available
-    }
-
-    return null;
+    // 7. Socket-level IP provided by Fastify or Node.js
+    return request.ip || request.socket.remoteAddress || null;
 }
