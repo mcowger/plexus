@@ -42,7 +42,8 @@ export interface UsageData {
 export interface Provider {
   id: string;
   name: string;
-  type: string;
+  type: string | string[];
+  apiBaseUrl?: string | Record<string, string>;
   apiKey: string;
   enabled: boolean;
 }
@@ -51,12 +52,14 @@ export interface Model {
   id: string;
   name: string;
   providerId: string;
+  pricingSource?: string;
 }
 
 export interface Alias {
     id: string;
+    aliases?: string[];
     selector?: string;
-    targets: Array<{ provider: string; model: string }>;
+    targets: Array<{ provider: string; model: string; apiType?: string[] }>;
 }
 
 export interface InferenceError {
@@ -115,8 +118,9 @@ interface BackendResponse<T> {
 
 interface PlexusConfig {
     providers: Record<string, {
-        type: string;
+        type: string | string[];
         api_key?: string;
+        api_base_url?: string | Record<string, string>;
         display_name?: string;
         models?: string[] | Record<string, any>;
         enabled?: boolean; // Custom field we might want to preserve if we could
@@ -351,6 +355,7 @@ export const api = {
             id: key,
             name: val.display_name || key,
             type: val.type,
+            apiBaseUrl: val.api_base_url,
             apiKey: val.api_key || '',
             enabled: true // backend config doesn't have enabled flag yet
         }));
@@ -417,11 +422,12 @@ export const api = {
                             });
                         });
                     } else if (typeof pVal.models === 'object') {
-                        Object.keys(pVal.models).forEach(m => {
+                        Object.entries(pVal.models).forEach(([mKey, mVal]) => {
                             models.push({
-                                id: m,
-                                name: m,
-                                providerId: pKey
+                                id: mKey,
+                                name: mKey,
+                                providerId: pKey,
+                                pricingSource: mVal.pricing?.source
                             });
                         });
                     }
@@ -440,13 +446,34 @@ export const api = {
         const yamlStr = await api.getConfig();
         const config = parse(yamlStr) as PlexusConfig;
         const aliases: Alias[] = [];
+        const providers = config.providers || {};
 
         if (config.models) {
             Object.entries(config.models).forEach(([key, val]) => {
+                const targets = (val.targets || []).map((t: { provider: string; model: string }) => {
+                    const providerConfig = providers[t.provider];
+                    let apiType: string | string[] = providerConfig?.type || 'unknown';
+
+                    // Check for specific model config overrides (access_via)
+                    if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
+                        const modelConfig = providerConfig.models[t.model];
+                        if (modelConfig && modelConfig.access_via) {
+                            apiType = modelConfig.access_via;
+                        }
+                    }
+
+                    return {
+                        provider: t.provider,
+                        model: t.model,
+                        apiType: Array.isArray(apiType) ? apiType : [apiType]
+                    };
+                });
+
                 aliases.push({
                     id: key,
+                    aliases: val.additional_aliases || [],
                     selector: val.selector,
-                    targets: val.targets || []
+                    targets
                 });
             });
         }
