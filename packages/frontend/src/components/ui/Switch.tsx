@@ -39,7 +39,7 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onChange, disabled, siz
       <div
         style={{
             position: 'absolute',
-            top: `${padding - (checked ? 0 : 1)}px`, // Adjust for border offset if needed, simplified here
+            top: `${padding - (checked ? 1 : 1)}px`, // Adjust for border offset if needed, simplified here
             left: checked ? `${width - knobSize - padding - (checked ? 0 : 2)}px` : `${padding}px`,
             width: `${knobSize}px`,
             height: `${knobSize}px`,
