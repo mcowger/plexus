@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
 import { handleResponse } from "../response-handler";
-import { Context } from "hono";
+import { FastifyReply } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -13,11 +13,6 @@ mock.module("../logger", () => ({
         error: mock(),
         warn: mock()
     }
-}));
-
-// Mock Hono Streaming
-mock.module("hono/streaming", () => ({
-    stream: (_c: any, cb: any) => ({ handler: cb })
 }));
 
 describe("handleResponse", () => {
@@ -36,11 +31,11 @@ describe("handleResponse", () => {
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
     };
 
-    const mockContext = {
-        json: mock((data) => data),
-        header: mock(),
-        newResponse: mock((body) => ({ body })),
-    } as unknown as Context;
+    const mockReply = {
+        send: mock(function(this: any, data) { return this; }),
+        header: mock(function(this: any) { return this; }),
+        code: mock(function(this: any) { return this; }),
+    } as unknown as FastifyReply;
 
     test("should process non-streaming response correctly", async () => {
         const unifiedResponse: UnifiedChatResponse = {
@@ -66,15 +61,15 @@ describe("handleResponse", () => {
             requestId: "req-1"
         };
 
-        const result = await handleResponse(
-            mockContext,
+        await handleResponse(
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
             mockStorage,
             Date.now(),
             "chat"
-        ) as any;
+        );
 
         // Verify Usage Record updates
         expect(usageRecord.selectedModelName).toBe("model-orig");
@@ -87,7 +82,9 @@ describe("handleResponse", () => {
         // Verify Storage called
         expect(mockStorage.saveRequest).toHaveBeenCalled();
 
-        // Verify Response Formatting (plexus stripped)
+        // Verify send called with formatted response
+        const lastCall = (mockReply.send as any).mock.calls.at(-1);
+        const result = lastCall[0];
         expect(result.plexus).toBeUndefined();
         expect(result.formatted).toBe(true);
     });
@@ -105,7 +102,7 @@ describe("handleResponse", () => {
         const usageRecord: Partial<UsageRecord> = {};
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -136,7 +133,7 @@ describe("handleResponse", () => {
 
             const usageRecord: Partial<UsageRecord> = {};
             await handleResponse(
-                mockContext,
+                mockReply,
                 unifiedResponse,
                 mockTransformer,
                 usageRecord,

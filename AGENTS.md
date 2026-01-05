@@ -1,12 +1,13 @@
 ## 1. Executive Summary
-**Plexus** is a high-performance, unified API gateway and virtualization layer for Large Language Models (LLMs). Built on the **Bun** runtime and **Hono** framework, it abstracts the complexity of integrating with multiple AI providers (OpenAI, Anthropic, Google, etc.) by transforming incoming APIs (`/v1/messages`, `/v1/chat/completions`, etc.). This enables developers to switch providers, load-balance requests, and manage model configurations without altering their client application code.
+**Plexus** is a high-performance, unified API gateway and virtualization layer for Large Language Models (LLMs). Built on the **Bun** runtime and **Fastify** framework, it abstracts the complexity of integrating with multiple AI providers (OpenAI, Anthropic, Google, etc.) by transforming incoming APIs (`/v1/messages`, `/v1/chat/completions`, etc.). This enables developers to switch providers, load-balance requests, and manage model configurations without altering their client application code.
 
-## 2. Target Audience
-- **AI Engineers & Developers:** Building applications that consume LLM APIs and require flexibility in provider selection.
-- **Platform Architects:** Seeking to unify LLM traffic through a centralized, controllable gateway.
+## 2. Target Audience - **AI Engineers & Developers:** Building applications that consume LLM APIs and require flexibility in provider selection. - **Platform Architects:** 
+Seeking to unify LLM traffic through a centralized, controllable gateway.
 
-## Goal
-The core objective is to provide a single entry point for various LLM APIs:
+
+## CRITICAL REQUIREMENTS:   NEVER default to searching types definitions files for libraries.  ALWAYS rely on the tavily and context7 MCP tools to search the web for better documentation. FOLLOWING THIS REQUIREMENT IS CRITICAL.
+
+## Goal The core objective is to provide a single entry point for various LLM APIs:
 
 - `/v1/chat/completions` (OpenAI style)
 - `/v1/messages` (Anthropic style)
@@ -27,9 +28,10 @@ Plexus routes requests to any backend provider regardless of its native API form
 - **Implemented Endpoints:**
   - `POST /v1/chat/completions`: Standard OpenAI-compatible chat completion endpoint.
   - `POST /v1/messages`: Standard Anthropic-compatible messages endpoint.
+  - `GET /v1/models`: List available models and aliases.
+
 - **Planned Endpoints:**
   - `POST /v1/responses`: OpenAI Responses API style.
-  - `GET /v1/models`: List available models and aliases.
 
 ### 3.2 Advanced Routing & Virtualization
 - **Model Aliasing:** Decouples requested model IDs from actual provider implementations.
@@ -47,14 +49,14 @@ Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
 
 ### 4.1 Stack
 - **Runtime:** [Bun](https://bun.sh)
-- **Web Framework:** [Hono](https://hono.dev/)
+- **Web Framework:** Fastify
 - **Configuration:** YAML (via `yaml` package)
 - **Validation:** [Zod](https://zod.dev/)
 - **Libraries:** Where possible, use native Bun libraries
 
 ### 4.2 System Components
-- **`packages/backend`**: The core Hono server. Contains the dispatcher, router, and transformer logic.
-- **`packages/frontend`**: React-based dashboard (work in progress).
+- **`packages/backend`**: The core Fastify server. Contains the dispatcher, router, and transformer logic.
+- **`packages/frontend`**: React-based dashboard.
 - **`llms/`**: A reference implementation (Fastify-based) containing extensive transformer logic for diverse providers (Vertex, Gemini, Cerebras, etc.) used to guide development in `packages/backend`.
 - **`CAP-UI/`**: A reference implementation of a management UI and usage tracking tool used to guide development in `packages/frontend`.  Do not use it as a reference for backend code.   Primarily use it for UI techniques and layout.
 - **`testcommands/`**: TypeScript-based CLI tools and JSON payloads for verifying transformations and streaming.
@@ -68,9 +70,7 @@ Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
   - `utils/`: Shared utilities (Logger).
 
 ## 6. Development & Testing
-- **Full Stack Dev:** Run `bun run scripts/dev.ts` from the root to start both the Backend (port 4000, watch mode) and Frontend Builder (watch mode).
-- **Backend Only:** Run `bun run dev:backend` (port 4000 default).
-- **Verification:** Use the scripts in `testcommands/test_request.ts` against `http://localhost:4000`.
+- **Full Stack Dev:** Run `bun run dev` from the root to start both the Backend (port 4000, watch mode) and Frontend Builder (watch mode).
 
 ### 6.1 Testing Guidelines
 When writing tests for the backend, especially those involving configuration (`packages/backend/src/config.ts`), strict adherence to isolation principles is required to prevent "mock pollution" across tests.

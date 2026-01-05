@@ -1,14 +1,12 @@
-import { Context, Next } from 'hono';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger'; 
 
-export const requestLogger = async (c: Context, next: Next) => {
-    const { method, path } = c.req;
+export const requestLogger = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { method, url: path } = request;
 
     if (method === 'GET' || method === 'POST') {
         logger.debug(`${method} ${path}`);
     } else {
         logger.info(`${method} ${path}`);
     }
-
-    await next();
 };

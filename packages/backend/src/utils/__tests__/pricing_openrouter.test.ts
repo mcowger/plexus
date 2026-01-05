@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, beforeAll } from "bun:test";
 import { handleResponse } from "../response-handler";
-import { Context } from "hono";
+import { FastifyReply } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -57,11 +57,11 @@ describe("handleResponse - OpenRouter Pricing", () => {
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
     };
 
-    const mockContext = {
-        json: mock((data) => data),
-        header: mock(),
-        newResponse: mock((body) => ({ body })),
-    } as unknown as Context;
+    const mockReply = {
+        send: mock(function(this: any, data) { return this; }),
+        header: mock(function(this: any) { return this; }),
+        code: mock(function(this: any) { return this; }),
+    } as unknown as FastifyReply;
 
     const baseUsage = {
         reasoning_tokens: 0,
@@ -104,7 +104,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -149,7 +149,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -190,7 +190,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-or-3" };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -234,7 +234,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -283,7 +283,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
