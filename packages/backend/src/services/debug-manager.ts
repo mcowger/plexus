@@ -1,6 +1,7 @@
 import { UsageStorageService } from './usage-storage';
 import { logger } from '../utils/logger';
-import { parse as parseSSE } from 'event-stream-parser';
+import { createParser, EventSourceMessage } from 'eventsource-parser';
+import { encode } from 'eventsource-encoder';
 
 export interface DebugLogRecord {
     requestId: string;
@@ -102,29 +103,37 @@ export class DebugManager {
             
             let sseText = '';
             const events: any[] = [];
+            const decoder = new TextDecoder();
             
             try {
                 // Parse SSE events properly (handles fragmentation)
-                const eventStream = await parseSSE(stream as ReadableStream<Uint8Array>);
-                const reader = eventStream.getReader();
-                
-                while (true) {
-                    const { done, value: event } = await reader.read();
-                    if (done) break;
-                    
-                    // Reconstruct original SSE format for raw display
-                    sseText += `data: ${event.data}\n\n`;
-                    
-                    // Parse and collect event data for snapshot
-                    try {
-                        const eventData = JSON.parse(event.data);
-                        events.push(eventData);
-                    } catch (e) {
-                        // Ignore parse errors
+                const parser = createParser({
+                    onEvent: (event: EventSourceMessage) => {
+                        // Reconstruct original SSE format for raw display
+                        sseText += encode(event);
+                        
+                        // Parse and collect event data for snapshot
+                        if (event.data && event.data !== '[DONE]') {
+                            try {
+                                const eventData = JSON.parse(event.data);
+                                events.push(eventData);
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
                     }
+                });
+
+                const reader = stream.getReader();
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        parser.feed(decoder.decode(value, { stream: true }));
+                    }
+                } finally {
+                    reader.releaseLock();
                 }
-                
-                reader.releaseLock();
                 
                 // Store accumulated data and snapshot
                 const log = this.pendingLogs.get(requestId);
