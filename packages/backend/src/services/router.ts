@@ -13,7 +13,7 @@ export interface RouteResult {
 }
 
 export class Router {
-    static resolve(modelName: string): RouteResult {
+    static resolve(modelName: string, incomingApiType?: string): RouteResult {
         const config = getConfig();
         
         // 1. Check aliases
@@ -37,10 +37,46 @@ export class Router {
             // Load balancing: pick target using selector
             const targets = alias.targets;
             if (targets && targets.length > 0) {
-                const healthyTargets = CooldownManager.getInstance().filterHealthyTargets(targets);
+                let healthyTargets = CooldownManager.getInstance().filterHealthyTargets(targets);
+
+                if (healthyTargets.length < targets.length) {
+                    const filteredCount = targets.length - healthyTargets.length;
+                    logger.warn(`Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`);
+                }
 
                 if (healthyTargets.length === 0) {
                     throw new Error(`All providers for model alias '${modelName}' are currently on cooldown.`);
+                }
+
+                // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
+                if (alias.priority === 'api_match' && incomingApiType) {
+                    const normalizedIncoming = incomingApiType.toLowerCase();
+                    
+                    const compatibleTargets = healthyTargets.filter(target => {
+                        const providerConfig = config.providers[target.provider];
+                        if (!providerConfig) return false;
+
+                        // Supported types for the provider
+                        const providerTypes = Array.isArray(providerConfig.type)
+                            ? providerConfig.type
+                            : [providerConfig.type];
+
+                        // Supported types for this specific model
+                        let modelSpecificTypes: string[] | undefined = undefined;
+                        if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+                            modelSpecificTypes = providerConfig.models[target.model]?.access_via;
+                        }
+
+                        const availableTypes = modelSpecificTypes || providerTypes;
+                        return availableTypes.some(t => t.toLowerCase() === normalizedIncoming);
+                    });
+
+                    if (compatibleTargets.length > 0) {
+                        logger.info(`Router: 'api_match' priority active. Narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} API-compatible targets.`);
+                        healthyTargets = compatibleTargets;
+                    } else {
+                        logger.info(`Router: 'api_match' priority active, but no targets support '${incomingApiType}'. Falling back to all healthy targets.`);
+                    }
                 }
 
                 // Enrich targets with modelConfig for selectors that need pricing info
@@ -53,7 +89,8 @@ export class Router {
                     return { ...target, route: { modelConfig } };
                 });
 
-                const selector = SelectorFactory.getSelector(alias.selector);
+                const selectorStrategy = alias.selector || 'random'; // Default to random
+                const selector = SelectorFactory.getSelector(selectorStrategy);
                 const target = selector.select(enrichedTargets);
                 
                 if (!target) {
@@ -65,7 +102,7 @@ export class Router {
                     throw new Error(`Provider '${target.provider}' configured for alias '${modelName}' not found`);
                 }
                 
-                // logger.debug(`Routed '${modelName}' to '${target.provider}/${target.model}' using ${alias.selector || 'default'} selector`);
+                logger.info(`Router: Selected '${target.provider}/${target.model}' using strategy '${selectorStrategy}'.`);
                 
                 let modelConfig = undefined;
                 if (!Array.isArray(providerConfig.models) && providerConfig.models) {

@@ -47,12 +47,13 @@ const ModelProviderConfigSchema = z.object({
     input: 0,
     output: 0,
   }),
+  access_via: z.array(z.string()).optional(),
 });
 
 const ProviderConfigSchema = z.object({
-  type: z.string(),
+  type: z.union([z.string(), z.array(z.string())]),
   display_name: z.string().optional(),
-  api_base_url: z.string().url(),
+  api_base_url: z.union([z.string().url(), z.record(z.string())]),
   api_key: z.string().optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
@@ -70,6 +71,7 @@ const ModelTargetSchema = z.object({
 
 const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'cost', 'latency', 'usage', 'performance']).optional(),
+  priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
 });

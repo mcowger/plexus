@@ -31,6 +31,7 @@ Plexus unifies interactions with multiple AI providers—OpenAI, Anthropic, Gemi
   - **OpenRouter**: Automatic fetching of real-time pricing.
   - **Tiered**: Advanced volume-based pricing tiers.
 - **Pass-through Optimization**: Automatically detects when the incoming request format matches the target provider's native format, bypassing expensive transformations to minimize latency and overhead while maintaining full observability. Active passthrough requests are highlighted with a ⚡ icon in the dashboard logs.
+- **Adaptive API Matching**: For providers that support multiple protocols (e.g., both OpenAI and Anthropic formats), Plexus dynamically selects the best protocol for each model to minimize transformation overhead and improve reliability.
 - **Deep Debugging**: Easy-to-use raw request and response capture, with detailed information of raw and transformed responses, as well as stream reconstruction.
 
 ## Performance Metrics & Observability

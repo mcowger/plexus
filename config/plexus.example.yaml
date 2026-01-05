@@ -129,6 +129,24 @@ providers:
       - deepseek-chat
       - deepseek-reasoner
 
+  # Example of a multi-protocol provider
+  # This provider supports both OpenAI (chat) and Anthropic (messages) formats
+  synthetic:
+    type: ["chat", "messages"]
+    display_name: Synthetic Provider
+    # Map API types to specific base URLs
+    api_base_url:
+      chat: https://api.synthetic.new/openai/v1
+      messages: https://api.synthetic.new/messages/v1
+    api_key: "your-synthetic-key"
+    models:
+      # This model can be accessed via both formats
+      "hf:MiniMaxAI/MiniMax-M2.1":
+        access_via: ["chat", "messages"]
+      # This model only supports the messages format
+      "legacy-model":
+        access_via: ["messages"]
+
   # Example with custom headers and OpenRouter pricing lookup
   openrouter:
     type: chat
@@ -185,6 +203,9 @@ models:
   # Requests to 'balanced-model' will distribute randomly across these two targets
   balanced-model:
     selector: random
+    # Optional: prioritizing native API matching over the selector
+    # If a client sends an Anthropic request, Plexus will prefer the 'anthropic' provider
+    priority: api_match
     targets:
       - provider: openai
         model: gpt-4o

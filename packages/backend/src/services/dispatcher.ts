@@ -9,10 +9,39 @@ import { DebugManager } from "./debug-manager";
 export class Dispatcher {
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
     // 1. Route
-    const route = Router.resolve(request.model);
+    const route = Router.resolve(request.model, request.incomingApiType);
+
+    // Determine Target API Type
+    const providerTypes = Array.isArray(route.config.type)
+      ? route.config.type
+      : [route.config.type];
+
+    // Check if model specific access_via is defined
+    const modelSpecificTypes = route.modelConfig?.access_via;
+    
+    // The available types for this specific routing
+    const availableTypes = modelSpecificTypes || providerTypes;
+
+    let targetApiType = availableTypes[0]; // Default to first one
+    let selectionReason = "default (first available)";
+
+    // Try to match incoming
+    if (request.incomingApiType) {
+        const incoming = request.incomingApiType.toLowerCase();
+        // Case-insensitive match
+        const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
+        if (match) {
+            targetApiType = match;
+            selectionReason = `matched incoming request type '${incoming}'`;
+        } else {
+            selectionReason = `incoming type '${incoming}' not supported, defaulted to '${targetApiType}'`;
+        }
+    }
+    
+    logger.info(`Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`);
 
     // 2. Get Transformer
-    const transformer = TransformerFactory.getTransformer(route.config.type);
+    const transformer = TransformerFactory.getTransformer(targetApiType);
 
     // 3. Transform Request
     // Override model in request to the target model
@@ -21,19 +50,16 @@ export class Dispatcher {
     let providerPayload;
 
     // Pass-through Optimization
-    // request.incomingApiType is now 'chat', 'messages', or 'gemini'
-    // route.config.type is 'OpenAI', 'Anthropic', or 'Gemini'/'Google'
-
     const isCompatible =
       !!request.incomingApiType?.toLowerCase() &&
       request.incomingApiType?.toLowerCase() ===
-        route.config.type?.toLowerCase();
+        targetApiType.toLowerCase();
 
     let bypassTransformation = false;
 
     if (isCompatible && request.originalBody) {
       logger.info(
-        `Pass-through optimization active: ${request.incomingApiType} -> ${route.config.type}`
+        `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
       );
       providerPayload = JSON.parse(JSON.stringify(request.originalBody));
       providerPayload.model = route.model;
@@ -54,14 +80,52 @@ export class Dispatcher {
     }
 
     // 4. Execute Request
+    // Resolve base URL based on target API type
+    let rawBaseUrl: string;
+    
+    if (typeof route.config.api_base_url === 'string') {
+        rawBaseUrl = route.config.api_base_url;
+    } else {
+        // It's a record/map
+        const typeKey = targetApiType.toLowerCase();
+        // Check exact match first, then fallback to just looking for keys that might match?
+        // Actually the config keys should probably match the api types (chat, messages, etc)
+        const specificUrl = route.config.api_base_url[typeKey];
+        const defaultUrl = route.config.api_base_url['default'];
+        
+        if (specificUrl) {
+            rawBaseUrl = specificUrl;
+            logger.debug(`Dispatcher: Using specific base URL for '${targetApiType}'.`);
+        } else if (defaultUrl) {
+            rawBaseUrl = defaultUrl;
+            logger.debug(`Dispatcher: Using default base URL.`);
+        } else {
+             // If we can't find a specific URL for this type, and no default, fall back to the first one?
+             // Or throw error.
+             const firstKey = Object.keys(route.config.api_base_url)[0];
+             
+             if (firstKey) {
+                 const firstUrl = route.config.api_base_url[firstKey];
+                 if (firstUrl) {
+                    rawBaseUrl = firstUrl;
+                    logger.warn(`No specific base URL found for api type '${targetApiType}'. using '${firstKey}' as fallback.`);
+                 } else {
+                    throw new Error(`No base URL configured for api type '${targetApiType}' and no default found.`);
+                 }
+             } else {
+                 throw new Error(`No base URL configured for api type '${targetApiType}' and no default found.`);
+             }
+        }
+    }
+
     // Ensure api_base_url doesn't end with slash if endpoint starts with slash, or handle cleanly
-    const baseUrl = route.config.api_base_url.replace(/\/$/, "");
+    const baseUrl = rawBaseUrl.replace(/\/$/, "");
     const endpoint = transformer.getEndpoint
       ? transformer.getEndpoint(requestWithTargetModel)
       : transformer.defaultEndpoint;
     const url = `${baseUrl}${endpoint}`;
 
-    const headers = this.setupHeaders(route);
+    const headers = this.setupHeaders(route, targetApiType);
 
     const incomingApi = request.incomingApiType || "unknown";
 
@@ -103,7 +167,7 @@ export class Dispatcher {
         plexus: {
           provider: route.provider,
           model: route.model,
-          apiType: route.config.type,
+          apiType: targetApiType,
           pricing: route.modelConfig?.pricing,
           providerDiscount: route.config.discount,
           canonicalModel: route.canonicalModel,
@@ -139,7 +203,7 @@ export class Dispatcher {
       unifiedResponse.plexus = {
         provider: route.provider,
         model: route.model,
-        apiType: route.config.type,
+        apiType: targetApiType,
         pricing: route.modelConfig?.pricing,
         providerDiscount: route.config.discount,
         canonicalModel: route.canonicalModel,
@@ -148,12 +212,12 @@ export class Dispatcher {
       return unifiedResponse;
     }
   }
-  setupHeaders(route: RouteResult): Record<string, string> {
+  setupHeaders(route: RouteResult, apiType: string): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
     if (route.config.api_key) {
-      const type = route.config.type.toLowerCase();
+      const type = apiType.toLowerCase();
       if (type === "messages") {
         headers["x-api-key"] = route.config.api_key;
         headers["anthropic-version"] = "2023-06-01";
