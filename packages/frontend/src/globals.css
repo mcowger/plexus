@@ -2,7 +2,7 @@
 @source "../src/**/*.{tsx,ts,jsx,js}";
 
 @theme {
-  /* Colors */
+  /* Colors. */
   --color-bg-deep: #000000;
   --color-bg-surface: #0F172A;
   --color-bg-card: rgba(15, 23, 42, 0.8);
