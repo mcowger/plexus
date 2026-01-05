@@ -75,7 +75,7 @@ export class DebugManager {
         }
     }
 
-    addRawResponseSnapshot(requestId: string, payload: any) {
+    addReconstructedRawResponse(requestId: string, payload: any) {
         if (!this.enabled) return;
         const log = this.pendingLogs.get(requestId);
         if (log) {
