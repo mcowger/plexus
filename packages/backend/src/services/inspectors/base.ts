@@ -7,5 +7,5 @@ export abstract class BaseInspector {
         this.requestId = requestId;
     }
 
-    abstract createInspector(): PassThrough;
+    abstract createInspector(providerApiType: string): PassThrough;
 }
