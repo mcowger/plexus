@@ -41,7 +41,7 @@ export const Providers = () => {
     setFormData({
         id: provider.id,
         name: provider.name,
-        type: provider.type,
+        type: Array.isArray(provider.type) ? provider.type.join(', ') : provider.type,
         apiKey: provider.apiKey
     });
     setIsModalOpen(true);
@@ -144,7 +144,9 @@ export const Providers = () => {
                 <div className="quota-provider-info">
                     <div className="quota-name-group">
                         <span className="quota-name">{provider.name}</span>
-                        <span className="quota-window">{provider.type}</span>
+                        <span className="quota-window">
+                            {Array.isArray(provider.type) ? provider.type.join(', ') : provider.type}
+                        </span>
                     </div>
                 </div>
                  <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
