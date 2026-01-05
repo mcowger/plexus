@@ -8,6 +8,8 @@ export interface RouteResult {
     model: string;    // model slug for that provider
     config: ProviderConfig;      // ProviderConfig
     modelConfig?: any; // The specific model config within that provider
+    incomingModelAlias?: string; // The alias requested by the user
+    canonicalModel?: string; // The canonical alias key in config
 }
 
 export class Router {
@@ -15,7 +17,22 @@ export class Router {
         const config = getConfig();
         
         // 1. Check aliases
-        const alias = config.models?.[modelName];
+        let alias = config.models?.[modelName];
+        let canonicalModel = modelName;
+        
+        if (!alias) {
+             // Check additional aliases
+             if (config.models) {
+                 for (const [key, value] of Object.entries(config.models)) {
+                     if (value.additional_aliases?.includes(modelName)) {
+                         alias = value;
+                         canonicalModel = key;
+                         break;
+                     }
+                 }
+             }
+        }
+
         if (alias) {
             // Load balancing: pick target using selector
             const targets = alias.targets;
@@ -55,13 +72,15 @@ export class Router {
                     modelConfig = providerConfig.models[target.model];
                 }
 
-                logger.info(`Router resolving ${modelName}. Target provider: ${target.provider}, Target model: ${target.model}`);
+                logger.info(`Router resolving ${modelName} (canonical: ${canonicalModel}). Target provider: ${target.provider}, Target model: ${target.model}`);
 
                 return {
                     provider: target.provider,
                     model: target.model,
                     config: providerConfig,
-                    modelConfig
+                    modelConfig,
+                    incomingModelAlias: modelName,
+                    canonicalModel
                 };
             }
         }

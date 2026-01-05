@@ -9,7 +9,16 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
      */
     fastify.get('/v1/models', async (request, reply) => {
         const config = getConfig();
-        const models = Object.keys(config.models).map(id => ({
+        const modelIds = new Set<string>();
+
+        Object.entries(config.models).forEach(([id, modelConfig]) => {
+            modelIds.add(id);
+            if (modelConfig.additional_aliases) {
+                modelConfig.additional_aliases.forEach(alias => modelIds.add(alias));
+            }
+        });
+
+        const models = Array.from(modelIds).map(id => ({
             id,
             object: 'model',
             created: Math.floor(Date.now() / 1000),

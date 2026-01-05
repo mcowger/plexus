@@ -131,6 +131,9 @@ Pricing is defined under the `pricing` key for a specific model.
 This section defines the "virtual" models or aliases that clients will use when making requests to Plexus.
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
+- **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration.
+    - Example: `["gpt-4", "gpt-4-turbo"]`
+    - Useful for transparently upgrading models (e.g., routing `gpt-4` requests to `gpt-4o`) or supporting legacy client configurations without changing the client code.
 - **`selector`**: (Optional) The strategy to use for target selection when multiple targets are defined.
     - `random`: (Default) Randomly selects a healthy target.
     - `cost`: Selects the target with the lowest configured cost.

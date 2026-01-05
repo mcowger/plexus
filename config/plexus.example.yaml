@@ -159,6 +159,16 @@ models:
       - provider: anthropic
         model: claude-3-5-sonnet-latest
 
+  # Alias with additional aliases
+  # Requests to 'gpt-4' or 'gpt-4-turbo' will also route here
+  gpt-4-wrapper:
+    additional_aliases:
+      - gpt-4
+      - gpt-4-turbo
+    targets:
+      - provider: openai
+        model: gpt-4o
+
   # Alias routing to a Chat-compatible backend
   fast-model:
     targets:
