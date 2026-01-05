@@ -1,6 +1,7 @@
 name: Dev Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -9,6 +10,8 @@ on:
       - 'packages/**/*.tsx'
       - 'packages/**/*.lock'
       - 'packages/**/*.json'
+      - '*.yaml'
+      - '*.yml'
 
 jobs:
   test-and-release:
