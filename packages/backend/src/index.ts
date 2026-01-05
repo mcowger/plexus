@@ -104,9 +104,21 @@ fastify.get('/health', (request, reply) => reply.send('OK'));
 
 // Serve the production React build from packages/frontend/dist
 // This is used for dev as well.
+const staticRoot = path.join(process.cwd(), '../frontend/dist');
+logger.info(`Serving static files from: ${staticRoot} (CWD: ${process.cwd()})`);
+
 fastify.register(fastifyStatic, {
-    root: path.join(process.cwd(), '../frontend/dist'),
+    root: staticRoot,
     prefix: '/',
+    // Disable caching to ensure frontend updates are seen immediately
+    cacheControl: false,
+    etag: false, 
+    lastModified: false,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
 });
 
 // Single Page Application (SPA) Fallback
