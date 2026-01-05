@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
 import { handleResponse } from "../response-handler";
-import { Context } from "hono";
+import { FastifyReply } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -28,11 +28,11 @@ describe("handleResponse - Pricing Metadata", () => {
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
     };
 
-    const mockContext = {
-        json: mock((data) => data),
-        header: mock(),
-        newResponse: mock((body) => ({ body })),
-    } as unknown as Context;
+    const mockReply = {
+        send: mock(function(this: any, data) { return this; }),
+        header: mock(function(this: any) { return this; }),
+        code: mock(function(this: any) { return this; }),
+    } as unknown as FastifyReply;
 
     const baseUsage = {
         total_tokens: 200,
@@ -62,7 +62,7 @@ describe("handleResponse - Pricing Metadata", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-1" };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -104,7 +104,7 @@ describe("handleResponse - Pricing Metadata", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-2" };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,
@@ -124,7 +124,7 @@ describe("handleResponse - Pricing Metadata", () => {
             range: [
                 { lower_bound: 0, input_per_m: 1, output_per_m: 2 }
             ]
-        };
+        } as any;
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-defined",
@@ -146,7 +146,7 @@ describe("handleResponse - Pricing Metadata", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-3" };
 
         await handleResponse(
-            mockContext,
+            mockReply,
             unifiedResponse,
             mockTransformer,
             usageRecord,

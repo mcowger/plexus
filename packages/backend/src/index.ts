@@ -1,5 +1,7 @@
-import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 import { logger, logEmitter } from './utils/logger';
 import { loadConfig, getConfig, getConfigPath, validateConfig } from './config';
 import { Dispatcher } from './services/dispatcher';
@@ -13,20 +15,41 @@ import { CooldownManager } from './services/cooldown-manager';
 import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
 import { SelectorFactory } from './services/selectors/factory';
-import { customAuth } from './middleware/auth';
+import { requestLogger } from './middleware/log';
 
-const app = new Hono();
+/**
+ * Plexus Backend Server
+ * 
+ * Powered by Fastify and Bun.
+ * This server acts as a unified gateway for various LLM providers,
+ * handling request transformation, load balancing, and usage tracking.
+ */
+
+const fastify = Fastify({
+    logger: false // We use a custom winston-based logger
+});
+
+// --- Plugin Registration ---
+
+// Enable CORS for all origins to support dashboard and external client access
+fastify.register(cors, {
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'x-goog-api-key'],
+    exposedHeaders: ['Content-Type']
+});
+
+// --- Service Initialization ---
+
 const dispatcher = new Dispatcher();
 const usageStorage = new UsageStorageService();
 
-// Initialize CooldownManager with storage
+// Initialize singletons with storage dependencies
 CooldownManager.getInstance().setStorage(usageStorage);
-// Initialize DebugManager with storage
 DebugManager.getInstance().setStorage(usageStorage);
-// Initialize SelectorFactory with storage
 SelectorFactory.setUsageStorage(usageStorage);
 
-// Load config and pricing on startup
+// Bootstrap configuration and pricing data
 try {
     await loadConfig();
     await PricingManager.getInstance().loadPricing();
@@ -35,12 +58,49 @@ try {
     process.exit(1);
 }
 
-// Middleware for logging
-// Global Request Logger
-app.use('*', requestLogger);
+// --- Hooks & Global Logic ---
 
-// Models list endpoint (no auth required - matches OpenAI)
-app.get('/v1/models', (c) => {
+// Global Request Logger: Runs on every incoming request
+fastify.addHook('onRequest', requestLogger);
+
+/**
+ * Global Error Handler
+ * Normalizes errors into a consistent JSON format compatible with AI API standards.
+ * Prevents double-sending responses by checking reply.sent.
+ */
+fastify.setErrorHandler((error, request, reply) => {
+    if (reply.sent) {
+        logger.error('Error occurred after response was sent', error);
+        return;
+    }
+
+    logger.error('Unhandled Fastify Error', error);
+    
+    if (error.validation) {
+        return reply.code(400).send({
+            error: {
+                message: "Validation Error",
+                details: error.validation
+            }
+        });
+    }
+
+    reply.code(error.statusCode || 500).send({
+        error: {
+            message: error.message || "Internal Server Error",
+            type: "api_error"
+        }
+    });
+});
+
+// --- Routes: v1 (Inference API) ---
+
+/**
+ * GET /v1/models
+ * Returns a list of available model aliases configured in plexus.yaml.
+ * Matches the OpenAI models list format.
+ */
+fastify.get('/v1/models', async (request, reply) => {
     const config = getConfig();
     const models = Object.keys(config.models).map(id => ({
         id,
@@ -49,23 +109,25 @@ app.get('/v1/models', (c) => {
         owned_by: 'plexus'
     }));
     
-    return c.json({
+    return reply.send({
         object: 'list',
         data: models
     });
 });
-    
-// Auth Middleware
-app.use('/v1/*', customAuth);
 
-// OpenAI Compatible Endpoint
-app.post('/v1/chat/completions', async (c) => {
+/**
+ * POST /v1/chat/completions
+ * OpenAI Compatible Endpoint.
+ * Translates OpenAI format to internal Unified format, dispatches to target,
+ * and translates the response back to OpenAI format.
+ */
+fastify.post('/v1/chat/completions', async (request, reply) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
         requestId,
         date: new Date().toISOString(),
-        sourceIp: getClientIp(c),
+        sourceIp: getClientIp(request),
         incomingApiType: 'chat',
         startTime,
         isStreamed: false,
@@ -73,10 +135,9 @@ app.post('/v1/chat/completions', async (c) => {
     };
 
     try {
-        const body = await c.req.json();
+        const body = request.body as any;
         usageRecord.incomingModelAlias = body.model;
-        // API Key extraction (best effort placeholder)
-        const authHeader = c.req.header('Authorization');
+        const authHeader = request.headers.authorization;
         usageRecord.apiKey = authHeader ? authHeader.replace('Bearer ', '').substring(0, 8) + '...' : null;
 
         logger.silly('Incoming OpenAI Request', body);
@@ -86,12 +147,10 @@ app.post('/v1/chat/completions', async (c) => {
         unifiedRequest.originalBody = body;
         unifiedRequest.requestId = requestId;
         
-        //DebugManager.getInstance().startLog(requestId, body);
-
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
         return await handleResponse(
-            c,
+            reply,
             unifiedResponse,
             transformer,
             usageRecord,
@@ -106,18 +165,21 @@ app.post('/v1/chat/completions', async (c) => {
         usageStorage.saveError(requestId, e, { apiType: 'chat' });
 
         logger.error('Error processing OpenAI request', e);
-        return c.json({ error: { message: e.message, type: 'api_error' } }, 500);
+        return reply.code(500).send({ error: { message: e.message, type: 'api_error' } });
     }
 });
 
-// Anthropic Compatible Endpoint
-app.post('/v1/messages', async (c) => {
+/**
+ * POST /v1/messages
+ * Anthropic Compatible Endpoint.
+ */
+fastify.post('/v1/messages', async (request, reply) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
         requestId,
         date: new Date().toISOString(),
-        sourceIp: getClientIp(c),
+        sourceIp: getClientIp(request),
         incomingApiType: 'messages',
         startTime,
         isStreamed: false,
@@ -125,10 +187,9 @@ app.post('/v1/messages', async (c) => {
     };
 
     try {
-        const body = await c.req.json();
+        const body = request.body as any;
         usageRecord.incomingModelAlias = body.model;
-        // API Key extraction
-        const authHeader = c.req.header('x-api-key');
+        const authHeader = request.headers['x-api-key'] as string;
         usageRecord.apiKey = authHeader ? authHeader.substring(0, 8) + '...' : null;
 
         logger.silly('Incoming Anthropic Request', body);
@@ -143,7 +204,7 @@ app.post('/v1/messages', async (c) => {
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
         return await handleResponse(
-            c,
+            reply,
             unifiedResponse,
             transformer,
             usageRecord,
@@ -158,19 +219,22 @@ app.post('/v1/messages', async (c) => {
         usageStorage.saveError(requestId, e, { apiType: 'messages' });
 
         logger.error('Error processing Anthropic request', e);
-        // Anthropic error format
-        return c.json({ type: 'error', error: { type: 'api_error', message: e.message } }, 500);
+        return reply.code(500).send({ type: 'error', error: { type: 'api_error', message: e.message } });
     }
 });
 
-// Gemini Compatible Endpoint
-app.post('/v1beta/models/:modelWithAction', async (c) => {
+/**
+ * POST /v1beta/models/:modelWithAction
+ * Gemini Compatible Endpoint.
+ * Supports both unary and streamGenerateContent actions.
+ */
+fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
         requestId,
         date: new Date().toISOString(),
-        sourceIp: getClientIp(c),
+        sourceIp: getClientIp(request),
         incomingApiType: 'gemini',
         startTime,
         isStreamed: false,
@@ -178,14 +242,14 @@ app.post('/v1beta/models/:modelWithAction', async (c) => {
     };
 
     try {
-        const body = await c.req.json();
-        const modelWithAction = c.req.param('modelWithAction');
-        // Extract model from "model-name:action"
+        const body = request.body as any;
+        const params = request.params as any;
+        const modelWithAction = params.modelWithAction;
         const modelName = modelWithAction.split(':')[0];
         usageRecord.incomingModelAlias = modelName;
         
-        // API Key extraction
-        const apiKey = c.req.query('key') || c.req.header('x-goog-api-key');
+        const query = request.query as any;
+        const apiKey = query.key || request.headers['x-goog-api-key'];
         usageRecord.apiKey = apiKey ? apiKey.substring(0, 8) + '...' : null;
 
         logger.silly('Incoming Gemini Request', body);
@@ -197,7 +261,6 @@ app.post('/v1beta/models/:modelWithAction', async (c) => {
 
         DebugManager.getInstance().startLog(requestId, body);
         
-        // Check if streaming based on action
         if (modelWithAction.includes('streamGenerateContent')) {
             unifiedRequest.stream = true;
         }
@@ -205,7 +268,7 @@ app.post('/v1beta/models/:modelWithAction', async (c) => {
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
         return await handleResponse(
-            c,
+            reply,
             unifiedResponse,
             transformer,
             usageRecord,
@@ -220,80 +283,71 @@ app.post('/v1beta/models/:modelWithAction', async (c) => {
         usageStorage.saveError(requestId, e, { apiType: 'gemini' });
 
         logger.error('Error processing Gemini request', e);
-        // Gemini error format (simplified)
-        return c.json({ error: { message: e.message, code: 500, status: "INTERNAL" } }, 500);
+        return reply.code(500).send({ error: { message: e.message, code: 500, status: "INTERNAL" } });
     }
 });
 
-// Responses API (OpenAI Responses Style - Placeholder as per plan Step 3.1)
-app.post('/v1/responses', async (c) => {
-     // TODO: Implement Responses API transformation
-     // For now, treat same as Chat Completions?
-     return c.json({ error: "Not implemented" }, 501);
+// Responses API Placeholder
+fastify.post('/v1/responses', async (request, reply) => {
+     return reply.code(501).send({ error: "Not implemented" });
 });
 
-// Admin Auth Middleware
-app.use('/v0/*', async (c, next) => {
-    const config = getConfig();
-    const authHeader = c.req.header('x-admin-key');
+// --- Management API (v0) ---
 
-    // Secure comparison: Admin key MUST be present in config and match header
-    if (!config.adminKey || !authHeader || authHeader !== config.adminKey) {
-        return c.json({ error: { message: "Unauthorized", type: "auth_error" } }, 401);
-    }
-    await next();
-});
-
-// Management API
-app.get('/v0/management/config', async (c) => {
+fastify.get('/v0/management/config', async (request, reply) => {
     const configPath = getConfigPath();
     if (!configPath) {
-        return c.json({ error: "Configuration file path not found" }, 404);
+        return reply.code(404).send({ error: "Configuration file path not found" });
     }
     const file = Bun.file(configPath);
     if (!(await file.exists())) {
-        return c.json({ error: "Configuration file not found" }, 404);
+        return reply.code(404).send({ error: "Configuration file not found" });
     }
     const configContent = await file.text();
-    c.header('Content-Type', 'application/x-yaml');
-    return c.body(configContent);
+    reply.header('Content-Type', 'application/x-yaml');
+    return reply.send(configContent);
 });
 
-app.post('/v0/management/config', async (c) => {
+fastify.post('/v0/management/config', async (request, reply) => {
     const configPath = getConfigPath();
     if (!configPath) {
-         return c.json({ error: "Configuration path not determined" }, 500);
+         return reply.code(500).send({ error: "Configuration path not determined" });
     }
 
     try {
-        const body = await c.req.text();
-        
-        // Validate YAML
-        try {
-            validateConfig(body);
-        } catch (e) {
-            if (e instanceof z.ZodError) {
-                return c.json({ error: "Validation failed", details: e.errors }, 400);
-            }
-             return c.json({ error: "Invalid YAML or Schema", details: String(e) }, 400);
+        const body = request.body as string; 
+        let configStr = body;
+        if (typeof body !== 'string') {
+             configStr = JSON.stringify(body);
         }
 
-        // Write to file
-        await Bun.write(configPath, body);
-        logger.info(`Configuration updated via API at ${configPath}`);
+        try {
+            validateConfig(configStr);
+        } catch (e) {
+            if (e instanceof z.ZodError) {
+                return reply.code(400).send({ error: "Validation failed", details: e.errors });
+            }
+             return reply.code(400).send({ error: "Invalid YAML or Schema", details: String(e) });
+        }
 
-        // Force reload
+        await Bun.write(configPath, configStr);
+        logger.info(`Configuration updated via API at ${configPath}`);
         await loadConfig(configPath);
         
-        return c.body(body, 200, { 'Content-Type': 'application/x-yaml' });
+        return reply.code(200).header('Content-Type', 'application/x-yaml').send(configStr);
     } catch (e: any) {
         logger.error("Failed to update config", e);
-        return c.json({ error: e.message }, 500);
+        return reply.code(500).send({ error: e.message });
     }
 });
 
-app.get('/v0/management/usage', (c) => {
-    const query = c.req.query();
+// Support YAML and Plain Text payloads for management API
+fastify.addContentTypeParser(['text/plain', 'application/x-yaml', 'text/yaml'], { parseAs: 'string' }, (req, body, done) => {
+    done(null, body);
+});
+
+fastify.get('/v0/management/usage', (request, reply) => {
+    const query = request.query as any;
     const limit = parseInt(query.limit || '50');
     const offset = parseInt(query.offset || '0');
 
@@ -313,14 +367,15 @@ app.get('/v0/management/usage', (c) => {
 
     try {
         const result = usageStorage.getUsage(filters, { limit, offset });
-        return c.json(result);
+        return reply.send(result);
     } catch (e: any) {
-        return c.json({ error: e.message }, 500);
+        return reply.code(500).send({ error: e.message });
     }
 });
 
-app.delete('/v0/management/usage', (c) => {
-    const olderThanDays = c.req.query('olderThanDays');
+fastify.delete('/v0/management/usage', (request, reply) => {
+    const query = request.query as any;
+    const olderThanDays = query.olderThanDays;
     let beforeDate: Date | undefined;
 
     if (olderThanDays) {
@@ -332,19 +387,43 @@ app.delete('/v0/management/usage', (c) => {
     }
 
     const success = usageStorage.deleteAllUsageLogs(beforeDate);
-    if (!success) return c.json({ error: "Failed to delete usage logs" }, 500);
-    return c.json({ success: true });
+    if (!success) return reply.code(500).send({ error: "Failed to delete usage logs" });
+    return reply.send({ success: true });
 });
 
-app.delete('/v0/management/usage/:requestId', (c) => {
-    const requestId = c.req.param('requestId');
+fastify.delete('/v0/management/usage/:requestId', (request, reply) => {
+    const params = request.params as any;
+    const requestId = params.requestId;
     const success = usageStorage.deleteUsageLog(requestId);
-    if (!success) return c.json({ error: "Usage log not found or could not be deleted" }, 404);
-    return c.json({ success: true });
+    if (!success) return reply.code(404).send({ error: "Usage log not found or could not be deleted" });
+    return reply.send({ success: true });
 });
 
-app.get('/v0/management/events', async (c) => {
-    return streamSSE(c, async (stream) => {
+/**
+ * handleSSE Helper
+ * Standardizes the creation of Server-Sent Events streams for management dashboards.
+ */
+const handleSSE = async (reply: FastifyReply, setup: (stream: { writeSSE: (msg: any) => Promise<void>, sleep: (ms: number) => Promise<void> }) => Promise<void>) => {
+    reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
+
+    const stream = {
+        writeSSE: async (msg: any) => {
+            if (reply.raw.destroyed) return;
+            reply.raw.write(`event: ${msg.event}\ndata: ${msg.data}\nid: ${msg.id}\n\n`);
+        },
+        sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    };
+
+    await setup(stream);
+};
+
+fastify.get('/v0/management/events', async (request, reply) => {
+    return handleSSE(reply, async (stream) => {
         const listener = async (record: any) => {
             await stream.writeSSE({
                 data: JSON.stringify(record),
@@ -355,110 +434,114 @@ app.get('/v0/management/events', async (c) => {
 
         usageStorage.on('created', listener);
 
-        stream.onAbort(() => {
+        request.raw.on('close', () => {
             usageStorage.off('created', listener);
         });
 
-        while (true) {
+        // Keep connection alive with periodic pings
+        while (!request.raw.destroyed) {
             await stream.sleep(10000);
             await stream.writeSSE({
                 event: 'ping',
-                data: 'pong'
+                data: 'pong',
+                id: String(Date.now())
             });
         }
     });
 });
 
-app.get('/v0/management/cooldowns', (c) => {
+fastify.get('/v0/management/cooldowns', (request, reply) => {
     const cooldowns = CooldownManager.getInstance().getCooldowns();
-    return c.json(cooldowns);
+    return reply.send(cooldowns);
 });
 
-app.delete('/v0/management/cooldowns', (c) => {
+fastify.delete('/v0/management/cooldowns', (request, reply) => {
     CooldownManager.getInstance().clearCooldown();
-    return c.json({ success: true });
+    return reply.send({ success: true });
 });
 
-app.delete('/v0/management/cooldowns/:provider', (c) => {
-    const provider = c.req.param('provider');
+fastify.delete('/v0/management/cooldowns/:provider', (request, reply) => {
+    const params = request.params as any;
+    const provider = params.provider;
     CooldownManager.getInstance().clearCooldown(provider);
-    return c.json({ success: true });
+    return reply.send({ success: true });
 });
 
-// Debug API
-
-// Performance Metrics API
-app.get('/v0/management/performance', (c) => {
-    const provider = c.req.query('provider');
-    const model = c.req.query('model');
+fastify.get('/v0/management/performance', (request, reply) => {
+    const query = request.query as any;
+    const provider = query.provider;
+    const model = query.model;
     
     const performance = usageStorage.getProviderPerformance(provider, model);
-    return c.json(performance);
+    return reply.send(performance);
 });
 
 
-app.get('/v0/management/debug', (c) => {
-    return c.json({ enabled: DebugManager.getInstance().isEnabled() });
+fastify.get('/v0/management/debug', (request, reply) => {
+    return reply.send({ enabled: DebugManager.getInstance().isEnabled() });
 });
 
-app.post('/v0/management/debug', async (c) => {
-    const body = await c.req.json();
+fastify.post('/v0/management/debug', async (request, reply) => {
+    const body = request.body as any;
     if (typeof body.enabled === 'boolean') {
         DebugManager.getInstance().setEnabled(body.enabled);
-        return c.json({ enabled: DebugManager.getInstance().isEnabled() });
+        return reply.send({ enabled: DebugManager.getInstance().isEnabled() });
     }
-    return c.json({ error: "Invalid body. Expected { enabled: boolean }" }, 400);
+    return reply.code(400).send({ error: "Invalid body. Expected { enabled: boolean }" });
 });
 
-app.get('/v0/management/debug/logs', (c) => {
-    const limit = parseInt(c.req.query('limit') || '50');
-    const offset = parseInt(c.req.query('offset') || '0');
-    return c.json(usageStorage.getDebugLogs(limit, offset));
+fastify.get('/v0/management/debug/logs', (request, reply) => {
+    const query = request.query as any;
+    const limit = parseInt(query.limit || '50');
+    const offset = parseInt(query.offset || '0');
+    return reply.send(usageStorage.getDebugLogs(limit, offset));
 });
 
-app.delete('/v0/management/debug/logs', (c) => {
+fastify.delete('/v0/management/debug/logs', (request, reply) => {
     const success = usageStorage.deleteAllDebugLogs();
-    if (!success) return c.json({ error: "Failed to delete logs" }, 500);
-    return c.json({ success: true });
+    if (!success) return reply.code(500).send({ error: "Failed to delete logs" });
+    return reply.send({ success: true });
 });
 
-app.get('/v0/management/debug/logs/:requestId', (c) => {
-    const requestId = c.req.param('requestId');
+fastify.get('/v0/management/debug/logs/:requestId', (request, reply) => {
+    const params = request.params as any;
+    const requestId = params.requestId;
     const log = usageStorage.getDebugLog(requestId);
-    if (!log) return c.json({ error: "Log not found" }, 404);
-    return c.json(log);
+    if (!log) return reply.code(404).send({ error: "Log not found" });
+    return reply.send(log);
 });
 
-app.delete('/v0/management/debug/logs/:requestId', (c) => {
-    const requestId = c.req.param('requestId');
+fastify.delete('/v0/management/debug/logs/:requestId', (request, reply) => {
+    const params = request.params as any;
+    const requestId = params.requestId;
     const success = usageStorage.deleteDebugLog(requestId);
-    if (!success) return c.json({ error: "Log not found or could not be deleted" }, 404);
-    return c.json({ success: true });
+    if (!success) return reply.code(404).send({ error: "Log not found or could not be deleted" });
+    return reply.send({ success: true });
 });
 
-// Error Logs API
-app.get('/v0/management/errors', (c) => {
-    const limit = parseInt(c.req.query('limit') || '50');
-    const offset = parseInt(c.req.query('offset') || '0');
-    return c.json(usageStorage.getErrors(limit, offset));
+fastify.get('/v0/management/errors', (request, reply) => {
+    const query = request.query as any;
+    const limit = parseInt(query.limit || '50');
+    const offset = parseInt(query.offset || '0');
+    return reply.send(usageStorage.getErrors(limit, offset));
 });
 
-app.delete('/v0/management/errors', (c) => {
+fastify.delete('/v0/management/errors', (request, reply) => {
     const success = usageStorage.deleteAllErrors();
-    if (!success) return c.json({ error: "Failed to delete error logs" }, 500);
-    return c.json({ success: true });
+    if (!success) return reply.code(500).send({ error: "Failed to delete error logs" });
+    return reply.send({ success: true });
 });
 
-app.delete('/v0/management/errors/:requestId', (c) => {
-    const requestId = c.req.param('requestId');
+fastify.delete('/v0/management/errors/:requestId', (request, reply) => {
+    const params = request.params as any;
+    const requestId = params.requestId;
     const success = usageStorage.deleteError(requestId);
-    if (!success) return c.json({ error: "Error log not found or could not be deleted" }, 404);
-    return c.json({ success: true });
+    if (!success) return reply.code(404).send({ error: "Error log not found or could not be deleted" });
+    return reply.send({ success: true });
 });
 
-// System Logs Stream
-app.get('/v0/system/logs/stream', async (c) => {
-    return streamSSE(c, async (stream) => {
+fastify.get('/v0/system/logs/stream', async (request, reply) => {
+    return handleSSE(reply, async (stream) => {
         const listener = async (log: any) => {
             await stream.writeSSE({
                 data: JSON.stringify(log),
@@ -469,34 +552,63 @@ app.get('/v0/system/logs/stream', async (c) => {
 
         logEmitter.on('log', listener);
 
-        stream.onAbort(() => {
+        request.raw.on('close', () => {
             logEmitter.off('log', listener);
         });
 
-        // Keep connection alive
-        while (true) {
+        while (!request.raw.destroyed) {
             await stream.sleep(10000);
             await stream.writeSSE({
                 event: 'ping',
-                data: 'pong'
+                data: 'pong',
+                id: String(Date.now())
             });
         }
     });
 });
 
-// Health check
-app.get('/health', (c) => c.text('OK'));
+// Health check endpoint for container orchestration
+fastify.get('/health', (request, reply) => reply.send('OK'));
 
-import { serveStatic } from 'hono/bun';
-import { requestLogger } from './middleware/log';
+// --- Static File Serving ---
 
-app.use('/*', serveStatic({ root: '../frontend/dist' }));
-app.get('*', serveStatic({ path: '../frontend/dist/index.html' }));
+// Serve the production React build from packages/frontend/dist
+fastify.register(fastifyStatic, {
+    root: path.join(process.cwd(), '../frontend/dist'),
+    prefix: '/',
+    wildcard: false 
+});
+
+// Single Page Application (SPA) Fallback
+// Redirects all non-API routes to index.html so React Router can take over
+fastify.setNotFoundHandler((request, reply) => {
+    if (request.url.startsWith('/v1') || request.url.startsWith('/v0')) {
+        reply.code(404).send({ error: "Not Found" });
+    } else {
+        reply.sendFile('index.html');
+    }
+});
 
 const port = parseInt(process.env.PORT || '4000');
-logger.info(`Server starting on port ${port}`);
+const host = '0.0.0.0';
+
+/**
+ * start
+ * Asynchronously starts the Fastify server.
+ */
+const start = async () => {
+    try {
+        await fastify.listen({ port, host });
+        logger.info(`Server starting on port ${port}`);
+    } catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+};
+
+start();
 
 export default {
     port,
-    fetch: app.fetch
+    server: fastify
 }
