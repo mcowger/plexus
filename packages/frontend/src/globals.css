@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@source "./**/*.tsx";
+@source "../src/**/*.{tsx,ts,jsx,js}";
 
 @theme {
   /* Colors */
@@ -59,35 +59,44 @@
   *,
   *::before,
   *::after {
-    @apply m-0 p-0 box-border;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
 
   body {
     font-family: var(--font-body);
-    @apply text-sm leading-normal bg-bg-deep text-text antialiased;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    background-color: var(--color-bg-deep);
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Scrollbar */
   ::-webkit-scrollbar {
-    @apply w-1.5 h-1.5;
+    width: 0.375rem;
+    height: 0.375rem;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-bg-surface;
+    background-color: var(--color-bg-surface);
   }
 
   ::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, var(--color-primary), var(--color-secondary));
-    @apply rounded-[3px];
+    border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-primary;
+    background-color: var(--color-primary);
   }
 
   /* Selection */
   ::selection {
-    @apply bg-primary text-black;
+    background-color: var(--color-primary);
+    color: #000000;
   }
 }
 

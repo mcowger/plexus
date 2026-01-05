@@ -6,9 +6,9 @@ import { spawn } from "child_process";
 
 const buildCSS = async () => {
   console.log("Building CSS...");
-  const proc = spawn("bun", ["x", "tailwindcss", "-i", "globals.css", "-o", "../dist/main.css"], {
+  const proc = spawn("bun", ["x", "@tailwindcss/cli", "-i", "./src/globals.css", "-o", "./dist/main.css"], {
     stdio: "inherit",
-    cwd: "./src",
+    cwd: ".",
   });
 
   return new Promise<void>((resolve, reject) => {
