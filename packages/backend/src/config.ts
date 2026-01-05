@@ -214,6 +214,5 @@ export function getConfigPath(): string | null {
 }
 
 export function setConfigForTesting(config: PlexusConfig) {
-    console.log("setConfigForTesting called with keys:", Object.keys(config.providers));
     currentConfig = config;
 }

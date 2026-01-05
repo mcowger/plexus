@@ -349,6 +349,8 @@ export class AnthropicTransformer implements Transformer {
           parser = createParser({
               onEvent: (event: EventSourceMessage) => {
                   if (event.data === '[DONE]') return;
+
+
                   try {
                       const data = JSON.parse(event.data);
                       let unifiedChunk: any = null;
@@ -443,8 +445,10 @@ export class AnthropicTransformer implements Transformer {
                       }
 
                       if (unifiedChunk) {
+                          logger.silly(`Anthropic Transformer: Enqueueing unified chunk`, unifiedChunk);
                           controller.enqueue(unifiedChunk);
                       }
+
                   } catch (e) {
                       logger.error("Error parsing Anthropic stream chunk", e);
                   }

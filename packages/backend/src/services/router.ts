@@ -1,3 +1,4 @@
+import { logger } from 'src/utils/logger';
 import { getConfig, ProviderConfig } from '../config';
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
@@ -54,7 +55,7 @@ export class Router {
                     modelConfig = providerConfig.models[target.model];
                 }
 
-                console.log(`Router resolving ${modelName}. Target provider: ${target.provider}, Target model: ${target.model}`);
+                logger.info(`Router resolving ${modelName}. Target provider: ${target.provider}, Target model: ${target.model}`);
 
                 return {
                     provider: target.provider,

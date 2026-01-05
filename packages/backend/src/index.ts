@@ -606,9 +606,13 @@ const start = async () => {
     }
 };
 
-start();
+// Only start the server if this file is being executed directly by Bun
+if (import.meta.main) {
+    start();
+}
 
 export default {
     port,
     server: fastify
 }
+

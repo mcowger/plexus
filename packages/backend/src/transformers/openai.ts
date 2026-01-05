@@ -3,21 +3,15 @@ import { UnifiedChatRequest, UnifiedChatResponse } from '../types/unified';
 import { extractOpenAIUsage } from './usage-extractors';
 import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
+import { logger } from '../utils/logger';
 
 /**
  * OpenAITransformer
- * 
- * Handles transformation between OpenAI Chat Completions API and the internal Unified format.
- * Used for OpenAI, OpenRouter, DeepSeek, and other OpenAI-compatible providers.
  */
 export class OpenAITransformer implements Transformer {
   name = 'chat';
   defaultEndpoint = '/chat/completions';
 
-  /**
-   * parseRequest (Client -> Unified)
-   * Converts an incoming OpenAI-style request body into our internal UnifiedChatRequest.
-   */
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
     return {
         messages: input.messages,
@@ -31,10 +25,6 @@ export class OpenAITransformer implements Transformer {
     };
   }
 
-  /**
-   * transformRequest (Unified -> Provider)
-   * Converts our internal UnifiedChatRequest into an OpenAI-style body for the upstream provider.
-   */
   async transformRequest(request: UnifiedChatRequest): Promise<any> {
     return {
         model: request.model,
@@ -47,10 +37,6 @@ export class OpenAITransformer implements Transformer {
     };
   }
 
-  /**
-   * transformResponse (Provider -> Unified)
-   * Converts a successful OpenAI unary response into our internal UnifiedChatResponse.
-   */
   async transformResponse(response: any): Promise<UnifiedChatResponse> {
     const choice = response.choices?.[0];
     const message = choice?.message;
@@ -75,10 +61,6 @@ export class OpenAITransformer implements Transformer {
     };
   }
 
-  /**
-   * formatResponse (Unified -> Client)
-   * Formats our internal UnifiedChatResponse back into the standard OpenAI response format for the client.
-   */
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
     return {
         id: response.id,
@@ -107,25 +89,18 @@ export class OpenAITransformer implements Transformer {
     };
   }
 
-  /**
-   * transformStream (Provider Stream -> Unified Stream)
-   * Uses eventsource-parser to robustly handle incoming SSE chunks from the provider.
-   * This solves fragmentation issues where JSON chunks are split across network packets.
-   */
   transformStream(stream: ReadableStream): ReadableStream {
     const decoder = new TextDecoder();
-    let parser: any;
     
-    const transformer = new TransformStream({
-        start(controller) {
-            // Initialize the SSE parser
-            parser = createParser({
+    return new ReadableStream({
+        async start(controller) {
+            const parser = createParser({
                 onEvent: (event: EventSourceMessage) => {
-                    // Standard OpenAI terminator
                     if (event.data === '[DONE]') return;
                     
                     try {
                         const data = JSON.parse(event.data);
+
                         const choice = data.choices?.[0];
                         
                         const usage = data.usage ? {
@@ -147,80 +122,84 @@ export class OpenAITransformer implements Transformer {
                                 reasoning_content: choice?.delta?.reasoning_content,
                                 tool_calls: choice?.delta?.tool_calls
                             },
-                            finish_reason: choice?.finish_reason,
+                            finish_reason: choice?.finish_reason || data.finish_reason || (choice?.delta ? null : 'stop'),
                             usage
                         };
+                        
                         controller.enqueue(unifiedChunk);
                     } catch (e) {
-                        // Incomplete or malformed JSON chunks are ignored by the parser
-                        // until a complete event is buffered.
+                        // ignore
                     }
                 }
             });
-        },
-        transform(chunk, controller) {
-            // Feed raw chunks into the parser
-            const text = typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
-            parser.feed(text);
+
+
+            const reader = stream.getReader();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    parser.feed(decoder.decode(value, { stream: true }));
+                }
+            } finally {
+                reader.releaseLock();
+                controller.close();
+            }
         }
     });
-    
-    return stream.pipeThrough(transformer);
   }
 
-  /**
-   * formatStream (Unified Stream -> Client Stream)
-   * Uses eventsource-encoder to properly format our unified chunks as valid SSE for the client.
-   */
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
-    
-    const transformer = new TransformStream({
-        transform(unifiedChunk: any, controller) {
-            const openAIChunk = {
-                id: unifiedChunk.id || 'chatcmpl-' + Date.now(),
-                object: 'chat.completion.chunk',
-                created: unifiedChunk.created || Math.floor(Date.now() / 1000),
-                model: unifiedChunk.model,
-                choices: [
-                    {
-                        index: 0,
-                        delta: unifiedChunk.delta,
-                        finish_reason: unifiedChunk.finish_reason || null
-                    }
-                ],
-                usage: unifiedChunk.usage ? {
-                    prompt_tokens: unifiedChunk.usage.input_tokens,
-                    completion_tokens: unifiedChunk.usage.output_tokens,
-                    total_tokens: unifiedChunk.usage.total_tokens,
-                    prompt_tokens_details: {
-                        cached_tokens: unifiedChunk.usage.cached_tokens
-                    },
-                    completion_tokens_details: {
-                        reasoning_tokens: unifiedChunk.usage.reasoning_tokens
-                    }
-                } : undefined
-            };
+    const reader = stream.getReader();
 
-            // Use eventsource-encoder to ensure proper SSE data: prefix and newlines
-            const sseMessage = encode({ 
-                data: JSON.stringify(openAIChunk) 
-            });
-            controller.enqueue(encoder.encode(sseMessage));
-        },
-        flush(controller) {
-            // Send final termination signal
-            controller.enqueue(encoder.encode(encode({ data: '[DONE]' })));
+    return new ReadableStream({
+        async start(controller) {
+            try {
+                while (true) {
+                    const { done, value: unifiedChunk } = await reader.read();
+                    if (done) {
+                        controller.enqueue(encoder.encode(encode({ data: '[DONE]' })));
+                        break;
+                    }
+
+                    const openAIChunk = {
+
+                        id: unifiedChunk.id || 'chatcmpl-' + Date.now(),
+                        object: 'chat.completion.chunk',
+                        created: unifiedChunk.created || Math.floor(Date.now() / 1000),
+                        model: unifiedChunk.model,
+                        choices: [
+                            {
+                                index: 0,
+                                delta: unifiedChunk.delta,
+                                finish_reason: unifiedChunk.finish_reason || null
+                            }
+                        ],
+                        usage: unifiedChunk.usage ? {
+                            prompt_tokens: unifiedChunk.usage.input_tokens,
+                            completion_tokens: unifiedChunk.usage.output_tokens,
+                            total_tokens: unifiedChunk.usage.total_tokens,
+                            prompt_tokens_details: {
+                                cached_tokens: unifiedChunk.usage.cached_tokens
+                            },
+                            completion_tokens_details: {
+                                reasoning_tokens: unifiedChunk.usage.reasoning_tokens
+                            }
+                        } : undefined
+                    };
+
+                    const sseMessage = encode({ data: JSON.stringify(openAIChunk) });
+                    controller.enqueue(encoder.encode(sseMessage));
+                }
+            } finally {
+                reader.releaseLock();
+                controller.close();
+            }
         }
     });
-    
-    return stream.pipeThrough(transformer);
   }
 
-  /**
-   * extractUsage
-   * Legacy utility for extracting usage from raw strings.
-   */
   extractUsage(input: string) {
     return extractOpenAIUsage(input);
   }

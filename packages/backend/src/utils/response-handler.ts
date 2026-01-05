@@ -5,6 +5,7 @@ import { UsageRecord } from "../types/usage";
 import { UsageStorageService } from "../services/usage-storage";
 import { logger } from "./logger";
 import { calculateCosts } from "./calculate-costs";
+import { TransformerFactory } from "../services/transformer-factory";
 
 /**
  * handleResponse
@@ -17,7 +18,7 @@ import { calculateCosts } from "./calculate-costs";
 export async function handleResponse(
   reply: FastifyReply,
   unifiedResponse: UnifiedChatResponse,
-  transformer: Transformer,
+  clientTransformer: Transformer,
   usageRecord: Partial<UsageRecord>,
   usageStorage: UsageStorageService,
   startTime: number,
@@ -45,17 +46,32 @@ export async function handleResponse(
     } else {
       /**
        * Transformation Pipeline:
-       * 1. transformStream: Provider SSE -> Unified internal chunks
-       * 2. formatStream: Unified internal chunks -> Client SSE format
+       * 1. providerTransformer.transformStream: Provider SSE (e.g. OpenAI) -> Unified internal chunks
+       * 2. clientTransformer.formatStream: Unified internal chunks -> Client SSE format (e.g. Anthropic)
        */
-      const unifiedStream = transformer.transformStream
-        ? transformer.transformStream(unifiedResponse.stream)
-        : unifiedResponse.stream;
       
-      finalClientStream = transformer.formatStream
-        ? transformer.formatStream(unifiedStream)
+      // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
+      let providerApiType = (unifiedResponse.plexus?.apiType || "chat").toLowerCase();
+      if (providerApiType === 'openai') providerApiType = 'chat';
+      if (providerApiType === 'anthropic') providerApiType = 'messages';
+      if (providerApiType === 'google') providerApiType = 'gemini';
+
+      // Get the transformer for the outgoing provider's format
+      const providerTransformer = TransformerFactory.getTransformer(providerApiType);
+
+      // Step 1: Raw Provider SSE -> Unified internal objects
+      const unifiedStream = providerTransformer.transformStream
+        ? providerTransformer.transformStream(unifiedResponse.stream)
+        : unifiedResponse.stream;
+
+
+      
+      // Step 2: Unified internal objects -> Client SSE format
+      finalClientStream = clientTransformer.formatStream
+        ? clientTransformer.formatStream(unifiedStream)
         : unifiedStream;
     }
+
 
     // Standard SSE headers to prevent buffering and timeouts
     reply.header("Content-Type", "text/event-stream");
@@ -80,7 +96,7 @@ export async function handleResponse(
       responseBody = unifiedResponse.rawResponse;
     } else {
       // Re-format the unified JSON body to match the client's expected API format
-      responseBody = await transformer.formatResponse(unifiedResponse);
+      responseBody = await clientTransformer.formatResponse(unifiedResponse);
     }
 
     // Capture token usage if available in the response

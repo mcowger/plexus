@@ -374,7 +374,7 @@ export class GeminiTransformer implements Transformer {
 
                       for (const part of parts) {
                           if (part.text) {
-                              controller.enqueue({
+                              const chunk = {
                                   id: data.responseId,
                                   model: data.modelVersion,
                                   delta: {
@@ -382,10 +382,12 @@ export class GeminiTransformer implements Transformer {
                                       reasoning_content: part.thought ? part.text : undefined,
                                       content: part.thought ? undefined : part.text,
                                   },
-                              });
+                              };
+                              logger.silly(`Gemini Transformer: Enqueueing unified chunk (text)`, chunk);
+                              controller.enqueue(chunk);
                           }
                           if (part.functionCall) {
-                              controller.enqueue({
+                              const chunk = {
                                   id: data.responseId,
                                   model: data.modelVersion,
                                   delta: {
@@ -396,12 +398,14 @@ export class GeminiTransformer implements Transformer {
                                           function: { name: part.functionCall.name, arguments: JSON.stringify(part.functionCall.args) },
                                       }],
                                   },
-                              });
+                              };
+                              logger.silly(`Gemini Transformer: Enqueueing unified chunk (tool)`, chunk);
+                              controller.enqueue(chunk);
                           }
                       }
 
                       if (candidate.finishReason) {
-                          controller.enqueue({
+                          const chunk = {
                               id: data.responseId,
                               model: data.modelVersion,
                               finish_reason: candidate.finishReason.toLowerCase(),
@@ -412,8 +416,11 @@ export class GeminiTransformer implements Transformer {
                                   reasoning_tokens: data.usageMetadata.thoughtsTokenCount,
                                   cached_tokens: data.usageMetadata.cachedContentTokenCount,
                               } : undefined,
-                          });
+                          };
+                          logger.silly(`Gemini Transformer: Enqueueing unified chunk (finish)`, chunk);
+                          controller.enqueue(chunk);
                       }
+
                   } catch (e) {
                       logger.error("Error parsing Gemini stream chunk", e);
                   }
