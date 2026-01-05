@@ -90,6 +90,7 @@ export class UsageStorageService extends EventEmitter {
                     incoming_api_type TEXT,
                     provider TEXT,
                     incoming_model_alias TEXT,
+                    canonical_model_name TEXT,
                     selected_model_name TEXT,
                     outgoing_api_type TEXT,
                     tokens_input INTEGER,
@@ -177,6 +178,9 @@ export class UsageStorageService extends EventEmitter {
             try {
                 this.db.run("ALTER TABLE request_usage ADD COLUMN tokens_per_sec REAL;");
             } catch (e) { /* ignore if exists */ }
+            try {
+                this.db.run("ALTER TABLE request_usage ADD COLUMN canonical_model_name TEXT;");
+            } catch (e) { /* ignore if exists */ }
 
             // Provider Performance Table - stores last 10 request latencies and throughput
             this.db.run(`
@@ -210,14 +214,14 @@ export class UsageStorageService extends EventEmitter {
             const query = this.db.prepare(`
                 INSERT INTO request_usage (
                     request_id, date, source_ip, api_key, incoming_api_type,
-                    provider, incoming_model_alias, selected_model_name, outgoing_api_type,
+                    provider, incoming_model_alias, canonical_model_name, selected_model_name, outgoing_api_type,
                     tokens_input, tokens_output, tokens_reasoning, tokens_cached,
                     cost_input, cost_output, cost_cached, cost_total, cost_source, cost_metadata,
                     start_time, duration_ms, is_streamed, response_status, is_passthrough,
                     ttft_ms, tokens_per_sec
                 ) VALUES (
                     $requestId, $date, $sourceIp, $apiKey, $incomingApiType,
-                    $provider, $incomingModelAlias, $selectedModelName, $outgoingApiType,
+                    $provider, $incomingModelAlias, $canonicalModelName, $selectedModelName, $outgoingApiType,
                     $tokensInput, $tokensOutput, $tokensReasoning, $tokensCached,
                     $costInput, $costOutput, $costCached, $costTotal, $costSource, $costMetadata,
                     $startTime, $durationMs, $isStreamed, $responseStatus, $isPassthrough,
@@ -233,6 +237,7 @@ export class UsageStorageService extends EventEmitter {
                 $incomingApiType: record.incomingApiType,
                 $provider: record.provider,
                 $incomingModelAlias: record.incomingModelAlias,
+                $canonicalModelName: record.canonicalModelName,
                 $selectedModelName: record.selectedModelName,
                 $outgoingApiType: record.outgoingApiType,
                 $tokensInput: record.tokensInput,
@@ -503,6 +508,7 @@ export class UsageStorageService extends EventEmitter {
                 incomingApiType: row.incoming_api_type,
                 provider: row.provider,
                 incomingModelAlias: row.incoming_model_alias,
+                canonicalModelName: row.canonical_model_name,
                 selectedModelName: row.selected_model_name,
                 outgoingApiType: row.outgoing_api_type,
                 tokensInput: row.tokens_input,

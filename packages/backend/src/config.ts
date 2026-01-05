@@ -71,6 +71,7 @@ const ModelTargetSchema = z.object({
 const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'cost', 'latency', 'usage', 'performance']).optional(),
   targets: z.array(ModelTargetSchema),
+  additional_aliases: z.array(z.string()).optional(),
 });
 
 const KeyConfigSchema = z.object({
@@ -114,7 +115,11 @@ function logConfigStats(config: PlexusConfig) {
     logger.info(`Loaded ${aliasCount} Model Aliases:`);
     Object.entries(config.models).forEach(([name, alias]) => {
       const targetCount = alias.targets.length;
-      logger.info(`  - ${name}: ${targetCount} targets`);
+      let msg = `  - ${name}: ${targetCount} targets`;
+      if (alias.additional_aliases && alias.additional_aliases.length > 0) {
+        msg += ` (aliases: ${alias.additional_aliases.join(', ')})`;
+      }
+      logger.info(msg);
     });
 
     if (config.keys) {

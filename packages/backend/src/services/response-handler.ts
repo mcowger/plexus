@@ -32,6 +32,7 @@ export async function handleResponse(
   usageRecord.selectedModelName =
     unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
   usageRecord.provider = unifiedResponse.plexus?.provider || "unknown";
+  usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel || null;
 
   let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
   usageRecord.outgoingApiType = outgoingApiType?.toLocaleLowerCase();
@@ -83,7 +84,20 @@ export async function handleResponse(
      * Instead, we use PassThrough streams ('inspectors') to 'tap' into the data.
      */
     const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!).createInspector(providerApiType);
-    const usageInspector = new UsageInspector(usageRecord.requestId!).createInspector();
+    
+    // Determine the format of the stream flowing through the inspectors
+    // If bypassTransformation is true, it's the provider's format.
+    // Otherwise, it's the client's requested format.
+    const streamApiType = unifiedResponse.bypassTransformation ? providerApiType : apiType;
+
+    const usageInspector = new UsageInspector(
+      usageRecord.requestId!,
+      usageStorage,
+      usageRecord,
+      pricing,
+      providerDiscount,
+      startTime
+    ).createInspector(streamApiType);
 
     // Convert Web Stream to Node Stream for piping
     const nodeStream = Readable.fromWeb(finalClientStream as any);

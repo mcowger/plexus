@@ -6,6 +6,7 @@ export interface UsageRecord {
     incomingApiType: string;
     provider: string | null;
     incomingModelAlias: string | null;
+    canonicalModelName: string | null;
     selectedModelName: string | null;
     outgoingApiType: string | null;
     tokensInput: number | null;
