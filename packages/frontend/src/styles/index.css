@@ -1043,3 +1043,15 @@ body {
     margin-top: 20px;
 }
 
+/* ===== Grid Utilities ===== */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.section-divider {
+  height: 1px;
+  background: var(--color-border-glass);
+  margin: 16px 0;
+}
