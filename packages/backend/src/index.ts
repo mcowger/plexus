@@ -103,6 +103,7 @@ fastify.get('/health', (request, reply) => reply.send('OK'));
 // --- Static File Serving ---
 
 // Serve the production React build from packages/frontend/dist
+// This is used for dev as well.
 fastify.register(fastifyStatic, {
     root: path.join(process.cwd(), '../frontend/dist'),
     prefix: '/',
