@@ -21,6 +21,7 @@ const PricingRangeSchema = z.object({
   upper_bound: z.number().default(Infinity),
   input_per_m: z.number().min(0),
   output_per_m: z.number().min(0),
+  cached_per_m: z.number().min(0).optional(),
 });
 
 const PricingSchema = z.discriminatedUnion('source', [

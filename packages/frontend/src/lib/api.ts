@@ -46,6 +46,10 @@ export interface Provider {
   apiBaseUrl?: string | Record<string, string>;
   apiKey: string;
   enabled: boolean;
+  discount?: number;
+  headers?: Record<string, string>;
+  extraBody?: Record<string, any>;
+  models?: string[] | Record<string, any>;
 }
 
 export interface Model {
@@ -358,7 +362,11 @@ export const api = {
             type: val.type,
             apiBaseUrl: val.api_base_url,
             apiKey: val.api_key || '',
-            enabled: true // backend config doesn't have enabled flag yet
+            enabled: val.enabled !== false, // Default to true if not present
+            discount: val.discount,
+            headers: val.headers,
+            extraBody: val.extraBody,
+            models: val.models
         }));
     } catch (e) {
         console.error("API Error getProviders", e);
@@ -393,13 +401,51 @@ export const api = {
               ...existing, // Keep existing fields like models list if any
               type: p.type,
               api_key: p.apiKey,
+              api_base_url: p.apiBaseUrl,
               display_name: p.name,
+              discount: p.discount,
+              headers: p.headers,
+              extraBody: p.extraBody,
+              models: p.models
           };
       }
       
       config.providers = newProvidersObj;
 
       // 3. Save
+      const newYaml = stringify(config);
+      await api.saveConfig(newYaml);
+  },
+
+  saveProvider: async (provider: Provider, oldId?: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          config = { providers: {}, models: {} };
+      }
+
+      if (!config) config = {};
+      if (!config.providers) config.providers = {};
+
+      // If ID changed, delete old key
+      if (oldId && oldId !== provider.id && config.providers[oldId]) {
+          delete config.providers[oldId];
+      }
+
+      config.providers[provider.id] = {
+          type: provider.type,
+          api_key: provider.apiKey,
+          api_base_url: provider.apiBaseUrl,
+          display_name: provider.name,
+          discount: provider.discount,
+          headers: provider.headers,
+          extraBody: provider.extraBody,
+          models: provider.models,
+          enabled: provider.enabled
+      };
+
       const newYaml = stringify(config);
       await api.saveConfig(newYaml);
   },
