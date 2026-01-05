@@ -131,6 +131,13 @@ export const formatLargeNumber = (num: number): string => {
     return num.toLocaleString();
 };
 
+export const STAT_LABELS = {
+    REQUESTS: 'Total Requests',
+    PROVIDERS: 'Active Providers',
+    TOKENS: 'Total Tokens',
+    DURATION: 'Avg. Duration'
+} as const;
+
 export const api = {
   getCooldowns: async (): Promise<Cooldown[]> => {
       try {
@@ -179,18 +186,18 @@ export const api = {
         const activeProviders = Object.keys(config.providers || {}).length;
 
         return [
-            { label: 'Total Requests', value: totalRequests.toLocaleString() }, // Change calculation requires historical comparison
-            { label: 'Active Providers', value: activeProviders },
-            { label: 'Total Tokens', value: formatLargeNumber(totalTokens) },
-            { label: 'Avg Latency', value: avgLatency + 'ms' },
+            { label: STAT_LABELS.REQUESTS, value: totalRequests.toLocaleString() }, // Change calculation requires historical comparison
+            { label: STAT_LABELS.PROVIDERS, value: activeProviders },
+            { label: STAT_LABELS.TOKENS, value: formatLargeNumber(totalTokens) },
+            { label: STAT_LABELS.DURATION, value: avgLatency + 'ms' },
         ];
     } catch (e) {
         console.error("API Error getStats", e);
         return [
-            { label: 'Total Requests', value: '-' },
-            { label: 'Active Providers', value: '-' },
-            { label: 'Total Tokens', value: '-' },
-            { label: 'Avg Latency', value: '-' },
+            { label: STAT_LABELS.REQUESTS, value: '-' },
+            { label: STAT_LABELS.PROVIDERS, value: '-' },
+            { label: STAT_LABELS.TOKENS, value: '-' },
+            { label: STAT_LABELS.DURATION, value: '-' },
         ];
     }
   },

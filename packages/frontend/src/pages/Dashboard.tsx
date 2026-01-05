@@ -2,15 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { api, Stat, UsageData, Cooldown } from '../lib/api';
+import { api, Stat, UsageData, Cooldown, STAT_LABELS } from '../lib/api';
 import { Activity, Server, Zap, Database, AlertTriangle } from 'lucide-react';
 import { RecentActivityChart } from '../components/dashboard/RecentActivityChart';
 
 const icons: Record<string, React.ReactNode> = {
-  'Total Requests': <Activity size={20} />,
-  'Active Providers': <Server size={20} />,
-  'Total Tokens': <Database size={20} />,
-  'Avg Latency': <Zap size={20} />,
+  [STAT_LABELS.REQUESTS]: <Activity size={20} />,
+  [STAT_LABELS.PROVIDERS]: <Server size={20} />,
+  [STAT_LABELS.TOKENS]: <Database size={20} />,
+  [STAT_LABELS.DURATION]: <Zap size={20} />,
 };
 
 export const Dashboard = () => {
