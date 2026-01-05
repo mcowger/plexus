@@ -27,15 +27,21 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: Install Base dependencies
         run: bun install --frozen-lockfile
+        working-directory: .
+
+      - name: Install Backend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/backend
+
+      - name: Install Frontend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/frontend
 
       - name: Run tests from backend directory
-        run: |
-          echo "=== Running tests from packages/backend directory ==="
-          cd packages/backend
-          bun test --verbose
-          echo "=== Test run completed ==="
+        run: bun test --verbose
+        working-directory: ./packages/backend
 
       - name: Compile Binaries
         # compiling each platform separately
