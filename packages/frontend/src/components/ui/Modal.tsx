@@ -37,23 +37,23 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="fixed inset-0 flex items-center justify-center z-[1000] p-5 bg-black/70 backdrop-blur-md animate-[fadeIn_0.2s_ease]" onClick={onClose}>
       <div
-        className={clsx('modal-content', {
-          'modal-sm': size === 'sm',
-          'modal-md': size === 'md',
-          'modal-lg': size === 'lg',
+        className={clsx('bg-bg-surface border border-border-glass rounded-xl max-w-full max-h-[90vh] overflow-hidden flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.5)] animate-[slideUp_0.3s_ease]', {
+          'w-[400px]': size === 'sm',
+          'w-[600px]': size === 'md',
+          'w-[800px]': size === 'lg',
         })}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
-          <button className="modal-close" onClick={onClose}>
+        <div className="flex items-center justify-between p-6 border-b border-border-glass">
+          <h2 className="font-heading text-xl font-semibold text-text m-0">{title}</h2>
+          <button className="bg-transparent border-0 text-text-muted cursor-pointer hover:text-text" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-footer">{footer}</div>}
+        <div className="p-8 overflow-y-auto flex-1">{children}</div>
+        {footer && <div className="flex items-center justify-end gap-3 px-6 py-5 border-t border-border-glass">{footer}</div>}
       </div>
     </div>,
     document.body

@@ -10,18 +10,18 @@ export const Input: React.FC<InputProps> = ({ label, error, className, id, ...pr
   const inputId = id || props.name || Math.random().toString(36).substr(2, 9);
 
   return (
-    <div className={clsx('input-wrapper', { 'input-has-error': !!error })}>
+    <div className={clsx('flex flex-col gap-2', { 'input-has-error': !!error })}>
       {label && (
-        <label htmlFor={inputId} className="input-label">
+        <label htmlFor={inputId} className="font-body text-[13px] font-medium text-text-secondary">
           {label}
         </label>
       )}
       <input
         id={inputId}
-        className={clsx('input-field', className)}
+        className={clsx('w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]', className)}
         {...props}
       />
-      {error && <span className="input-error">{error}</span>}
+      {error && <span className="text-danger text-xs mt-1">{error}</span>}
     </div>
   );
 };

@@ -34,90 +34,88 @@ export const Sidebar: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/login';
+    window.location.href = '/ui/login';
   };
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-          <img src={logo} alt="Plexus" style={{ width: '32px', height: '32px' }} />
-          <h1 className="sidebar-title">Plexus</h1>
+    <aside className="w-[260px] h-screen fixed left-0 top-0 bg-bg-surface flex flex-col overflow-y-auto z-50 transition-transform duration-300 border-r border-border">
+      <div className="px-5 py-6 border-b border-border">
+        <div className="flex items-center gap-3 mb-1">
+          <img src={logo} alt="Plexus" className="w-8 h-8" />
+          <h1 className="font-heading text-xl font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">Plexus</h1>
         </div>
-        <p className="sidebar-subtitle">AI Infrastructure Management</p>
+        <p className="text-xs text-text-muted mt-1">AI Infrastructure Management</p>
       </div>
 
-      <nav className="sidebar-nav">
-        <NavLink to="/" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+      <nav className="flex-1 py-4 px-2 flex flex-col gap-1">
+        <NavLink to="/" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
           <LayoutDashboard size={20} />
           <span>Dashboard</span>
         </NavLink>
-        <NavLink to="/usage" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+        <NavLink to="/usage" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
           <Activity size={20} />
           <span>Usage</span>
         </NavLink>
-        <NavLink to="/logs" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+        <NavLink to="/logs" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
           <FileText size={20} />
           <span>Logs</span>
         </NavLink>
         
-        <div className="nav-section">
-            <h3 className="nav-section-title">Configuration</h3>
-            <NavLink to="/providers" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+        <div className="mt-6 px-4">
+            <h3 className="font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2">Configuration</h3>
+            <NavLink to="/providers" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
             <Server size={20} />
             <span>Providers</span>
             </NavLink>
-            <NavLink to="/models" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+            <NavLink to="/models" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
             <Box size={20} />
             <span>Models</span>
             </NavLink>
-            <NavLink to="/keys" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+            <NavLink to="/keys" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
             <Key size={20} />
             <span>Keys</span>
             </NavLink>
-             <NavLink to="/config" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+             <NavLink to="/config" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
             <Settings size={20} />
             <span>Settings</span>
             </NavLink>
-            <NavLink to="/system-logs" className={({ isActive }) => clsx('nav-item', isActive && 'active')}>
+            <NavLink to="/system-logs" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')}>
             <FileText size={20} />
             <span>System Logs</span>
             </NavLink>
         </div>
 
-        <div className="nav-section mt-auto">
-            <h3 className="nav-section-title">System</h3>
-            <NavLink to="/debug" className={({ isActive }) => clsx('nav-item', isActive && 'active')} style={{ marginBottom: '8px' }}>
+        <div className="mt-6 px-4 mt-auto">
+            <h3 className="font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2">System</h3>
+            <NavLink to="/debug" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')} style={{ marginBottom: '8px' }}>
                 <Database size={20} />
                 <span>Debug Traces</span>
             </NavLink>
-            <NavLink to="/errors" className={({ isActive }) => clsx('nav-item', isActive && 'active')} style={{ marginBottom: '8px' }}>
+            <NavLink to="/errors" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')} style={{ marginBottom: '8px' }}>
                 <AlertTriangle size={20} />
                 <span>Errors</span>
             </NavLink>
             <button 
                 onClick={handleToggleClick}
                 className={clsx(
-                    "nav-item debug-btn",
-                    debugMode && "active"
+                    "flex items-center justify-between gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text bg-transparent w-full",
+                    debugMode && "text-danger border-danger/30 shadow-sm bg-[rgba(239,68,68,0.1)] shadow-[0_2px_8px_rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.15)]"
                 )}
              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="flex items-center gap-3">
                     <Bug size={20} />
                     <span>Debug Mode</span>
                 </div>
-                <span className="debug-status">
+                <span className={clsx("text-[10px] uppercase tracking-wider font-bold text-text-muted", debugMode && "text-danger/80")}>
                     {debugMode ? 'Enabled' : 'Disabled'}
                 </span>
              </button>
              <button 
                 onClick={handleLogout}
-                className="nav-item nav-item-danger mt-4"
+                className="flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent text-danger w-full bg-transparent border-transparent justify-start hover:text-danger hover:border-danger/30 hover:bg-red-500/10 mt-4"
              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <LogOut size={20} />
-                    <span>Logout</span>
-                </div>
+                <LogOut size={20} />
+                <span>Logout</span>
              </button>
         </div>
       </nav>

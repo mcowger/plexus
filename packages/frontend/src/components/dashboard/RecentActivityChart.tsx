@@ -19,7 +19,7 @@ interface RecentActivityChartProps {
 export const RecentActivityChart: React.FC<RecentActivityChartProps> = ({ data }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="empty-state">
+      <div className="flex items-center justify-center h-full text-text-muted italic p-8">
         No activity data available
       </div>
     );

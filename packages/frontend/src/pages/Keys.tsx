@@ -93,12 +93,12 @@ export const Keys = () => {
   );
 
   return (
-    <div className="dashboard">
-      <div className="page-header">
+    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+      <div className="mb-8">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <div>
-                <h1 className="page-title">API Keys</h1>
-                <p className="page-description">Manage access keys for the Plexus Gateway.</p>
+                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">API Keys</h1>
+                <p className="text-[15px] text-text-secondary m-0">Manage access keys for the Plexus Gateway.</p>
             </div>
             <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Key</Button>
         </div>
@@ -117,31 +117,31 @@ export const Keys = () => {
       </Card>
 
       <Card title="Active Keys" className="mb-6">
-        <div className="table-wrapper">
-            <table className="data-table">
+        <div className="overflow-x-auto -m-6">
+            <table className="w-full border-collapse font-body text-[13px]">
                 <thead>
                     <tr>
-                        <th style={{paddingLeft: '24px'}}>Key Name</th>
-                        <th>Secret</th>
-                        <th>Comment</th>
-                        <th style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>Key Name</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Secret</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Comment</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {filteredKeys.map(key => (
-                        <tr key={key.key}>
-                            <td style={{fontWeight: 600, paddingLeft: '24px'}}>
+                        <tr key={key.key} className="hover:bg-bg-hover">
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{fontWeight: 600, paddingLeft: '24px'}}>
                                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                                     {key.key}
                                 </div>
                             </td>
-                            <td>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                                     <span style={{fontFamily: 'monospace', fontSize: '12px', backgroundColor: 'var(--color-bg-subtle)', padding: '2px 6px', borderRadius: '4px'}}>
                                         {key.secret.substring(0, 5)}...
                                     </span>
                                     <button 
-                                        className="icon-btn" 
+                                        className="bg-transparent border-0 text-text-muted p-1.5 rounded-sm cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-bg-hover hover:text-primary active:scale-95" 
                                         onClick={() => copyToClipboard(key.secret, key.key)}
                                         title="Copy Secret"
                                         style={copiedKey === key.key ? { color: 'var(--color-success)' } : {}}
@@ -150,12 +150,12 @@ export const Keys = () => {
                                     </button>
                                 </div>
                             </td>
-                            <td>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                 <span style={{color: 'var(--color-text-secondary)', fontSize: '13px'}}>
                                     {key.comment || '-'}
                                 </span>
                             </td>
-                            <td style={{paddingRight: '24px', textAlign: 'right'}}>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
                                 <div style={{display: 'flex', justifyContent: 'flex-end', gap: '8px'}}>
                                     <Button variant="ghost" size="sm" onClick={() => handleEdit(key)}>
                                         <Edit2 size={14} />
@@ -169,7 +169,7 @@ export const Keys = () => {
                     ))}
                     {filteredKeys.length === 0 && (
                         <tr>
-                            <td colSpan={4} className="empty">No keys found</td>
+                            <td colSpan={4} className="text-center text-text-muted p-12">No keys found</td>
                         </tr>
                     )}
                 </tbody>
@@ -199,8 +199,8 @@ export const Keys = () => {
                 helpText={originalKeyName ? "Key ID cannot be changed once created." : "A unique identifier for this key."}
               />
               
-              <div className="input-wrapper">
-                  <label className="input-label">Secret Key</label>
+              <div className="flex flex-col gap-2">
+                  <label className="font-body text-[13px] font-medium text-text-secondary">Secret Key</label>
                   <div style={{display: 'flex', gap: '8px'}}>
                       <Input 
                         value={editingKey.secret} 
@@ -213,7 +213,7 @@ export const Keys = () => {
                           <RefreshCw size={16} />
                       </Button>
                   </div>
-                   <p className="input-help">The secret used to authenticate. Click refresh to generate a secure random key.</p>
+                   <p className="text-xs text-text-muted mt-1">The secret used to authenticate. Click refresh to generate a secure random key.</p>
               </div>
 
               <Input 

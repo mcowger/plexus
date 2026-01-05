@@ -31,15 +31,15 @@ export const Usage = () => {
   );
 
   return (
-    <div className="dashboard">
-      <div className="page-header">
-        <h1 className="page-title">Usage Overview</h1>
-        <p className="page-description">Token usage and request statistics over time.</p>
+    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+      <div className="mb-8">
+        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Usage Overview</h1>
+        <p className="text-[15px] text-text-secondary m-0">Token usage and request statistics over time.</p>
       </div>
 
-      <div className="charts-row">
+      <div className="flex gap-4 mb-4 flex-col lg:flex-row">
         <Card 
-          className="chart-large"
+          className="flex-[2] min-w-0"
           title="Requests over Time"
           extra={renderTimeControls()}
         >
@@ -63,7 +63,7 @@ export const Usage = () => {
         </Card>
 
         <Card 
-          className="chart-large"
+          className="flex-[2] min-w-0"
           title="Token Usage"
           extra={renderTimeControls()}
         >

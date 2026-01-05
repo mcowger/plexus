@@ -127,18 +127,18 @@ export const SystemLogs: React.FC = () => {
   };
 
   return (
-    <div className="dashboard system-logs-container">
-      <div className="page-header">
-        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div className="dashboard h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+      <div className="mb-8">
+        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Terminal size={24} />
           System Logs
         </h1>
-        <p className="page-description">Live stream of backend system logs.</p>
+        <p className="text-[15px] text-text-secondary m-0">Live stream of backend system logs.</p>
       </div>
 
-      <div className="card log-viewer-card">
-        <div className="card-header">
-          <h3 className="card-title">Live Output</h3>
+      <div className="flex flex-col flex-1 min-h-0 mb-3 overflow-hidden glass-bg rounded-lg p-4 transition-all duration-300">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border-glass">
+          <h3 className="font-heading text-lg font-semibold text-text m-0">Live Output</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button 
                 variant="secondary" 
@@ -159,17 +159,17 @@ export const SystemLogs: React.FC = () => {
           </div>
         </div>
         
-        <div className="log-viewer-content">
+        <div className="flex-1 bg-[#0f172a] p-3 overflow-y-auto font-mono text-[13px] text-[#e2e8f0] rounded-sm">
             {logs.length === 0 && (
-                <div className="log-waiting">Waiting for logs...</div>
+                <div className="text-text-muted italic text-center mt-5">Waiting for logs...</div>
             )}
             {logs.map((log, i) => (
-                <div key={i} className="log-entry">
-                    <span className="log-timestamp">[{log.timestamp}]</span>
-                    <span className={`log-level ${getLevelClass(log.level)}`}>{log.level.toUpperCase()}:</span>
+                <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">
+                    <span className="text-text-muted mr-2">[{log.timestamp}]</span>
+                    <span className={`font-bold mr-2 ${getLevelClass(log.level)}`}>{log.level.toUpperCase()}:</span>
                     <span>{log.message}</span>
                     {Object.keys(log).filter(k => !['level', 'message', 'timestamp'].includes(k)).length > 0 && (
-                        <pre className="log-details">
+                        <pre className="text-text-muted text-[11px] ml-8 mt-1">
                             {JSON.stringify(
                                 Object.fromEntries(Object.entries(log).filter(([k]) => !['level', 'message', 'timestamp'].includes(k))),
                                 null, 2

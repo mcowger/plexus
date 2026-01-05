@@ -212,10 +212,10 @@ export const Logs = () => {
     const reasoningEmoji = "🧠"
 
     return (
-        <div className="page-container">
-            <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div className="header-left">
-                    <h1 className="page-title">Logs</h1>
+        <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+            <div className="mb-8 flex justify-between items-center">
+                <div>
+                    <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Logs</h1>
                     <Badge status="neutral">{total} Records</Badge>
                 </div>
                 <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0}>
@@ -224,10 +224,10 @@ export const Logs = () => {
                 </Button>
             </div>
 
-            <Card className="logs-card">
-                <div className="table-controls">
-                    <form onSubmit={handleSearch} className="search-form" style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-                        <div className="input-icon-wrapper" style={{ position: 'relative', width: '250px' }}>
+            <Card className="glass-bg rounded-lg p-6 max-w-full shadow-xl overflow-hidden flex flex-col gap-4">
+                <div className="mb-4">
+                    <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+                        <div className="relative w-[250px]">
                             <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
                             <Input
                                 placeholder="Filter by Model..."
@@ -236,7 +236,7 @@ export const Logs = () => {
                                 style={{ paddingLeft: '32px' }}
                             />
                         </div>
-                        <div className="input-icon-wrapper" style={{ position: 'relative', width: '200px' }}>
+                        <div className="relative w-[200px]">
                             <Filter size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
                             <Input
                                 placeholder="Filter by Provider..."
@@ -249,59 +249,58 @@ export const Logs = () => {
                     </form>
                 </div>
 
-                <div className="table-container" style={{ overflowX: 'auto' }}>
-                    <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <div className="overflow-x-auto -mx-6 px-6">
+                    <table className="w-full border-collapse font-body text-[13px]">
                         <thead>
-                            <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
-                                <th style={{ padding: '6px' }}>Date</th>
-                                <th style={{ padding: '6px' }}>Key</th>
-                                <th style={{ padding: '6px' }}>Source IP</th>
-                                <th style={{ padding: '6px' }}>API (In/Out)</th>
-                                <th style={{ padding: '6px' }}>Model (In/Sel)</th>
+                            <tr className="text-left border-b border-border">
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Date</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Key</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Source IP</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">API (In/Out)</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Model (In/Sel)</th>
                                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                                <th style={{ padding: '6px' }}>Tokens (I/O/R/C)</th>
-                                <th style={{ padding: '6px', textAlign: 'right' }}>Cost</th>
-                                <th style={{ padding: '6px' }}>Performance</th>
-                                <th style={{ padding: '6px' }}>Streamed</th>
-                                <th style={{ padding: '6px' }}>Direct</th>
-                                <th style={{ padding: '6px' }}>Status</th>
-                                <th style={{ padding: '6px', width: '40px' }}></th>
-                                <th style={{ padding: '6px', width: '40px' }}></th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Tokens (I/O/R/C)</th>
+                                <th className="px-4 py-3 border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider text-right">Cost</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Performance</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Streamed</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Direct</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider w-[40px]"></th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider w-[40px]"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={16} style={{ padding: '20px', textAlign: 'center' }}>Loading...</td>
+                                    <td colSpan={16} className="p-5 text-center">Loading...</td>
                                 </tr>
                             ) : logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={16} style={{ padding: '20px', textAlign: 'center' }}>No logs found</td>
+                                    <td colSpan={16} className="p-5 text-center">No logs found</td>
                                 </tr>
                             ) : (
                                 logs.map((log) => (
                                     <tr
                                         key={log.requestId}
-                                        style={{ borderBottom: '1px solid var(--color-border-light)' }}
-                                        className={clsx("group", log.requestId === newestLogId && 'animate-pulse-fade')}
+                                        className={clsx("group border-b border-border-glass hover:bg-bg-hover", log.requestId === newestLogId && 'animate-pulse-fade')}
                                     >
-                                        <td style={{ padding: '6px', whiteSpace: 'nowrap' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                                             {new Date(log.date).toLocaleString()}
                                         </td>
-                                        <td style={{ padding: '6px' }}>{log.apiKey || '-'}</td>
-                                        <td style={{ padding: '6px' }}>{log.sourceIp || '-'}
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">{log.apiKey || '-'}</td>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">{log.sourceIp || '-'}
                                         </td>
-                                        <td style={{ padding: '6px' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                                             {log.incomingApiType || '?'}→{log.outgoingApiType || '?'}
                                         </td>
-                                        <td style={{ padding: '6px' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                 <span>{log.incomingModelAlias || '-'}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>{log.provider || '-'}:{log.selectedModelName || '-'}</span>
 
                                             </div>
                                         </td>
-                                        <td style={{ padding: '6px', alignContent: 'center', textAlign: 'center' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle text-center">
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                                 <span style={{ fontWeight: '500' }}>{uploadEmoji} {formatLargeNumber(log.tokensInput || 0)} {downloadEmoji} {formatLargeNumber(log.tokensOutput || 0)} </span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
@@ -311,7 +310,7 @@ export const Logs = () => {
                                             </div>
                                             {/* {log.tokensInput || 0} / {log.tokensOutput || 0} / {log.tokensReasoning || 0} / {log.tokensCached || 0} */}
                                         </td>
-                                        <td style={{ padding: '6px', textAlign: 'right' }}>
+                                        <td className="px-4 py-3 border-b border-border-glass text-text align-middle text-right">
                                             {log.costTotal !== undefined && log.costTotal !== null ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', justifyContent: 'space-between' }}>
@@ -344,7 +343,7 @@ export const Logs = () => {
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '1.2em' }}>∅</span>
                                             )}
                                         </td>
-                                        <td style={{ padding: '6px' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                 <span style={{ fontWeight: '500' }}>{log.durationMs > 10 ? `${(log.durationMs / 1000).toFixed(1)}s` : '∅'}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
@@ -353,22 +352,22 @@ export const Logs = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '2px', alignContent: 'center', textAlign: 'center' }}>{log.isStreamed ? '✓' : ''}
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle text-center">{log.isStreamed ? '✓' : ''}
                                         </td>
-                                        <td style={{ padding: '2px', alignContent: 'center', textAlign: 'center' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle text-center">
                                             {log.isPassthrough ? <Zap size={14} className="text-yellow-500" /> : ''}
                                         </td>
-                                        <td style={{ padding: '6px' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                                             <Badge status={log.responseStatus === 'success' ? 'connected' : 'error'}>
                                                 {log.responseStatus === 'success' ? '✓' : '✗'}
                                             </Badge>
                                         </td>
-                                        <td style={{ padding: '6px' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                                             <div className="flex gap-2">
                                                 {log.hasDebug && (
                                                     <button
                                                         onClick={() => navigate('/debug', { state: { requestId: log.requestId } })}
-                                                        className="debug-delete-btn"
+                                                        className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger"
                                                         title="View Debug Trace"
                                                     >
                                                         <Bug size={14} className="text-blue-400" />
@@ -377,7 +376,7 @@ export const Logs = () => {
                                                 {log.hasError && (
                                                     <button
                                                         onClick={() => navigate('/errors', { state: { requestId: log.requestId } })}
-                                                        className="debug-delete-btn"
+                                                        className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger"
                                                         title="View Error Details"
                                                     >
                                                         <AlertTriangle size={14} className="text-red-500" />
@@ -385,10 +384,10 @@ export const Logs = () => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td style={{ padding: '6px' }}>
+                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                                             <button
                                                 onClick={() => handleDelete(log.requestId)}
-                                                className="debug-delete-btn group-hover-visible"
+                                                className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0 transition-opacity"
                                                 title="Delete log"
                                             >
                                                 <Trash2 size={14} />
@@ -401,11 +400,11 @@ export const Logs = () => {
                     </table>
                 </div>
 
-                <div className="pagination" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '20px', gap: '10px' }}>
+                <div className="flex justify-end items-center mt-5 gap-3">
                     <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                         Page {currentPage} of {Math.max(1, totalPages)}
                     </span>
-                    <div className="pagination-controls" style={{ display: 'flex', gap: '5px' }}>
+                    <div className="flex gap-1">
                         <Button
                             variant="secondary"
                             disabled={offset === 0}

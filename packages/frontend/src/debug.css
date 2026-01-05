@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@source "./components/layout/MainLayout.tsx";
+
+@theme {
+  --color-bg-deep: #000000;
+}

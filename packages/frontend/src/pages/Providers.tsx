@@ -240,39 +240,39 @@ export const Providers = () => {
   };
 
   return (
-    <div className="dashboard">
-      <div className="page-header">
+    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+      <div className="mb-8">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <div>
-                <h1 className="page-title">Providers</h1>
-                <p className="page-description">Manage AI provider integrations.</p>
+                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Providers</h1>
+                <p className="text-[15px] text-text-secondary m-0">Manage AI provider integrations.</p>
             </div>
             <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Provider</Button>
         </div>
       </div>
 
       <Card title="Active Providers">
-          <div className="table-wrapper">
-              <table className="data-table">
+          <div className="overflow-x-auto -m-6">
+              <table className="w-full border-collapse font-body text-[13px]">
                   <thead>
                       <tr>
-                          <th style={{paddingLeft: '24px'}}>ID / Name</th>
-                          <th>Status</th>
-                          <th>APIs</th>
-                          <th style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>ID / Name</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">APIs</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
                       </tr>
                   </thead>
                   <tbody>
                       {providers.map(p => (
-                          <tr key={p.id} onClick={() => handleEdit(p)} style={{cursor: 'pointer'}}>
-                              <td style={{paddingLeft: '24px'}}>
+                          <tr key={p.id} onClick={() => handleEdit(p)} style={{cursor: 'pointer'}} className="hover:bg-bg-hover">
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingLeft: '24px'}}>
                                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                                       <Edit2 size={12} style={{opacity: 0.5}} />
                                       <div style={{fontWeight: 600}}>{p.id}</div>
                                       <div style={{fontSize: '12px', color: 'var(--color-text-secondary)'}}>( {p.name} )</div>
                                   </div>
                               </td>
-                              <td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                   <div onClick={(e) => e.stopPropagation()}>
                                       <Switch 
                                         checked={p.enabled !== false} 
@@ -281,21 +281,21 @@ export const Providers = () => {
                                       />
                                   </div>
                               </td>
-                              <td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                   <div style={{display: 'flex', gap: '4px'}}>
                                       {(Array.isArray(p.type) ? p.type : [p.type]).map(t => (
                                           <Badge 
                                             key={t} 
                                             status="connected" 
                                             style={{ ...getApiBadgeStyle(t), fontSize: '10px', padding: '2px 8px' }}
-                                            className="api-badge-no-dot"
+                                            className="[&_.connection-dot]:hidden"
                                           >
                                               {t}
                                           </Badge>
                                       ))}
                                   </div>
                               </td>
-                              <td style={{paddingRight: '24px', textAlign: 'right'}}>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
                                   <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
                                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
                                   </div>
@@ -320,7 +320,7 @@ export const Providers = () => {
         }
       >
           <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
-              <div className="grid-2">
+              <div className="grid gap-4 grid-cols-2">
                   <Input 
                     label="Unique ID" 
                     value={editingProvider.id} 
@@ -337,16 +337,16 @@ export const Providers = () => {
               </div>
 
               <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                   <label className="input-label" style={{marginBottom: 0, marginRight: '8px'}}>Enabled</label>
+                   <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0, marginRight: '8px'}}>Enabled</label>
                    <Switch 
                       checked={editingProvider.enabled !== false}
                       onChange={(checked) => setEditingProvider({...editingProvider, enabled: checked})}
                    />
               </div>
 
-              <div className="input-wrapper">
+              <div className="flex flex-col gap-2">
 
-                  <label className="input-label">Supported APIs & Base URLs</label>
+                  <label className="font-body text-[13px] font-medium text-text-secondary">Supported APIs & Base URLs</label>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--color-bg-subtle)', padding: '16px', borderRadius: 'var(--radius-md)'}}>
                       {KNOWN_APIS.map(apiType => {
                           const isEnabled = (Array.isArray(editingProvider.type) ? editingProvider.type : [editingProvider.type]).includes(apiType);
@@ -383,11 +383,10 @@ export const Providers = () => {
               />
 
               {/* Advanced Accordion */}
-              <div className="accordion-item" style={{border: '1px solid var(--color-border-glass)', borderRadius: 'var(--radius-md)'}}>
+              <div className="border border-border-glass rounded-md">
                   <div 
-                    className="accordion-header" 
+                    className="p-3 px-4 flex items-center gap-3 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass" 
                     onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                    style={{padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: 'var(--color-bg-hover)'}}
                   >
                       {isAdvancedOpen ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
                       <span style={{fontWeight: 600, fontSize: '14px'}}>Advanced Configuration</span>
@@ -408,7 +407,7 @@ export const Providers = () => {
 
                           <div>
                               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                                  <label className="input-label" style={{marginBottom: 0}}>Custom Headers</label>
+                                  <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Custom Headers</label>
                                   <Button size="sm" variant="secondary" onClick={() => addKV('headers')}><Plus size={14}/></Button>
                               </div>
                               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -424,7 +423,7 @@ export const Providers = () => {
 
                           <div>
                               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                                  <label className="input-label" style={{marginBottom: 0}}>Extra Body Fields</label>
+                                  <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Extra Body Fields</label>
                                   <Button size="sm" variant="secondary" onClick={() => addKV('extraBody')}><Plus size={14}/></Button>
                               </div>
                               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -442,11 +441,10 @@ export const Providers = () => {
               </div>
 
               {/* Models Accordion */}
-              <div className="accordion-item" style={{border: '1px solid var(--color-border-glass)', borderRadius: 'var(--radius-md)'}}>
+              <div className="border border-border-glass rounded-md">
                   <div 
-                    className="accordion-header" 
+                    className="p-3 px-4 flex items-center gap-3 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass" 
                     onClick={() => setIsModelsOpen(!isModelsOpen)}
-                    style={{padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: 'var(--color-bg-hover)'}}
                   >
                       {isModelsOpen ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
                       <span style={{fontWeight: 600, fontSize: '14px', flex: 1}}>Provider Models</span>
@@ -473,11 +471,11 @@ export const Providers = () => {
                                                 onChange={(e) => updateModelId(mId, e.target.value)}
                                               />
                                               
-                                              <div className="grid-2">
-                                                  <div className="input-wrapper">
-                                                      <label className="input-label">Pricing Source</label>
+                                              <div className="grid gap-4 grid-cols-2">
+                                                  <div className="flex flex-col gap-2">
+                                                      <label className="font-body text-[13px] font-medium text-text-secondary">Pricing Source</label>
                                                       <select 
-                                                        className="input-field"
+                                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                                         value={mCfg.pricing?.source || 'simple'}
                                                         onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, source: e.target.value } })}
                                                       >
@@ -486,8 +484,8 @@ export const Providers = () => {
                                                           <option value="defined">Ranges (Complex)</option>
                                                       </select>
                                                   </div>
-                                                  <div className="input-wrapper">
-                                                      <label className="input-label">Access Via (APIs)</label>
+                                                  <div className="flex flex-col gap-2">
+                                                      <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
                                                       <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px'}}>
                                                           {KNOWN_APIS.map(apiType => (
                                                               <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px'}}>
@@ -500,7 +498,7 @@ export const Providers = () => {
                                                                         updateModelConfig(mId, { access_via: next });
                                                                     }}
                                                                   />
-                                                                  <span className="badge" style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 6px', opacity: (mCfg.access_via || []).includes(apiType) ? 1 : 0.5 }}>
+                                                                  <span className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium" style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 6px', opacity: (mCfg.access_via || []).includes(apiType) ? 1 : 0.5 }}>
                                                                     {apiType}
                                                                   </span>
                                                               </label>
@@ -515,7 +513,7 @@ export const Providers = () => {
                                               </div>
 
                                               {mCfg.pricing?.source === 'simple' && (
-                                                  <div className="grid-3" style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)'}}>
+                                                  <div className="grid grid-cols-3 gap-4" style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)'}}>
                                                       <Input 
                                                         label="Input $/M" type="number" step="0.000001"
                                                         value={mCfg.pricing.input || 0}
@@ -548,7 +546,7 @@ export const Providers = () => {
                                               {mCfg.pricing?.source === 'defined' && (
                                                   <div style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '12px'}}>
                                                       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                                                          <label className="input-label" style={{marginBottom: 0}}>Pricing Ranges</label>
+                                                          <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Pricing Ranges</label>
                                                           <Button size="sm" variant="secondary" onClick={() => {
                                                               const currentRanges = mCfg.pricing.range || [];
                                                               updateModelConfig(mId, { pricing: { ...mCfg.pricing, range: [...currentRanges, { lower_bound: 0, upper_bound: 0, input_per_m: 0, output_per_m: 0 }] } });
@@ -570,7 +568,7 @@ export const Providers = () => {
                                                                   <X size={14}/>
                                                               </Button>
                                                               
-                                                              <div className="grid-2" style={{marginBottom: '8px'}}>
+                                                              <div className="grid gap-4 grid-cols-2" style={{marginBottom: '8px'}}>
                                                                   <Input 
                                                                     label="Lower Bound" type="number"
                                                                     value={range.lower_bound}
@@ -591,7 +589,7 @@ export const Providers = () => {
                                                                     }}
                                                                   />
                                                               </div>
-                                                              <div className="grid-3">
+                                                              <div className="grid grid-cols-3 gap-4">
                                                                   <Input 
                                                                     label="Input $/M" type="number" step="0.000001"
                                                                     value={range.input_per_m}
@@ -623,7 +621,7 @@ export const Providers = () => {
                                                           </div>
                                                       ))}
                                                       {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
-                                                          <div className="empty-state-sm">No ranges defined. Pricing will likely default to 0.</div>
+                                                          <div className="text-text-muted italic text-center text-sm p-4">No ranges defined. Pricing will likely default to 0.</div>
                                                       )}
                                                   </div>
                                               )}

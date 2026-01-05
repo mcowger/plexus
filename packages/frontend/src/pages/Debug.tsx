@@ -128,11 +128,11 @@ export const Debug: React.FC = () => {
     };
 
     return (
-        <div className="debug-page">
-            <header className="debug-header">
+        <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+            <header className="flex justify-between items-center p-6 shrink-0">
                 <div>
-                    <h1 className="page-title">Debug Traces</h1>
-                    <p className="page-description">Inspect full request/response lifecycles</p>
+                    <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Debug Traces</h1>
+                    <p className="text-[15px] text-text-secondary m-0">Inspect full request/response lifecycles</p>
                 </div>
                 <div className="flex gap-2">
                     <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0}>
@@ -146,41 +146,41 @@ export const Debug: React.FC = () => {
                 </div>
             </header>
 
-            <div className="debug-content">
+            <div className="flex flex-1 overflow-hidden border-t border-border-glass">
                 {/* Left Pane: Request List */}
-                <div className="debug-sidebar">
-                    <div className="debug-list-header">
-                        <span className="debug-list-title">
+                <div className="w-[320px] border-r border-border-glass bg-bg-surface flex flex-col shrink-0">
+                    <div className="p-4 border-b border-border-glass">
+                        <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
                             Recent Requests
                         </span>
                     </div>
-                    <div className="debug-list">
+                    <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
                         {logs.map(log => (
                             <div 
                                 key={log.requestId}
                                 onClick={() => setSelectedId(log.requestId)}
                                 className={clsx(
-                                    "debug-list-item group",
-                                    selectedId === log.requestId && "selected"
+                                    "p-3 rounded-md cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover group",
+                                    selectedId === log.requestId && "bg-bg-glass border-border-glass shadow-sm"
                                 )}
                             >
-                                <div className="debug-item-content w-full">
-                                    <div className="debug-item-meta justify-between items-center">
+                                <div className="w-full">
+                                    <div className="flex items-center gap-2 mb-1 justify-between items-center">
                                         <div className="flex items-center gap-2">
                                             <Clock size={14} className="text-[var(--color-text-muted)]" />
-                                            <span className="debug-time">
+                                            <span className="text-xs font-mono text-text-muted">
                                                 {new Date(log.createdAt).toLocaleTimeString()}
                                             </span>
                                         </div>
                                         <button 
                                             onClick={(e) => handleDelete(e, log.requestId)}
-                                            className="debug-delete-btn group-hover-visible"
+                                            className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0 transition-opacity"
                                             title="Delete log"
                                         >
                                             <Trash2 size={12} />
                                         </button>
                                     </div>
-                                    <div className="debug-id mt-1">
+                                    <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1">
                                         {log.requestId.substring(0, 8)}...
                                     </div>
                                 </div>
@@ -195,9 +195,9 @@ export const Debug: React.FC = () => {
                 </div>
 
                 {/* Right Pane: Details */}
-                <div className="debug-main">
+                <div className="flex-1 bg-bg-deep overflow-y-auto flex flex-col relative">
                     {selectedId && detail ? (
-                        <div className="debug-accordion-container">
+                        <div className="flex flex-col">
                              <AccordionPanel 
                                 title="Raw Request" 
                                 content={formatContent(detail.rawRequest)} 
@@ -236,14 +236,14 @@ export const Debug: React.FC = () => {
                              )}
                         </div>
                     ) : (
-                        <div className="debug-empty">
+                        <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">
                             <Database size={48} opacity={0.2} />
                             <p>Select a request trace to inspect details</p>
                         </div>
                     )}
                     
                     {loadingDetail && (
-                        <div className="debug-loading-overlay">
+                        <div className="absolute inset-0 bg-[rgba(15,23,42,0.5)] backdrop-blur-sm flex items-center justify-center z-10">
                             <RefreshCw className="animate-spin text-[var(--color-primary)]" size={32} />
                         </div>
                     )}
@@ -302,17 +302,17 @@ const AccordionPanel: React.FC<{
     };
 
     return (
-        <div className="debug-accordion-item">
+        <div className="border-b border-border-glass bg-bg-surface">
             <div 
-                className="debug-accordion-header" 
+                className="px-4 py-3 cursor-pointer flex justify-between items-center bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass" 
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <div className="flex items-center gap-2">
                     {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    <span className={clsx("debug-accordion-title", color)}>{title}</span>
+                    <span className={clsx("text-[11px] font-bold uppercase tracking-wider", color)}>{title}</span>
                 </div>
                 <button 
-                    className="debug-copy-btn"
+                    className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
                     onClick={handleCopy}
                     title="Copy to clipboard"
                 >
@@ -321,11 +321,11 @@ const AccordionPanel: React.FC<{
             </div>
             <div 
                 className={clsx(
-                    "debug-accordion-content",
-                    isOpen ? "open" : "closed"
+                    "overflow-hidden transition-[max-height] duration-300 ease-in-out",
+                    isOpen ? "max-h-[500px]" : "max-h-0"
                 )}
             >
-                <div className="debug-editor-container">
+                <div className="h-[400px] bg-[#1e1e1e]">
                     <Editor 
                         height="100%" 
                         defaultLanguage="json" 

@@ -16,8 +16,8 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     localStorage.removeItem('plexus_admin_key');
     // Optional: Dispatch event or reload. 
     // Usually the React Context will catch this on next refresh, or we can reload here.
-    if (window.location.pathname !== '/login') {
-       window.location.href = '/login';
+    if (window.location.pathname !== '/ui/login') {
+       window.location.href = '/ui/login';
     }
   }
   return res;

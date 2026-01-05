@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@source "./**/*.tsx";
+
+@theme {
+  /* Colors */
+  --color-bg-deep: #000000;
+  --color-bg-surface: #0F172A;
+  --color-bg-card: rgba(15, 23, 42, 0.8);
+  --color-bg-glass: rgba(30, 41, 59, 0.6);
+  --color-bg-hover: rgba(51, 65, 85, 0.5);
+
+  --color-primary: #F59E0B;
+  --color-secondary: #FBBF24;
+  --color-cta: #8B5CF6;
+  --color-success: #10B981;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+  --color-cyan: #06B6D4;
+
+  --color-text: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+
+  --color-border: #334155;
+  --color-border-glass: rgba(255, 255, 255, 0.1);
+  --color-glow: rgba(245, 158, 11, 0.3);
+
+  /* Fonts */
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+/* Custom Utilities based on variables */
+@utility glass-bg {
+  background-color: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@utility glass-blur {
+  backdrop-filter: blur(16px);
+}
+
+/* Base Reset */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    @apply m-0 p-0 box-border;
+  }
+
+  body {
+    font-family: var(--font-body);
+    @apply text-sm leading-normal bg-bg-deep text-text antialiased;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-bg-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-secondary));
+    @apply rounded-[3px];
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-primary text-black;
+  }
+}
+
+/* Keyframes */
+@keyframes pulse-fade {
+  0% {
+    background-color: rgba(245, 158, 11, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

@@ -19,21 +19,21 @@ export const Config = () => {
   };
 
   return (
-    <div className="dashboard">
-      <div className="page-header">
-        <h1 className="page-title">Configuration</h1>
-        <p className="page-description">Edit global system configuration.</p>
+    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+      <div className="mb-8">
+        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Configuration</h1>
+        <p className="text-[15px] text-text-secondary m-0">Edit global system configuration.</p>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-            <h3 className="card-title">plexus.yaml</h3>
+      <div className="glass-bg backdrop-blur-md border border-white/10 rounded-lg shadow-xl overflow-hidden transition-all duration-300 max-w-full shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border-glass">
+            <h3 className="font-heading text-lg font-semibold text-text m-0">plexus.yaml</h3>
             <div style={{display: 'flex', gap: '8px'}}>
                  <Button variant="secondary" size="sm" onClick={() => api.getConfig().then(setConfig)} leftIcon={<RotateCcw size={14}/>}>Reset</Button>
                  <Button variant="primary" size="sm" onClick={handleSave} isLoading={isSaving} leftIcon={<Save size={14}/>}>Save Changes</Button>
             </div>
         </div>
-        <div className="code-editor-container" style={{ height: '500px', borderRadius: '4px', overflow: 'hidden' }}>
+        <div className="h-[500px] rounded-sm overflow-hidden">
             <Editor
               height="100%"
               defaultLanguage="yaml"

@@ -107,3 +107,15 @@ test("my test", () => {
     expect(infoSpy).toHaveBeenCalled();
 });
 ```
+
+## 7. Frontend Styling & Tailwind CSS
+
+### 7.1 Tailwind CSS Build Process
+The frontend uses Tailwind CSS v4. To ensure utility classes are correctly scanned and generated, the following configurations are CRITICAL:
+
+- **Build Command Execution:** The `tailwindcss` CLI **must** be executed with `packages/frontend/src` as the current working directory (`cwd`). This ensures that `@source` directives relative to the CSS file resolve correctly.
+- **Source Directives:** In `packages/frontend/src/globals.css`, use simple glob patterns for `@source`. Avoid complex brace expansion if it causes issues with the CLI scanner.
+  - **Correct:** `@source "./**/*.tsx";`
+- **Output Path:** Ensure the output path in the build script (`packages/frontend/build.ts`) correctly points to the `dist` directory relative to the `src` folder (e.g., `-o ../dist/main.css`).
+
+Failure to follow these settings will result in a `main.css` file that contains only base styles and no generated utility classes, causing the UI to appear unstyled.

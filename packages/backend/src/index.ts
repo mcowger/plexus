@@ -109,7 +109,7 @@ logger.info(`Serving static files from: ${staticRoot} (CWD: ${process.cwd()})`);
 
 fastify.register(fastifyStatic, {
     root: staticRoot,
-    prefix: '/',
+    prefix: '/ui/',
     // Disable caching to ensure frontend updates are seen immediately
     cacheControl: false,
     etag: false, 
@@ -121,13 +121,24 @@ fastify.register(fastifyStatic, {
     }
 });
 
+// Root Redirect to UI
+fastify.get('/', (request, reply) => {
+    reply.redirect('/ui/');
+});
+
+fastify.get('/ui', (request, reply) => {
+    reply.redirect('/ui/');
+});
+
 // Single Page Application (SPA) Fallback
 // Redirects all non-API routes to index.html so React Router can take over
 fastify.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith('/v1') || request.url.startsWith('/v0')) {
         reply.code(404).send({ error: "Not Found" });
-    } else {
+    } else if (request.url.startsWith('/ui/') || request.url === '/ui') {
         reply.sendFile('index.html');
+    } else {
+        reply.code(404).send({ error: "Not Found" });
     }
 });
 

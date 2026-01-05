@@ -120,12 +120,12 @@ export const Models = () => {
   const filteredAliases = aliases.filter(a => a.id.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="dashboard">
-      <div className="page-header">
+    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+      <div className="mb-8">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <div>
-                <h1 className="page-title">Models</h1>
-                <p className="page-description">Available AI models across providers.</p>
+                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Models</h1>
+                <p className="text-[15px] text-text-secondary m-0">Available AI models across providers.</p>
             </div>
             <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Model</Button>
         </div>
@@ -144,42 +144,42 @@ export const Models = () => {
       </Card>
 
       <Card title="Model Aliases" className="mb-6">
-        <div className="table-wrapper">
-            <table className="data-table">
+        <div className="overflow-x-auto -m-6">
+            <table className="w-full border-collapse font-body text-[13px]">
                 <thead>
                     <tr>
-                        <th style={{paddingLeft: '24px'}}>Alias</th>
-                        <th>Aliases</th>
-                        <th>Selector</th>
-                        <th style={{paddingRight: '24px'}}>Targets</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>Alias</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Aliases</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Selector</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px'}}>Targets</th>
                     </tr>
                 </thead>
                 <tbody>
                     {filteredAliases.map(alias => (
-                        <tr key={alias.id} onClick={() => handleEdit(alias)} style={{cursor: 'pointer'}}>
-                            <td style={{fontWeight: 600, paddingLeft: '24px'}}>
+                        <tr key={alias.id} onClick={() => handleEdit(alias)} style={{cursor: 'pointer'}} className="hover:bg-bg-hover">
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{fontWeight: 600, paddingLeft: '24px'}}>
                                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                                     <Edit2 size={12} style={{opacity: 0.5}} />
                                     {alias.id}
                                 </div>
                             </td>
-                            <td>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                 {alias.aliases && alias.aliases.length > 0 ? (
                                     <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px'}}>
                                         {alias.aliases.map(a => (
-                                            <span key={a} className="badge badge-outline" style={{fontSize: '10px'}}>
+                                            <span key={a} className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border border-border-glass text-text-secondary" style={{fontSize: '10px'}}>
                                                 {a}
                                             </span>
                                         ))}
                                     </div>
                                 ) : <span style={{color: 'var(--color-text-secondary)', fontSize: '12px'}}>-</span>}
                             </td>
-                            <td>
-                                <span className="badge badge-outline" style={{fontSize: '11px', textTransform: 'capitalize'}}>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border border-border-glass text-text-secondary" style={{fontSize: '11px', textTransform: 'capitalize'}}>
                                     {alias.selector || 'random'} / {alias.priority || 'selector'}
                                 </span>
                             </td>
-                            <td style={{paddingRight: '24px'}}>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px'}}>
                                 {alias.targets.map((t, i) => {
                                     const provider = providers.find(p => p.id === t.provider);
                                     const isDisabled = provider?.enabled === false;
@@ -199,7 +199,7 @@ export const Models = () => {
                     ))}
                     {filteredAliases.length === 0 && (
                         <tr>
-                            <td colSpan={4} className="empty">No aliases found</td>
+                            <td colSpan={4} className="text-center text-text-muted p-12">No aliases found</td>
                         </tr>
                     )}
                 </tbody>
@@ -220,7 +220,7 @@ export const Models = () => {
         }
       >
           <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-              <div className="grid-2">
+              <div className="grid grid-cols-2 gap-4">
                   <Input 
                     label="Primary Name (ID)" 
                     value={editingAlias.id} 
@@ -228,10 +228,10 @@ export const Models = () => {
                     placeholder="e.g. gpt-4-turbo"
                   />
                   
-                  <div className="input-wrapper">
-                      <label className="input-label">Selector Strategy</label>
+                  <div className="flex flex-col gap-2">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Selector Strategy</label>
                       <select 
-                        className="input-field" 
+                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
                         value={editingAlias.selector || 'random'}
                         onChange={(e) => setEditingAlias({...editingAlias, selector: e.target.value})}
                       >
@@ -244,29 +244,29 @@ export const Models = () => {
                   </div>
               </div>
 
-               <div className="input-wrapper">
-                  <label className="input-label">Priority</label>
+               <div className="flex flex-col gap-2">
+                  <label className="font-body text-[13px] font-medium text-text-secondary">Priority</label>
                   <select 
-                    className="input-field" 
+                    className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
                     value={editingAlias.priority || 'selector'}
                     onChange={(e) => setEditingAlias({...editingAlias, priority: e.target.value as any})}
                   >
                       <option value="selector">Selector (Use strategy)</option>
                       <option value="api_match">API Match (Prioritize incoming API format)</option>
                   </select>
-                  <p className="input-help">"Selector" uses the strategy defined above. "API Match" tries to match the provider type to the incoming request format (e.g. OpenAI -> OpenAI).</p>
+                  <p className="text-xs text-text-muted mt-1">"Selector" uses the strategy defined above. "API Match" tries to match the provider type to the incoming request format (e.g. OpenAI -> OpenAI).</p>
               </div>
 
-              <div className="section-divider" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
+              <div className="h-px bg-border-glass my-4" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
 
               <div>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                      <label className="input-label" style={{marginBottom: 0}}>Additional Aliases</label>
+                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Additional Aliases</label>
                       <Button size="sm" variant="secondary" onClick={addAlias} leftIcon={<Plus size={14}/>}>Add Alias</Button>
                   </div>
                   
                   {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
-                      <div className="empty-state-sm">No additional aliases</div>
+                      <div className="text-text-muted italic text-center text-sm p-4">No additional aliases</div>
                   )}
 
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -286,16 +286,16 @@ export const Models = () => {
                   </div>
               </div>
 
-              <div className="section-divider" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
+              <div className="h-px bg-border-glass my-4" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
 
               <div>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                      <label className="input-label" style={{marginBottom: 0}}>Targets</label>
+                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Targets</label>
                       <Button size="sm" variant="secondary" onClick={addTarget} leftIcon={<Plus size={14}/>}>Add Target</Button>
                   </div>
                   
                   {editingAlias.targets.length === 0 && (
-                       <div className="empty-state-sm">No targets configured (Model will not work)</div>
+                       <div className="text-text-muted italic text-center text-sm p-4">No targets configured (Model will not work)</div>
                   )}
 
                   <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
@@ -303,9 +303,9 @@ export const Models = () => {
                           <Card key={idx} style={{padding: '12px', backgroundColor: 'var(--color-bg-subtle)'}}>
                               <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
                                   <div style={{flex: 1}}>
-                                      <label className="input-label" style={{fontSize: '11px'}}>Provider</label>
+                                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{fontSize: '11px'}}>Provider</label>
                                       <select 
-                                        className="input-field" 
+                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
                                         value={target.provider}
                                         onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
                                       >
@@ -316,9 +316,9 @@ export const Models = () => {
                                       </select>
                                   </div>
                                   <div style={{flex: 1}}>
-                                      <label className="input-label" style={{fontSize: '11px'}}>Model</label>
+                                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{fontSize: '11px'}}>Model</label>
                                       <select 
-                                        className="input-field" 
+                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
                                         value={target.model}
                                         onChange={(e) => updateTarget(idx, 'model', e.target.value)}
                                         disabled={!target.provider}

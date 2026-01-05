@@ -31,18 +31,17 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4">
       <div className="w-full" style={{ maxWidth: '600px' }}>
         <div className="text-center mb-8">
-          <img src="/plexus_logo_transparent.png" alt="Plexus" className="h-16 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-100">Admin Access</h1>
-          <p className="text-gray-400">Enter your Admin Key to continue</p>
+                      <img src="/ui/plexus_logo_transparent.png" alt="Plexus" className="h-16 mx-auto mb-4" />          <h1 className="text-2xl font-bold text-text">Admin Access</h1>
+          <p className="text-text-muted">Enter your Admin Key to continue</p>
         </div>
         
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="adminKey" className="block text-sm font-medium text-gray-400 mb-1">
+              <label htmlFor="adminKey" className="block text-sm font-medium text-text-muted mb-1">
                 Admin Key
               </label>
               <Input
@@ -55,7 +54,7 @@ export const Login: React.FC = () => {
               />
             </div>
             
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-danger text-sm">{error}</p>}
             
             <Button type="submit" className="w-full">
               Access Dashboard
