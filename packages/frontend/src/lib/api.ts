@@ -59,6 +59,7 @@ export interface Alias {
     id: string;
     aliases?: string[];
     selector?: string;
+    priority?: 'selector' | 'api_match';
     targets: Array<{ provider: string; model: string; apiType?: string[] }>;
 }
 
@@ -403,6 +404,37 @@ export const api = {
       await api.saveConfig(newYaml);
   },
 
+  saveAlias: async (alias: Alias, oldId?: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          config = { providers: {}, models: {} };
+      }
+
+      if (!config) config = {};
+      if (!config.models) config.models = {};
+
+      // If ID changed, delete old key
+      if (oldId && oldId !== alias.id && config.models[oldId]) {
+          delete config.models[oldId];
+      }
+
+      config.models[alias.id] = {
+          selector: alias.selector,
+          priority: alias.priority || 'selector',
+          additional_aliases: alias.aliases,
+          targets: alias.targets.map(t => ({
+              provider: t.provider,
+              model: t.model
+          }))
+      };
+
+      const newYaml = stringify(config);
+      await api.saveConfig(newYaml);
+  },
+
   getModels: async (): Promise<Model[]> => {
     try {
         const yamlStr = await api.getConfig();
@@ -473,6 +505,7 @@ export const api = {
                     id: key,
                     aliases: val.additional_aliases || [],
                     selector: val.selector,
+                    priority: val.priority,
                     targets
                 });
             });
