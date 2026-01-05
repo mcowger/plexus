@@ -8,6 +8,7 @@ import { calculateCosts } from "../utils/calculate-costs";
 import { TransformerFactory } from "../services/transformer-factory";
 import { DebugLoggingInspector, UsageInspector } from "./inspectors";
 import { Readable } from "stream";
+import { DebugManager } from "./debug-manager";
 /**
  * handleResponse
  *
@@ -81,8 +82,8 @@ export async function handleResponse(
      * We avoid .tee() as it breaks backpressure and stability.
      * Instead, we use PassThrough streams ('inspectors') to 'tap' into the data.
      */
-    const rawLogInspector = new DebugLoggingInspector(request.id).createInspector(providerApiType);
-    const usageInspector = new UsageInspector(request.id).createInspector();
+    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!).createInspector(providerApiType);
+    const usageInspector = new UsageInspector(usageRecord.requestId!).createInspector();
 
     // Convert Web Stream to Node Stream for piping
     const nodeStream = Readable.fromWeb(finalClientStream as any);
@@ -109,6 +110,9 @@ export async function handleResponse(
       // Re-format the unified JSON body to match the client's expected API format
       responseBody = await clientTransformer.formatResponse(unifiedResponse);
     }
+
+    // Capture transformed response for debugging
+    DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
 
     // Record the usage.
     finalizeUsage(

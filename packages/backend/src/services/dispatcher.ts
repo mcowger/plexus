@@ -4,6 +4,7 @@ import { TransformerFactory } from "./transformer-factory";
 import { logger } from "../utils/logger";
 import { CooldownManager } from "./cooldown-manager";
 import { RouteResult } from "./router";
+import { DebugManager } from "./debug-manager";
 
 export class Dispatcher {
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
@@ -45,6 +46,11 @@ export class Dispatcher {
 
     if (route.config.extraBody) {
       providerPayload = { ...providerPayload, ...route.config.extraBody };
+    }
+
+    // Capture transformed request
+    if (request.requestId) {
+      DebugManager.getInstance().addTransformedRequest(request.requestId, providerPayload);
     }
 
     // 4. Execute Request
@@ -107,6 +113,10 @@ export class Dispatcher {
     else {
       const responseBody = JSON.parse(await response.text());
       logger.silly("Upstream Response Payload", responseBody);
+
+      if (request.requestId) {
+        DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+      }
 
       let unifiedResponse: UnifiedChatResponse;
 
