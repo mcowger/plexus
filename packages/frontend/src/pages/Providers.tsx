@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { api, Provider, Cooldown } from '../lib/api';
+import { api, Provider, Cooldown, Model } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { Card } from '../components/ui/Card';
 import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 
 export const Providers = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
@@ -29,10 +31,12 @@ export const Providers = () => {
   const loadProviders = () => {
       Promise.all([
           api.getProviders(),
-          api.getCooldowns()
-      ]).then(([provs, cools]) => {
+          api.getCooldowns(),
+          api.getModels()
+      ]).then(([provs, cools, mods]) => {
           setProviders(provs);
           setCooldowns(cools);
+          setModels(mods);
       }).catch(err => console.error(err));
   };
 
@@ -184,6 +188,76 @@ export const Providers = () => {
             </div>
           </div>
         )})}
+      </div>
+
+      <div style={{marginTop: '32px'}}>
+        <Card title="Provider Models">
+            <div className="table-wrapper">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th style={{paddingLeft: '24px'}}>Provider</th>
+                            <th>APIs Supported</th>
+                            <th style={{paddingRight: '24px'}}>Models [pricing source]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {providers.map(provider => {
+                            const providerModels = models.filter(m => m.providerId === provider.id);
+                            
+                            return (
+                                <tr key={provider.id}>
+                                    <td style={{fontWeight: 600, paddingLeft: '24px', verticalAlign: 'top'}}>
+                                        {provider.id}
+                                    </td>
+                                    <td style={{verticalAlign: 'top', fontSize: '12px', color: 'var(--color-text-secondary)'}}>
+                                        {Array.isArray(provider.type) ? (
+                                            <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                                {provider.type.map(type => (
+                                                    <div key={type}>
+                                                        <span style={{fontWeight: 500}}>{type}:</span>{' '}
+                                                        <span style={{opacity: 0.8}}>
+                                                            {typeof provider.apiBaseUrl === 'object' 
+                                                                ? (provider.apiBaseUrl as Record<string,string>)[type] 
+                                                                : provider.apiBaseUrl}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <span style={{fontWeight: 500}}>{provider.type}:</span>{' '}
+                                                <span style={{opacity: 0.8}}>{provider.apiBaseUrl as string}</span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td style={{paddingRight: '24px', verticalAlign: 'top'}}>
+                                        <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                            {providerModels.map(model => (
+                                                <div key={model.id} style={{fontSize: '13px'}}>
+                                                    {model.name}
+                                                    {model.pricingSource && (
+                                                        <span style={{marginLeft: '8px', fontSize: '11px', color: 'var(--color-text-tertiary)'}}>
+                                                            [{model.pricingSource}]
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {providerModels.length === 0 && <span style={{fontSize: '12px', opacity: 0.5}}>No models configured</span>}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {providers.length === 0 && (
+                            <tr>
+                                <td colSpan={3} className="empty">No providers found</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </Card>
       </div>
 
       <Modal
