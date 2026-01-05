@@ -8,6 +8,11 @@ export class DebugLoggingInspector extends BaseInspector {
 
   createInspector(providerApiType: string): PassThrough {
     const inspector = new PassThrough();
+
+    if (!this.debugManager.isEnabled()) {
+      return inspector;
+    }
+
     let rawBody = "";
 
     inspector.on("data", (chunk: Buffer) => {
@@ -33,9 +38,11 @@ export class DebugLoggingInspector extends BaseInspector {
         logger.silly(`[Inspector] Request ${this.requestId} reconstructed: ${JSON.stringify(reconstructed, null, 2)}`);
         this.saveReconstructedResponse(reconstructed);
         this.saveRawResponse(rawBody);
+        this.debugManager.flush(this.requestId);
       } catch (err) {
         logger.error(`[Inspector] Reconstruction failed: ${err}`);
         this.saveRawResponse(rawBody);
+        this.debugManager.flush(this.requestId);
       }
     });
 

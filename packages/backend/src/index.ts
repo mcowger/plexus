@@ -148,6 +148,8 @@ fastify.post('/v1/chat/completions', async (request, reply) => {
         unifiedRequest.incomingApiType = 'chat';
         unifiedRequest.originalBody = body;
         unifiedRequest.requestId = requestId;
+
+        DebugManager.getInstance().startLog(requestId, body);
         
         const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
         
@@ -576,7 +578,6 @@ fastify.get('/health', (request, reply) => reply.send('OK'));
 fastify.register(fastifyStatic, {
     root: path.join(process.cwd(), '../frontend/dist'),
     prefix: '/',
-    wildcard: false 
 });
 
 // Single Page Application (SPA) Fallback
