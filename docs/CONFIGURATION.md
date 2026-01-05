@@ -46,102 +46,51 @@ models:
         model: claude-3-5-sonnet-latest
 ```
 
-### Configuration Sections
+## Routing & Dispatching Lifecycle
 
-#### `providers`
-This section defines the upstream AI services you want to connect to.
+When a request enters Plexus, it follows a two-stage process to determine the destination and the protocol. The order of these stages can be configured using the `priority` field in the model configuration.
 
-- **`type`**: The transformer type to use. Supported types include:
-    - `OpenAI`
-    - `Anthropic`
-    - `Gemini`
-    - *Note: If the incoming request format (e.g., OpenAI) matches the provider type, Plexus automatically uses **Pass-through Optimization** to minimize latency.*
-- **`api_base_url`**: The root URL for the provider's API.
-- **`api_key`**: Your authentication token.
-- **`discount`**: (Optional) A number between 0 and 1 representing the discount to apply to all models under this provider (e.g., `0.1` for 10% off). This can be overridden by model-specific discounts.
-- **`models`**: A list of raw model identifiers available from this specific provider.
-    - Can be a simple list of strings: `["model-a", "model-b"]`
-    - Or a map for detailed configuration (e.g., pricing):
-      ```yaml
-      models:
-        gpt-4o:
-          pricing:
-            source: simple
-            input: 2.50
-            output: 10.00
-      ```
-- **`headers`**: (Optional) Extra headers to send with every request to this provider (useful for custom gateways or organization IDs).
+### Default Lifecycle (`priority: selector`)
 
-### Pricing Configuration
+1.  **Stage 1: Routing (The "Where")**: 
+    - The **Selector** takes precedence here. 
+    - Plexus identifies all healthy targets for the requested model alias.
+    - It applies the configured `selector` (random, cost, etc.) to choose exactly **one** target provider and model.
+    - **Outcome**: A specific provider and model are selected.
 
-You can define pricing for each model within the `providers` configuration. This allows Plexus to track and calculate estimated costs for your usage.
+2.  **Stage 2: Dispatching (The "How")**: 
+    - **API Matching** occurs after the target is locked in.
+    - Plexus looks at the available API types for the selected provider (and specific model).
+    - It attempts to match the incoming request format to an available provider protocol to enable **Pass-through Optimization**.
+    - If a match is found, it uses that protocol; otherwise, it falls back to the first available protocol and performs transformation.
 
-**Schema:**
+### Inverted Lifecycle (`priority: api_match`)
 
-Pricing is defined under the `pricing` key for a specific model.
+1.  **Stage 1: API Matching Filter**:
+    - Plexus first identifies all healthy targets for the requested model alias.
+    - It then filters these targets to only include those that natively support the **incoming API type** (e.g., if the client sent an OpenAI request, it looks for providers that support `chat`).
+    - If one or more compatible targets are found, they are passed to the Selector.
+    - If **no** targets support the incoming API type, Plexus falls back to the full list of healthy targets.
 
-1.  **Simple Pricing** (`source: simple`)
-    -   `input`: Cost per 1 million input tokens.
-    -   `output`: Cost per 1 million output tokens.
-    -   `cached`: (Optional) Cost per 1 million cached input tokens.
+2.  **Stage 2: Routing**:
+    - The **Selector** is applied to the filtered list (or the fallback list) to choose the final target.
 
-    ```yaml
-    pricing:
-      source: simple
-      input: 5.00
-      output: 15.00
-    ```
+---
 
-2.  **OpenRouter Pricing** (`source: openrouter`)
-    -   `slug`: The specific OpenRouter model identifier (e.g., `openai/gpt-4o`, `anthropic/claude-3-opus`).
-    -   `discount`: (Optional) A number between 0 and 1 representing the discount to apply (e.g., `0.1` for a 10% discount).
-    -   *Note: Plexus automatically fetches the latest pricing data from the OpenRouter API on startup and uses it for cost calculations. This ensures your tracked costs stay up-to-date with public rates without manual configuration.*
+## Configuration Sections
 
-    ```yaml
-    pricing:
-      source: openrouter
-      slug: openai/gpt-4o
-      discount: 0.1
-    ```
-
-3.  **Defined (Tiered/Range) Pricing** (`source: defined`)
-    -   `range`: An array of pricing tiers based on input token usage.
-    -   `lower_bound`: (Optional, default 0) Minimum input tokens for this tier (inclusive).
-    -   `upper_bound`: (Optional, default Infinity) Maximum input tokens for this tier (inclusive). Use `.inf` for Infinity in YAML.
-    -   `input_per_m`: Cost per 1 million input tokens in this tier.
-    -   `output_per_m`: Cost per 1 million output tokens in this tier.
-
-    ```yaml
-    pricing:
-      source: defined
-      range:
-        # First 1M tokens
-        - lower_bound: 0
-          upper_bound: 1000000
-          input_per_m: 5.00
-          output_per_m: 15.00
-        # Anything above 1M tokens
-        - lower_bound: 1000001
-          upper_bound: .inf
-          input_per_m: 4.00
-          output_per_m: 12.00
-    ```
+...
 
 #### `models`
 This section defines the "virtual" models or aliases that clients will use when making requests to Plexus.
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
 - **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration.
-    - Example: `["gpt-4", "gpt-4-turbo"]`
-    - Useful for transparently upgrading models (e.g., routing `gpt-4` requests to `gpt-4o`) or supporting legacy client configurations without changing the client code.
-- **`selector`**: (Optional) The strategy to use for target selection when multiple targets are defined.
-    - `random`: (Default) Randomly selects a healthy target.
-    - `cost`: Selects the target with the lowest configured cost.
-    - `performance`: Selects the target with the highest average tokens per second (TPS) based on recent usage history.
-    - `latency`: Selects the target with the lowest average Time to First Token (TTFT) based on recent usage history.
-    - `usage`: (Not yet implemented) Will select based on usage patterns.
-- **`targets`**: A list of provider/model pairs that back this alias.
-    - `provider`: Must match a key defined in the `providers` section.
+- **`selector`**: (Optional) The strategy to use for target selection (random, cost, performance, latency).
+- **`priority`**: (Optional) Determines the precedence of API matching vs. routing selection.
+    - `selector`: (Default) Select the target first, then determine the best API to use.
+    - `api_match`: Filter targets by compatibility with the incoming API type first, then apply the selector.
+- **`targets`**: A list of provider/model pairs that back this alias.    - `provider`: Must match a key defined in the `providers` section.
     - `model`: The specific model name to use on that provider.
 
 #### `keys`
