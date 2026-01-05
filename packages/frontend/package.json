@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "bun run build.ts",
+    "check-types": "bun x tsc --noEmit",
     "dev": "NODE_ENV=development bun build ./src/main.tsx --outdir ./dist --watch"
   },
   "devDependencies": {

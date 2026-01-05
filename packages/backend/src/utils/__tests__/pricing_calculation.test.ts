@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
-import { handleResponse } from "../response-handler";
-import { FastifyReply } from "fastify";
+import { handleResponse } from "../../services/response-handler";
+import { FastifyReply, FastifyRequest } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -25,6 +25,7 @@ describe("handleResponse - Pricing Calculation", () => {
         parseRequest: mock(),
         transformRequest: mock(),
         transformResponse: mock(),
+        extractUsage: mock(),
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
     };
 
@@ -33,6 +34,10 @@ describe("handleResponse - Pricing Calculation", () => {
         header: mock(function(this: any) { return this; }),
         code: mock(function(this: any) { return this; }),
     } as unknown as FastifyReply;
+
+    const mockRequest = {
+        id: "test-req-id"
+    } as unknown as FastifyRequest;
 
     const baseUsage = {
         reasoning_tokens: 0,
@@ -80,6 +85,7 @@ describe("handleResponse - Pricing Calculation", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -138,6 +144,7 @@ describe("handleResponse - Pricing Calculation", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,

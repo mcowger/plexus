@@ -6,14 +6,13 @@ import {
   MessageContent,
 } from "../types/unified";
 import { logger } from "../utils/logger";
-import { Content, Part, Tool, FunctionDeclaration } from "@google/genai";
-import { extractGeminiUsage } from "./usage-extractors";
-import { createParser, EventSourceMessage } from 'eventsource-parser';
-import { encode } from 'eventsource-encoder';
+import { Content, Part, Tool } from "@google/genai";
+import { createParser, EventSourceMessage } from "eventsource-parser";
+import { encode } from "eventsource-encoder";
 
 /**
  * GeminiTransformer
- * 
+ *
  * Handles transformation between Google Gemini's GenerateContent API and the internal Unified format.
  * Maps Gemini's part-based content system (text, inlineData, functionCall) to Unified messages.
  */
@@ -72,7 +71,7 @@ export class GeminiTransformer implements Transformer {
       model,
       max_tokens: generationConfig.maxOutputTokens,
       temperature: generationConfig.temperature,
-      stream: false, 
+      stream: false,
       tool_choice: undefined,
     };
 
@@ -101,10 +100,7 @@ export class GeminiTransformer implements Transformer {
     // Map Gemini Contents to Unified Messages
     if (Array.isArray(contents)) {
       contents.forEach((content) => {
-        const role =
-          content.role === "model"
-            ? "assistant"
-            : "user"; 
+        const role = content.role === "model" ? "assistant" : "user";
 
         if (content.parts) {
           const message: UnifiedMessage = {
@@ -113,7 +109,7 @@ export class GeminiTransformer implements Transformer {
           };
 
           const contentParts: MessageContent[] = [];
-          
+
           content.parts.forEach((part) => {
             if (part.text) {
               // @ts-ignore - Check for internal 'thought' flag used by some Gemini versions
@@ -146,7 +142,9 @@ export class GeminiTransformer implements Transformer {
             } else if (part.functionCall) {
               if (!message.tool_calls) message.tool_calls = [];
               message.tool_calls.push({
-                id: part.functionCall.name || "call_" + Math.random().toString(36).substring(7),
+                id:
+                  part.functionCall.name ||
+                  "call_" + Math.random().toString(36).substring(7),
                 type: "function",
                 function: {
                   name: part.functionCall.name || "unknown",
@@ -167,7 +165,9 @@ export class GeminiTransformer implements Transformer {
           }
 
           // Handle Gemini's functionResponse (mapping to 'tool' role)
-          const functionResponses = content.parts.filter(p => p.functionResponse);
+          const functionResponses = content.parts.filter(
+            (p) => p.functionResponse
+          );
           if (functionResponses.length > 0) {
             functionResponses.forEach((fr) => {
               unifiedChatRequest.messages.push({
@@ -177,7 +177,8 @@ export class GeminiTransformer implements Transformer {
                 name: fr.functionResponse?.name,
               });
             });
-            if (contentParts.length > 0) unifiedChatRequest.messages.push(message);
+            if (contentParts.length > 0)
+              unifiedChatRequest.messages.push(message);
           } else {
             unifiedChatRequest.messages.push(message);
           }
@@ -191,7 +192,9 @@ export class GeminiTransformer implements Transformer {
   /**
    * transformRequest (Unified -> Provider)
    */
-  async transformRequest(request: UnifiedChatRequest): Promise<GenerateContentRequest> {
+  async transformRequest(
+    request: UnifiedChatRequest
+  ): Promise<GenerateContentRequest> {
     const contents: Content[] = [];
     const tools: Tool[] = [];
 
@@ -201,7 +204,12 @@ export class GeminiTransformer implements Transformer {
 
       if (msg.role === "system") {
         role = "user";
-        parts.push({ text: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content) });
+        parts.push({
+          text:
+            typeof msg.content === "string"
+              ? msg.content
+              : JSON.stringify(msg.content),
+        });
       } else if (msg.role === "user" || msg.role === "assistant") {
         role = msg.role === "assistant" ? "model" : "user";
 
@@ -223,9 +231,16 @@ export class GeminiTransformer implements Transformer {
             } else if (c.type === "image_url") {
               if (c.image_url.url.startsWith("data:")) {
                 const [meta, data] = c.image_url.url.split(",");
-                parts.push({ inlineData: { mimeType: "image/jpeg", data: data || "" } });
+                parts.push({
+                  inlineData: { mimeType: "image/jpeg", data: data || "" },
+                });
               } else {
-                parts.push({ fileData: { mimeType: c.media_type || "image/jpeg", fileUri: c.image_url.url } });
+                parts.push({
+                  fileData: {
+                    mimeType: c.media_type || "image/jpeg",
+                    fileUri: c.image_url.url,
+                  },
+                });
               }
             }
           });
@@ -233,8 +248,14 @@ export class GeminiTransformer implements Transformer {
 
         if (msg.tool_calls) {
           msg.tool_calls.forEach((tc, index) => {
-            const part: any = { functionCall: { name: tc.function.name, args: JSON.parse(tc.function.arguments) } };
-            if (index === 0 && msg.thinking?.signature) part.thoughtSignature = msg.thinking.signature;
+            const part: any = {
+              functionCall: {
+                name: tc.function.name,
+                args: JSON.parse(tc.function.arguments),
+              },
+            };
+            if (index === 0 && msg.thinking?.signature)
+              part.thoughtSignature = msg.thinking.signature;
             parts.push(part);
           });
         }
@@ -243,7 +264,12 @@ export class GeminiTransformer implements Transformer {
         parts.push({
           functionResponse: {
             name: msg.name || msg.tool_call_id || "unknown_tool",
-            response: { content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content) },
+            response: {
+              content:
+                typeof msg.content === "string"
+                  ? msg.content
+                  : JSON.stringify(msg.content),
+            },
           },
         });
       }
@@ -253,11 +279,13 @@ export class GeminiTransformer implements Transformer {
 
     // Transform Unified tools to Gemini function declarations
     if (request.tools && request.tools.length > 0) {
-      tools.push({ functionDeclarations: request.tools.map(t => ({
-        name: t.function.name,
-        description: t.function.description,
-        parameters: t.function.parameters as any,
-      })) });
+      tools.push({
+        functionDeclarations: request.tools.map((t) => ({
+          name: t.function.name,
+          description: t.function.description,
+          parameters: t.function.parameters as any,
+        })),
+      });
     }
 
     const req: GenerateContentRequest = {
@@ -291,29 +319,38 @@ export class GeminiTransformer implements Transformer {
       }
       if (part.functionCall) {
         tool_calls.push({
-          id: part.functionCall.name || "call_" + Math.random().toString(36).substring(7),
+          id:
+            part.functionCall.name ||
+            "call_" + Math.random().toString(36).substring(7),
           type: "function",
-          function: { name: part.functionCall.name, arguments: JSON.stringify(part.functionCall.args) },
+          function: {
+            name: part.functionCall.name,
+            arguments: JSON.stringify(part.functionCall.args),
+          },
         });
       }
       if (part.thoughtSignature) thoughtSignature = part.thoughtSignature;
     });
 
-    const usage = response.usageMetadata ? {
-      input_tokens: response.usageMetadata.promptTokenCount || 0,
-      output_tokens: response.usageMetadata.candidatesTokenCount || 0,
-      total_tokens: response.usageMetadata.totalTokenCount || 0,
-      reasoning_tokens: response.usageMetadata.thoughtsTokenCount || 0,
-      cached_tokens: response.usageMetadata.cachedContentTokenCount || 0,
-      cache_creation_tokens: 0,
-    } : undefined;
+    const usage = response.usageMetadata
+      ? {
+          input_tokens: response.usageMetadata.promptTokenCount || 0,
+          output_tokens: response.usageMetadata.candidatesTokenCount || 0,
+          total_tokens: response.usageMetadata.totalTokenCount || 0,
+          reasoning_tokens: response.usageMetadata.thoughtsTokenCount || 0,
+          cached_tokens: response.usageMetadata.cachedContentTokenCount || 0,
+          cache_creation_tokens: 0,
+        }
+      : undefined;
 
     return {
       id: response.responseId || "gemini-" + Date.now(),
       model: response.modelVersion || "gemini-model",
       content: content || null,
       reasoning_content: reasoning_content || null,
-      thinking: thoughtSignature ? { content: reasoning_content, signature: thoughtSignature } : undefined,
+      thinking: thoughtSignature
+        ? { content: reasoning_content, signature: thoughtSignature }
+        : undefined,
       tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
       usage,
     };
@@ -326,14 +363,24 @@ export class GeminiTransformer implements Transformer {
     const parts: Part[] = [];
     if (response.reasoning_content) {
       const part: any = { text: response.reasoning_content, thought: true };
-      if (response.thinking?.signature) part.thoughtSignature = response.thinking.signature;
+      if (response.thinking?.signature)
+        part.thoughtSignature = response.thinking.signature;
       parts.push(part);
     }
     if (response.content) parts.push({ text: response.content });
     if (response.tool_calls) {
       response.tool_calls.forEach((tc, index) => {
-        const part: any = { functionCall: { name: tc.function.name, args: JSON.parse(tc.function.arguments) } };
-        if (index === 0 && response.thinking?.signature && !response.reasoning_content) {
+        const part: any = {
+          functionCall: {
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments),
+          },
+        };
+        if (
+          index === 0 &&
+          response.thinking?.signature &&
+          !response.reasoning_content
+        ) {
           part.thoughtSignature = response.thinking.signature;
         }
         parts.push(part);
@@ -341,13 +388,17 @@ export class GeminiTransformer implements Transformer {
     }
 
     return {
-      candidates: [{ content: { role: "model", parts }, finishReason: "STOP", index: 0 }],
-      usageMetadata: response.usage ? {
-        promptTokenCount: response.usage.input_tokens,
-        candidatesTokenCount: response.usage.output_tokens,
-        totalTokenCount: response.usage.total_tokens,
-        thoughtsTokenCount: response.usage.reasoning_tokens,
-      } : undefined,
+      candidates: [
+        { content: { role: "model", parts }, finishReason: "STOP", index: 0 },
+      ],
+      usageMetadata: response.usage
+        ? {
+            promptTokenCount: response.usage.input_tokens,
+            candidatesTokenCount: response.usage.output_tokens,
+            totalTokenCount: response.usage.total_tokens,
+            thoughtsTokenCount: response.usage.reasoning_tokens,
+          }
+        : undefined,
       modelVersion: response.model,
     };
   }
@@ -362,73 +413,92 @@ export class GeminiTransformer implements Transformer {
 
     const transformer = new TransformStream({
       start(controller) {
-          parser = createParser({
-              onEvent: (event: EventSourceMessage) => {
-                  if (event.data === '[DONE]') return;
-                  try {
-                      const data = JSON.parse(event.data);
-                      const candidate = data.candidates?.[0];
-                      if (!candidate) return;
+        parser = createParser({
+          onEvent: (event: EventSourceMessage) => {
+            if (event.data === "[DONE]") return;
+            try {
+              const data = JSON.parse(event.data);
+              const candidate = data.candidates?.[0];
+              if (!candidate) return;
 
-                      const parts = candidate.content?.parts || [];
+              const parts = candidate.content?.parts || [];
 
-                      for (const part of parts) {
-                          if (part.text) {
-                              const chunk = {
-                                  id: data.responseId,
-                                  model: data.modelVersion,
-                                  delta: {
-                                      role: "assistant",
-                                      reasoning_content: part.thought ? part.text : undefined,
-                                      content: part.thought ? undefined : part.text,
-                                  },
-                              };
-                              logger.silly(`Gemini Transformer: Enqueueing unified chunk (text)`, chunk);
-                              controller.enqueue(chunk);
-                          }
-                          if (part.functionCall) {
-                              const chunk = {
-                                  id: data.responseId,
-                                  model: data.modelVersion,
-                                  delta: {
-                                      role: "assistant",
-                                      tool_calls: [{
-                                          id: part.functionCall.name,
-                                          type: "function",
-                                          function: { name: part.functionCall.name, arguments: JSON.stringify(part.functionCall.args) },
-                                      }],
-                                  },
-                              };
-                              logger.silly(`Gemini Transformer: Enqueueing unified chunk (tool)`, chunk);
-                              controller.enqueue(chunk);
-                          }
-                      }
-
-                      if (candidate.finishReason) {
-                          const chunk = {
-                              id: data.responseId,
-                              model: data.modelVersion,
-                              finish_reason: candidate.finishReason.toLowerCase(),
-                              usage: data.usageMetadata ? {
-                                  input_tokens: data.usageMetadata.promptTokenCount,
-                                  output_tokens: data.usageMetadata.candidatesTokenCount,
-                                  total_tokens: data.usageMetadata.totalTokenCount,
-                                  reasoning_tokens: data.usageMetadata.thoughtsTokenCount,
-                                  cached_tokens: data.usageMetadata.cachedContentTokenCount,
-                              } : undefined,
-                          };
-                          logger.silly(`Gemini Transformer: Enqueueing unified chunk (finish)`, chunk);
-                          controller.enqueue(chunk);
-                      }
-
-                  } catch (e) {
-                      logger.error("Error parsing Gemini stream chunk", e);
-                  }
+              for (const part of parts) {
+                if (part.text) {
+                  const chunk = {
+                    id: data.responseId,
+                    model: data.modelVersion,
+                    delta: {
+                      role: "assistant",
+                      reasoning_content: part.thought ? part.text : undefined,
+                      content: part.thought ? undefined : part.text,
+                    },
+                  };
+                  logger.silly(
+                    `Gemini Transformer: Enqueueing unified chunk (text)`,
+                    chunk
+                  );
+                  controller.enqueue(chunk);
+                }
+                if (part.functionCall) {
+                  const chunk = {
+                    id: data.responseId,
+                    model: data.modelVersion,
+                    delta: {
+                      role: "assistant",
+                      tool_calls: [
+                        {
+                          id: part.functionCall.name,
+                          type: "function",
+                          function: {
+                            name: part.functionCall.name,
+                            arguments: JSON.stringify(part.functionCall.args),
+                          },
+                        },
+                      ],
+                    },
+                  };
+                  logger.silly(
+                    `Gemini Transformer: Enqueueing unified chunk (tool)`,
+                    chunk
+                  );
+                  controller.enqueue(chunk);
+                }
               }
-          });
+
+              if (candidate.finishReason) {
+                const chunk = {
+                  id: data.responseId,
+                  model: data.modelVersion,
+                  finish_reason: candidate.finishReason.toLowerCase(),
+                  usage: data.usageMetadata
+                    ? {
+                        input_tokens: data.usageMetadata.promptTokenCount,
+                        output_tokens: data.usageMetadata.candidatesTokenCount,
+                        total_tokens: data.usageMetadata.totalTokenCount,
+                        reasoning_tokens: data.usageMetadata.thoughtsTokenCount,
+                        cached_tokens:
+                          data.usageMetadata.cachedContentTokenCount,
+                      }
+                    : undefined,
+                };
+                logger.silly(
+                  `Gemini Transformer: Enqueueing unified chunk (finish)`,
+                  chunk
+                );
+                controller.enqueue(chunk);
+              }
+            } catch (e) {
+              logger.error("Error parsing Gemini stream chunk", e);
+            }
+          },
+        });
       },
       transform(chunk, controller) {
-        const text = typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream: true });
+        const text =
+          typeof chunk === "string"
+            ? chunk
+            : decoder.decode(chunk, { stream: true });
         parser.feed(text);
       },
     });
@@ -446,22 +516,39 @@ export class GeminiTransformer implements Transformer {
       transform(chunk: any, controller) {
         const parts: Part[] = [];
         if (chunk.delta?.content) parts.push({ text: chunk.delta.content });
-        if (chunk.delta?.reasoning_content) parts.push({ text: chunk.delta.reasoning_content, thought: true } as any);
+        if (chunk.delta?.reasoning_content)
+          parts.push({
+            text: chunk.delta.reasoning_content,
+            thought: true,
+          } as any);
         if (chunk.delta?.tool_calls) {
           chunk.delta.tool_calls.forEach((tc: any) => {
-            parts.push({ functionCall: { name: tc.function.name, args: JSON.parse(tc.function.arguments || "{}") } });
+            parts.push({
+              functionCall: {
+                name: tc.function.name,
+                args: JSON.parse(tc.function.arguments || "{}"),
+              },
+            });
           });
         }
 
         if (parts.length > 0 || chunk.finish_reason) {
           const geminiChunk = {
-            candidates: [{ content: { role: "model", parts }, finishReason: chunk.finish_reason?.toUpperCase() || null, index: 0 }],
-            usageMetadata: chunk.usage ? {
-              promptTokenCount: chunk.usage.input_tokens,
-              candidatesTokenCount: chunk.usage.output_tokens,
-              totalTokenCount: chunk.usage.total_tokens,
-              thoughtsTokenCount: chunk.usage.reasoning_tokens,
-            } : undefined,
+            candidates: [
+              {
+                content: { role: "model", parts },
+                finishReason: chunk.finish_reason?.toUpperCase() || null,
+                index: 0,
+              },
+            ],
+            usageMetadata: chunk.usage
+              ? {
+                  promptTokenCount: chunk.usage.input_tokens,
+                  candidatesTokenCount: chunk.usage.output_tokens,
+                  totalTokenCount: chunk.usage.total_tokens,
+                  thoughtsTokenCount: chunk.usage.reasoning_tokens,
+                }
+              : undefined,
           };
           const sseMessage = encode({ data: JSON.stringify(geminiChunk) });
           controller.enqueue(encoder.encode(sseMessage));
@@ -472,7 +559,33 @@ export class GeminiTransformer implements Transformer {
     return stream.pipeThrough(transformer);
   }
 
-  extractUsage(input: string) {
-    return extractGeminiUsage(input);
+  /**
+   * Extract usage from Gemini-style event data (already parsed JSON string)
+   */
+  extractUsage(dataStr: string):
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        cached_tokens?: number;
+        reasoning_tokens?: number;
+      }
+    | undefined {
+    try {
+      const data = JSON.parse(dataStr);
+
+      // Gemini sends usage in usageMetadata
+      if (data.usageMetadata) {
+        return {
+          input_tokens: data.usageMetadata.promptTokenCount || 0,
+          output_tokens: data.usageMetadata.candidatesTokenCount || 0,
+          cached_tokens: data.usageMetadata.cachedContentTokenCount || 0,
+          reasoning_tokens: 0,
+        };
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    return undefined;
   }
 }

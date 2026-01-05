@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, beforeAll } from "bun:test";
-import { handleResponse } from "../response-handler";
-import { FastifyReply } from "fastify";
+import { handleResponse } from "../../services/response-handler";
+import { FastifyReply, FastifyRequest } from "fastify";
 import { UsageStorageService } from "../../services/usage-storage";
 import { Transformer } from "../../types/transformer";
 import { UnifiedChatResponse } from "../../types/unified";
@@ -55,6 +55,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         transformRequest: mock(),
         transformResponse: mock(),
         formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
+        extractUsage: mock()
     };
 
     const mockReply = {
@@ -62,6 +63,10 @@ describe("handleResponse - OpenRouter Pricing", () => {
         header: mock(function(this: any) { return this; }),
         code: mock(function(this: any) { return this; }),
     } as unknown as FastifyReply;
+
+    const mockRequest = {
+        id: "test-req-id"
+    } as unknown as FastifyRequest;
 
     const baseUsage = {
         reasoning_tokens: 0,
@@ -104,6 +109,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -149,6 +155,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -190,6 +197,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         const usageRecord: Partial<UsageRecord> = { requestId: "req-or-3" };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -234,6 +242,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,
@@ -283,6 +292,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         };
 
         await handleResponse(
+            mockRequest,
             mockReply,
             unifiedResponse,
             mockTransformer,

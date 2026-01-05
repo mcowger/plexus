@@ -8,13 +8,12 @@ import {
 } from "../types/unified";
 import { logger } from "../utils/logger";
 import { countTokens } from "./utils";
-import { extractAnthropicUsage } from "./usage-extractors";
-import { createParser, EventSourceMessage } from 'eventsource-parser';
-import { encode } from 'eventsource-encoder';
+import { createParser, EventSourceMessage } from "eventsource-parser";
+import { encode } from "eventsource-encoder";
 
 /**
  * AnthropicTransformer
- * 
+ *
  * Handles transformation between Anthropic's Messages API and the internal Unified format.
  * Includes specialized logic for content blocks (thinking, tool_use, etc.) and token imputation.
  */
@@ -346,117 +345,121 @@ export class AnthropicTransformer implements Transformer {
 
     const transformer = new TransformStream({
       start(controller) {
-          parser = createParser({
-              onEvent: (event: EventSourceMessage) => {
-                  if (event.data === '[DONE]') return;
+        parser = createParser({
+          onEvent: (event: EventSourceMessage) => {
+            if (event.data === "[DONE]") return;
 
+            try {
+              const data = JSON.parse(event.data);
+              let unifiedChunk: any = null;
 
-                  try {
-                      const data = JSON.parse(event.data);
-                      let unifiedChunk: any = null;
-
-                      switch (data.type) {
-                          case "message_start":
-                              unifiedChunk = {
-                                  id: data.message.id,
-                                  model: data.message.model,
-                                  created: Math.floor(Date.now() / 1000),
-                                  delta: { role: "assistant" },
-                              };
-                              break;
-                          case "content_block_delta":
-                              if (data.delta.type === "text_delta") {
-                                  accumulatedText += data.delta.text;
-                                  unifiedChunk = {
-                                      delta: { content: data.delta.text },
-                                  };
-                              } else if (data.delta.type === "thinking_delta") {
-                                  seenThinking = true;
-                                  unifiedChunk = {
-                                      delta: { reasoning_content: data.delta.thinking },
-                                  };
-                              } else if (data.delta.type === "input_json_delta") {
-                                  unifiedChunk = {
-                                      delta: {
-                                          tool_calls: [
-                                              {
-                                                  index: data.index,
-                                                  function: { arguments: data.delta.partial_json },
-                                              },
-                                          ],
-                                      },
-                                  };
-                              }
-                              break;
-                          case "content_block_start":
-                              if (data.content_block.type === "tool_use") {
-                                  unifiedChunk = {
-                                      delta: {
-                                          tool_calls: [
-                                              {
-                                                  index: data.index,
-                                                  id: data.content_block.id,
-                                                  type: "function",
-                                                  function: {
-                                                      name: data.content_block.name,
-                                                      arguments: "",
-                                                  },
-                                              },
-                                          ],
-                                      },
-                                  };
-                              }
-                              break;
-                          case "message_delta":
-                              // Handle usage update and finish reason
-                              const inputTokens = data.usage?.input_tokens || 0;
-                              const totalOutputTokens = data.usage?.output_tokens || 0;
-
-                              let realOutputTokens = totalOutputTokens;
-                              let imputedThinkingTokens = 0;
-
-                              if (seenThinking) {
-                                  realOutputTokens = countTokens(accumulatedText);
-                                  imputedThinkingTokens = Math.max(
-                                      0,
-                                      totalOutputTokens - realOutputTokens
-                                  );
-                              }
-
-                              unifiedChunk = {
-                                  finish_reason:
-                                      data.delta.stop_reason === "end_turn"
-                                          ? "stop"
-                                          : data.delta.stop_reason === "tool_use"
-                                          ? "tool_calls"
-                                          : data.delta.stop_reason,
-                                  usage: data.usage
-                                      ? {
-                                          input_tokens: inputTokens,
-                                          output_tokens: realOutputTokens,
-                                          total_tokens: inputTokens + totalOutputTokens,
-                                          reasoning_tokens: imputedThinkingTokens,
-                                          cached_tokens: 0,
-                                          cache_creation_tokens: 0,
-                                      }
-                                      : undefined,
-                              };
-                              break;
-                      }
-
-                      if (unifiedChunk) {
-                          logger.silly(`Anthropic Transformer: Enqueueing unified chunk`, unifiedChunk);
-                          controller.enqueue(unifiedChunk);
-                      }
-
-                  } catch (e) {
-                      logger.error("Error parsing Anthropic stream chunk", e);
+              switch (data.type) {
+                case "message_start":
+                  unifiedChunk = {
+                    id: data.message.id,
+                    model: data.message.model,
+                    created: Math.floor(Date.now() / 1000),
+                    delta: { role: "assistant" },
+                  };
+                  break;
+                case "content_block_delta":
+                  if (data.delta.type === "text_delta") {
+                    accumulatedText += data.delta.text;
+                    unifiedChunk = {
+                      delta: { content: data.delta.text },
+                    };
+                  } else if (data.delta.type === "thinking_delta") {
+                    seenThinking = true;
+                    unifiedChunk = {
+                      delta: { reasoning_content: data.delta.thinking },
+                    };
+                  } else if (data.delta.type === "input_json_delta") {
+                    unifiedChunk = {
+                      delta: {
+                        tool_calls: [
+                          {
+                            index: data.index,
+                            function: { arguments: data.delta.partial_json },
+                          },
+                        ],
+                      },
+                    };
                   }
+                  break;
+                case "content_block_start":
+                  if (data.content_block.type === "tool_use") {
+                    unifiedChunk = {
+                      delta: {
+                        tool_calls: [
+                          {
+                            index: data.index,
+                            id: data.content_block.id,
+                            type: "function",
+                            function: {
+                              name: data.content_block.name,
+                              arguments: "",
+                            },
+                          },
+                        ],
+                      },
+                    };
+                  }
+                  break;
+                case "message_delta":
+                  // Handle usage update and finish reason
+                  const inputTokens = data.usage?.input_tokens || 0;
+                  const totalOutputTokens = data.usage?.output_tokens || 0;
+
+                  let realOutputTokens = totalOutputTokens;
+                  let imputedThinkingTokens = 0;
+
+                  if (seenThinking) {
+                    realOutputTokens = countTokens(accumulatedText);
+                    imputedThinkingTokens = Math.max(
+                      0,
+                      totalOutputTokens - realOutputTokens
+                    );
+                  }
+
+                  unifiedChunk = {
+                    finish_reason:
+                      data.delta.stop_reason === "end_turn"
+                        ? "stop"
+                        : data.delta.stop_reason === "tool_use"
+                        ? "tool_calls"
+                        : data.delta.stop_reason,
+                    usage: data.usage
+                      ? {
+                          input_tokens: inputTokens,
+                          output_tokens: realOutputTokens,
+                          total_tokens: inputTokens + totalOutputTokens,
+                          reasoning_tokens: imputedThinkingTokens,
+                          cached_tokens: 0,
+                          cache_creation_tokens: 0,
+                        }
+                      : undefined,
+                  };
+                  break;
               }
-          });
+
+              if (unifiedChunk) {
+                logger.silly(
+                  `Anthropic Transformer: Enqueueing unified chunk`,
+                  unifiedChunk
+                );
+                controller.enqueue(unifiedChunk);
+              }
+            } catch (e) {
+              logger.error("Error parsing Anthropic stream chunk", e);
+            }
+          },
+        });
       },
       transform(chunk, controller) {
-        const text = typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream: true });
+        const text =
+          typeof chunk === "string"
+            ? chunk
+            : decoder.decode(chunk, { stream: true });
         parser.feed(text);
       },
     });
@@ -489,9 +492,9 @@ export class AnthropicTransformer implements Transformer {
               usage: { input_tokens: 0, output_tokens: 0 },
             },
           };
-          const sseMessage = encode({ 
-              event: 'message_start',
-              data: JSON.stringify(messageStart) 
+          const sseMessage = encode({
+            event: "message_start",
+            data: JSON.stringify(messageStart),
           });
           controller.enqueue(encoder.encode(sseMessage));
           hasSentStart = true;
@@ -504,9 +507,9 @@ export class AnthropicTransformer implements Transformer {
               index: 0,
               delta: { type: "text_delta", text: chunk.delta.content },
             };
-            const sseMessage = encode({ 
-                event: 'content_block_delta',
-                data: JSON.stringify(textDelta) 
+            const sseMessage = encode({
+              event: "content_block_delta",
+              data: JSON.stringify(textDelta),
             });
             controller.enqueue(encoder.encode(sseMessage));
           }
@@ -520,9 +523,9 @@ export class AnthropicTransformer implements Transformer {
                 thinking: chunk.delta.reasoning_content,
               },
             };
-            const sseMessage = encode({ 
-                event: 'content_block_delta',
-                data: JSON.stringify(thinkingDelta) 
+            const sseMessage = encode({
+              event: "content_block_delta",
+              data: JSON.stringify(thinkingDelta),
             });
             controller.enqueue(encoder.encode(sseMessage));
           }
@@ -537,9 +540,9 @@ export class AnthropicTransformer implements Transformer {
                   partial_json: tc.function?.arguments || "",
                 },
               };
-              const sseMessage = encode({ 
-                  event: 'content_block_delta',
-                  data: JSON.stringify(toolDelta) 
+              const sseMessage = encode({
+                event: "content_block_delta",
+                data: JSON.stringify(toolDelta),
               });
               controller.enqueue(encoder.encode(sseMessage));
             }
@@ -565,16 +568,16 @@ export class AnthropicTransformer implements Transformer {
                 }
               : undefined,
           };
-          const sseMessage = encode({ 
-              event: 'message_delta',
-              data: JSON.stringify(messageDelta) 
+          const sseMessage = encode({
+            event: "message_delta",
+            data: JSON.stringify(messageDelta),
           });
           controller.enqueue(encoder.encode(sseMessage));
 
           const messageStop = { type: "message_stop" };
-          const sseStop = encode({ 
-              event: 'message_stop',
-              data: JSON.stringify(messageStop) 
+          const sseStop = encode({
+            event: "message_stop",
+            data: JSON.stringify(messageStop),
           });
           controller.enqueue(encoder.encode(sseStop));
         }
@@ -616,7 +619,45 @@ export class AnthropicTransformer implements Transformer {
     }));
   }
 
-  extractUsage(input: string) {
-    return extractAnthropicUsage(input);
+  /**
+   * Extract usage from Anthropic-style event data (already parsed JSON string)
+   */
+  extractUsage(dataStr: string):
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        cached_tokens?: number;
+        reasoning_tokens?: number;
+      }
+    | undefined {
+    try {
+      const data = JSON.parse(dataStr);
+
+      // Anthropic sends usage in message_start and message_delta events
+      if (data.type === "message_start" && data.message?.usage) {
+        return {
+          input_tokens: data.message.usage.input_tokens || 0,
+          output_tokens: data.message.usage.output_tokens || 0,
+          cached_tokens:
+            data.message.usage.cache_read_input_tokens ||
+            data.message.usage.cache_creation_input_tokens ||
+            0,
+          reasoning_tokens: 0,
+        };
+      }
+
+      if (data.type === "message_delta" && data.usage) {
+        return {
+          input_tokens: 0,
+          output_tokens: data.usage.output_tokens || 0,
+          cached_tokens: 0,
+          reasoning_tokens: 0,
+        };
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    return undefined;
   }
 }
