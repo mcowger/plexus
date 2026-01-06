@@ -118,3 +118,12 @@ The frontend uses Tailwind CSS v4. To ensure utility classes are correctly scann
 - **Source Directives:** In `packages/frontend/src/globals.css`, use `@source "../src/**/*.{tsx,ts,jsx,js}";`. This ensures the scanner looks at the source files relative to the CSS file's location.
 
 Failure to follow these settings will result in a `main.css` file that contains only base styles and no generated utility classes, causing the UI to appear unstyled.
+
+### 7.2 Static Assets Location
+All static assets (images, logos, icons, etc.) must be placed in `packages/frontend/src/assets/`.
+
+- **Import Assets in Components:** Import assets using ES6 import statements (e.g., `import logo from '../assets/logo.svg'`) rather than using direct paths.
+- **Do NOT use dynamic paths:** Avoid using template strings or dynamic paths like `/images/${filename}.svg` as they won't work with the build process.
+- **Move Existing Assets:** If you find assets in other locations (e.g., `packages/frontend/images/`), move them to `packages/frontend/src/assets/` and update any references to use imports.
+
+This ensures assets are properly bundled by the build system and served correctly in both development and production environments.

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import logo from '../assets/plexus_logo_transparent.png';
 
 export const Login: React.FC = () => {
   const [key, setKey] = useState('');
@@ -34,7 +35,8 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4">
       <div className="w-full" style={{ maxWidth: '600px' }}>
         <div className="text-center mb-8">
-                      <img src="/ui/plexus_logo_transparent.png" alt="Plexus" className="h-16 mx-auto mb-4" />          <h1 className="text-2xl font-bold text-text">Admin Access</h1>
+          <img src={logo} alt="Plexus" className="h-16 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-text">Admin Access</h1>
           <p className="text-text-muted">Enter your Admin Key to continue</p>
         </div>
         

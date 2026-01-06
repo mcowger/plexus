@@ -6,10 +6,14 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import messagesLogo from '../assets/messages.svg';
+import antigravityLogo from '../assets/antigravity.svg';
+import chatLogo from '../assets/chat.svg';
+import geminiLogo from '../assets/gemini.svg';
 
 export const Logs = () => {
     const navigate = useNavigate();
@@ -24,6 +28,13 @@ export const Logs = () => {
         incomingModelAlias: '',
         provider: ''
     });
+
+    const apiLogos: Record<string, string> = {
+        'messages': messagesLogo,
+        'antigravity': antigravityLogo,
+        'chat': chatLogo,
+        'gemini': geminiLogo
+    };
 
     // Delete Modal State
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -206,67 +217,62 @@ export const Logs = () => {
 
     const totalPages = Math.ceil(total / limit);
     const currentPage = Math.floor(offset / limit) + 1;
-    const uploadEmoji = "🔺"
-    const downloadEmoji = "🔻"
-    const cachedEmoji = "📦"
-    const reasoningEmoji = "🧠"
 
     return (
         <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
-            <div className="mb-8 flex justify-between items-center">
-                <div>
-                    <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Logs</h1>
-                    <Badge status="neutral">{total} Records</Badge>
-                </div>
-                <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0}>
-                    <Trash2 size={16} />
-                    Delete All
-                </Button>
+            <div className="mb-8">
+                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Logs</h1>
+                <Badge status="neutral">{total} Records</Badge>
             </div>
 
-            <Card className="glass-bg rounded-lg p-6 max-w-full shadow-xl overflow-hidden flex flex-col gap-4">
+            <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
                 <div className="mb-4">
-                    <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-                        <div className="relative w-[250px]">
-                            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
-                            <Input
-                                placeholder="Filter by Model..."
-                                value={filters.incomingModelAlias}
-                                onChange={e => setFilters({ ...filters, incomingModelAlias: e.target.value })}
-                                style={{ paddingLeft: '32px' }}
-                            />
+                    <form onSubmit={handleSearch} className="flex gap-2 mb-4 justify-between">
+                        <div className="flex gap-2">
+                            <div className="relative w-[250px]">
+                                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+                                <Input
+                                    placeholder="Filter by Model..."
+                                    value={filters.incomingModelAlias}
+                                    onChange={e => setFilters({ ...filters, incomingModelAlias: e.target.value })}
+                                    style={{ paddingLeft: '32px' }}
+                                />
+                            </div>
+                            <div className="relative w-[200px]">
+                                <Filter size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+                                <Input
+                                    placeholder="Filter by Provider..."
+                                    value={filters.provider}
+                                    onChange={e => setFilters({ ...filters, provider: e.target.value })}
+                                    style={{ paddingLeft: '32px' }}
+                                />
+                            </div>
+                            <Button type="submit" variant="primary">Search</Button>
                         </div>
-                        <div className="relative w-[200px]">
-                            <Filter size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
-                            <Input
-                                placeholder="Filter by Provider..."
-                                value={filters.provider}
-                                onChange={e => setFilters({ ...filters, provider: e.target.value })}
-                                style={{ paddingLeft: '32px' }}
-                            />
-                        </div>
-                        <Button type="submit" variant="primary">Search</Button>
+                        <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0} type="button">
+                            <Trash2 size={16} />
+                            Delete All
+                        </Button>
                     </form>
                 </div>
 
-                <div className="overflow-x-auto -mx-6 px-6">
+                <div className="overflow-x-auto -mx-3 px-3">
                     <table className="w-full border-collapse font-body text-[13px]">
                         <thead>
                             <tr className="text-left border-b border-border">
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Date</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Key</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Source IP</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">API (In/Out)</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Model (In/Sel)</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Date</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Key</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Source IP</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">API (In/Out)</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Model (In/Sel)</th>
                                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{ minWidth: '140px' }}>Tokens (I/O/R/C)</th>
-                                <th className="px-4 py-3 border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider text-right">Cost</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Performance</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Streamed</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Direct</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider w-[40px]"></th>
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider w-[40px]"></th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Tokens (I/O/R/C)</th>
+                                <th className="px-2 py-1.5 border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider text-right whitespace-nowrap" style={{ minWidth: '102px' }}>Cost</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Performance</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Mode</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ maxWidth: '60px' }}>Status</th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-[40px]"></th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-[40px]"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -284,42 +290,108 @@ export const Logs = () => {
                                         key={log.requestId}
                                         className={clsx("group border-b border-border-glass hover:bg-bg-hover", log.requestId === newestLogId && 'animate-pulse-fade')}
                                     >
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                                            {new Date(log.date).toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">{log.apiKey || '-'}</td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">{log.sourceIp || '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
-                                            {log.incomingApiType || '?'}→{log.outgoingApiType || '?'}
-                                        </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span>{log.incomingModelAlias || '-'}</span>
-                                                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>{log.provider || '-'}:{log.selectedModelName || '-'}</span>
-
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle text-center">
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                <span style={{ fontWeight: '500' }}>{uploadEmoji} {formatLargeNumber(log.tokensInput || 0)} {downloadEmoji} {formatLargeNumber(log.tokensOutput || 0)} </span>
-                                                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                    {cachedEmoji} {formatLargeNumber(log.tokensCached || 0)}
-                                                    {reasoningEmoji} {formatLargeNumber(log.tokensReasoning || 0)}
+                                                <span style={{ fontWeight: '500' }}>{new Date(log.date).toLocaleTimeString()}</span>
+                                                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+                                                    {new Date(log.date).toISOString()}
                                                 </span>
                                             </div>
-                                            {/* {log.tokensInput || 0} / {log.tokensOutput || 0} / {log.tokensReasoning || 0} / {log.tokensCached || 0} */}
                                         </td>
-                                        <td className="px-4 py-3 border-b border-border-glass text-text align-middle text-right">
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">{log.apiKey || '-'}</td>
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">{log.sourceIp || '-'}
+                                        </td>
+                                        <td
+                                            className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+                                            title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'}`}
+                                            style={{ cursor: 'help' }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                {log.incomingApiType && apiLogos[log.incomingApiType] ? (
+                                                    <img
+                                                        src={apiLogos[log.incomingApiType]}
+                                                        alt={log.incomingApiType}
+                                                        style={{ width: '16px', height: '16px' }}
+                                                    />
+                                                ) : '?'}
+                                                <span>→</span>
+                                                {log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
+                                                    <img
+                                                        src={apiLogos[log.outgoingApiType]}
+                                                        alt={log.outgoingApiType}
+                                                        style={{ width: '16px', height: '16px' }}
+                                                    />
+                                                ) : '?'}
+                                            </div>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <div className="group/model flex items-center gap-1">
+                                                    <span>{log.incomingModelAlias || '-'}</span>
+                                                    {log.incomingModelAlias && log.incomingModelAlias !== '-' && (
+                                                        <button
+                                                            onClick={() => navigator.clipboard.writeText(log.incomingModelAlias)}
+                                                            className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
+                                                            title="Copy incoming model alias"
+                                                        >
+                                                            <Copy size={12} className="text-text-secondary hover:text-text" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="group/selected flex items-center gap-1">
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>{log.provider || '-'}:{log.selectedModelName || '-'}</span>
+                                                    {log.selectedModelName && log.selectedModelName !== '-' && (
+                                                        <button
+                                                            onClick={() => navigator.clipboard.writeText(log.selectedModelName)}
+                                                            className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
+                                                            title="Copy selected model name"
+                                                        >
+                                                            <Copy size={10} className="text-text-secondary hover:text-text" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td
+                                            className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
+                                            title={`Input: ${formatLargeNumber(log.tokensInput || 0)} • Output: ${formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${formatLargeNumber(log.tokensCached || 0)}`}
+                                            style={{ cursor: 'help' }}
+                                        >
+                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                {/* Left side: Input/Output */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <CloudUpload size={12} className="text-blue-400" />
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{formatLargeNumber(log.tokensInput || 0)}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <CloudDownload size={12} className="text-green-400" />
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{formatLargeNumber(log.tokensOutput || 0)}</span>
+                                                    </div>
+                                                </div>
+                                                {/* Right side: Reasoning/Cache */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <BrainCog size={12} className="text-purple-400" />
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{formatLargeNumber(log.tokensReasoning || 0)}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <PackageOpen size={12} className="text-orange-400" />
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{formatLargeNumber(log.tokensCached || 0)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle text-right">
                                             {log.costTotal !== undefined && log.costTotal !== null ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', justifyContent: 'space-between' }}>
                                                         {log.costSource ? (
                                                             <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
-                                                                <span style={{ cursor: 'help', fontSize: '0.9em' }}>
-                                                                    {log.costSource === 'simple' ? '⚪' : 
-                                                                     log.costSource === 'defined' ? '🧩' : 
-                                                                     log.costSource === 'openrouter' ? '🌐' : '❔'}
+                                                                <span style={{ cursor: 'help', display: 'flex', alignItems: 'center' }}>
+                                                                    {log.costSource === 'simple' ? <CircleDollarSign size={14} className="text-green-400" /> :
+                                                                     log.costSource === 'defined' ? <ChartCandlestick size={14} className="text-blue-400" /> :
+                                                                     log.costSource === 'openrouter' ? <Globe size={14} className="text-purple-400" /> : '❔'}
                                                                 </span>
                                                             </CostToolTip>
                                                         ) : <span />}
@@ -327,15 +399,15 @@ export const Logs = () => {
                                                             ${log.costTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
                                                         </span>
                                                     </div>
-                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                        {uploadEmoji} ${(log.costInput || 0).toFixed(6)}
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <CloudUpload size={10} className="text-blue-400" /> ${(log.costInput || 0).toFixed(6)}
                                                     </span>
-                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                        {downloadEmoji} ${(log.costOutput || 0).toFixed(6)}
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <CloudDownload size={10} className="text-green-400" /> ${(log.costOutput || 0).toFixed(6)}
                                                     </span>
-                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         {(log.costCached || 0) > 0 && (
-                                                            <>{cachedEmoji} ${log.costCached?.toFixed(6)}</>
+                                                            <><PackageOpen size={10} className="text-orange-400" /> ${log.costCached?.toFixed(6)}</>
                                                         )}
                                                     </span>
                                                 </div>
@@ -343,26 +415,39 @@ export const Logs = () => {
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '1.2em' }}>∅</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: '500' }}>{log.durationMs > 10 ? `${(log.durationMs / 1000).toFixed(1)}s` : '∅'}</span>
+                                                <span style={{ fontWeight: '500' }}>Duration: {log.durationMs > 10 ? `${(log.durationMs / 1000).toFixed(1)}s` : '∅'}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                                                    {log.ttftMs && log.ttftMs > 0 ? `${Math.round(log.ttftMs)}ms` : ''}
-                                                    {log.tokensPerSec && log.tokensPerSec > 0 ? ` • ${log.tokensPerSec.toFixed(1)}t/s` : ''}
+                                                    {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${log.ttftMs >= 1000 ? `${(log.ttftMs / 1000).toFixed(1)}s` : `${Math.round(log.ttftMs)}ms`}` : ''}
+                                                </span>
+                                                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+                                                    {log.tokensPerSec && log.tokensPerSec > 0 ? `TPS: ${log.tokensPerSec.toFixed(1)}` : ''}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle text-center">{log.isStreamed ? '✓' : ''}
+                                        <td
+                                            className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle text-center"
+                                            title={`${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
+                                            style={{ cursor: 'help' }}
+                                        >
+                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                                {log.isStreamed ?
+                                                    <Zap size={14} className="text-blue-400" /> :
+                                                    <ZapOff size={14} className="text-gray-400" />
+                                                }
+                                                {log.isPassthrough ?
+                                                    <MoveHorizontal size={14} className="text-yellow-500" /> :
+                                                    <Languages size={14} className="text-purple-400" />
+                                                }
+                                            </div>
                                         </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle text-center">
-                                            {log.isPassthrough ? <Zap size={14} className="text-yellow-500" /> : ''}
-                                        </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
                                             <Badge status={log.responseStatus === 'success' ? 'connected' : 'error'}>
                                                 {log.responseStatus === 'success' ? '✓' : '✗'}
                                             </Badge>
                                         </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
                                             <div className="flex gap-2">
                                                 {log.hasDebug && (
                                                     <button
@@ -384,7 +469,7 @@ export const Logs = () => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
                                             <button
                                                 onClick={() => handleDelete(log.requestId)}
                                                 className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0 transition-opacity"
