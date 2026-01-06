@@ -47,11 +47,30 @@ export async function handleResponse(
   // --- Scenario A: Streaming Response ---
   if (unifiedResponse.stream) {
     let finalClientStream: ReadableStream;
+    let rawStream = unifiedResponse.stream;
+
+    // TAP THE RAW STREAM for debugging
+    // We want to capture the stream BEFORE any transformation to log the true "Raw Response".
+    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType);
+    
+    const tapStream = new TransformStream({
+      transform(chunk, controller) {
+        // Feed the inspector (Node PassThrough)
+        rawLogInspector.write(chunk);
+        controller.enqueue(chunk);
+      },
+      flush() {
+        rawLogInspector.end();
+      }
+    });
+    
+    // Replace the original stream with the tapped stream
+    rawStream = rawStream.pipeThrough(tapStream);
 
     if (unifiedResponse.bypassTransformation) {
       // Direct pass-through: No changes to the provider's raw bytes
       // Maximize performance and accuracy by avoiding unnecessary transformations
-      finalClientStream = unifiedResponse.stream;
+      finalClientStream = rawStream;
     } else {
       /**
        * Transformation Pipeline:
@@ -64,14 +83,30 @@ export async function handleResponse(
 
       // Step 1: Raw Provider SSE -> Unified internal objects
       const unifiedStream = providerTransformer.transformStream
-        ? providerTransformer.transformStream(unifiedResponse.stream)
-        : unifiedResponse.stream;
+        ? providerTransformer.transformStream(rawStream)
+        : rawStream;
 
       // Step 2: Unified internal objects -> Client SSE format
       finalClientStream = clientTransformer.formatStream
         ? clientTransformer.formatStream(unifiedStream)
         : unifiedStream;
     }
+
+    // TAP THE TRANSFORMED STREAM for debugging
+    // This captures what is actually sent to the client
+    const transformedLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'transformed').createInspector(apiType);
+
+    const transformedTapStream = new TransformStream({
+      transform(chunk, controller) {
+        transformedLogInspector.write(chunk);
+        controller.enqueue(chunk);
+      },
+      flush() {
+        transformedLogInspector.end();
+      }
+    });
+
+    finalClientStream = finalClientStream.pipeThrough(transformedTapStream);
 
     // Standard SSE headers to prevent buffering and timeouts
     reply.header("Content-Type", "text/event-stream");
@@ -80,10 +115,7 @@ export async function handleResponse(
 
     /**
      * Build the linear stream pipeline.
-     * We avoid .tee() as it breaks backpressure and stability.
-     * Instead, we use PassThrough streams ('inspectors') to 'tap' into the data.
      */
-    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!).createInspector(providerApiType);
     
     // Determine the format of the stream flowing through the inspectors
     // If bypassTransformation is true, it's the provider's format.
@@ -102,8 +134,9 @@ export async function handleResponse(
     // Convert Web Stream to Node Stream for piping
     const nodeStream = Readable.fromWeb(finalClientStream as any);
 
-    // Pipeline: Source -> Raw Logger -> Usage -> Client
-    const pipeline = nodeStream.pipe(rawLogInspector).pipe(usageInspector);
+    // Pipeline: Source -> Usage -> Client
+    // rawLogInspector is already tapped via the TransformStream above
+    const pipeline = nodeStream.pipe(usageInspector);
 
     usageRecord.responseStatus = "success";
 
@@ -127,6 +160,7 @@ export async function handleResponse(
 
     // Capture transformed response for debugging
     DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
+    DebugManager.getInstance().flush(usageRecord.requestId!);
 
     // Record the usage.
     finalizeUsage(

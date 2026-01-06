@@ -7,7 +7,7 @@ import {
   MessageContent,
 } from "../types/unified";
 import { logger } from "../utils/logger";
-import { countTokens } from "./utils";
+import { countTokens, getThinkLevel, formatBase64 } from "./utils";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
 
@@ -30,7 +30,18 @@ export class AnthropicTransformer implements Transformer {
 
     // Anthropic uses a separate 'system' field; we merge it as a 'system' role message.
     if (input.system) {
-      messages.push({ role: "system", content: input.system });
+      if (typeof input.system === "string") {
+        messages.push({ role: "system", content: input.system });
+      } else if (Array.isArray(input.system)) {
+        const systemContent = input.system
+          .filter((part: any) => part.type === "text")
+          .map((part: any) => ({
+            type: "text" as const,
+            text: part.text,
+            cache_control: part.cache_control,
+          }));
+        messages.push({ role: "system", content: systemContent });
+      }
     }
 
     if (input.messages) {
@@ -54,6 +65,7 @@ export class AnthropicTransformer implements Transformer {
                       ? tool.content
                       : JSON.stringify(tool.content),
                   tool_call_id: tool.tool_use_id,
+                  cache_control: tool.cache_control,
                 });
               }
               const otherParts = msg.content.filter(
@@ -78,7 +90,7 @@ export class AnthropicTransformer implements Transformer {
                 type: "function",
                 function: {
                   name: t.name,
-                  arguments: JSON.stringify(t.input),
+                  arguments: JSON.stringify(t.input || {}),
                 },
               }));
             }
@@ -113,7 +125,7 @@ export class AnthropicTransformer implements Transformer {
       }
     }
 
-    return {
+    const result: UnifiedChatRequest = {
       messages,
       model: input.model,
       max_tokens: input.max_tokens,
@@ -124,6 +136,29 @@ export class AnthropicTransformer implements Transformer {
         : undefined,
       tool_choice: input.tool_choice,
     };
+
+    // Map Thinking/Reasoning Configuration
+    if (input.thinking) {
+      result.reasoning = {
+        effort: getThinkLevel(input.thinking.budget_tokens),
+        max_tokens: input.thinking.budget_tokens,
+        enabled: input.thinking.type === "enabled",
+      };
+    }
+
+    // Strict Tool Choice Mapping
+    if (input.tool_choice) {
+      if (typeof input.tool_choice === "object" && input.tool_choice.type === "tool") {
+        result.tool_choice = {
+          type: "function",
+          function: { name: input.tool_choice.name },
+        };
+      } else if (typeof input.tool_choice === "object" && input.tool_choice.type) {
+        result.tool_choice = input.tool_choice.type;
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -132,6 +167,27 @@ export class AnthropicTransformer implements Transformer {
    */
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
     const content: any[] = [];
+
+    // Support Annotations/Citations
+    if (response.annotations && response.annotations.length > 0) {
+      // Use a stable-ish random ID for the server tool
+      const toolId = `srvtoolu_${Math.random().toString(36).substring(2, 11)}`;
+      content.push({
+        type: "server_tool_use",
+        id: toolId,
+        name: "web_search",
+        input: { query: "" },
+      });
+      content.push({
+        type: "web_search_tool_result",
+        tool_use_id: toolId,
+        content: response.annotations.map((a) => ({
+          type: "web_search_result",
+          url: a.url_citation?.url,
+          title: a.url_citation?.title,
+        })),
+      });
+    }
 
     if (response.reasoning_content) {
       content.push({
@@ -146,13 +202,30 @@ export class AnthropicTransformer implements Transformer {
 
     if (response.tool_calls) {
       for (const toolCall of response.tool_calls) {
+        let input = {};
+        try {
+          const argumentsStr = toolCall.function.arguments || "{}";
+          input =
+            typeof argumentsStr === "object"
+              ? argumentsStr
+              : JSON.parse(argumentsStr);
+        } catch (e) {
+          // Robust Tool Argument Parsing: Wrap in safe state if JSON fails
+          input = { raw_arguments: toolCall.function.arguments };
+        }
         content.push({
           type: "tool_use",
           id: toolCall.id,
           name: toolCall.function.name,
-          input: JSON.parse(toolCall.function.arguments),
+          input,
         });
       }
+    }
+
+    // Fix Stop Reason Mapping: Dynamically set stop_reason
+    let stop_reason = "end_turn";
+    if (response.tool_calls && response.tool_calls.length > 0) {
+      stop_reason = "tool_use";
     }
 
     return {
@@ -161,10 +234,13 @@ export class AnthropicTransformer implements Transformer {
       role: "assistant",
       model: response.model,
       content,
-      stop_reason: "end_turn",
+      stop_reason,
       stop_sequence: null,
       usage: {
-        input_tokens: response.usage?.input_tokens || 0,
+        // Usage Token Normalization: input_tokens = prompt_tokens - cached_tokens
+        input_tokens:
+          (response.usage?.input_tokens || 0) -
+          (response.usage?.cached_tokens || 0),
         output_tokens: response.usage?.output_tokens || 0,
         thinkingTokens: response.usage?.reasoning_tokens || 0,
         cache_read_input_tokens: response.usage?.cached_tokens || 0,
@@ -247,12 +323,12 @@ export class AnthropicTransformer implements Transformer {
       }
     }
 
-    // Merge consecutive user/assistant messages (Fastify cleanup)
+    // Merge consecutive messages of the same role (User+Tool or Assistant+Assistant)
     const mergedMessages: any[] = [];
     for (const msg of messages) {
       if (mergedMessages.length > 0) {
         const last = mergedMessages[mergedMessages.length - 1];
-        if (last.role === msg.role && msg.role === "user") {
+        if (last.role === msg.role) {
           last.content.push(...msg.content);
           continue;
         }
@@ -342,6 +418,8 @@ export class AnthropicTransformer implements Transformer {
     let accumulatedText = "";
     let seenThinking = false;
     let parser: any;
+    let messageId: string | undefined;
+    let model: string | undefined;
 
     const transformer = new TransformStream({
       start(controller) {
@@ -355,11 +433,23 @@ export class AnthropicTransformer implements Transformer {
 
               switch (data.type) {
                 case "message_start":
+                  messageId = data.message.id;
+                  model = data.message.model;
                   unifiedChunk = {
-                    id: data.message.id,
-                    model: data.message.model,
+                    id: messageId,
+                    model: model,
                     created: Math.floor(Date.now() / 1000),
                     delta: { role: "assistant" },
+                    usage: data.message.usage
+                      ? {
+                          input_tokens: data.message.usage.input_tokens || 0,
+                          output_tokens: data.message.usage.output_tokens || 0,
+                          total_tokens: (data.message.usage.input_tokens || 0) + (data.message.usage.output_tokens || 0),
+                          reasoning_tokens: 0,
+                          cached_tokens: data.message.usage.cache_read_input_tokens || 0,
+                          cache_creation_tokens: data.message.usage.cache_creation_input_tokens || 0,
+                        }
+                      : undefined,
                   };
                   break;
                 case "content_block_delta":
@@ -371,7 +461,16 @@ export class AnthropicTransformer implements Transformer {
                   } else if (data.delta.type === "thinking_delta") {
                     seenThinking = true;
                     unifiedChunk = {
-                      delta: { reasoning_content: data.delta.thinking },
+                      delta: { 
+                        reasoning_content: data.delta.thinking,
+                        thinking: { content: data.delta.thinking }
+                      },
+                    };
+                  } else if (data.delta.type === "signature_delta") {
+                    unifiedChunk = {
+                      delta: { 
+                        thinking: { signature: data.delta.signature }
+                      },
                     };
                   } else if (data.delta.type === "input_json_delta") {
                     unifiedChunk = {
@@ -402,6 +501,13 @@ export class AnthropicTransformer implements Transformer {
                           },
                         ],
                       },
+                    };
+                  } else if (data.content_block.type === "thinking") {
+                    seenThinking = true;
+                    unifiedChunk = {
+                      delta: {
+                        thinking: { content: data.content_block.thinking || "" }
+                      }
                     };
                   }
                   break;
@@ -434,8 +540,8 @@ export class AnthropicTransformer implements Transformer {
                           output_tokens: realOutputTokens,
                           total_tokens: inputTokens + totalOutputTokens,
                           reasoning_tokens: imputedThinkingTokens,
-                          cached_tokens: 0,
-                          cache_creation_tokens: 0,
+                          cached_tokens: data.usage.cache_read_input_tokens || 0,
+                          cache_creation_tokens: data.usage.cache_creation_input_tokens || 0,
                         }
                       : undefined,
                   };
@@ -470,10 +576,33 @@ export class AnthropicTransformer implements Transformer {
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     let hasSentStart = false;
+    let hasSentFinish = false;
+
+    // State machine
+    let nextBlockIndex = 0;
+    let activeBlockType: "text" | "thinking" | "tool_use" | null = null;
+    let activeBlockIndex: number | null = null;
+    
+    // Track usage and finish reason across chunks
+    let lastUsage: any = null;
+    let pendingFinishReason: string | null = null;
 
     const transformer = new TransformStream({
       transform(chunk: any, controller) {
-        // Anthropic requires a message_start event first
+        const safeEnqueue = (str: string) => {
+          controller.enqueue(encoder.encode(str));
+        };
+
+        const sendEvent = (event: string, data: any) => {
+          safeEnqueue(encode({ event, data: JSON.stringify(data) }));
+        };
+        
+        // Accumulate Usage
+        if (chunk.usage) {
+           lastUsage = chunk.usage;
+        }
+
+        // 1. Message Start
         if (!hasSentStart) {
           const messageStart = {
             type: "message_start",
@@ -485,99 +614,178 @@ export class AnthropicTransformer implements Transformer {
               content: [],
               stop_reason: null,
               stop_sequence: null,
-              usage: { input_tokens: 0, output_tokens: 0 },
+              usage: {
+                input_tokens: chunk.usage?.input_tokens || 0,
+                output_tokens: chunk.usage?.output_tokens || 0,
+                cache_read_input_tokens: chunk.usage?.cached_tokens || 0,
+                cache_creation_input_tokens: chunk.usage?.cache_creation_tokens || 0,
+              },
             },
           };
-          const sseMessage = encode({
-            event: "message_start",
-            data: JSON.stringify(messageStart),
-          });
-          controller.enqueue(encoder.encode(sseMessage));
+          sendEvent("message_start", messageStart);
           hasSentStart = true;
         }
 
-        if (chunk.delta) {
-          if (chunk.delta.content) {
-            const textDelta = {
-              type: "content_block_delta",
-              index: 0,
-              delta: { type: "text_delta", text: chunk.delta.content },
-            };
-            const sseMessage = encode({
-              event: "content_block_delta",
-              data: JSON.stringify(textDelta),
+        const closeCurrentBlock = () => {
+          if (activeBlockType !== null && activeBlockIndex !== null) {
+            sendEvent("content_block_stop", {
+              type: "content_block_stop",
+              index: activeBlockIndex,
             });
-            controller.enqueue(encoder.encode(sseMessage));
+            activeBlockType = null;
+            activeBlockIndex = null;
+          }
+        };
+
+        const startBlock = (
+          type: "text" | "thinking" | "tool_use",
+          info?: any
+        ) => {
+          closeCurrentBlock();
+
+          activeBlockIndex = nextBlockIndex++;
+          activeBlockType = type;
+
+          let content_block: any;
+          if (type === "text") {
+            content_block = { type: "text", text: "" };
+          } else if (type === "thinking") {
+            content_block = { type: "thinking", thinking: "" };
+          } else if (type === "tool_use") {
+            content_block = {
+              type: "tool_use",
+              id: info.id,
+              name: info.name,
+              input: {},
+            };
           }
 
-          if (chunk.delta.reasoning_content) {
-            const thinkingDelta = {
+          sendEvent("content_block_start", {
+            type: "content_block_start",
+            index: activeBlockIndex,
+            content_block,
+          });
+        };
+
+        if (chunk.delta) {
+          // Thinking
+          if (chunk.delta.thinking?.content || chunk.delta.reasoning_content) {
+            if (activeBlockType !== "thinking") {
+              startBlock("thinking");
+            }
+            sendEvent("content_block_delta", {
               type: "content_block_delta",
-              index: 0,
+              index: activeBlockIndex,
               delta: {
                 type: "thinking_delta",
-                thinking: chunk.delta.reasoning_content,
+                thinking: chunk.delta.thinking?.content || chunk.delta.reasoning_content,
               },
-            };
-            const sseMessage = encode({
-              event: "content_block_delta",
-              data: JSON.stringify(thinkingDelta),
             });
-            controller.enqueue(encoder.encode(sseMessage));
           }
 
+          if (chunk.delta.thinking?.signature) {
+            if (activeBlockType !== "thinking") {
+              startBlock("thinking");
+            }
+            sendEvent("content_block_delta", {
+              type: "content_block_delta",
+              index: activeBlockIndex,
+              delta: {
+                type: "signature_delta",
+                signature: chunk.delta.thinking.signature,
+              },
+            });
+          }
+
+          // Text
+          if (chunk.delta.content) {
+            if (activeBlockType !== "text") {
+              startBlock("text");
+            }
+            sendEvent("content_block_delta", {
+              type: "content_block_delta",
+              index: activeBlockIndex,
+              delta: { type: "text_delta", text: chunk.delta.content },
+            });
+          }
+
+          // Tool Calls
           if (chunk.delta.tool_calls) {
             for (const tc of chunk.delta.tool_calls) {
-              const toolDelta = {
-                type: "content_block_delta",
-                index: tc.index || 0,
-                delta: {
-                  type: "input_json_delta",
-                  partial_json: tc.function?.arguments || "",
-                },
-              };
-              const sseMessage = encode({
-                event: "content_block_delta",
-                data: JSON.stringify(toolDelta),
-              });
-              controller.enqueue(encoder.encode(sseMessage));
+              if (tc.id) {
+                startBlock("tool_use", { id: tc.id, name: tc.function?.name });
+              }
+
+              if (tc.function?.arguments) {
+                if (
+                  activeBlockType === "tool_use" &&
+                  activeBlockIndex !== null
+                ) {
+                  sendEvent("content_block_delta", {
+                    type: "content_block_delta",
+                    index: activeBlockIndex,
+                    delta: {
+                      type: "input_json_delta",
+                      partial_json: tc.function.arguments,
+                    },
+                  });
+                }
+              }
             }
           }
         }
 
+        // Capture Finish Reason
         if (chunk.finish_reason) {
-          const messageDelta = {
-            type: "message_delta",
-            delta: {
-              stop_reason:
-                chunk.finish_reason === "stop"
-                  ? "end_turn"
-                  : chunk.finish_reason === "tool_calls"
-                  ? "tool_use"
-                  : chunk.finish_reason,
-              stop_sequence: null,
-            },
-            usage: chunk.usage
-              ? {
-                  output_tokens: chunk.usage.output_tokens,
-                  thinkingTokens: chunk.usage.reasoning_tokens,
-                }
-              : undefined,
+          closeCurrentBlock();
+          
+          // Store finish reason but defer sending completion events
+          // to allow subsequent chunks (like usage) to be processed.
+          const mapping: Record<string, string> = {
+            stop: "end_turn",
+            length: "max_tokens",
+            tool_calls: "tool_use",
+            content_filter: "stop_sequence",
           };
-          const sseMessage = encode({
-            event: "message_delta",
-            data: JSON.stringify(messageDelta),
-          });
-          controller.enqueue(encoder.encode(sseMessage));
 
-          const messageStop = { type: "message_stop" };
-          const sseStop = encode({
-            event: "message_stop",
-            data: JSON.stringify(messageStop),
-          });
-          controller.enqueue(encoder.encode(sseStop));
+          pendingFinishReason = mapping[chunk.finish_reason] || chunk.finish_reason;
         }
       },
+      flush(controller) {
+        // Robust Termination: ensure message_delta and message_stop are sent
+        if (hasSentStart && !hasSentFinish) {
+          const safeEnqueue = (str: string) => {
+            controller.enqueue(encoder.encode(str));
+          };
+          const sendEvent = (event: string, data: any) => {
+            safeEnqueue(encode({ event, data: JSON.stringify(data) }));
+          };
+
+          if (activeBlockType !== null && activeBlockIndex !== null) {
+            sendEvent("content_block_stop", {
+              type: "content_block_stop",
+              index: activeBlockIndex,
+            });
+          }
+
+          // Send message_delta with collected usage and stop reason
+          sendEvent("message_delta", {
+            type: "message_delta",
+            delta: {
+              stop_reason: pendingFinishReason || "end_turn",
+              stop_sequence: null,
+            },
+            usage: lastUsage ? {
+              input_tokens: lastUsage.input_tokens,
+              output_tokens: lastUsage.output_tokens,
+              cache_read_input_tokens: lastUsage.cached_tokens,
+            } : undefined
+          });
+          
+          sendEvent("message_stop", { type: "message_stop" });
+          hasSentFinish = true;
+        }
+      }
     });
 
     return stream.pipeThrough(transformer);
@@ -588,11 +796,28 @@ export class AnthropicTransformer implements Transformer {
   private convertAnthropicContent(content: any[]): string | MessageContent[] {
     const parts: MessageContent[] = [];
     for (const c of content) {
-      if (c.type === "text") parts.push({ type: "text", text: c.text });
+      if (c.type === "text") {
+        parts.push({
+          type: "text",
+          text: c.text,
+          cache_control: c.cache_control,
+        });
+      } else if (c.type === "image" && c.source) {
+        parts.push({
+          type: "image_url",
+          image_url: {
+            url:
+              c.source.type === "base64"
+                ? formatBase64(c.source.data, c.source.media_type)
+                : c.source.url,
+          },
+          media_type: c.source.media_type,
+        });
+      }
     }
     if (!parts.length) return "";
-    if (!parts[0]) return "";
-    if (parts.length === 1 && parts[0].type === "text") return parts[0].text;
+    const firstPart = parts[0];
+    if (parts.length === 1 && firstPart?.type === "text") return firstPart.text;
     return parts;
   }
 
@@ -644,9 +869,9 @@ export class AnthropicTransformer implements Transformer {
 
       if (data.type === "message_delta" && data.usage) {
         return {
-          input_tokens: 0,
+          input_tokens: data.usage.input_tokens || 0,
           output_tokens: data.usage.output_tokens || 0,
-          cached_tokens: 0,
+          cached_tokens: data.usage.cache_read_input_tokens || 0,
           reasoning_tokens: 0,
         };
       }
