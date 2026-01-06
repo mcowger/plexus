@@ -254,7 +254,7 @@ export const Models = () => {
                       <option value="selector">Selector (Use strategy)</option>
                       <option value="api_match">API Match (Prioritize incoming API format)</option>
                   </select>
-                  <p className="text-xs text-text-muted mt-1">"Selector" uses the strategy defined above. "API Match" tries to match the provider type to the incoming request format (e.g. OpenAI -> OpenAI).</p>
+                  <p className="text-xs text-text-muted mt-1">"Selector" uses the strategy defined above. "API Match" tries to match the provider type to the incoming request format (e.g. OpenAI &rarr; OpenAI).</p>
               </div>
 
               <div className="h-px bg-border-glass my-4" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
