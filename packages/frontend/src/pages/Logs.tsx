@@ -259,7 +259,7 @@ export const Logs = () => {
                                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">API (In/Out)</th>
                                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Model (In/Sel)</th>
                                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Tokens (I/O/R/C)</th>
+                                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{ minWidth: '140px' }}>Tokens (I/O/R/C)</th>
                                 <th className="px-4 py-3 border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider text-right">Cost</th>
                                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Performance</th>
                                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Streamed</th>
