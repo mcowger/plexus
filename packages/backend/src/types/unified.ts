@@ -161,6 +161,10 @@ export interface UnifiedChatStreamChunk {
             }
         }>;
         reasoning_content?: string | null;
+        thinking?: {
+            content?: string;
+            signature?: string;
+        };
     };
     finish_reason?: string | null;
     usage?: UnifiedUsage;

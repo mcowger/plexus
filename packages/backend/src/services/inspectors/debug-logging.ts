@@ -5,6 +5,12 @@ import { DebugManager } from "../debug-manager";
 
 export class DebugLoggingInspector extends BaseInspector {
   private debugManager = DebugManager.getInstance();
+  private mode: 'raw' | 'transformed';
+
+  constructor(requestId: string, mode: 'raw' | 'transformed' = 'raw') {
+    super(requestId);
+    this.mode = mode;
+  }
 
   createInspector(providerApiType: string): PassThrough {
     const inspector = new PassThrough();
@@ -15,8 +21,20 @@ export class DebugLoggingInspector extends BaseInspector {
 
     let rawBody = "";
 
-    inspector.on("data", (chunk: Buffer) => {
-      rawBody += chunk.toString();
+    inspector.on("data", (chunk: any) => {
+      if (typeof chunk === 'string') {
+        rawBody += chunk;
+      } else if (Buffer.isBuffer(chunk)) {
+        rawBody += chunk.toString('utf8');
+      } else if (chunk instanceof Uint8Array) {
+        rawBody += new TextDecoder().decode(chunk);
+      } else {
+        try {
+            rawBody += String(chunk);
+        } catch (e) {
+            logger.warn(`[Inspector:${this.mode}] Failed to convert chunk to string`);
+        }
+      }
     });
 
     inspector.on("end", () => {
@@ -35,14 +53,12 @@ export class DebugLoggingInspector extends BaseInspector {
           default:
             logger.warn(`[Inspector] Unknown providerApiType: ${providerApiType}`);
         }
-        logger.silly(`[Inspector] Request ${this.requestId} reconstructed: ${JSON.stringify(reconstructed, null, 2)}`);
+        logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} reconstructed: ${JSON.stringify(reconstructed, null, 2)}`);
         this.saveReconstructedResponse(reconstructed);
         this.saveRawResponse(rawBody);
-        this.debugManager.flush(this.requestId);
       } catch (err) {
-        logger.error(`[Inspector] Reconstruction failed: ${err}`);
+        logger.error(`[Inspector:${this.mode}] Reconstruction failed: ${err}`);
         this.saveRawResponse(rawBody);
-        this.debugManager.flush(this.requestId);
       }
     });
 
@@ -50,11 +66,19 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   private saveRawResponse(fullBody: string): void {
-    this.debugManager.addRawResponse(this.requestId, fullBody);
+    if (this.mode === 'raw') {
+        this.debugManager.addRawResponse(this.requestId, fullBody);
+    } else {
+        this.debugManager.addTransformedResponse(this.requestId, fullBody);
+    }
   }
 
   private saveReconstructedResponse(snapshot: any): void {
-    this.debugManager.addReconstructedRawResponse(this.requestId, snapshot);
+    if (this.mode === 'raw') {
+        this.debugManager.addReconstructedRawResponse(this.requestId, snapshot);
+    } else {
+        this.debugManager.addTransformedResponseSnapshot(this.requestId, snapshot);
+    }
   }
 
   private reconstructChatCompletions(fullBody: string): any {

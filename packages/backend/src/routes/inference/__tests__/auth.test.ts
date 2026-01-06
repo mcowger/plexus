@@ -39,7 +39,10 @@ describe("Auth Middleware", () => {
         setConfigForTesting({
             providers: {},
             models: {
-                "gpt-4": { targets: [{ provider: "openai", model: "gpt-4" }] }
+                "gpt-4": { 
+                    priority: "selector",
+                    targets: [{ provider: "openai", model: "gpt-4" }] 
+                }
             },
             keys: {
                 "test-key-1": { secret: "sk-valid-key", comment: "Test Key" }
