@@ -89,6 +89,8 @@ This section defines the upstream AI providers that Plexus will route requests t
   - A single string: `"chat"`, `"messages"`, or `"gemini"`
   - An array for multi-protocol providers: `["chat", "messages"]`
   
+  Note: While Gemini can technically be included in multi-protocol arrays, it's typically configured as a single-protocol provider due to its unique API requirements.
+  
 - **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
 
 - **`api_base_url`**: The base URL for the provider's API. Can be:
@@ -168,7 +170,7 @@ This section defines the "virtual" models or aliases that clients will use when 
   - `latency`: Routes to the lowest time-to-first-token provider
 
 - **`priority`**: (Optional) Determines the routing lifecycle order:
-  - `selector` (Default): Apply the selector first to choose a target, then determine the appropriate API type for that target
+  - `selector` (Default): Choose a provider using the selector strategy, then use the best available API format for that provider
   - `api_match`: Filter for native API compatibility first, then apply the selector
   
   Use `api_match` when you want maximum compatibility with the incoming request format, even if it means fewer provider options. This is especially useful for:
