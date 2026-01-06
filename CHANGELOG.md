@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.6.0 - 2026-01-06
+
+### v0.6.0: Google Antigravity Authentication Support
+
+### New Features
+
+- **Google Antigravity Integration**: Added support for Google Antigravity accounts ([b296521](https://github.com/mcowger/plexus/commit/b296521)).
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.5.2 - 2026-01-06
 
 ### Hotfix: Fix dispatcher when access_via[] is empty.
