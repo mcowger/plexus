@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5.1 - 2026-01-06
+
+### v0.5.1 Release - Anthropic API Improvements and Enhanced Test Coverage
+
+## What's New in v0.5.1
+
+### Main Features
+
+- **Anthropic API Support Improvements** - This release merges significant improvements to the Anthropic API implementation, enhancing how the system handles and transforms Anthropic API usage data. The changes improve the accuracy and reliability of usage inspection for Anthropic API calls. (https://github.com/mcowger/plexus/commit/aacee34)
+
+### Other Changes
+
+- **Test Coverage Expansion** - Added comprehensive tests for `UsageTransformer` and `AnthropicTransformer` functionality to ensure robust behavior and prevent regressions. (https://github.com/mcowger/plexus/commit/3cb8921)
+
+---
+
+**Docker Image Updated**: The latest release is available at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.5.0 - 2026-01-06
 
 ### v0.5.0: Multi-Protocol API Routing, Provider/Model Management UI, and Gemini Integration
