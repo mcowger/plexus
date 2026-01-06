@@ -778,6 +778,7 @@ export class AnthropicTransformer implements Transformer {
             usage: lastUsage ? {
               input_tokens: lastUsage.input_tokens,
               output_tokens: lastUsage.output_tokens,
+              thinkingTokens: lastUsage.reasoning_tokens,
               cache_read_input_tokens: lastUsage.cached_tokens,
             } : undefined
           });
@@ -863,7 +864,7 @@ export class AnthropicTransformer implements Transformer {
             data.message.usage.cache_read_input_tokens ||
             data.message.usage.cache_creation_input_tokens ||
             0,
-          reasoning_tokens: 0,
+          reasoning_tokens: data.message.usage.thinkingTokens || 0,
         };
       }
 
@@ -872,7 +873,7 @@ export class AnthropicTransformer implements Transformer {
           input_tokens: data.usage.input_tokens || 0,
           output_tokens: data.usage.output_tokens || 0,
           cached_tokens: data.usage.cache_read_input_tokens || 0,
-          reasoning_tokens: 0,
+          reasoning_tokens: data.usage.thinkingTokens || 0,
         };
       }
     } catch (e) {

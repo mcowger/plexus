@@ -22,6 +22,7 @@ export class DebugLoggingInspector extends BaseInspector {
     let rawBody = "";
 
     inspector.on("data", (chunk: any) => {
+      logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} received chunk, length: ${chunk.length || chunk.toString().length}: ${chunk.toString()}`);
       if (typeof chunk === 'string') {
         rawBody += chunk;
       } else if (Buffer.isBuffer(chunk)) {
@@ -38,6 +39,7 @@ export class DebugLoggingInspector extends BaseInspector {
     });
 
     inspector.on("end", () => {
+      logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} raw body collected, length: ${rawBody.length}:\n${rawBody}`);
       try {
         let reconstructed: any = null;
         switch (providerApiType) {

@@ -764,5 +764,84 @@ export const api = {
           console.error("API Error setDebugMode", e);
           throw e;
       }
+  },
+
+  // OAuth Management
+  getOAuthStatus: async (provider: string = 'antigravity'): Promise<{
+      configured: boolean;
+      provider?: string;
+      user?: string;
+      project_id?: string;
+      expires_at?: number;
+      expires_in_seconds?: number;
+      is_expired?: boolean;
+      auth_url?: string;
+      message?: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/status?provider=${provider}`);
+          if (!res.ok) throw new Error('Failed to fetch OAuth status');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getOAuthStatus", e);
+          return { configured: false, message: 'Error fetching OAuth status' };
+      }
+  },
+
+  initiateOAuthFlow: async (provider: string = 'antigravity'): Promise<{
+      auth_url: string;
+      instructions: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/authorize?provider=${provider}`);
+          if (!res.ok) throw new Error('Failed to initiate OAuth flow');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error initiateOAuthFlow", e);
+          throw e;
+      }
+  },
+
+  deleteOAuthCredentials: async (provider: string, userIdentifier: string): Promise<boolean> => {
+      try {
+          const res = await fetchWithAuth(
+              `${API_BASE}/v0/oauth/credentials?provider=${provider}&user_identifier=${encodeURIComponent(userIdentifier)}`,
+              { method: 'DELETE' }
+          );
+          return res.ok;
+      } catch (e) {
+          console.error("API Error deleteOAuthCredentials", e);
+          return false;
+      }
+  },
+
+  refreshOAuthToken: async (): Promise<{ success: boolean; message: string }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/refresh`, {
+              method: 'POST'
+          });
+          if (!res.ok) throw new Error('Failed to refresh OAuth token');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error refreshOAuthToken", e);
+          return { success: false, message: 'Failed to trigger token refresh' };
+      }
+  },
+
+  getOAuthRefreshStatus: async (): Promise<{
+      available: boolean;
+      running?: boolean;
+      checkInterval?: number;
+      refreshThreshold?: number;
+      message?: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/refresh/status`);
+          if (!res.ok) throw new Error('Failed to fetch refresh status');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getOAuthRefreshStatus", e);
+          return { available: false, message: 'Error fetching refresh status' };
+      }
   }
 };

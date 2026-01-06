@@ -6,6 +6,22 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { DebugLogRecord } from './debug-manager';
 
+export interface OAuthCredential {
+    id: number;
+    provider: string;
+    user_identifier: string;
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_at: number;
+    scope?: string;
+    project_id?: string;
+    metadata?: string;
+    created_at: number;
+    updated_at: number;
+    last_refreshed_at?: number;
+}
+
 export interface UsageFilters {
     startDate?: string;
     endDate?: string;
@@ -142,6 +158,30 @@ export class UsageStorageService extends EventEmitter {
                     details TEXT,
                     created_at INTEGER
                 );
+            `);
+
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS oauth_credentials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    provider TEXT NOT NULL,
+                    user_identifier TEXT NOT NULL,
+                    access_token TEXT NOT NULL,
+                    refresh_token TEXT NOT NULL,
+                    token_type TEXT DEFAULT 'Bearer',
+                    expires_at INTEGER NOT NULL,
+                    scope TEXT,
+                    project_id TEXT,
+                    metadata TEXT,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    last_refreshed_at INTEGER,
+                    UNIQUE(provider, user_identifier)
+                );
+            `);
+
+            this.db.run(`
+                CREATE INDEX IF NOT EXISTS idx_oauth_provider
+                ON oauth_credentials(provider);
             `);
             
             // Migration: Add columns if they don't exist (primitive check)
@@ -669,6 +709,170 @@ export class UsageStorageService extends EventEmitter {
             return query.all(params) as any[];
         } catch (error) {
             logger.error("Failed to get provider performance", error);
+            return [];
+        }
+    }
+
+    saveOAuthCredential(credential: Omit<OAuthCredential, 'id'>): void {
+        try {
+            const query = this.db.prepare(`
+                INSERT INTO oauth_credentials (
+                    provider, user_identifier, access_token, refresh_token,
+                    token_type, expires_at, scope, project_id, metadata,
+                    created_at, updated_at, last_refreshed_at
+                ) VALUES (
+                    $provider, $userIdentifier, $accessToken, $refreshToken,
+                    $tokenType, $expiresAt, $scope, $projectId, $metadata,
+                    $createdAt, $updatedAt, $lastRefreshedAt
+                )
+                ON CONFLICT(provider, user_identifier) DO UPDATE SET
+                    access_token = $accessToken,
+                    refresh_token = $refreshToken,
+                    token_type = $tokenType,
+                    expires_at = $expiresAt,
+                    scope = $scope,
+                    project_id = $projectId,
+                    metadata = $metadata,
+                    updated_at = $updatedAt,
+                    last_refreshed_at = $lastRefreshedAt
+            `);
+
+            query.run({
+                $provider: credential.provider,
+                $userIdentifier: credential.user_identifier,
+                $accessToken: credential.access_token,
+                $refreshToken: credential.refresh_token,
+                $tokenType: credential.token_type,
+                $expiresAt: credential.expires_at,
+                $scope: credential.scope || null,
+                $projectId: credential.project_id || null,
+                $metadata: credential.metadata || null,
+                $createdAt: credential.created_at,
+                $updatedAt: credential.updated_at,
+                $lastRefreshedAt: credential.last_refreshed_at || null
+            });
+
+            logger.debug(`OAuth credential saved for ${credential.provider}:${credential.user_identifier}`);
+        } catch (error) {
+            logger.error("Failed to save OAuth credential", error);
+            throw error;
+        }
+    }
+
+    getOAuthCredential(provider: string, userIdentifier?: string): OAuthCredential | null {
+        try {
+            let query;
+            let params: any;
+
+            if (userIdentifier) {
+                query = this.db.prepare(`
+                    SELECT * FROM oauth_credentials
+                    WHERE provider = $provider AND user_identifier = $userIdentifier
+                `);
+                params = { $provider: provider, $userIdentifier: userIdentifier };
+            } else {
+                query = this.db.prepare(`
+                    SELECT * FROM oauth_credentials
+                    WHERE provider = $provider
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                `);
+                params = { $provider: provider };
+            }
+
+            const row = query.get(params) as any;
+            if (!row) return null;
+
+            return {
+                id: row.id,
+                provider: row.provider,
+                user_identifier: row.user_identifier,
+                access_token: row.access_token,
+                refresh_token: row.refresh_token,
+                token_type: row.token_type,
+                expires_at: row.expires_at,
+                scope: row.scope,
+                project_id: row.project_id,
+                metadata: row.metadata,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                last_refreshed_at: row.last_refreshed_at
+            };
+        } catch (error) {
+            logger.error(`Failed to get OAuth credential for ${provider}`, error);
+            return null;
+        }
+    }
+
+    updateOAuthToken(provider: string, userIdentifier: string, accessToken: string, expiresAt: number): void {
+        try {
+            const query = this.db.prepare(`
+                UPDATE oauth_credentials
+                SET access_token = $accessToken,
+                    expires_at = $expiresAt,
+                    updated_at = $updatedAt,
+                    last_refreshed_at = $lastRefreshedAt
+                WHERE provider = $provider AND user_identifier = $userIdentifier
+            `);
+
+            const now = Date.now();
+            query.run({
+                $accessToken: accessToken,
+                $expiresAt: expiresAt,
+                $updatedAt: now,
+                $lastRefreshedAt: now,
+                $provider: provider,
+                $userIdentifier: userIdentifier
+            });
+
+            logger.debug(`OAuth token updated for ${provider}:${userIdentifier}`);
+        } catch (error) {
+            logger.error(`Failed to update OAuth token for ${provider}:${userIdentifier}`, error);
+            throw error;
+        }
+    }
+
+    deleteOAuthCredential(provider: string, userIdentifier: string): boolean {
+        try {
+            const query = this.db.prepare(`
+                DELETE FROM oauth_credentials
+                WHERE provider = $provider AND user_identifier = $userIdentifier
+            `);
+            const result = query.run({ $provider: provider, $userIdentifier: userIdentifier });
+            return result.changes > 0;
+        } catch (error) {
+            logger.error(`Failed to delete OAuth credential for ${provider}:${userIdentifier}`, error);
+            return false;
+        }
+    }
+
+    listExpiringSoonCredentials(thresholdMinutes: number): OAuthCredential[] {
+        try {
+            const thresholdMs = Date.now() + (thresholdMinutes * 60 * 1000);
+            const query = this.db.prepare(`
+                SELECT * FROM oauth_credentials
+                WHERE expires_at <= $threshold
+                ORDER BY expires_at ASC
+            `);
+
+            const rows = query.all({ $threshold: thresholdMs }) as any[];
+            return rows.map(row => ({
+                id: row.id,
+                provider: row.provider,
+                user_identifier: row.user_identifier,
+                access_token: row.access_token,
+                refresh_token: row.refresh_token,
+                token_type: row.token_type,
+                expires_at: row.expires_at,
+                scope: row.scope,
+                project_id: row.project_id,
+                metadata: row.metadata,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                last_refreshed_at: row.last_refreshed_at
+            }));
+        } catch (error) {
+            logger.error("Failed to list expiring credentials", error);
             return [];
         }
     }

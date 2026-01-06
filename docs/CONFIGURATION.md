@@ -95,7 +95,9 @@ This section defines the upstream AI providers that Plexus will route requests t
   - A single URL string for single-protocol providers
   - An object mapping API types to specific URLs for multi-protocol providers
   
-- **`api_key`**: (Optional) The authentication key for this provider.
+- **`api_key`**: (Optional) The authentication key for this provider. Required unless `oauth_provider` is specified.
+
+- **`oauth_provider`**: (Optional) The OAuth provider to use for authentication instead of a static API key. Currently supported: `"antigravity"`. When specified, Plexus will use OAuth 2.0 tokens for authentication.
 
 - **`enabled`**: (Optional, default: `true`) Set to `false` to temporarily disable a provider.
 
@@ -108,6 +110,8 @@ This section defines the upstream AI providers that Plexus will route requests t
 - **`extraBody`**: (Optional) Additional fields to merge into every request body.
 
 - **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider. Often used if you want to base your pricing on public numbers but apply a global discount.
+
+- **`force_transformer`**: (Optional) Override the transformer used for this provider regardless of the API type. Useful when a provider uses a compatible API format but requires custom endpoint handling. For example, Antigravity uses the Gemini API format but requires a different transformer for its specific endpoints.
 
 **Multi-Protocol Provider Configuration:**
 
@@ -235,4 +239,76 @@ The `adminKey` acts as a shared secret for administrative access:
 1.  **Dashboard Access**: Users will be prompted to enter this key to access the web interface.
 2.  **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.
 3.  **Startup Requirement**: The Plexus server will fail to start if this key is missing from the configuration.
+
+---
+
+## OAuth Authentication
+
+Plexus supports OAuth 2.0 authentication for providers like Google Antigravity. Instead of using a static API key, OAuth allows Plexus to obtain and automatically refresh access tokens on your behalf.
+
+### Configuring an OAuth Provider
+
+To use OAuth authentication, specify `oauth_provider` instead of `api_key` in your provider configuration. For Antigravity, use `type: gemini` for API compatibility (so models with `access_via: ["gemini"]` will work) and `force_transformer: antigravity` to use the Antigravity-specific endpoint transformer:
+
+```yaml
+providers:
+  antigravity:
+    type: gemini                              # Use gemini for API compatibility
+    force_transformer: antigravity            # But use Antigravity transformer for endpoints
+    display_name: Google Antigravity
+    api_base_url: https://cloudcode-pa.googleapis.com
+    oauth_provider: antigravity
+    models:
+      claude-opus-4.5:                        # Example model mapping
+        pricing:
+          source: openrouter
+          slug: anthropic/claude-opus-4.5
+        access_via: ["gemini"]                # Works because type is gemini
+      gemini-2.0-flash-thinking-exp-01-21:
+        access_via: ["gemini"]
+```
+
+This configuration allows models to use `access_via: ["gemini"]` for API compatibility matching, while the `force_transformer: antigravity` ensures the correct Antigravity-specific endpoints are used.
+
+### OAuth Environment Variables
+
+OAuth functionality can be configured using environment variables. If not set, the following defaults are used:
+
+- **`EXTERNAL_PLEXUS_URL`**: The external URL used for OAuth callbacks
+  - Default: `http://localhost:4000`
+  - Used to construct callback URLs during OAuth flow
+
+- **`ANTIGRAVITY_CLIENT_ID`**: Google OAuth client ID for Antigravity
+  - Default: `REDACTED_GOOGLE_OAUTH_CLIENT_ID`
+
+- **`ANTIGRAVITY_CLIENT_SECRET`**: Google OAuth client secret for Antigravity
+  - Default: `REDACTED_GOOGLE_OAUTH_CLIENT_SECRET`
+
+**Example** (if you need to override the defaults):
+
+```bash
+export EXTERNAL_PLEXUS_URL=https://plexus.example.com
+export ANTIGRAVITY_CLIENT_ID=your-client-id
+export ANTIGRAVITY_CLIENT_SECRET=your-client-secret
+```
+
+### OAuth Flow
+
+1. **Initiate Authentication**: Visit `/v0/oauth/authorize?provider=antigravity` to start the OAuth flow
+2. **Google Sign-In**: You'll be redirected to Google to authenticate
+3. **Callback**: After authentication, you'll be redirected back to Plexus at `/v0/oauth/callback`
+4. **Automatic Refresh**: Plexus will automatically refresh tokens in the background before they expire
+
+### OAuth Management Endpoints
+
+- **`GET /v0/oauth/authorize?provider=antigravity`**: Start OAuth flow
+- **`GET /v0/oauth/callback`**: OAuth callback endpoint (used by Google)
+- **`GET /v0/oauth/status?provider=antigravity`**: Check OAuth status and token expiry
+- **`DELETE /v0/oauth/credentials?provider=antigravity&user_identifier=email`**: Remove stored credentials
+- **`POST /v0/oauth/refresh`**: Manually trigger token refresh
+- **`GET /v0/oauth/refresh/status`**: Check token refresh service status
+
+### Supported OAuth Providers
+
+- **`antigravity`**: Google Antigravity (Code Assist) - Uses Google OAuth with special scopes for accessing Gemini models via the Antigravity API
 

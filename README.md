@@ -31,6 +31,7 @@ Plexus unifies interactions with multiple AI providers—OpenAI, Anthropic, Gemi
 
 ### Security & Authentication
 - **API Key Authentication**: Standard Bearer token authentication for all inference endpoints
+- **OAuth 2.0 Support**: Use your Google Antigravity account (supporting Pro, Ultra, and Free accounts) with automatic token refresh—no API keys required
 - **Secure Dashboard**: Admin key protection for management APIs and web interface
 
 ## Performance Metrics & Observability

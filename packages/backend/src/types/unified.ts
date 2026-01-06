@@ -86,6 +86,10 @@ export interface UnifiedChatRequest {
   };
   incomingApiType?: string;
   originalBody?: any;
+  metadata?: {
+    oauth_project_id?: string;
+    [key: string]: any;
+  };
 }
 
 // Unified Response

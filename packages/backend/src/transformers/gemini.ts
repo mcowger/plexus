@@ -579,7 +579,7 @@ export class GeminiTransformer implements Transformer {
           input_tokens: data.usageMetadata.promptTokenCount || 0,
           output_tokens: data.usageMetadata.candidatesTokenCount || 0,
           cached_tokens: data.usageMetadata.cachedContentTokenCount || 0,
-          reasoning_tokens: 0,
+          reasoning_tokens: data.usageMetadata.thoughtsTokenCount || 0,
         };
       }
     } catch (e) {

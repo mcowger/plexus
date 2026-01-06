@@ -44,8 +44,9 @@ describe("Dispatcher Bug Fixes", () => {
                 "naga": {
                     type: "chat", // Provider supports 'chat'
                     api_base_url: "https://api.naga.ac/v1",
+                    api_key: "test-key-123", // Add API key for authentication
                     models: {
-                        "claude-haiku-4.5-20251001": { 
+                        "claude-haiku-4.5-20251001": {
                             pricing: { source: "simple", input: 0, output: 0 },
                             access_via: [] // The problematic config
                         }
@@ -90,8 +91,9 @@ describe("Dispatcher Bug Fixes", () => {
                 "naga": {
                     type: [], // Empty provider types!
                     api_base_url: "https://api.naga.ac/v1",
+                    api_key: "test-key-123", // Add API key for authentication
                     models: {
-                        "claude-haiku-4.5-20251001": { 
+                        "claude-haiku-4.5-20251001": {
                             pricing: { source: "simple", input: 0, output: 0 },
                             access_via: [] // Also empty
                         }

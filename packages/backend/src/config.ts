@@ -56,6 +56,7 @@ const ProviderConfigSchema = z.object({
   display_name: z.string().optional(),
   api_base_url: z.union([z.string().url(), z.record(z.string())]),
   api_key: z.string().optional(),
+  oauth_provider: z.string().optional(),
   enabled: z.boolean().default(true).optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
@@ -64,7 +65,16 @@ const ProviderConfigSchema = z.object({
   ]).optional(),
   headers: z.record(z.string()).optional(),
   extraBody: z.record(z.any()).optional(),
-});
+  force_transformer: z.string().optional(),
+}).refine(
+  (data) => {
+    // Either api_key OR oauth_provider must be present, but not neither
+    return data.api_key || data.oauth_provider;
+  },
+  {
+    message: "Either 'api_key' or 'oauth_provider' must be specified",
+  }
+);
 
 const ModelTargetSchema = z.object({
   provider: z.string(),

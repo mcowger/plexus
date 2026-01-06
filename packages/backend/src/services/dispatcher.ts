@@ -5,8 +5,14 @@ import { logger } from "../utils/logger";
 import { CooldownManager } from "./cooldown-manager";
 import { RouteResult } from "./router";
 import { DebugManager } from "./debug-manager";
+import { UsageStorageService } from "./usage-storage";
 
 export class Dispatcher {
+  private usageStorage?: UsageStorageService;
+
+  setUsageStorage(storage: UsageStorageService) {
+    this.usageStorage = storage;
+  }
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
     // 1. Route
     const route = Router.resolve(request.model, request.incomingApiType);
@@ -48,15 +54,24 @@ export class Dispatcher {
     logger.info(`Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`);
 
     // 2. Get Transformer
-    const transformer = TransformerFactory.getTransformer(targetApiType);
+    // Check if provider has force_transformer override
+    const transformerType = route.config.force_transformer || targetApiType;
+    if (route.config.force_transformer) {
+        logger.info(`Dispatcher: Using forced transformer '${transformerType}' instead of '${targetApiType}' for provider '${route.provider}'`);
+    }
+    const transformer = TransformerFactory.getTransformer(transformerType);
 
     // 3. Transform Request
     // Override model in request to the target model
-    const requestWithTargetModel = { ...request, model: route.model };
+    const requestWithTargetModel = this.populateOAuthMetadata(
+      { ...request, model: route.model },
+      route
+    );
 
     let providerPayload;
 
     // Pass-through Optimization
+    // Only use pass-through if incoming API matches target API AND no force_transformer is set
     const isCompatible =
       !!request.incomingApiType?.toLowerCase() &&
       request.incomingApiType?.toLowerCase() ===
@@ -64,7 +79,7 @@ export class Dispatcher {
 
     let bypassTransformation = false;
 
-    if (isCompatible && request.originalBody) {
+    if (isCompatible && request.originalBody && !route.config.force_transformer) {
       logger.info(
         `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
       );
@@ -72,6 +87,9 @@ export class Dispatcher {
       providerPayload.model = route.model;
       bypassTransformation = true;
     } else {
+      if (route.config.force_transformer) {
+        logger.info(`Pass-through optimization bypassed due to force_transformer: ${route.config.force_transformer}`);
+      }
       providerPayload = await transformer.transformRequest(
         requestWithTargetModel
       );
@@ -132,7 +150,7 @@ export class Dispatcher {
       : transformer.defaultEndpoint;
     const url = `${baseUrl}${endpoint}`;
 
-    const headers = this.setupHeaders(route, targetApiType);
+    const headers = this.setupHeaders(route, targetApiType, request);
 
     const incomingApi = request.incomingApiType || "unknown";
 
@@ -219,11 +237,43 @@ export class Dispatcher {
       return unifiedResponse;
     }
   }
-  setupHeaders(route: RouteResult, apiType: string): Record<string, string> {
+  setupHeaders(route: RouteResult, apiType: string, request: UnifiedChatRequest): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (route.config.api_key) {
+
+    // Set Accept header based on streaming
+    if (request.stream) {
+      headers["Accept"] = "text/event-stream";
+    } else {
+      headers["Accept"] = "application/json";
+    }
+
+    // Check if this provider uses OAuth
+    if (route.config.oauth_provider && this.usageStorage) {
+      const credential = this.usageStorage.getOAuthCredential(route.config.oauth_provider);
+
+      if (credential) {
+        // Check if token is expired or expiring soon (within 5 minutes)
+        const isExpired = Date.now() >= credential.expires_at;
+        const isExpiringSoon = Date.now() >= (credential.expires_at - 5 * 60 * 1000);
+
+        if (isExpired) {
+          throw new Error(`OAuth token for provider '${route.config.oauth_provider}' has expired. Please re-authenticate.`);
+        }
+
+        if (isExpiringSoon) {
+          logger.warn(`OAuth token for provider '${route.config.oauth_provider}' is expiring soon. Refresh process should handle this.`);
+        }
+
+        // Use the OAuth access token
+        headers["Authorization"] = `Bearer ${credential.access_token}`;
+        logger.debug(`Using OAuth token for provider: ${route.config.oauth_provider}`);
+      } else {
+        throw new Error(`OAuth provider '${route.config.oauth_provider}' is configured but no credentials found. Please authenticate.`);
+      }
+    } else if (route.config.api_key) {
+      // Use static API key
       const type = apiType.toLowerCase();
       if (type === "messages") {
         headers["x-api-key"] = route.config.api_key;
@@ -234,10 +284,37 @@ export class Dispatcher {
         // Default to Bearer for Chat (OpenAI) and others
         headers["Authorization"] = `Bearer ${route.config.api_key}`;
       }
+    } else {
+      throw new Error(`No authentication configured for provider '${route.provider}'. Either api_key or oauth_provider must be set.`);
     }
+
     if (route.config.headers) {
       Object.assign(headers, route.config.headers);
     }
     return headers;
+  }
+
+  /**
+   * Populates OAuth metadata into the request if OAuth provider is configured
+   * @private
+   */
+  private populateOAuthMetadata(
+    request: UnifiedChatRequest,
+    route: RouteResult
+  ): UnifiedChatRequest {
+    // If OAuth is used, add OAuth metadata to request for transformer access
+    if (route.config.oauth_provider && this.usageStorage) {
+      const credential = this.usageStorage.getOAuthCredential(route.config.oauth_provider);
+      if (credential && credential.project_id) {
+        return {
+          ...request,
+          metadata: {
+            ...request.metadata,
+            oauth_project_id: credential.project_id
+          }
+        };
+      }
+    }
+    return request;
   }
 }
