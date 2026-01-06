@@ -20,9 +20,16 @@ export class Dispatcher {
     const modelSpecificTypes = route.modelConfig?.access_via;
     
     // The available types for this specific routing
-    const availableTypes = modelSpecificTypes || providerTypes;
+    // If model specific types are defined and not empty, use them. Otherwise fallback to provider types.
+    const availableTypes = (modelSpecificTypes && modelSpecificTypes.length > 0) 
+      ? modelSpecificTypes 
+      : providerTypes;
 
     let targetApiType = availableTypes[0]; // Default to first one
+
+    if (!targetApiType) {
+        throw new Error(`No available API type found for provider '${route.provider}' and model '${route.model}'. Check configuration.`);
+    }
     let selectionReason = "default (first available)";
 
     // Try to match incoming
