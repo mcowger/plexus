@@ -165,13 +165,13 @@ This section defines the "virtual" models or aliases that clients will use when 
 
 - **`selector`**: (Optional) The strategy to use for target selection when multiple targets are available:
   - `random`: (Default) Randomly selects a healthy target
-  - `cost`: Routes to the lowest-cost provider
+  - `cost`: Routes to the lowest-cost healthy provider
   - `performance`: Routes to the highest tokens-per-second provider
   - `latency`: Routes to the lowest time-to-first-token provider
 
 - **`priority`**: (Optional) Determines the routing lifecycle order:
   - `selector` (Default): Choose a provider using the selector strategy, then use the best available API format for that provider
-  - `api_match`: Filter for native API compatibility first, then apply the selector
+  - `api_match`: Filter for native API compatibility first, then apply the selector. If no providers match the incoming API type, falls back to any viable provider selected by the selector
   
   Use `api_match` when you want maximum compatibility with the incoming request format, even if it means fewer provider options. This is especially useful for:
   - Tools that rely on specific API features (e.g., Claude Code with Anthropic messages)
