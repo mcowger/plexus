@@ -1,5 +1,67 @@
 # Changelog
 
+## v0.5.0 - 2026-01-06
+
+### v0.5.0: Multi-Protocol API Routing, Provider/Model Management UI, and Gemini Integration
+
+## Major Features
+
+### Provider and Model Management UI
+This release introduces full Provider and Model editing capabilities. Users can now manage AI providers and models directly through the web interface with an enhanced providers page that consolidates provider and model management ([47cd66d](https://github.com/mcowger/plexus/commit/47cd66d), [c2cf12c](https://github.com/mcowger/plexus/commit/c2cf12c), [cd8648d](https://github.com/mcowger/plexus/commit/cd8648d), [1b5d065](https://github.com/mcowger/plexus/commit/1b5d065)).
+
+### Route Protection and Key Management
+Inference routes are now protected, and a Key management UI has been added for better security and credential management ([5723029](https://github.com/mcowger/plexus/commit/5723029)).
+
+### Multi-Protocol API Routing with Adaptive Matching
+The API routing system has been significantly enhanced to support multiple protocols with adaptive matching, providing more flexible and intelligent request routing ([746ebc1](https://github.com/mcowger/plexus/commit/746ebc1)).
+
+### Gemini Support
+Added support for Google's Gemini AI models, expanding the range of supported providers ([2a8bc4e](https://github.com/mcowger/plexus/commit/2a8bc4e), [cbb6096](https://github.com/mcowger/plexus/commit/cbb6096)).
+
+### Usage Tracking
+Implemented comprehensive usage tracking to monitor API consumption and resource utilization ([cbb6096](https://github.com/mcowger/plexus/commit/cbb6096), [c51f4cb](https://github.com/mcowger/plexus/commit/c51f4cb)).
+
+### Additional Aliases Support
+Extended alias functionality to provide more flexible routing and endpoint naming ([f9b2005](https://github.com/mcowger/plexus/commit/f9b2005)).
+
+### Fastify Migration
+The application has been refactored to use Fastify as the web framework, improving performance and developer experience ([3fbb6fa](https://github.com/mcowger/plexus/commit/3fbb6fa)).
+
+### Tailwind CSS Integration
+Completely refactored the frontend styling with Tailwind CSS integration and updated build configurations ([c50c371](https://github.com/mcowger/plexus/commit/c50c371), [ce06349](https://github.com/mcowger/plexus/commit/ce06349)).
+
+## Improvements and Fixes
+
+### Core Improvements
+- Refactored management routes for better organization ([3610d36](https://github.com/mcowger/plexus/commit/3610d36), [8f26846](https://github.com/mcowger/plexus/commit/8f26846))
+- Streamlined OpenAI transformer and removed usage-extractors ([5974154](https://github.com/mcowger/plexus/commit/5974154))
+- Simplified logging and response handling ([9838f54](https://github.com/mcowger/plexus/commit/9838f54))
+- Fixed caching and Duration display ([b489333](https://github.com/mcowger/plexus/commit/b489333))
+
+### Bug Fixes
+- Fixed paths for compilation ([08490d9](https://github.com/mcowger/plexus/commit/08490d9))
+- Improved mocking reliability ([9764306](https://github.com/mcowger/plexus/commit/9764306))
+- Fixed mocks ([f1a7dca](https://github.com/mcowger/plexus/commit/f1a7dca))
+- Fixed debouncing issues ([295594b](https://github.com/mcowger/plexus/commit/295594b))
+- Fixed switch offset ([6bea944](https://github.com/mcowger/plexus/commit/6bea944))
+- Fixed terminal escape codes ([4b0c194](https://github.com/mcowger/plexus/commit/4b0c194))
+- Fixed debug logging ([ff18de2](https://github.com/mcowger/plexus/commit/ff18de2))
+
+### Build and Testing
+- Removed HAR file generation ([4af4e02](https://github.com/mcowger/plexus/commit/4af4e02))
+- Updated build configurations ([c8585d6](https://github.com/mcowger/plexus/commit/c8585d6), [4e2a140](https://github.com/mcowger/plexus/commit/4e2a140))
+- Fixed and simplified tests ([6b19516](https://github.com/mcowger/plexus/commit/6b19516), [5a8e477](https://github.com/mcowger/plexus/commit/5a8e477))
+- Removed outdated test suites ([7f109e0](https://github.com/mcowger/plexus/commit/7f109e0))
+
+### Cleanup and Maintenance
+- General code cleanup ([d439f50](https://github.com/mcowger/plexus/commit/d439f50))
+- Updated README documentation ([57f105a](https://github.com/mcowger/plexus/commit/57f105a))
+- Updated dependency locks ([5974154](https://github.com/mcowger/plexus/commit/5974154))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.3.2 - 2026-01-04
 
 ### v0.3.2 - SSE Ping Events for Log Streaming
