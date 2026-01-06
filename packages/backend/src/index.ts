@@ -59,6 +59,12 @@ CooldownManager.getInstance().setStorage(usageStorage);
 DebugManager.getInstance().setStorage(usageStorage);
 SelectorFactory.setUsageStorage(usageStorage);
 
+// Enable debug mode if DEBUG=true environment variable is set
+if (process.env.DEBUG === 'true') {
+    DebugManager.getInstance().setEnabled(true);
+    logger.info('Debug mode auto-enabled via DEBUG=true environment variable');
+}
+
 // Bootstrap configuration and pricing data
 try {
     await loadConfig();
