@@ -152,7 +152,6 @@ async function main() {
         const url = `${apiBase.replace(/\/+$/, "")}/chat/completions`;
 
         console.log(`\n${pc.dim("Sending request to AI API...")}`);
-        console.log(`\n${pc.dim(`POST ${url}`)}`);
         const requestBody = {
             model: apiModel, 
             messages: [
@@ -162,7 +161,6 @@ async function main() {
                 }
             ]
         };
-        console.log(`\n${pc.dim(`Request Body: ${JSON.stringify(requestBody, null, 2)}`)}`);
         const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -175,7 +173,7 @@ async function main() {
         if (!response.ok) {
             throw new Error(`API request failed: ${response.status} ${response.statusText} - ${await response.text()}`);
         }
-        
+
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content;
         

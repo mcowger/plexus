@@ -88,7 +88,6 @@ export class DebugManager {
         const log = this.pendingLogs.get(requestId);
         if (log) {
             log.transformedResponse = payload;
-            this.flush(requestId); // For non-streaming responses
         }
     }
 
