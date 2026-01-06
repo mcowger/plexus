@@ -79,27 +79,135 @@ When a request enters Plexus, it follows a two-stage process to determine the de
 
 ## Configuration Sections
 
-...
+### `providers`
 
-#### `models`
+This section defines the upstream AI providers that Plexus will route requests to. Each provider configuration specifies how to connect and authenticate with that provider's API.
+
+**Basic Configuration Fields:**
+
+- **`type`**: The API format(s) supported by this provider. Can be:
+  - A single string: `"chat"`, `"messages"`, or `"gemini"`
+  - An array for multi-protocol providers: `["chat", "messages"]`
+  
+- **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
+
+- **`api_base_url`**: The base URL for the provider's API. Can be:
+  - A single URL string for single-protocol providers
+  - An object mapping API types to specific URLs for multi-protocol providers
+  
+- **`api_key`**: (Optional) The authentication key for this provider.
+
+- **`enabled`**: (Optional, default: `true`) Set to `false` to temporarily disable a provider.
+
+- **`models`**: The models available from this provider. Can be:
+  - An array of model name strings: `["model-a", "model-b"]`
+  - An object mapping model names to configuration (for pricing or API access control)
+
+- **`headers`**: (Optional) Custom HTTP headers to include in every request to this provider.
+
+- **`extraBody`**: (Optional) Additional fields to merge into every request body.
+
+- **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider. Often used if you want to base your pricing on public numbers but apply a global discount.
+
+**Multi-Protocol Provider Configuration:**
+
+For providers that support multiple API endpoints (e.g., both OpenAI chat completions and Anthropic messages), you can configure them as follows:
+
+```yaml
+providers:
+  synthetic:
+    # Declare multiple supported API types
+    type: ["chat", "messages"]
+    display_name: Synthetic Provider
+    
+    # Map each API type to its specific base URL
+    api_base_url:
+      chat: https://api.synthetic.new/openai/v1
+      messages: https://api.synthetic.new/messages/v1
+    
+    api_key: "your-synthetic-key"
+    
+    models:
+      # Specify which APIs each model supports
+      "hf:MiniMaxAI/MiniMax-M2.1":
+        access_via: ["chat", "messages"]
+      
+      # Models can be restricted to specific APIs
+      "legacy-model":
+        access_via: ["messages"]
+```
+
+When using multi-protocol providers with API priority matching (`priority: api_match` in model configuration), Plexus will automatically filter for providers that natively support the incoming API type, maximizing compatibility and enabling pass-through optimization.
+
+**Single-Protocol Provider Example:**
+
+```yaml
+providers:
+  openai:
+    type: chat
+    display_name: OpenAI
+    api_base_url: https://api.openai.com/v1
+    api_key: "sk-..."
+    models:
+      - gpt-4o
+      - gpt-4o-mini
+```
+
+### `models`
+
 This section defines the "virtual" models or aliases that clients will use when making requests to Plexus.
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
-- **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration.
-- **`selector`**: (Optional) The strategy to use for target selection (random, cost, performance, latency).
-- **`priority`**: (Optional) Determines the precedence of API matching vs. routing selection.
-    - `selector`: (Default) Select the target first, then determine the best API to use.
-    - `api_match`: Filter targets by compatibility with the incoming API type first, then apply the selector.
-- **`targets`**: A list of provider/model pairs that back this alias.    - `provider`: Must match a key defined in the `providers` section.
-    - `model`: The specific model name to use on that provider.
 
-#### `keys`
+- **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration. Can be used for tools like Claude Code that are picky about model names, or clients that have fixed lists of models that you want to remap.
+
+- **`selector`**: (Optional) The strategy to use for target selection when multiple targets are available:
+  - `random`: (Default) Randomly selects a healthy target
+  - `cost`: Routes to the lowest-cost healthy provider
+  - `performance`: Routes to the highest tokens-per-second provider
+  - `latency`: Routes to the lowest time-to-first-token provider
+
+- **`priority`**: (Optional) Determines the routing lifecycle order:
+  - `selector` (Default): Choose a provider using the selector strategy, then use the best available API format for that provider
+  - `api_match`: Filter for native API compatibility first, then apply the selector. If no providers match the incoming API type, falls back to any viable provider selected by the selector
+  
+  Use `api_match` when you want maximum compatibility with the incoming request format, even if it means fewer provider options. This is especially useful for:
+  - Tools that rely on specific API features (e.g., Claude Code with Anthropic messages)
+  - Maximizing pass-through optimization for better performance
+  - Ensuring high-fidelity interactions by avoiding translation
+
+- **`targets`**: A list of provider/model pairs that back this alias.
+  - `provider`: Must match a key defined in the `providers` section.
+  - `model`: The specific model name to use on that provider.
+
+**Example with API Priority Matching:**
+
+```yaml
+models:
+  balanced-model:
+    selector: random
+    # Prioritize providers that natively support the incoming API type
+    priority: api_match
+    targets:
+      - provider: openai
+        model: gpt-4o
+      - provider: anthropic
+        model: claude-3-5-sonnet-latest
+```
+
+With this configuration, if a client sends an Anthropic-style request to `balanced-model`, Plexus will prefer the Anthropic provider (if healthy) to enable pass-through optimization. If an OpenAI-style request is sent, it will prefer the OpenAI provider.
+
+### `keys`
+
 This section defines the API keys required to access the Plexus gateway inference endpoints (e.g., `/v1/chat/completions`).
 
 - **Key Name**: A unique identifier for the key (e.g., `client-app-1`).
 - **`secret`**: The actual bearer token string clients must provide in the `Authorization` header.
 - **`comment`**: (Optional) A friendly description or owner name for the key.
 
+**Example:**
+
+```yaml
 keys:
   production-app:
     secret: "sk-plexus-abc-123"
@@ -108,11 +216,12 @@ keys:
   testing-key:
     secret: "sk-plexus-test-456"
     comment: "Key for CI/CD tests"
+```
 
-Once keys are defined, clients must include the `Authorization: Bearer <secret>` header in their requests. Note that `/v1/models` remains accessible without authentication to support model discovery.
+Keys are required. Once defined, clients must include the `Authorization: Bearer <secret>` header in their requests. Note that `/v1/models` remains accessible without authentication to support model discovery.
 
-#### `adminKey` (Required)
-This global setting secures the Admin Dashboard and Management APIs (`/v0/*`).
+### `adminKey` (Required)
+This global setting secures the Admin Dashboard and Management APIs (`/v0/*`). Cannot be configured via UI.
 
 **Example:**
 ```yaml

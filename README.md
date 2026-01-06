@@ -12,27 +12,26 @@ Plexus unifies interactions with multiple AI providers—OpenAI, Anthropic, Gemi
 
 ## Core Features
 
-- **Unified API**: Support for both OpenAI-compatible, Anthropic-compatible and Gemini endpoints.
-  - Tools like Gemini and ClaudeCode work flawlessly.
-- **Protocol Transformation**: Transparently convert requests and responses between different provider formats (e.g., send an OpenAI request to Anthropic Claude).
-- **Streaming Support**: Full streaming support with real-time transformation of event streams.
-- **Model Aliasing**: Define friendly model names that route to specific provider/model combinations.
-- **Intelligent Load Balancing**: Distribute requests across multiple backends for the same model alias using sophisticated selection strategies:
-  - **Random**: (Default) Simple random distribution across healthy targets.
-  - **Lowest Cost**: Automatically routes to the cheapest available target based on your pricing configuration.
-  - **Highest Performance**: Routes based on real-time throughput (Tokens Per Second).
-  - **Lowest Latency**: Routes based on Time to First Token (TTFT).
-  - **Automatic Cooldown**: Temporarily removes providers from rotation if they encounter errors or rate limits.
-- **Performance Tracking**: Continuous monitoring of upstream providers, tracking TTFT, TPS, and error rates to power intelligent routing.
-- **Reasoning Support**: Unified handling of reasoning/thinking content from modern models, including Gemini `thoughtSignatures`.
-- **API Key Authentication**: Secure your gateway with standard Bearer token authentication for all inference endpoints.
-- **Cost Tracking & Management**: Comprehensive cost tracking with support for multiple pricing strategies:
-  - **Simple**: Fixed per-token rates.
-  - **OpenRouter**: Automatic fetching of real-time pricing.
-  - **Tiered**: Advanced volume-based pricing tiers.
-- **Pass-through Optimization**: Automatically detects when the incoming request format matches the target provider's native format, bypassing expensive transformations to minimize latency and overhead while maintaining full observability. Active passthrough requests are highlighted with a ⚡ icon in the dashboard logs.
-- **Adaptive API Matching**: For providers that support multiple protocols (e.g., both OpenAI and Anthropic formats), Plexus dynamically selects the best protocol for each model to minimize transformation overhead and improve reliability.
-- **Deep Debugging**: Easy-to-use raw request and response capture, with detailed information of raw and transformed responses, as well as stream reconstruction.
+### Protocol Support & Transformation
+- **Unified API**: OpenAI (`/v1/chat/completions`), Anthropic (`/v1/messages`), and Gemini endpoints with full image support
+- **Multi-Protocol Providers**: Configure providers with multiple API endpoints (e.g., both OpenAI and Anthropic formats)
+- **Intelligent Protocol Transformation**: Seamlessly convert between provider formats with robust state-machine-based streaming, powered by Fastify
+- **Pass-through Optimization**: Automatically bypasses protocol conversion when formats match, reducing latency while maintaining observability (⚡ icon in logs)
+
+### Routing & Load Balancing
+- **Model Aliasing**: Map friendly names to specific provider/model combinations
+- **Smart Routing**: Distribute requests across backends with multiple strategies (random, cost, performance, latency) and automatic cooldown for unhealthy providers
+- **API Priority Matching**: Optionally filter providers by native API compatibility before applying selection strategies for maximum fidelity
+
+### Observability & Management
+- **Performance Tracking**: Real-time monitoring of TTFT, TPS, and error rates across all providers
+- **Cost Management**: Track costs with multiple pricing strategies (simple, OpenRouter, tiered)
+- **Deep Debugging**: Capture and inspect raw requests, responses, and stream reconstruction
+- **Reasoning Support**: Unified handling of thinking content from models like Gemini and Claude
+
+### Security & Authentication
+- **API Key Authentication**: Standard Bearer token authentication for all inference endpoints
+- **Secure Dashboard**: Admin key protection for management APIs and web interface
 
 ## Performance Metrics & Observability
 
@@ -59,13 +58,17 @@ Use **Debug Mode** to inspect the raw input and output of every transformation s
 ![Debug Mode](docs/images/debug_mode.png)
 
 ### Configuration Management
-Manage your providers and model aliases directly from the UI or via the YAML configuration editor.
+Manage your entire Plexus configuration through the web interface with comprehensive UI coverage for all settings:
+- **Provider Management**: Add, edit, and configure AI providers with support for multi-endpoint configurations
+- **Model Aliases**: Create and manage model routing rules with load balancing strategies
+- **API Keys**: Manage authentication keys for secure access
+- **Routing Preferences**: Configure selection strategies (cost, latency, performance) and API priority matching
 
 | Provider Management | Model Aliases |
 |:---:|:---:|
 | ![Providers](docs/images/providers.png) | ![Model Aliases](docs/images/model_aliases.png) |
 
-**YAML Config Editor** for power users:
+**YAML Config Editor** for power users - all UI changes are written back to your `plexus.yaml` configuration file:
 ![Config Editor](docs/images/config_editor.png)
 
 ### Usage Analytics
