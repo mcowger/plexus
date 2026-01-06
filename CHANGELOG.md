@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.2 - 2026-01-06
+
+### Hotfix: Fix dispatcher when access_via[] is empty.
+
+Hotfix: Fix dispatcher when access_via[] is empty.
+
 ## v0.5.1 - 2026-01-06
 
 ### v0.5.1 Release - Anthropic API Improvements and Enhanced Test Coverage
