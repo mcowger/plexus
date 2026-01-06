@@ -33,8 +33,19 @@ const consoleFormat = printf(({ level, message, timestamp, ...metadata }) => {
   return msg;
 });
 
+// Determine log level: If DEBUG=true is set, use 'debug' level unless LOG_LEVEL is explicitly set
+export const getLogLevel = (): string => {
+  if (process.env.LOG_LEVEL) {
+    return process.env.LOG_LEVEL;
+  }
+  if (process.env.DEBUG === 'true') {
+    return 'debug';
+  }
+  return 'info';
+};
+
 export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: getLogLevel(),
   // Default format
   format: combine(
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
