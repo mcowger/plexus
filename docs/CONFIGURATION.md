@@ -89,8 +89,6 @@ This section defines the upstream AI providers that Plexus will route requests t
   - A single string: `"chat"`, `"messages"`, or `"gemini"`
   - An array for multi-protocol providers: `["chat", "messages"]`
   
-  Note: While Gemini can technically be included in multi-protocol arrays, it's typically configured as a single-protocol provider due to its unique API requirements.
-  
 - **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
 
 - **`api_base_url`**: The base URL for the provider's API. Can be:
@@ -109,7 +107,7 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`extraBody`**: (Optional) Additional fields to merge into every request body.
 
-- **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider.
+- **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider. Often used if you want to base your pricing on public numbers but apply a global discount.
 
 **Multi-Protocol Provider Configuration:**
 
@@ -161,7 +159,7 @@ This section defines the "virtual" models or aliases that clients will use when 
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
 
-- **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration.
+- **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration. Can be used for tools like Claude Code that are picky about model names, or clients that have fixed lists of models that you want to remap.
 
 - **`selector`**: (Optional) The strategy to use for target selection when multiple targets are available:
   - `random`: (Default) Randomly selects a healthy target
@@ -176,7 +174,7 @@ This section defines the "virtual" models or aliases that clients will use when 
   Use `api_match` when you want maximum compatibility with the incoming request format, even if it means fewer provider options. This is especially useful for:
   - Tools that rely on specific API features (e.g., Claude Code with Anthropic messages)
   - Maximizing pass-through optimization for better performance
-  - Ensuring high-fidelity protocol translation
+  - Ensuring high-fidelity interactions by avoiding translation
 
 - **`targets`**: A list of provider/model pairs that back this alias.
   - `provider`: Must match a key defined in the `providers` section.
@@ -220,10 +218,10 @@ keys:
     comment: "Key for CI/CD tests"
 ```
 
-Once keys are defined, clients must include the `Authorization: Bearer <secret>` header in their requests. Note that `/v1/models` remains accessible without authentication to support model discovery.
+Keys are required. Once defined, clients must include the `Authorization: Bearer <secret>` header in their requests. Note that `/v1/models` remains accessible without authentication to support model discovery.
 
 ### `adminKey` (Required)
-This global setting secures the Admin Dashboard and Management APIs (`/v0/*`).
+This global setting secures the Admin Dashboard and Management APIs (`/v0/*`). Cannot be configured via UI.
 
 **Example:**
 ```yaml
