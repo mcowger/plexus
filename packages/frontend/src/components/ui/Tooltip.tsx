@@ -3,29 +3,39 @@ import React, { useState } from 'react';
 interface TooltipProps {
     content: React.ReactNode;
     children: React.ReactNode;
+    position?: 'bottom' | 'right';
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({ content, children }) => {
+export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'bottom' }) => {
     const [isVisible, setIsVisible] = useState(false);
 
+    const positionStyles = position === 'right' ? {
+        left: '100%',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        marginLeft: '8px',
+    } : {
+        top: '100%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        marginTop: '8px',
+    };
+
     return (
-        <div 
-            className="tooltip-container" 
+        <div
+            className="tooltip-container"
             style={{ position: 'relative', display: 'inline-block' }}
             onMouseEnter={() => setIsVisible(true)}
             onMouseLeave={() => setIsVisible(false)}
         >
             {children}
             {isVisible && (
-                <div 
+                <div
                     className="tooltip-content"
                     style={{
                         position: 'absolute',
-                        top: '100%',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        marginTop: '8px',
-                        padding: '8px',
+                        ...positionStyles,
+                        padding: '8px 12px',
                         backgroundColor: '#1e1e1e',
                         border: '1px solid var(--color-border)',
                         borderRadius: '4px',
@@ -33,9 +43,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children }) => {
                         zIndex: 1000,
                         opacity: 1,
                         visibility: 'visible',
-                        whiteSpace: 'pre-wrap',
-                        minWidth: '200px',
-                        maxWidth: '300px',
+                        whiteSpace: 'nowrap',
                         fontSize: '0.85em',
                         color: 'var(--color-text-primary)'
                     }}
