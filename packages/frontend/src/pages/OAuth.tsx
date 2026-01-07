@@ -1,21 +1,31 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import { formatDuration, formatTimeAgo } from '../lib/format';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { RefreshCw, CheckCircle, XCircle, AlertTriangle, ExternalLink, Trash2 } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertTriangle, ExternalLink, Trash2, ChevronDown, ChevronRight, Shield, AlertCircle, X } from 'lucide-react';
 
-interface OAuthStatus {
-    configured: boolean;
-    provider?: string;
-    user?: string;
-    project_id?: string;
-    expires_at?: number;
-    expires_in_seconds?: number;
-    is_expired?: boolean;
-    auth_url?: string;
-    message?: string;
+interface OAuthCredentialsGrouped {
+    providers: Array<{
+        provider: string;
+        accounts: Array<{
+            user_identifier: string;
+            expires_at: number;
+            expires_in_seconds: number;
+            is_expired: boolean;
+            project_id?: string;
+            on_cooldown: boolean;
+            cooldown_expiry?: number;
+            cooldown_remaining_seconds?: number;
+            status: 'active' | 'expiring' | 'expired' | 'cooldown';
+            last_refreshed_at: number;
+            token_age_seconds: number;
+            refresh_token_expires_at: number;
+            refresh_token_expires_in_seconds: number;
+        }>;
+    }>;
 }
 
 interface RefreshStatus {
@@ -27,22 +37,25 @@ interface RefreshStatus {
 }
 
 export default function OAuth() {
-    const [status, setStatus] = useState<OAuthStatus | null>(null);
+    const [credentials, setCredentials] = useState<OAuthCredentialsGrouped | null>(null);
     const [refreshStatus, setRefreshStatus] = useState<RefreshStatus | null>(null);
     const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+    const [refreshingAccounts, setRefreshingAccounts] = useState<Set<string>>(new Set());
+    const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set(['antigravity']));
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<{ provider: string; account: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [cooldownTimers, setCooldownTimers] = useState<Record<string, number>>({});
 
     const loadStatus = async () => {
         try {
             setLoading(true);
             setError(null);
-            const [oauthStatus, tokenRefreshStatus] = await Promise.all([
-                api.getOAuthStatus('antigravity'),
+            const [oauthCredentials, tokenRefreshStatus] = await Promise.all([
+                api.getOAuthCredentialsGrouped(),
                 api.getOAuthRefreshStatus()
             ]);
-            setStatus(oauthStatus);
+            setCredentials(oauthCredentials);
             setRefreshStatus(tokenRefreshStatus);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load OAuth status');
@@ -58,14 +71,45 @@ export default function OAuth() {
         return () => clearInterval(interval);
     }, []);
 
-    const handleInitiateAuth = async () => {
+    // Cooldown countdown timer
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const newTimers: Record<string, number> = {};
+            credentials?.providers.forEach(provider => {
+                provider.accounts.forEach(account => {
+                    if (account.on_cooldown && account.cooldown_remaining_seconds) {
+                        const key = `${provider.provider}:${account.user_identifier}`;
+                        const remaining = Math.max(0, account.cooldown_remaining_seconds - 1);
+                        if (remaining > 0) {
+                            newTimers[key] = remaining;
+                        }
+                    }
+                });
+            });
+            setCooldownTimers(newTimers);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [credentials]);
+
+    const toggleProvider = (provider: string) => {
+        const newExpanded = new Set(expandedProviders);
+        if (newExpanded.has(provider)) {
+            newExpanded.delete(provider);
+        } else {
+            newExpanded.add(provider);
+        }
+        setExpandedProviders(newExpanded);
+    };
+
+    const handleInitiateAuth = async (provider: string) => {
         try {
-            const response = await api.initiateOAuthFlow('antigravity');
+            const response = await api.initiateOAuthFlow(provider);
             window.open(response.auth_url, '_blank');
             // Poll for status after opening auth window
             const pollInterval = setInterval(async () => {
-                const newStatus = await api.getOAuthStatus('antigravity');
-                if (newStatus.configured) {
+                const newStatus = await api.getOAuthCredentialsGrouped(provider);
+                if (newStatus.providers.length > 0 && newStatus.providers[0].accounts.length > 0) {
                     clearInterval(pollInterval);
                     await loadStatus();
                 }
@@ -78,9 +122,10 @@ export default function OAuth() {
         }
     };
 
-    const handleRefreshToken = async () => {
+    const handleRefreshAccount = async (provider: string, accountId: string) => {
+        const key = `${provider}:${accountId}`;
         try {
-            setRefreshing(true);
+            setRefreshingAccounts(prev => new Set(prev).add(key));
             setError(null);
             const result = await api.refreshOAuthToken();
             if (result.success) {
@@ -91,18 +136,23 @@ export default function OAuth() {
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to refresh token');
         } finally {
-            setRefreshing(false);
+            setRefreshingAccounts(prev => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+            });
         }
     };
 
     const handleDeleteCredentials = async () => {
-        if (!status?.user) return;
+        if (!deleteTarget) return;
 
         try {
             setError(null);
-            const success = await api.deleteOAuthCredentials('antigravity', status.user);
+            const success = await api.deleteOAuthCredentials(deleteTarget.provider, deleteTarget.account);
             if (success) {
                 setShowDeleteModal(false);
+                setDeleteTarget(null);
                 await loadStatus();
             } else {
                 setError('Failed to delete credentials');
@@ -112,33 +162,66 @@ export default function OAuth() {
         }
     };
 
-    const formatTimeRemaining = (seconds: number): string => {
-        if (seconds < 0) return 'Expired';
-        const days = Math.floor(seconds / 86400);
-        const hours = Math.floor((seconds % 86400) / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-
-        if (days > 0) return `${days}d ${hours}h`;
-        if (hours > 0) return `${hours}h ${minutes}m`;
-        return `${minutes}m`;
+    const openDeleteModal = (provider: string, account: string) => {
+        setDeleteTarget({ provider, account });
+        setShowDeleteModal(true);
     };
 
-    const getStatusBadge = () => {
-        if (!status) return null;
+    const handleClearCooldown = async (provider: string, accountId: string) => {
+        try {
+            setError(null);
+            await api.clearCooldown(provider, accountId);
+            await loadStatus();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to clear cooldown');
+        }
+    };
 
-        if (!status.configured) {
-            return <Badge variant="secondary" icon={<XCircle size={14} />}>Not Configured</Badge>;
+
+    const getTokenStatus = (expiresInSeconds: number): { label: string; variant: 'success' | 'warning' | 'danger' } => {
+        if (expiresInSeconds < 0) return { label: 'Expired', variant: 'danger' };
+        if (expiresInSeconds < 600) return { label: 'Expiring', variant: 'warning' }; // < 10 minutes
+        return { label: 'Valid', variant: 'success' };
+    };
+
+    const getAccountStatusBadge = (account: { status: string; on_cooldown: boolean }) => {
+        if (account.on_cooldown) {
+            return <Badge variant="danger" icon={<AlertCircle size={14} />}>On Cooldown</Badge>;
         }
 
-        if (status.is_expired) {
-            return <Badge variant="danger" icon={<XCircle size={14} />}>Expired</Badge>;
+        switch (account.status) {
+            case 'active':
+                return <Badge variant="success" icon={<CheckCircle size={14} />}>Active</Badge>;
+            case 'expiring':
+                return <Badge variant="warning" icon={<AlertTriangle size={14} />}>Expiring Soon</Badge>;
+            case 'expired':
+                return <Badge variant="danger" icon={<XCircle size={14} />}>Expired</Badge>;
+            default:
+                return <Badge variant="secondary">Unknown</Badge>;
         }
+    };
 
-        if (status.expires_in_seconds && status.expires_in_seconds < 600) {
-            return <Badge variant="warning" icon={<AlertTriangle size={14} />}>Expiring Soon</Badge>;
-        }
+    const getProviderSummary = (accounts: any[]) => {
+        const total = accounts.length;
+        const healthy = accounts.filter(a => a.status === 'active' && !a.on_cooldown).length;
+        const onCooldown = accounts.filter(a => a.on_cooldown).length;
+        const expired = accounts.filter(a => a.is_expired).length;
 
-        return <Badge variant="success" icon={<CheckCircle size={14} />}>Connected</Badge>;
+        if (total === 0) return 'No accounts';
+
+        const parts = [`${total} account${total !== 1 ? 's' : ''}`];
+        if (healthy > 0) parts.push(`${healthy} healthy`);
+        if (onCooldown > 0) parts.push(`${onCooldown} on cooldown`);
+        if (expired > 0) parts.push(`${expired} expired`);
+
+        return parts.join(', ');
+    };
+
+    const getProviderName = (provider: string): string => {
+        const names: Record<string, string> = {
+            'antigravity': 'Google Antigravity'
+        };
+        return names[provider] || provider;
     };
 
     if (loading) {
@@ -151,19 +234,28 @@ export default function OAuth() {
         );
     }
 
+    const hasAnyAccounts = credentials?.providers.some(p => p.accounts.length > 0);
+
     return (
         <div className="p-8 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold">OAuth Management</h1>
                     <p className="text-muted-foreground mt-1">
-                        Manage OAuth 2.0 authentication for providers like Google Antigravity
+                        Manage OAuth 2.0 authentication for providers with multiple accounts
                     </p>
                 </div>
-                <Button onClick={loadStatus} variant="secondary" size="sm">
-                    <RefreshCw size={16} className="mr-2" />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-3">
+                    {refreshStatus && (
+                        <Badge variant={refreshStatus.running ? 'success' : 'secondary'}>
+                            Auto-refresh: {refreshStatus.running ? 'Active' : 'Inactive'}
+                        </Badge>
+                    )}
+                    <Button onClick={loadStatus} variant="secondary" size="sm">
+                        <RefreshCw size={16} className="mr-2" />
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
             {error && (
@@ -172,153 +264,233 @@ export default function OAuth() {
                 </div>
             )}
 
-            <Card>
-                <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-semibold flex items-center gap-2">
-                                Google Antigravity
-                                {getStatusBadge()}
-                            </h2>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                OAuth 2.0 authentication for Google Antigravity API
-                            </p>
-                        </div>
-                    </div>
-
-                    {status?.configured ? (
-                        <div className="space-y-4">
-                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                                <div className="text-sm font-medium text-blue-400 mb-2">⚠️ Remember to Configure Provider & Model</div>
-                                <div className="text-sm text-muted-foreground space-y-2">
-                                    <p>OAuth authentication is active, but you must configure a provider and model in your config to use it.</p>
-                                    <p>
-                                        <strong>Option 1:</strong> Visit the <a href="/providers" className="text-blue-400 hover:underline">Providers page</a> to configure via UI.
-                                    </p>
-                                    <p>
-                                        <strong>Option 2:</strong> Add to your YAML config with <code className="bg-background/50 px-1 py-0.5 rounded text-xs">oauth_provider: antigravity</code> (no <code className="bg-background/50 px-1 py-0.5 rounded text-xs">api_key</code> needed).
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-background/50 rounded-lg p-4 border border-border/50">
-                                    <div className="text-sm text-muted-foreground">Account</div>
-                                    <div className="font-mono text-sm mt-1">{status.user || 'Unknown'}</div>
-                                </div>
-
-                                {status.project_id && (
-                                    <div className="bg-background/50 rounded-lg p-4 border border-border/50">
-                                        <div className="text-sm text-muted-foreground">Project ID</div>
-                                        <div className="font-mono text-sm mt-1">{status.project_id}</div>
-                                    </div>
-                                )}
-
-                                {status.expires_in_seconds !== undefined && (
-                                    <div className="bg-background/50 rounded-lg p-4 border border-border/50">
-                                        <div className="text-sm text-muted-foreground">Token Expires In</div>
-                                        <div className="font-mono text-sm mt-1">
-                                            {formatTimeRemaining(status.expires_in_seconds)}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {status.expires_at && (
-                                    <div className="bg-background/50 rounded-lg p-4 border border-border/50">
-                                        <div className="text-sm text-muted-foreground">Expires At</div>
-                                        <div className="font-mono text-sm mt-1">
-                                            {new Date(status.expires_at).toLocaleString()}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {refreshStatus && (
-                                <div className="bg-background/50 rounded-lg p-4 border border-border/50">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-sm font-medium">Automatic Token Refresh</div>
-                                            <div className="text-xs text-muted-foreground mt-1">
-                                                {refreshStatus.running ? 'Service is running' : 'Service not available'}
-                                                {refreshStatus.checkInterval && ` • Checks every ${Math.floor(refreshStatus.checkInterval / 60000)} minutes`}
-                                                {refreshStatus.refreshThreshold && ` • Refreshes ${Math.floor(refreshStatus.refreshThreshold / 60000)} minutes before expiry`}
-                                            </div>
-                                        </div>
-                                        <Badge variant={refreshStatus.running ? 'success' : 'secondary'}>
-                                            {refreshStatus.running ? 'Active' : 'Inactive'}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex gap-3">
-                                <Button
-                                    onClick={handleRefreshToken}
-                                    variant="secondary"
-                                    disabled={refreshing}
-                                >
-                                    {refreshing ? (
-                                        <>
-                                            <RefreshCw size={16} className="mr-2 animate-spin" />
-                                            Refreshing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <RefreshCw size={16} className="mr-2" />
-                                            Refresh Token Now
-                                        </>
-                                    )}
-                                </Button>
-                                <Button
-                                    onClick={() => setShowDeleteModal(true)}
-                                    variant="danger"
-                                >
-                                    <Trash2 size={16} className="mr-2" />
-                                    Disconnect
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="bg-background/50 rounded-lg p-4 border border-border/50">
-                                <p className="text-sm text-muted-foreground">
-                                    {status?.message || 'No OAuth credentials configured. Click the button below to authenticate with Google.'}
+            {!hasAnyAccounts ? (
+                <Card>
+                    <div className="p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <Shield size={24} className="text-muted-foreground" />
+                            <div>
+                                <h2 className="text-xl font-semibold">Get Started with OAuth</h2>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    No OAuth accounts configured yet. Connect your first account to get started.
                                 </p>
                             </div>
+                        </div>
 
-                            <Button onClick={handleInitiateAuth} variant="primary">
+                        <div className="bg-background/50 rounded-lg p-4 border border-border/50">
+                            <div className="text-sm font-medium mb-2">Google Antigravity</div>
+                            <p className="text-sm text-muted-foreground mb-3">
+                                OAuth 2.0 authentication for Google Antigravity API
+                            </p>
+                            <Button onClick={() => handleInitiateAuth('antigravity')} variant="primary">
                                 <ExternalLink size={16} className="mr-2" />
                                 Connect to Google Antigravity
                             </Button>
-
-                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                                <div className="text-sm font-medium text-blue-400 mb-2">What happens next?</div>
-                                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                                    <li>You'll be redirected to Google to sign in</li>
-                                    <li>Grant Plexus access to the required scopes</li>
-                                    <li>You'll be redirected back to Plexus</li>
-                                    <li>Your tokens will be securely stored and automatically refreshed</li>
-                                </ol>
-                            </div>
                         </div>
-                    )}
-                </div>
-            </Card>
 
-            {showDeleteModal && (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                            <div className="text-sm font-medium text-blue-400 mb-2">What happens next?</div>
+                            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                                <li>You'll be redirected to Google to sign in</li>
+                                <li>Grant Plexus access to the required scopes</li>
+                                <li>You'll be redirected back to Plexus</li>
+                                <li>Your tokens will be securely stored and automatically refreshed</li>
+                            </ol>
+                        </div>
+                    </div>
+                </Card>
+            ) : (
+                <>
+                    {/* Accordion for each provider */}
+                    {credentials?.providers.map(providerData => {
+                        const isExpanded = expandedProviders.has(providerData.provider);
+                        const providerName = getProviderName(providerData.provider);
+                        const summary = getProviderSummary(providerData.accounts);
+
+                        return (
+                            <div key={providerData.provider} className="border border-border-glass rounded-md">
+                                {/* Accordion Header */}
+                                <div
+                                    className="p-3 px-4 flex items-center justify-between cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                                    onClick={() => toggleProvider(providerData.provider)}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {isExpanded ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
+                                        <span style={{fontWeight: 600, fontSize: '14px'}}>{providerName}</span>
+                                        <span className="text-sm text-muted-foreground">{summary}</span>
+                                    </div>
+                                    <Button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleInitiateAuth(providerData.provider);
+                                        }}
+                                        variant="secondary"
+                                        size="sm"
+                                    >
+                                        <ExternalLink size={14} className="mr-2" />
+                                        Add Account
+                                    </Button>
+                                </div>
+
+                                {/* Accordion Content */}
+                                {isExpanded && (
+                                    <div style={{borderTop: '1px solid var(--color-border-glass)'}}>
+                                        <div className="p-6 space-y-4">
+                                            {/* Configuration Reminder */}
+                                            <div className="bg-blue-500/5 border border-blue-500/10 rounded p-2">
+                                                <div className="text-xs text-muted-foreground">
+                                                    Configure provider on the <a href="/providers" className="text-blue-400 hover:underline">Providers page</a> to use these accounts.
+                                                </div>
+                                            </div>
+
+                                            {/* Accounts Grid */}
+                                            <div>
+                                                <div className="text-sm font-medium mb-3">Connected Accounts</div>
+                                                <div className="flex flex-wrap gap-3">
+                                                    {providerData.accounts.map(account => {
+                                                        const cooldownKey = `${providerData.provider}:${account.user_identifier}`;
+                                                        const cooldownRemaining = cooldownTimers[cooldownKey] || account.cooldown_remaining_seconds || 0;
+                                                        const authTokenStatus = getTokenStatus(account.expires_in_seconds);
+                                                        const refreshTokenStatus = getTokenStatus(account.refresh_token_expires_in_seconds);
+
+                                                        return (
+                                                            <div
+                                                                key={account.user_identifier}
+                                                                className="bg-background/50 rounded-lg p-3 border border-border/50"
+                                                                style={{ width: '340px' }}
+                                                            >
+                                                            {/* Header Row */}
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <div>
+                                                                    <div className="font-mono text-sm font-medium">{account.user_identifier}</div>
+                                                                    {account.project_id && (
+                                                                        <div className="text-xs text-muted-foreground">
+                                                                            {account.project_id}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {account.on_cooldown && (
+                                                                        <Button
+                                                                            onClick={() => handleClearCooldown(providerData.provider, account.user_identifier)}
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            title="Clear cooldown"
+                                                                        >
+                                                                            <X size={16} style={{color: 'var(--color-warning)'}}/>
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button
+                                                                        onClick={() => handleRefreshAccount(providerData.provider, account.user_identifier)}
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        title="Refresh token"
+                                                                        disabled={refreshingAccounts.has(`${providerData.provider}:${account.user_identifier}`)}
+                                                                    >
+                                                                        <RefreshCw
+                                                                            size={16}
+                                                                            style={{color: 'var(--color-success)'}}
+                                                                            className={refreshingAccounts.has(`${providerData.provider}:${account.user_identifier}`) ? 'animate-spin' : ''}
+                                                                        />
+                                                                    </Button>
+                                                                    <Button
+                                                                        onClick={() => openDeleteModal(providerData.provider, account.user_identifier)}
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        title="Remove account"
+                                                                    >
+                                                                        <Trash2 size={16} style={{color: 'var(--color-danger)'}}/>
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Status Row */}
+                                                            {account.on_cooldown ? (
+                                                                <div className="text-center py-2 bg-red-500/10 border border-red-500/20 rounded text-sm">
+                                                                    <span className="text-red-400 font-medium">Status: On Cooldown</span>
+                                                                    <span className="text-muted-foreground ml-2">
+                                                                        (resets in <span className="font-mono">{formatDuration(cooldownRemaining)}</span>)
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-center py-2 bg-background/30 rounded text-sm">
+                                                                    <span className="text-muted-foreground">Status: </span>
+                                                                    <span className={
+                                                                        account.status === 'active' ? 'text-green-400' :
+                                                                        account.status === 'expiring' ? 'text-yellow-400' :
+                                                                        'text-red-400'
+                                                                    }>
+                                                                        {account.status === 'active' ? 'Active' :
+                                                                         account.status === 'expiring' ? 'Expiring Soon' :
+                                                                         'Expired'}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Token Status Grid */}
+                                                            <div className="grid grid-cols-2 gap-3 mt-2">
+                                                                <div className="text-center">
+                                                                    <div className="text-xs text-muted-foreground mb-1">Auth Token:</div>
+                                                                    <div className={`text-xs font-medium ${
+                                                                        authTokenStatus.variant === 'success' ? 'text-green-400' :
+                                                                        authTokenStatus.variant === 'warning' ? 'text-yellow-400' :
+                                                                        'text-red-400'
+                                                                    }`}>
+                                                                        Status: {authTokenStatus.label}
+                                                                    </div>
+                                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                                        Expires in {formatDuration(account.expires_in_seconds)}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-xs text-muted-foreground mb-1">Refresh Token:</div>
+                                                                    <div className={`text-xs font-medium ${
+                                                                        refreshTokenStatus.variant === 'success' ? 'text-green-400' :
+                                                                        refreshTokenStatus.variant === 'warning' ? 'text-yellow-400' :
+                                                                        'text-red-400'
+                                                                    }`}>
+                                                                        Status: {refreshTokenStatus.label}
+                                                                    </div>
+                                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                                        Expires in {formatDuration(account.refresh_token_expires_in_seconds)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && deleteTarget && (
                 <Modal
                     isOpen={showDeleteModal}
-                    onClose={() => setShowDeleteModal(false)}
-                    title="Disconnect OAuth Account"
+                    onClose={() => {
+                        setShowDeleteModal(false);
+                        setDeleteTarget(null);
+                    }}
+                    title="Remove OAuth Account"
                 >
                     <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
-                            Are you sure you want to disconnect your Google Antigravity account ({status?.user})?
-                            This will remove all stored OAuth credentials.
+                            Are you sure you want to remove the account <span className="font-mono">{deleteTarget.account}</span> from <span className="font-semibold">{getProviderName(deleteTarget.provider)}</span>?
+                            This will remove all stored OAuth credentials for this account.
                         </p>
                         <div className="flex gap-3 justify-end">
                             <Button
-                                onClick={() => setShowDeleteModal(false)}
+                                onClick={() => {
+                                    setShowDeleteModal(false);
+                                    setDeleteTarget(null);
+                                }}
                                 variant="secondary"
                             >
                                 Cancel
@@ -327,7 +499,7 @@ export default function OAuth() {
                                 onClick={handleDeleteCredentials}
                                 variant="danger"
                             >
-                                Disconnect
+                                Remove Account
                             </Button>
                         </div>
                     </div>

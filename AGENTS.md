@@ -127,3 +127,58 @@ All static assets (images, logos, icons, etc.) must be placed in `packages/front
 - **Move Existing Assets:** If you find assets in other locations (e.g., `packages/frontend/images/`), move them to `packages/frontend/src/assets/` and update any references to use imports.
 
 This ensures assets are properly bundled by the build system and served correctly in both development and production environments.
+
+### 7.3 Number and Time Formatting - **PREFERRED APPROACH**
+
+The project uses centralized formatting utilities in `packages/frontend/src/lib/format.ts` powered by the [human-format](https://www.npmjs.com/package/human-format) library.
+
+**ALWAYS use these utilities instead of creating custom formatting logic:**
+
+- **`formatNumber(num, decimals?)`**: Large numbers with K/M/B suffixes (e.g., "1.3k", "2.5M")
+- **`formatTokens(tokens)`**: Alias for `formatNumber` specifically for token counts
+- **`formatDuration(seconds)`**: Human-readable durations with two most significant units (e.g., "2h 30m", "3mo 2w", "1y 2mo")
+- **`formatTimeAgo(seconds)`**: Relative time format (e.g., "5m ago", "2h ago", "3d ago")
+- **`formatCost(cost, maxDecimals?)`**: Dollar formatting with appropriate precision (e.g., "$0.001234", "$1.23")
+- **`formatMs(ms)`**: Milliseconds to seconds conversion (e.g., "45ms", "2.5s", "∅")
+- **`formatTPS(tps)`**: Tokens per second with one decimal place (e.g., "15.3")
+
+**DO NOT:**
+- Use `toFixed()` for number formatting
+- Use `toLocaleString()` with custom fraction digits for numbers
+- Create inline formatting logic with manual calculations
+- Duplicate formatting code across components
+
+**Example Usage:**
+
+```typescript
+import { formatCost, formatMs, formatTPS, formatDuration, formatTokens } from '../lib/format';
+
+// Cost formatting
+{formatCost(log.costTotal)}           // "$1.23"
+{formatCost(log.costInput)}           // "$0.000456"
+
+// Time formatting
+{formatMs(log.durationMs)}            // "2.5s"
+{formatMs(log.ttftMs)}                // "450ms"
+{formatTPS(log.tokensPerSec)}         // "15.3"
+
+// Duration formatting (tokens, cooldowns, etc.)
+{formatDuration(account.expires_in_seconds)}     // "2h 30m"
+{formatDuration(cooldownRemaining)}              // "45m"
+{formatDuration(3600 * 24 * 365 + 2592000)}      // "1y 1mo"
+
+// Token counts
+{formatTokens(log.tokensInput)}       // "1.3k"
+```
+
+**Backend Integration:**
+
+The `formatLargeNumber` function exported from `packages/frontend/src/lib/api.ts` is an alias to `formatNumber` for backward compatibility. Always import from `format.ts` for new code:
+
+```typescript
+// ✅ Preferred
+import { formatNumber } from '../lib/format';
+
+// ⚠️ Legacy (still works but avoid in new code)
+import { formatLargeNumber } from '../lib/api';
+```

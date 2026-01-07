@@ -1,4 +1,5 @@
 import { parse, stringify } from 'yaml';
+import { formatNumber } from './format';
 
 const API_BASE = ''; // Proxied via server.ts
 
@@ -79,6 +80,7 @@ export interface InferenceError {
 
 export interface Cooldown {
     provider: string;
+    accountId?: string;
     expiry: number;
     timeRemainingMs: number;
 }
@@ -140,12 +142,7 @@ export interface KeyConfig {
     comment?: string;
 }
 
-export const formatLargeNumber = (num: number): string => {
-    if (num >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
-    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-    return num.toLocaleString();
-};
+export const formatLargeNumber = formatNumber;
 
 export const STAT_LABELS = {
     REQUESTS: 'Total Requests',
@@ -166,11 +163,17 @@ export const api = {
       }
   },
 
-  clearCooldown: async (provider?: string): Promise<void> => {
-      const url = provider 
-        ? `${API_BASE}/v0/management/cooldowns/${provider}`
-        : `${API_BASE}/v0/management/cooldowns`;
-      
+  clearCooldown: async (provider?: string, accountId?: string): Promise<void> => {
+      let url: string;
+      if (provider) {
+          url = `${API_BASE}/v0/management/cooldowns/${provider}`;
+          if (accountId) {
+              url += `?accountId=${encodeURIComponent(accountId)}`;
+          }
+      } else {
+          url = `${API_BASE}/v0/management/cooldowns`;
+      }
+
       const res = await fetchWithAuth(url, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to clear cooldown');
   },
@@ -842,6 +845,40 @@ export const api = {
       } catch (e) {
           console.error("API Error getOAuthRefreshStatus", e);
           return { available: false, message: 'Error fetching refresh status' };
+      }
+  },
+
+  // Multi-Account OAuth Management
+  getOAuthCredentialsGrouped: async (provider?: string): Promise<{
+      providers: Array<{
+          provider: string;
+          accounts: Array<{
+              user_identifier: string;
+              expires_at: number;
+              expires_in_seconds: number;
+              is_expired: boolean;
+              project_id?: string;
+              on_cooldown: boolean;
+              cooldown_expiry?: number;
+              cooldown_remaining_seconds?: number;
+              status: 'active' | 'expiring' | 'expired' | 'cooldown';
+              last_refreshed_at: number;
+              token_age_seconds: number;
+              refresh_token_expires_at: number;
+              refresh_token_expires_in_seconds: number;
+          }>;
+      }>;
+  }> => {
+      try {
+          const url = provider
+              ? `${API_BASE}/v0/oauth/credentials/grouped?provider=${provider}`
+              : `${API_BASE}/v0/oauth/credentials/grouped`;
+          const res = await fetchWithAuth(url);
+          if (!res.ok) throw new Error('Failed to fetch OAuth credentials');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getOAuthCredentialsGrouped", e);
+          return { providers: [] };
       }
   }
 };

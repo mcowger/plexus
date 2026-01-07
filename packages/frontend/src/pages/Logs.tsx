@@ -6,13 +6,18 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
+import { formatCost, formatMs, formatTPS } from '../lib/format';
 import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+// @ts-ignore
 import messagesLogo from '../assets/messages.svg';
+// @ts-ignore
 import antigravityLogo from '../assets/antigravity.svg';
+// @ts-ignore
 import chatLogo from '../assets/chat.svg';
+// @ts-ignore
 import geminiLogo from '../assets/gemini.svg';
 
 export const Logs = () => {
@@ -219,7 +224,7 @@ export const Logs = () => {
     const currentPage = Math.floor(offset / limit) + 1;
 
     return (
-        <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+        <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
             <div className="mb-8">
                 <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Logs</h1>
                 <Badge status="neutral">{total} Records</Badge>
@@ -229,7 +234,7 @@ export const Logs = () => {
                 <div className="mb-4">
                     <form onSubmit={handleSearch} className="flex gap-2 mb-4 justify-between">
                         <div className="flex gap-2">
-                            <div className="relative w-[250px]">
+                            <div className="relative w-62.5">
                                 <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
                                 <Input
                                     placeholder="Filter by Model..."
@@ -238,7 +243,7 @@ export const Logs = () => {
                                     style={{ paddingLeft: '32px' }}
                                 />
                             </div>
-                            <div className="relative w-[200px]">
+                            <div className="relative w-50">
                                 <Filter size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
                                 <Input
                                     placeholder="Filter by Provider..."
@@ -271,8 +276,8 @@ export const Logs = () => {
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Performance</th>
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Mode</th>
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ maxWidth: '60px' }}>Status</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-[40px]"></th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-[40px]"></th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-10"></th>
+                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-10"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -330,7 +335,7 @@ export const Logs = () => {
                                                     <span>{log.incomingModelAlias || '-'}</span>
                                                     {log.incomingModelAlias && log.incomingModelAlias !== '-' && (
                                                         <button
-                                                            onClick={() => navigator.clipboard.writeText(log.incomingModelAlias)}
+                                                            onClick={() => navigator.clipboard.writeText(log.incomingModelAlias || '')}
                                                             className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
                                                             title="Copy incoming model alias"
                                                         >
@@ -342,7 +347,7 @@ export const Logs = () => {
                                                     <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>{log.provider || '-'}:{log.selectedModelName || '-'}</span>
                                                     {log.selectedModelName && log.selectedModelName !== '-' && (
                                                         <button
-                                                            onClick={() => navigator.clipboard.writeText(log.selectedModelName)}
+                                                            onClick={() => navigator.clipboard.writeText(log.selectedModelName || '')}
                                                             className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
                                                             title="Copy selected model name"
                                                         >
@@ -396,18 +401,18 @@ export const Logs = () => {
                                                             </CostToolTip>
                                                         ) : <span />}
                                                         <span style={{ fontWeight: '500' }}>
-                                                            ${log.costTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                                                            {formatCost(log.costTotal)}
                                                         </span>
                                                     </div>
                                                     <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <CloudUpload size={10} className="text-blue-400" /> ${(log.costInput || 0).toFixed(6)}
+                                                        <CloudUpload size={10} className="text-blue-400" /> {formatCost(log.costInput || 0)}
                                                     </span>
                                                     <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <CloudDownload size={10} className="text-green-400" /> ${(log.costOutput || 0).toFixed(6)}
+                                                        <CloudDownload size={10} className="text-green-400" /> {formatCost(log.costOutput || 0)}
                                                     </span>
                                                     <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         {(log.costCached || 0) > 0 && (
-                                                            <><PackageOpen size={10} className="text-orange-400" /> ${log.costCached?.toFixed(6)}</>
+                                                            <><PackageOpen size={10} className="text-orange-400" /> {formatCost(log.costCached || 0)}</>
                                                         )}
                                                     </span>
                                                 </div>
@@ -417,17 +422,17 @@ export const Logs = () => {
                                         </td>
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: '500' }}>Duration: {log.durationMs > 10 ? `${(log.durationMs / 1000).toFixed(1)}s` : '∅'}</span>
+                                                <span style={{ fontWeight: '500' }}>Duration: {formatMs(log.durationMs)}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                                                    {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${log.ttftMs >= 1000 ? `${(log.ttftMs / 1000).toFixed(1)}s` : `${Math.round(log.ttftMs)}ms`}` : ''}
+                                                    {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : ''}
                                                 </span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                                                    {log.tokensPerSec && log.tokensPerSec > 0 ? `TPS: ${log.tokensPerSec.toFixed(1)}` : ''}
+                                                    {log.tokensPerSec && log.tokensPerSec > 0 ? `TPS: ${formatTPS(log.tokensPerSec)}` : ''}
                                                 </span>
                                             </div>
                                         </td>
                                         <td
-                                            className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle text-center"
+                                            className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
                                             title={`${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
                                             style={{ cursor: 'help' }}
                                         >
@@ -472,7 +477,7 @@ export const Logs = () => {
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
                                             <button
                                                 onClick={() => handleDelete(log.requestId)}
-                                                className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0 transition-opacity"
+                                                className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
                                                 title="Delete log"
                                             >
                                                 <Trash2 size={14} />

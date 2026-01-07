@@ -198,6 +198,9 @@ export async function oauthRoutes(
   my-antigravity:
     type: gemini
     oauth_provider: antigravity
+    oauth_account_pool:
+      - ${email}
+      # Add more accounts here for load balancing
     models:
       gemini-2.0-flash-thinking-exp:
         pricing:
@@ -212,7 +215,7 @@ models:
       - provider: my-antigravity
         model: gemini-2.0-flash-thinking-exp</div>
                 <p style="margin-top: 15px; font-size: 0.9em; color: #718096;">
-                  <strong>Note:</strong> Replace model names and pricing as needed. No <code>api_key</code> is required when using <code>oauth_provider: antigravity</code>.
+                  <strong>Note:</strong> The <code>oauth_account_pool</code> must list all authenticated account emails. Add multiple accounts for automatic load balancing with per-account cooldowns.
                 </p>
               </div>
 
@@ -252,6 +255,88 @@ models:
       project_id: credential.project_id,
       is_expired: Date.now() >= credential.expires_at,
       expires_in_seconds: Math.max(0, Math.floor((credential.expires_at - Date.now()) / 1000)),
+    });
+  });
+
+  // List all OAuth credentials grouped by provider (for multi-account UI)
+  fastify.get('/v0/oauth/credentials/grouped', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { provider } = request.query as { provider?: string };
+
+    // Get all providers or filter by specific provider
+    const providers = provider ? [provider] : ['antigravity']; // Add more providers as needed
+
+    const result = [];
+    const now = Date.now();
+
+    for (const providerName of providers) {
+      const credentials = usageStorage.getAllOAuthCredentials(providerName);
+
+      if (credentials.length === 0) {
+        continue;
+      }
+
+      // Get cooldown info for each account
+      const { CooldownManager } = await import('../../services/cooldown-manager.js');
+      const cooldownManager = CooldownManager.getInstance();
+      const allCooldowns = cooldownManager.getCooldowns();
+
+      const accounts = credentials.map(cred => {
+        const expiresInSeconds = Math.max(0, Math.floor((cred.expires_at - now) / 1000));
+        const isExpired = now >= cred.expires_at;
+        const isExpiringSoon = now >= (cred.expires_at - 10 * 60 * 1000); // Within 10 minutes
+
+        // Check if this account is on cooldown
+        const accountCooldown = allCooldowns.find(
+          cd => cd.provider === providerName && cd.accountId === cred.user_identifier
+        );
+
+        let status: 'active' | 'expiring' | 'expired' | 'cooldown';
+        if (accountCooldown) {
+          status = 'cooldown';
+        } else if (isExpired) {
+          status = 'expired';
+        } else if (isExpiringSoon) {
+          status = 'expiring';
+        } else {
+          status = 'active';
+        }
+
+        // Calculate refresh token age (time since last refresh)
+        const lastRefreshedAt = cred.last_refreshed_at || cred.created_at;
+        const tokenAgeSeconds = Math.floor((now - lastRefreshedAt) / 1000);
+
+        // Google OAuth refresh tokens expire after 6 months of inactivity
+        const sixMonthsMs = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
+        const refreshTokenExpiresAt = lastRefreshedAt + sixMonthsMs;
+        const refreshTokenExpiresInSeconds = Math.max(0, Math.floor((refreshTokenExpiresAt - now) / 1000));
+
+        return {
+          user_identifier: cred.user_identifier,
+          expires_at: cred.expires_at,
+          expires_in_seconds: expiresInSeconds,
+          is_expired: isExpired,
+          project_id: cred.project_id,
+          on_cooldown: !!accountCooldown,
+          cooldown_expiry: accountCooldown?.expiry,
+          cooldown_remaining_seconds: accountCooldown
+            ? Math.ceil(accountCooldown.timeRemainingMs / 1000)
+            : undefined,
+          status,
+          last_refreshed_at: lastRefreshedAt,
+          token_age_seconds: tokenAgeSeconds,
+          refresh_token_expires_at: refreshTokenExpiresAt,
+          refresh_token_expires_in_seconds: refreshTokenExpiresInSeconds,
+        };
+      });
+
+      result.push({
+        provider: providerName,
+        accounts,
+      });
+    }
+
+    return reply.send({
+      providers: result,
     });
   });
 

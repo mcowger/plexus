@@ -6,9 +6,11 @@ import { CooldownManager } from "./cooldown-manager";
 import { RouteResult } from "./router";
 import { DebugManager } from "./debug-manager";
 import { UsageStorageService } from "./usage-storage";
+import { CooldownParserRegistry } from "./cooldown-parsers";
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
+  private accountRotationIndex = new Map<string, number>(); // Track last used index per provider
 
   setUsageStorage(storage: UsageStorageService) {
     this.usageStorage = storage;
@@ -61,11 +63,28 @@ export class Dispatcher {
     }
     const transformer = TransformerFactory.getTransformer(transformerType);
 
-    // 3. Transform Request
-    // Override model in request to the target model
+    // 3. Select OAuth account (if applicable) before transforming request
+    let selectedOAuthAccountId: string | undefined;
+    if (route.config.oauth_provider && this.usageStorage) {
+      const accountPool = route.config.oauth_account_pool!;
+      const selected = this.selectOAuthAccount(
+        route.provider,
+        route.config.oauth_provider,
+        accountPool
+      );
+
+      if (!selected) {
+        throw new Error(`Failed to select OAuth account for provider '${route.provider}'`);
+      }
+      selectedOAuthAccountId = selected;
+    }
+
+    // 4. Transform Request
+    // Override model in request to the target model, and populate OAuth metadata with selected account
     const requestWithTargetModel = this.populateOAuthMetadata(
       { ...request, model: route.model },
-      route
+      route,
+      selectedOAuthAccountId
     );
 
     let providerPayload;
@@ -150,7 +169,7 @@ export class Dispatcher {
       : transformer.defaultEndpoint;
     const url = `${baseUrl}${endpoint}`;
 
-    const headers = this.setupHeaders(route, targetApiType, request);
+    const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
 
     const incomingApi = request.incomingApiType || "unknown";
 
@@ -169,8 +188,36 @@ export class Dispatcher {
       const errorText = await response.text();
       logger.error(`Provider error: ${response.status} ${errorText}`);
 
-      if (response.status >= 500 || [401, 408, 429].includes(response.status)) {
-        CooldownManager.getInstance().markProviderFailure(route.provider);
+      const cooldownManager = CooldownManager.getInstance();
+
+      // Extract account ID if OAuth was used (from the transformed request with metadata)
+      const accountId = requestWithTargetModel.metadata?.selected_oauth_account as string | undefined;
+
+      if (response.status >= 500 || [401, 403, 408, 429].includes(response.status)) {
+        let cooldownDuration: number | undefined;
+
+        // For 429 errors, try to parse provider-specific cooldown duration
+        if (response.status === 429) {
+          // Get provider type for parser lookup
+          const providerTypes = Array.isArray(route.config.type)
+            ? route.config.type
+            : [route.config.type];
+          const providerType = providerTypes[0];
+
+          // Try to parse cooldown duration from error message
+          const parsedDuration = CooldownParserRegistry.parseCooldown(providerType, errorText);
+
+          if (parsedDuration) {
+            cooldownDuration = parsedDuration;
+            logger.info(`Parsed cooldown duration: ${cooldownDuration}ms (${cooldownDuration / 1000}s)`);
+          } else {
+            logger.debug(`No cooldown duration parsed from error, using default`);
+          }
+        }
+
+        // Mark provider/account as failed with optional duration
+        // For non-429 errors, cooldownDuration will be undefined and default (10 minutes) will be used
+        cooldownManager.markProviderFailure(route.provider, accountId, cooldownDuration);
       }
 
       throw new Error(`Provider failed: ${response.status} ${errorText}`);
@@ -237,6 +284,62 @@ export class Dispatcher {
       return unifiedResponse;
     }
   }
+  /**
+   * Select next healthy OAuth account using round-robin strategy
+   * @private
+   */
+  private selectOAuthAccount(provider: string, oauthProvider: string, accountPool: string[]): string | null {
+    if (!accountPool || accountPool.length === 0) {
+      throw new Error(`OAuth account pool is empty for provider '${provider}'`);
+    }
+
+    const cooldownManager = CooldownManager.getInstance();
+
+    // Filter out accounts on cooldown
+    const healthyAccounts = accountPool.filter(accountId =>
+      cooldownManager.isProviderHealthy(provider, accountId)
+    );
+
+    if (healthyAccounts.length === 0) {
+      // All accounts are on cooldown, provide helpful error with cooldown info
+      const cooldowns = cooldownManager.getCooldowns()
+        .filter(cd => cd.provider === provider && cd.accountId)
+        .map(cd => `${cd.accountId}: ${Math.ceil(cd.timeRemainingMs / 1000)}s`)
+        .join(', ');
+
+      throw new Error(
+        `All OAuth accounts for provider '${provider}' are on cooldown. ` +
+        `Retry after cooldowns expire: ${cooldowns}`
+      );
+    }
+
+    // Get current rotation index for this provider
+    const currentIndex = this.accountRotationIndex.get(provider) || 0;
+
+    // Find next healthy account using round-robin (wrap around if needed)
+    let attempts = 0;
+    let nextIndex = currentIndex;
+
+    while (attempts < accountPool.length) {
+      nextIndex = (nextIndex + 1) % accountPool.length;
+      const candidate = accountPool[nextIndex];
+
+      if (healthyAccounts.includes(candidate)) {
+        // Found healthy account, update index and return
+        this.accountRotationIndex.set(provider, nextIndex);
+        logger.info(`Selected OAuth account '${candidate}' for provider '${provider}' (round-robin index: ${nextIndex})`);
+        return candidate;
+      }
+
+      attempts++;
+    }
+
+    // Fallback to first healthy account (shouldn't reach here, but just in case)
+    logger.warn(`Round-robin selection failed for provider '${provider}', using first healthy account`);
+    this.accountRotationIndex.set(provider, accountPool.indexOf(healthyAccounts[0]));
+    return healthyAccounts[0];
+  }
+
   setupHeaders(route: RouteResult, apiType: string, request: UnifiedChatRequest): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -251,7 +354,18 @@ export class Dispatcher {
 
     // Check if this provider uses OAuth
     if (route.config.oauth_provider && this.usageStorage) {
-      const credential = this.usageStorage.getOAuthCredential(route.config.oauth_provider);
+      // Use the already-selected account from request metadata
+      const selectedAccountId = request.metadata?.selected_oauth_account;
+
+      if (!selectedAccountId) {
+        throw new Error(`OAuth account was not selected for provider '${route.provider}'. This is a bug in the dispatcher.`);
+      }
+
+      // Get credential for selected account
+      const credential = this.usageStorage.getOAuthCredential(
+        route.config.oauth_provider,
+        selectedAccountId
+      );
 
       if (credential) {
         // Check if token is expired or expiring soon (within 5 minutes)
@@ -259,18 +373,18 @@ export class Dispatcher {
         const isExpiringSoon = Date.now() >= (credential.expires_at - 5 * 60 * 1000);
 
         if (isExpired) {
-          throw new Error(`OAuth token for provider '${route.config.oauth_provider}' has expired. Please re-authenticate.`);
+          throw new Error(`OAuth token for account '${selectedAccountId}' has expired. Please re-authenticate.`);
         }
 
         if (isExpiringSoon) {
-          logger.warn(`OAuth token for provider '${route.config.oauth_provider}' is expiring soon. Refresh process should handle this.`);
+          logger.warn(`OAuth token for account '${selectedAccountId}' is expiring soon. Refresh process should handle this.`);
         }
 
         // Use the OAuth access token
         headers["Authorization"] = `Bearer ${credential.access_token}`;
-        logger.debug(`Using OAuth token for provider: ${route.config.oauth_provider}`);
+        logger.debug(`Using OAuth token for account: ${selectedAccountId}`);
       } else {
-        throw new Error(`OAuth provider '${route.config.oauth_provider}' is configured but no credentials found. Please authenticate.`);
+        throw new Error(`OAuth credentials not found for account '${selectedAccountId}'. Please authenticate.`);
       }
     } else if (route.config.api_key) {
       // Use static API key
@@ -300,20 +414,31 @@ export class Dispatcher {
    */
   private populateOAuthMetadata(
     request: UnifiedChatRequest,
-    route: RouteResult
+    route: RouteResult,
+    selectedAccountId?: string
   ): UnifiedChatRequest {
     // If OAuth is used, add OAuth metadata to request for transformer access
-    if (route.config.oauth_provider && this.usageStorage) {
-      const credential = this.usageStorage.getOAuthCredential(route.config.oauth_provider);
+    if (route.config.oauth_provider && this.usageStorage && selectedAccountId) {
+      const credential = this.usageStorage.getOAuthCredential(
+        route.config.oauth_provider,
+        selectedAccountId
+      );
+
+      // Always set selected_oauth_account for setupHeaders to use
+      const updatedMetadata: any = {
+        ...request.metadata,
+        selected_oauth_account: selectedAccountId
+      };
+
+      // Add project_id if available (for Antigravity)
       if (credential && credential.project_id) {
-        return {
-          ...request,
-          metadata: {
-            ...request.metadata,
-            oauth_project_id: credential.project_id
-          }
-        };
+        updatedMetadata.oauth_project_id = credential.project_id;
       }
+
+      return {
+        ...request,
+        metadata: updatedMetadata
+      };
     }
     return request;
   }

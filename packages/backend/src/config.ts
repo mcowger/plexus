@@ -57,6 +57,7 @@ const ProviderConfigSchema = z.object({
   api_base_url: z.union([z.string().url(), z.record(z.string())]),
   api_key: z.string().optional(),
   oauth_provider: z.string().optional(),
+  oauth_account_pool: z.array(z.string()).min(1).optional(),
   enabled: z.boolean().default(true).optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
@@ -69,10 +70,17 @@ const ProviderConfigSchema = z.object({
 }).refine(
   (data) => {
     // Either api_key OR oauth_provider must be present, but not neither
-    return data.api_key || data.oauth_provider;
+    if (!data.api_key && !data.oauth_provider) {
+      return false;
+    }
+    // If oauth_provider is specified, oauth_account_pool is required
+    if (data.oauth_provider && !data.oauth_account_pool) {
+      return false;
+    }
+    return true;
   },
   {
-    message: "Either 'api_key' or 'oauth_provider' must be specified",
+    message: "Either 'api_key' must be specified, OR both 'oauth_provider' and 'oauth_account_pool' must be specified",
   }
 );
 

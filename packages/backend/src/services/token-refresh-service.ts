@@ -12,7 +12,7 @@ export class TokenRefreshService {
   private intervalId?: Timer;
   private isRunning = false;
   private readonly CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
-  private readonly REFRESH_THRESHOLD = 10; // Refresh tokens expiring within 10 minutes
+  private readonly REFRESH_THRESHOLD = 5; // Refresh tokens expiring within 5 minutes
 
   constructor(
     private usageStorage: UsageStorageService,

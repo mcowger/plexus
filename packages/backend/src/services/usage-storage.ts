@@ -126,13 +126,68 @@ export class UsageStorageService extends EventEmitter {
                 );
             `);
             
-            this.db.run(`
-                CREATE TABLE IF NOT EXISTS provider_cooldowns (
-                    provider TEXT PRIMARY KEY,
-                    expiry INTEGER,
-                    created_at INTEGER
-                );
-            `);
+            // Migration: Recreate provider_cooldowns table with account_id support
+            // Check if old schema exists and migrate
+            try {
+                const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_cooldowns'").all();
+                if (tables.length > 0) {
+                    // Check if it has the old schema (no account_id)
+                    const columns = this.db.prepare("PRAGMA table_info(provider_cooldowns)").all() as { name: string }[];
+                    const hasAccountId = columns.some(col => col.name === 'account_id');
+
+                    if (!hasAccountId) {
+                        logger.info("Migrating provider_cooldowns table to support per-account cooldowns");
+
+                        // Rename old table
+                        this.db.run("ALTER TABLE provider_cooldowns RENAME TO provider_cooldowns_old");
+
+                        // Create new table with updated schema
+                        this.db.run(`
+                            CREATE TABLE provider_cooldowns (
+                                provider TEXT NOT NULL,
+                                account_id TEXT,
+                                expiry INTEGER,
+                                created_at INTEGER,
+                                PRIMARY KEY (provider, account_id)
+                            )
+                        `);
+
+                        // Migrate existing data (set account_id to NULL for existing cooldowns)
+                        this.db.run(`
+                            INSERT INTO provider_cooldowns (provider, account_id, expiry, created_at)
+                            SELECT provider, NULL, expiry, created_at FROM provider_cooldowns_old
+                        `);
+
+                        // Drop old table
+                        this.db.run("DROP TABLE provider_cooldowns_old");
+
+                        logger.info("provider_cooldowns migration completed");
+                    }
+                } else {
+                    // Create table with new schema
+                    this.db.run(`
+                        CREATE TABLE provider_cooldowns (
+                            provider TEXT NOT NULL,
+                            account_id TEXT,
+                            expiry INTEGER,
+                            created_at INTEGER,
+                            PRIMARY KEY (provider, account_id)
+                        )
+                    `);
+                }
+            } catch (error) {
+                logger.error("Failed to migrate provider_cooldowns table", error);
+                // Fall back to creating new table if migration fails
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS provider_cooldowns (
+                        provider TEXT NOT NULL,
+                        account_id TEXT,
+                        expiry INTEGER,
+                        created_at INTEGER,
+                        PRIMARY KEY (provider, account_id)
+                    )
+                `);
+            }
 
             this.db.run(`
                 CREATE TABLE IF NOT EXISTS debug_logs (
@@ -829,6 +884,36 @@ export class UsageStorageService extends EventEmitter {
         } catch (error) {
             logger.error(`Failed to update OAuth token for ${provider}:${userIdentifier}`, error);
             throw error;
+        }
+    }
+
+    getAllOAuthCredentials(provider: string): OAuthCredential[] {
+        try {
+            const query = this.db.prepare(`
+                SELECT * FROM oauth_credentials
+                WHERE provider = $provider
+                ORDER BY updated_at DESC
+            `);
+
+            const rows = query.all({ $provider: provider }) as any[];
+            return rows.map(row => ({
+                id: row.id,
+                provider: row.provider,
+                user_identifier: row.user_identifier,
+                access_token: row.access_token,
+                refresh_token: row.refresh_token,
+                token_type: row.token_type,
+                expires_at: row.expires_at,
+                scope: row.scope,
+                project_id: row.project_id,
+                metadata: row.metadata,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                last_refreshed_at: row.last_refreshed_at
+            }));
+        } catch (error) {
+            logger.error(`Failed to get all OAuth credentials for ${provider}`, error);
+            return [];
         }
     }
 

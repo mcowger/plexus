@@ -107,20 +107,46 @@ export const Dashboard = () => {
 
       {cooldowns.length > 0 && (
           <div style={{marginBottom: '24px'}}>
-              <Card 
-                title="Service Alerts" 
-                className="alert-card" 
+              <Card
+                title="Service Alerts"
+                className="alert-card"
                 style={{borderColor: 'var(--color-warning)'}}
                 extra={<button className="bg-transparent text-text border-0 hover:bg-amber-500/10 !py-1.5 !px-3.5 !text-xs" onClick={handleClearCooldowns} style={{color: 'var(--color-warning)'}}>Clear All</button>}
               >
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                      {cooldowns.map(c => (
-                          <div key={c.provider} style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', backgroundColor: 'rgba(255, 171, 0, 0.1)', borderRadius: '4px'}}>
-                              <AlertTriangle size={16} color="var(--color-warning)"/>
-                              <span style={{fontWeight: 500}}>{c.provider}</span>
-                              <span style={{color: 'var(--color-text-secondary)'}}>is on cooldown for {Math.ceil(c.timeRemainingMs / 60000)} minutes</span>
-                          </div>
-                      ))}
+                      {(() => {
+                          // Group cooldowns by provider
+                          const groupedCooldowns = cooldowns.reduce((acc, c) => {
+                              if (!acc[c.provider]) {
+                                  acc[c.provider] = [];
+                              }
+                              acc[c.provider].push(c);
+                              return acc;
+                          }, {} as Record<string, Cooldown[]>);
+
+                          return Object.entries(groupedCooldowns).map(([provider, providerCooldowns]) => {
+                              const hasAccountId = providerCooldowns.some(c => c.accountId);
+                              const maxTime = Math.max(...providerCooldowns.map(c => c.timeRemainingMs));
+                              const minutes = Math.ceil(maxTime / 60000);
+
+                              let statusText: string;
+                              if (hasAccountId && providerCooldowns.length > 1) {
+                                  statusText = `has ${providerCooldowns.length} accounts on cooldown for up to ${minutes} minutes`;
+                              } else if (hasAccountId && providerCooldowns.length === 1) {
+                                  statusText = `has 1 account on cooldown for ${minutes} minutes`;
+                              } else {
+                                  statusText = `is on cooldown for ${minutes} minutes`;
+                              }
+
+                              return (
+                                  <div key={provider} style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', backgroundColor: 'rgba(255, 171, 0, 0.1)', borderRadius: '4px'}}>
+                                      <AlertTriangle size={16} color="var(--color-warning)"/>
+                                      <span style={{fontWeight: 500}}>{provider}</span>
+                                      <span style={{color: 'var(--color-text-secondary)'}}>{statusText}</span>
+                                  </div>
+                              );
+                          });
+                      })()}
                   </div>
               </Card>
           </div>

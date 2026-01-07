@@ -9,14 +9,22 @@
 # --------------------
 # Define your upstream AI providers here.
 #
-#   type:         The transformer architecture used by the provider. 
+#   type:         The transformer architecture used by the provider.
 #                 Common values: chat, messages, gemini.
 #   display_name: A friendly name for logging and metadata.
 #   api_base_url: The root endpoint for the provider's API.
 #   api_key:      Your authentication token for the provider.
+#                 OR use OAuth authentication (see below).
 #   models:       A list of raw model identifiers supported by this provider.
 #                 OR a map of model names to configuration (e.g. pricing).
 #   headers:      (Optional) Custom HTTP headers to include in every request.
+#
+#   OAuth Authentication (Alternative to api_key):
+#   oauth_provider:      The OAuth system to use (e.g., 'antigravity').
+#   oauth_account_pool:  Array of authenticated account emails (min 1 required).
+#                        Enables automatic load balancing with per-account
+#                        rate limit handling. Authenticate accounts via the
+#                        OAuth page in the Plexus dashboard (/ui/oauth).
 #
 # 2. MODELS SECTION (ALIASES)
 # ---------------------------
@@ -170,6 +178,61 @@ providers:
       "HTTP-Referer": "https://your-app.com"
       "X-Title": "My Plexus App"
 
+  # OAuth Provider with Multiple Accounts (Google Antigravity Example)
+  # ===================================================================
+  # OAuth providers support multiple authenticated accounts per provider.
+  # This enables automatic load balancing with per-account rate limit handling.
+  #
+  # Key Features:
+  # - Round-robin load balancing across healthy accounts
+  # - Per-account cooldown tracking (not per-provider)
+  # - Automatic failover to healthy accounts when one hits rate limits
+  # - Dynamic cooldown duration parsing from API error responses
+  #
+  # Setup Instructions:
+  # 1. Visit the OAuth page in the Plexus dashboard (/ui/oauth)
+  # 2. Click "Connect to Google Antigravity" for each account you want to add
+  # 3. Complete the OAuth flow for each Google account
+  # 4. Add the authenticated email addresses to oauth_account_pool below
+  my-antigravity:
+    type: gemini
+    display_name: Google Antigravity (Multi-Account)
+    # oauth_provider: Specifies which OAuth system to use
+    oauth_provider: antigravity
+    # oauth_account_pool: List of authenticated account emails
+    # - REQUIRED: Must contain at least 1 account
+    # - Add multiple accounts for automatic load balancing
+    # - Requests distribute round-robin across healthy accounts
+    # - Accounts on cooldown are automatically skipped
+    oauth_account_pool:
+      - user1@company.com
+      - user2@company.com
+      - user3@company.com
+    models:
+      gemini-2.0-flash-thinking-exp:
+        pricing:
+          source: simple
+          input: 0    # Free tier pricing
+          output: 0   # Free tier pricing
+        access_via: [gemini]
+      gemini-2.0-flash-exp:
+        pricing:
+          source: simple
+          input: 0
+          output: 0
+        access_via: [gemini]
+
+  # OAuth Provider with Single Account (Minimum Configuration)
+  my-antigravity-single:
+    type: gemini
+    display_name: Google Antigravity (Single Account)
+    oauth_provider: antigravity
+    # Even with single account, oauth_account_pool is required
+    oauth_account_pool:
+      - primary-user@company.com
+    models:
+      - gemini-2.0-flash-thinking-exp
+
 models:
   # Basic alias routing to a single target
   smart-model:
@@ -229,6 +292,23 @@ models:
         model: claude-3-5-haiku-latest
       - provider: openai
         model: gpt-4o-mini
+
+  # OAuth Provider Routing Example
+  # Route requests to OAuth-authenticated Antigravity accounts
+  gemini-thinking:
+    targets:
+      - provider: my-antigravity
+        model: gemini-2.0-flash-thinking-exp
+
+  # Multi-Target with OAuth Provider
+  # Load balances between OAuth-enabled Antigravity and API-key OpenAI
+  hybrid-smart-model:
+    selector: random
+    targets:
+      - provider: my-antigravity
+        model: gemini-2.0-flash-thinking-exp
+      - provider: openai
+        model: gpt-4o
 
 keys:
   # Example API Key for accessing Plexus
