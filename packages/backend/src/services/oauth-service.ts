@@ -69,7 +69,7 @@ export class OAuthService {
       access_type: 'offline',
       client_id: this.ANTIGRAVITY_CLIENT_ID,
       prompt: 'consent',
-      redirect_uri: `${this.externalUrl}/v0/oauth/callback`,
+      redirect_uri: 'http://localhost:4000/v0/oauth/callback',
       response_type: 'code',
       scope: [
         'https://www.googleapis.com/auth/cloud-platform',
@@ -94,7 +94,7 @@ export class OAuthService {
       code,
       client_id: this.ANTIGRAVITY_CLIENT_ID,
       client_secret: this.ANTIGRAVITY_CLIENT_SECRET,
-      redirect_uri: `${this.externalUrl}/v0/oauth/callback`,
+      redirect_uri: 'http://localhost:4000/v0/oauth/callback',
       grant_type: 'authorization_code',
     });
 

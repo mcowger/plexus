@@ -49,6 +49,7 @@ export default function OAuth() {
 
     // Manual Auth State
     const [showManualAuthModal, setShowManualAuthModal] = useState(false);
+    const [manualAuthProvider, setManualAuthProvider] = useState<string>('');
     const [manualAuthUrl, setManualAuthUrl] = useState('');
     const [pastedUrl, setPastedUrl] = useState('');
     const [manualAuthLoading, setManualAuthLoading] = useState(false);
@@ -113,20 +114,21 @@ export default function OAuth() {
         try {
             let response: { auth_url: string };
 
+            // Check for localhost
+            const hostname = window.location.hostname;
+            const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+
             if (provider === 'claude-code') {
                 response = await api.initiateClaudeCodeAuth();
-
-                // Check for localhost
-                const hostname = window.location.hostname;
-                const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-
-                if (!isLocalhost) {
-                    setManualAuthUrl(response.auth_url);
-                    setShowManualAuthModal(true);
-                    return;
-                }
             } else {
                 response = await api.initiateOAuthFlow(provider);
+            }
+
+            if (!isLocalhost) {
+                setManualAuthUrl(response.auth_url);
+                setManualAuthProvider(provider);
+                setShowManualAuthModal(true);
+                return;
             }
 
             window.open(response.auth_url, '_blank');
@@ -174,11 +176,17 @@ export default function OAuth() {
                 return;
             }
 
-            const result = await api.finalizeClaudeCodeAuth(code, state);
+            let result;
+            if (manualAuthProvider === 'claude-code') {
+                result = await api.finalizeClaudeCodeAuth(code, state);
+            } else {
+                result = await api.finalizeOAuth(manualAuthProvider, code, state);
+            }
 
             if (result.success) {
                 setShowManualAuthModal(false);
                 setPastedUrl('');
+                setManualAuthProvider('');
                 await loadStatus();
             } else {
                 setManualAuthError(result.error || 'Failed to complete authentication.');
@@ -611,7 +619,7 @@ export default function OAuth() {
             >
                 <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        You are accessing Plexus remotely. Claude Code OAuth only supports callbacks to <code className="bg-muted px-1 py-0.5 rounded">localhost</code>.
+                        You are accessing Plexus remotely. {manualAuthProvider === 'claude-code' ? 'Claude Code' : 'Google Antigravity'} OAuth only supports callbacks to <code className="bg-muted px-1 py-0.5 rounded">localhost</code>.
                         You need to perform a manual "Loopback" authentication.
                     </p>
 
@@ -631,7 +639,10 @@ export default function OAuth() {
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm space-y-2">
                         <div className="font-semibold text-blue-400">Step 2: Copy Failed URL</div>
                         <p className="text-muted-foreground">
-                            When authorization completes, the browser will try to redirect to <code className="bg-muted px-1 py-0.5 rounded">localhost:54545</code>.
+                            When authorization completes, the browser will try to redirect to
+                            <code className="bg-muted px-1 py-0.5 rounded ml-1">
+                                localhost:{manualAuthProvider === 'claude-code' ? '54545' : '4000'}
+                            </code>.
                             This will likely fail with "Connection Refused" or "Site can't be reached".
                             <strong>Copy the entire URL from the address bar of that failed page.</strong>
                         </p>
@@ -644,7 +655,7 @@ export default function OAuth() {
                             type="text"
                             value={pastedUrl}
                             onChange={(e) => setPastedUrl(e.target.value)}
-                            placeholder="http://localhost:54545/v0/oauth/claude/callback?code=..."
+                            placeholder={`http://localhost:${manualAuthProvider === 'claude-code' ? '54545' : '4000'}/v0/oauth/callback?code=...`}
                             className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                     </div>
