@@ -624,21 +624,32 @@ export const api = {
     try {
         const yamlStr = await api.getConfig();
         const config = parse(yamlStr) as PlexusConfig;
-        
+
         if (!config.providers) return [];
 
-        return Object.entries(config.providers).map(([key, val]) => ({
-            id: key,
-            name: val.display_name || key,
-            type: val.type,
-            apiBaseUrl: val.api_base_url,
-            apiKey: val.api_key || '',
-            enabled: val.enabled !== false, // Default to true if not present
-            discount: val.discount,
-            headers: val.headers,
-            extraBody: val.extraBody,
-            models: val.models
-        }));
+        return Object.entries(config.providers).map(([key, val]) => {
+            // Normalize models array format to object format
+            let normalizedModels = val.models;
+            if (Array.isArray(val.models)) {
+                normalizedModels = val.models.reduce((acc, modelName) => {
+                    acc[modelName] = {};
+                    return acc;
+                }, {} as Record<string, any>);
+            }
+
+            return {
+                id: key,
+                name: val.display_name || key,
+                type: val.type,
+                apiBaseUrl: val.api_base_url,
+                apiKey: val.api_key || '',
+                enabled: val.enabled !== false, // Default to true if not present
+                discount: val.discount,
+                headers: val.headers,
+                extraBody: val.extraBody,
+                models: normalizedModels
+            };
+        });
     } catch (e) {
         console.error("API Error getProviders", e);
         return [];
