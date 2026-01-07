@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.5 - 2026-01-07
+
+### v0.6.5: OAuth Multi-Account Scoping Fix and Logs UI Improvements
+
+Introduce Multi-Oauth account balancing & Logs UI Improvements
+
 ## v0.6.0 - 2026-01-06
 
 ### v0.6.0: Google Antigravity Authentication Support
