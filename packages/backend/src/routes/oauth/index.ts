@@ -379,10 +379,13 @@ models:
     const credentials = usageStorage.getOAuthCredential(provider || 'antigravity');
 
     if (!credentials) {
+      const externalUrl = process.env.EXTERNAL_PLEXUS_URL || 'http://localhost:4000';
+      const baseUrl = externalUrl.endsWith('/') ? externalUrl.slice(0, -1) : externalUrl;
+      
       return reply.send({
         configured: false,
         message: 'OAuth not configured',
-        auth_url: `${process.env.EXTERNAL_PLEXUS_URL || 'http://localhost:4000'}/v0/oauth/authorize?provider=${provider || 'antigravity'}`,
+        auth_url: `${baseUrl}/v0/oauth/authorize?provider=${provider || 'antigravity'}`,
       });
     }
 
