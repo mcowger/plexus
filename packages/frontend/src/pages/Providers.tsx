@@ -414,7 +414,16 @@ export const Providers = () => {
                                   {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
                                       <div key={idx} style={{display: 'flex', gap: '8px'}}>
                                           <Input placeholder="Header Name" value={key} onChange={(e) => updateKV('headers', key, e.target.value, val)} style={{flex: 1}}/>
-                                          <Input placeholder="Value" value={val} onChange={(e) => updateKV('headers', key, key, e.target.value)} style={{flex: 1}}/>
+                                          <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
+                                                  const rawValue = e.target.value;
+                                                  let parsedValue;
+                                                  try {
+                                                      parsedValue = JSON.parse(rawValue);
+                                                  } catch {
+                                                      parsedValue = rawValue;
+                                                  }
+                                                  updateKV('headers', key, key, parsedValue);
+                                              }} style={{flex: 1}}/>
                                           <Button variant="ghost" size="sm" onClick={() => removeKV('headers', key)}><Trash2 size={16} style={{color: 'var(--color-danger)'}}/></Button>
                                       </div>
                                   ))}
@@ -430,7 +439,16 @@ export const Providers = () => {
                                   {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
                                       <div key={idx} style={{display: 'flex', gap: '8px'}}>
                                           <Input placeholder="Field Name" value={key} onChange={(e) => updateKV('extraBody', key, e.target.value, val)} style={{flex: 1}}/>
-                                          <Input placeholder="Value" value={val} onChange={(e) => updateKV('extraBody', key, key, e.target.value)} style={{flex: 1}}/>
+                                          <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
+                                                  const rawValue = e.target.value;
+                                                  let parsedValue;
+                                                  try {
+                                                      parsedValue = JSON.parse(rawValue);
+                                                  } catch {
+                                                      parsedValue = rawValue;
+                                                  }
+                                                  updateKV('extraBody', key, key, parsedValue);
+                                              }} style={{flex: 1}}/>
                                           <Button variant="ghost" size="sm" onClick={() => removeKV('extraBody', key)}><Trash2 size={16} style={{color: 'var(--color-danger)'}}/></Button>
                                       </div>
                                   ))}
