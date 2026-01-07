@@ -3,6 +3,7 @@ import { RandomSelector } from './random';
 import { CostSelector } from './cost';
 import { PerformanceSelector } from './performance';
 import { LatencySelector } from './latency';
+import { InOrderSelector } from './in-order';
 import { UsageStorageService } from '../usage-storage';
 
 export class SelectorFactory {
@@ -18,6 +19,8 @@ export class SelectorFactory {
       case undefined:
       case null:
         return new RandomSelector();
+      case 'in_order':
+        return new InOrderSelector();
       case 'cost':
         return new CostSelector();
       case 'performance':

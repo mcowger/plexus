@@ -4,6 +4,7 @@ import { RandomSelector } from '../random';
 import { CostSelector } from '../cost';
 import { PerformanceSelector } from '../performance';
 import { LatencySelector } from '../latency';
+import { InOrderSelector } from '../in-order';
 import { UsageStorageService } from '../../usage-storage';
 
 describe('SelectorFactory', () => {
@@ -33,6 +34,11 @@ describe('SelectorFactory', () => {
   it('should return CostSelector for "cost"', () => {
     const selector = SelectorFactory.getSelector('cost');
     expect(selector).toBeInstanceOf(CostSelector);
+  });
+
+  it('should return InOrderSelector for "in_order"', () => {
+    const selector = SelectorFactory.getSelector('in_order');
+    expect(selector).toBeInstanceOf(InOrderSelector);
   });
 
   it('should return PerformanceSelector for "performance"', () => {

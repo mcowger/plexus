@@ -230,12 +230,13 @@ export const Models = () => {
                   
                   <div className="flex flex-col gap-2">
                       <label className="font-body text-[13px] font-medium text-text-secondary">Selector Strategy</label>
-                      <select 
-                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
+                      <select
+                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                         value={editingAlias.selector || 'random'}
                         onChange={(e) => setEditingAlias({...editingAlias, selector: e.target.value})}
                       >
                           <option value="random">Random</option>
+                          <option value="in_order">In Order (Defined Priority)</option>
                           <option value="cost">Lowest Cost</option>
                           <option value="latency">Lowest Latency</option>
                           <option value="usage">Usage Balanced</option>

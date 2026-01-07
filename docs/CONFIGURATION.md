@@ -167,6 +167,7 @@ This section defines the "virtual" models or aliases that clients will use when 
 
 - **`selector`**: (Optional) The strategy to use for target selection when multiple targets are available:
   - `random`: (Default) Randomly selects a healthy target
+  - `in_order`: Selects providers in the order defined, falling back to the next if the current one is unhealthy
   - `cost`: Routes to the lowest-cost healthy provider
   - `performance`: Routes to the highest tokens-per-second provider
   - `latency`: Routes to the lowest time-to-first-token provider
@@ -200,6 +201,44 @@ models:
 ```
 
 With this configuration, if a client sends an Anthropic-style request to `balanced-model`, Plexus will prefer the Anthropic provider (if healthy) to enable pass-through optimization. If an OpenAI-style request is sent, it will prefer the OpenAI provider.
+
+**Selector Strategies:**
+
+The `selector` field determines which target is chosen from the available healthy targets:
+
+- **`random` (Default)**: Randomly distributes requests across all healthy targets. Useful for general load balancing without any specific optimization criteria.
+
+- **`in_order`**: Selects targets in the exact order they are defined, automatically falling back to the next target if the current one becomes unhealthy. This is ideal when you have a **primary provider preference** with fallback providers. For example:
+
+```yaml
+models:
+  minimax-m2.1:
+    selector: in_order
+    targets:
+      - provider: kilo
+        model: minimax/minimax-m2.1
+      - provider: naga
+        model: minimax-m2.1
+      - provider: synthetic
+        model: "hf:MiniMaxAI/MiniMax-M2.1"
+```
+
+With this configuration:
+1. Requests always route to **kilo** if it's healthy
+2. If kilo becomes unavailable/unhealthy, requests automatically fall back to **naga**
+3. If naga is also unavailable, requests route to **synthetic**
+4. Once kilo recovers and becomes healthy again, requests resume routing to kilo
+
+This is particularly useful when you have:
+- A preferred provider with guaranteed performance
+- Cost-conscious fallbacks (e.g., primary provider is premium, fallbacks are cheaper)
+- Specific provider ordering requirements based on business logic
+
+- **`cost`**: Routes to the provider with the lowest configured pricing. Plexus uses a standardized comparison (1000 input tokens + 500 output tokens) to compare costs across providers. Requires pricing configuration on model definitions.
+
+- **`performance`**: Routes to the provider with the highest average throughput (tokens per second). Uses historical performance data collected from actual requests. Falls back to the first target if no performance data exists yet.
+
+- **`latency`**: Routes to the provider with the lowest average time-to-first-token (TTFT). Uses historical latency data from actual requests. Defaults to the first target if all targets have no data.
 
 ### `keys`
 

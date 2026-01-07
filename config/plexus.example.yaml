@@ -31,10 +31,11 @@
 # Define friendly "Model Aliases" that your clients will use.
 #
 #   selector:     (Optional) The strategy to select a target.
-#                 Options: 'random' (default), 'cost', 'performance', 'latency'.
+#                 Options: 'random' (default), 'cost', 'performance', 'latency', 'in_order'.
 #                 If multiple targets are available, Plexus will prioritize
 #                 selection based on the defined 'selector'.
 #                   - random: Randomly selects a healthy target.
+#                   - in_order: Selects providers in the order defined. Falls back to next if current is unhealthy.
 #                   - cost: Selects the target with the lowest configured cost.
 #                   - performance: Selects the target with the highest average tokens/sec.
 #                   - latency: Selects the target with the lowest average time-to-first-token.
@@ -365,6 +366,18 @@ models:
         model: claude-3-5-haiku-latest
       - provider: openai
         model: gpt-4o-mini
+
+  # Example using InOrder Selector (Defined Order with Fallback)
+  # Requests route to 'kilo' first, then 'naga', then 'synthetic' if earlier ones are unavailable
+  minimax-m2.1:
+    selector: in_order
+    targets:
+      - provider: kilo
+        model: minimax/minimax-m2.1
+      - provider: naga
+        model: minimax-m2.1
+      - provider: synthetic
+        model: "hf:MiniMaxAI/MiniMax-M2.1"
 
   # OAuth Provider Routing Example
   # Route requests to OAuth-authenticated Antigravity accounts
