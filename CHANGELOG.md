@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.6 - 2026-01-07
+
+### v0.6.6: Corrected TPS Calculation and Documentation Updates
+
+### Changes and Improvements
+
+*   **Fix TPS Calculation:** Resolved an issue in the calculation logic for Transactions Per Second (TPS) to ensure accurate performance metrics. ([6375d96](https://github.com/mcowger/plexus/commit/6375d96))
+*   **Documentation:** Updated the README to reflect recent project changes and instructions. ([6375d96](https://github.com/mcowger/plexus/commit/6375d96))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.6.5 - 2026-01-07
 
 ### v0.6.5: OAuth Multi-Account Scoping Fix and Logs UI Improvements
