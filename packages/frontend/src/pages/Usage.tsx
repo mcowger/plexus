@@ -1,27 +1,35 @@
 import { useEffect, useState } from 'react';
-import { api, UsageData } from '../lib/api';
+import { api, UsageData, PieChartDataPoint } from '../lib/api';
 import { formatNumber, formatTokens } from '../lib/format';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 
 type TimeRange = 'hour' | 'day' | 'week' | 'month';
 
 export const Usage = () => {
   const [data, setData] = useState<UsageData[]>([]);
+  const [modelData, setModelData] = useState<PieChartDataPoint[]>([]);
+  const [providerData, setProviderData] = useState<PieChartDataPoint[]>([]);
+  const [keyData, setKeyData] = useState<PieChartDataPoint[]>([]);
   const [range, setRange] = useState<TimeRange>('week');
 
   useEffect(() => {
     api.getUsageData(range).then(setData);
+    api.getUsageByModel(range).then(setModelData);
+    api.getUsageByProvider(range).then(setProviderData);
+    api.getUsageByKey(range).then(setKeyData);
   }, [range]);
+
+  const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#f97316'];
 
   const renderTimeControls = () => (
     <div style={{ display: 'flex', gap: '8px' }}>
         {(['hour', 'day', 'week', 'month'] as TimeRange[]).map(r => (
-            <Button 
-                key={r} 
-                size="sm" 
-                variant={range === r ? 'primary' : 'secondary'} 
+            <Button
+                key={r}
+                size="sm"
+                variant={range === r ? 'primary' : 'secondary'}
                 onClick={() => setRange(r)}
                 style={{ textTransform: 'capitalize' }}
             >
@@ -31,6 +39,67 @@ export const Usage = () => {
     </div>
   );
 
+  const renderPieChart = (dataKey: 'requests' | 'tokens', data: PieChartDataPoint[]) => {
+    const CustomTooltip = ({ active, payload }: any) => {
+      if (active && payload && payload.length) {
+        const value = payload[0].value;
+        const label = payload[0].name;
+        const formattedValue = dataKey === 'requests' ? formatNumber(value) : formatTokens(value);
+        return (
+          <div style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            border: '1px solid var(--color-border)'
+          }}>
+            <p style={{ margin: 0, color: '#ffffff', fontSize: '14px' }}>
+              <strong>{label}</strong>
+            </p>
+            <p style={{ margin: '4px 0 0 0', color: '#ffffff', fontSize: '13px' }}>
+              {dataKey === 'requests' ? 'Requests' : 'Tokens'}: {formattedValue}
+            </p>
+          </div>
+        );
+      }
+      return null;
+    };
+
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="30%"
+            labelLine={false}
+            outerRadius={50}
+            fill="#8884d8"
+            dataKey={dataKey}
+            nameKey="name"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Legend
+            verticalAlign="bottom"
+            align="left"
+            height={36}
+            formatter={(value) => {
+              const item = data.find(d => d.name === value);
+              if (!item) return value;
+              const itemValue = item[dataKey as keyof PieChartDataPoint] as number;
+              const total = data.reduce((sum, d) => sum + (d[dataKey as keyof PieChartDataPoint] as number), 0);
+              const percent = total > 0 ? ((itemValue / total) * 100).toFixed(0) : 0;
+              return `${value} (${percent}%)`;
+            }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  };
+
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
       <div className="mb-8">
@@ -38,13 +107,12 @@ export const Usage = () => {
         <p className="text-[15px] text-text-secondary m-0">Token usage and request statistics over time.</p>
       </div>
 
-      <div className="flex gap-4 mb-4 flex-col lg:flex-row">
-        <Card
-          className="flex-[2] min-w-0"
-          title="Requests over Time"
-          extra={renderTimeControls()}
-        >
-          <div style={{ height: 400, marginTop: '12px' }}>
+      {/* All Charts in 4-Column Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Time Series - Requests */}
+        <Card className="min-w-0" title="Requests over Time">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
@@ -64,12 +132,10 @@ export const Usage = () => {
           </div>
         </Card>
 
-        <Card
-          className="flex-[2] min-w-0"
-          title="Token Usage"
-          extra={renderTimeControls()}
-        >
-          <div style={{ height: 400, marginTop: '12px' }}>
+        {/* Time Series - Tokens */}
+        <Card className="min-w-0" title="Token Usage">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
@@ -90,6 +156,54 @@ export const Usage = () => {
                 <Area type="monotone" dataKey="cachedTokens" name="Cached" stroke="#ff7300" fill="#ff7300" fillOpacity={0.3} />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Model Distribution - Requests */}
+        <Card className="min-w-0" title="Usage by Model Alias (Requests)">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
+            {renderPieChart('requests', modelData)}
+          </div>
+        </Card>
+
+        {/* Model Distribution - Tokens */}
+        <Card className="min-w-0" title="Usage by Model Alias (Tokens)">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
+            {renderPieChart('tokens', modelData)}
+          </div>
+        </Card>
+
+        {/* Provider Distribution - Requests */}
+        <Card className="min-w-0" title="Usage by Provider (Requests)">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
+            {renderPieChart('requests', providerData)}
+          </div>
+        </Card>
+
+        {/* Provider Distribution - Tokens */}
+        <Card className="min-w-0" title="Usage by Provider (Tokens)">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
+            {renderPieChart('tokens', providerData)}
+          </div>
+        </Card>
+
+        {/* API Key Distribution - Requests */}
+        <Card className="min-w-0" title="Usage by API Key (Requests)">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
+            {renderPieChart('requests', keyData)}
+          </div>
+        </Card>
+
+        {/* API Key Distribution - Tokens */}
+        <Card className="min-w-0" title="Usage by API Key (Tokens)">
+          {renderTimeControls()}
+          <div style={{ height: 300, marginTop: '12px' }}>
+            {renderPieChart('tokens', keyData)}
           </div>
         </Card>
       </div>

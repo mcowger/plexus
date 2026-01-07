@@ -49,6 +49,12 @@ export interface TodayMetrics {
   totalCost: number;
 }
 
+export interface PieChartDataPoint {
+  name: string;
+  requests: number;
+  tokens: number;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -384,6 +390,144 @@ export const api = {
             cachedTokens: 0,
             totalCost: 0
         };
+    }
+  },
+
+  getUsageByModel: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<PieChartDataPoint[]> => {
+    try {
+        const startDate = new Date();
+        switch (range) {
+            case 'hour':
+                startDate.setHours(startDate.getHours() - 1);
+                break;
+            case 'day':
+                startDate.setHours(startDate.getHours() - 24);
+                break;
+            case 'week':
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case 'month':
+                startDate.setDate(startDate.getDate() - 30);
+                break;
+        }
+
+        const params = new URLSearchParams({
+            limit: '5000',
+            startDate: startDate.toISOString()
+        });
+
+        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
+        if (!res.ok) throw new Error('Failed to fetch usage');
+        const json = await res.json() as BackendResponse<UsageRecord[]>;
+        const records = json.data || [];
+
+        const aggregated: Record<string, PieChartDataPoint> = {};
+
+        records.forEach(r => {
+            const name = r.incomingModelAlias || 'Unknown';
+            if (!aggregated[name]) {
+                aggregated[name] = { name, requests: 0, tokens: 0 };
+            }
+            aggregated[name].requests++;
+            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
+        });
+
+        return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
+    } catch (e) {
+        console.error("API Error getUsageByModel", e);
+        return [];
+    }
+  },
+
+  getUsageByProvider: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<PieChartDataPoint[]> => {
+    try {
+        const startDate = new Date();
+        switch (range) {
+            case 'hour':
+                startDate.setHours(startDate.getHours() - 1);
+                break;
+            case 'day':
+                startDate.setHours(startDate.getHours() - 24);
+                break;
+            case 'week':
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case 'month':
+                startDate.setDate(startDate.getDate() - 30);
+                break;
+        }
+
+        const params = new URLSearchParams({
+            limit: '5000',
+            startDate: startDate.toISOString()
+        });
+
+        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
+        if (!res.ok) throw new Error('Failed to fetch usage');
+        const json = await res.json() as BackendResponse<UsageRecord[]>;
+        const records = json.data || [];
+
+        const aggregated: Record<string, PieChartDataPoint> = {};
+
+        records.forEach(r => {
+            const name = r.provider || 'Unknown';
+            if (!aggregated[name]) {
+                aggregated[name] = { name, requests: 0, tokens: 0 };
+            }
+            aggregated[name].requests++;
+            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
+        });
+
+        return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
+    } catch (e) {
+        console.error("API Error getUsageByProvider", e);
+        return [];
+    }
+  },
+
+  getUsageByKey: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<PieChartDataPoint[]> => {
+    try {
+        const startDate = new Date();
+        switch (range) {
+            case 'hour':
+                startDate.setHours(startDate.getHours() - 1);
+                break;
+            case 'day':
+                startDate.setHours(startDate.getHours() - 24);
+                break;
+            case 'week':
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case 'month':
+                startDate.setDate(startDate.getDate() - 30);
+                break;
+        }
+
+        const params = new URLSearchParams({
+            limit: '5000',
+            startDate: startDate.toISOString()
+        });
+
+        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
+        if (!res.ok) throw new Error('Failed to fetch usage');
+        const json = await res.json() as BackendResponse<UsageRecord[]>;
+        const records = json.data || [];
+
+        const aggregated: Record<string, PieChartDataPoint> = {};
+
+        records.forEach(r => {
+            const name = r.apiKey ? `${r.apiKey.slice(0, 8)}...` : 'Unknown';
+            if (!aggregated[name]) {
+                aggregated[name] = { name, requests: 0, tokens: 0 };
+            }
+            aggregated[name].requests++;
+            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
+        });
+
+        return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
+    } catch (e) {
+        console.error("API Error getUsageByKey", e);
+        return [];
     }
   },
 
