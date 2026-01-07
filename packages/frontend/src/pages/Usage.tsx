@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, UsageData, formatLargeNumber } from '../lib/api';
+import { api, UsageData } from '../lib/api';
+import { formatNumber, formatTokens } from '../lib/format';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -38,7 +39,7 @@ export const Usage = () => {
       </div>
 
       <div className="flex gap-4 mb-4 flex-col lg:flex-row">
-        <Card 
+        <Card
           className="flex-[2] min-w-0"
           title="Requests over Time"
           extra={renderTimeControls()}
@@ -48,13 +49,14 @@ export const Usage = () => {
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
                 <XAxis dataKey="timestamp" stroke="var(--color-text-secondary)" />
-                <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatLargeNumber} />
+                <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatNumber} />
                 <Tooltip
                   contentStyle={{
                       backgroundColor: 'var(--color-bg-card)',
                       borderColor: 'var(--color-border)',
                       color: 'var(--color-text)'
                   }}
+                  formatter={(value) => formatNumber(value as number)}
                 />
                 <Area type="monotone" dataKey="requests" stroke="var(--color-primary)" fill="var(--color-glow)" />
               </AreaChart>
@@ -62,7 +64,7 @@ export const Usage = () => {
           </div>
         </Card>
 
-        <Card 
+        <Card
           className="flex-[2] min-w-0"
           title="Token Usage"
           extra={renderTimeControls()}
@@ -72,13 +74,14 @@ export const Usage = () => {
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
                 <XAxis dataKey="timestamp" stroke="var(--color-text-secondary)" />
-                <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatLargeNumber} />
+                <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatTokens} />
                 <Tooltip
                   contentStyle={{
                       backgroundColor: 'var(--color-bg-card)',
                       borderColor: 'var(--color-border)',
                       color: 'var(--color-text)'
                   }}
+                  formatter={(value) => formatTokens(value as number)}
                 />
                 <Legend />
                 <Area type="monotone" dataKey="tokens" name="Total Tokens" stroke="var(--color-primary)" fill="var(--color-glow)" fillOpacity={0.1} />
