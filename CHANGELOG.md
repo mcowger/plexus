@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.7.1 - 2026-01-07
+
+### v0.7.1: Manual OAuth Flow Implementation and Client Restriction Bypass
+
+## Main Features
+
+*   **Manual OAuth Flow**: Introduced a manual OAuth authentication method to circumvent environment-specific restrictions, specifically targeting limitations in Antigravity and Claude Code environments. ([19a7dd2](https://github.com/mcowger/plexus/commit/19a7dd2), [19c9835](https://github.com/mcowger/plexus/commit/19c9835), [4f2530b](https://github.com/mcowger/plexus/commit/4f2530b))
+
+## Smaller Changes & Bug Fixes
+
+*   **OAuth Logic Correction**: Resolved a bug that restricted OAuth options when an existing account was already configured in the system. ([8b1fe1d](https://github.com/mcowger/plexus/commit/8b1fe1d))
+*   **URL Generation**: Fixed an issue with OAuth URL generation to ensure correct redirect behavior. ([469ce33](https://github.com/mcowger/plexus/commit/469ce33))
+*   **Documentation**: General updates to the project documentation. ([8aea510](https://github.com/mcowger/plexus/commit/8aea510))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.7.0 - 2026-01-07
 
 ### v0.7.0: Claude Code OAuth Integration
