@@ -155,7 +155,9 @@ export class UsageInspector extends BaseInspector {
                 // Finalize stats
                 this.usageRecord.durationMs = Date.now() - this.startTime;
                 if (stats.outputTokens > 0 && this.usageRecord.durationMs && this.usageRecord.durationMs > 0) {
-                     this.usageRecord.tokensPerSec = (stats.outputTokens / this.usageRecord.durationMs) * 1000;
+                    // Calculate TPS from first token to end
+                    const timeToTokensMs = this.usageRecord.durationMs - (this.usageRecord.ttftMs || 0);
+                    this.usageRecord.tokensPerSec = timeToTokensMs > 0 ? (stats.outputTokens / timeToTokensMs) * 1000 : 0;
                 }
                 
                 calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
