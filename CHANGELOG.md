@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.0 - 2026-01-07
+
+### v0.7.0: Claude Code OAuth Integration
+
+### ✨ New Features
+
+*   **Claude Code OAuth Integration:** Introduced the ability to authenticate with Claude Code using OAuth. This allows for seamless integration with Claude Code environments. ([cc89abe](https://github.com/mcowger/plexus/commit/cc89abe))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.6.6 - 2026-01-07
 
 ### v0.6.6: Corrected TPS Calculation and Documentation Updates
