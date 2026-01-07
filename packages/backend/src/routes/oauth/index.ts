@@ -272,6 +272,10 @@ models:
       const credentials = usageStorage.getAllOAuthCredentials(providerName);
 
       if (credentials.length === 0) {
+        result.push({
+          provider: providerName,
+          accounts: [],
+        });
         continue;
       }
 

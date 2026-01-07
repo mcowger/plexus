@@ -379,14 +379,6 @@ export default function OAuth() {
                             <p className="text-sm text-muted-foreground mb-3">
                                 OAuth 2.0 authentication for Anthropic Claude API (via Claude Code)
                             </p>
-                            <div className="bg-orange-500/10 border border-orange-500/20 rounded p-3 mb-3">
-                                <div className="flex items-start gap-2">
-                                    <AlertTriangle size={16} className="text-orange-400 mt-0.5 flex-shrink-0" />
-                                    <div className="text-xs text-orange-300">
-                                        <strong>Port 54545 Required:</strong> Claude Code OAuth requires port 54545 to be available and accessible from this client system for callbacks. Ensure this port is not in use and is allowed through your firewall if accessing Plexus remotely.
-                                    </div>
-                                </div>
-                            </div>
                             <Button onClick={() => handleInitiateAuth('claude-code')} variant="primary">
                                 <ExternalLink size={16} className="mr-2" />
                                 Connect to Claude Code
@@ -441,18 +433,6 @@ export default function OAuth() {
                                 {isExpanded && (
                                     <div style={{borderTop: '1px solid var(--color-border-glass)'}}>
                                         <div className="p-6 space-y-4">
-                                            {/* Port 54545 Warning for Claude Code */}
-                                            {providerData.provider === 'claude-code' && (
-                                                <div className="bg-orange-500/10 border border-orange-500/20 rounded p-3">
-                                                    <div className="flex items-start gap-2">
-                                                        <AlertTriangle size={16} className="text-orange-400 mt-0.5 flex-shrink-0" />
-                                                        <div className="text-xs text-orange-300">
-                                                            <strong>Port 54545 Required:</strong> Claude Code OAuth requires port 54545 to be available and accessible for callbacks. Ensure this port is not in use and is allowed through your firewall if accessing Plexus remotely.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
                                             {/* Configuration Reminder */}
                                             <div className="bg-blue-500/5 border border-blue-500/10 rounded p-2">
                                                 <div className="text-xs text-muted-foreground">
