@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { api, Stat, UsageData, Cooldown, STAT_LABELS } from '../lib/api';
+import { Button } from '../components/ui/Button';
+import { api, Stat, UsageData, Cooldown, STAT_LABELS, TodayMetrics, formatLargeNumber } from '../lib/api';
 import { Activity, Server, Zap, Database, AlertTriangle } from 'lucide-react';
 import { RecentActivityChart } from '../components/dashboard/RecentActivityChart';
+
+type TimeRange = 'hour' | 'day' | 'week' | 'month';
 
 const icons: Record<string, React.ReactNode> = {
   [STAT_LABELS.REQUESTS]: <Activity size={20} />,
@@ -19,17 +22,31 @@ export const Dashboard = () => {
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [timeAgo, setTimeAgo] = useState<string>('Just now');
+  const [activityRange, setActivityRange] = useState<TimeRange>('day');
+  const [todayMetrics, setTodayMetrics] = useState<TodayMetrics>({
+    requests: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    cachedTokens: 0,
+    totalCost: 0
+  });
   const navigate = useNavigate();
 
   const loadData = async () => {
-      const [statsData, usage, cooldownsData] = await Promise.all([
+      const [statsData, usage, cooldownsData, metricsData] = await Promise.all([
           api.getStats(),
-          api.getUsageData(),
-          api.getCooldowns()
+          api.getUsageData(activityRange),
+          api.getCooldowns(),
+          api.getTodayMetrics()
       ]);
-      setStats(statsData);
+      setStats(statsData.filter(stat =>
+        stat.label !== STAT_LABELS.PROVIDERS &&
+        stat.label !== STAT_LABELS.DURATION
+      ));
       setUsageData(usage);
       setCooldowns(cooldownsData);
+      setTodayMetrics(metricsData);
       setLastUpdated(new Date());
   };
 
@@ -37,7 +54,7 @@ export const Dashboard = () => {
     loadData();
     const interval = setInterval(loadData, 30000); // Poll every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [activityRange]);
 
   useEffect(() => {
       const updateTime = () => {
@@ -61,6 +78,22 @@ export const Dashboard = () => {
       const interval = setInterval(updateTime, 10000);
       return () => clearInterval(interval);
   }, [lastUpdated]);
+
+  const renderActivityTimeControls = () => (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      {(['hour', 'day', 'week', 'month'] as TimeRange[]).map(r => (
+        <Button
+          key={r}
+          size="sm"
+          variant={activityRange === r ? 'primary' : 'secondary'}
+          onClick={() => setActivityRange(r)}
+          style={{ textTransform: 'capitalize' }}
+        >
+          {r}
+        </Button>
+      ))}
+    </div>
+  );
 
   const handleClearCooldowns = async () => {
       if (confirm('Are you sure you want to clear all provider cooldowns?')) {
@@ -86,7 +119,7 @@ export const Dashboard = () => {
           </div>
       </div>
 
-      <div className="grid gap-4 mb-6 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+      <div className="mb-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
         {stats.map((stat, i) => (
           <div key={i} className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
             <div className="flex justify-between items-start">
@@ -103,6 +136,42 @@ export const Dashboard = () => {
             )}
           </div>
         ))}
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">Requests Today</span>
+            <div className="w-8 h-8 rounded-sm flex items-center justify-center text-white" style={{background: 'var(--color-bg-hover)'}}>
+              <Activity size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">{todayMetrics.requests.toLocaleString()}</div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">Tokens Today</span>
+            <div className="w-8 h-8 rounded-sm flex items-center justify-center text-white" style={{background: 'var(--color-bg-hover)'}}>
+              <Database size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">{formatLargeNumber(todayMetrics.inputTokens + todayMetrics.outputTokens + todayMetrics.reasoningTokens + todayMetrics.cachedTokens)}</div>
+          <div className="text-xs text-text-muted space-y-0.5">
+            <div>In: {formatLargeNumber(todayMetrics.inputTokens)}</div>
+            <div>Out: {formatLargeNumber(todayMetrics.outputTokens)}</div>
+            {todayMetrics.reasoningTokens > 0 && <div>Reasoning: {formatLargeNumber(todayMetrics.reasoningTokens)}</div>}
+            {todayMetrics.cachedTokens > 0 && <div>Cached: {formatLargeNumber(todayMetrics.cachedTokens)}</div>}
+          </div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">Cost Today</span>
+            <div className="w-8 h-8 rounded-sm flex items-center justify-center text-white" style={{background: 'var(--color-bg-hover)'}}>
+              <Zap size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">${todayMetrics.totalCost.toFixed(4)}</div>
+        </div>
       </div>
 
       {cooldowns.length > 0 && (
@@ -152,15 +221,10 @@ export const Dashboard = () => {
           </div>
       )}
 
+
       <div className="flex gap-4 mb-4 flex-col lg:flex-row">
-          <Card className="flex-[2] min-w-0" title="Recent Activity">
+          <Card className="flex-[2] min-w-0" title="Recent Activity" extra={renderActivityTimeControls()}>
              <RecentActivityChart data={usageData} />
-          </Card>
-          <Card className="flex-1 min-w-[300px]" title="Quick Actions">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button className="text-black shadow-md bg-gradient-to-br from-primary to-secondary shadow-[0_4px_12px_rgba(245,158,11,0.3)] hover:disabled:transform-none hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(245,158,11,0.4)] inline-flex items-center justify-center gap-2 py-2.5 px-5 font-body text-sm font-medium leading-normal border-0 rounded-md cursor-pointer transition-all duration-200 whitespace-nowrap select-none outline-none disabled:opacity-50 disabled:cursor-not-allowed" style={{ width: '100%' }}>New Provider</button>
-                  <button className="bg-bg-glass text-text border border-border-glass backdrop-blur-md hover:bg-bg-hover hover:border-primary inline-flex items-center justify-center gap-2 py-2.5 px-5 font-body text-sm font-medium leading-normal border-0 rounded-md cursor-pointer transition-all duration-200 whitespace-nowrap select-none outline-none disabled:opacity-50 disabled:cursor-not-allowed" style={{ width: '100%' }} onClick={() => navigate('/logs')}>View Logs</button>
-              </div>
           </Card>
       </div>
     </div>

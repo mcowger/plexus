@@ -40,6 +40,15 @@ export interface UsageData {
   cachedTokens: number;
 }
 
+export interface TodayMetrics {
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cachedTokens: number;
+  totalCost: number;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -255,12 +264,12 @@ export const api = {
                 step = 24 * 60 * 60 * 1000; // 1 day
                 break;
         }
-        
+
         const params = new URLSearchParams({
             limit: '5000',
             startDate: startDate.toISOString()
         });
-        
+
         const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
         if (!res.ok) throw new Error('Failed to fetch usage');
         const json = await res.json() as BackendResponse<UsageRecord[]>;
@@ -268,20 +277,20 @@ export const api = {
 
         // Grouping
         const grouped: Record<string, UsageData> = {};
-        
+
         // Initialize buckets
         const now = Date.now();
         for (let i = buckets; i >= 0; i--) {
             const t = new Date(now - (i * step));
             // Snap to bucket start
-            if (range === 'day') t.setMinutes(0, 0, 0); 
+            if (range === 'day') t.setMinutes(0, 0, 0);
             if (range === 'week' || range === 'month') t.setHours(0, 0, 0, 0);
-            
+
             const key = bucketFormat(t);
             if (!grouped[key]) {
-                grouped[key] = { 
-                    timestamp: key, 
-                    requests: 0, 
+                grouped[key] = {
+                    timestamp: key,
+                    requests: 0,
                     tokens: 0,
                     inputTokens: 0,
                     outputTokens: 0,
@@ -293,22 +302,22 @@ export const api = {
         records.forEach(r => {
             const d = new Date(r.date);
             if (d < startDate) return;
-            
+
             let key = bucketFormat(d);
-            // Fix key generation for aggregation to match initialized buckets if needed, 
+            // Fix key generation for aggregation to match initialized buckets if needed,
             // but simplified formatting usually aligns enough for visual graph
-            
+
             // For 'day' (24h), we want to group by hour. bucketFormat returns HH:MM.
             // If we initialized buckets as HH:00, we need to snap record time to HH:00
             if (range === 'day') d.setMinutes(0, 0, 0);
             if (range === 'week' || range === 'month') d.setHours(0, 0, 0, 0);
-            
+
             key = bucketFormat(d);
 
             if (!grouped[key]) {
-                grouped[key] = { 
-                    timestamp: key, 
-                    requests: 0, 
+                grouped[key] = {
+                    timestamp: key,
+                    requests: 0,
                     tokens: 0,
                     inputTokens: 0,
                     outputTokens: 0,
@@ -326,6 +335,55 @@ export const api = {
     } catch (e) {
         console.error("API Error getUsageData", e);
         return [];
+    }
+  },
+
+  getTodayMetrics: async (): Promise<TodayMetrics> => {
+    try {
+        // Get records from midnight today to now
+        const startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+
+        const params = new URLSearchParams({
+            limit: '10000',
+            startDate: startDate.toISOString()
+        });
+
+        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
+        if (!res.ok) throw new Error('Failed to fetch usage');
+        const json = await res.json() as BackendResponse<UsageRecord[]>;
+        const records = json.data || [];
+
+        // Aggregate all records from today
+        const metrics: TodayMetrics = {
+            requests: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            reasoningTokens: 0,
+            cachedTokens: 0,
+            totalCost: 0
+        };
+
+        records.forEach(r => {
+            metrics.requests++;
+            metrics.inputTokens += r.tokensInput || 0;
+            metrics.outputTokens += r.tokensOutput || 0;
+            metrics.reasoningTokens += r.tokensReasoning || 0;
+            metrics.cachedTokens += r.tokensCached || 0;
+            metrics.totalCost += r.costTotal || 0;
+        });
+
+        return metrics;
+    } catch (e) {
+        console.error("API Error getTodayMetrics", e);
+        return {
+            requests: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            reasoningTokens: 0,
+            cachedTokens: 0,
+            totalCost: 0
+        };
     }
   },
 

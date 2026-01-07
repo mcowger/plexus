@@ -76,7 +76,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className={clsx(
-      "h-screen fixed left-0 top-0 bg-bg-surface flex flex-col overflow-y-auto z-50 transition-all duration-300 border-r border-border",
+      "h-screen fixed left-0 top-0 bg-bg-surface flex flex-col overflow-y-auto overflow-x-hidden z-50 transition-all duration-300 border-r border-border",
       isCollapsed ? "w-[64px]" : "w-[200px]"
     )}>
       <div className="px-5 py-6 border-b border-border flex items-center justify-between">
@@ -105,9 +105,15 @@ export const Sidebar: React.FC = () => {
       </p>
 
       <nav className="flex-1 py-4 px-2 flex flex-col gap-1">
-        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
-        <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
-        <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
+        <div className="px-2">
+            <h3 className={clsx(
+              "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2 transition-opacity duration-200",
+              isCollapsed && "opacity-0 h-0 overflow-hidden"
+            )}>Main</h3>
+            <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
+            <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
+            <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
+        </div>
 
         <div className="mt-6 px-2">
             <h3 className={clsx(
