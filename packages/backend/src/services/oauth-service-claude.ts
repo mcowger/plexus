@@ -56,8 +56,13 @@ export class ClaudeOAuthService {
     private usageStorage: UsageStorageService,
     private externalUrl: string
   ) {
-    // Claude Code OAuth client is configured to use localhost:54545
-    this.config.redirectUri = 'http://localhost:54545/callback';
+    // Ensure externalUrl does not have a trailing slash
+    if (this.externalUrl.endsWith('/')) {
+      this.externalUrl = this.externalUrl.slice(0, -1);
+    }
+
+    // Configure redirect URI to use the external URL
+    this.config.redirectUri = `${this.externalUrl}/v0/oauth/claude/callback`;
 
     // Clean up expired sessions every 5 minutes
     setInterval(() => this.cleanExpiredSessions(), 5 * 60 * 1000);

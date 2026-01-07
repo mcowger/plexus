@@ -26,6 +26,11 @@ export class OAuthService {
     private usageStorage: UsageStorageService,
     private externalUrl: string
   ) {
+    // Ensure externalUrl does not have a trailing slash
+    if (this.externalUrl.endsWith('/')) {
+      this.externalUrl = this.externalUrl.slice(0, -1);
+    }
+
     // Clean up expired sessions every 5 minutes
     setInterval(() => this.cleanExpiredSessions(), 5 * 60 * 1000);
   }
