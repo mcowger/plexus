@@ -195,8 +195,9 @@ providers:
   # 3. Complete the OAuth flow for each Google account
   # 4. Add the authenticated email addresses to oauth_account_pool below
   my-antigravity:
-    type: gemini
+    type: antigravity
     display_name: Google Antigravity (Multi-Account)
+    api_base_url: https://cloudcode-pa.googleapis.com
     # oauth_provider: Specifies which OAuth system to use
     oauth_provider: antigravity
     # oauth_account_pool: List of authenticated account emails
@@ -214,18 +215,19 @@ providers:
           source: simple
           input: 0    # Free tier pricing
           output: 0   # Free tier pricing
-        access_via: [gemini]
+        access_via: [antigravity]
       gemini-2.0-flash-exp:
         pricing:
           source: simple
           input: 0
           output: 0
-        access_via: [gemini]
+        access_via: [antigravity]
 
   # OAuth Provider with Single Account (Minimum Configuration)
   my-antigravity-single:
-    type: gemini
+    type: antigravity
     display_name: Google Antigravity (Single Account)
+    api_base_url: https://cloudcode-pa.googleapis.com
     oauth_provider: antigravity
     # Even with single account, oauth_account_pool is required
     oauth_account_pool:
