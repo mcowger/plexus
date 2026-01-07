@@ -805,6 +805,30 @@ export const api = {
       }
   },
 
+  finalizeOAuth: async (code: string, state: string): Promise<{
+      success: boolean;
+      email?: string;
+      project_id?: string;
+      error?: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/finalize`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, state })
+          });
+          
+          if (!res.ok) {
+              const error = await res.json();
+              return { success: false, error: error.error || 'Failed to finalize OAuth flow' };
+          }
+          return await res.json();
+      } catch (e) {
+          console.error("API Error finalizeOAuth", e);
+          return { success: false, error: 'Failed to finalize OAuth flow' };
+      }
+  },
+
   deleteOAuthCredentials: async (provider: string, userIdentifier: string): Promise<boolean> => {
       try {
           const res = await fetchWithAuth(

@@ -35,6 +35,82 @@ export async function oauthRoutes(
     });
   });
 
+  // Manual OAuth finalization (for non-localhost clients)
+  fastify.post('/v0/oauth/finalize', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { code, state } = request.body as {
+      code?: string;
+      state?: string;
+    };
+
+    if (!code || !state) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Missing code or state parameter',
+      });
+    }
+
+    // Validate state
+    const session = oauthService.validateState(state);
+    if (!session) {
+      logger.warn('Invalid or expired OAuth state');
+      return reply.status(400).send({
+        success: false,
+        error: 'Invalid or expired state',
+      });
+    }
+
+    try {
+      // Exchange code for tokens
+      const tokenResponse = await oauthService.exchangeAntigravityCode(code);
+
+      // Fetch user info
+      const userInfo = await oauthService.fetchUserInfo(tokenResponse.access_token);
+      const email = userInfo.email || 'unknown';
+
+      // Fetch project ID
+      let projectId = '';
+      try {
+        projectId = await oauthService.fetchProjectId(tokenResponse.access_token);
+        logger.info(`Fetched project ID: ${projectId} for user: ${email}`);
+      } catch (err) {
+        logger.warn('Failed to fetch project ID:', err);
+      }
+
+      // Calculate expiry timestamp
+      const expiresAt = Date.now() + tokenResponse.expires_in * 1000;
+
+      // Save to database
+      usageStorage.saveOAuthCredential({
+        provider: 'antigravity',
+        user_identifier: email,
+        access_token: tokenResponse.access_token,
+        refresh_token: tokenResponse.refresh_token,
+        token_type: tokenResponse.token_type,
+        expires_at: expiresAt,
+        scope: 'cloud-platform userinfo.email userinfo.profile cclog experimentsandconfigs',
+        project_id: projectId,
+        metadata: JSON.stringify({ email }),
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      });
+
+      logger.info(`OAuth credentials saved for ${email}`);
+
+      return reply.send({
+        success: true,
+        email,
+        project_id: projectId
+      });
+    } catch (err) {
+      logger.error('OAuth finalization error:', err);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to complete OAuth flow',
+        details: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
   // OAuth callback handler
   fastify.get('/v0/oauth/callback', async (request: FastifyRequest, reply: FastifyReply) => {
     const { code, state, error } = request.query as {
