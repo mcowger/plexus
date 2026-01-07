@@ -14,6 +14,7 @@ import { Errors } from './pages/Errors';
 import OAuth from './pages/OAuth';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SidebarProvider } from './contexts/SidebarContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { adminKey } = useAuth();
@@ -78,7 +79,9 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <AuthProvider>
+      <SidebarProvider>
         <AppRoutes />
+      </SidebarProvider>
     </AuthProvider>
   );
 };
