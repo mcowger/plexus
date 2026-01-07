@@ -1,5 +1,6 @@
 import { UsageStorageService } from './usage-storage.js';
 import { OAuthService } from './oauth-service.js';
+import { ClaudeOAuthService } from './oauth-service-claude.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -12,11 +13,13 @@ export class TokenRefreshService {
   private intervalId?: Timer;
   private isRunning = false;
   private readonly CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
-  private readonly REFRESH_THRESHOLD = 5; // Refresh tokens expiring within 5 minutes
+  private readonly REFRESH_THRESHOLD_ANTIGRAVITY = 5; // Refresh Antigravity tokens expiring within 5 minutes
+  private readonly REFRESH_THRESHOLD_CLAUDE = 240; // Refresh Claude Code tokens 4 hours before expiry
 
   constructor(
     private usageStorage: UsageStorageService,
-    private oauthService: OAuthService
+    private oauthService: OAuthService,
+    private claudeOAuthService?: ClaudeOAuthService
   ) {}
 
   /**
@@ -63,20 +66,27 @@ export class TokenRefreshService {
     try {
       logger.debug('Checking for expiring OAuth tokens');
 
-      // Get all credentials expiring within the threshold
-      const expiringCredentials = this.usageStorage.listExpiringSoonCredentials(
-        this.REFRESH_THRESHOLD
-      );
+      // Get Antigravity credentials expiring within 5 minutes
+      const expiringAntigravity = this.usageStorage.listExpiringSoonCredentials(
+        this.REFRESH_THRESHOLD_ANTIGRAVITY
+      ).filter(c => c.provider === 'antigravity');
 
-      if (expiringCredentials.length === 0) {
+      // Get Claude Code credentials expiring within 4 hours
+      const expiringClaude = this.usageStorage.listExpiringSoonCredentials(
+        this.REFRESH_THRESHOLD_CLAUDE
+      ).filter(c => c.provider === 'claude-code');
+
+      const totalExpiring = expiringAntigravity.length + expiringClaude.length;
+
+      if (totalExpiring === 0) {
         logger.debug('No tokens need refreshing');
         return;
       }
 
-      logger.info(`Found ${expiringCredentials.length} token(s) that need refreshing`);
+      logger.info(`Found ${totalExpiring} token(s) that need refreshing (${expiringAntigravity.length} Antigravity, ${expiringClaude.length} Claude Code)`);
 
       // Refresh each token
-      for (const credential of expiringCredentials) {
+      for (const credential of [...expiringAntigravity, ...expiringClaude]) {
         await this.refreshToken(credential);
       }
     } catch (error) {
@@ -93,20 +103,31 @@ export class TokenRefreshService {
     try {
       logger.info(`Refreshing token for ${provider}:${user_identifier}`);
 
-      // Only Antigravity is currently supported
-      if (provider !== 'antigravity') {
+      let tokenResponse: any;
+      let expiresAt: number;
+
+      if (provider === 'antigravity') {
+        // Call the Antigravity OAuth service to refresh the token
+        tokenResponse = await this.oauthService.refreshToken(
+          provider,
+          refresh_token
+        );
+        expiresAt = Date.now() + tokenResponse.expires_in * 1000;
+      } else if (provider === 'claude-code') {
+        if (!this.claudeOAuthService) {
+          logger.error('Claude OAuth service not available');
+          return;
+        }
+
+        // Call the Claude OAuth service to refresh the token
+        tokenResponse = await this.claudeOAuthService.refreshAccessToken(
+          refresh_token
+        );
+        expiresAt = Date.now() + tokenResponse.expires_in * 1000;
+      } else {
         logger.warn(`Unsupported provider for token refresh: ${provider}`);
         return;
       }
-
-      // Call the OAuth service to refresh the token
-      const tokenResponse = await this.oauthService.refreshToken(
-        provider,
-        refresh_token
-      );
-
-      // Calculate new expiry time
-      const expiresAt = Date.now() + tokenResponse.expires_in * 1000;
 
       // Update the token in the database
       this.usageStorage.updateOAuthToken(
@@ -143,11 +164,12 @@ export class TokenRefreshService {
   /**
    * Get service status
    */
-  getStatus(): { running: boolean; checkInterval: number; refreshThreshold: number } {
+  getStatus(): { running: boolean; checkInterval: number; refreshThresholdAntigravity: number; refreshThresholdClaude: number } {
     return {
       running: this.isRunning,
       checkInterval: this.CHECK_INTERVAL,
-      refreshThreshold: this.REFRESH_THRESHOLD,
+      refreshThresholdAntigravity: this.REFRESH_THRESHOLD_ANTIGRAVITY,
+      refreshThresholdClaude: this.REFRESH_THRESHOLD_CLAUDE,
     };
   }
 }

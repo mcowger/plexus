@@ -880,5 +880,82 @@ export const api = {
           console.error("API Error getOAuthCredentialsGrouped", e);
           return { providers: [] };
       }
+  },
+
+  // Claude Code OAuth Management
+  initiateClaudeCodeAuth: async (): Promise<{
+      auth_url: string;
+      state: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/authorize`, {
+              method: 'POST'
+          });
+          if (!res.ok) throw new Error('Failed to initiate Claude Code OAuth flow');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error initiateClaudeCodeAuth", e);
+          throw e;
+      }
+  },
+
+  getClaudeCodeAccounts: async (): Promise<{
+      accounts: Array<{
+          email: string;
+          organization_name: string;
+          organization_uuid: string;
+          account_uuid: string;
+          expires_at: number;
+          expires_in_seconds: number;
+          is_expired: boolean;
+          on_cooldown: boolean;
+          cooldown_remaining_seconds?: number;
+          status: 'active' | 'expired' | 'cooldown';
+          last_refreshed_at: number;
+      }>;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/accounts`);
+          if (!res.ok) throw new Error('Failed to fetch Claude Code accounts');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getClaudeCodeAccounts", e);
+          return { accounts: [] };
+      }
+  },
+
+  refreshClaudeCodeToken: async (email: string): Promise<{
+      success: boolean;
+      expires_at?: number;
+      error?: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email })
+          });
+          if (!res.ok) {
+              const error = await res.json();
+              return { success: false, error: error.error || 'Failed to refresh token' };
+          }
+          return await res.json();
+      } catch (e) {
+          console.error("API Error refreshClaudeCodeToken", e);
+          return { success: false, error: 'Failed to refresh token' };
+      }
+  },
+
+  deleteClaudeCodeAccount: async (email: string): Promise<boolean> => {
+      try {
+          const res = await fetchWithAuth(
+              `${API_BASE}/v0/oauth/claude/${encodeURIComponent(email)}`,
+              { method: 'DELETE' }
+          );
+          return res.ok;
+      } catch (e) {
+          console.error("API Error deleteClaudeCodeAccount", e);
+          return false;
+      }
   }
 };

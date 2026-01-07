@@ -104,6 +104,47 @@ export class Dispatcher {
       );
       providerPayload = JSON.parse(JSON.stringify(request.originalBody));
       providerPayload.model = route.model;
+
+      // Add metadata from requestWithTargetModel (includes OAuth metadata like user_id)
+      if (requestWithTargetModel.metadata) {
+        const apiMetadata = this.getApiMetadata(requestWithTargetModel.metadata, route.config.oauth_provider);
+        if (Object.keys(apiMetadata).length > 0) {
+          providerPayload.metadata = apiMetadata;
+        }
+      }
+
+      // Inject Claude Code system instruction if using Claude Code OAuth (pass-through path)
+      // This is REQUIRED for Claude Code OAuth authentication
+      if (route.config.oauth_provider === 'claude-code' &&
+          requestWithTargetModel.metadata?.user_id &&
+          typeof requestWithTargetModel.metadata.user_id === 'string' &&
+          requestWithTargetModel.metadata.user_id.includes('_account_') &&
+          requestWithTargetModel.metadata.user_id.includes('_session_')) {
+
+        const claudeCodeInstruction = {
+          type: "text",
+          text: "You are Claude Code, Anthropic's official CLI for Claude."
+        };
+
+        // Anthropic's system field can be a string or an array of content blocks
+        // For Claude Code, we need to use array format and prepend the instruction
+        const systemArray: any[] = [claudeCodeInstruction];
+
+        if (providerPayload.system) {
+          // If system is already an array, prepend to it
+          if (Array.isArray(providerPayload.system)) {
+            providerPayload.system.unshift(claudeCodeInstruction);
+          } else {
+            // If it's a string, convert to array format and append
+            systemArray.push({ type: "text", text: providerPayload.system });
+            providerPayload.system = systemArray;
+          }
+        } else {
+          // No existing system message, create new one with Claude Code instruction
+          providerPayload.system = systemArray;
+        }
+      }
+
       bypassTransformation = true;
     } else {
       if (route.config.force_transformer) {
@@ -176,6 +217,7 @@ export class Dispatcher {
     logger.info(
       `Dispatching ${request.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
     );
+
     logger.silly("Upstream Request Payload", providerPayload);
 
     const response = await fetch(url, {
@@ -383,6 +425,27 @@ export class Dispatcher {
         // Use the OAuth access token
         headers["Authorization"] = `Bearer ${credential.access_token}`;
         logger.debug(`Using OAuth token for account: ${selectedAccountId}`);
+
+        // Add Claude Code specific headers
+        if (route.config.oauth_provider === 'claude-code') {
+          headers["Anthropic-Beta"] = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
+          headers["Anthropic-Version"] = "2023-06-01";
+          headers["Anthropic-Dangerous-Direct-Browser-Access"] = "true";
+          headers["User-Agent"] = "claude-cli/1.0.83 (external, cli)";
+          headers["X-App"] = "cli";
+          headers["X-Stainless-Helper-Method"] = "stream";
+          headers["X-Stainless-Retry-Count"] = "0";
+          headers["X-Stainless-Runtime-Version"] = "v24.3.0";
+          headers["X-Stainless-Package-Version"] = "0.55.1";
+          headers["X-Stainless-Runtime"] = "node";
+          headers["X-Stainless-Lang"] = "js";
+          headers["X-Stainless-Arch"] = "arm64";
+          headers["X-Stainless-Os"] = "MacOS";
+          headers["X-Stainless-Timeout"] = "60";
+          headers["Connection"] = "keep-alive";
+          headers["Accept-Encoding"] = "gzip, deflate, br, zstd";
+          logger.debug('Added Claude Code OAuth headers');
+        }
       } else {
         throw new Error(`OAuth credentials not found for account '${selectedAccountId}'. Please authenticate.`);
       }
@@ -406,6 +469,26 @@ export class Dispatcher {
       Object.assign(headers, route.config.headers);
     }
     return headers;
+  }
+
+  /**
+   * Filters metadata to only include fields that should be sent to the API
+   * Removes internal Plexus fields like selected_oauth_account
+   * @private
+   */
+  private getApiMetadata(metadata: Record<string, any>, oauthProvider?: string): Record<string, any> {
+    const apiMetadata: Record<string, any> = {};
+
+    // List of internal fields that should NOT be sent to the API
+    const internalFields = ['selected_oauth_account', 'oauth_project_id'];
+
+    for (const [key, value] of Object.entries(metadata)) {
+      if (!internalFields.includes(key)) {
+        apiMetadata[key] = value;
+      }
+    }
+
+    return apiMetadata;
   }
 
   /**
@@ -433,6 +516,25 @@ export class Dispatcher {
       // Add project_id if available (for Antigravity)
       if (credential && credential.project_id) {
         updatedMetadata.oauth_project_id = credential.project_id;
+      }
+
+      // Generate user_id for Claude Code OAuth (required for credential validation)
+      if (route.config.oauth_provider === 'claude-code' && credential) {
+        // Parse metadata to get account UUID
+        let accountUuid = '';
+        try {
+          const metadata = JSON.parse(credential.metadata || '{}');
+          accountUuid = metadata.account_uuid || '';
+        } catch (e) {
+          logger.warn(`Failed to parse metadata for ${selectedAccountId}`, e);
+        }
+
+        if (accountUuid) {
+          const { generateClaudeCodeUserId } = require('../utils/oauth-helpers.js');
+          updatedMetadata.user_id = generateClaudeCodeUserId(accountUuid);
+        } else {
+          logger.warn(`Missing account_uuid for Claude Code OAuth account ${selectedAccountId}`);
+        }
       }
 
       return {

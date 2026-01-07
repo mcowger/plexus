@@ -82,6 +82,20 @@ const ProviderConfigSchema = z.object({
   {
     message: "Either 'api_key' must be specified, OR both 'oauth_provider' and 'oauth_account_pool' must be specified",
   }
+).refine(
+  (data) => {
+    // Claude Code OAuth must use type 'messages'
+    if (data.oauth_provider === 'claude-code') {
+      const types = Array.isArray(data.type) ? data.type : [data.type];
+      if (!types.includes('messages')) {
+        return false;
+      }
+    }
+    return true;
+  },
+  {
+    message: "Claude Code OAuth provider must use type 'messages'",
+  }
 );
 
 const ModelTargetSchema = z.object({

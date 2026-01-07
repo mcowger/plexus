@@ -263,7 +263,7 @@ models:
     const { provider } = request.query as { provider?: string };
 
     // Get all providers or filter by specific provider
-    const providers = provider ? [provider] : ['antigravity']; // Add more providers as needed
+    const providers = provider ? [provider] : ['antigravity', 'claude-code'];
 
     const result = [];
     const now = Date.now();
@@ -305,10 +305,21 @@ models:
         const lastRefreshedAt = cred.last_refreshed_at || cred.created_at;
         const tokenAgeSeconds = Math.floor((now - lastRefreshedAt) / 1000);
 
-        // Google OAuth refresh tokens expire after 6 months of inactivity
-        const sixMonthsMs = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
-        const refreshTokenExpiresAt = lastRefreshedAt + sixMonthsMs;
-        const refreshTokenExpiresInSeconds = Math.max(0, Math.floor((refreshTokenExpiresAt - now) / 1000));
+        // Calculate refresh token expiry based on provider
+        let refreshTokenExpiresAt: number;
+        let refreshTokenExpiresInSeconds: number;
+
+        if (providerName === 'claude-code') {
+          // Claude Code refresh tokens expire after 90 days
+          const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+          refreshTokenExpiresAt = lastRefreshedAt + ninetyDaysMs;
+          refreshTokenExpiresInSeconds = Math.max(0, Math.floor((refreshTokenExpiresAt - now) / 1000));
+        } else {
+          // Google OAuth refresh tokens expire after 6 months of inactivity
+          const sixMonthsMs = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
+          refreshTokenExpiresAt = lastRefreshedAt + sixMonthsMs;
+          refreshTokenExpiresInSeconds = Math.max(0, Math.floor((refreshTokenExpiresAt - now) / 1000));
+        }
 
         return {
           user_identifier: cred.user_identifier,

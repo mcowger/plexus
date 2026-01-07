@@ -244,11 +244,15 @@ The `adminKey` acts as a shared secret for administrative access:
 
 ## OAuth Authentication
 
-Plexus supports OAuth 2.0 authentication for providers like Google Antigravity. Instead of using a static API key, OAuth allows Plexus to obtain and automatically refresh access tokens on your behalf.
+Plexus supports OAuth 2.0 authentication for providers like Google Antigravity and Anthropic Claude Code. Instead of using a static API key, OAuth allows Plexus to obtain and automatically refresh access tokens on your behalf.
 
 ### Configuring an OAuth Provider
 
-To use OAuth authentication, specify `oauth_provider` instead of `api_key` in your provider configuration. For Antigravity, use `type: gemini` for API compatibility (so models with `access_via: ["gemini"]` will work) and `force_transformer: antigravity` to use the Antigravity-specific endpoint transformer:
+To use OAuth authentication, specify `oauth_provider` instead of `api_key` in your provider configuration.
+
+#### Google Antigravity
+
+For Antigravity, use `type: gemini` for API compatibility (so models with `access_via: ["gemini"]` will work) and `force_transformer: antigravity` to use the Antigravity-specific endpoint transformer:
 
 ```yaml
 providers:
@@ -258,6 +262,8 @@ providers:
     display_name: Google Antigravity
     api_base_url: https://cloudcode-pa.googleapis.com
     oauth_provider: antigravity
+    oauth_account_pool:                       # List authenticated account emails
+      - your-email@gmail.com
     models:
       claude-opus-4.5:                        # Example model mapping
         pricing:
@@ -269,6 +275,48 @@ providers:
 ```
 
 This configuration allows models to use `access_via: ["gemini"]` for API compatibility matching, while the `force_transformer: antigravity` ensures the correct Antigravity-specific endpoints are used.
+
+#### Anthropic Claude Code
+
+For Claude Code OAuth, use `type: messages` for the standard Anthropic Messages API:
+
+```yaml
+providers:
+  my-claude-code:
+    type: messages
+    display_name: Claude Code OAuth
+    api_base_url: https://api.anthropic.com/v1
+    oauth_provider: claude-code
+    oauth_account_pool:                       # List authenticated account emails
+      - your-email@example.com
+    models:
+      claude-sonnet-4-5:
+        pricing:
+          source: simple
+          input: 0.003
+          output: 0.015
+        access_via: [messages]
+      claude-opus-4-5:
+        pricing:
+          source: simple
+          input: 0.015
+          output: 0.075
+        access_via: [messages]
+```
+
+**⚠️ Important: Port 54545 Requirement**
+
+Claude Code OAuth requires a special callback server on **port 54545** for OAuth callbacks. This server automatically starts when Plexus boots and must remain running during the OAuth flow.
+
+- **Port must be available**: Ensure port 54545 is not in use by another application
+- **Automatic startup**: The callback server starts automatically with Plexus
+- **Same binding as Plexus**: The server binds to `0.0.0.0` (all interfaces), just like the main Plexus server
+- **Network accessibility**: If Plexus is accessible remotely, port 54545 must also be accessible from the client browser performing OAuth
+- **Firewall configuration**: If you access Plexus remotely, ensure your firewall allows connections to port 54545
+
+If you see an error like `Port 54545 already in use`, stop any other processes using that port before starting Plexus.
+
+**Why port 54545?** Claude's OAuth client configuration hardcodes `http://localhost:54545/callback` as the redirect URI. The callback server receives the OAuth code from Claude, then redirects it to Plexus's main OAuth handler.
 
 ### OAuth Environment Variables
 
@@ -294,21 +342,68 @@ export ANTIGRAVITY_CLIENT_SECRET=your-client-secret
 
 ### OAuth Flow
 
-1. **Initiate Authentication**: Visit `/v0/oauth/authorize?provider=antigravity` to start the OAuth flow
+#### Antigravity OAuth Flow
+
+1. **Initiate Authentication**: Visit the OAuth management page in the Plexus UI, or directly access `/v0/oauth/authorize?provider=antigravity`
 2. **Google Sign-In**: You'll be redirected to Google to authenticate
 3. **Callback**: After authentication, you'll be redirected back to Plexus at `/v0/oauth/callback`
 4. **Automatic Refresh**: Plexus will automatically refresh tokens in the background before they expire
 
+#### Claude Code OAuth Flow
+
+1. **Initiate Authentication**: Visit the OAuth management page in the Plexus UI, or send a POST request to `/v0/oauth/claude/authorize`
+2. **Claude Sign-In**: You'll be redirected to Claude.ai to authenticate
+3. **Loopback Callback**: Claude redirects to `http://localhost:54545/callback` (the loopback server)
+4. **Backend Callback**: The loopback server extracts OAuth parameters and redirects to `/v0/oauth/claude/callback`
+5. **Automatic Refresh**: Plexus will automatically refresh tokens in the background before they expire (tokens expire after 1 hour, refresh tokens expire after 90 days)
+
 ### OAuth Management Endpoints
+
+#### Antigravity Endpoints
 
 - **`GET /v0/oauth/authorize?provider=antigravity`**: Start OAuth flow
 - **`GET /v0/oauth/callback`**: OAuth callback endpoint (used by Google)
 - **`GET /v0/oauth/status?provider=antigravity`**: Check OAuth status and token expiry
+- **`GET /v0/oauth/credentials/grouped`**: Get all OAuth accounts grouped by provider (for UI)
 - **`DELETE /v0/oauth/credentials?provider=antigravity&user_identifier=email`**: Remove stored credentials
 - **`POST /v0/oauth/refresh`**: Manually trigger token refresh
 - **`GET /v0/oauth/refresh/status`**: Check token refresh service status
 
+#### Claude Code Endpoints
+
+- **`POST /v0/oauth/claude/authorize`**: Start Claude Code OAuth flow
+- **`GET /v0/oauth/claude/callback`**: OAuth callback endpoint (receives redirect from loopback server)
+- **`GET /v0/oauth/claude/accounts`**: Get all Claude Code OAuth accounts
+- **`POST /v0/oauth/claude/refresh`**: Manually refresh a specific account's token (requires `email` in request body)
+- **`DELETE /v0/oauth/claude/:email`**: Remove stored credentials for a specific account
+
+### Multi-Account Support
+
+Both Antigravity and Claude Code support multiple OAuth accounts through the `oauth_account_pool` configuration. This enables:
+
+- **Load Balancing**: Distribute requests across multiple accounts
+- **Per-Account Cooldowns**: When one account hits rate limits, requests automatically route to healthy accounts
+- **Account Management**: View and manage all authenticated accounts through the OAuth management UI
+
+**Example with multiple accounts:**
+
+```yaml
+providers:
+  my-claude-code:
+    type: messages
+    api_base_url: https://api.anthropic.com/v1
+    oauth_provider: claude-code
+    oauth_account_pool:
+      - alice@example.com
+      - bob@example.com
+      - charlie@example.com
+    models:
+      claude-sonnet-4-5:
+        access_via: [messages]
+```
+
 ### Supported OAuth Providers
 
 - **`antigravity`**: Google Antigravity (Code Assist) - Uses Google OAuth with special scopes for accessing Gemini models via the Antigravity API
+- **`claude-code`**: Anthropic Claude Code - Uses Anthropic OAuth for accessing Claude models via the Claude API with extended rate limits
 

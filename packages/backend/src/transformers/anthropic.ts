@@ -22,6 +22,22 @@ export class AnthropicTransformer implements Transformer {
   defaultEndpoint = "/messages";
 
   /**
+   * Get the endpoint for the request
+   * Claude Code OAuth requires ?beta=true query parameter
+   */
+  getEndpoint(request: UnifiedChatRequest): string {
+    // Check if this request is using Claude Code OAuth by looking for user_id in metadata
+    if (request.metadata && request.metadata.user_id &&
+        typeof request.metadata.user_id === 'string' &&
+        request.metadata.user_id.startsWith('user_') &&
+        request.metadata.user_id.includes('_account_') &&
+        request.metadata.user_id.includes('_session_')) {
+      return "/messages?beta=true";
+    }
+    return this.defaultEndpoint;
+  }
+
+  /**
    * parseRequest (Client -> Unified)
    * Maps Anthropic's unique system/messages split and content array format to our flat Unified structure.
    */
@@ -336,10 +352,35 @@ export class AnthropicTransformer implements Transformer {
       mergedMessages.push(msg);
     }
 
-    return {
+    // Inject Claude Code system instruction if using Claude Code OAuth
+    // This is REQUIRED for Claude Code OAuth to work - it's an authentication signal
+    let systemField: any = system;
+    if (request.metadata?.user_id &&
+        typeof request.metadata.user_id === 'string' &&
+        request.metadata.user_id.includes('_account_') &&
+        request.metadata.user_id.includes('_session_')) {
+
+      const claudeCodeInstruction = {
+        type: "text",
+        text: "You are Claude Code, Anthropic's official CLI for Claude."
+      };
+
+      // Anthropic's system field can be a string or an array of content blocks
+      // For Claude Code, we need to use array format and prepend the instruction
+      const systemArray: any[] = [claudeCodeInstruction];
+
+      if (system) {
+        // Append existing system content
+        systemArray.push({ type: "text", text: system });
+      }
+
+      systemField = systemArray;
+    }
+
+    const payload: any = {
       model: request.model,
       messages: mergedMessages,
-      system,
+      system: systemField,
       max_tokens: request.max_tokens || 4096,
       temperature: request.temperature,
       stream: request.stream,
@@ -347,6 +388,17 @@ export class AnthropicTransformer implements Transformer {
         ? this.convertUnifiedToolsToAnthropic(request.tools)
         : undefined,
     };
+
+    // Include metadata if present (required for Claude Code OAuth)
+    // Filter out internal Plexus fields that shouldn't be sent to the API
+    if (request.metadata) {
+      const apiMetadata = this.getApiMetadata(request.metadata);
+      if (Object.keys(apiMetadata).length > 0) {
+        payload.metadata = apiMetadata;
+      }
+    }
+
+    return payload;
   }
 
   /**
@@ -881,5 +933,25 @@ export class AnthropicTransformer implements Transformer {
     }
 
     return undefined;
+  }
+
+  /**
+   * Filters metadata to only include fields that should be sent to the API
+   * Removes internal Plexus fields like selected_oauth_account
+   * @private
+   */
+  private getApiMetadata(metadata: Record<string, any>): Record<string, any> {
+    const apiMetadata: Record<string, any> = {};
+
+    // List of internal fields that should NOT be sent to the API
+    const internalFields = ['selected_oauth_account', 'oauth_project_id'];
+
+    for (const [key, value] of Object.entries(metadata)) {
+      if (!internalFields.includes(key)) {
+        apiMetadata[key] = value;
+      }
+    }
+
+    return apiMetadata;
   }
 }

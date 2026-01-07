@@ -41,7 +41,7 @@ export default function OAuth() {
     const [refreshStatus, setRefreshStatus] = useState<RefreshStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshingAccounts, setRefreshingAccounts] = useState<Set<string>>(new Set());
-    const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set(['antigravity']));
+    const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set(['antigravity', 'claude-code']));
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<{ provider: string; account: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -104,8 +104,16 @@ export default function OAuth() {
 
     const handleInitiateAuth = async (provider: string) => {
         try {
-            const response = await api.initiateOAuthFlow(provider);
+            let response: { auth_url: string };
+
+            if (provider === 'claude-code') {
+                response = await api.initiateClaudeCodeAuth();
+            } else {
+                response = await api.initiateOAuthFlow(provider);
+            }
+
             window.open(response.auth_url, '_blank');
+
             // Poll for status after opening auth window
             const pollInterval = setInterval(async () => {
                 const newStatus = await api.getOAuthCredentialsGrouped(provider);
@@ -127,11 +135,21 @@ export default function OAuth() {
         try {
             setRefreshingAccounts(prev => new Set(prev).add(key));
             setError(null);
-            const result = await api.refreshOAuthToken();
-            if (result.success) {
-                await loadStatus();
+
+            if (provider === 'claude-code') {
+                const result = await api.refreshClaudeCodeToken(accountId);
+                if (result.success) {
+                    await loadStatus();
+                } else {
+                    setError(result.error || 'Failed to refresh token');
+                }
             } else {
-                setError(result.message);
+                const result = await api.refreshOAuthToken();
+                if (result.success) {
+                    await loadStatus();
+                } else {
+                    setError(result.message);
+                }
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to refresh token');
@@ -149,7 +167,14 @@ export default function OAuth() {
 
         try {
             setError(null);
-            const success = await api.deleteOAuthCredentials(deleteTarget.provider, deleteTarget.account);
+            let success: boolean;
+
+            if (deleteTarget.provider === 'claude-code') {
+                success = await api.deleteClaudeCodeAccount(deleteTarget.account);
+            } else {
+                success = await api.deleteOAuthCredentials(deleteTarget.provider, deleteTarget.account);
+            }
+
             if (success) {
                 setShowDeleteModal(false);
                 setDeleteTarget(null);
@@ -219,7 +244,8 @@ export default function OAuth() {
 
     const getProviderName = (provider: string): string => {
         const names: Record<string, string> = {
-            'antigravity': 'Google Antigravity'
+            'antigravity': 'Google Antigravity',
+            'claude-code': 'Claude Code'
         };
         return names[provider] || provider;
     };
@@ -288,10 +314,29 @@ export default function OAuth() {
                             </Button>
                         </div>
 
+                        <div className="bg-background/50 rounded-lg p-4 border border-border/50">
+                            <div className="text-sm font-medium mb-2">Claude Code</div>
+                            <p className="text-sm text-muted-foreground mb-3">
+                                OAuth 2.0 authentication for Anthropic Claude API (via Claude Code)
+                            </p>
+                            <div className="bg-orange-500/10 border border-orange-500/20 rounded p-3 mb-3">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle size={16} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                                    <div className="text-xs text-orange-300">
+                                        <strong>Port 54545 Required:</strong> Claude Code OAuth requires port 54545 to be available and accessible from this client system for callbacks. Ensure this port is not in use and is allowed through your firewall if accessing Plexus remotely.
+                                    </div>
+                                </div>
+                            </div>
+                            <Button onClick={() => handleInitiateAuth('claude-code')} variant="primary">
+                                <ExternalLink size={16} className="mr-2" />
+                                Connect to Claude Code
+                            </Button>
+                        </div>
+
                         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                             <div className="text-sm font-medium text-blue-400 mb-2">What happens next?</div>
                             <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                                <li>You'll be redirected to Google to sign in</li>
+                                <li>You'll be redirected to your provider to sign in</li>
                                 <li>Grant Plexus access to the required scopes</li>
                                 <li>You'll be redirected back to Plexus</li>
                                 <li>Your tokens will be securely stored and automatically refreshed</li>
@@ -336,6 +381,18 @@ export default function OAuth() {
                                 {isExpanded && (
                                     <div style={{borderTop: '1px solid var(--color-border-glass)'}}>
                                         <div className="p-6 space-y-4">
+                                            {/* Port 54545 Warning for Claude Code */}
+                                            {providerData.provider === 'claude-code' && (
+                                                <div className="bg-orange-500/10 border border-orange-500/20 rounded p-3">
+                                                    <div className="flex items-start gap-2">
+                                                        <AlertTriangle size={16} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                                                        <div className="text-xs text-orange-300">
+                                                            <strong>Port 54545 Required:</strong> Claude Code OAuth requires port 54545 to be available and accessible for callbacks. Ensure this port is not in use and is allowed through your firewall if accessing Plexus remotely.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {/* Configuration Reminder */}
                                             <div className="bg-blue-500/5 border border-blue-500/10 rounded p-2">
                                                 <div className="text-xs text-muted-foreground">
