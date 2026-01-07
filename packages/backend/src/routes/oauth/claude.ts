@@ -39,6 +39,61 @@ export async function claudeOAuthRoutes(
     }
   );
 
+  // Manual OAuth finalization (for non-localhost clients)
+  fastify.post(
+    '/v0/oauth/claude/finalize',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { code, state } = request.body as {
+        code?: string;
+        state?: string;
+      };
+
+      if (!code || !state) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Missing code or state parameter',
+        });
+      }
+
+      // Validate and consume session
+      const session = claudeOAuthService.validateAndConsumeSession(state);
+      if (!session) {
+        logger.warn('Invalid or expired Claude OAuth state');
+        return reply.status(400).send({
+          success: false,
+          error: 'Invalid or expired state',
+        });
+      }
+
+      try {
+        // Exchange code for tokens
+        const tokenResponse = await claudeOAuthService.exchangeCodeForTokens(
+          code,
+          state,
+          session.codeVerifier
+        );
+
+        // Store credentials
+        await claudeOAuthService.storeCredentials(tokenResponse);
+
+        logger.info(`Claude Code OAuth successful for ${tokenResponse.account.email_address}`);
+
+        return reply.send({
+          success: true,
+          email: tokenResponse.account.email_address,
+          organization: tokenResponse.organization.name
+        });
+      } catch (error) {
+        logger.error('Claude OAuth finalization error:', error);
+        return reply.status(500).send({
+          success: false,
+          error: 'Failed to complete OAuth flow',
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
   // OAuth callback handler
   fastify.get(
     '/v0/oauth/claude/callback',

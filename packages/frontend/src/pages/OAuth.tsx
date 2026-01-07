@@ -47,6 +47,13 @@ export default function OAuth() {
     const [error, setError] = useState<string | null>(null);
     const [cooldownTimers, setCooldownTimers] = useState<Record<string, number>>({});
 
+    // Manual Auth State
+    const [showManualAuthModal, setShowManualAuthModal] = useState(false);
+    const [manualAuthUrl, setManualAuthUrl] = useState('');
+    const [pastedUrl, setPastedUrl] = useState('');
+    const [manualAuthLoading, setManualAuthLoading] = useState(false);
+    const [manualAuthError, setManualAuthError] = useState<string | null>(null);
+
     const loadStatus = async () => {
         try {
             setLoading(true);
@@ -108,6 +115,16 @@ export default function OAuth() {
 
             if (provider === 'claude-code') {
                 response = await api.initiateClaudeCodeAuth();
+
+                // Check for localhost
+                const hostname = window.location.hostname;
+                const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+
+                if (!isLocalhost) {
+                    setManualAuthUrl(response.auth_url);
+                    setShowManualAuthModal(true);
+                    return;
+                }
             } else {
                 response = await api.initiateOAuthFlow(provider);
             }
@@ -127,6 +144,49 @@ export default function OAuth() {
             setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to initiate OAuth flow');
+        }
+    };
+
+    const handleManualAuthComplete = async () => {
+        if (!pastedUrl) return;
+
+        try {
+            setManualAuthLoading(true);
+            setManualAuthError(null);
+
+            // Parse URL to get query parameters
+            let urlObj: URL;
+            try {
+                // If user pasted just path or incomplete URL, try to fix it, but really they should paste full URL
+                urlObj = new URL(pastedUrl);
+            } catch (e) {
+                setManualAuthError('Invalid URL format. Please paste the full URL from your address bar.');
+                setManualAuthLoading(false);
+                return;
+            }
+
+            const code = urlObj.searchParams.get('code');
+            const state = urlObj.searchParams.get('state');
+
+            if (!code || !state) {
+                setManualAuthError('The URL does not contain the required "code" and "state" parameters.');
+                setManualAuthLoading(false);
+                return;
+            }
+
+            const result = await api.finalizeClaudeCodeAuth(code, state);
+
+            if (result.success) {
+                setShowManualAuthModal(false);
+                setPastedUrl('');
+                await loadStatus();
+            } else {
+                setManualAuthError(result.error || 'Failed to complete authentication.');
+            }
+        } catch (err) {
+            setManualAuthError(err instanceof Error ? err.message : 'An error occurred.');
+        } finally {
+            setManualAuthLoading(false);
         }
     };
 
@@ -562,6 +622,83 @@ export default function OAuth() {
                     </div>
                 </Modal>
             )}
+
+            {/* Manual Auth Modal */}
+            <Modal
+                isOpen={showManualAuthModal}
+                onClose={() => setShowManualAuthModal(false)}
+                title="Remote Authentication Required"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        You are accessing Plexus remotely. Claude Code OAuth only supports callbacks to <code className="bg-muted px-1 py-0.5 rounded">localhost</code>.
+                        You need to perform a manual "Loopback" authentication.
+                    </p>
+
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm space-y-2">
+                        <div className="font-semibold text-blue-400">Step 1: Start Authorization</div>
+                        <p className="text-muted-foreground">Click the button below to open the authorization page in a new tab.</p>
+                        <Button
+                            onClick={() => window.open(manualAuthUrl, '_blank')}
+                            variant="primary"
+                            className="w-full mt-2"
+                        >
+                            <ExternalLink size={16} className="mr-2" />
+                            Open Authorization Page
+                        </Button>
+                    </div>
+
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm space-y-2">
+                        <div className="font-semibold text-blue-400">Step 2: Copy Failed URL</div>
+                        <p className="text-muted-foreground">
+                            When authorization completes, the browser will try to redirect to <code className="bg-muted px-1 py-0.5 rounded">localhost:54545</code>.
+                            This will likely fail with "Connection Refused" or "Site can't be reached".
+                            <strong>Copy the entire URL from the address bar of that failed page.</strong>
+                        </p>
+                    </div>
+
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm space-y-2">
+                        <div className="font-semibold text-blue-400">Step 3: Paste URL</div>
+                        <p className="text-muted-foreground">Paste the copied URL below to complete the setup.</p>
+                        <input
+                            type="text"
+                            value={pastedUrl}
+                            onChange={(e) => setPastedUrl(e.target.value)}
+                            placeholder="http://localhost:54545/v0/oauth/claude/callback?code=..."
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                    </div>
+
+                    {manualAuthError && (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3 text-sm text-red-400">
+                            {manualAuthError}
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 justify-end pt-2">
+                        <Button
+                            onClick={() => setShowManualAuthModal(false)}
+                            variant="secondary"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleManualAuthComplete}
+                            disabled={!pastedUrl || manualAuthLoading}
+                            variant="primary"
+                        >
+                            {manualAuthLoading ? (
+                                <>
+                                    <RefreshCw className="animate-spin mr-2" size={16} />
+                                    Verifying...
+                                </>
+                            ) : (
+                                'Complete Authorization'
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

@@ -61,8 +61,10 @@ export class ClaudeOAuthService {
       this.externalUrl = this.externalUrl.slice(0, -1);
     }
 
-    // Configure redirect URI to use the external URL
-    this.config.redirectUri = `${this.externalUrl}/v0/oauth/claude/callback`;
+    // Configure redirect URI to use the fixed localhost callback required by Claude Code
+    // strictly for the initial OAuth handshake. Our loopback server will catch this
+    // and redirect to the actual Plexus backend.
+    this.config.redirectUri = `http://localhost:${this.LOOPBACK_PORT}/callback`;
 
     // Clean up expired sessions every 5 minutes
     setInterval(() => this.cleanExpiredSessions(), 5 * 60 * 1000);

@@ -899,6 +899,30 @@ export const api = {
       }
   },
 
+  finalizeClaudeCodeAuth: async (code: string, state: string): Promise<{
+      success: boolean;
+      email?: string;
+      organization?: string;
+      error?: string;
+  }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/finalize`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, state })
+          });
+          
+          if (!res.ok) {
+              const error = await res.json();
+              return { success: false, error: error.error || 'Failed to finalize OAuth flow' };
+          }
+          return await res.json();
+      } catch (e) {
+          console.error("API Error finalizeClaudeCodeAuth", e);
+          return { success: false, error: 'Failed to finalize OAuth flow' };
+      }
+  },
+
   getClaudeCodeAccounts: async (): Promise<{
       accounts: Array<{
           email: string;
