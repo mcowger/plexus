@@ -180,7 +180,7 @@ export default function OAuth() {
             if (manualAuthProvider === 'claude-code') {
                 result = await api.finalizeClaudeCodeAuth(code, state);
             } else {
-                result = await api.finalizeOAuth(manualAuthProvider, code, state);
+                result = await api.finalizeOAuth(code, state);
             }
 
             if (result.success) {
