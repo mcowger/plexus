@@ -91,6 +91,17 @@ export const Sidebar: React.FC = () => {
 
         <div className="mt-6 px-4 mt-auto">
             <h3 className="font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2">System</h3>
+            <button
+                onClick={handleToggleClick}
+                className={clsx(
+                    "flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover w-full justify-start bg-transparent",
+                    debugMode ? "text-danger border-danger/30 shadow-sm bg-[rgba(239,68,68,0.1)] shadow-[0_2px_8px_rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.15)]" : "text-text-secondary hover:text-text"
+                )}
+                style={{ marginBottom: '8px' }}
+             >
+                <Bug size={20} />
+                <span>{debugMode ? 'Debug Mode: On' : 'Debug Mode: Off'}</span>
+             </button>
             <NavLink to="/debug" className={({ isActive }) => clsx('flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text', isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]')} style={{ marginBottom: '8px' }}>
                 <Database size={20} />
                 <span>Debug Traces</span>
@@ -99,21 +110,6 @@ export const Sidebar: React.FC = () => {
                 <AlertTriangle size={20} />
                 <span>Errors</span>
             </NavLink>
-            <button 
-                onClick={handleToggleClick}
-                className={clsx(
-                    "flex items-center justify-between gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text bg-transparent w-full",
-                    debugMode && "text-danger border-danger/30 shadow-sm bg-[rgba(239,68,68,0.1)] shadow-[0_2px_8px_rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.15)]"
-                )}
-             >
-                <div className="flex items-center gap-3">
-                    <Bug size={20} />
-                    <span>Debug Mode</span>
-                </div>
-                <span className={clsx("text-[10px] uppercase tracking-wider font-bold text-text-muted", debugMode && "text-danger/80")}>
-                    {debugMode ? 'Enabled' : 'Disabled'}
-                </span>
-             </button>
              <button 
                 onClick={handleLogout}
                 className="flex items-center gap-3 py-3 px-4 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent text-danger w-full bg-transparent border-transparent justify-start hover:text-danger hover:border-danger/30 hover:bg-red-500/10 mt-4"
