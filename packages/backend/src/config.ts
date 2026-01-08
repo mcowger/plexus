@@ -104,7 +104,7 @@ const ModelTargetSchema = z.object({
 });
 
 const ModelConfigSchema = z.object({
-  selector: z.enum(['random', 'cost', 'latency', 'usage', 'performance']).optional(),
+  selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
