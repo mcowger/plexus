@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.7.6 - 2026-01-08
+
+### Hotfix: Fix selector validation when using in-order selector
+
+### New Features
+
+- **Config Validation Notifications**: Added real-time validation error notifications to the Configuration page to improve user feedback ([169f46e](https://github.com/mcowger/plexus/commit/169f46e)).
+
+### Bug Fixes and Improvements
+
+- **Tokenization & Anthropic Integration**: Resolved issues with token overcounting and enhanced the imputation logic for Anthropic reasoning tokens ([4eec611](https://github.com/mcowger/plexus/commit/4eec611)).
+- **Alias Validation Schema**: Integrated the `in_order` selector into the alias validation schema ([2fcb8e2](https://github.com/mcowger/plexus/commit/2fcb8e2)).
+- **Testing Reliability**: Fixed mock pollution in `UsageInspector` tests to ensure isolated and reliable test runs ([5aafdc8](https://github.com/mcowger/plexus/commit/5aafdc8)).
+- **Documentation**: Updated `CONFIGURATION.md` with latest configuration details ([0884ddf](https://github.com/mcowger/plexus/commit/0884ddf)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.7.5 - 2026-01-08
 
 ### Plexus v0.7.5: InOrder Selector, Usage Analytics, and Sidebar UI Refinement
