@@ -97,7 +97,7 @@ This section defines the upstream AI providers that Plexus will route requests t
   
 - **`api_key`**: (Optional) The authentication key for this provider. Required unless `oauth_provider` is specified.
 
-- **`oauth_provider`**: (Optional) The OAuth provider to use for authentication instead of a static API key. Currently supported: `"antigravity"`. When specified, Plexus will use OAuth 2.0 tokens for authentication.
+- **`oauth_provider`**: (Optional) The OAuth provider to use for authentication instead of a static API key. Currently supported: `"antigravity" | "claude-code"`. When specified, Plexus will use OAuth 2.0 tokens for authentication.
 
 - **`enabled`**: (Optional, default: `true`) Set to `false` to temporarily disable a provider.
 
@@ -110,8 +110,6 @@ This section defines the upstream AI providers that Plexus will route requests t
 - **`extraBody`**: (Optional) Additional fields to merge into every request body.
 
 - **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider. Often used if you want to base your pricing on public numbers but apply a global discount.
-
-- **`force_transformer`**: (Optional) Override the transformer used for this provider regardless of the API type. Useful when a provider uses a compatible API format but requires custom endpoint handling. For example, Antigravity uses the Gemini API format but requires a different transformer for its specific endpoints.
 
 **Multi-Protocol Provider Configuration:**
 
@@ -167,10 +165,10 @@ This section defines the "virtual" models or aliases that clients will use when 
 
 - **`selector`**: (Optional) The strategy to use for target selection when multiple targets are available:
   - `random`: (Default) Randomly selects a healthy target
-  - `in_order`: Selects providers in the order defined, falling back to the next if the current one is unhealthy
-  - `cost`: Routes to the lowest-cost healthy provider
-  - `performance`: Routes to the highest tokens-per-second provider
-  - `latency`: Routes to the lowest time-to-first-token provider
+  - `in_order`: Selects providers in the order defined, falling back to the next if the current one is unhealthy. this can be used to prioritize "subscription" providers before moving on to PAYG providers.  
+  - `cost`: Routes to the lowest-cost healthy provider, as defined by the pricing.  
+  - `performance`: Routes to the highest tokens-per-second provider, calculated over the last 10 requests.  
+  - `latency`: Routes to the lowest time-to-first-token provider, calculated over the last 10 requests.  
 
 - **`priority`**: (Optional) Determines the routing lifecycle order:
   - `selector` (Default): Choose a provider using the selector strategy, then use the best available API format for that provider
@@ -215,8 +213,6 @@ models:
   minimax-m2.1:
     selector: in_order
     targets:
-      - provider: kilo
-        model: minimax/minimax-m2.1
       - provider: naga
         model: minimax-m2.1
       - provider: synthetic
@@ -224,10 +220,9 @@ models:
 ```
 
 With this configuration:
-1. Requests always route to **kilo** if it's healthy
-2. If kilo becomes unavailable/unhealthy, requests automatically fall back to **naga**
-3. If naga is also unavailable, requests route to **synthetic**
-4. Once kilo recovers and becomes healthy again, requests resume routing to kilo
+1. Requests always route to **naga** if it's healthy
+2. If kilo becomes unavailable/unhealthy, requests automatically fall back to **synthetic**
+4. Once naga recovers and becomes healthy again, requests resume routing to naga
 
 This is particularly useful when you have:
 - A preferred provider with guaranteed performance
@@ -367,13 +362,11 @@ To use OAuth authentication, specify `oauth_provider` instead of `api_key` in yo
 
 #### Google Antigravity
 
-For Antigravity, use `type: gemini` for API compatibility (so models with `access_via: ["gemini"]` will work) and `force_transformer: antigravity` to use the Antigravity-specific endpoint transformer:
 
 ```yaml
 providers:
   antigravity:
-    type: gemini                              # Use gemini for API compatibility
-    force_transformer: antigravity            # But use Antigravity transformer for endpoints
+    type: antigravity                              # Use gemini for API compatibility
     display_name: Google Antigravity
     api_base_url: https://cloudcode-pa.googleapis.com
     oauth_provider: antigravity
@@ -384,12 +377,7 @@ providers:
         pricing:
           source: openrouter
           slug: anthropic/claude-opus-4.5
-        access_via: ["gemini"]                # Works because type is gemini
-      gemini-2.0-flash-thinking-exp-01-21:
-        access_via: ["gemini"]
 ```
-
-This configuration allows models to use `access_via: ["gemini"]` for API compatibility matching, while the `force_transformer: antigravity` ensures the correct Antigravity-specific endpoints are used.
 
 #### Anthropic Claude Code
 
@@ -419,27 +407,9 @@ providers:
         access_via: [messages]
 ```
 
-**⚠️ Important: Port 54545 Requirement**
-
-Claude Code OAuth requires a special callback server on **port 54545** for OAuth callbacks. This server automatically starts when Plexus boots and must remain running during the OAuth flow.
-
-- **Port must be available**: Ensure port 54545 is not in use by another application
-- **Automatic startup**: The callback server starts automatically with Plexus
-- **Same binding as Plexus**: The server binds to `0.0.0.0` (all interfaces), just like the main Plexus server
-- **Network accessibility**: If Plexus is accessible remotely, port 54545 must also be accessible from the client browser performing OAuth
-- **Firewall configuration**: If you access Plexus remotely, ensure your firewall allows connections to port 54545
-
-If you see an error like `Port 54545 already in use`, stop any other processes using that port before starting Plexus.
-
-**Why port 54545?** Claude's OAuth client configuration hardcodes `http://localhost:54545/callback` as the redirect URI. The callback server receives the OAuth code from Claude, then redirects it to Plexus's main OAuth handler.
-
 ### OAuth Environment Variables
 
-OAuth functionality can be configured using environment variables. If not set, the following defaults are used:
-
-- **`EXTERNAL_PLEXUS_URL`**: The external URL used for OAuth callbacks
-  - Default: `http://localhost:4000`
-  - Used to construct callback URLs during OAuth flow
+OAuth functionality can be configured using environment variables. If not set, the following defaults are
 
 - **`ANTIGRAVITY_CLIENT_ID`**: Google OAuth client ID for Antigravity
   - Default: `1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com`
@@ -450,7 +420,6 @@ OAuth functionality can be configured using environment variables. If not set, t
 **Example** (if you need to override the defaults):
 
 ```bash
-export EXTERNAL_PLEXUS_URL=https://plexus.example.com
 export ANTIGRAVITY_CLIENT_ID=your-client-id
 export ANTIGRAVITY_CLIENT_SECRET=your-client-secret
 ```
