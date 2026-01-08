@@ -9,6 +9,201 @@ import { TransformerFactory } from "../services/transformer-factory";
 import { DebugLoggingInspector, UsageInspector } from "./inspectors";
 import { Readable } from "stream";
 import { DebugManager } from "./debug-manager";
+
+/**
+ * Populates usage record with metadata from the unified response
+ */
+function populateUsageMetadata(
+  usageRecord: Partial<UsageRecord>,
+  unifiedResponse: UnifiedChatResponse
+): { pricing: any; providerDiscount: any; providerApiType: string } {
+  usageRecord.selectedModelName =
+    unifiedResponse.plexus?.model || unifiedResponse.model;
+  usageRecord.provider = unifiedResponse.plexus?.provider || "unknown";
+  usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel || null;
+
+  const outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
+  usageRecord.outgoingApiType = outgoingApiType?.toLocaleLowerCase();
+  usageRecord.isStreamed = !!unifiedResponse.stream;
+  usageRecord.isPassthrough = unifiedResponse.bypassTransformation;
+
+  const pricing = unifiedResponse.plexus?.pricing;
+  const providerDiscount = unifiedResponse.plexus?.providerDiscount;
+  const providerApiType = (unifiedResponse.plexus?.apiType || "chat").toLowerCase();
+
+  return { pricing, providerDiscount, providerApiType };
+}
+
+/**
+ * Creates a transform stream that taps into the stream for debugging purposes
+ */
+function createStreamTap(
+  requestId: string,
+  logType: 'raw' | 'transformed',
+  apiType: string
+): { tapStream: TransformStream; inspector: NodeJS.WritableStream } {
+  const inspector = new DebugLoggingInspector(requestId, logType).createInspector(apiType);
+
+  const tapStream = new TransformStream({
+    transform(chunk, controller) {
+      inspector.write(chunk);
+      controller.enqueue(chunk);
+    },
+    flush() {
+      inspector.end();
+    }
+  });
+
+  return { tapStream, inspector };
+}
+
+/**
+ * Builds the transformation pipeline for streaming responses
+ */
+function buildTransformationPipeline(
+  rawStream: ReadableStream,
+  unifiedResponse: UnifiedChatResponse,
+  clientTransformer: Transformer,
+  providerApiType: string
+): ReadableStream {
+  if (unifiedResponse.bypassTransformation) {
+    return rawStream;
+  }
+
+  // Get the transformer for the outgoing provider's format
+  const providerTransformer = TransformerFactory.getTransformer(providerApiType);
+
+  // Step 1: Raw Provider SSE -> Unified internal objects
+  const unifiedStream = providerTransformer.transformStream
+    ? providerTransformer.transformStream(rawStream)
+    : rawStream;
+
+  // Step 2: Unified internal objects -> Client SSE format
+  return clientTransformer.formatStream
+    ? clientTransformer.formatStream(unifiedStream)
+    : unifiedStream;
+}
+
+/**
+ * Sets up SSE headers for streaming responses
+ */
+function setupStreamingHeaders(reply: FastifyReply): void {
+  reply.header("Content-Type", "text/event-stream");
+  reply.header("Cache-Control", "no-cache");
+  reply.header("Connection", "keep-alive");
+}
+
+/**
+ * Handles streaming responses
+ */
+async function handleStreamingResponse(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  unifiedResponse: UnifiedChatResponse,
+  clientTransformer: Transformer,
+  usageRecord: Partial<UsageRecord>,
+  usageStorage: UsageStorageService,
+  startTime: number,
+  apiType: "chat" | "messages" | "gemini",
+  pricing: any,
+  providerDiscount: any,
+  providerApiType: string
+): Promise<FastifyReply> {
+  let rawStream = unifiedResponse.stream!;
+
+  // Tap the raw stream for debugging
+  const { tapStream: rawTap } = createStreamTap(
+    usageRecord.requestId!,
+    'raw',
+    providerApiType
+  );
+  rawStream = rawStream.pipeThrough(rawTap);
+
+  // Build transformation pipeline
+  let finalClientStream = buildTransformationPipeline(
+    rawStream,
+    unifiedResponse,
+    clientTransformer,
+    providerApiType
+  );
+
+  // Tap the transformed stream for debugging
+  const streamApiType = unifiedResponse.bypassTransformation ? providerApiType : apiType;
+  const { tapStream: transformedTap } = createStreamTap(
+    usageRecord.requestId!,
+    'transformed',
+    apiType
+  );
+  finalClientStream = finalClientStream.pipeThrough(transformedTap);
+
+  // Set up SSE headers
+  setupStreamingHeaders(reply);
+
+  // Create usage inspector
+  const usageInspector = new UsageInspector(
+    usageRecord.requestId!,
+    usageStorage,
+    usageRecord,
+    pricing,
+    providerDiscount,
+    startTime
+  ).createInspector(streamApiType);
+
+  // Convert Web Stream to Node Stream and pipe through inspector
+  const nodeStream = Readable.fromWeb(finalClientStream as any);
+  const pipeline = nodeStream.pipe(usageInspector);
+
+  usageRecord.responseStatus = "success";
+
+  return reply.send(pipeline);
+}
+
+/**
+ * Handles unary (non-streaming) responses
+ */
+async function handleUnaryResponse(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  unifiedResponse: UnifiedChatResponse,
+  clientTransformer: Transformer,
+  usageRecord: Partial<UsageRecord>,
+  usageStorage: UsageStorageService,
+  startTime: number,
+  apiType: "chat" | "messages" | "gemini",
+  pricing: any,
+  providerDiscount: any
+): Promise<FastifyReply> {
+  // Remove internal plexus metadata before sending to client
+  if (unifiedResponse.plexus) {
+    delete (unifiedResponse as any).plexus;
+  }
+
+  // Determine response body
+  let responseBody;
+  if (unifiedResponse.bypassTransformation && unifiedResponse.rawResponse) {
+    responseBody = unifiedResponse.rawResponse;
+  } else {
+    responseBody = await clientTransformer.formatResponse(unifiedResponse);
+  }
+
+  // Capture transformed response for debugging
+  DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
+  DebugManager.getInstance().flush(usageRecord.requestId!);
+
+  // Record the usage
+  finalizeUsage(
+    usageRecord,
+    unifiedResponse,
+    usageStorage,
+    startTime,
+    pricing,
+    providerDiscount
+  );
+
+  logger.debug(`Outgoing ${apiType} Response`, responseBody);
+  return reply.send(responseBody);
+}
+
 /**
  * handleResponse
  *
@@ -28,152 +223,40 @@ export async function handleResponse(
   startTime: number,
   apiType: "chat" | "messages" | "gemini"
 ) {
-  // Populate usage record with metadata from the dispatcher's selection
-  usageRecord.selectedModelName =
-    unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
-  usageRecord.provider = unifiedResponse.plexus?.provider || "unknown";
-  usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel || null;
+  // Populate usage record with metadata
+  const { pricing, providerDiscount, providerApiType } = populateUsageMetadata(
+    usageRecord,
+    unifiedResponse
+  );
 
-  let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
-  usageRecord.outgoingApiType = outgoingApiType?.toLocaleLowerCase();
-  usageRecord.isStreamed = !!unifiedResponse.stream;
-  usageRecord.isPassthrough = unifiedResponse.bypassTransformation;
-
-  const pricing = unifiedResponse.plexus?.pricing;
-  const providerDiscount = unifiedResponse.plexus?.providerDiscount;
-  // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
-  const providerApiType = (unifiedResponse.plexus?.apiType || "chat").toLowerCase();
-
-  // --- Scenario A: Streaming Response ---
+  // Route to appropriate handler based on response type
   if (unifiedResponse.stream) {
-    let finalClientStream: ReadableStream;
-    let rawStream = unifiedResponse.stream;
-
-    // TAP THE RAW STREAM for debugging
-    // We want to capture the stream BEFORE any transformation to log the true "Raw Response".
-    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType);
-    
-    const tapStream = new TransformStream({
-      transform(chunk, controller) {
-        // Feed the inspector (Node PassThrough)
-        rawLogInspector.write(chunk);
-        controller.enqueue(chunk);
-      },
-      flush() {
-        rawLogInspector.end();
-      }
-    });
-    
-    // Replace the original stream with the tapped stream
-    rawStream = rawStream.pipeThrough(tapStream);
-
-    if (unifiedResponse.bypassTransformation) {
-      // Direct pass-through: No changes to the provider's raw bytes
-      // Maximize performance and accuracy by avoiding unnecessary transformations
-      finalClientStream = rawStream;
-    } else {
-      /**
-       * Transformation Pipeline:
-       * 1. providerTransformer.transformStream: Provider SSE (e.g. OpenAI) -> Unified internal chunks
-       * 2. clientTransformer.formatStream: Unified internal chunks -> Client SSE format (e.g. Anthropic)
-       */
-      // Get the transformer for the outgoing provider's format
-      const providerTransformer =
-        TransformerFactory.getTransformer(providerApiType);
-
-      // Step 1: Raw Provider SSE -> Unified internal objects
-      const unifiedStream = providerTransformer.transformStream
-        ? providerTransformer.transformStream(rawStream)
-        : rawStream;
-
-      // Step 2: Unified internal objects -> Client SSE format
-      finalClientStream = clientTransformer.formatStream
-        ? clientTransformer.formatStream(unifiedStream)
-        : unifiedStream;
-    }
-
-    // TAP THE TRANSFORMED STREAM for debugging
-    // This captures what is actually sent to the client
-    const transformedLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'transformed').createInspector(apiType);
-
-    const transformedTapStream = new TransformStream({
-      transform(chunk, controller) {
-        transformedLogInspector.write(chunk);
-        controller.enqueue(chunk);
-      },
-      flush() {
-        transformedLogInspector.end();
-      }
-    });
-
-    finalClientStream = finalClientStream.pipeThrough(transformedTapStream);
-
-    // Standard SSE headers to prevent buffering and timeouts
-    reply.header("Content-Type", "text/event-stream");
-    reply.header("Cache-Control", "no-cache");
-    reply.header("Connection", "keep-alive");
-
-    /**
-     * Build the linear stream pipeline.
-     */
-    
-    // Determine the format of the stream flowing through the inspectors
-    // If bypassTransformation is true, it's the provider's format.
-    // Otherwise, it's the client's requested format.
-    const streamApiType = unifiedResponse.bypassTransformation ? providerApiType : apiType;
-
-    const usageInspector = new UsageInspector(
-      usageRecord.requestId!,
-      usageStorage,
-      usageRecord,
-      pricing,
-      providerDiscount,
-      startTime
-    ).createInspector(streamApiType);
-
-    // Convert Web Stream to Node Stream for piping
-    const nodeStream = Readable.fromWeb(finalClientStream as any);
-
-    // Pipeline: Source -> Usage -> Client
-    // rawLogInspector is already tapped via the TransformStream above
-    const pipeline = nodeStream.pipe(usageInspector);
-
-    usageRecord.responseStatus = "success";
-
-    // Fastify natively supports sending ReadableStream as the response body
-    return reply.send(pipeline);
-  } else {
-    // --- Scenario B: Non-Streaming (Unary) Response ---
-
-    // Remove internal plexus metadata before sending to client
-    if (unifiedResponse.plexus) {
-      delete (unifiedResponse as any).plexus;
-    }
-
-    let responseBody;
-    if (unifiedResponse.bypassTransformation && unifiedResponse.rawResponse) {
-      responseBody = unifiedResponse.rawResponse;
-    } else {
-      // Re-format the unified JSON body to match the client's expected API format
-      responseBody = await clientTransformer.formatResponse(unifiedResponse);
-    }
-
-    // Capture transformed response for debugging
-    DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
-    DebugManager.getInstance().flush(usageRecord.requestId!);
-
-    // Record the usage.
-    finalizeUsage(
-      usageRecord,
+    return handleStreamingResponse(
+      request,
+      reply,
       unifiedResponse,
+      clientTransformer,
+      usageRecord,
       usageStorage,
       startTime,
+      apiType,
+      pricing,
+      providerDiscount,
+      providerApiType
+    );
+  } else {
+    return handleUnaryResponse(
+      request,
+      reply,
+      unifiedResponse,
+      clientTransformer,
+      usageRecord,
+      usageStorage,
+      startTime,
+      apiType,
       pricing,
       providerDiscount
     );
-
-    logger.debug(`Outgoing ${apiType} Response`, responseBody);
-    return reply.send(responseBody);
   }
 }
 
