@@ -134,7 +134,8 @@ export class TokenRefreshService {
         provider,
         user_identifier,
         tokenResponse.access_token,
-        expiresAt
+        expiresAt,
+        tokenResponse.refresh_token
       );
 
       logger.info(

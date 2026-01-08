@@ -504,7 +504,12 @@ models:
 
         // Update the database
         const expiresAtMs = Date.now() + tokenResponse.expires_in * 1000;
-        await claudeOAuthService.updateToken(email, tokenResponse.access_token, expiresAtMs);
+        await claudeOAuthService.updateToken(
+          email,
+          tokenResponse.access_token,
+          expiresAtMs,
+          tokenResponse.refresh_token
+        );
 
         logger.info(`Successfully refreshed token for ${email}`);
 

@@ -864,26 +864,39 @@ export class UsageStorageService extends EventEmitter {
         }
     }
 
-    updateOAuthToken(provider: string, userIdentifier: string, accessToken: string, expiresAt: number): void {
+    updateOAuthToken(provider: string, userIdentifier: string, accessToken: string, expiresAt: number, refreshToken?: string): void {
         try {
-            const query = this.db.prepare(`
+            let queryStr = `
                 UPDATE oauth_credentials
                 SET access_token = $accessToken,
                     expires_at = $expiresAt,
                     updated_at = $updatedAt,
                     last_refreshed_at = $lastRefreshedAt
-                WHERE provider = $provider AND user_identifier = $userIdentifier
-            `);
+            `;
+
+            if (refreshToken) {
+                queryStr += `, refresh_token = $refreshToken`;
+            }
+
+            queryStr += ` WHERE provider = $provider AND user_identifier = $userIdentifier`;
+
+            const query = this.db.prepare(queryStr);
 
             const now = Date.now();
-            query.run({
+            const params: any = {
                 $accessToken: accessToken,
                 $expiresAt: expiresAt,
                 $updatedAt: now,
                 $lastRefreshedAt: now,
                 $provider: provider,
                 $userIdentifier: userIdentifier
-            });
+            };
+
+            if (refreshToken) {
+                params.$refreshToken = refreshToken;
+            }
+
+            query.run(params);
 
             logger.debug(`OAuth token updated for ${provider}:${userIdentifier}`);
         } catch (error) {

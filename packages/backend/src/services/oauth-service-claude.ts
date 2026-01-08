@@ -246,13 +246,15 @@ export class ClaudeOAuthService {
   async updateToken(
     email: string,
     accessToken: string,
-    expiresAtMs: number
+    expiresAtMs: number,
+    refreshToken?: string
   ): Promise<void> {
     this.usageStorage.updateOAuthToken(
       'claude-code',
       email,
       accessToken,
-      expiresAtMs
+      expiresAtMs,
+      refreshToken
     );
     logger.info(`Updated token for ${email}`);
   }
