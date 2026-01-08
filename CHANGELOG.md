@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.7.5 - 2026-01-08
+
+### Plexus v0.7.5: InOrder Selector, Usage Analytics, and Sidebar UI Refinement
+
+## v0.7.5 Release Notes
+
+### New Features
+- **InOrder Selector**: Introduced a new `InOrder` selector to support prioritized provider fallback logic. ([fc913ab](https://github.com/mcowger/plexus/commit/fc913ab))
+- **Usage Visualization**: Added interactive pie charts to provide usage breakdowns by model, provider, and API key. ([357cc8b](https://github.com/mcowger/plexus/commit/357cc8b))
+- **Persistent Collapsible Sidebar**: Implemented a new sidebar with a persistent state across sessions for improved navigation. ([81bbecf](https://github.com/mcowger/plexus/commit/81bbecf))
+
+### Minor Changes & Bug Fixes
+- **Data Handling**: Fixed serialization and parsing for nested objects within Extra Body Fields and Custom Headers. ([435e43e](https://github.com/mcowger/plexus/commit/435e43e))
+- **UI Normalization**: Standardized provider model arrays into object formats for consistent UI rendering. ([86e9071](https://github.com/mcowger/plexus/commit/86e9071))
+- **Log Attribution**: Added attribution display to the key column within the logs table. ([70d7f34](https://github.com/mcowger/plexus/commit/70d7f34))
+- **Layout Refinements**: 
+    - Improved sidebar layout with a dedicated Main navigation section. ([aba668b](https://github.com/mcowger/plexus/commit/aba668b))
+    - Reduced sidebar width to 200px and button padding to 8px for higher information density. ([e8bbade](https://github.com/mcowger/plexus/commit/e8bbade))
+    - Refactored Debug Mode UI within the sidebar. ([00a6bc5](https://github.com/mcowger/plexus/commit/00a6bc5))
+- **Chart Formatting**: Applied consistent number formatting across usage overview charts. ([232f5e9](https://github.com/mcowger/plexus/commit/232f5e9))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.7.1 - 2026-01-07
 
 ### v0.7.1: Manual OAuth Flow Implementation and Client Restriction Bypass
