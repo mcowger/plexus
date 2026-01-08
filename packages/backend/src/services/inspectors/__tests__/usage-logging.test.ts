@@ -22,12 +22,6 @@ describe("UsageInspector Reproduction", () => {
     usageRecord = {
       requestId: "test-req-id",
     };
-
-    // Ensure TransformerFactory returns OpenAITransformer for 'chat'
-    TransformerFactory.getTransformer = (type: string) => {
-        if (type === 'chat') return new OpenAITransformer();
-        throw new Error(`Unknown type ${type}`);
-    };
   });
 
   test("should parse usage from the user provided example line", async () => {

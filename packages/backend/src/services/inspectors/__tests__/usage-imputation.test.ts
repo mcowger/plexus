@@ -18,11 +18,6 @@ describe("UsageInspector Anthropic Imputation", () => {
     usageRecord = {
       requestId: "test-req-id",
     };
-
-    TransformerFactory.getTransformer = (type: string) => {
-        if (type === 'messages') return new AnthropicTransformer();
-        throw new Error(`Unknown type ${type}`);
-    };
   });
 
   test("should impute thinking tokens when thinking is present but not in usage", async () => {
