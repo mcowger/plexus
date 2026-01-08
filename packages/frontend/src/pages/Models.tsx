@@ -4,7 +4,7 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
-import { Search, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, GripVertical } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
     id: '',
@@ -25,6 +25,7 @@ export const Models = () => {
   const [editingAlias, setEditingAlias] = useState<Alias>(EMPTY_ALIAS);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [draggedTargetIndex, setDraggedTargetIndex] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -96,6 +97,34 @@ export const Models = () => {
       const newTargets = [...editingAlias.targets];
       newTargets.splice(index, 1);
       setEditingAlias({ ...editingAlias, targets: newTargets });
+  };
+
+  const handleTargetDragStart = (index: number) => {
+      setDraggedTargetIndex(index);
+  };
+
+  const handleTargetDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleTargetDrop = (dropIndex: number) => {
+      if (draggedTargetIndex === null || draggedTargetIndex === dropIndex) {
+          setDraggedTargetIndex(null);
+          return;
+      }
+
+      const newTargets = [...editingAlias.targets];
+      const draggedTarget = newTargets[draggedTargetIndex];
+      newTargets.splice(draggedTargetIndex, 1);
+      newTargets.splice(dropIndex, 0, draggedTarget);
+
+      setEditingAlias({ ...editingAlias, targets: newTargets });
+      setDraggedTargetIndex(null);
+  };
+
+  const handleTargetDragEnd = () => {
+      setDraggedTargetIndex(null);
   };
 
   const addAlias = () => {
@@ -301,12 +330,29 @@ export const Models = () => {
 
                   <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                       {editingAlias.targets.map((target, idx) => (
-                          <Card key={idx} style={{padding: '12px', backgroundColor: 'var(--color-bg-subtle)'}}>
+                          <Card
+                            key={idx}
+                            draggable
+                            onDragStart={() => handleTargetDragStart(idx)}
+                            onDragOver={handleTargetDragOver}
+                            onDrop={() => handleTargetDrop(idx)}
+                            onDragEnd={handleTargetDragEnd}
+                            style={{
+                              padding: '12px',
+                              backgroundColor: 'var(--color-bg-subtle)',
+                              opacity: draggedTargetIndex === idx ? 0.5 : 1,
+                              cursor: 'grab',
+                              transition: 'opacity 0.2s ease'
+                            }}
+                          >
                               <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                                  <div style={{display: 'flex', alignItems: 'center', marginTop: '24px', cursor: 'grab', opacity: 0.6}}>
+                                      <GripVertical size={16} />
+                                  </div>
                                   <div style={{flex: 1}}>
                                       <label className="font-body text-[13px] font-medium text-text-secondary" style={{fontSize: '11px'}}>Provider</label>
-                                      <select 
-                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
+                                      <select
+                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                         value={target.provider}
                                         onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
                                       >
@@ -318,8 +364,8 @@ export const Models = () => {
                                   </div>
                                   <div style={{flex: 1}}>
                                       <label className="font-body text-[13px] font-medium text-text-secondary" style={{fontSize: '11px'}}>Model</label>
-                                      <select 
-                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
+                                      <select
+                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                         value={target.model}
                                         onChange={(e) => updateTarget(idx, 'model', e.target.value)}
                                         disabled={!target.provider}
