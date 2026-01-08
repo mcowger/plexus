@@ -303,7 +303,16 @@ export const Logs = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">{log.apiKey || '-'}</td>
+                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontWeight: '500' }}>{log.apiKey || '-'}</span>
+                                                {log.attribution && (
+                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                                                        {log.attribution}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">{log.sourceIp || '-'}
                                         </td>
                                         <td
