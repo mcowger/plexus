@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.7 - 2026-01-08
+
+### Release v0.7.7: OAuth Refresh Token Rotation
+
+## v0.7.7 Release Notes \n **OAuth Refresh Token Rotation**: Added support for refresh token rotation to enhance security and session persistence. ([ee187f2](https://github.com/mcowger/plexus/commit/ee187f2))
+
 ## v0.7.6 - 2026-01-08
 
 ### Hotfix: Fix selector validation when using in-order selector
