@@ -99,19 +99,12 @@ export class UsageInspector extends BaseInspector {
                 if (usage) {
                     stats.foundUsage = true;
                     
-                    // "chat" (OpenAI) and "gemini" typically report cumulative totals in each event (or final event)
-                    if (transformer.name === 'gemini' || transformer.name === 'chat') {
-                        stats.inputTokens = Math.max(stats.inputTokens, usage.input_tokens || 0);
-                        stats.outputTokens = Math.max(stats.outputTokens, usage.output_tokens || 0);
-                        stats.cachedTokens = Math.max(stats.cachedTokens, usage.cached_tokens || 0);
-                        stats.reasoningTokens = Math.max(stats.reasoningTokens, usage.reasoning_tokens || 0);
-                    } else {
-                        // "messages" (Anthropic) reports distinct parts (deltas) in different events
-                        stats.inputTokens += usage.input_tokens || 0;
-                        stats.outputTokens += usage.output_tokens || 0;
-                        stats.cachedTokens += usage.cached_tokens || 0;
-                        stats.reasoningTokens += usage.reasoning_tokens || 0;
-                    }
+                    // Most providers report cumulative totals in usage events.
+                    // Even Anthropic's message_start and message_delta usage fields are cumulative for those specific fields.
+                    stats.inputTokens = Math.max(stats.inputTokens, usage.input_tokens || 0);
+                    stats.outputTokens = Math.max(stats.outputTokens, usage.output_tokens || 0);
+                    stats.cachedTokens = Math.max(stats.cachedTokens, usage.cached_tokens || 0);
+                    stats.reasoningTokens = Math.max(stats.reasoningTokens, usage.reasoning_tokens || 0);
                 }
             }
         });
@@ -129,14 +122,13 @@ export class UsageInspector extends BaseInspector {
 
         inspector.on('end', () => {
             try {
-                // Apply Anthropic Imputation Logic if needed
-                if (transformer.name === "messages" && seenThinking) {
+                // Apply Anthropic Imputation Logic if needed (fallback when provider doesn't report reasoning tokens)
+                if (transformer.name === "messages" && seenThinking && stats.reasoningTokens === 0) {
                     const realOutputTokens = countTokens(accumulatedText);
                     const totalOutputTokens = stats.outputTokens;
                     
                     // If the reported total is significantly larger than the text count,
                     // we assume the difference is reasoning.
-                    // If they are equal (because already imputed), this results in 0, which is safe.
                     const imputedThinkingTokens = Math.max(0, totalOutputTokens - realOutputTokens);
                     
                     if (imputedThinkingTokens > 0) {

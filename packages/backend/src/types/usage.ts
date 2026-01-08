@@ -3,6 +3,7 @@ export interface UsageRecord {
     date: string; // ISO string
     sourceIp: string | null;
     apiKey: string | null;
+    attribution: string | null;
     incomingApiType: string;
     provider: string | null;
     incomingModelAlias: string | null;

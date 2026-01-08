@@ -37,13 +37,31 @@ export async function registerInferenceRoutes(fastify: FastifyInstance, dispatch
             auth: (key: string, req: any) => {
                 const config = getConfig();
                 if (!config.keys) return false;
-                
-                // Check if the provided key matches any secret in the config
-                const entry = Object.entries(config.keys).find(([_, k]) => k.secret === key);
-                
+
+                // Parse the key to extract secret and optional attribution
+                // Format: "secret:attribution" where attribution can contain colons
+                // Split on first colon only
+                let secretPart: string;
+                let attributionPart: string | null = null;
+
+                const firstColonIndex = key.indexOf(':');
+                if (firstColonIndex !== -1) {
+                    secretPart = key.substring(0, firstColonIndex);
+                    const rawAttribution = key.substring(firstColonIndex + 1);
+                    // Normalize to lowercase, treat empty string as null
+                    attributionPart = rawAttribution.toLowerCase() || null;
+                } else {
+                    secretPart = key;
+                }
+
+                // Check if the secret part matches any secret in the config
+                const entry = Object.entries(config.keys).find(([_, k]) => k.secret === secretPart);
+
                 if (entry) {
                     // Attach the key name (identifier) to the request for usage tracking
                     req.keyName = entry[0];
+                    // Attach the attribution label if present
+                    req.attribution = attributionPart;
                     return true;
                 }
                 return false;

@@ -33,6 +33,8 @@ export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Di
             usageRecord.incomingModelAlias = body.model;
             // Use the key name identified by the auth middleware, not the raw secret
             usageRecord.apiKey = (request as any).keyName;
+            // Capture attribution if provided in the API key
+            usageRecord.attribution = (request as any).attribution || null;
 
             logger.silly('Incoming OpenAI Request', body);
             const transformer = new OpenAITransformer();

@@ -53,6 +53,8 @@ The Management APIs provide endpoints for inspecting the system configuration an
   - `offset` (optional): Number of records to skip (default: 0).
   - `startDate` (optional): ISO date string (e.g., `2023-01-01`).
   - `endDate` (optional): ISO date string.
+  - `apiKey` (optional): Filter by API key name (e.g., `app-key`).
+  - `attribution` (optional): Filter by attribution label (e.g., `copilot`, `claude`). Used to track usage by feature or application variant when using [Dynamic Key Attribution](./CONFIGURATION.md#dynamic-key-attribution).
   - `incomingApiType` (optional): e.g., `chat`, `messages`.
   - `provider` (optional): The upstream provider name.
   - `incomingModelAlias` (optional): The model name requested by the client.
@@ -70,7 +72,8 @@ The Management APIs provide endpoints for inspecting the system configuration an
         "requestId": "uuid",
         "date": "2025-12-31T23:59:59.000Z",
         "sourceIp": "127.0.0.1",
-        "apiKey": "sk-...",
+        "apiKey": "app-key",
+        "attribution": "copilot",
         "incomingApiType": "chat",
         "provider": "openai_direct",
         "incomingModelAlias": "fast-model",
@@ -96,6 +99,9 @@ The Management APIs provide endpoints for inspecting the system configuration an
     "total": 1250
   }
   ```
+
+**Response Fields:**
+- `attribution` (optional, string or null): Optional label appended to the API key for tracking usage by feature or application variant. Set when using [Dynamic Key Attribution](./CONFIGURATION.md#dynamic-key-attribution) (e.g., `copilot`, `claude`, `mobile:v2.5`). Null if no attribution was provided with the request.
 
 ### Performance Metrics
 - **Endpoint:** `GET /v0/management/performance`

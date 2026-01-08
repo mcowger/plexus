@@ -263,6 +263,82 @@ keys:
 
 Keys are required. Once defined, clients must include the `Authorization: Bearer <secret>` header in their requests. Note that `/v1/models` remains accessible without authentication to support model discovery.
 
+#### Dynamic Key Attribution
+
+Keys support an optional **attribution** label for granular usage tracking without creating dozens of separate keys. This is useful when you want to track usage by application, feature, or user cohort within a single key.
+
+**Format:** `<secret>:<attribution>`
+
+Clients can append a colon and attribution label to the secret. Multiple colons are supported, allowing labels like `team:feature:version`.
+
+**Behavior:**
+- The secret part (before the first colon) authenticates the request
+- The attribution part (after the first colon) is stored in usage logs for tracking
+- Attribution values are normalized to lowercase
+- If no attribution is provided, the field remains null
+- All variations of the same secret authenticate as the same key
+
+**Example configuration:**
+
+```yaml
+keys:
+  app-key:
+    secret: "sk-plexus-app-abc-123"
+    comment: "Main application key"
+```
+
+**Usage examples:**
+
+```bash
+# Track requests from Copilot feature
+curl -H "Authorization: Bearer sk-plexus-app-abc-123:copilot" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"gpt-4","messages":[]}' \
+     http://localhost:3000/v1/chat/completions
+
+# Track requests from Claude feature
+curl -H "Authorization: Bearer sk-plexus-app-abc-123:claude" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"gpt-4","messages":[]}' \
+     http://localhost:3000/v1/chat/completions
+
+# Track requests from mobile app v2.5
+curl -H "Authorization: Bearer sk-plexus-app-abc-123:mobile:v2.5" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"gpt-4","messages":[]}' \
+     http://localhost:3000/v1/chat/completions
+
+# No attribution (backward compatible)
+curl -H "Authorization: Bearer sk-plexus-app-abc-123" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"gpt-4","messages":[]}' \
+     http://localhost:3000/v1/chat/completions
+```
+
+**Query usage logs by attribution:**
+
+```sql
+-- View all requests grouped by attribution
+SELECT api_key, attribution, COUNT(*) as request_count, SUM(tokens_input) as total_input_tokens
+FROM request_usage
+WHERE api_key = 'app-key'
+GROUP BY attribution
+ORDER BY request_count DESC;
+
+-- View specific attribution's usage
+SELECT request_id, date, attribution, tokens_input, tokens_output, cost_total
+FROM request_usage
+WHERE api_key = 'app-key' AND attribution = 'copilot'
+ORDER BY date DESC
+LIMIT 100;
+```
+
+This approach allows you to:
+- Track usage by feature without managing multiple keys
+- Simplify API key rotation (one key per application instead of many)
+- Maintain security without exposing separate secrets
+- Enable fine-grained usage analytics and cost allocation
+
 ### `adminKey` (Required)
 This global setting secures the Admin Dashboard and Management APIs (`/v0/*`). Cannot be configured via UI.
 
