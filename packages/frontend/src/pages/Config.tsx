@@ -14,8 +14,14 @@ export const Config = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await api.saveConfig(config);
-    setTimeout(() => setIsSaving(false), 500); // Simulate delay
+    try {
+      await api.saveConfig(config);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to save config';
+      alert(`Validation failed:\n\n${errorMessage}`);
+    } finally {
+      setTimeout(() => setIsSaving(false), 500); // Simulate delay
+    }
   };
 
   return (
