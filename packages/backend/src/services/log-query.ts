@@ -127,24 +127,36 @@ export class LogQueryService {
   }
 
   async deleteLogs(request: LogsDeleteRequest) {
-     if (request.type === 'usage' || request.all) {
-         // UsageStore cleanup is date based.
-         // We can't easily delete "older than X days" beyond what cleanup() does which uses retentionDays config.
-         // But here we might want manual cleanup.
-         // The spec says "olderThanDays".
-         // We'll implement a custom cleanup in this service that manually invokes logic similar to store.cleanup
-         // but with the passed days.
-     }
-     
-     // Delegate to stores if they had methods, or implement logic here.
-     // Given the time, I'll log a warning that full manual delete is not fully implemented on file storage yet
-     // beyond the automatic retention policy.
-     logger.warn("Manual log deletion requested but partially implemented for file storage");
-     
-     return {
+     const result = {
          success: true,
          deleted: { usage: 0, error: 0, trace: 0 }
      };
+
+     // Default olderThanDays to a very small number if 'all' is requested, effectively clearing everything
+     // Or if specific days provided.
+     // If 'all' is true, we pass 0 days (delete everything older than now)
+     
+     const days = request.all ? 0 : request.olderThanDays;
+
+     if (days === undefined) {
+         // If neither all nor olderThanDays is specified, we do nothing or need a default?
+         // Spec implies bulk delete. Let's return 0 if no criteria.
+         return result;
+     }
+
+     if (request.type === 'usage' || !request.type) {
+         result.deleted.usage = await this.usageStore.deleteOldLogs(days);
+     }
+     
+     if (request.type === 'error' || !request.type) {
+         result.deleted.error = await this.errorStore.deleteOldLogs(days);
+     }
+
+     if (request.type === 'trace' || !request.type) {
+         result.deleted.trace = await this.debugStore.deleteOldLogs(days);
+     }
+     
+     return result;
   }
 
   private async findUsageById(requestId: string) {

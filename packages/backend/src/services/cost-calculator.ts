@@ -134,13 +134,36 @@ export class CostCalculator {
         return cached.pricing;
       }
 
-      // Query OpenRouter API
-      // Note: This is a placeholder - actual implementation would call OpenRouter's API
-      // OpenRouter API endpoint: https://openrouter.ai/api/v1/models
-      logger.debug("Would query OpenRouter for pricing", { model });
+      logger.debug("Querying OpenRouter for pricing", { model });
+      
+      const response = await fetch("https://openrouter.ai/api/v1/models");
+      if (!response.ok) {
+        throw new Error(`OpenRouter API returned ${response.status} ${response.statusText}`);
+      }
 
-      // For now, return null (not implemented)
-      return null;
+      const data = await response.json();
+      const models = data.data as any[];
+      const modelInfo = models.find((m: any) => m.id === model);
+
+      if (!modelInfo || !modelInfo.pricing) {
+        return null;
+      }
+
+      // OpenRouter pricing is per token, we convert to per 1M tokens
+      const pricing: SimplePricing = {
+        inputPer1M: parseFloat(modelInfo.pricing.prompt) * 1_000_000,
+        outputPer1M: parseFloat(modelInfo.pricing.completion) * 1_000_000,
+        // OpenRouter doesn't strictly separate cached/reasoning in the same way everywhere,
+        // but we can map if available or default to 0/undefined
+      };
+
+      // Cache the result
+      this.openRouterCache.set(model, {
+        pricing,
+        timestamp: Date.now(),
+      });
+
+      return pricing;
     } catch (error) {
       logger.warn("Failed to query OpenRouter pricing", {
         model,

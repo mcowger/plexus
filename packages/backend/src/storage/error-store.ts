@@ -106,6 +106,44 @@ export class ErrorStore {
   }
 
   /**
+   * Delete logs older than specific days
+   * @param days - Number of days to keep
+   * @returns Number of files deleted
+   */
+  async deleteOldLogs(days: number): Promise<number> {
+    try {
+      const glob = new Bun.Glob("*.jsonl");
+      const files = Array.from(glob.scanSync(this.storagePath));
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      const cutoffString = cutoffDate.toISOString().split("T")[0];
+      
+      let deletedCount = 0;
+
+      for (const file of files) {
+        const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})\.jsonl$/);
+        if (!dateMatch) continue;
+
+        const fileDate = dateMatch[1];
+        if (fileDate < cutoffString) {
+          const filePath = join(this.storagePath, file);
+          await Bun.file(filePath).writer().end();
+          const proc = Bun.spawn(["rm", filePath]);
+          await proc.exited;
+          deletedCount++;
+          logger.info("Deleted error log file", { file, date: fileDate });
+        }
+      }
+      return deletedCount;
+    } catch (error) {
+      logger.error("Failed to delete error logs", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  }
+
+  /**
    * Clean up old error log files based on retention policy
    */
   async cleanup(): Promise<void> {

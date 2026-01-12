@@ -60,6 +60,58 @@ export class DebugStore {
   }
 
   /**
+   * Delete logs older than specific days
+   * @param days - Number of days to keep
+   * @returns Number of files deleted
+   */
+  async deleteOldLogs(days: number): Promise<number> {
+      try {
+      const storageExists = await exists(this.storagePath);
+      if (!storageExists) {
+        return 0;
+      }
+
+      const now = Date.now();
+      const cutoffTime = now - days * 24 * 60 * 60 * 1000;
+
+      // Read directory
+      const entries = await Array.fromAsync(
+        new Bun.Glob("*.json").scan({ cwd: this.storagePath })
+      );
+
+      let deletedCount = 0;
+      for (const entry of entries) {
+        const filePath = join(this.storagePath, entry);
+
+        try {
+          // Get file stats
+          const file = Bun.file(filePath);
+          const stat = await file.exists();
+          
+          if (!stat) continue;
+
+          // Check if file is older than cutoff
+          const fileTime = file.lastModified;
+          if (fileTime < cutoffTime) {
+            await Bun.write(filePath, ""); // Truncate first
+            const proc = Bun.spawn(["rm", filePath]);
+            await proc.exited;
+            deletedCount++;
+          }
+        } catch (error) {
+           // ignore specific file error
+        }
+      }
+      return deletedCount;
+    } catch (error) {
+      logger.error("Failed to delete debug traces", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  }
+
+  /**
    * Clean up old debug traces
    */
   async cleanup(): Promise<void> {
