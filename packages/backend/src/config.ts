@@ -142,6 +142,17 @@ export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
       (configWithEnvVars as any).logging.level = process.env.PLEXUS_LOG_LEVEL;
     }
 
+    // Handle DEBUG_MODE environment variable
+    if (process.env.DEBUG_MODE) {
+      const logging = ((configWithEnvVars as any).logging = (configWithEnvVars as any).logging || {});
+      logging.level = "debug";
+
+      const debug = (logging.debug = logging.debug || {});
+      debug.enabled = true;
+      debug.captureRequests = true;
+      debug.captureResponses = true;
+    }
+
     // Validate configuration with Zod
     const config = PlexusConfigSchema.parse(configWithEnvVars);
 
