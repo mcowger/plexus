@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll } from "bun:test";
+import { describe, test, expect, beforeAll, mock, spyOn } from "bun:test";
 import { handleState } from "../routes/v0/state";
 import { CooldownManager } from "../services/cooldown-manager";
 import { HealthMonitor } from "../services/health-monitor";
@@ -6,6 +6,7 @@ import type { ServerContext } from "../types/server";
 
 describe("State API", () => {
   let context: ServerContext;
+  let updateConfigSpy: any;
 
   beforeAll(() => {
     const mockConfig: any = {
@@ -22,11 +23,19 @@ describe("State API", () => {
 
     const cooldownManager = new CooldownManager(mockConfig);
     const healthMonitor = new HealthMonitor(mockConfig, cooldownManager);
+    
+    // Mock ConfigManager
+    updateConfigSpy = mock(async () => ({ previousChecksum: "old", newChecksum: "new" }));
+    const mockConfigManager: any = {
+        getConfig: () => ({ config: JSON.stringify(mockConfig), lastModified: "", checksum: "old" }),
+        updateConfig: updateConfigSpy
+    };
 
     context = {
       config: mockConfig,
       cooldownManager,
-      healthMonitor
+      healthMonitor,
+      configManager: mockConfigManager
     };
   });
 
@@ -59,6 +68,26 @@ describe("State API", () => {
     
     expect(body.success).toBe(true);
     expect(body.message).toContain("Debug mode set to true");
+  });
+
+  test("POST /v0/state disable-provider persists changes", async () => {
+    const req = new Request("http://localhost/v0/state", {
+      method: "POST",
+      body: JSON.stringify({ 
+        action: "disable-provider", 
+        payload: { provider: "openai" } 
+      }),
+      headers: { "Content-Type": "application/json" }
+    });
+
+    const res = await handleState(req, context);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    
+    expect(body.message).toContain("disabled (persisted)");
+    expect(updateConfigSpy).toHaveBeenCalled();
+    // Verify runtime update
+    expect(context.config.providers.find(p => p.name === "openai")?.enabled).toBe(false);
   });
 
   test("POST /v0/state unknown action", async () => {

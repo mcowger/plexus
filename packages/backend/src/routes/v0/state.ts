@@ -1,6 +1,8 @@
 import type { ServerContext } from "../../types/server";
 import type { StateAction, StateUpdateResponse } from "../../types/management";
 import { logger } from "../../utils/logger";
+import { parse, stringify } from "yaml";
+import type { PlexusConfig } from "../../types/config";
 
 export async function handleState(req: Request, context: ServerContext): Promise<Response> {
   const method = req.method;
@@ -40,16 +42,42 @@ export async function handleState(req: Request, context: ServerContext): Promise
           break;
 
         case "disable-provider":
-            // This requires modifying runtime config or provider state
-            // context.config.providers.find(...) -> enabled = false
-            // Note: This is runtime only, doesn't persist to file unless we use ConfigManager
-            logger.info("Provider disable requested", { provider: body.payload.provider });
-            message = `Provider ${body.payload.provider} disabled (runtime only)`;
-            break;
-
         case "enable-provider":
-            logger.info("Provider enable requested", { provider: body.payload.provider });
-            message = `Provider ${body.payload.provider} enabled (runtime only)`;
+            const isEnable = body.action === "enable-provider";
+            const providerName = body.payload.provider;
+
+            // Runtime update
+            const runtimeProvider = context.config.providers.find(p => p.name === providerName);
+            if (runtimeProvider) {
+                runtimeProvider.enabled = isEnable;
+            }
+
+            // Persist changes
+            if (context.configManager) {
+                try {
+                    const { config: rawYaml } = context.configManager.getConfig();
+                    const parsed = parse(rawYaml) as PlexusConfig;
+                    
+                    const configProvider = parsed.providers.find(p => p.name === providerName);
+                    if (configProvider) {
+                        configProvider.enabled = isEnable;
+                        const newYaml = stringify(parsed);
+                        await context.configManager.updateConfig(newYaml);
+                        message = `Provider ${providerName} ${isEnable ? "enabled" : "disabled"} (persisted)`;
+                        logger.info("Provider state updated and persisted", { provider: providerName, enabled: isEnable });
+                    } else {
+                         // Should not happen if runtime found it, unless config file desync
+                         message = `Provider ${providerName} ${isEnable ? "enabled" : "disabled"} (runtime only - not found in file)`;
+                         logger.warn("Provider found in runtime but not in config file", { provider: providerName });
+                    }
+                } catch (e) {
+                    logger.error("Failed to persist provider state", { error: e });
+                    message = `Provider ${providerName} ${isEnable ? "enabled" : "disabled"} (runtime only - persistence failed)`;
+                }
+            } else {
+                logger.info("Provider state updated (runtime only)", { provider: providerName, enabled: isEnable });
+                message = `Provider ${providerName} ${isEnable ? "enabled" : "disabled"} (runtime only)`;
+            }
             break;
             
         default:
