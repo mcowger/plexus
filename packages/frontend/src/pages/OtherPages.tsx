@@ -234,7 +234,7 @@ export const UsagePage: React.FC = () => {
           Loading...
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Requests Over Time</CardTitle>
@@ -415,117 +415,19 @@ export const UsagePage: React.FC = () => {
   );
 };
 
-export const LogsPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Request Logs</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Logs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { LogsPage } from './Logs';
 
-export const ProvidersPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Provider Management</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Providers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { ProvidersPage } from './Providers';
 
-export const ModelsPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Model Aliases</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Models</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { ModelsPage } from './Models';
 
-export const KeysPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">API Key Management</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Keys</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { KeysPage } from './Keys';
 
-export const ConfigPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Configuration</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Config</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { ConfigPage } from './Config';
 
-export const DebugPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Debug Traces</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Debug</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { DebugPage } from './Debug';
 
-export const ErrorsPage: React.FC = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Error Logs</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Errors</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Content coming soon.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+export { ErrorsPage } from './Errors';
 
 export const NotFoundPage: React.FC = () => {
   return (

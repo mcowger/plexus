@@ -29,9 +29,9 @@
     
     // Skip Checking
     "skipLibCheck": true,
-    
+
     // Bun
-    "types": ["bun-types"]
+    "types": ["bun-types", "uuid"]
   },
   "include": ["packages/**/src/**/*", "packages/**/tests/**/*"],
   "exclude": ["node_modules","new_translations"]

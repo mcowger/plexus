@@ -14,7 +14,10 @@ import {
   Key,
   PanelLeftClose,
   PanelLeftOpen,
+  Moon,
+  Sun,
 } from 'lucide-react';
+import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,6 +80,7 @@ export const Sidebar: React.FC = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const { logout } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     api.getState().then(state => {
@@ -220,6 +224,35 @@ export const Sidebar: React.FC = () => {
           })()}
           <NavItem to="/debug" icon={Database} label="Debug Traces" isCollapsed={isCollapsed} />
           <NavItem to="/errors" icon={AlertTriangle} label="Errors" isCollapsed={isCollapsed} />
+          {(() => {
+            const themeButton = (
+              <Button
+                variant="ghost"
+                className={cn('w-full justify-start mt-2', isCollapsed && 'justify-center')}
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                <span
+                  className={cn('transition-opacity duration-200', isCollapsed && 'opacity-0 w-0 overflow-hidden')}
+                >
+                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                </span>
+              </Button>
+            );
+
+            return isCollapsed ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>{themeButton}</TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              themeButton
+            );
+          })()}
           {(() => {
             const logoutButton = (
               <Button

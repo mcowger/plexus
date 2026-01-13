@@ -29,8 +29,10 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@radix-ui/react-toast": "^1.2.15",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
+    "@types/uuid": "^11.0.0",
     "bun-plugin-tailwind": "latest",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3"

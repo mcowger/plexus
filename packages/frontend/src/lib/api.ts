@@ -1,6 +1,12 @@
 import { parse, stringify } from 'yaml';
 import { client, type paths, type components } from './api-client';
 
+interface DeleteLogsRequest {
+  type?: 'usage' | 'error' | 'trace';
+  olderThanDays?: number;
+  all?: boolean;
+}
+
 export const api = {
   getConfig: async (): Promise<string> => {
     const { data, error } = await client.GET('/config');
@@ -48,11 +54,11 @@ export const api = {
     return data;
   },
 
-  deleteLogs: async (params?: paths['/logs']['delete']['parameters']['query']): Promise<
+  deleteLogs: async (body?: DeleteLogsRequest): Promise<
     paths['/logs']['delete']['responses'][200]['content']['application/json']
   > => {
     const { data, error } = await client.DELETE('/logs', {
-      body: params || {},
+      body: body as components['requestBodies']['deleteLogs'] || {},
     });
     if (error) throw new Error(String(error));
     if (!data) throw new Error('Delete logs data missing');

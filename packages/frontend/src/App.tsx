@@ -11,8 +11,9 @@ import { UsagePage, LogsPage, ProvidersPage, ModelsPage, KeysPage, ConfigPage, D
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <SidebarProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <SidebarProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
@@ -110,6 +111,7 @@ function App() {
           </Routes>
         </SidebarProvider>
       </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

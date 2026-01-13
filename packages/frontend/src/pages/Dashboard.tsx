@@ -289,8 +289,9 @@ export const DashboardPage: React.FC = () => {
                   return acc;
                 }, {});
 
-                return Object.entries(groupedCooldowns).map(([provider, providerCooldowns]: [string, any[]]) => {
-                  const maxSeconds = Math.max(...providerCooldowns.map((c: any) => c.remaining));
+                return Object.entries(groupedCooldowns).map(([provider, providerCooldowns]: [string, unknown]) => {
+                  const cooldowns = providerCooldowns as Array<{ remaining: number }>;
+                  const maxSeconds = Math.max(...cooldowns.map((c) => c.remaining));
                   const minutes = Math.ceil(maxSeconds / 60);
 
                   return (
