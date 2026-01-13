@@ -141,8 +141,8 @@ export class CostCalculator {
         throw new Error(`OpenRouter API returned ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
-      const models = data.data as any[];
+      const data = await response.json() as { data: any[] };
+      const models = data.data;
       const modelInfo = models.find((m: any) => m.id === model);
 
       if (!modelInfo || !modelInfo.pricing) {

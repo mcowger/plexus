@@ -139,7 +139,7 @@ describe("DebugLogger", () => {
     const dirs = Array.from(glob.scanSync({ cwd: testStoragePath, onlyFiles: false }));
     
     expect(dirs).toHaveLength(1);
-    const dirPath = join(testStoragePath, dirs[0]);
+    const dirPath = join(testStoragePath, dirs[0]!);
     
     expect(await Bun.file(join(dirPath, "trace.json")).exists()).toBe(true);
     expect(await Bun.file(join(dirPath, "client_request.json")).exists()).toBe(true);

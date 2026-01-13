@@ -3,13 +3,13 @@ import type { LoggingConfig } from "../types/config";
 
 type LogLevel = "silly" | "debug" | "info" | "warn" | "error";
 
-interface LogContext {
+export interface LogContext {
   requestId?: string;
   component?: string;
   [key: string]: unknown;
 }
 
-class Logger {
+export class Logger {
   private pinoLogger: pino.Logger;
 
   constructor(pinoInstance?: pino.Logger) {

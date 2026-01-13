@@ -199,6 +199,10 @@ export class Router {
     }
 
     const [providerName, model] = parts;
+    if (!providerName || !model) {
+      return null;
+    }
+
     const provider = this.providerMap.get(providerName);
 
     if (!provider) {

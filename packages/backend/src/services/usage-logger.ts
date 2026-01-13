@@ -39,7 +39,8 @@ export interface ResponseInfo {
   usage?: {
     inputTokens: number;
     outputTokens: number;
-    cachedTokens?: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
     reasoningTokens?: number;
   };
   errorType?: string;
@@ -128,11 +129,12 @@ export class UsageLogger {
     const usage = {
       inputTokens: responseInfo.usage?.inputTokens || 0,
       outputTokens: responseInfo.usage?.outputTokens || 0,
-      cachedTokens: responseInfo.usage?.cachedTokens || 0,
+      cacheReadTokens: responseInfo.usage?.cacheReadTokens || 0,
+      cacheCreationTokens: responseInfo.usage?.cacheCreationTokens || 0,
       reasoningTokens: responseInfo.usage?.reasoningTokens || 0,
       totalTokens: 0,
     };
-    usage.totalTokens = usage.inputTokens + usage.outputTokens + usage.cachedTokens + usage.reasoningTokens;
+    usage.totalTokens = usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheCreationTokens + usage.reasoningTokens;
 
     // Calculate cost
     const costResult = await this.costCalculator.calculateCost({
@@ -140,7 +142,7 @@ export class UsageLogger {
       provider: context.actualProvider || "",
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
-      cachedTokens: usage.cachedTokens,
+      cachedTokens: usage.cacheReadTokens,
       reasoningTokens: usage.reasoningTokens,
     });
 

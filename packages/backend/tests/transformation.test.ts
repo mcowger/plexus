@@ -110,8 +110,8 @@ describe("Anthropic Transformer - parseRequest", () => {
     expect(unified.model).toBe("claude-3-opus");
     expect(unified.max_tokens).toBe(1000);
     expect(unified.messages).toHaveLength(1);
-    expect(unified.messages[0].role).toBe("user");
-    expect(unified.messages[0].content).toBe("Hello");
+    expect(unified.messages[0]!.role).toBe("user");
+    expect(unified.messages[0]!.content).toBe("Hello");
   });
 
   test("converts Anthropic system message to unified format", async () => {
@@ -127,10 +127,10 @@ describe("Anthropic Transformer - parseRequest", () => {
     const unified = await anthropicTransformer.parseRequest(anthropicRequest);
 
     // System should be first message
-    expect(unified.messages[0].role).toBe("system");
-    expect(unified.messages[0].content).toBe("You are a helpful assistant.");
-    expect(unified.messages[1].role).toBe("user");
-    expect(unified.messages[1].content).toBe("Hello");
+    expect(unified.messages[0]!.role).toBe("system");
+    expect(unified.messages[0]!.content).toBe("You are a helpful assistant.");
+    expect(unified.messages[1]!.role).toBe("user");
+    expect(unified.messages[1]!.content).toBe("Hello");
   });
 
   test("converts Anthropic tools to unified format", async () => {
@@ -158,9 +158,9 @@ describe("Anthropic Transformer - parseRequest", () => {
     const unified = await anthropicTransformer.parseRequest(anthropicRequest);
 
     expect(unified.tools).toHaveLength(1);
-    expect(unified.tools![0].type).toBe("function");
-    expect(unified.tools![0].function.name).toBe("get_weather");
-    expect(unified.tools![0].function.description).toBe("Get weather for a location");
+    expect(unified.tools![0]!.type).toBe("function");
+    expect(unified.tools![0]!.function.name).toBe("get_weather");
+    expect(unified.tools![0]!.function.description).toBe("Get weather for a location");
   });
 
   test("handles assistant messages with content blocks", async () => {
@@ -180,8 +180,8 @@ describe("Anthropic Transformer - parseRequest", () => {
 
     const unified = await anthropicTransformer.parseRequest(anthropicRequest);
 
-    expect(unified.messages[1].role).toBe("assistant");
-    expect(unified.messages[1].content).toBe("Hi there!");
+    expect(unified.messages[1]!.role).toBe("assistant");
+    expect(unified.messages[1]!.content).toBe("Hi there!");
   });
 });
 
@@ -221,9 +221,138 @@ describe("transformToUnified and transformFromUnified", () => {
 
     expect(unified.model).toBe("claude-3-opus");
     // System message should be converted to a message in unified format
-    expect(unified.messages[0].role).toBe("system");
-    expect(unified.messages[0].content).toBe("You are helpful.");
-    expect(unified.messages[1].role).toBe("user");
-    expect(unified.messages[1].content).toBe("Hello");
-  });
-});
+    expect(unified.messages[0]!.role).toBe("system");
+    expect(unified.messages[0]!.content).toBe("You are helpful.");
+        expect(unified.messages[1]!.role).toBe("user");
+        expect(unified.messages[1]!.content).toBe("Hello");
+      });
+    });
+    
+    describe("Usage Parsing and Formatting", () => {
+        describe("OpenAITransformer", () => {
+            const transformer = new OpenAITransformer();
+    
+            test("parseUsage converts OpenAI usage to UnifiedUsage", () => {
+                const input = {
+                    prompt_tokens: 10,
+                    completion_tokens: 20,
+                    total_tokens: 30,
+                    prompt_tokens_details: { cached_tokens: 5 },
+                    completion_tokens_details: { reasoning_tokens: 7 }
+                };
+                const result = transformer.parseUsage(input);
+                expect(result).toEqual({
+                    input_tokens: 10,
+                    output_tokens: 13, // 20 - 7
+                    total_tokens: 30,
+                    reasoning_tokens: 7,
+                    cache_read_tokens: 5,
+                    cache_creation_tokens: 0
+                });
+            });
+    
+            test("formatUsage converts UnifiedUsage to OpenAI usage", () => {
+                const usage = {
+                    input_tokens: 10,
+                    output_tokens: 13,
+                    total_tokens: 30,
+                    reasoning_tokens: 7,
+                    cache_read_tokens: 5,
+                    cache_creation_tokens: 0
+                };
+                const result = transformer.formatUsage(usage);
+                expect(result).toEqual({
+                    prompt_tokens: 10,
+                    completion_tokens: 20, // 13 + 7
+                    total_tokens: 30,
+                    prompt_tokens_details: { cached_tokens: 5 },
+                    completion_tokens_details: { reasoning_tokens: 7 }
+                });
+            });
+        });
+    
+        describe("AnthropicTransformer", () => {
+            const transformer = new AnthropicTransformer();
+    
+            test("parseUsage converts Anthropic usage to UnifiedUsage", () => {
+                const input = {
+                    input_tokens: 15, // Non-cached input
+                    output_tokens: 25,
+                    thinking_tokens: 8,
+                    cache_read_input_tokens: 5,
+                    cache_creation_input_tokens: 2
+                };
+                const result = transformer.parseUsage(input);
+                expect(result).toEqual({
+                    input_tokens: 20, // 15 + 5
+                    output_tokens: 25,
+                    total_tokens: 47, // 20 + 25 + 2
+                    reasoning_tokens: 8,
+                    cache_read_tokens: 5,
+                    cache_creation_tokens: 2
+                });
+            });
+    
+            test("formatUsage converts UnifiedUsage to Anthropic usage with normalization", () => {
+                const usage = {
+                    input_tokens: 20, // Total input tokens (including cached)
+                    output_tokens: 30,
+                    total_tokens: 53,
+                    reasoning_tokens: 10,
+                    cache_read_tokens: 5,
+                    cache_creation_tokens: 3
+                };
+                const result = transformer.formatUsage(usage);
+                // Anthropic format expects input_tokens to exclude cached tokens in the client response context
+                expect(result).toEqual({
+                    input_tokens: 15, // 20 - 5
+                    output_tokens: 30,
+                    thinkingTokens: 10,
+                    cache_read_input_tokens: 5,
+                    cache_creation_input_tokens: 3
+                });
+            });
+        });
+    
+        describe("GeminiTransformer", () => {
+            const transformer = new GeminiTransformer();
+    
+            test("parseUsage converts Gemini usageMetadata to UnifiedUsage", () => {
+                const input = {
+                    promptTokenCount: 100,
+                    candidatesTokenCount: 50,
+                    totalTokenCount: 150,
+                    thoughtsTokenCount: 20,
+                    cachedContentTokenCount: 10
+                };
+                const result = transformer.parseUsage(input);
+                expect(result).toEqual({
+                    input_tokens: 100,
+                    output_tokens: 50,
+                    total_tokens: 150,
+                    reasoning_tokens: 20,
+                    cache_read_tokens: 10,
+                    cache_creation_tokens: 0
+                });
+            });
+    
+            test("formatUsage converts UnifiedUsage to Gemini usageMetadata", () => {
+                 const usage = {
+                    input_tokens: 100,
+                    output_tokens: 50,
+                    total_tokens: 150,
+                    reasoning_tokens: 20,
+                    cache_read_tokens: 10,
+                    cache_creation_tokens: 0
+                };
+                const result = transformer.formatUsage(usage);
+                expect(result).toEqual({
+                    promptTokenCount: 100,
+                    candidatesTokenCount: 50,
+                    totalTokenCount: 150,
+                    thoughtsTokenCount: 20,
+                    cachedContentTokenCount: 10
+                });
+            });
+        });
+    });    

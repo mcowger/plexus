@@ -80,7 +80,7 @@ export class TargetSelector {
     if (!hasWeights) {
       // Uniform random selection
       const randomIndex = Math.floor(Math.random() * targets.length);
-      const selected = targets[randomIndex];
+      const selected = targets[randomIndex]!;
       logger.debug("Selected random target (uniform)", {
         provider: selected.provider,
         model: selected.model,
@@ -99,9 +99,9 @@ export class TargetSelector {
     // Find the target corresponding to this random value
     let cumulativeWeight = 0;
     for (let i = 0; i < targets.length; i++) {
-      cumulativeWeight += weights[i];
+      cumulativeWeight += weights[i]!;
       if (random < cumulativeWeight) {
-        const selected = targets[i];
+        const selected = targets[i]!;
         logger.debug("Selected random target (weighted)", {
           provider: selected.provider,
           model: selected.model,
@@ -113,7 +113,7 @@ export class TargetSelector {
     }
 
     // Fallback (should never reach here, but needed for type safety)
-    const fallback = targets[targets.length - 1];
+    const fallback = targets[targets.length - 1]!;
     logger.debug("Selected random target (fallback)", {
       provider: fallback.provider,
       model: fallback.model,
@@ -135,7 +135,7 @@ export class TargetSelector {
     // Find first target not yet attempted
     for (let i = 0; i < targets.length; i++) {
       if (!previousAttempts.includes(i)) {
-        const selected = targets[i];
+        const selected = targets[i]!;
         logger.debug("Selected in-order target", {
           provider: selected.provider,
           model: selected.model,
@@ -147,7 +147,7 @@ export class TargetSelector {
     }
 
     // All targets attempted, return first one
-    const fallback = targets[0];
+    const fallback = targets[0]!;
     logger.debug("All targets attempted, returning first one (in-order)", {
       provider: fallback.provider,
       model: fallback.model,

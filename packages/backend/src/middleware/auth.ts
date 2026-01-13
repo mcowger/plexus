@@ -34,7 +34,7 @@ export function validateAuthHeader(
 
   // Parse Bearer token
   const parts = authHeader.split(" ");
-  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
+  if (parts.length !== 2 || parts[0]?.toLowerCase() !== "bearer") {
     logger.debug("Invalid Authorization header format", { authHeader });
     throw new PlexusErrorResponse(
       "authentication_error",
@@ -49,8 +49,8 @@ export function validateAuthHeader(
   // Find matching API key
   const apiKey = apiKeys.find((key) => key.secret === token && key.enabled);
 
-  if (!apiKey) {
-    logger.debug("Invalid or disabled API key", { token: token.slice(0, 10) + "..." });
+  if (!apiKey || !token) {
+    logger.debug("Invalid or disabled API key", { token: token?.slice(0, 10) + "..." });
     throw new PlexusErrorResponse(
       "authentication_error",
       "Invalid API key",

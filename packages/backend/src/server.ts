@@ -217,7 +217,7 @@ export async function createServer(config: PlexusConfig): Promise<{ server: any;
   const server = Bun.serve({
     port: config.server.port,
     hostname: config.server.host,
-    fetch: (req: Request) => {
+    fetch: (req: Request, server): Promise<Response> | Response => {
       const clientIp = req.headers.get("x-forwarded-for") || server.requestIP(req)?.address || "0.0.0.0";
       return router(req, context, adminAuth, clientIp);
     },

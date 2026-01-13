@@ -120,7 +120,23 @@ Definitions for virtual model aliases and their routing strategies.
 | `additionalAliases` | array | (Optional) Other names that map to this same config. |
 | `selector` | string | Strategy for choosing a target (`random`, `in_order`, `cost`, `latency`, `performance`). |
 | `apiMatch` | boolean | (Optional) If true, only targets matching the client's API type are considered. |
-| `targets` | array | List of concrete provider/model pairs. |
+| `targets` | array | List of concrete provider/model pairs.
+
+### Model Aliasing
+
+Aliases map a virtual model name to one or more targets. They are defined in the `models` list.
+
+**Passthrough Resolution:**
+You can also request a model using the `provider_name/model_name` format (e.g., `openai/gpt-4o`).
+*   **Behavior**: This bypasses the alias selector, cooldown checks, and health checks.
+*   **Requirements**: The provider must be enabled, and the model must be present in the provider's `models` list.
+*   **Use Case**: Testing specific providers or accessing models without defining an explicit alias.
+
+```yaml
+models:
+  - alias: "gpt-4"
+    targets:
+``` |
 
 ### targets entry
 | Option | Type | Description |

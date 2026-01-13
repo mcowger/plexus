@@ -39,7 +39,7 @@ logging:
     const res = await handleConfig(req, configManager);
     
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.config).toContain("port: 3000");
     expect(body.checksum).toBeDefined();
     expect(body.lastModified).toBeDefined();
@@ -95,7 +95,7 @@ resilience:
     const res = await handleConfig(req, configManager);
     expect(res.status).toBe(200);
     
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.success).toBe(true);
     expect(body.newChecksum).not.toBe(body.previousChecksum);
 
@@ -122,7 +122,7 @@ server:
 
     const res = await handleConfig(req, configManager);
     expect(res.status).toBe(400); // Or 500 depending on parser error
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.success).toBe(false);
   });
 });

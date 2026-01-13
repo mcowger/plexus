@@ -107,12 +107,34 @@ export interface Annotation {
 }
 
 export interface UnifiedUsage {
+    /**
+     * Intended to track the total amount of tokens the user sent, regardless of cache hits.
+     */
     input_tokens: number;
+    /**
+     * intended to represent the number of tokens in the substantive response to the user.   Thus this should EXCLUDE reasoning tokens.
+     */
     output_tokens: number;
+    /**
+     * Intended to represent the total of ALL tokens involved in the interaction - reasoning, output, input, cache hits, etc.
+     */
     total_tokens: number;
-    reasoning_tokens: number;
-    cached_tokens: number;
-    cache_creation_tokens: number;
+    /**
+     * intended to represent the number of tokens used for tool calls.  This is not commonly exposed.
+     */
+    tool_use_tokens?: number;
+    /**
+     * intended to represent the number of tokens used by the model to perform thinking or reasoning.
+     */
+    reasoning_tokens?: number;
+    /**
+     * intended to represent the number of tokens from the input that the model was able to retrieve from cache.  Consider as a strict subset of input_tokens
+     */
+    cache_read_tokens?: number;
+    /**
+     * intended to represent the number of tokens that were written into cache in this turn.  This is not commonly exposed.
+     */
+    cache_creation_tokens?: number;
 }
 
 export interface UnifiedChatResponse {
@@ -183,6 +205,8 @@ export interface Transformer {
   transformRequest(request: UnifiedChatRequest): Promise<any>;
   transformResponse(response: any): Promise<UnifiedChatResponse>;
   formatResponse(response: UnifiedChatResponse): Promise<any>;
+  parseUsage(input: any): UnifiedUsage;
+  formatUsage(usage: UnifiedUsage): any;
   transformStream?(stream: ReadableStream): ReadableStream;
   formatStream?(stream: ReadableStream): ReadableStream;
 }

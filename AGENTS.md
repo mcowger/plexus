@@ -1,90 +1,107 @@
-## 1. Executive Summary
-**Plexus** is a high-performance, unified API gateway and virtualization layer for Large Language Models (LLMs). Built on the **Bun** runtime and **Fastify** framework, it abstracts the complexity of integrating with multiple AI providers (OpenAI, Anthropic, Google, etc.) by transforming incoming APIs (`/v1/messages`, `/v1/chat/completions`, etc.). This enables developers to switch providers, load-balance requests, and manage model configurations without altering their client application code.
+# Plexus System Context & Agent Guidelines
 
-## 2. Target Audience - **AI Engineers & Developers:** Building applications that consume LLM APIs and require flexibility in provider selection. - **Platform Architects:** 
-Seeking to unify LLM traffic through a centralized, controllable gateway.
+## 1. 🚨 CRITICAL OPERATIONAL MANDATES 🚨
+> **These rules are non-negotiable and must be followed by all agents and LLMs working on this codebase.**
 
+### 1.1 Documentation & Search Strategy
+*   **NEVER** default to searching type definition files (`.d.ts`) to understand libraries.
+*   **ALWAYS** use `tavily_search` or `google_web_search` to find official documentation and examples.
+*   **REASON:** Type definitions often lack context and usage nuances.
 
-## CRITICAL REQUIREMENTS:   NEVER default to searching types definitions files for libraries.  ALWAYS rely on the tavily and context7 MCP tools to search the web for better documentation. FOLLOWING THIS REQUIREMENT IS CRITICAL.
+### 1.2 Development Standards
+*   **Type Safety:** `bun run typecheck` MUST pass before finalizing any changes.
+*   **No 'Any':** Strictly avoid `any`. Use `unknown` with narrowing or proper interfaces.
+*   **Library Constraints:**
+    *   **Runtime:** Native Bun APIs are preferred over Node.js polyfills (e.g., file I/O).
+    *   **Transformations:** NEVER build custom transformations. Use the existing architecture in `src/transformers` (derived from `@musistudio/llms`).
+    *   **Types:** Do not duplicate types. Check `src/types` and `src/transformers/types.ts` first.
 
-DO NOT BUILD YOUR OWN TRANSFORMATIONS.  ALWAYS USE THE musistudio/llms transformations.  DO NOT BUILD YOUR OWN TYPES THAT EXIST IN MUSISTUDIO/LLMS 
+---
 
-ALWAYS DEFAULT TO USING the file IO operations from Bun.
+## 2. Project Overview
 
-## Goal The core objective is to provide a single entry point for various 
-LLM APIs:
+### 2.1 Identity
+**Plexus** is a high-performance, unified API gateway and virtualization layer for Large Language Models (LLMs). It allows switching between providers (OpenAI, Anthropic, Gemini) without changing client code.
 
-- `/v1/chat/completions` (OpenAI style) - `/v1/messages` (Anthropic style) 
-- `/v1/responses` (OpenAI Responses style - Planned)
+### 2.2 Core Objectives
+1.  **Unified Surface:** Provide a single entry point for various LLM APIs.
+    *   `/v1/chat/completions` (OpenAI style)
+    *   `/v1/messages` (Anthropic style)
+2.  **Virtualization:** Decouple "requested model" from "actual provider".
+3.  **Control:** Centralized logging, load balancing, and configuration.
 
-Plexus routes requests to any backend provider regardless of its native API format. For example, a request sent to the `/v1/chat/completions` endpoint can be routed to an Anthropic model, with Plexus handling the transformation of both the request and the response.
+### 2.3 Target Audience
+*   **AI Engineers:** Needing provider flexibility.
+*   **Platform Architects:** Managing LLM traffic and costs.
 
-### Transformation Workflow:
-1. **Receive Request:** Accept a request in a supported style (e.g., OpenAI chat completions).
-2. **Select Provider:** Resolve the target provider and model based on the request's `model` field and the system configuration.
-3. **Transform Request:** Convert the input payload into the internal `UnifiedChatRequest` format, then into the target provider's specific format (e.g., Anthropic messages).
-4. **Execute Call:** Make the HTTP request to the target provider's endpoint with appropriate headers and authentication.
-5. **Transform Response:** Convert the provider's response back into the original requesting style before returning it to the client.
+---
 
-## 3. Core Features & Capabilities
+## 3. Architecture & Data Flow
 
-### 3.1 Unified API Surface
-- **Implemented Endpoints:**
-  - `POST /v1/chat/completions`: Standard OpenAI-compatible chat completion endpoint.
-  - `POST /v1/messages`: Standard Anthropic-compatible messages endpoint.
-  - `GET /v1/models`: List available models and aliases.
+### 3.1 Tech Stack
+*   **Runtime:** [Bun](https://bun.sh)
+*   **Server:** Native Bun Webserver (`Bun.serve`)
+*   **Language:** TypeScript
+*   **Config:** YAML/JSON via Zod
 
+### 3.2 Request Lifecycle (Transformation Workflow)
+1.  **Ingest:** Client sends request (e.g., OpenAI format) to Plexus.
+2.  **Route:** `Dispatcher` selects provider based on `config/plexus.yaml` rules (load balancing, aliasing).
+3.  **Normalize:** `Transformer` converts request to `UnifiedChatRequest`.
+4.  **Adapt:** `Transformer` converts `UnifiedChatRequest` to Provider's native format (e.g., Anthropic).
+5.  **Execute:** HTTP call to Provider.
+6.  **Denormalize:** Response is converted back to `UnifiedChatResponse`, then to the Client's expected format.
 
-### 3.2 Advanced Routing & Virtualization
-- **Model Aliasing:** Decouples requested model IDs from actual provider implementations.
-- **Load Balancing:** Supports multiple targets for a single alias with randomized distribution.
-- **Configuration-Driven:** Routing and provider settings are defined in `config/plexus.json`.
+### 3.3 Directory Map
+*   **`config/`**: System configuration.
+*   **`packages/backend/src/`**:
+    *   `index.ts`: Entry point.
+    *   `server.ts`: HTTP server setup.
+    *   `services/`: Business logic (`Dispatcher`, `Router`).
+    *   `transformers/`: Provider adapters (OpenAI, Anthropic, Gemini).
+    *   `types/`: Shared TypeScript definitions.
+    *   `utils/`: Helpers (`logger`, `usage`).
 
-### 3.3 Multi-Provider Support
-Uses a "Transformer" architecture from the @musistudio/llms library.
+---
 
-## 4. Technical Architecture
+## 4. Implementation Details
 
-### 4.1 Stack
-- **Runtime:** [Bun](https://bun.sh)
-- **Web Framework:** Bun webserver
-- **Configuration:** JSON (via `bun`'s import support package)
-- **Libraries:** Where possible, use native Bun libraries
+### 4.1 Unified API Surface
+*   **POST** `/v1/chat/completions`: OpenAI compatibility.
+*   **POST** `/v1/messages`: Anthropic compatibility.
+*   **GET** `/v1/models`: Available models list.
 
-### 4.2 System Components
-- **`packages/backend`**: The core server. Contains the dispatcher, router, and transformer instantiation logic.
-- **`packages/frontend`**: React-based dashboard.  DO NOT implement this.
+### 4.2 Shared Utilities
+**Usage Normalization (`src/utils/usage.ts`)**:
+*   **MUST** be used for token metrics.
+*   Handles difference between `prompt_tokens` (OpenAI) vs `input_tokens` (Anthropic).
+*   Example:
+    ```typescript
+    import { normalizeUsage } from "../utils/usage";
+    const usage = normalizeUsage(rawUsage);
+    ```
 
+---
 
-## 5. Directory Structure
-- `config/`: Configuration files (`plexus.json`).
-- `packages/backend/src/`:
-  - `services/`: Core logic (`Dispatcher`, `Router`, `TransformerFactory`).
-  - `types/`: Unified types for requests, responses, and streaming chunks.
-  - `utils/`: Shared utilities (Logger).
+## 5. Development & Testing
 
-## 6. Development & Testing
-- **Full Stack Dev:** Run `bun run dev` from the root to start both the Backend (port 4000, watch mode).
+### 5.1 Environment
+*   **Start Dev:** `bun run dev` (Watches `packages/backend`).
+*   **Run Tests:** `bun test`.
 
-### 6.1 Testing Guidelines
-When writing tests for the backend, especially those involving configuration (`packages/backend/src/config.ts`), strict adherence to isolation principles is required to prevent "mock pollution" across tests.
+### 5.2 Testing Guidelines (Strict Isolation)
+*   **Global Mocks:** Do NOT use `mock.module` for global config in individual tests. It pollutes state.
+*   **Setup:** Use `setup.ts` for common mocks (Logger).
+*   **Spying:** Prefer `spyOn` over re-mocking.
 
-**Do NOT use `mock.module` to mock the configuration module globally.** 
-Bun's test runner can share state between test files, and hard-mocking the config module will cause other tests (like `pricing_config.test.ts` or `dispatcher.test.ts`) to fail unpredictably because they receive the mocked configuration instead of the real logic.  
+    ```typescript
+    // ✅ CORRECT
+    import { logger } from "src/utils/logger";
+    import { spyOn, expect, test } from "bun:test";
 
-To prevent crashes in other tests (e.g., `TypeError: logger.info is not a function`), follow these rules:
-
-1.  **Use the Global Setup:** Common modules like `src/utils/logger` should be mocked once in `setup.ts`.
-2.  **Robust Mocking:** If you must mock a module in a specific test file, your mock **MUST** implement the entire public interface of that module (including all log levels like `silly`, `debug`, etc.).
-3.  **Prefer Spying:** If you need to assert that a global dependency was called, use `spyOn` on the already-mocked global instance rather than re-mocking the module.
-
-```typescript
-import { logger } from "src/utils/logger";
-import { spyOn, expect, test } from "bun:test";
-
-test("my test", () => {
-    const infoSpy = spyOn(logger, "info");
-    // ... run code ...
-    expect(infoSpy).toHaveBeenCalled();
-});
-```
+    test("logger usage", () => {
+        const spy = spyOn(logger, "info");
+        // ... action ...
+        expect(spy).toHaveBeenCalled();
+    });
+    ```

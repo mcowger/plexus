@@ -65,8 +65,8 @@ export class MetricsCollector {
     const latencies = recentMetrics.map((m) => m.latencyMs);
     const avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
     const sortedLatencies = [...latencies].sort((a, b) => a - b);
-    const p50Latency = sortedLatencies[Math.floor(sortedLatencies.length * 0.5)];
-    const p95Latency = sortedLatencies[Math.floor(sortedLatencies.length * 0.95)];
+    const p50Latency = sortedLatencies[Math.floor(sortedLatencies.length * 0.5)] ?? 0;
+    const p95Latency = sortedLatencies[Math.floor(sortedLatencies.length * 0.95)] ?? 0;
 
     // TTFT metrics (only for streaming requests)
     const ttfts = recentMetrics.filter((m) => m.ttftMs !== null).map((m) => m.ttftMs!);

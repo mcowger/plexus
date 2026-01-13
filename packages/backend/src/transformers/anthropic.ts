@@ -5,6 +5,7 @@ import {
   UnifiedMessage,
   UnifiedTool,
   MessageContent,
+  UnifiedUsage
 } from "./types";
 import { logger } from "../utils/logger";
 import { getThinkLevel, formatBase64 } from "./utils";
@@ -165,6 +166,49 @@ export class AnthropicTransformer implements Transformer {
     return result;
   }
 
+  parseUsage(input: any): UnifiedUsage {
+    if (!input) {
+      return {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+      };
+    }
+
+    const nonCachedInputTokens = input.input_tokens || 0;
+    const cacheReadTokens = input.cache_read_input_tokens || 0;
+    const cacheCreationTokens = input.cache_creation_input_tokens || 0;
+    const outputTokens = input.output_tokens || 0;
+    const thinkingTokens = input.thinking_tokens || 0;
+
+    // input_tokens only represents the non-cached part of the input.
+    // The total number of input tokens, for the purposes of a UnifiedUsage object should be calculated as input_tokens + cache_read_input_tokens.
+    const totalInputTokens = nonCachedInputTokens + cacheReadTokens;
+
+    return {
+      input_tokens: totalInputTokens,
+      output_tokens: outputTokens,
+      // Total calculation logic: all inputs (cached + non-cached) + outputs + cache creation cost?
+      // User guideline: "total_tokens: number; # Intended to represent the total of ALL tokens involved in the interaction - reasoning, output, input, cache hits, etc."
+      total_tokens: totalInputTokens + outputTokens + cacheCreationTokens,
+      reasoning_tokens: thinkingTokens,
+      cache_read_tokens: cacheReadTokens,
+      cache_creation_tokens: cacheCreationTokens,
+    };
+  }
+
+  formatUsage(usage: UnifiedUsage): any {
+    const cacheReadTokens = usage.cache_read_tokens || 0;
+    return {
+        // when output via formatUsage() should be subtracted again to maintain consistency with the API expectations.
+        input_tokens: (usage.input_tokens || 0) - cacheReadTokens,
+        output_tokens: usage.output_tokens || 0,
+        thinkingTokens: usage.reasoning_tokens || 0,
+        cache_read_input_tokens: cacheReadTokens,
+        cache_creation_input_tokens: usage.cache_creation_tokens || 0,
+    };
+  }
+
   /**
    * formatResponse (Unified -> Client)
    * Maps Unified response back to Anthropic's block-based content format.
@@ -240,16 +284,7 @@ export class AnthropicTransformer implements Transformer {
       content,
       stop_reason,
       stop_sequence: null,
-      usage: {
-        // Usage Token Normalization: input_tokens = prompt_tokens - cached_tokens
-        input_tokens:
-          (response.usage?.input_tokens || 0) -
-          (response.usage?.cached_tokens || 0),
-        output_tokens: response.usage?.output_tokens || 0,
-        thinkingTokens: response.usage?.reasoning_tokens || 0,
-        cache_read_input_tokens: response.usage?.cached_tokens || 0,
-        cache_creation_input_tokens: response.usage?.cache_creation_tokens || 0,
-      },
+      usage: response.usage ? this.formatUsage(response.usage) : undefined,
     };
   }
 
@@ -423,12 +458,7 @@ export class AnthropicTransformer implements Transformer {
       }
     }
 
-    const inputTokens = response.usage?.input_tokens || 0;
-    const totalOutputTokens = response.usage?.output_tokens || 0;
-    const thinkingTokens = response.usage?.thinking_tokens || 0;
-    const cacheReadTokens = response.usage?.cache_read_input_tokens || 0;
-    const cacheCreationTokens =
-      response.usage?.cache_creation_input_tokens || 0;
+    const usage = response.usage ? this.parseUsage(response.usage) : undefined;
 
     return {
       id: response.id,
@@ -436,14 +466,7 @@ export class AnthropicTransformer implements Transformer {
       content: text || null,
       reasoning_content: reasoning || null,
       tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-      usage: {
-        input_tokens: inputTokens,
-        output_tokens: totalOutputTokens,
-        total_tokens: inputTokens + totalOutputTokens,
-        reasoning_tokens: thinkingTokens,
-        cached_tokens: cacheReadTokens,
-        cache_creation_tokens: cacheCreationTokens,
-      },
+      usage,
     };
   }
 
@@ -456,6 +479,7 @@ export class AnthropicTransformer implements Transformer {
     let parser: any;
     let messageId: string | undefined;
     let model: string | undefined;
+    const self = this;
 
     const transformer = new TransformStream({
       start(controller) {
@@ -476,16 +500,7 @@ export class AnthropicTransformer implements Transformer {
                     model: model,
                     created: Math.floor(Date.now() / 1000),
                     delta: { role: "assistant" },
-                    usage: data.message.usage
-                      ? {
-                          input_tokens: data.message.usage.input_tokens || 0,
-                          output_tokens: data.message.usage.output_tokens || 0,
-                          total_tokens: (data.message.usage.input_tokens || 0) + (data.message.usage.output_tokens || 0),
-                          reasoning_tokens: 0,
-                          cached_tokens: data.message.usage.cache_read_input_tokens || 0,
-                          cache_creation_tokens: data.message.usage.cache_creation_input_tokens || 0,
-                        }
-                      : undefined,
+                    usage: data.message.usage ? self.parseUsage(data.message.usage) : undefined,
                   };
                   break;
                 case "content_block_delta":
@@ -546,10 +561,6 @@ export class AnthropicTransformer implements Transformer {
                   break;
                 case "message_delta":
                   // Handle usage update and finish reason
-                  const inputTokens = data.usage?.input_tokens || 0;
-                  const totalOutputTokens = data.usage?.output_tokens || 0;
-                  const thinkingTokens = data.usage?.thinking_tokens || 0;
-
                   unifiedChunk = {
                     finish_reason:
                       data.delta.stop_reason === "end_turn"
@@ -557,16 +568,7 @@ export class AnthropicTransformer implements Transformer {
                         : data.delta.stop_reason === "tool_use"
                         ? "tool_calls"
                         : data.delta.stop_reason,
-                    usage: data.usage
-                      ? {
-                          input_tokens: inputTokens,
-                          output_tokens: totalOutputTokens,
-                          total_tokens: inputTokens + totalOutputTokens,
-                          reasoning_tokens: thinkingTokens,
-                          cached_tokens: data.usage.cache_read_input_tokens || 0,
-                          cache_creation_tokens: data.usage.cache_creation_input_tokens || 0,
-                        }
-                      : undefined,
+                    usage: data.usage ? self.parseUsage(data.usage) : undefined,
                   };
                   break;
               }
@@ -575,7 +577,7 @@ export class AnthropicTransformer implements Transformer {
                 controller.enqueue(unifiedChunk);
               }
             } catch (e) {
-              logger.error("Error parsing Anthropic stream chunk", e);
+              logger.error("Error parsing Anthropic stream chunk", { error: e });
             }
           },
         });
@@ -600,6 +602,7 @@ export class AnthropicTransformer implements Transformer {
     const encoder = new TextEncoder();
     let hasSentStart = false;
     let hasSentFinish = false;
+    const self = this;
 
     // State machine
     let nextBlockIndex = 0;
@@ -607,7 +610,7 @@ export class AnthropicTransformer implements Transformer {
     let activeBlockIndex: number | null = null;
     
     // Track usage and finish reason across chunks
-    let lastUsage: any = null;
+    let lastUsage: UnifiedUsage | null = null;
     let pendingFinishReason: string | null = null;
 
     const transformer = new TransformStream({
@@ -627,6 +630,13 @@ export class AnthropicTransformer implements Transformer {
 
         // 1. Message Start
         if (!hasSentStart) {
+          const formattedUsage = chunk.usage ? self.formatUsage(chunk.usage) : {
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          };
+
           const messageStart = {
             type: "message_start",
             message: {
@@ -638,10 +648,10 @@ export class AnthropicTransformer implements Transformer {
               stop_reason: null,
               stop_sequence: null,
               usage: {
-                input_tokens: chunk.usage?.input_tokens || 0,
-                output_tokens: chunk.usage?.output_tokens || 0,
-                cache_read_input_tokens: chunk.usage?.cached_tokens || 0,
-                cache_creation_input_tokens: chunk.usage?.cache_creation_tokens || 0,
+                  input_tokens: formattedUsage.input_tokens,
+                  output_tokens: formattedUsage.output_tokens,
+                  cache_read_input_tokens: formattedUsage.cache_read_input_tokens,
+                  cache_creation_input_tokens: formattedUsage.cache_creation_input_tokens
               },
             },
           };
@@ -791,6 +801,8 @@ export class AnthropicTransformer implements Transformer {
             });
           }
 
+          const formattedUsage = lastUsage ? self.formatUsage(lastUsage) : undefined;
+
           // Send message_delta with collected usage and stop reason
           sendEvent("message_delta", {
             type: "message_delta",
@@ -798,11 +810,11 @@ export class AnthropicTransformer implements Transformer {
               stop_reason: pendingFinishReason || "end_turn",
               stop_sequence: null,
             },
-            usage: lastUsage ? {
-              input_tokens: lastUsage.input_tokens,
-              output_tokens: lastUsage.output_tokens,
-              thinkingTokens: lastUsage.reasoning_tokens,
-              cache_read_input_tokens: lastUsage.cached_tokens,
+            usage: formattedUsage ? {
+                input_tokens: formattedUsage.input_tokens,
+                output_tokens: formattedUsage.output_tokens,
+                thinkingTokens: formattedUsage.thinkingTokens,
+                cache_read_input_tokens: formattedUsage.cache_read_input_tokens,
             } : undefined
           });
           

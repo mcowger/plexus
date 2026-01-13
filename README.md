@@ -11,6 +11,7 @@ Plexus is a high-performance, unified API gateway and virtualization layer for L
     - `cost`: Prefer the cheapest provider.
     - `latency`: Prefer the fastest provider.
     - `performance`: Composite score of throughput, latency, and cost.
+- **Direct Provider Access**: Bypass routing logic to target specific providers directly (e.g., `openai/gpt-4o`) while still leveraging protocol transformation.
 - **Resilience**: Automatic provider cooldowns on errors (429, 5xx, timeouts) with persistent state.
 - **Observability**: Detailed usage logging, cost calculation, and performance metrics.
 - **Management API**: RESTful endpoints for configuration, state control, and log inspection.

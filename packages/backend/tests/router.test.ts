@@ -2,9 +2,9 @@ import { test, expect, describe } from "bun:test";
 import { Router } from "../src/services/router";
 import type { PlexusConfig } from "../src/types/config";
 
-const mockConfig: PlexusConfig = {
+const mockConfig: any = {
   server: { port: 4000, host: "localhost" },
-  logging: { level: "info" },
+  logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
   providers: [
     {
       name: "openai",
@@ -179,6 +179,30 @@ describe("Router", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.code).toBe("ALIAS_NOT_FOUND");
+      }
+    });
+
+    test("passthrough ignores cooldown", () => {
+      // Mock cooldown manager
+      const mockCooldownManager = {
+        isOnCooldown: (provider: string) => true, // Always on cooldown
+        getRemainingTime: (provider: string) => 3600,
+        setCooldown: () => {},
+        getCooldown: () => ({ startTime: 0, endTime: 0, provider: "openai", reason: "rate_limit" }),
+        clearCooldown: () => true,
+        clearAllCooldowns: () => {},
+        getActiveCooldowns: () => [],
+        updateConfig: () => {}
+      } as any;
+
+      const router = new Router(mockConfig, mockCooldownManager);
+      
+      // Should succeed even though provider is "on cooldown"
+      const result = router.resolve("openai/gpt-4o");
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.target.provider.name).toBe("openai");
       }
     });
   });

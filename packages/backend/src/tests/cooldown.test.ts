@@ -35,7 +35,7 @@ describe("Cooldown Manager", () => {
 
     mockConfig = {
       server: { port: 4000, host: "0.0.0.0" },
-      logging: { level: "info" },
+      logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
       apiKeys: [],
       providers: [
         {

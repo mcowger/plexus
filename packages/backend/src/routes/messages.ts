@@ -109,17 +109,13 @@ export async function handleMessages(
 
     // Handle PlexusErrorResponse - convert to Anthropic error format
     if (error instanceof PlexusErrorResponse) {
-      return Response.json(
-        {
-          type: "error",
-          error: {
-            type: error.type,
-            message: error.message,
-          },
-        },
-        { status: error.statusCode }
-      );
-    }
+            return Response.json(
+              {
+                type: "error",
+                error: error.toJSON().error,
+              },
+              { status: error.status }
+            );    }
 
     // Generic error response in Anthropic format
     return Response.json(

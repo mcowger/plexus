@@ -26,7 +26,7 @@ test("Auth Middleware - Missing Authorization Header", () => {
     validateAuthHeader(req, mockApiKeys);
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(401);
+      expect(error.status).toBe(401);
       expect(error.type).toBe("authentication_error");
     }
   }
@@ -42,7 +42,7 @@ test("Auth Middleware - Invalid Bearer Format", () => {
     validateAuthHeader(req, mockApiKeys);
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(401);
+      expect(error.status).toBe(401);
       expect(error.type).toBe("authentication_error");
     }
   }
@@ -58,7 +58,7 @@ test("Auth Middleware - Invalid API Key", () => {
     validateAuthHeader(req, mockApiKeys);
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(401);
+      expect(error.status).toBe(401);
       expect(error.type).toBe("authentication_error");
     }
   }
@@ -74,7 +74,7 @@ test("Auth Middleware - Disabled API Key", () => {
     validateAuthHeader(req, mockApiKeys);
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(401);
+      expect(error.status).toBe(401);
       expect(error.type).toBe("authentication_error");
     }
   }
@@ -90,7 +90,7 @@ test("Auth Middleware - Malformed Header (no space)", () => {
     validateAuthHeader(req, mockApiKeys);
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(401);
+      expect(error.status).toBe(401);
     }
   }
 });

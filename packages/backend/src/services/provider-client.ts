@@ -138,7 +138,7 @@ export class ProviderClient {
 
     // Check for {env:VAR_NAME} format
     const envMatch = keyConfig.match(/^\{env:([^}]+)\}$/);
-    if (envMatch) {
+    if (envMatch && envMatch[1]) {
       const varName = envMatch[1];
       const apiKey = process.env[varName];
 

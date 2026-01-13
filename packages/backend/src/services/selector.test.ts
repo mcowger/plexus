@@ -43,20 +43,20 @@ describe("TargetSelector", () => {
     test("selects from available targets", () => {
       const selector = new TargetSelector();
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
       ];
 
       const selected = selector.select(targets, "random");
       expect(selected).not.toBeNull();
-      expect(targets).toContainEqual(selected);
+      expect(targets).toContainEqual(selected!);
     });
 
     test("respects weights when provided", () => {
       const selector = new TargetSelector();
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, weight: 9 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, weight: 1 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true, weight: 9 },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true, weight: 1 },
       ];
 
       // Run multiple times to verify weighted distribution
@@ -82,8 +82,8 @@ describe("TargetSelector", () => {
     test("selects first target when no previous attempts", () => {
       const selector = new TargetSelector();
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
       ];
 
       const selected = selector.select(targets, "in_order", {});
@@ -93,9 +93,9 @@ describe("TargetSelector", () => {
     test("skips previously attempted targets", () => {
       const selector = new TargetSelector();
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
-        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
+        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3, healthy: true },
       ];
 
       const selected = selector.select(targets, "in_order", {
@@ -107,8 +107,8 @@ describe("TargetSelector", () => {
     test("wraps around after all targets attempted", () => {
       const selector = new TargetSelector();
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
       ];
 
       const selected = selector.select(targets, "in_order", {
@@ -138,9 +138,9 @@ describe("TargetSelector", () => {
 
       const selector = new TargetSelector(undefined, mockMetricsCollector);
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
-        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
+        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3, healthy: true },
       ];
 
       const selected = selector.select(targets, "cost");
@@ -160,19 +160,19 @@ describe("TargetSelector", () => {
 
       const selector = new TargetSelector(undefined, mockMetricsCollector);
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
       ];
 
       const selected = selector.select(targets, "cost");
       expect(selected).not.toBeNull();
-      expect(targets).toContainEqual(selected);
+      expect(targets).toContainEqual(selected!);
     });
 
     test("falls back to random when no metrics collector", () => {
       const selector = new TargetSelector();
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
       ];
 
       const selected = selector.select(targets, "cost");
@@ -199,9 +199,9 @@ describe("TargetSelector", () => {
 
       const selector = new TargetSelector(undefined, mockMetricsCollector);
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
-        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
+        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3, healthy: true },
       ];
 
       const selected = selector.select(targets, "latency");
@@ -221,8 +221,8 @@ describe("TargetSelector", () => {
 
       const selector = new TargetSelector(undefined, mockMetricsCollector);
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
       ];
 
       const selected = selector.select(targets, "latency");
@@ -249,9 +249,9 @@ describe("TargetSelector", () => {
 
       const selector = new TargetSelector(undefined, mockMetricsCollector);
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
-        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2 },
-        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
+        { provider: "provider-b", model: "model-2", providerConfig: mockProvider2, healthy: true },
+        { provider: "provider-c", model: "model-3", providerConfig: mockProvider3, healthy: true },
       ];
 
       const selected = selector.select(targets, "performance");
@@ -271,7 +271,7 @@ describe("TargetSelector", () => {
 
       const selector = new TargetSelector(undefined, mockMetricsCollector);
       const targets: TargetWithProvider[] = [
-        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1 },
+        { provider: "provider-a", model: "model-1", providerConfig: mockProvider1, healthy: true },
       ];
 
       const selected = selector.select(targets, "performance");

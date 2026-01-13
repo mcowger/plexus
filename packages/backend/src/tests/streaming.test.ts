@@ -22,7 +22,7 @@ mock.module("../utils/logger", () => ({
 }));
 
 describe("Streaming Support", () => {
-  let mockConfig: PlexusConfig;
+  let mockConfig: any;
   let dispatcher: Dispatcher;
 
   beforeEach(() => {
@@ -93,6 +93,9 @@ describe("Streaming Support", () => {
       },
       logging: {
         level: "error",
+        debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false },
+        usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 },
+        errors: { storagePath: "logs/errors", retentionDays: 90 }
       },
     };
 

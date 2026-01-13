@@ -40,7 +40,11 @@ export type RouteResolutionResult =
   | {
       success: false;
       error: string;
-      code: "ALIAS_NOT_FOUND" | "NO_ENABLED_TARGETS" | "PROVIDER_NOT_FOUND";
+      code:
+        | "ALIAS_NOT_FOUND"
+        | "NO_ENABLED_TARGETS"
+        | "PROVIDER_NOT_FOUND"
+        | "ALL_PROVIDERS_ON_COOLDOWN";
     };
 
 /**

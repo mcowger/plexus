@@ -3,9 +3,9 @@ import { Dispatcher } from "../src/services/dispatcher";
 import { PlexusErrorResponse } from "../src/types/errors";
 import type { PlexusConfig } from "../src/types/config";
 
-const mockConfig: PlexusConfig = {
+const mockConfig: any = {
   server: { port: 4000, host: "localhost" },
-  logging: { level: "info" },
+  logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
   providers: [
     {
       name: "openai",
@@ -42,7 +42,7 @@ test("Dispatcher - Find Provider for Valid Model", () => {
 
   // This is a private method test, so we'll verify it indirectly through dispatchChatCompletion
   // by checking that it finds the provider correctly
-  expect(mockConfig.providers.find((p) => p.enabled && p.models.includes("gpt-4"))).toBeDefined();
+  expect(mockConfig.providers.find((p: any) => p.enabled && p.models.includes("gpt-4"))).toBeDefined();
 });
 
 test("Dispatcher - Model Not Found", async () => {
@@ -59,7 +59,7 @@ test("Dispatcher - Model Not Found", async () => {
     expect.unreachable();
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(404);
+      expect(error.status).toBe(404);
       expect(error.type).toBe("invalid_request_error");
     } else {
       expect.unreachable();
@@ -81,7 +81,7 @@ test("Dispatcher - Disabled Provider Not Found", async () => {
     expect.unreachable();
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(404);
+      expect(error.status).toBe(404);
       expect(error.type).toBe("invalid_request_error");
     } else {
       expect.unreachable();
@@ -108,7 +108,7 @@ test("Dispatcher - No Providers Configured", async () => {
     expect.unreachable();
   } catch (error) {
     if (error instanceof PlexusErrorResponse) {
-      expect(error.statusCode).toBe(404);
+      expect(error.status).toBe(404);
     } else {
       expect.unreachable();
     }

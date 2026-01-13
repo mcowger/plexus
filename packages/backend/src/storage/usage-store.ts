@@ -179,9 +179,9 @@ export class UsageStore {
 
       const sortedDurations = [...durations].sort((a, b) => a - b);
       summary.performance.p50Duration =
-        sortedDurations[Math.floor(sortedDurations.length * 0.5)];
+        sortedDurations[Math.floor(sortedDurations.length * 0.5)] ?? 0;
       summary.performance.p95Duration =
-        sortedDurations[Math.floor(sortedDurations.length * 0.95)];
+        sortedDurations[Math.floor(sortedDurations.length * 0.95)] ?? 0;
     }
 
     if (ttfts.length > 0) {
@@ -210,8 +210,8 @@ export class UsageStore {
         const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})\.jsonl$/);
         if (!dateMatch) continue;
 
-        const fileDate = dateMatch[1];
-        if (fileDate < cutoffString) {
+        const fileDate = dateMatch[1]!;
+        if (fileDate < cutoffString!) {
           const filePath = join(this.storagePath, file);
           try {
             await unlink(filePath);
@@ -286,8 +286,8 @@ export class UsageStore {
         const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})\.jsonl$/);
         if (!dateMatch) continue;
 
-        const fileDate = dateMatch[1];
-        if (fileDate < cutoffString) {
+        const fileDate = dateMatch[1]!;
+        if (fileDate < cutoffString!) {
           const filePath = join(this.storagePath, file);
           await Bun.file(filePath).writer().end();
           // Note: Bun doesn't have a direct unlink, we'd use fs.unlinkSync if needed
@@ -320,9 +320,9 @@ export class UsageStore {
           const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})\.jsonl$/);
           if (!dateMatch) return false;
 
-          const fileDate = dateMatch[1];
-          if (startDate && fileDate < startDate.split("T")[0]) return false;
-          if (endDate && fileDate > endDate.split("T")[0]) return false;
+          const fileDate = dateMatch[1]!;
+          if (startDate && fileDate < startDate.split("T")[0]!) return false;
+          if (endDate && fileDate > endDate.split("T")[0]!) return false;
 
           return true;
         })

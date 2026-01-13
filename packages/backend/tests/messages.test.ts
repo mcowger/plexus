@@ -7,7 +7,7 @@ import type { ServerContext } from "../src/types/server";
 
 const mockConfig: PlexusConfig = {
   server: { port: 4000, host: "localhost" },
-  logging: { level: "info" },
+  logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
   providers: [
     {
       name: "anthropic",
@@ -34,7 +34,7 @@ const mockConfig: PlexusConfig = {
     },
   ],
   apiKeys: [{ name: "default", secret: "test-key", enabled: true }],
-  pricing: {},
+  pricing: { models: {} },
   resilience: {
     cooldown: {
       defaults: {
@@ -81,7 +81,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(401);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.type).toBe("error");
       expect(body.error.type).toBe("authentication_error");
     });
@@ -141,7 +141,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(401);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error.type).toBe("authentication_error");
     });
   });
@@ -160,7 +160,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(400);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error.type).toBe("invalid_request_error");
     });
 
@@ -180,7 +180,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(400);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error.type).toBe("invalid_request_error");
       expect(body.error.message).toContain("model");
     });
@@ -201,7 +201,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(400);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error.type).toBe("invalid_request_error");
       expect(body.error.message).toContain("messages");
     });
@@ -222,7 +222,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(400);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error.type).toBe("invalid_request_error");
       expect(body.error.message).toContain("max_tokens");
     });
@@ -246,7 +246,7 @@ describe("POST /v1/messages", () => {
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
       expect(response.status).toBe(404);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.type).toBe("error");
     });
   });
@@ -267,7 +267,7 @@ describe("POST /v1/messages", () => {
       });
 
       const response = await handleMessages(req, mockContext, "test-id", "127.0.0.1");
-      const body = await response.json();
+      const body = await response.json() as any;
 
       // Anthropic error format has type and error.type/error.message
       expect(body).toHaveProperty("type");

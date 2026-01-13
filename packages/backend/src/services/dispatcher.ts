@@ -259,7 +259,7 @@ export class Dispatcher {
       if (this.usageLogger && requestContext) {
         try {
           // Parse response to extract usage information
-          const responseBody = await transformedResponse.json();
+          const responseBody = await transformedResponse.json() as any;
           
           // Capture provider and client responses for debug (Phase 7)
           if (this.debugLogger?.enabled) {
@@ -278,17 +278,32 @@ export class Dispatcher {
             await this.debugLogger.completeTrace(requestId);
           }
 
+          let usageInfo: {
+              inputTokens: number;
+              outputTokens: number;
+              cacheReadTokens: number;
+              cacheCreationTokens: number;
+              reasoningTokens: number;
+          } | undefined;
+
+          const clientTransformer = transformerFactory.getTransformer(clientApiType);
+          const rawUsage = responseBody.usage || responseBody.usageMetadata;
+          
+          if (rawUsage) {
+             const unifiedUsage = clientTransformer.parseUsage(rawUsage);
+             usageInfo = {
+                 inputTokens: unifiedUsage.input_tokens,
+                 outputTokens: unifiedUsage.output_tokens,
+                 cacheReadTokens: unifiedUsage.cache_read_tokens || 0,
+                 cacheCreationTokens: unifiedUsage.cache_creation_tokens || 0,
+                 reasoningTokens: unifiedUsage.reasoning_tokens || 0
+             };
+          }
+
           const responseInfo: ResponseInfo = {
             success: true,
             streaming: false,
-            usage: responseBody.usage
-              ? {
-                  inputTokens: responseBody.usage.prompt_tokens || 0,
-                  outputTokens: responseBody.usage.completion_tokens || 0,
-                  cachedTokens: responseBody.usage.prompt_tokens_details?.cached_tokens || 0,
-                  reasoningTokens: responseBody.usage.completion_tokens_details?.reasoning_tokens || 0,
-                }
-              : undefined,
+            usage: usageInfo,
           };
 
           await this.usageLogger.logRequest(requestContext, responseInfo);
@@ -499,22 +514,31 @@ export class Dispatcher {
               // Stream complete - extract usage from final snapshot
               if (finalSnapshot && context) {
                 try {
+                  let usageInfo: {
+                      inputTokens: number;
+                      outputTokens: number;
+                      cacheReadTokens: number;
+                      cacheCreationTokens: number;
+                      reasoningTokens: number;
+                  } | undefined;
+                  
+                  const rawUsage = finalSnapshot.usage || finalSnapshot.usageMetadata;
+                  if (rawUsage) {
+                      const clientTransformer = transformerFactory.getTransformer(clientApiType);
+                      const unifiedUsage = clientTransformer.parseUsage(rawUsage);
+                      usageInfo = {
+                         inputTokens: unifiedUsage.input_tokens,
+                         outputTokens: unifiedUsage.output_tokens,
+                         cacheReadTokens: unifiedUsage.cache_read_tokens || 0,
+                         cacheCreationTokens: unifiedUsage.cache_creation_tokens || 0,
+                         reasoningTokens: unifiedUsage.reasoning_tokens || 0
+                      };
+                  }
+
                   const responseInfo: ResponseInfo = {
                     success: true,
                     streaming: true,
-                    usage: finalSnapshot.usage
-                      ? {
-                          inputTokens: finalSnapshot.usage.prompt_tokens || finalSnapshot.usage.input_tokens || 0,
-                          outputTokens: finalSnapshot.usage.completion_tokens || finalSnapshot.usage.output_tokens || 0,
-                          cachedTokens:
-                            finalSnapshot.usage.prompt_tokens_details?.cached_tokens ||
-                            finalSnapshot.usage.prompt_cache_read_input_tokens ||
-                            0,
-                          reasoningTokens:
-                            finalSnapshot.usage.completion_tokens_details?.reasoning_tokens ||
-                            0,
-                        }
-                      : undefined,
+                    usage: usageInfo,
                   };
 
                   await usageLogger.logRequest(context, responseInfo);
@@ -544,57 +568,26 @@ export class Dispatcher {
             // Pass through the chunk
             controller.enqueue(value);
 
-            // Parse chunk to look for final snapshot
+            // Parse chunk to look for usage
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
             buffer = lines.pop() || ""; // Keep incomplete line in buffer
 
             for (const line of lines) {
-              if (!line.trim()) continue;
+              const trimmedLine = line.trim();
+              if (!trimmedLine || !trimmedLine.startsWith("data: ")) continue;
 
-              // OpenAI format: "data: {...}"
-              if (line.startsWith("data: ") && line.trim() !== "data: [DONE]") {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  
-                  // Store snapshot with usage
-                  if (data.usage) {
-                    finalSnapshot = data;
-                  }
+              if (trimmedLine === "data: [DONE]") continue;
 
-                  // Capture periodic snapshots for debug (every 10 chunks)
-                  if (debugLogger?.enabled && chunkCount % 10 === 0) {
-                    debugLogger.captureStreamSnapshot(context.id, data);
-                  }
-                  chunkCount++;
-                } catch {
-                  // Ignore parse errors
+              try {
+                const data = JSON.parse(trimmedLine.slice(6));
+                
+                // Track latest usage
+                if (data.usage || data.usageMetadata) {
+                  finalSnapshot = data;
                 }
-              }
-
-              // Anthropic format: "event: message_stop" followed by "data: {...}"
-              if (clientApiType === "messages") {
-                if (line.startsWith("event: message_stop")) {
-                  // Next data line should have usage
-                  continue;
-                }
-                if (line.startsWith("data: ")) {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    
-                    if (data.type === "message_stop" || data.usage) {
-                      finalSnapshot = data;
-                    }
-
-                    // Capture periodic snapshots for debug (every 10 chunks)
-                    if (debugLogger?.enabled && chunkCount % 10 === 0) {
-                      debugLogger.captureStreamSnapshot(context.id, data);
-                    }
-                    chunkCount++;
-                  } catch {
-                    // Ignore parse errors
-                  }
-                }
+              } catch (e) {
+                // Ignore parse errors from partial chunks or non-JSON data
               }
             }
           }

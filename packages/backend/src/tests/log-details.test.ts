@@ -69,7 +69,7 @@ describe("Log Details Integration", () => {
     expect(details).not.toBeNull();
     expect(details?.usage.id).toBe("test-req-123");
     expect(details?.traces).toHaveLength(1);
-    expect(details?.traces[0].id).toBe("test-req-123");
+    expect(details!.traces![0]!.id).toBe("test-req-123");
   });
 
   test("getLogDetails returns null for non-existent ID", async () => {

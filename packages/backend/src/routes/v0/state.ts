@@ -114,7 +114,7 @@ function buildStateResponse(context: ServerContext) {
     return {
       name: p.name,
       enabled: p.enabled,
-      healthy: health?.status === 'healthy',
+      healthy: !health?.onCooldown,
       cooldownRemaining,
       metrics: {
         avgLatency: metrics?.avgLatency || 0,

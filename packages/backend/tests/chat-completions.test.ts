@@ -7,7 +7,7 @@ import type { ServerContext } from "../src/types/server";
 
 const mockConfig: PlexusConfig = {
   server: { port: 4000, host: "localhost" },
-  logging: { level: "info" },
+  logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
   providers: [
     {
       name: "openai",
@@ -36,7 +36,7 @@ const mockConfig: PlexusConfig = {
     },
   ],
   apiKeys: [{ name: "default", secret: "test-key-123", enabled: true }],
-  pricing: {},
+  pricing: { models: {} },
   resilience: {
     cooldown: {
       defaults: {
@@ -78,7 +78,7 @@ test("Chat Completions - Missing Authorization Header", async () => {
   const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
   expect(response.status).toBe(401);
 
-  const data = await response.json();
+  const data = await response.json() as any;
   expect(data.error.type).toBe("authentication_error");
 });
 
@@ -95,7 +95,7 @@ test("Chat Completions - Invalid JSON Body", async () => {
   const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
   expect(response.status).toBe(400);
 
-  const data = await response.json();
+  const data = await response.json() as any;
   expect(data.error.type).toBe("invalid_request_error");
 });
 
@@ -114,7 +114,7 @@ test("Chat Completions - Missing Model Field", async () => {
   const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
   expect(response.status).toBe(400);
 
-  const data = await response.json();
+  const data = await response.json() as any;
   expect(data.error.type).toBe("invalid_request_error");
 });
 
@@ -133,7 +133,7 @@ test("Chat Completions - Missing Messages Field", async () => {
   const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
   expect(response.status).toBe(400);
 
-  const data = await response.json();
+  const data = await response.json() as any;
   expect(data.error.type).toBe("invalid_request_error");
 });
 
@@ -153,7 +153,7 @@ test("Chat Completions - Invalid Role in Message", async () => {
   const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
   expect(response.status).toBe(400);
 
-  const data = await response.json();
+  const data = await response.json() as any;
   expect(data.error.type).toBe("invalid_request_error");
 });
 
@@ -173,12 +173,12 @@ test("Chat Completions - Unknown Model", async () => {
   const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
   expect(response.status).toBe(404);
 
-  const data = await response.json();
+  const data = await response.json() as any;
   expect(data.error.type).toBe("invalid_request_error");
 });
 
 test("Chat Completions - Valid Request (with mock provider)", async () => {
-  const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+  const fetchSpy = spyOn(global as any, "fetch").mockResolvedValue(
     new Response(
       JSON.stringify({
         id: "chatcmpl-test-123",
@@ -216,7 +216,7 @@ test("Chat Completions - Valid Request (with mock provider)", async () => {
     const response = await handleChatCompletions(req, mockContext, "test-id", "127.0.0.1");
     expect(response.status).toBe(200);
 
-    const data = await response.json();
+    const data = await response.json() as any;
     expect(data.object).toBe("chat.completion");
     expect(data.model).toBe("gpt-4");
     expect(data.choices).toHaveLength(1);
@@ -227,7 +227,7 @@ test("Chat Completions - Valid Request (with mock provider)", async () => {
 });
 
 test("Chat Completions - Valid with All Optional Fields", async () => {
-  const fetchSpy = spyOn(global, "fetch").mockImplementation(async (url: string | URL | Request, options?: any) => {
+  const fetchSpy = spyOn(global as any, "fetch").mockImplementation(async (url: string | URL | Request, options?: any) => {
     // Verify that all fields were passed through
     const body = JSON.parse(options.body);
     expect(body.temperature).toBe(0.7);

@@ -23,7 +23,8 @@ export interface UsageLogEntry {
   usage: {
     inputTokens: number;
     outputTokens: number;
-    cachedTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
     reasoningTokens: number;
     totalTokens: number;
   };
@@ -83,7 +84,8 @@ export interface UsageSummary {
   tokens: {
     input: number;
     output: number;
-    cached: number;
+    cachedRead: number;
+    cacheCreation: number;
     reasoning: number;
     total: number;
   };

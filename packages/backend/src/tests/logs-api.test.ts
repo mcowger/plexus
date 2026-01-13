@@ -36,7 +36,7 @@ describe("Logs API", () => {
     const res = await handleLogs(req, logQueryService);
     
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     
     expect(body.type).toBe("usage");
     expect(body.total).toBe(2);
@@ -48,7 +48,7 @@ describe("Logs API", () => {
     const res = await handleLogs(req, logQueryService);
     
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     
     expect(body.entries).toHaveLength(1);
     expect(body.entries[0].actualProvider).toBe("openai");

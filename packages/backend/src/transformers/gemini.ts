@@ -1,4 +1,4 @@
-import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, MessageContent } from "./types";
+import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, MessageContent, UnifiedUsage } from "./types";
 import { logger } from "../utils/logger";
 import { Content, Part, Tool } from "@google/genai";
 import { createParser, EventSourceMessage } from "eventsource-parser";
@@ -183,6 +183,35 @@ export class GeminiTransformer implements Transformer {
     return unifiedChatRequest;
   }
 
+  parseUsage(input: any): UnifiedUsage {
+    if (!input) {
+      return {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+      };
+    }
+
+    return {
+      input_tokens: input.promptTokenCount || 0,
+      output_tokens: input.candidatesTokenCount || 0,
+      total_tokens: input.totalTokenCount || 0,
+      reasoning_tokens: input.thoughtsTokenCount || 0,
+      cache_read_tokens: input.cachedContentTokenCount || 0,
+      cache_creation_tokens: 0,
+    };
+  }
+
+  formatUsage(usage: UnifiedUsage): any {
+    return {
+      promptTokenCount: usage.input_tokens,
+      candidatesTokenCount: usage.output_tokens,
+      totalTokenCount: usage.total_tokens,
+      thoughtsTokenCount: usage.reasoning_tokens,
+      cachedContentTokenCount: usage.cache_read_tokens,
+    };
+  }
+
   /**
    * transformRequest (Unified -> Provider)
    */
@@ -326,16 +355,7 @@ export class GeminiTransformer implements Transformer {
       if (part.thoughtSignature) thoughtSignature = part.thoughtSignature;
     });
 
-    const usage = response.usageMetadata
-      ? {
-          input_tokens: response.usageMetadata.promptTokenCount || 0,
-          output_tokens: response.usageMetadata.candidatesTokenCount || 0,
-          total_tokens: response.usageMetadata.totalTokenCount || 0,
-          reasoning_tokens: response.usageMetadata.thoughtsTokenCount || 0,
-          cached_tokens: response.usageMetadata.cachedContentTokenCount || 0,
-          cache_creation_tokens: 0,
-        }
-      : undefined;
+    const usage = response.usageMetadata ? this.parseUsage(response.usageMetadata) : undefined;
 
     return {
       id: response.responseId || "gemini-" + Date.now(),
@@ -385,14 +405,7 @@ export class GeminiTransformer implements Transformer {
       candidates: [
         { content: { role: "model", parts }, finishReason: "STOP", index: 0 },
       ],
-      usageMetadata: response.usage
-        ? {
-            promptTokenCount: response.usage.input_tokens,
-            candidatesTokenCount: response.usage.output_tokens,
-            totalTokenCount: response.usage.total_tokens,
-            thoughtsTokenCount: response.usage.reasoning_tokens,
-          }
-        : undefined,
+      usageMetadata: response.usage ? this.formatUsage(response.usage) : undefined,
       modelVersion: response.model,
     };
   }
@@ -404,6 +417,7 @@ export class GeminiTransformer implements Transformer {
   transformStream(stream: ReadableStream): ReadableStream {
     const decoder = new TextDecoder();
     let parser: any;
+    const self = this;
 
     const transformer = new TransformStream({
       start(controller) {
@@ -465,16 +479,7 @@ export class GeminiTransformer implements Transformer {
                   id: data.responseId,
                   model: data.modelVersion,
                   finish_reason: candidate.finishReason.toLowerCase(),
-                  usage: data.usageMetadata
-                    ? {
-                        input_tokens: data.usageMetadata.promptTokenCount,
-                        output_tokens: data.usageMetadata.candidatesTokenCount,
-                        total_tokens: data.usageMetadata.totalTokenCount,
-                        reasoning_tokens: data.usageMetadata.thoughtsTokenCount,
-                        cached_tokens:
-                          data.usageMetadata.cachedContentTokenCount,
-                      }
-                    : undefined,
+                  usage: data.usageMetadata ? self.parseUsage(data.usageMetadata) : undefined,
                 };
                 logger.silly(
                   `Gemini Transformer: Enqueueing unified chunk (finish)`,
@@ -483,7 +488,7 @@ export class GeminiTransformer implements Transformer {
                 controller.enqueue(chunk);
               }
             } catch (e) {
-              logger.error("Error parsing Gemini stream chunk", e);
+              logger.error("Error parsing Gemini stream chunk", { error: e });
             }
           },
         });
@@ -505,6 +510,7 @@ export class GeminiTransformer implements Transformer {
    */
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
+    const self = this;
 
     const transformer = new TransformStream({
       transform(chunk: any, controller) {
@@ -535,14 +541,7 @@ export class GeminiTransformer implements Transformer {
                 index: 0,
               },
             ],
-            usageMetadata: chunk.usage
-              ? {
-                  promptTokenCount: chunk.usage.input_tokens,
-                  candidatesTokenCount: chunk.usage.output_tokens,
-                  totalTokenCount: chunk.usage.total_tokens,
-                  thoughtsTokenCount: chunk.usage.reasoning_tokens,
-                }
-              : undefined,
+            usageMetadata: chunk.usage ? self.formatUsage(chunk.usage) : undefined,
           };
           const sseMessage = encode({ data: JSON.stringify(geminiChunk) });
           controller.enqueue(encoder.encode(sseMessage));

@@ -69,7 +69,7 @@ describe("State API", () => {
     const res = await handleState(req, context);
     
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     
     expect(body.uptime).toBeDefined();
     expect(body.providers).toHaveLength(2);
@@ -96,7 +96,7 @@ describe("State API", () => {
 
     const res = await handleState(req, context);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     
     expect(body.success).toBe(true);
     expect(body.message).toContain("Debug mode set to true");
@@ -114,7 +114,7 @@ describe("State API", () => {
 
     const res = await handleState(req, context);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     
     expect(body.message).toContain("disabled (persisted)");
     expect(updateConfigSpy).toHaveBeenCalled();

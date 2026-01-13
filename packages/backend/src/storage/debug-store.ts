@@ -114,7 +114,7 @@ export class DebugStore {
       if (dirs.length === 0) return null;
 
       // Use the first match (there should only be one for a unique request ID)
-      const dirPath = join(this.storagePath, dirs[0]);
+      const dirPath = join(this.storagePath, dirs[0]!);
       const traceFile = join(dirPath, "trace.json");
       
       const file = Bun.file(traceFile);

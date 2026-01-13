@@ -1,4 +1,4 @@
-import { Transformer, UnifiedChatRequest, UnifiedChatResponse } from "./types";
+import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedUsage } from "./types";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
 
@@ -58,22 +58,52 @@ export class OpenAITransformer implements Transformer {
     };
   }
 
+  parseUsage(input: any): UnifiedUsage {
+    if (!input) {
+      return {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+      };
+    }
+
+    const reasoningTokens = input.completion_tokens_details?.reasoning_tokens || 0;
+    const completionTokens = input.completion_tokens || 0;
+
+    return {
+      // UnifiedUsage.input_tokens - prompt_tokens is the input superset. It represents every token sent to the model.
+      input_tokens: input.prompt_tokens || 0,
+      // completion_tokens is the response superset. It represents everything the model generated, including reasoning.
+      // So when calculating for conversion to UnifiedUsage, reasoning_tokens should be subtracted from this number.
+      output_tokens: completionTokens - reasoningTokens,
+      total_tokens: input.total_tokens || 0,
+      reasoning_tokens: reasoningTokens,
+      // UnifiedUsage.cache_read_tokens
+      cache_read_tokens: input.prompt_tokens_details?.cached_tokens || 0,
+      cache_creation_tokens: 0,
+    };
+  }
+
+  formatUsage(usage: UnifiedUsage): any {
+    return {
+      prompt_tokens: usage.input_tokens,
+      // Reconstruct completion_tokens superset
+      completion_tokens: usage.output_tokens + (usage.reasoning_tokens || 0),
+      total_tokens: usage.total_tokens,
+      prompt_tokens_details: {
+        cached_tokens: usage.cache_read_tokens || 0,
+      },
+      completion_tokens_details: {
+        reasoning_tokens: usage.reasoning_tokens || 0,
+      },
+    };
+  }
+
   async transformResponse(response: any): Promise<UnifiedChatResponse> {
     const choice = response.choices?.[0];
     const message = choice?.message;
 
-    const usage = response.usage
-      ? {
-          input_tokens: response.usage.prompt_tokens || 0,
-          output_tokens: response.usage.completion_tokens || 0,
-          total_tokens: response.usage.total_tokens || 0,
-          reasoning_tokens:
-            response.usage.completion_tokens_details?.reasoning_tokens || 0,
-          cached_tokens:
-            response.usage.prompt_tokens_details?.cached_tokens || 0,
-          cache_creation_tokens: 0,
-        }
-      : undefined;
+    const usage = response.usage ? this.parseUsage(response.usage) : undefined;
 
     return {
       id: response.id,
@@ -104,20 +134,13 @@ export class OpenAITransformer implements Transformer {
           finish_reason: response.tool_calls ? "tool_calls" : "stop",
         },
       ],
-      usage: response.usage
-        ? {
-            prompt_tokens: response.usage.input_tokens,
-            completion_tokens: response.usage.output_tokens,
-            total_tokens: response.usage.total_tokens,
-            prompt_tokens_details: null,
-            reasoning_tokens: response.usage.reasoning_tokens,
-          }
-        : undefined,
+      usage: response.usage ? this.formatUsage(response.usage) : undefined,
     };
   }
 
   transformStream(stream: ReadableStream): ReadableStream {
     const decoder = new TextDecoder();
+    const self = this;
 
     return new ReadableStream({
       async start(controller) {
@@ -130,19 +153,7 @@ export class OpenAITransformer implements Transformer {
 
               const choice = data.choices?.[0];
 
-              const usage = data.usage
-                ? {
-                    input_tokens: data.usage.prompt_tokens || 0,
-                    output_tokens: data.usage.completion_tokens || 0,
-                    total_tokens: data.usage.total_tokens || 0,
-                    reasoning_tokens:
-                      data.usage.completion_tokens_details?.reasoning_tokens ||
-                      0,
-                    cached_tokens:
-                      data.usage.prompt_tokens_details?.cached_tokens || 0,
-                    cache_creation_tokens: 0,
-                  }
-                : undefined;
+              const usage = data.usage ? self.parseUsage(data.usage) : undefined;
 
               const unifiedChunk = {
                 id: data.id,
@@ -186,6 +197,7 @@ export class OpenAITransformer implements Transformer {
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     const reader = stream.getReader();
+    const self = this;
 
     return new ReadableStream({
       async start(controller) {
@@ -209,19 +221,7 @@ export class OpenAITransformer implements Transformer {
                   finish_reason: unifiedChunk.finish_reason || null,
                 },
               ],
-              usage: unifiedChunk.usage
-                ? {
-                    prompt_tokens: unifiedChunk.usage.input_tokens,
-                    completion_tokens: unifiedChunk.usage.output_tokens,
-                    total_tokens: unifiedChunk.usage.total_tokens,
-                    prompt_tokens_details: {
-                      cached_tokens: unifiedChunk.usage.cached_tokens,
-                    },
-                    completion_tokens_details: {
-                      reasoning_tokens: unifiedChunk.usage.reasoning_tokens,
-                    },
-                  }
-                : undefined,
+              usage: unifiedChunk.usage ? self.formatUsage(unifiedChunk.usage) : undefined,
             };
 
             const sseMessage = encode({ data: JSON.stringify(openAIChunk) });

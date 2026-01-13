@@ -24,8 +24,8 @@ export type PlexusError = z.infer<typeof PlexusErrorSchema>;
 export class PlexusErrorResponse extends Error {
   constructor(
     public type: ErrorType,
-    public message: string,
-    public statusCode: number,
+    message: string,
+    public status: number,
     public code?: string,
     public param?: string
   ) {
@@ -45,6 +45,6 @@ export class PlexusErrorResponse extends Error {
   }
 
   toResponse(): Response {
-    return Response.json(this.toJSON(), { status: this.statusCode });
+    return Response.json(this.toJSON(), { status: this.status });
   }
 }

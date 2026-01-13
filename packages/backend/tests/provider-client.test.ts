@@ -59,9 +59,9 @@ test("Provider Client - Bearer Token Authentication", async () => {
     });
 
     expect(capturedHeaders).not.toBeNull();
-    expect(capturedHeaders?.authorization).toBe("Bearer test-api-key-123");
-    expect(capturedHeaders?.["content-type"]).toBe("application/json");
-    expect(capturedHeaders?.["x-request-id"]).toBe("test-request-id");
+    expect(capturedHeaders!.authorization).toBe("Bearer test-api-key-123");
+    expect(capturedHeaders!["content-type"]).toBe("application/json");
+    expect(capturedHeaders!["x-request-id"]).toBe("test-request-id");
   } finally {
     (global as any).fetch = originalFetch;
   }
@@ -131,7 +131,7 @@ test("Provider Client - X-API-Key Authentication", async () => {
       body: {},
     });
 
-    expect(capturedHeaders?.["x-api-key"]).toBe("custom-key-value");
+    expect(capturedHeaders!["x-api-key"]).toBe("custom-key-value");
   } finally {
     (global as any).fetch = originalFetch;
   }
@@ -168,7 +168,7 @@ test("Provider Client - Direct String API Key", async () => {
       body: {},
     });
 
-    expect(capturedHeaders?.authorization).toBe("Bearer direct-api-key-value");
+    expect(capturedHeaders!.authorization).toBe("Bearer direct-api-key-value");
   } finally {
     (global as any).fetch = originalFetch;
   }
