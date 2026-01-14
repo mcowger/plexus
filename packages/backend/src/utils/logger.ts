@@ -1,4 +1,5 @@
 import pino from "pino";
+import pretty from "pino-pretty";
 import type { LoggingConfig } from "../types/config";
 
 type LogLevel = "silly" | "debug" | "info" | "warn" | "error";
@@ -16,17 +17,20 @@ export class Logger {
     if (pinoInstance) {
       this.pinoLogger = pinoInstance;
     } else {
-      this.pinoLogger = pino({
-        level: "info",
-        transport: {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-            translateTime: "SYS:standard",
-            ignore: "pid,hostname",
-          },
-        },
+      // 2. Create the stream directly
+      const stream = pretty({
+        colorize: true,
+        translateTime: "SYS:standard",
+        ignore: "pid,hostname",
       });
+
+      // 3. Pass the stream as the second argument
+      this.pinoLogger = pino(
+        {
+          level: "info",
+        },
+        stream
+      );
     }
   }
 

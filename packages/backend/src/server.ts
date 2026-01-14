@@ -26,7 +26,8 @@ import { EventEmitter } from "./services/event-emitter";
 import { ConfigManager } from "./services/config-manager";
 import { LogQueryService } from "./services/log-query";
 import { TransformerFactory } from "./services/transformer-factory";
-// @ts-ignore
+
+// @ts-ignore - HTML import
 import frontendHtml from "../../frontend/src/index.html";
 
 function withCORS(response: Response): Response {
@@ -113,14 +114,7 @@ async function router(req: Request, context: ServerContext, adminAuth: AdminAuth
     return withCORS(await handleModels(req, context.config, requestId));
   }
 
-  // Frontend routes - serve HTML for React Router client-side routing
-  if (path === "/ui" || path.startsWith("/ui/")) {
-    return withCORS(new Response(String(frontendHtml), {
-      headers: {
-        "Content-Type": "text/html",
-      },
-    }));
-  }
+
 
   // 404 for unknown routes
   requestLogger.debug("Route not found", { path });
@@ -245,18 +239,20 @@ export async function createServer(config: PlexusConfig): Promise<{ server: any;
   };
 
   const server = Bun.serve({
-    port: config.server.port,
+  port: config.server.port,
     hostname: config.server.host,
     idleTimeout: 60, // 60 seconds to allow for 30s keep-alive heatbeats for SSE
     development: process.env.NODE_ENV !== "production" && {
       hmr: true,
+      console: true,
     },
     routes: {
+      // Frontend UI routes - serve the HTML app
       "/ui": frontendHtml,
       "/ui/*": frontendHtml,
     },
     fetch: (req: Request, server): Promise<Response> | Response => {
-      const clientIp = req.headers.get("x-forwarded-for") || server.requestIP(req)?.address || "0.0.0.0";
+  const clientIp = req.headers.get("x-forwarded-for") || server.requestIP(req)?.address || "0.0.0.0";
       return router(req, context, adminAuth, clientIp);
     },
   });

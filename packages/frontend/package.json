@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun src/index.html --host 0.0.0.0",
-    "build": "bun build src/index.html --outdir=dist --minify",
+    "build": "bun build ./src/index.html --outdir ./dist --minify",
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
@@ -42,7 +42,7 @@
     "@types/react-dom": "^19.0.2",
     "@types/uuid": "^11.0.0",
     "bun-plugin-tailwind": "latest",
-    "tailwindcss": "^3.4.17",
+    "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3"
   }
 }
