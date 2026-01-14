@@ -346,48 +346,6 @@ if (data.type === 'usage') {
 
   return (
     <>
-    <style jsx>{`
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      @keyframes singlePulse {
-        0% {
-          background-color: rgb(219 234 254); /* blue-100 */
-        }
-        100% {
-          background-color: transparent;
-        }
-      }
-      
-      .animate-slide-in {
-        animation: slideIn 0.5s ease-out;
-      }
-      
-      .animate-single-pulse {
-        animation: singlePulse 1s ease-out;
-      }
-      
-      .dark .animate-single-pulse {
-        animation: singlePulseDark 1s ease-out;
-      }
-      
-      @keyframes singlePulseDark {
-        0% {
-          background-color: rgb(30 58 138); /* blue-900 */
-        }
-        100% {
-          background-color: transparent;
-        }
-      }
-    `}</style>
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
