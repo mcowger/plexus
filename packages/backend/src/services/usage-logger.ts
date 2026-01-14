@@ -271,4 +271,89 @@ export class UsageLogger {
       context.firstTokenTime = Date.now();
     }
   }
+
+  /**
+   * Update usage information for a streaming request from reconstructed response
+   * This is called by DebugLogger after it reconstructs the response from stream chunks
+   * @param requestId - Request ID
+   * @param unifiedUsage - Unified usage object from parseUsage()
+   */
+  async updateUsageFromReconstructed(requestId: string, unifiedUsage: any): Promise<void> {
+    if (!this.enabled) {
+      return;
+    }
+
+    try {
+      // First, get the existing usage log entry
+      const existingEntry = await this.usageStore.getById(requestId);
+      
+      if (!existingEntry) {
+        logger.warn("Cannot update usage - entry not found", { requestId });
+        return;
+      }
+
+      // Build updated usage object
+      const usage = {
+        inputTokens: unifiedUsage.input_tokens || 0,
+        outputTokens: unifiedUsage.output_tokens || 0,
+        cacheReadTokens: unifiedUsage.cache_read_tokens || 0,
+        cacheCreationTokens: unifiedUsage.cache_creation_tokens || 0,
+        reasoningTokens: unifiedUsage.reasoning_tokens || 0,
+        totalTokens: 0,
+      };
+      usage.totalTokens = usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheCreationTokens + usage.reasoningTokens;
+
+      // Recalculate cost with updated token counts
+      const costResult = await this.costCalculator.calculateCost({
+        model: existingEntry.actualModel,
+        provider: existingEntry.actualProvider,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cachedTokens: usage.cacheReadTokens,
+        reasoningTokens: usage.reasoningTokens,
+      });
+
+      const cost = {
+        inputCost: costResult.inputCost,
+        outputCost: costResult.outputCost,
+        cachedCost: costResult.cachedCost,
+        reasoningCost: costResult.reasoningCost,
+        totalCost: costResult.totalCost,
+        currency: "USD" as const,
+        source: costResult.source,
+      };
+
+      // Update the usage store
+      const updated = await this.usageStore.updateUsage(requestId, usage, cost);
+
+      if (updated) {
+        logger.info("Updated usage log from reconstructed stream response", {
+          requestId,
+          totalTokens: usage.totalTokens,
+          totalCost: cost.totalCost,
+        });
+
+        // Emit event for updated usage
+        if (this.eventEmitter) {
+          this.eventEmitter.emitEvent("usage", {
+            requestId,
+            alias: existingEntry.aliasUsed,
+            provider: existingEntry.actualProvider,
+            model: existingEntry.actualModel,
+            success: true,
+            tokens: usage.totalTokens,
+            cost: cost.totalCost,
+            duration: existingEntry.metrics.durationMs,
+            updated: true, // Flag to indicate this was an update
+          });
+        }
+      }
+    } catch (error) {
+      logger.error("Failed to update usage from reconstructed response", {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - this shouldn't break the debug logging flow
+    }
+  }
 }

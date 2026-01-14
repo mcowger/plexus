@@ -289,6 +289,86 @@ export class UsageStore {
   }
 
   /**
+   * Update usage information for an existing log entry
+   * This is used to backfill usage data for streaming requests after reconstruction
+   * @param requestId - The unique request ID to update
+   * @param usage - Updated usage information
+   * @param cost - Updated cost information
+   */
+  async updateUsage(
+    requestId: string,
+    usage: UsageLogEntry["usage"],
+    cost: UsageLogEntry["cost"]
+  ): Promise<boolean> {
+    try {
+      const glob = new Bun.Glob("*.jsonl");
+      const files = Array.from(glob.scanSync(this.storagePath)).sort().reverse();
+
+      for (const fileName of files) {
+        const filePath = join(this.storagePath, fileName);
+        const file = Bun.file(filePath);
+        const content = await file.text();
+        const lines = content.trim().split("\n");
+
+        let updated = false;
+        const updatedLines: string[] = [];
+
+        for (const line of lines) {
+          if (!line) {
+            updatedLines.push(line);
+            continue;
+          }
+
+          try {
+            if (line.includes(requestId)) {
+              const entry: UsageLogEntry = JSON.parse(line);
+              if (entry.id === requestId) {
+                // Update the entry
+                entry.usage = usage;
+                entry.cost = cost;
+                updatedLines.push(JSON.stringify(entry));
+                updated = true;
+                logger.debug("Updated usage log entry", {
+                  requestId,
+                  file: fileName,
+                });
+                continue;
+              }
+            }
+          } catch (e) {
+            // If parse fails, keep original line
+            logger.warn("Failed to parse line during update", {
+              file: fileName,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+
+          updatedLines.push(line);
+        }
+
+        if (updated) {
+          // Write updated content back to file
+          await Bun.write(filePath, updatedLines.join("\n") + "\n");
+          logger.info("Updated usage log file", {
+            requestId,
+            file: fileName,
+          });
+          return true;
+        }
+      }
+
+      logger.warn("Usage log entry not found for update", { requestId });
+      return false;
+    } catch (error) {
+      logger.error("Failed to update usage log", {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
    * Clean up old log files based on retention policy
    */
   async cleanup(): Promise<void> {

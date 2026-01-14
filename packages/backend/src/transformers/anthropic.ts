@@ -936,8 +936,13 @@ export class AnthropicTransformer implements Transformer {
               result.stop_reason = parsed.delta.stop_reason;
             }
             if (parsed.usage) {
-        // Anthropic usually sends cumulative output tokens here
-              result.usage!.output_tokens = parsed.usage.output_tokens;
+        // Anthropic sends final cumulative usage in message_delta
+              if (parsed.usage.input_tokens !== undefined) {
+                result.usage!.input_tokens = parsed.usage.input_tokens;
+              }
+              if (parsed.usage.output_tokens !== undefined) {
+                result.usage!.output_tokens = parsed.usage.output_tokens;
+              }
             }
             break;
         }

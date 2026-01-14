@@ -218,7 +218,7 @@ export async function createServer(config: PlexusConfig): Promise<{ server: any;
       enabled: config.logging.debug.enabled,
       storagePath: config.logging.debug.storagePath,
       retentionDays: config.logging.debug.retentionDays,
-    }, debugStore, transformerFactory);
+    }, debugStore, transformerFactory, usageLogger);
     
      // DebugLogger.initialize() also calls store.initialize(), but it's safe to call idempotent
      await debugLogger.initialize();

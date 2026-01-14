@@ -211,6 +211,34 @@ export class Dispatcher {
           ),
         });
 
+        // Log initial usage entry for streaming request (with 0 tokens)
+        // This will be updated later when the stream completes and response is reconstructed
+        if (this.context.usageLogger) {
+          try {
+            const responseInfo: ResponseInfo = {
+              success: true,
+              streaming: true,
+              usage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                cacheCreationTokens: 0,
+                reasoningTokens: 0,
+              },
+            };
+
+            await this.context.usageLogger.logRequest(requestContext, responseInfo);
+            requestLogger.debug("Created initial usage log entry for streaming request", {
+              requestId,
+            });
+          } catch (error) {
+            requestLogger.error("Failed to log initial streaming usage", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            // Don't throw - logging failures shouldn't break requests
+          }
+        }
+
         // --- TAP 1: Raw Provider Response (Silent / False) ---
         const providerTap = new StreamTap(this.context.debugLogger!, requestId, false);
 

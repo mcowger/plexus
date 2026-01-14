@@ -1,6 +1,7 @@
 import type { DebugTraceEntry } from "../types/debug";
 import type { ApiType } from "./transformer-factory";
 import type { TransformerFactory } from "./transformer-factory";
+import type { UsageLogger } from "./usage-logger";
 import { DebugStore } from "../storage/debug-store";
 import { logger } from "../utils/logger";
 
@@ -20,11 +21,18 @@ export class DebugLogger {
   private store: DebugStore;
   private traces: Map<string, Partial<DebugTraceEntry>> = new Map();
   private transformerFactory?: TransformerFactory;
+  private usageLogger?: UsageLogger;
 
-  constructor(private config: DebugConfig, store?: DebugStore, transformerFactory?: TransformerFactory) {
+  constructor(
+    private config: DebugConfig, 
+    store?: DebugStore, 
+    transformerFactory?: TransformerFactory,
+    usageLogger?: UsageLogger
+  ) {
     this.store =
       store || new DebugStore(config.storagePath, config.retentionDays);
     this.transformerFactory = transformerFactory;
+    this.usageLogger = usageLogger;
   }
 
   /**
@@ -435,6 +443,46 @@ export class DebugLogger {
             }
           } catch (error) {
             logger.warn("Failed to reconstruct client response from stream", {
+              requestId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
+        // Extract usage from reconstructed client response and update usage log
+        // We use the CLIENT response because it contains the complete usage data
+        // after transformation and aggregation from all stream chunks
+        if (
+          this.usageLogger &&
+          trace.clientResponse?.body &&
+          trace.clientResponse?.type === "reconstructed" &&
+          trace.clientRequest?.apiType
+        ) {
+          try {
+            const transformer = this.transformerFactory.getTransformer(
+              trace.clientRequest.apiType
+            );
+            
+            const clientBody = trace.clientResponse.body;
+            
+            // Check if response contains usage data
+            if (clientBody?.usage || clientBody?.usageMetadata) {
+              const rawUsage = clientBody.usage || clientBody.usageMetadata;
+              const unifiedUsage = transformer.parseUsage(rawUsage);
+              
+              logger.debug("Extracted usage from reconstructed response", {
+                requestId,
+                usage: unifiedUsage,
+              });
+
+              // Update usage log entry with reconstructed usage data
+              await this.usageLogger.updateUsageFromReconstructed(
+                requestId,
+                unifiedUsage
+              );
+            }
+          } catch (error) {
+            logger.warn("Failed to extract usage from reconstructed response", {
               requestId,
               error: error instanceof Error ? error.message : String(error),
             });
