@@ -8,7 +8,13 @@
   "scripts": {
     "dev": "bun --watch packages/backend/src/index.ts",
     "test": "bun test",
-    "typecheck": "bun --workspaces run typecheck"
+    "typecheck": "bun --workspaces run typecheck",
+    "start": "NODE_ENV=production bun packages/backend/src/index.ts",
+    "compile:macos": "bun build packages/backend/src/index.ts --compile --target bun-darwin-arm64 --outfile dist/plexus2-macos",
+    "compile:linux": "bun build packages/backend/src/index.ts --compile --target bun-linux-x64-modern --outfile dist/plexus2-linux-x64",
+    "compile:windows": "bun build packages/backend/src/index.ts --compile --target bun-win-x64 --outfile dist/plexus2-windows-x64.exe",
+    "compile:linux-arm64": "bun build packages/backend/src/index.ts --compile --target bun-linux-arm64 --outfile dist/plexus2-linux-arm64",
+    "compile:all": "bun run compile:macos && bun run compile:linux && bun run compile:windows && bun run compile:linux-arm64"
   },
   "devDependencies": {
     "@microsoft/fetch-event-source": "^2.0.1",

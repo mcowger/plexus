@@ -2,3 +2,4 @@ node_modules
 config/plexus.yaml
 data/*
 dist/
+*.exe

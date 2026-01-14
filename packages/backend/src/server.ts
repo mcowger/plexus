@@ -239,17 +239,17 @@ export async function createServer(config: PlexusConfig): Promise<{ server: any;
   };
 
   const server = Bun.serve({
-  port: config.server.port,
+    port: config.server.port,
     hostname: config.server.host,
     idleTimeout: 60, // 60 seconds to allow for 30s keep-alive heatbeats for SSE
-    development: process.env.NODE_ENV !== "production" && {
+    development: process.env.NODE_ENV !== "production" ? {
       hmr: true,
       console: true,
-    },
+    } : false,
     routes: {
       // Frontend UI routes - serve the HTML app
       "/ui": frontendHtml,
-      "/ui/*": frontendHtml,
+    "/ui/*": frontendHtml,
     },
     fetch: (req: Request, server): Promise<Response> | Response => {
   const clientIp = req.headers.get("x-forwarded-for") || server.requestIP(req)?.address || "0.0.0.0";
