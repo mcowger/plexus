@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Trash2, ChevronLeft, ChevronRight, Bug, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const activeSSEConnections = new Set<AbortController>();
 
@@ -237,9 +237,42 @@ export function LogsPage() {
         if (!msg.data) return;
         try {
           const data = JSON.parse(msg.data);
-          if (data.type === 'usage') {
+          
+if (data.type === 'usage') {
             console.log('[SSE] Usage event received', data);
-            fetchLogsRef.current?.();
+            // Append new entry instead of refetching all logs
+            setLogs(prevLogs => {
+              // The SSE data is now the complete UsageLog object
+              const newLog = data.data as UsageLog;
+              
+              // Ensure we have a valid log with an ID
+              if (!newLog || !newLog.id) {
+                console.log('[SSE] Invalid log entry received', newLog);
+                return prevLogs;
+              }
+              
+              // Check if this is an update event
+              if (newLog.updated) {
+                // Replace existing log entry completely
+                return prevLogs.map(log => 
+                  log.id === newLog.id ? newLog : log
+                );
+              } else {
+                // Check if log already exists to avoid duplicates
+                const exists = prevLogs.some(log => log.id === newLog.id);
+                if (exists) return prevLogs;
+                
+                // Add new log to the beginning (newest first)
+                const updatedLogs = [newLog, ...prevLogs];
+                // Keep only the most recent 100 entries to prevent memory issues
+                return updatedLogs.slice(0, 100);
+              }
+            });
+            
+            // Only increment total for new entries, not updates
+            if (!data.data?.updated) {
+              setTotal(prev => prev + 1);
+            }
           } else if (data.type === 'heartbeat') {
             console.log('[SSE] Heartbeat', new Date().toISOString());
           }
@@ -443,17 +476,17 @@ export function LogsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (log.id) {
-                            handleShowDebug(log.id);
-                          }
-                        }}
-                      >
-                        <Bug className="h-4 w-4" />
-                      </Button>
+<Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => {
+                           if (log.id) {
+                             handleShowDebug(log.id);
+                           }
+                         }}
+                       >
+                         <Info className="h-4 w-4" />
+                       </Button>
                       {log.error && (
                         <Button variant="ghost" size="sm">
                           <AlertTriangle className="h-4 w-4" />
@@ -536,18 +569,18 @@ export function LogsPage() {
     <Dialog open={debugDialogOpen} onOpenChange={setDebugDialogOpen}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Debug Trace Details</DialogTitle>
+          <DialogTitle>Log Details</DialogTitle>
           <DialogDescription>
             Request ID: {selectedLogId}
           </DialogDescription>
         </DialogHeader>
         {detailsLoading ? (
           <div className="flex items-center justify-center py-8">
-            Loading debug traces...
+            Loading log details...
           </div>
         ) : !logDetails ? (
           <div className="flex items-center justify-center py-8">
-            No debug traces available
+            No log details available
           </div>
         ) : (
           <div className="space-y-4">
@@ -574,55 +607,7 @@ export function LogsPage() {
               </div>
             )}
 
-            {logDetails.traces && logDetails.traces.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="font-semibold">Request/Response Traces</h3>
-                {logDetails.traces.map((trace: any, index: number) => (
-                  <div key={index} className="bg-muted p-4 rounded-lg space-y-3">
-                    <div className="flex justify-between items-center text-sm text-muted-foreground">
-                      <span>Trace #{index + 1}</span>
-                      <span>{formatTimestamp(trace.timestamp)}</span>
-                    </div>
-
-                    {trace.clientRequest && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2 text-green-700">Client Request</h4>
-                        <pre className="bg-background p-3 rounded text-xs overflow-auto max-h-48">
-                          {JSON.stringify(trace.clientRequest, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-
-                    {trace.unifiedRequest && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2 text-blue-700">Unified Request</h4>
-                        <pre className="bg-background p-3 rounded text-xs overflow-auto max-h-48">
-                          {JSON.stringify(trace.unifiedRequest, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-
-                    {trace.providerRequest && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2 text-purple-700">Provider Request</h4>
-                        <pre className="bg-background p-3 rounded text-xs overflow-auto max-h-48">
-                          {JSON.stringify(trace.providerRequest, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-
-                    {trace.clientResponse && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2 text-orange-700">Client Response</h4>
-                        <pre className="bg-background p-3 rounded text-xs overflow-auto max-h-48">
-                          {JSON.stringify(trace.clientResponse, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            
 
             {logDetails.errors && logDetails.errors.length > 0 && (
               <div className="bg-destructive/10 p-4 rounded-lg">

@@ -236,18 +236,9 @@ export class UsageLogger {
     this.metricsCollector.recordRequest(requestMetrics);
 
     // Emit event
-    if (this.eventEmitter) {
-      this.eventEmitter.emitEvent("usage", {
-        requestId: entry.id,
-        alias: entry.aliasUsed,
-        provider: entry.actualProvider,
-        model: entry.actualModel,
-        success: true,
-        tokens: entry.usage.totalTokens,
-        cost: entry.cost.totalCost,
-        duration: entry.metrics.durationMs
-      });
-    }
+if (this.eventEmitter) {
+        this.eventEmitter.emitEvent("usage", entry);
+      }
 
     logger.debug("Usage logged", {
       requestId: context.id,
@@ -439,17 +430,14 @@ export class UsageLogger {
 
         // Emit event for updated usage
         if (this.eventEmitter) {
-          this.eventEmitter.emitEvent("usage", {
-            requestId,
-            alias: existingEntry.aliasUsed,
-            provider: existingEntry.actualProvider,
-            model: existingEntry.actualModel,
-            success: true,
-            tokens: usage.totalTokens,
-            cost: cost.totalCost,
-            duration: existingEntry.metrics.durationMs,
-            updated: true, // Flag to indicate this was an update
-          });
+          const updatedEntry = {
+            ...existingEntry,
+            usage,
+            cost,
+            pending: false, // Request is no longer pending
+            updated: true // Flag to indicate this was an update
+          };
+          this.eventEmitter.emitEvent("usage", updatedEntry);
         }
       }
     } catch (error) {
