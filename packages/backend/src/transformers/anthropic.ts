@@ -5,7 +5,9 @@ import {
   UnifiedMessage,
   UnifiedTool,
   MessageContent,
-  UnifiedUsage
+  UnifiedUsage,
+  ReconstructedMessagesResponse,
+  AnthropicContentBlock
 } from "./types";
 import { logger } from "../utils/logger";
 import { getThinkLevel, formatBase64 } from "./utils";
@@ -875,5 +877,75 @@ export class AnthropicTransformer implements Transformer {
       description: t.function.description,
       input_schema: t.function.parameters,
     }));
+  }
+
+  /**
+   * Reconstructs an Anthropic Message response from raw SSE stream data.
+   */
+  reconstructResponseFromStream(rawSSE: string): ReconstructedMessagesResponse | null {
+    const lines = rawSSE.split(/\r?\n/);
+
+    let result: Partial<ReconstructedMessagesResponse> = {
+      content: [],
+      usage: { input_tokens: 0, output_tokens: 0 }
+    };
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+
+      const dataString = line.replace("data: ", "").trim();
+      if (dataString === "[DONE]") continue;
+
+    try {
+        const parsed = JSON.parse(dataString);
+        switch (parsed.type) {
+          case "message_start":
+            result.id = parsed.message.id;
+         result.role = parsed.message.role;
+      result.model = parsed.message.model;
+        result.type = "message";
+            result.usage!.input_tokens = parsed.message.usage.input_tokens;
+            break;
+
+       case "content_block_start":
+            // Initialize the block at the specific index
+        const index = parsed.index;
+            result.content![index] = {
+              type: parsed.content_block.type,
+          ...(parsed.content_block.type === "text" ? { text: "" } : {}),
+              ...(parsed.content_block.type === "thinking" ? { thinking: "" } : {}),
+            };
+            break;
+
+          case "content_block_delta":
+            const deltaIndex = parsed.index;
+       const block = result.content![deltaIndex];
+
+            if (block && parsed.delta.type === "text_delta") {
+            block.text = (block.text || "") + parsed.delta.text;
+          } else if (block && parsed.delta.type === "thinking_delta") {
+              block.thinking = (block.thinking || "") + parsed.delta.thinking;
+            } else if (block && parsed.delta.type === "input_json_delta") {
+        // Used for tool use reconstruction
+            block.input = (block.input || "") + parsed.delta.partial_json;
+            }
+            break;
+
+          case "message_delta":
+       if (parsed.delta.stop_reason) {
+              result.stop_reason = parsed.delta.stop_reason;
+            }
+            if (parsed.usage) {
+        // Anthropic usually sends cumulative output tokens here
+              result.usage!.output_tokens = parsed.usage.output_tokens;
+            }
+            break;
+        }
+      } catch (e) {
+        // Ignore parse errors for non-JSON lines
+      }
+    }
+
+    return result.id ? (result as ReconstructedMessagesResponse) : null;
   }
 }

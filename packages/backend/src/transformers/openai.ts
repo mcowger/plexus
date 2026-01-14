@@ -1,4 +1,4 @@
-import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedUsage } from "./types";
+import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedUsage, ReconstructedChatResponse } from "./types";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
 
@@ -204,9 +204,9 @@ export class OpenAITransformer implements Transformer {
     return new ReadableStream({
       async start(controller) {
         try {
-          while (true) {
-            const { done, value: unifiedChunk } = await reader.read();
-            if (done) {
+       while (true) {
+         const { done, value: unifiedChunk } = await reader.read();
+        if (done) {
               controller.enqueue(encoder.encode(encode({ data: "[DONE]" })));
               break;
             }
@@ -214,27 +214,100 @@ export class OpenAITransformer implements Transformer {
             const openAIChunk = {
               id: unifiedChunk.id || "chatcmpl-" + Date.now(),
               object: "chat.completion.chunk",
-              created: unifiedChunk.created || Math.floor(Date.now() / 1000),
+           created: unifiedChunk.created || Math.floor(Date.now() / 1000),
               model: unifiedChunk.model,
               choices: [
                 {
                   index: 0,
                   delta: unifiedChunk.delta,
-                  finish_reason: unifiedChunk.finish_reason || null,
+        finish_reason: unifiedChunk.finish_reason || null,
                 },
               ],
               usage: unifiedChunk.usage ? self.formatUsage(unifiedChunk.usage) : undefined,
-            };
+         };
 
             const sseMessage = encode({ data: JSON.stringify(openAIChunk) });
 
             controller.enqueue(encoder.encode(sseMessage));
           }
         } finally {
-          reader.releaseLock();
+        reader.releaseLock();
           controller.close();
         }
-      },
-    });
+       },
+     });
+   }
+
+  /**
+   * Reconstructs a full JSON response body from a raw SSE string.
+   */
+  reconstructResponseFromStream(rawSSE: string): ReconstructedChatResponse | null {
+    const lines = rawSSE.split(/\r?\n/);
+
+    let id = "";
+    let model = "";
+    let created = 0;
+    let accumulatedContent = "";
+    let accumulatedReasoning = "";
+    let finishReason = "stop";
+    let usageMetadata: any = null;
+
+    for (const line of lines) {
+    // Skip comments (lines starting with ':') or empty lines
+   if (!line.startsWith("data: ") || line === "data: [DONE]") {
+      continue;
+      }
+
+      // Remove "data: " prefix and parse JSON
+      const jsonString = line.replace(/^data: /, "").trim();
+      try {
+        const chunk: any = JSON.parse(jsonString);
+
+        // Capture metadata from the first valid chunk
+        if (!id) id = chunk.id;
+        if (!model) model = chunk.model;
+        if (!created) created = chunk.created;
+
+        // Accumulate Content and Reasoning
+        const delta = chunk.choices?.[0]?.delta;
+        if (delta) {
+        if (delta.content) accumulatedContent += delta.content;
+          if (delta.reasoning) accumulatedReasoning += delta.reasoning;
+        }
+
+        // Capture Finish Reason
+        if (chunk.choices?.[0]?.finish_reason) {
+       finishReason = chunk.choices[0].finish_reason;
+        }
+
+        // Capture Usage (usually in the last chunk)
+      if (chunk.usage) {
+          usageMetadata = chunk.usage;
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    if (!id) return null;
+
+    return {
+      id,
+      model,
+      object: "chat.completion",
+      created,
+    choices: [
+      {
+          index: 0,
+          message: {
+            role: "assistant",
+          content: accumulatedContent,
+            ...(accumulatedReasoning ? { reasoning: accumulatedReasoning } : {}),
+          },
+          finish_reason: finishReason,
+        },
+      ],
+      usage: usageMetadata,
+    };
   }
 }

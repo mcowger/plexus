@@ -1,5 +1,6 @@
 import type { DebugTraceEntry } from "../types/debug";
 import type { ApiType } from "./transformer-factory";
+import type { TransformerFactory } from "./transformer-factory";
 import { DebugStore } from "../storage/debug-store";
 import { logger } from "../utils/logger";
 
@@ -18,10 +19,12 @@ export interface DebugConfig {
 export class DebugLogger {
   private store: DebugStore;
   private traces: Map<string, Partial<DebugTraceEntry>> = new Map();
+  private transformerFactory?: TransformerFactory;
 
-  constructor(private config: DebugConfig, store?: DebugStore) {
+  constructor(private config: DebugConfig, store?: DebugStore, transformerFactory?: TransformerFactory) {
     this.store =
       store || new DebugStore(config.storagePath, config.retentionDays);
+    this.transformerFactory = transformerFactory;
   }
 
   /**
@@ -242,6 +245,7 @@ export class DebugLogger {
         status,
         headers,
         body,
+        type: "original",
       };
     }
     logger.debug("Captured provider response", { requestId, status });
@@ -267,6 +271,7 @@ export class DebugLogger {
       trace.clientResponse = {
         status,
         body,
+        type: "original",
       };
     }
     logger.debug("Captured client response", { requestId, status });
@@ -349,6 +354,92 @@ export class DebugLogger {
       if (!trace.id || !trace.timestamp) {
         logger.warn("Incomplete debug trace, skipping storage", { requestId });
         return;
+      }
+
+      // Reconstruct responses from stream chunks if needed
+      if (this.transformerFactory) {
+        // Reconstruct provider response from stream chunks
+        if (
+          trace.providerStreamChunks &&
+          trace.providerStreamChunks.length > 0 &&
+          !trace.providerResponse?.body &&
+          trace.providerRequest?.apiType
+        ) {
+          try {
+            const transformer = this.transformerFactory.getTransformer(
+              trace.providerRequest.apiType
+            );
+            
+            if (transformer.reconstructResponseFromStream) {
+              // Combine all stream chunks into one string
+              const rawSSE = trace.providerStreamChunks
+                .map((item) => item.chunk)
+                .join("");
+
+              const reconstructed = transformer.reconstructResponseFromStream(rawSSE);
+              
+              if (reconstructed) {
+                trace.providerResponse = {
+                  status: trace.providerResponse?.status || 200,
+                  headers: trace.providerResponse?.headers || {},
+                  body: reconstructed,
+                  type: "reconstructed",
+                };
+                
+                logger.debug("Reconstructed provider response from stream", {
+                  requestId,
+                  apiType: trace.providerRequest.apiType,
+                });
+              }
+            }
+          } catch (error) {
+            logger.warn("Failed to reconstruct provider response from stream", {
+              requestId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
+        // Reconstruct client response from stream chunks
+        if (
+          trace.clientStreamChunks &&
+          trace.clientStreamChunks.length > 0 &&
+          !trace.clientResponse?.body &&
+          trace.clientRequest?.apiType
+        ) {
+          try {
+            const transformer = this.transformerFactory.getTransformer(
+              trace.clientRequest.apiType
+            );
+            
+            if (transformer.reconstructResponseFromStream) {
+              // Combine all stream chunks into one string
+              const rawSSE = trace.clientStreamChunks
+                .map((item) => item.chunk)
+                .join("");
+
+              const reconstructed = transformer.reconstructResponseFromStream(rawSSE);
+              
+              if (reconstructed) {
+                trace.clientResponse = {
+                  status: trace.clientResponse?.status || 200,
+                  body: reconstructed,
+                  type: "reconstructed",
+                };
+                
+                logger.debug("Reconstructed client response from stream", {
+                  requestId,
+                  apiType: trace.clientRequest.apiType,
+                });
+              }
+            }
+          } catch (error) {
+            logger.warn("Failed to reconstruct client response from stream", {
+              requestId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
       }
 
       // RESTORED: Your full original debug metadata block

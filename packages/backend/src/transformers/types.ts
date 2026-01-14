@@ -202,6 +202,53 @@ export interface StreamTransformOptions {
   requestId?: string;
 }
 
+export interface ReconstructedChatResponse {
+  id: string;
+  model: string;
+  object: string;
+  created: number;
+  choices: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+      reasoning_content?: string;
+      tool_calls?: Array<{
+        id: string;
+        type: "function";
+        function: {
+          name: string;
+          arguments: string;
+        };
+      }>;
+    };
+    finish_reason: string | null;
+  }>;
+  usage?: any;
+}
+
+export interface AnthropicContentBlock {
+  type: "text" | "thinking" | "tool_use";
+  text?: string;
+  thinking?: string;
+  id?: string; // for tool_use
+  name?: string;
+  input?: any;
+}
+
+export interface ReconstructedMessagesResponse {
+  id: string;
+  type: "message";
+  role: string;
+  model: string;
+  content: AnthropicContentBlock[];
+  stop_reason: string | null;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
 export interface Transformer {
   name: string;
   defaultEndpoint: string;
@@ -214,4 +261,5 @@ export interface Transformer {
   formatUsage(usage: UnifiedUsage): any;
   transformStream?(stream: ReadableStream, options?: StreamTransformOptions): ReadableStream;
   formatStream?(stream: ReadableStream, options?: StreamTransformOptions): ReadableStream;
+  reconstructResponseFromStream?(rawSSE: string): ReconstructedChatResponse | ReconstructedMessagesResponse | null;
 }

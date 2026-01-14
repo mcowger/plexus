@@ -401,7 +401,7 @@ paths:
                   traces:
                     type: array
                     items:
-                      type: object
+                      $ref: '#/components/schemas/DebugTraceEntry'
                     description: Array of debug trace entries
         '404':
           description: Log entry not found
@@ -573,6 +573,94 @@ components:
           properties:
             provider:
               type: string
+
+    DebugTraceEntry:
+      type: object
+      required: [id, timestamp, clientRequest, providerRequest]
+      properties:
+        id:
+          type: string
+          description: Request ID
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+        clientRequest:
+          type: object
+          required: [apiType, body, headers]
+          properties:
+            apiType:
+              type: string
+              enum: [chat, messages, gemini]
+            body:
+              type: object
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+        providerRequest:
+          type: object
+          required: [apiType, body, headers]
+          properties:
+            apiType:
+              type: string
+              enum: [chat, messages, gemini]
+            body:
+              type: object
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+        providerResponse:
+          type: object
+          properties:
+            status:
+              type: integer
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+            body:
+              type: object
+            type:
+              type: string
+              enum: [original, reconstructed]
+              description: Indicates if response is original (non-streaming) or reconstructed from stream chunks
+        clientResponse:
+          type: object
+          properties:
+            status:
+              type: integer
+            body:
+              type: object
+            type:
+              type: string
+              enum: [original, reconstructed]
+              description: Indicates if response is original (non-streaming) or reconstructed from stream chunks
+        providerStreamChunks:
+          type: array
+          items:
+            type: object
+            required: [timestamp, chunk]
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              chunk:
+                type: string
+                description: Raw SSE chunk text
+        clientStreamChunks:
+          type: array
+          items:
+            type: object
+            required: [timestamp, chunk]
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              chunk:
+                type: string
+                description: Raw SSE chunk text
 
 tags:
   - name: Configuration

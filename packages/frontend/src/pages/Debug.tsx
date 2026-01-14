@@ -6,38 +6,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import MonacoEditor from '@/components/ui/monaco-editor';
 import { Copy, Trash2, Clock } from 'lucide-react';
+import type { components } from '@/lib/management';
 
-interface DebugLog {
-  id: string;
-  timestamp: string;
-  clientRequest?: {
-    apiType: string;
-    body: Record<string, unknown>;
-    headers: Record<string, string>;
-  };
-  providerRequest?: {
-    apiType: string;
-    body: Record<string, unknown>;
-    headers: Record<string, string>;
-  };
-  providerResponse?: {
-    status: number;
-    headers: Record<string, string>;
-    body: Record<string, unknown>;
-  };
-  clientResponse?: {
-    status: number;
-    body: Record<string, unknown>;
-  };
-  providerStreamChunks?: Array<{
-    timestamp: string;
-    chunk: string;
-  }>;
-  clientStreamChunks?: Array<{
-    timestamp: string;
-    chunk: string;
-  }>;
-}
+type DebugLog = components['schemas']['DebugTraceEntry'];
 
 interface DebugLogListItem {
   id: string;
@@ -131,6 +102,19 @@ export function DebugPage() {
     }
   };
 
+  const renderResponseTypeBadge = (type?: 'original' | 'reconstructed') => {
+    if (!type) return null;
+    
+    return (
+      <Badge 
+        variant={type === 'original' ? 'default' : 'secondary'}
+        className="ml-2"
+      >
+        {type === 'original' ? 'Original' : 'Reconstructed'}
+      </Badge>
+    );
+  };
+
   return (
     <div className="p-6 space-y-6 h-[calc(100vh-100px)]">
       <div className="flex items-center justify-between">
@@ -207,7 +191,7 @@ export function DebugPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
-                <Accordion type="multiple" defaultValue={["client-request", "unified-request"]} className="w-full">
+                <Accordion type="multiple" defaultValue={["client-request", "provider-request"]} className="w-full">
                   {selectedLog.clientRequest && (
                     <AccordionItem value="client-request">
                       <AccordionTrigger className="hover:no-underline">
@@ -227,35 +211,6 @@ export function DebugPage() {
                           </div>
                           <MonacoEditor
                             value={formatContent(selectedLog.clientRequest)}
-                            language="json"
-                            height="300px"
-                            className="rounded-md"
-                            options={{ readOnly: true }}
-                          />
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  )}
-
-                  {selectedLog.unifiedRequest && (
-                    <AccordionItem value="unified-request">
-                      <AccordionTrigger className="hover:no-underline">
-                        Unified Request
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyToClipboard(formatContent(selectedLog.unifiedRequest))}
-                            >
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy
-                            </Button>
-                          </div>
-                          <MonacoEditor
-                            value={formatContent(selectedLog.unifiedRequest)}
                             language="json"
                             height="300px"
                             className="rounded-md"
@@ -298,7 +253,10 @@ export function DebugPage() {
                   {selectedLog.providerResponse && (
                     <AccordionItem value="provider-response">
                       <AccordionTrigger className="hover:no-underline">
-                        Provider Response
+                        <span className="flex items-center">
+                          Provider Response
+                          {renderResponseTypeBadge(selectedLog.providerResponse.type)}
+                        </span>
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-2">
@@ -327,7 +285,10 @@ export function DebugPage() {
                   {selectedLog.clientResponse && (
                     <AccordionItem value="client-response">
                       <AccordionTrigger className="hover:no-underline">
-                        Client Response
+                        <span className="flex items-center">
+                          Client Response
+                          {renderResponseTypeBadge(selectedLog.clientResponse.type)}
+                        </span>
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-2">

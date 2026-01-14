@@ -1,4 +1,4 @@
-import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, MessageContent, UnifiedUsage } from "./types";
+import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, MessageContent, UnifiedUsage, ReconstructedChatResponse, ReconstructedMessagesResponse, AnthropicContentBlock } from "./types";
 import { logger } from "../utils/logger";
 import { Content, Part, Tool } from "@google/genai";
 import { createParser, EventSourceMessage } from "eventsource-parser";
@@ -550,5 +550,120 @@ export class GeminiTransformer implements Transformer {
     });
 
     return stream.pipeThrough(transformer);
+  }
+
+  /**
+   * Reconstructs a full JSON response body from a raw SSE string.
+   * Parses Gemini's streaming format and accumulates content and tool calls
+   * into a single response object.
+   */
+  reconstructResponseFromStream(rawSSE: string): ReconstructedChatResponse | null {
+    const lines = rawSSE.split(/\r?\n/);
+
+    let id = "";
+    let model = "";
+    let created = Math.floor(Date.now() / 1000);
+    let accumulatedContent = "";
+    let accumulatedReasoning = "";
+    let finishReason: string | null = null;
+    let usageMetadata: any = null;
+    const toolCallsMap = new Map<string, any>();
+
+    for (const line of lines) {
+      // Skip comments (lines starting with ':'), empty lines, or [DONE] marker
+      if (!line.startsWith("data: ") || line === "data: [DONE]") {
+        continue;
+      }
+
+      // Remove "data: " prefix and parse JSON
+      const jsonString = line.replace(/^data: /, "").trim();
+      if (!jsonString) continue;
+
+      try {
+        const chunk: any = JSON.parse(jsonString);
+
+        // Capture metadata from the first valid chunk
+        if (!id && chunk.responseId) id = chunk.responseId;
+        if (!model && chunk.modelVersion) model = chunk.modelVersion;
+
+        const candidate = chunk.candidates?.[0];
+        if (candidate) {
+          const parts = candidate.content?.parts || [];
+
+          // Accumulate content from parts
+          for (const part of parts) {
+        if (part.text) {
+            if (part.thought === true) {
+          accumulatedReasoning += part.text;
+              } else {
+                accumulatedContent += part.text;
+          }
+            }
+
+         // Capture function calls
+            if (part.functionCall) {
+          const callId = part.functionCall.name || `call_${Math.random().toString(36).substring(7)}`;
+            toolCallsMap.set(callId, {
+           id: callId,
+                type: "function",
+                function: {
+                  name: part.functionCall.name,
+                  arguments: JSON.stringify(part.functionCall.args || {}),
+                },
+              });
+         }
+          }
+
+          // Capture finish reason
+          if (candidate.finishReason) {
+            finishReason = candidate.finishReason === "STOP"
+           ? "stop"
+              : candidate.finishReason === "MAX_TOKENS"
+                ? "length"
+                : candidate.finishReason.toLowerCase();
+          }
+        }
+
+        // Capture usage
+        if (chunk.usageMetadata) {
+          usageMetadata = chunk.usageMetadata;
+      }
+      } catch {
+        // Ignore parse errors for malformed chunks
+      }
+    }
+
+    if (!id) return null;
+
+    // Build the message object
+    const message: any = {
+      role: "assistant",
+      content: accumulatedContent,
+    };
+
+    if (accumulatedReasoning) {
+      message.reasoning_content = accumulatedReasoning;
+    }
+
+    // Add tool calls if any
+    const toolCalls = Array.from(toolCallsMap.values());
+    if (toolCalls.length > 0) {
+      message.tool_calls = toolCalls;
+    }
+
+    return {
+      id,
+      model,
+      object: "chat.completion",
+      created,
+      choices: [
+        {
+          index: 0,
+          message,
+      finish_reason: finishReason || "stop",
+        },
+      ],
+      usage: usageMetadata,
+    };
   }
 }

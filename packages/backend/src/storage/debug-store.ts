@@ -43,12 +43,12 @@ export class DebugStore {
 
       const [, year, month, day, hour, minute, second, requestId] = match;
       const timestamp = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hour),
-        parseInt(minute),
-        parseInt(second)
+        parseInt(year!),
+        parseInt(month!) - 1,
+        parseInt(day!),
+        parseInt(hour!),
+        parseInt(minute!),
+        parseInt(second!)
       ).toISOString();
 
       // Read individual files
@@ -61,7 +61,7 @@ export class DebugStore {
 
       // Build the trace entry
       const trace: DebugTraceEntry = {
-        id: requestId,
+        id: requestId!,
         timestamp,
         clientRequest: (await clientRequestFile.exists()) ? await clientRequestFile.json() : { apiType: "", body: {}, headers: {} },
         providerRequest: (await providerRequestFile.exists()) ? await providerRequestFile.json() : { apiType: "", body: {}, headers: {} },

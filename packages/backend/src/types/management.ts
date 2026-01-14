@@ -78,7 +78,8 @@ export interface LogsQuery {
 
 // We need to import these from existing types or redefine them if they are internal
 // Importing from usage.ts assuming they are exported there
-import type { UsageLogEntry, ErrorLogEntry, DebugTraceEntry } from "./usage";
+import type { UsageLogEntry, ErrorLogEntry } from "./usage";
+import type { DebugTraceEntry } from "./debug";
 
 export interface LogsListResponse {
   type: LogType;

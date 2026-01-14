@@ -16,6 +16,7 @@ import type { MetricsCollector } from "./metrics-collector";
 import type { DebugLogger } from "./debug-logger";
 import { ServerContext } from "src/types/server";
 import { StreamTap } from "./streamtap";
+import type { RequestContext, ResponseInfo } from "./usage-logger";
 
 /**
  * Dispatcher service for routing requests to appropriate providers
@@ -71,6 +72,16 @@ export class Dispatcher {
   ): Promise<Response> {
     const requestLogger = logger.child({ requestId, clientApiType });
 
+    // Create request context for usage logging
+    const requestContext: RequestContext = {
+      id: requestId,
+      startTime: Date.now(),
+      clientIp,
+      apiKeyName,
+      clientApiType,
+      streaming: request.stream || false,
+    };
+
     try {
       // Step 1: Resolve model using router
       const resolution = this.router.resolve(request.model);
@@ -91,11 +102,18 @@ export class Dispatcher {
 
       const { provider, model, aliasUsed } = resolution.target;
 
+      // Update request context with routing information
+      requestContext.aliasUsed = aliasUsed;
+      requestContext.actualProvider = provider.name;
+      requestContext.actualModel = model;
+
       // Step 2: Determine provider's native API type
       const providerApiType = getProviderApiType(
         provider.apiTypes || ["chat"],
         clientApiType
       );
+
+      requestContext.targetApiType = providerApiType;
 
       requestLogger.debug("Dispatching request", {
         requestedModel: request.model,
@@ -242,12 +260,30 @@ export class Dispatcher {
         status: providerResponse.status,
       });
 
+      // Parse provider response body to extract usage BEFORE transformation
+      const providerResponseBody = await providerResponse.clone().json() as any;
+
       this.context.debugLogger?.captureProviderResponse(
         requestId,
         providerResponse.status,
         Object.fromEntries(providerResponse.headers),
-        await providerResponse.clone().json()
+        providerResponseBody
       );
+
+      // Extract and parse usage from provider response
+      let unifiedUsage = null;
+      if (providerResponseBody?.usage || providerResponseBody?.usageMetadata) {
+        try {
+          const providerTransformer = transformerFactory.getTransformer(providerApiType);
+          const rawUsage = providerResponseBody.usage || providerResponseBody.usageMetadata;
+          unifiedUsage = providerTransformer.parseUsage(rawUsage);
+        } catch (error) {
+          requestLogger.error("Failed to parse usage from provider response", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       // Step 7: Transform non-streaming response back to client's expected format
       const transformedResponse = await transformerFactory.transformResponse(
         providerResponse,
@@ -264,11 +300,38 @@ export class Dispatcher {
         status: providerResponse.status,
       });
 
+      // Parse response body for debug logging
+      const responseBody = await transformedResponse.clone().json();
+
       this.context.debugLogger?.captureClientResponse(
         requestId,
         providerResponse.status,
-        await transformedResponse.clone().json()
+        responseBody
       );
+
+      // Log usage if usageLogger is available and we have parsed usage
+      if (this.context.usageLogger && unifiedUsage) {
+        try {
+          const responseInfo: ResponseInfo = {
+            success: true,
+            streaming: false,
+            usage: {
+              inputTokens: unifiedUsage.input_tokens,
+              outputTokens: unifiedUsage.output_tokens,
+              cacheReadTokens: unifiedUsage.cache_read_tokens,
+              cacheCreationTokens: unifiedUsage.cache_creation_tokens,
+              reasoningTokens: unifiedUsage.reasoning_tokens,
+            },
+          };
+
+          await this.context.usageLogger.logRequest(requestContext, responseInfo);
+        } catch (error) {
+          requestLogger.error("Failed to log usage", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Don't throw - logging failures shouldn't break requests
+        }
+      }
 
       this.context.debugLogger?.completeTrace(requestId);
       return transformedResponse;
@@ -277,6 +340,26 @@ export class Dispatcher {
         error: error instanceof Error ? error.message : String(error),
       });
       await this.context.debugLogger?.completeTrace(requestId);
+
+      // Log error if usageLogger is available and we have provider info
+      if (this.context.usageLogger && requestContext.actualProvider) {
+        try {
+          const responseInfo: ResponseInfo = {
+            success: false,
+            streaming: false,
+            errorType: error instanceof PlexusErrorResponse ? error.type : "api_error",
+            errorMessage: error instanceof Error ? error.message : String(error),
+            httpStatus: error instanceof PlexusErrorResponse ? error.status : 500,
+          };
+
+          await this.context.usageLogger.logRequest(requestContext, responseInfo);
+        } catch (logError) {
+          requestLogger.error("Failed to log error", {
+            error: logError instanceof Error ? logError.message : String(logError),
+          });
+          // Don't throw - logging failures shouldn't break error handling
+        }
+      }
 
       // Check if this is a network/connection error
       if (error instanceof Error && this.isConnectionError(error)) {

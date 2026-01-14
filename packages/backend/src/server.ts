@@ -25,6 +25,7 @@ import { DebugLogger } from "./services/debug-logger";
 import { EventEmitter } from "./services/event-emitter";
 import { ConfigManager } from "./services/config-manager";
 import { LogQueryService } from "./services/log-query";
+import { TransformerFactory } from "./services/transformer-factory";
 // @ts-ignore
 import frontendHtml from "../../frontend/src/index.html";
 
@@ -210,11 +211,14 @@ export async function createServer(config: PlexusConfig): Promise<{ server: any;
   );
   
    if (config.logging.debug?.enabled) {
+      // Create transformer factory for stream reconstruction
+      const transformerFactory = new TransformerFactory();
+      
       debugLogger = new DebugLogger({
       enabled: config.logging.debug.enabled,
       storagePath: config.logging.debug.storagePath,
       retentionDays: config.logging.debug.retentionDays,
-    }, debugStore);
+    }, debugStore, transformerFactory);
     
      // DebugLogger.initialize() also calls store.initialize(), but it's safe to call idempotent
      await debugLogger.initialize();

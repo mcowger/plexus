@@ -182,6 +182,64 @@ export interface components {
                 provider: string;
             };
         };
+        DebugTraceEntry: {
+            /** @description Request ID */
+            id: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp
+             */
+            timestamp: string;
+            clientRequest: {
+                /** @enum {string} */
+                apiType: "chat" | "messages" | "gemini";
+                body: Record<string, never>;
+                headers: {
+                    [key: string]: string;
+                };
+            };
+            providerRequest: {
+                /** @enum {string} */
+                apiType: "chat" | "messages" | "gemini";
+                body: Record<string, never>;
+                headers: {
+                    [key: string]: string;
+                };
+            };
+            providerResponse?: {
+                status?: number;
+                headers?: {
+                    [key: string]: string;
+                };
+                body?: Record<string, never>;
+                /**
+                 * @description Indicates if response is original (non-streaming) or reconstructed from stream chunks
+                 * @enum {string}
+                 */
+                type?: "original" | "reconstructed";
+            };
+            clientResponse?: {
+                status?: number;
+                body?: Record<string, never>;
+                /**
+                 * @description Indicates if response is original (non-streaming) or reconstructed from stream chunks
+                 * @enum {string}
+                 */
+                type?: "original" | "reconstructed";
+            };
+            providerStreamChunks?: {
+                /** Format: date-time */
+                timestamp: string;
+                /** @description Raw SSE chunk text */
+                chunk: string;
+            }[];
+            clientStreamChunks?: {
+                /** Format: date-time */
+                timestamp: string;
+                /** @description Raw SSE chunk text */
+                chunk: string;
+            }[];
+        };
     };
     responses: never;
     parameters: never;
@@ -518,7 +576,7 @@ export interface operations {
                         /** @description Array of error log entries */
                         errors?: Record<string, never>[];
                         /** @description Array of debug trace entries */
-                        traces?: Record<string, never>[];
+                        traces?: components["schemas"]["DebugTraceEntry"][];
                     };
                 };
             };
