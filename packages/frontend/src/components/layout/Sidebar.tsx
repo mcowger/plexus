@@ -196,9 +196,9 @@ export const Sidebar: React.FC = () => {
               <Button
                 variant={debugMode ? 'destructive' : 'ghost'}
                 className={cn(
-                  'w-full justify-start h-8',
+                  'flex items-center gap-3 w-full justify-start py-1.5 px-2 rounded-md text-sm font-medium transition-all duration-200 border border-transparent hover:bg-accent hover:text-accent-foreground h-8',
                   isCollapsed && 'justify-center',
-                  debugMode && 'border-destructive/30'
+                  debugMode && 'border-destructive/30 bg-destructive text-destructive-foreground shadow-sm'
                 )}
                 onClick={handleToggleClick}
               >
@@ -230,7 +230,10 @@ export const Sidebar: React.FC = () => {
             const themeButton = (
               <Button
                 variant="ghost"
-                className={cn('w-full justify-start h-8', isCollapsed && 'justify-center')}
+                className={cn(
+                  'flex items-center gap-3 w-full justify-start py-1.5 px-2 rounded-md text-sm font-medium transition-all duration-200 border border-transparent hover:bg-accent hover:text-accent-foreground h-8',
+                  isCollapsed && 'justify-center'
+                )}
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               >
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -259,7 +262,10 @@ export const Sidebar: React.FC = () => {
             const logoutButton = (
               <Button
                 variant="ghost"
-                className={cn('w-full justify-start text-destructive hover:text-destructive h-8', isCollapsed && 'justify-center')}
+                className={cn(
+                  'flex items-center gap-3 w-full justify-start py-1.5 px-2 rounded-md text-sm font-medium transition-all duration-200 border border-transparent hover:bg-accent hover:text-destructive text-destructive h-8',
+                  isCollapsed && 'justify-center'
+                )}
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4" />

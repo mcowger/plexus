@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages } from 'lucide-react';
 import chatIcon from '@/assets/chat.svg';
 import messagesIcon from '@/assets/messages.svg';
 import geminiIcon from '@/assets/gemini.svg';
@@ -529,7 +529,11 @@ if (data.type === 'usage') {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {renderApiIcon(log.apiType)}
-                      <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
+                      {log.apiType === log.targetApiType ? (
+                        <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
+                      ) : (
+                        <Languages className="w-3 h-3 text-muted-foreground" />
+                      )}
                       {renderApiIcon(log.targetApiType)}
                     </div>
                   </TableCell>
@@ -695,7 +699,11 @@ if (data.type === 'usage') {
                     <strong>API:</strong>
                     <div className="flex items-center gap-1">
                       {renderApiIcon(logDetails.usage.apiType)}
-                      <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
+                      {logDetails.usage.apiType === logDetails.usage.targetApiType ? (
+                        <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
+                      ) : (
+                        <Languages className="w-3 h-3 text-muted-foreground" />
+                      )}
                       {renderApiIcon(logDetails.usage.targetApiType)}
                     </div>
                     <span className="text-muted-foreground">({logDetails.usage.apiType} → {logDetails.usage.targetApiType})</span>
