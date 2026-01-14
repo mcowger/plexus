@@ -1,8 +1,8 @@
 import { test, expect } from "bun:test";
 import { Dispatcher } from "../src/services/dispatcher";
 import { PlexusErrorResponse } from "../src/types/errors";
-import type { PlexusConfig, ServerContext } from "../src/types/config";
-import type { ServerContext as SC } from "../src/types/server";
+import type { PlexusConfig } from "../src/types/config";
+import type { ServerContext } from "../src/types/server";
 import { Router } from "../src/services/router";
 import { spyOn } from "bun:test";
 
@@ -43,7 +43,7 @@ const mockConfig: any = {
   aliases: {},
 };
 
-const createMockContext = (config: any): SC => ({
+const createMockContext = (config: any): ServerContext => ({
   config,
   cooldownManager: {
     isOnCooldown: () => false,
