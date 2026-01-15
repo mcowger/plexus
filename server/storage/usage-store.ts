@@ -102,6 +102,9 @@ export class UsageStore {
         }
       }
 
+      // Sort by timestamp in descending order (newest first)
+      entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
       // Apply pagination
       const offset = query.offset || 0;
       const limit = query.limit || entries.length;
