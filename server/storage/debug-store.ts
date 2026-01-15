@@ -8,11 +8,29 @@ import { join } from "node:path";
  * Stores full request/response captures for debugging
  */
 export class DebugStore {
+  private readonly storagePath: string;
+  private readonly retentionDays: number;
+  private readonly enabled: boolean;
+
   constructor(
-    private storagePath: string, 
-    private retentionDays: number,
-    private enabled: boolean = true
-  ) {}
+    storagePath: string, 
+    retentionDays: number,
+    enabled: boolean = true
+  ) {
+    // Sanitize storagePath to remove any null bytes or trailing whitespace
+    const sanitized = storagePath.replace(/\0/g, "").trim();
+    
+    if (sanitized !== storagePath) {
+      logger.warn("Sanitized storagePath contained null bytes or whitespace", {
+        original: JSON.stringify(storagePath),
+        sanitized: JSON.stringify(sanitized)
+      });
+    }
+    
+    this.storagePath = sanitized;
+    this.retentionDays = retentionDays;
+    this.enabled = enabled;
+  }
 
   /**
    * Helper to format timestamp for directory name
@@ -273,57 +291,65 @@ export class DebugStore {
     }
   }
 
-  /**
-   * Query debug traces
-   * @param query - Filter options
-   */
-  async query(query: {
-    startDate?: string;
-    endDate?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<DebugTraceEntry[]> {
-    try {
-      const glob = new Bun.Glob("*");
-      const dirs = this.sanitizeGlobEntries(
-        glob.scanSync({ cwd: this.storagePath, onlyFiles: false })
-      );
+   /**
+    * Query debug traces
+    * @param query - Filter options
+    */
+   async query(query: {
+     startDate?: string;
+     endDate?: string;
+     limit?: number;
+     offset?: number;
+   }): Promise<DebugTraceEntry[]> {
+     try {
+       const glob = new Bun.Glob("*");
+       let dirs: string[];
+       
+       try {
+         dirs = this.sanitizeGlobEntries(
+           glob.scanSync({ cwd: this.storagePath, onlyFiles: false })
+         );
+       } catch (scanError) {
+         // If directory doesn't exist or can't be scanned, return empty array
+         logger.debug("Cannot scan debug storage directory", { path: this.storagePath, error: scanError });
+         return [];
+       }
 
-      // Filter by directory name (starts with timestamp)
-      const startStr = query.startDate
-        ? this.getTimestamp(query.startDate)
-        : "0000";
-      const endStr = query.endDate ? this.getTimestamp(query.endDate) : "9999";
+       // Filter by directory name (starts with timestamp)
+       const startStr = query.startDate
+         ? this.getTimestamp(query.startDate)
+         : "0000";
+       const endStr = query.endDate ? this.getTimestamp(query.endDate) : "9999";
 
-      const validDirs = dirs
-        .filter((name) => name >= startStr && name <= endStr)
-        .sort((a, b) => b.localeCompare(a)); // Newest first
+       const validDirs = dirs
+         .filter((name) => name >= startStr && name <= endStr)
+         .sort((a, b) => b.localeCompare(a)); // Newest first
 
-      const entries: DebugTraceEntry[] = [];
+       const entries: DebugTraceEntry[] = [];
 
-      // Pagination
-      const offset = query.offset || 0;
-      const limit = query.limit || 100;
-      const pagedDirs = validDirs.slice(offset, offset + limit);
+       // Pagination
+       const offset = query.offset || 0;
+       const limit = query.limit || 100;
+       const pagedDirs = validDirs.slice(offset, offset + limit);
 
-      for (const dirName of pagedDirs) {
-        try {
-      const dirPath = join(this.storagePath, dirName);
-          const trace = await this.reconstructTraceFromFiles(dirPath);
-        if (trace) {
-            entries.push(trace);
-        }
-        } catch (e) {
-          logger.debug("Failed to reconstruct trace from files", { dirName, error: e });
-        }
-      }
+       for (const dirName of pagedDirs) {
+         try {
+           const dirPath = join(this.storagePath, dirName);
+           const trace = await this.reconstructTraceFromFiles(dirPath);
+           if (trace) {
+             entries.push(trace);
+           }
+         } catch (e) {
+           logger.debug("Failed to reconstruct trace from files", { dirName, error: e });
+         }
+       }
 
-      return entries;
-    } catch (error) {
-      logger.error("Failed to query debug traces", { error });
-      return [];
-    }
-  }
+       return entries;
+     } catch (error) {
+       logger.error("Failed to query debug traces", { error, storagePath: this.storagePath });
+       return [];
+     }
+   }
 
   /**
    * Delete logs older than specific days
