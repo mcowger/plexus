@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages, CircleStop } from 'lucide-react';
 import chatIcon from '@/assets/chat.svg';
 import messagesIcon from '@/assets/messages.svg';
 import geminiIcon from '@/assets/gemini.svg';
@@ -172,6 +172,17 @@ export function LogsPage() {
     setLogToDelete(null);
   };
 
+  const handleForceComplete = async (id?: string) => {
+    if (!id) return;
+    try {
+      await api.forceCompleteLog(id);
+      setPage(0);
+      await fetchLogs();
+    } catch (error) {
+      console.error('Failed to force complete log:', error);
+    }
+  };
+
   const handleDeleteAllLogs = async () => {
     try {
       await api.deleteLogs({ type: 'usage', all: true });
@@ -197,11 +208,14 @@ export function LogsPage() {
   };
 
   const formatTimestamp = (timestamp?: string) => {
-    if (!timestamp) return '-';
+    if (!timestamp) return { time: '-', date: '' };
     try {
-      return new Date(timestamp).toLocaleString();
+      const date = new Date(timestamp);
+      const time = date.toLocaleTimeString();
+      const dateStr = date.toLocaleDateString();
+      return { time, date: dateStr };
     } catch {
-      return '-';
+      return { time: '-', date: '' };
     }
   };
 
@@ -445,16 +459,16 @@ if (data.type === 'usage') {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Key</TableHead>
-              <TableHead>Source IP</TableHead>
-              <TableHead>API</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Tokens</TableHead>
-              <TableHead>Cost</TableHead>
-              <TableHead>Performance</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="whitespace-nowrap">Date</TableHead>
+              <TableHead className="whitespace-nowrap">Key</TableHead>
+              <TableHead className="whitespace-nowrap">Source IP</TableHead>
+              <TableHead className="whitespace-nowrap">API</TableHead>
+              <TableHead className="whitespace-nowrap">Model</TableHead>
+              <TableHead className="whitespace-nowrap">Tokens</TableHead>
+              <TableHead className="whitespace-nowrap">Cost</TableHead>
+              <TableHead className="whitespace-nowrap">TTFT</TableHead>
+              <TableHead className="whitespace-nowrap w-32 min-w-32">Status</TableHead>
+              <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -481,11 +495,19 @@ if (data.type === 'usage') {
                   )}
                 >
                   <TableCell className="whitespace-nowrap">
-                    {formatTimestamp(log.timestamp)}
+                    {(() => {
+                      const { time, date } = formatTimestamp(log.timestamp);
+                      return (
+                        <div className="flex flex-col">
+                          <span>{time}</span>
+                          {date && <span className="text-xs text-muted-foreground">{date}</span>}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{safeText(log.apiKey)}</TableCell>
                   <TableCell className="text-muted-foreground">{safeText(log.clientIp)}</TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       {renderApiIcon(log.apiType)}
                       {log.apiType === log.targetApiType ? (
@@ -496,7 +518,14 @@ if (data.type === 'usage') {
                       {renderApiIcon(log.targetApiType)}
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{safeText(log.actualModel)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{safeText(log.aliasUsed)}</span>
+                      {log.aliasUsed !== log.actualModel && (
+                        <span className="text-xs text-muted-foreground">{safeText(log.actualModel)}</span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {log.pending ? (
                       <span className="text-muted-foreground italic flex items-center gap-1">
@@ -520,7 +549,7 @@ if (data.type === 'usage') {
                     )}
                   </TableCell>
                   <TableCell>{formatLatency(log.metrics?.durationMs)}</TableCell>
-                  <TableCell>
+                  <TableCell className="w-32 min-w-32">
                     {log.pending ? (
                       <Badge variant="secondary" className="gap-1">
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -553,6 +582,19 @@ if (data.type === 'usage') {
                        >
                          <Info className="h-4 w-4" />
                        </Button>
+                      {log.pending && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (log.id) {
+                              handleForceComplete(log.id);
+                            }
+                          }}
+                        >
+                          <CircleStop className="h-4 w-4 text-orange-500" />
+                        </Button>
+                      )}
                       {log.error && (
                         <Button variant="ghost" size="sm">
                           <AlertTriangle className="h-4 w-4" />

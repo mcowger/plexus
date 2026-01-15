@@ -238,12 +238,15 @@ export class Dispatcher {
 
         // --- TAP 1: Raw Provider Response (Silent / False) ---
         // Track first token time at provider level for fair performance measurement
+        const streamTimeout = this.context.config.logging.debug?.streamTimeoutSeconds;
+
         const providerTap = new StreamTap(
-          this.context.debugLogger!, 
-          requestId, 
+          this.context.debugLogger!,
+          requestId,
           false,
           this.context.usageLogger,
-          requestContext
+          requestContext,
+          streamTimeout
         );
 
         const tappedProviderBody = providerResponse.body
@@ -269,11 +272,12 @@ export class Dispatcher {
         // --- TAP 2: Transformed Client Response (Final) ---
         // Track client TTFT to measure transformation overhead
         const streamTap = new StreamTap(
-          this.context.debugLogger!, 
-          requestId, 
+          this.context.debugLogger!,
+          requestId,
           true,
           this.context.usageLogger,
-          requestContext
+          requestContext,
+          streamTimeout
         );
 
         // 3. Wrap the body in the tap

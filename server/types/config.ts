@@ -49,12 +49,14 @@ export const LoggingConfigSchema = z.object({
     captureResponses: z.boolean().default(true),
     storagePath: z.string().default("./data/logs/debug"),
     retentionDays: z.number().default(7),
+    streamTimeoutSeconds: z.number().default(300), // 5 minutes default timeout for streams
   }).optional().default({
     enabled: false,
     captureRequests: true,
     captureResponses: true,
     storagePath: "./data/logs/debug",
     retentionDays: 7,
+    streamTimeoutSeconds: 300,
   }),
   
   // Error logging

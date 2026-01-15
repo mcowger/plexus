@@ -35,7 +35,7 @@ export async function handleState(req: Request, context: ServerContext): Promise
                 parsed.logging = {} as any;
               }
               if (!parsed.logging.debug) {
-                parsed.logging.debug = { enabled: false, storagePath: "./logs/debug", retentionDays: 7 };
+                parsed.logging.debug = { enabled: false, storagePath: "./logs/debug", retentionDays: 7, captureRequests: true, captureResponses: true, streamTimeoutSeconds: 300 };
               }
               parsed.logging.debug.enabled = enabled;
 

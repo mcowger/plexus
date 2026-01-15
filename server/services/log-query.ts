@@ -177,4 +177,13 @@ export class LogQueryService {
 
     return result;
   }
+
+  /**
+   * Force complete a pending request by marking it as failed
+   * @param requestId - The unique request ID to force complete
+   */
+  async forceCompleteLog(requestId: string) {
+    const success = await this.usageStore.forceComplete(requestId);
+    return { success };
+  }
 }

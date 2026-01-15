@@ -452,6 +452,78 @@ export class UsageStore {
   }
 
   /**
+   * Force complete a pending log entry by marking it as complete with error state
+   * @param requestId - The unique request ID to force complete
+   * @returns True if the entry was found and force completed, false otherwise
+   */
+  async forceComplete(requestId: string): Promise<boolean> {
+    try {
+      const glob = new Bun.Glob("*.jsonl");
+      const files = Array.from(glob.scanSync(this.storagePath)).sort().reverse();
+
+      for (const fileName of files) {
+        const filePath = join(this.storagePath, fileName);
+        const file = Bun.file(filePath);
+        const content = await file.text();
+        const lines = content.trim().split("\n");
+
+        let updated = false;
+        const updatedLines: string[] = [];
+
+        for (const line of lines) {
+          if (!line) {
+            updatedLines.push(line);
+            continue;
+          }
+
+          try {
+            if (line.includes(requestId)) {
+              const entry: UsageLogEntry = JSON.parse(line);
+              if (entry.id === requestId && entry.pending) {
+                // Force complete the entry
+                entry.pending = false;
+                entry.success = false;
+                entry.errorType = "UserAction";
+                entry.errorMessage = "Request force completed by user";
+                updatedLines.push(JSON.stringify(entry));
+                updated = true;
+                logger.info("Force completed usage log entry", {
+                  requestId,
+                  file: fileName,
+                });
+                continue;
+              }
+            }
+          } catch (e) {
+            // If parse fails, keep original line
+            logger.warn("Failed to parse line during force complete", {
+              file: fileName,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+
+          updatedLines.push(line);
+        }
+
+        if (updated) {
+          // Write updated content back to file
+          await Bun.write(filePath, updatedLines.join("\n") + "\n");
+          return true;
+        }
+      }
+
+      logger.warn("Pending usage log entry not found for force complete", { requestId });
+      return false;
+    } catch (error) {
+      logger.error("Failed to force complete usage log entry", {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
    * Delete a specific log entry by request ID
    * @param requestId - The unique request ID to delete
    * @returns True if the entry was found and deleted, false otherwise

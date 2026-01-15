@@ -73,7 +73,7 @@ export const api = {
     });
     if (error) throw new Error(String(error));
     if (!data) throw new Error('Delete log data missing');
-    return data as { success: boolean; deleted: { usage: boolean; error: boolean; trace: boolean } };
+    return data;
   },
 
   getLogDetails: async (id: string) => {
@@ -84,7 +84,7 @@ export const api = {
     });
     if (error) throw new Error(String(error));
     if (!data) throw new Error('Log details data missing');
-    
+
     // Extract traces if present and format them properly
     if (data.traces && data.traces.length > 0) {
       return {
@@ -103,7 +103,18 @@ export const api = {
         }))
       };
     }
-    
+
+    return data;
+  },
+
+  forceCompleteLog: async (id: string): Promise<{ success: boolean }> => {
+    const { data, error } = await client.PATCH('/logs/{id}/complete', {
+      params: {
+        path: { id },
+      },
+    });
+    if (error) throw new Error(String(error));
+    if (!data) throw new Error('Force complete log data missing');
     return data;
   },
 };

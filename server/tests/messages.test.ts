@@ -7,7 +7,7 @@ import type { ServerContext } from "../types/server";
 
 const mockConfig: PlexusConfig = {
   server: { port: 4000, host: "localhost" },
-  logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
+  logging: { level: "info", debug: { enabled: false, storagePath: "logs/debug", retentionDays: 7, captureRequests: false, captureResponses: false, streamTimeoutSeconds: 300 }, usage: { enabled: false, storagePath: "logs/usage", retentionDays: 30 }, errors: { storagePath: "logs/errors", retentionDays: 90 } },
   providers: [
     {
       name: "anthropic",

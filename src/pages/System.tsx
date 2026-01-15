@@ -50,6 +50,7 @@ interface LoggingSettings {
     captureResponses: boolean;
     storagePath: string;
     retentionDays: number;
+    streamTimeoutSeconds: number;
   };
   errors: {
     storagePath: string;
@@ -119,6 +120,7 @@ export const SystemPage: React.FC = () => {
       captureResponses: true,
       storagePath: './data/logs/debug',
       retentionDays: 7,
+      streamTimeoutSeconds: 300,
     },
     errors: {
       storagePath: './data/logs/errors',
@@ -548,6 +550,26 @@ export const SystemPage: React.FC = () => {
                       })
                     }
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stream-timeout">Stream Timeout (seconds)</Label>
+                  <Input
+                    id="stream-timeout"
+                    type="number"
+                    min="30"
+                    max="3600"
+                    value={logging.debug.streamTimeoutSeconds}
+                    onChange={(e) =>
+                      setLogging({
+                        ...logging,
+                        debug: { ...logging.debug, streamTimeoutSeconds: parseInt(e.target.value) || 300 },
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum duration for streaming requests before force completing trace (30-3600 seconds)
+                  </p>
                 </div>
               </div>
 

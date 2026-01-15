@@ -91,10 +91,34 @@ export interface paths {
         get: operations["getLogDetails"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete log entry
+         * @description Delete a specific log entry by ID
+         */
+        delete: operations["deleteLogById"];
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/logs/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Force complete a pending request
+         * @description Force complete a pending request by marking it as failed
+         */
+        patch: operations["forceCompleteLog"];
         trace?: never;
     };
     "/events": {
@@ -581,6 +605,89 @@ export interface operations {
                 };
             };
             /** @description Log entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteLogById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Request ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                        deleted: {
+                            usage: boolean;
+                            error: boolean;
+                            trace: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Log entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    forceCompleteLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Request ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log force completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                    };
+                };
+            };
+            /** @description Log entry not found or not pending */
             404: {
                 headers: {
                     [name: string]: unknown;

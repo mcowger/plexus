@@ -4,12 +4,27 @@ import { logger } from "../../utils/logger";
 
 export async function handleLogs(req: Request, logQueryService: LogQueryService): Promise<Response> {
   const url = new URL(req.url);
-  const path = url.pathname; // /v0/logs or /v0/logs/:id
+  const path = url.pathname; // /v0/logs or /v0/logs/:id or /v0/logs/:id/complete
   const method = req.method;
 
   // Check if ID is provided
-  const match = path.match(/\/v0\/logs\/([^/]+)$/);
+  const match = path.match(/\/v0\/logs\/([^/]+)(?:\/(.+))?$/);
   const id = match ? match[1] : null;
+  const action = match && match[2] ? match[2] : null;
+
+  // PATCH /v0/logs/:id/complete - Force complete a pending request
+  if (id && action === "complete" && method === "PATCH") {
+    try {
+      const result = await logQueryService.forceCompleteLog(id);
+      if (!result.success) {
+        return new Response("Log not found or not pending", { status: 404 });
+      }
+      return Response.json(result);
+    } catch (error) {
+      logger.error("Failed to force complete log", { id, error });
+      return new Response("Internal Server Error", { status: 500 });
+    }
+  }
 
   if (id && method === "GET") {
     // Get Details
