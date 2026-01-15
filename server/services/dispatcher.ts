@@ -29,7 +29,7 @@ export class Dispatcher {
   constructor(context: ServerContext) {
     this.context = context;
     this.router = new Router(
-      context.config,
+      context.configManager!,
       context.cooldownManager,
       context.costCalculator,
       context.metricsCollector
@@ -38,12 +38,9 @@ export class Dispatcher {
 
   /**
    * Updates configuration (e.g., on config reload)
-   * @param config - New configuration
    */
-  updateConfig(config: PlexusConfig): void {
-    this.context.config = config;
-    this.router.updateConfig(config);
-    this.context.cooldownManager?.updateConfig(config);
+  updateConfig(): void {
+    this.router.updateConfig();
   }
 
   /**

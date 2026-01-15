@@ -70,10 +70,10 @@ export async function createServer(
   eventEmitter: EventEmitter,
 ): Promise<{ server: any; shutdown: () => Promise<void> }> {
   // Initialize resilience services
-  const cooldownManager = new CooldownManager(config);
-  const healthMonitor = new HealthMonitor(config, cooldownManager);
+  const cooldownManager = new CooldownManager(configManager);
+  const healthMonitor = new HealthMonitor(configManager, cooldownManager);
 
-  const adminAuth = new AdminAuth(config);
+  const adminAuth = new AdminAuth(configManager);
 
   // Initialize observability services (Phase 7)
   let usageLogger: UsageLogger | undefined;
@@ -101,7 +101,7 @@ export async function createServer(
     await errorStore.initialize();
 
     // Initialize cost calculator
-    costCalculator = new CostCalculator(config.pricing);
+    costCalculator = new CostCalculator(configManager);
 
     // Initialize metrics collector (5 minute rolling window)
     metricsCollector = new MetricsCollector(5);

@@ -19,15 +19,39 @@ export async function handleState(req: Request, context: ServerContext): Promise
 
       switch (body.action) {
         case "set-debug":
-          if (context.debugLogger) {
-            // Assuming DebugLogger has a setEnabled method or we toggle directly if public
-            // The DebugLogger interface in Phase 7 didn't strictly expose dynamic toggling 
-            // but let's assume we can modify the config it holds or we add a method.
-            // For now, we'll just acknowledge.
-            // Ideally: context.debugLogger.setEnabled(body.payload.enabled);
-            logger.info("Debug mode toggle requested", { enabled: body.payload.enabled });
+          if (context.debugLogger && context.configManager) {
+            const enabled = body.payload.enabled;
+
+            // Runtime update - toggle the debug logger
+            context.debugLogger.setEnabled(enabled);
+
+            // Persist changes to config file
+            try {
+              const { config: rawYaml } = await context.configManager.getConfig();
+              const parsed = parse(rawYaml) as PlexusConfig;
+
+              // Update debug logging configuration
+              if (!parsed.logging) {
+                parsed.logging = {} as any;
+              }
+              if (!parsed.logging.debug) {
+                parsed.logging.debug = { enabled: false, storagePath: "./logs/debug", retentionDays: 7 };
+              }
+              parsed.logging.debug.enabled = enabled;
+
+              const newYaml = stringify(parsed);
+              await context.configManager.updateConfig(newYaml);
+
+              message = `Debug mode ${enabled ? "enabled" : "disabled"} (persisted)`;
+              logger.info("Debug mode updated and persisted", { enabled });
+            } catch (e) {
+              logger.error("Failed to persist debug mode", { error: e });
+              message = `Debug mode ${enabled ? "enabled" : "disabled"} (runtime only - persistence failed)`;
+            }
+          } else {
+            logger.warn("Debug logger or config manager not available");
+            message = "Debug mode toggle not available";
           }
-          message = `Debug mode set to ${body.payload.enabled}`;
           break;
 
         case "clear-cooldowns":
@@ -100,7 +124,9 @@ export async function handleState(req: Request, context: ServerContext): Promise
 }
 
 function buildStateResponse(context: ServerContext) {
-  const { config, cooldownManager, healthMonitor, metricsCollector } = context;
+  // Get live config from ConfigManager
+  const config = context.configManager?.getCurrentConfig() || context.config;
+  const { cooldownManager, healthMonitor, metricsCollector } = context;
 
   // Build providers list with metrics
   const providers = config.providers.map(p => {

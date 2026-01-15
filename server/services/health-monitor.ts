@@ -1,5 +1,6 @@
 import { logger } from "../utils/logger";
 import type { CooldownManager } from "./cooldown-manager";
+import type { ConfigManager } from "./config-manager";
 import type { PlexusConfig } from "../types/config";
 import type {
   SystemHealth,
@@ -12,7 +13,7 @@ import type {
  */
 export class HealthMonitor {
   constructor(
-    private config: PlexusConfig,
+    private configManager: ConfigManager,
     private cooldownManager: CooldownManager
   ) {}
 
@@ -20,7 +21,8 @@ export class HealthMonitor {
    * Gets current system health status
    */
   getSystemHealth(): SystemHealth {
-    const providers = this.config.providers;
+    const config = this.configManager.getCurrentConfig();
+    const providers = config.providers;
     const providerHealthList: ProviderHealth[] = [];
 
     let enabledCount = 0;
@@ -83,6 +85,8 @@ export class HealthMonitor {
     enabledCount: number,
     onCooldownCount: number
   ): SystemHealthStatus {
+    const config = this.configManager.getCurrentConfig();
+
     // If no enabled providers, system is unhealthy
     if (enabledCount === 0) {
       return "unhealthy";
@@ -92,7 +96,7 @@ export class HealthMonitor {
     const cooldownRatio = onCooldownCount / enabledCount;
 
     const { degradedThreshold, unhealthyThreshold } =
-      this.config.resilience.health;
+      config.resilience.health;
 
     if (cooldownRatio >= unhealthyThreshold) {
       return "unhealthy";
@@ -109,7 +113,8 @@ export class HealthMonitor {
    * Gets health status for a specific provider
    */
   getProviderHealth(providerName: string): ProviderHealth | undefined {
-    const provider = this.config.providers.find((p) => p.name === providerName);
+    const config = this.configManager.getCurrentConfig();
+    const provider = config.providers.find((p) => p.name === providerName);
     if (!provider) {
       return undefined;
     }
@@ -128,13 +133,5 @@ export class HealthMonitor {
         ? this.cooldownManager.getRemainingTime(provider.name)
         : undefined,
     };
-  }
-
-  /**
-   * Updates configuration (e.g., on config reload)
-   */
-  updateConfig(config: PlexusConfig): void {
-    this.config = config;
-    logger.debug("Health monitor configuration updated");
   }
 }

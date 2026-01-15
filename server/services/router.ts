@@ -10,6 +10,7 @@ import { logger } from "../utils/logger";
 import type { CooldownManager } from "./cooldown-manager";
 import type { CostCalculator } from "./cost-calculator";
 import type { MetricsCollector } from "./metrics-collector";
+import type { ConfigManager } from "./config-manager";
 
 /**
  * Router service for model alias resolution and target selection
@@ -20,13 +21,15 @@ export class Router {
   private providerMap: Map<string, ProviderConfig> = new Map();
   private selector: TargetSelector;
   private cooldownManager?: CooldownManager;
+  private configManager: ConfigManager;
 
   constructor(
-    private config: PlexusConfig,
+    configManager: ConfigManager,
     cooldownManager?: CooldownManager,
     costCalculator?: CostCalculator,
     metricsCollector?: MetricsCollector
   ) {
+    this.configManager = configManager;
     this.selector = new TargetSelector(costCalculator, metricsCollector);
     this.cooldownManager = cooldownManager;
     this.buildMaps();
@@ -37,18 +40,20 @@ export class Router {
    * Called on initialization and when configuration changes
    */
   private buildMaps(): void {
+    const config = this.configManager.getCurrentConfig();
+
     // Clear existing maps
     this.aliasMap.clear();
     this.additionalAliasMap.clear();
     this.providerMap.clear();
 
     // Build provider map
-    for (const provider of this.config.providers) {
+    for (const provider of config.providers) {
       this.providerMap.set(provider.name, provider);
     }
 
     // Build alias maps
-    for (const modelAlias of this.config.models || []) {
+    for (const modelAlias of config.models || []) {
       // Add canonical alias
       this.aliasMap.set(modelAlias.alias, modelAlias);
 
@@ -69,10 +74,8 @@ export class Router {
 
   /**
    * Rebuilds maps when configuration changes
-   * @param config - Updated configuration
    */
-  updateConfig(config: PlexusConfig): void {
-    this.config = config;
+  updateConfig(): void {
     this.buildMaps();
     logger.info("Router configuration updated");
   }

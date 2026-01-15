@@ -2,6 +2,7 @@ import { logger } from "../utils/logger";
 import { CooldownStore } from "../storage/cooldown-store";
 import type { CooldownEntry, CooldownReason, CooldownState } from "../types/health";
 import type { PlexusConfig, ProviderConfig } from "../types/config";
+import type { ConfigManager } from "./config-manager";
 
 /**
  * Options for setting a cooldown
@@ -23,11 +24,14 @@ export class CooldownManager {
   private state: CooldownState;
   private store: CooldownStore;
   private ready: Promise<void>;
+  private configManager: ConfigManager;
 
-  constructor(private config: PlexusConfig) {
+  constructor(configManager: ConfigManager) {
+    this.configManager = configManager;
+    const config = configManager.getCurrentConfig();
     this.store = new CooldownStore(config.resilience.cooldown.storagePath);
     this.state = { entries: {}, lastUpdated: Date.now() };
-    
+
     // Load state asynchronously
     this.ready = this.initialize();
   }
@@ -212,6 +216,8 @@ export class CooldownManager {
     explicitDuration?: number,
     retryAfter?: number
   ): number {
+    const config = this.configManager.getCurrentConfig();
+
     // 1. Use explicit duration if provided
     if (explicitDuration !== undefined) {
       return this.clampDuration(explicitDuration);
@@ -232,7 +238,7 @@ export class CooldownManager {
     }
 
     // 4. Use default for reason type
-    const defaultDuration = (this.config.resilience.cooldown.defaults as any)[reason];
+    const defaultDuration = (config.resilience.cooldown.defaults as any)[reason];
     return this.clampDuration(defaultDuration || 60);
   }
 
@@ -240,7 +246,8 @@ export class CooldownManager {
    * Clamps duration between min and max configured values
    */
   private clampDuration(duration: number): number {
-    const { minDuration, maxDuration } = this.config.resilience.cooldown;
+    const config = this.configManager.getCurrentConfig();
+    const { minDuration, maxDuration } = config.resilience.cooldown;
     return Math.max(minDuration, Math.min(maxDuration, duration));
   }
 
@@ -248,14 +255,7 @@ export class CooldownManager {
    * Finds a provider in config by name
    */
   private findProvider(name: string): ProviderConfig | undefined {
-    return this.config.providers.find((p) => p.name === name);
-  }
-
-  /**
-   * Updates configuration (e.g., on config reload)
-   */
-  updateConfig(config: PlexusConfig): void {
-    this.config = config;
-    logger.debug("Cooldown manager configuration updated");
+    const config = this.configManager.getCurrentConfig();
+    return config.providers.find((p) => p.name === name);
   }
 }

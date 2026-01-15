@@ -59,6 +59,16 @@ export class DebugLogger {
   }
 
   /**
+   * Dynamically enable or disable debug logging
+   * @param enabled - Whether to enable debug logging
+   */
+  setEnabled(enabled: boolean): void {
+    this.config.enabled = enabled;
+    this.store.setEnabled(enabled);
+    logger.info("Debug logging toggled", { enabled });
+  }
+
+  /**
    * Helper to analyze object structure and detect non-serializable values
    * @param obj - Object to analyze
    * @returns Info about the object structure and any non-serializable fields

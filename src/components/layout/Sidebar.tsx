@@ -85,10 +85,79 @@ export const Sidebar: React.FC = () => {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const { theme, setTheme } = useTheme();
 
+  // Fetch initial state
   useEffect(() => {
     api.getState().then(state => {
       setDebugMode(state.debug.enabled || false);
     }).catch(() => {});
+  }, []);
+
+  // Subscribe to config changes via SSE
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const connectSSE = async () => {
+      try {
+        const adminKey = localStorage.getItem('plexus_admin_key');
+        if (!adminKey) return;
+
+        const response = await fetch('/v0/events', {
+          headers: {
+            'Authorization': `Bearer ${adminKey}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          console.error('SSE connection failed:', response.status);
+          return;
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) return;
+
+        console.log('SSE connection established for Sidebar');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                // Handle config_change events
+                if (data.type === 'config_change') {
+                  console.log('Received config_change event, refreshing debug state');
+                  // Refresh state to get updated debug mode
+                  api.getState().then(state => {
+                    setDebugMode(state.debug.enabled || false);
+                  }).catch(() => {});
+                }
+              } catch (e) {
+                // Ignore parse errors for heartbeats
+              }
+            }
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('SSE connection error:', error);
+        }
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   const handleToggleClick = () => {

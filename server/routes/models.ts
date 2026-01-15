@@ -34,8 +34,12 @@ export async function handleModels(
     const auth = validateAuthHeader(req, config.apiKeys);
     requestLogger.debug("Request authenticated", { apiKey: auth.apiKeyName });
 
-    // Create router and get all aliases
-    const router = new Router(config);
+    // Note: For this simple route, we create a temporary router
+    // In production, you might want to cache this or get it from context
+    const configManager = {
+      getCurrentConfig: () => config
+    };
+    const router = new Router(configManager as any);
     const aliases = router.getAllAliases();
 
     // Use consistent timestamp (current time)

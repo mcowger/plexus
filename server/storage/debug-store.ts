@@ -10,26 +10,34 @@ import { join } from "node:path";
 export class DebugStore {
   private readonly storagePath: string;
   private readonly retentionDays: number;
-  private readonly enabled: boolean;
+  private enabled: boolean;
 
   constructor(
-    storagePath: string, 
+    storagePath: string,
     retentionDays: number,
     enabled: boolean = true
   ) {
     // Sanitize storagePath to remove any null bytes or trailing whitespace
     const sanitized = storagePath.replace(/\0/g, "").trim();
-    
+
     if (sanitized !== storagePath) {
       logger.warn("Sanitized storagePath contained null bytes or whitespace", {
         original: JSON.stringify(storagePath),
         sanitized: JSON.stringify(sanitized)
       });
     }
-    
+
     this.storagePath = sanitized;
     this.retentionDays = retentionDays;
     this.enabled = enabled;
+  }
+
+  /**
+   * Dynamically enable or disable debug storage
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    logger.debug("Debug store toggled", { enabled });
   }
 
   /**

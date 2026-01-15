@@ -23,12 +23,19 @@ export class ConfigManager {
   async getConfig() {
     const file = Bun.file(this.configPath);
     const rawContent = await file.text();
-    
+
     return {
       config: rawContent,
       lastModified: new Date(file.lastModified).toISOString(),
       checksum: this.calculateChecksum(rawContent),
     };
+  }
+
+  /**
+   * Get the current in-memory configuration object
+   */
+  getCurrentConfig(): PlexusConfig {
+    return this.currentConfig;
   }
 
   /**
@@ -38,13 +45,16 @@ export class ConfigManager {
     const current = await this.getConfig();
 
     // 1. Parse and Validate
+    let parsedConfig: PlexusConfig;
     if (validate) {
       try {
         const parsed = parse(newConfigYaml);
-        PlexusConfigSchema.parse(parsed);
+        parsedConfig = PlexusConfigSchema.parse(parsed);
       } catch (error) {
         throw new Error(`Invalid configuration: ${error instanceof Error ? error.message : String(error)}`);
       }
+    } else {
+      parsedConfig = parse(newConfigYaml);
     }
 
     // 2. Write to temp file
@@ -57,20 +67,20 @@ export class ConfigManager {
     // 4. Calculate new checksum
     const newChecksum = this.calculateChecksum(newConfigYaml);
 
-    // 5. Emit change event
+    // 5. Update in-memory config
+    if (reload) {
+      this.currentConfig = parsedConfig;
+      logger.info("Configuration reloaded in memory", {
+        changedSections: this.detectChangedSections(current.config, newConfigYaml),
+      });
+    }
+
+    // 6. Emit change event
     this.eventEmitter.emitEvent("config_change", {
       previousChecksum: current.checksum,
       newChecksum,
       changedSections: this.detectChangedSections(current.config, newConfigYaml),
     });
-
-    // 6. Reload if requested (In a real app, we might need to trigger a server restart or re-init services)
-    if (reload) {
-        // We rely on the file watcher in config.ts to pick this up, 
-        // OR we can explicitly call a reload function if passed.
-        // For this implementation, we assume the watcher or the caller handles the actual re-init.
-        logger.info("Configuration updated via API");
-    }
 
     return {
       previousChecksum: current.checksum,

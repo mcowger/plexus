@@ -1,14 +1,14 @@
 import type { PricingConfig, PriceLookup, CostResult, SimplePricing, TieredPricing } from "../types/pricing";
 import type { PricingConfigType } from "../types/config";
+import type { ConfigManager } from "./config-manager";
 import { logger } from "../utils/logger";
 
 /**
  * Service for calculating request costs based on pricing configuration
  */
 export class CostCalculator {
-  private config: PricingConfig | undefined;
+  private configManager: ConfigManager;
   private openRouterCache: Map<string, { pricing: SimplePricing; timestamp: number }>;
-  private cacheRefreshMs: number;
   private estimatedFallback: SimplePricing = {
     inputPer1M: 1.0,
     outputPer1M: 3.0,
@@ -16,11 +16,11 @@ export class CostCalculator {
     reasoningPer1M: 2.0,
   };
 
-  constructor(config?: PricingConfigType) {
-    this.config = config as PricingConfig | undefined;
+  constructor(configManager: ConfigManager) {
+    this.configManager = configManager;
     this.openRouterCache = new Map();
-    this.cacheRefreshMs = (config?.openrouter?.cacheRefreshMinutes || 60) * 60 * 1000;
 
+    const config = configManager.getCurrentConfig().pricing;
     logger.info("Cost calculator initialized", {
       modelsConfigured: Object.keys(config?.models || {}).length,
       openRouterEnabled: config?.openrouter?.enabled || false,
@@ -68,17 +68,19 @@ export class CostCalculator {
     provider: string,
     inputTokens: number
   ): Promise<{ pricing: SimplePricing; source: "config" | "openrouter" } | null> {
+    const config = this.configManager.getCurrentConfig().pricing;
+
     // 1. Check model-specific config pricing
-    if (this.config?.models?.[model]) {
+    if (config?.models?.[model]) {
       return {
-        pricing: this.config.models[model],
+        pricing: config.models[model],
         source: "config",
       };
     }
 
     // 2. Check tiered pricing
-    if (this.config?.tiered?.[model]) {
-      const tiers = this.config.tiered[model];
+    if (config?.tiered?.[model]) {
+      const tiers = config.tiered[model];
       const tier = this.getTierForTokens(tiers, inputTokens);
       if (tier) {
         return {
@@ -93,7 +95,7 @@ export class CostCalculator {
     }
 
     // 3. Query OpenRouter (if enabled)
-    if (this.config?.openrouter?.enabled) {
+    if (config?.openrouter?.enabled) {
       const openRouterPricing = await this.queryOpenRouter(model);
       if (openRouterPricing) {
         return {
@@ -127,15 +129,18 @@ export class CostCalculator {
    */
   private async queryOpenRouter(model: string): Promise<SimplePricing | null> {
     try {
+      const config = this.configManager.getCurrentConfig().pricing;
+      const cacheRefreshMs = (config?.openrouter?.cacheRefreshMinutes || 60) * 60 * 1000;
+
       // Check cache first
       const cached = this.openRouterCache.get(model);
-      if (cached && Date.now() - cached.timestamp < this.cacheRefreshMs) {
+      if (cached && Date.now() - cached.timestamp < cacheRefreshMs) {
         logger.debug("Using cached OpenRouter pricing", { model });
         return cached.pricing;
       }
 
       logger.debug("Querying OpenRouter for pricing", { model });
-      
+
       const response = await fetch("https://openrouter.ai/api/v1/models");
       if (!response.ok) {
         throw new Error(`OpenRouter API returned ${response.status} ${response.statusText}`);
@@ -179,8 +184,9 @@ export class CostCalculator {
    * @returns Discount multiplier (1.0 = no discount, 0.85 = 15% discount)
    */
   private getDiscountFactor(provider: string): number {
-    if (this.config?.discounts?.[provider]) {
-      return this.config.discounts[provider];
+    const config = this.configManager.getCurrentConfig().pricing;
+    if (config?.discounts?.[provider]) {
+      return config.discounts[provider];
     }
     return 1.0; // No discount
   }
@@ -237,18 +243,5 @@ export class CostCalculator {
     // Return average of input and output costs
     const discount = this.getDiscountFactor(provider);
     return ((pricing.pricing.inputPer1M + pricing.pricing.outputPer1M) / 2) * discount;
-  }
-
-  /**
-   * Update pricing configuration
-   */
-  updateConfig(config?: PricingConfigType): void {
-    this.config = config as PricingConfig | undefined;
-    this.cacheRefreshMs = (config?.openrouter?.cacheRefreshMinutes || 60) * 60 * 1000;
-
-    logger.info("Cost calculator config updated", {
-      modelsConfigured: Object.keys(config?.models || {}).length,
-      openRouterEnabled: config?.openrouter?.enabled || false,
-    });
   }
 }
