@@ -12,9 +12,8 @@ COPY tsconfig.json .
 COPY bunfig.toml .
 
 # Install dependencies early to leverage caching
-RUN bun install --frozen-lockfile --no-progress --verbose
+RUN bun install --frozen-lockfile --no-progress
 
-COPY public/ public/
 COPY server/ server/
 COPY src/ src/
 COPY index.ts .
