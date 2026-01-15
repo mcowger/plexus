@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { formatTokens, formatCost as formatCostUtil } from '@/lib/format';
 import { parse } from 'yaml';
 import { fetchEventSource, EventStreamContentType } from '@microsoft/fetch-event-source';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages, CircleStop, Copy } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages, CircleStop, Copy, CloudUpload, CloudDownload, PackageOpen, Brain } from 'lucide-react';
 import chatIcon from '@/assets/chat.svg';
 import messagesIcon from '@/assets/messages.svg';
 import geminiIcon from '@/assets/gemini.svg';
@@ -204,7 +205,7 @@ export function LogsPage() {
     if (cost === undefined || cost === null) return '-';
     const numCost = typeof cost === 'string' ? parseFloat(cost) : cost;
     if (isNaN(numCost)) return '-';
-    return `$${numCost.toFixed(6)}`;
+    return formatCostUtil(numCost);
   };
 
   const formatTimestamp = (timestamp?: string) => {
@@ -550,8 +551,25 @@ if (data.type === 'usage') {
                         <Loader2 className="h-3 w-3 animate-spin" />
                         pending...
                       </span>
-                    ) : log.usage?.totalTokens !== undefined ? (
-                      log.usage.totalTokens.toLocaleString()
+                    ) : log.usage ? (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <CloudUpload className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span>{formatTokens(log.usage.inputTokens ?? 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <CloudDownload className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span>{formatTokens(log.usage.outputTokens ?? 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Brain className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span>{formatTokens(log.usage.reasoningTokens ?? 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <PackageOpen className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span>{formatTokens(log.usage.cacheReadTokens ?? 0)}</span>
+                        </div>
+                      </div>
                     ) : (
                       '-'
                     )}
