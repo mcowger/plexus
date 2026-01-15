@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Table,
   TableBody,
@@ -17,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages, CircleStop, Copy, CloudUpload, CloudDownload, PackageOpen, Brain } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages, CircleStop, Copy, CloudUpload, CloudDownload, PackageOpen, Brain, Timer, Gauge, Clock, Zap, FileDown } from 'lucide-react';
 import chatDarkIcon from '@/assets/dark_icons/chat.svg';
 import messagesDarkIcon from '@/assets/dark_icons/messages.svg';
 import geminiDarkIcon from '@/assets/dark_icons/gemini.svg';
@@ -64,6 +65,7 @@ interface UsageLog {
   error?: string;
   isNew?: boolean; // For animation tracking
   isUpdating?: boolean; // For pulse animation
+  streaming?: boolean;
 }
 
 interface StateResponse {
@@ -468,7 +470,7 @@ if (data.type === 'usage') {
               <TableHead className="whitespace-nowrap">Model</TableHead>
               <TableHead className="whitespace-nowrap">Tokens</TableHead>
               <TableHead className="whitespace-nowrap">Cost</TableHead>
-              <TableHead className="whitespace-nowrap">TTFT</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[154px]">Metrics</TableHead>
               <TableHead className="whitespace-nowrap w-32 min-w-32">Status</TableHead>
               <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
             </TableRow>
@@ -518,6 +520,21 @@ if (data.type === 'usage') {
                         <Languages className="w-3 h-3 text-muted-foreground" />
                       )}
                       {renderApiIcon(log.targetApiType)}
+                      <span className="text-muted-foreground text-sm mx-1">|</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            {log.streaming ? (
+                              <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                              <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{log.streaming ? 'Streaming response' : 'Non-streaming response'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
@@ -581,7 +598,40 @@ if (data.type === 'usage') {
                       formatCost(log.cost?.totalCost)
                     )}
                   </TableCell>
-                  <TableCell>{formatLatency(log.metrics?.durationMs)}</TableCell>
+                  <TableCell>
+                    {log.pending ? (
+                      <span className="text-muted-foreground italic flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        pending...
+                      </span>
+                    ) : log.metrics ? (
+                      <div className="grid grid-cols-1 gap-y-1 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Timer className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span>TTFT</span>
+                          </div>
+                          <span>{formatLatency(log.metrics.clientTtftMs)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Gauge className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span>Tokens/Sec</span>
+                          </div>
+                          <span>{log.metrics.clientTokensPerSecond?.toFixed(1) ?? '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span>Total Duration</span>
+                          </div>
+                          <span>{formatLatency(log.metrics.durationMs)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
                   <TableCell className="w-32 min-w-32">
                     {log.pending ? (
                       <Badge variant="secondary" className="gap-1">
