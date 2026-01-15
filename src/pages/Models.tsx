@@ -12,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { parse, stringify } from 'yaml';
 import { Settings2, Trash2, Search, X, Copy, Weight } from 'lucide-react';
@@ -22,6 +29,7 @@ interface ModelTarget {
   provider: string;
   model: string;
   weight?: number;
+  needs_sanitizer?: boolean;
 }
 
 interface ModelAlias {
@@ -53,7 +61,7 @@ export const ModelsPage: React.FC = () => {
     description: '',
     selector: 'random' as SelectorStrategy,
     additionalAliases: [] as Tag[],
-    targets: [{ provider: '', model: '', weight: 100 }] as Array<{ provider: string; model: string; weight: number }>,
+    targets: [{ provider: '', model: '', weight: 100, needs_sanitizer: false }] as Array<{ provider: string; model: string; weight: number; needs_sanitizer?: boolean }>,
   });
 
   const loadConfig = async () => {
@@ -81,7 +89,7 @@ export const ModelsPage: React.FC = () => {
       description: '',
       selector: 'random',
       additionalAliases: [] as Tag[],
-      targets: [{ provider: '', model: '', weight: 100 }],
+      targets: [{ provider: '', model: '', weight: 100, needs_sanitizer: false }],
     });
     setShowModal(true);
   };
@@ -93,7 +101,7 @@ export const ModelsPage: React.FC = () => {
       description: alias.description || '',
       selector: alias.selector,
       additionalAliases: (alias.additionalAliases || []).map(a => ({ id: a, text: a })),
-      targets: alias.targets.map(t => ({ provider: t.provider, model: t.model, weight: t.weight || 100 })),
+      targets: alias.targets.map(t => ({ provider: t.provider, model: t.model, weight: t.weight || 100, needs_sanitizer: t.needs_sanitizer || false })),
     });
     setShowModal(true);
   };
@@ -131,11 +139,12 @@ export const ModelsPage: React.FC = () => {
       if (formData.additionalAliases.length > 0) {
         newAlias.additionalAliases = formData.additionalAliases.map(tag => tag.text);
       }
-      if (formData.targets.some(t => t.weight && t.weight !== 100)) {
+      if (formData.targets.some(t => t.weight && t.weight !== 100) || formData.targets.some(t => t.needs_sanitizer)) {
         newAlias.targets = formData.targets.map(t => ({
           provider: t.provider,
           model: t.model,
           weight: t.weight || undefined,
+          needs_sanitizer: t.needs_sanitizer || undefined,
         }));
       }
 
@@ -162,7 +171,7 @@ export const ModelsPage: React.FC = () => {
   const addTarget = () => {
     setFormData({
       ...formData,
-      targets: [...formData.targets, { provider: '', model: '', weight: 100 }],
+      targets: [...formData.targets, { provider: '', model: '', weight: 100, needs_sanitizer: false }],
     });
   };
 
@@ -286,7 +295,7 @@ export const ModelsPage: React.FC = () => {
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {alias.targets.map((t, i) => (
-                          <Tag key={i} text={`${t.provider}/${t.model}${t.weight && t.weight !== 100 ? ` (${t.weight}%)` : ''}`} />
+                          <Tag key={i} text={`${t.provider}/${t.model}${t.weight && t.weight !== 100 ? ` (${t.weight}%)` : ''}${t.needs_sanitizer ? ' 🧹' : ''}`} />
                         ))}
                       </div>
                     </TableCell>
@@ -459,6 +468,30 @@ export const ModelsPage: React.FC = () => {
                       />
                     </div>
                   )}
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor={`sanitizer-${index}`} className="text-xs text-muted-foreground cursor-pointer">
+                            Sanitize
+                          </Label>
+                          <Switch
+                            id={`sanitizer-${index}`}
+                            checked={target.needs_sanitizer || false}
+                            onCheckedChange={(checked) => {
+                              const newTargets = [...formData.targets];
+                              newTargets[index] = { ...target, needs_sanitizer: checked };
+                              setFormData({ ...formData, targets: newTargets });
+                            }}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Corrects for providers that emit invalid SSE stream endings</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   <div className="flex items-center gap-1">
                     <div className="h-6 w-[1px] bg-border" />

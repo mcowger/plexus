@@ -115,6 +115,7 @@ export const ModelTargetSchema = z.object({
   provider: z.string(),
   model: z.string(),
   weight: z.number().positive().optional(),
+  needs_sanitizer: z.boolean().optional(),
 });
 
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;

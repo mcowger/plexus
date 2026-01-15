@@ -468,20 +468,27 @@ export class DebugLogger {
 
       const clientBody = trace.clientResponse.body;
 
-      // Check if response contains usage data
-      if (!clientBody?.usage && !clientBody?.usageMetadata) {
-        return;
-      }
-
-      const rawUsage = clientBody.usage || clientBody.usageMetadata;
-      const unifiedUsage = transformer.parseUsage(rawUsage);
+      // Extract usage data (may be null/undefined if provider didn't send it)
+      const rawUsage = clientBody?.usage || clientBody?.usageMetadata;
+      
+  // Parse usage data - transformer should handle null/undefined gracefully
+      // If no usage data is available, we still need to mark the request as complete
+      const unifiedUsage = rawUsage ? transformer.parseUsage(rawUsage) : {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_creation_tokens: 0,
+        reasoning_tokens: 0,
+      };
 
       logger.debug("Extracted usage from reconstructed response", {
         requestId,
         usage: unifiedUsage,
+        hadUsageData: !!rawUsage,
       });
 
-      // Update usage log entry with reconstructed usage data
+      // Update usage log entry with reconstructed usage data (or zeros if unavailable)
+      // This also marks the request as no longer pending
       await this.usageLogger.updateUsageFromReconstructed(requestId, unifiedUsage);
     } catch (error) {
       logger.warn("Failed to extract usage from reconstructed response", {

@@ -7,6 +7,7 @@ export interface ModelTarget {
   provider: string;
   model: string;
   weight?: number; // For weighted random selection
+  needs_sanitizer?: boolean; // Whether this target needs SSE stream sanitization
 }
 
 /**
@@ -27,6 +28,7 @@ export interface ResolvedTarget {
   model: string;
   aliasUsed: string;
   targetIndex: number;
+  needsSanitizer?: boolean; // Whether this target needs SSE stream sanitization
 }
 
 /**

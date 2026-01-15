@@ -12,6 +12,7 @@ import type {
   StreamTransformOptions,
 } from "../transformers/types";
 import { logger } from "../utils/logger";
+import { streamSanitizer } from "./stream-sanitizer";
 
 /**
  * Supported API types
@@ -133,7 +134,8 @@ export class TransformerFactory {
     response: Response,
     sourceApiType: ApiType,
     targetApiType: ApiType,
-    debugOptions?: StreamTransformOptions
+    debugOptions?: StreamTransformOptions,
+    needsSanitizer?: boolean
   ): Promise<Response> {
     // If source and target are the same, no transformation needed (optimization)
     // But strictly speaking we might want to normalize through Unified anyway?
@@ -144,9 +146,15 @@ export class TransformerFactory {
       const isStream = contentType.includes("text/event-stream");
 
       if (isStream) {
-        return new Response(response.body, {
+        // Sanitize the stream to fix malformed SSE (e.g., "data: null" -> "data: [DONE]")
+        // Only applied if the target is marked with needs_sanitizer: true
+        const sanitizedBody = (response.body && needsSanitizer)
+          ? streamSanitizer.sanitize(response.body)
+      : response.body;
+        
+        return new Response(sanitizedBody, {
           status: response.status,
-          headers: Object.fromEntries(response.headers.entries()),
+        headers: Object.fromEntries(response.headers.entries()),
         });
       } else {
         // For non-streaming, we need to parse and recreate to avoid body consumption issues

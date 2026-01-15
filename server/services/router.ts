@@ -175,6 +175,7 @@ export class Router {
       model: selectedTarget.model,
       aliasUsed,
       targetIndex,
+      needsSanitizer: selectedTarget.needs_sanitizer || false,
     };
 
     logger.debug("Model resolved", {

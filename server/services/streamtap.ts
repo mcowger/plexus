@@ -1,5 +1,6 @@
 import type { DebugLogger } from "./debug-logger";
 import type { UsageLogger, RequestContext } from "./usage-logger";
+import { logger as appLogger } from "../utils/logger";
 // stream-tap.ts
 export class StreamTap {
   debugLogger: DebugLogger;
@@ -84,13 +85,13 @@ export class StreamTap {
 
         async flush() {
           // Triggered when stream ends successfully
-          if (isFinalPipe) {
+       if (isFinalPipe) {
             // Clear timeout since stream completed naturally
-            if (timeoutTimer) {
-              clearTimeout(timeoutTimer);
-            }
-            await logger.completeTrace(requestId);
+       if (timeoutTimer) {
+           clearTimeout(timeoutTimer);
           }
+    await logger.completeTrace(requestId);
+        }
         },
         // @ts-ignore: Bun supports cancel() in TransformStream to handle client disconnects
         async cancel(reason) {

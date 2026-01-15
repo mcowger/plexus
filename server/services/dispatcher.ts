@@ -97,7 +97,7 @@ export class Dispatcher {
         );
       }
 
-      const { provider, model, aliasUsed } = resolution.target;
+      const { provider, model, aliasUsed, needsSanitizer } = resolution.target;
 
       // Update request context with routing information
       requestContext.aliasUsed = aliasUsed;
@@ -266,7 +266,9 @@ export class Dispatcher {
         const transformedResponse = await transformerFactory.transformResponse(
           providerProxy, // Pass the proxy Response, NOT the POJO
           providerApiType,
-          clientApiType
+          clientApiType,
+        undefined, // debugOptions
+          needsSanitizer // Pass sanitizer flag from target config
         );
 
         // --- TAP 2: Transformed Client Response (Final) ---
