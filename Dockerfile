@@ -8,16 +8,22 @@ WORKDIR /app
 # Copy workspace configuration and source code
 COPY package.json .
 COPY bun.lock .
-COPY packages/ packages/
+COPY public/ public/
+COPY server/ server/
+COPY src/ src/
+COPY index.ts .
+COPY server.ts .
+
 
 # Install dependencies
-RUN bun install --frozen-lockfile
-
+RUN bun install --frozen-lockfile --no-progress --verbose
 # Compile for Linux x64
 RUN bun run compile:linux
 
 # Create data directory in builder stage
 RUN mkdir -p /app/data
+# Create config directory in builder stage
+RUN mkdir -p /app/config
 
 # Runtime stage - distroless
 FROM oven/bun:distroless
@@ -28,13 +34,14 @@ COPY --from=builder /app/dist/plexus2-linux-x64 /app/plexus2
 
 # Copy data directory from builder
 COPY --from=builder /app/data /app/data
+COPY --from=builder /app/config /app/config
 
 # Volume mounts
-VOLUME ["/app/config.yaml", "/app/data"]
+VOLUME ["/app/config", "/app/data"]
 
 # Expose port
 EXPOSE 4000
 
 # Run the application
-ENTRYPOINT ["/app/plexus2"]
+ENTRYPOINT ["/app/plexus2", "--config", "/app/config/plexus.yaml"]
 CMD []
