@@ -425,6 +425,51 @@ export class DebugStore {
   }
 
   /**
+   * Delete a specific debug trace by request ID
+   * @param requestId - The unique request ID to delete
+   * @returns True if the trace was found and deleted, false otherwise
+   */
+  async deleteById(requestId: string): Promise<boolean> {
+    try {
+      // Find directory ending with the request ID
+      const glob = new Bun.Glob(`*-${requestId}`);
+      const dirs = this.sanitizeGlobEntries(
+        glob.scanSync({ cwd: this.storagePath, onlyFiles: false })
+      );
+
+      if (dirs.length === 0) {
+        logger.warn("Debug trace not found for deletion", { requestId });
+        return false;
+      }
+
+      // Delete the first match (there should only be one for a unique request ID)
+      const dirPath = join(this.storagePath, dirs[0]!);
+
+      try {
+        await rm(dirPath, {
+          recursive: true,
+          force: true,
+        });
+        logger.info("Deleted debug trace", { requestId, dirPath });
+        return true;
+      } catch (e) {
+        logger.error("Failed to delete debug trace directory", {
+          requestId,
+          dirPath,
+          error: e instanceof Error ? e.message : String(e),
+        });
+        return false;
+      }
+    } catch (error) {
+      logger.error("Failed to delete debug trace", {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
    * Clean up old debug traces
    */
   async cleanup(): Promise<void> {

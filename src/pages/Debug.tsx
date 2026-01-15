@@ -64,7 +64,7 @@ export function DebugPage() {
   const handleDeleteLog = async () => {
     if (selectedLog) {
       try {
-        await api.deleteLogs({ all: true });
+        await api.deleteLogById(selectedLog.id);
         setSelectedLog(null);
         await fetchDebugLogs();
       } catch (error) {

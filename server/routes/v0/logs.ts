@@ -25,6 +25,20 @@ export async function handleLogs(req: Request, logQueryService: LogQueryService)
     }
   }
 
+  if (id && method === "DELETE") {
+    // Delete by ID
+    try {
+      const result = await logQueryService.deleteLogById(id);
+      if (!result.success) {
+        return new Response("Log not found", { status: 404 });
+      }
+      return Response.json(result);
+    } catch (error) {
+      logger.error("Failed to delete log by ID", { id, error });
+      return new Response("Internal Server Error", { status: 500 });
+    }
+  }
+
   if (method === "GET") {
     // Query Logs
     try {
@@ -50,7 +64,7 @@ export async function handleLogs(req: Request, logQueryService: LogQueryService)
   }
 
   if (method === "DELETE") {
-    // Delete Logs
+    // Bulk Delete Logs
     try {
       const body = await req.json() as LogsDeleteRequest;
       const result = await logQueryService.deleteLogs(body);

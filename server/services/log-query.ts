@@ -133,7 +133,7 @@ export class LogQueryService {
      // Default olderThanDays to a very small number if 'all' is requested, effectively clearing everything
      // Or if specific days provided.
      // If 'all' is true, we pass 0 days (delete everything older than now)
-     
+
      const days = request.all ? 0 : request.olderThanDays;
 
      if (days === undefined) {
@@ -145,7 +145,7 @@ export class LogQueryService {
      if (request.type === 'usage' || !request.type) {
          result.deleted.usage = await this.usageStore.deleteOldLogs(days);
      }
-     
+
      if (request.type === 'error' || !request.type) {
          result.deleted.error = await this.errorStore.deleteOldLogs(days);
      }
@@ -153,7 +153,28 @@ export class LogQueryService {
      if (request.type === 'trace' || !request.type) {
          result.deleted.trace = await this.debugStore.deleteOldLogs(days);
      }
-     
+
      return result;
+  }
+
+  /**
+   * Delete a specific log entry by request ID
+   * Deletes from all stores (usage, error, and trace)
+   */
+  async deleteLogById(requestId: string) {
+    const result = {
+      success: true,
+      deleted: { usage: false, error: false, trace: false }
+    };
+
+    // Try to delete from all stores
+    result.deleted.usage = await this.usageStore.deleteById(requestId);
+    result.deleted.error = await this.errorStore.deleteById(requestId);
+    result.deleted.trace = await this.debugStore.deleteById(requestId);
+
+    // Consider it successful if at least one store had the entry
+    result.success = result.deleted.usage || result.deleted.error || result.deleted.trace;
+
+    return result;
   }
 }

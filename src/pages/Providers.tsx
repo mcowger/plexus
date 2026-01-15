@@ -142,6 +142,22 @@ export const ProvidersPage: React.FC = () => {
     setShowModal(true);
   };
 
+  const handleToggleEnabled = async (name: string, enabled: boolean) => {
+    try {
+      const configYaml = await api.getConfig();
+      const config = parse(configYaml) as ConfigData;
+      const provider = config.providers.find(p => p.name === name);
+      if (provider) {
+        provider.enabled = enabled;
+        await api.updateConfig(stringify(config));
+        loadConfig();
+      }
+    } catch (error) {
+      console.error('Failed to update provider:', error);
+      alert('Failed to update provider');
+    }
+  };
+
   const handleDelete = async (name: string) => {
     if (confirm(`Are you sure you want to delete provider "${name}"?`)) {
       try {
@@ -278,7 +294,11 @@ export const ProvidersPage: React.FC = () => {
                     </TableCell>
                     <TableCell>{provider.models.length} configured</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2 items-center">
+                        <Switch
+                          checked={provider.enabled}
+                          onCheckedChange={(checked) => handleToggleEnabled(provider.name, checked)}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"

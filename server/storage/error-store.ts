@@ -133,7 +133,7 @@ export class ErrorStore {
     try {
       const glob = new Bun.Glob("*.jsonl");
       const files = Array.from(glob.scanSync(this.storagePath));
-      
+
       let deletedCount = 0;
 
       // If days is 0, delete ALL logs (including today)
@@ -177,6 +177,80 @@ export class ErrorStore {
         error: error instanceof Error ? error.message : String(error),
       });
       return 0;
+    }
+  }
+
+  /**
+   * Delete a specific error log entry by request ID
+   * @param requestId - The unique request ID to delete
+   * @returns True if the entry was found and deleted, false otherwise
+   */
+  async deleteById(requestId: string): Promise<boolean> {
+    try {
+      const glob = new Bun.Glob("*.jsonl");
+      const files = Array.from(glob.scanSync(this.storagePath)).sort().reverse();
+
+      for (const fileName of files) {
+        const filePath = join(this.storagePath, fileName);
+        const file = Bun.file(filePath);
+        const content = await file.text();
+        const lines = content.trim().split("\n");
+
+        let deleted = false;
+        const updatedLines: string[] = [];
+
+        for (const line of lines) {
+          if (!line) {
+            updatedLines.push(line);
+            continue;
+          }
+
+          try {
+            if (line.includes(requestId)) {
+              const entry: ErrorLogEntry = JSON.parse(line);
+              if (entry.id === requestId) {
+                // Skip this line (delete it)
+                deleted = true;
+                logger.info("Deleted error log entry", {
+                  requestId,
+                  file: fileName,
+                });
+                continue;
+              }
+            }
+          } catch (e) {
+            // If parse fails, keep original line
+            logger.warn("Failed to parse line during delete", {
+              file: fileName,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+
+          updatedLines.push(line);
+        }
+
+        if (deleted) {
+          // Write updated content back to file
+          const newContent = updatedLines.filter(l => l.trim()).join("\n");
+          if (newContent) {
+            await Bun.write(filePath, newContent + "\n");
+          } else {
+            // If file is now empty, delete it
+            await unlink(filePath);
+            logger.info("Deleted empty error log file", { file: fileName });
+          }
+          return true;
+        }
+      }
+
+      logger.warn("Error log entry not found for deletion", { requestId });
+      return false;
+    } catch (error) {
+      logger.error("Failed to delete error log entry", {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
     }
   }
 

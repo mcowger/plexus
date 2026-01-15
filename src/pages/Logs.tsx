@@ -162,7 +162,7 @@ export function LogsPage() {
   const handleDeleteLog = async (id?: string) => {
     if (!id) return;
     try {
-      await api.deleteLogs({ all: true });
+      await api.deleteLogById(id);
       setPage(0);
       await fetchLogs();
     } catch (error) {

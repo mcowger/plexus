@@ -65,6 +65,17 @@ export const api = {
     return data;
   },
 
+  deleteLogById: async (id: string): Promise<{ success: boolean; deleted: { usage: boolean; error: boolean; trace: boolean } }> => {
+    const { data, error } = await client.DELETE('/logs/{id}', {
+      params: {
+        path: { id },
+      },
+    });
+    if (error) throw new Error(String(error));
+    if (!data) throw new Error('Delete log data missing');
+    return data as { success: boolean; deleted: { usage: boolean; error: boolean; trace: boolean } };
+  },
+
   getLogDetails: async (id: string) => {
     const { data, error } = await client.GET('/logs/{id}', {
       params: {
