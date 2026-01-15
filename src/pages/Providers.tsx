@@ -21,9 +21,12 @@ import { api } from '@/lib/api';
 import { parse, stringify } from 'yaml';
 import { Plus, Trash2, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
-import chatIcon from '@/assets/chat.svg';
-import messagesIcon from '@/assets/messages.svg';
-import geminiIcon from '@/assets/gemini.svg';
+import chatDarkIcon from '@/assets/dark_icons/chat.svg';
+import messagesDarkIcon from '@/assets/dark_icons/messages.svg';
+import geminiDarkIcon from '@/assets/dark_icons/gemini.svg';
+import chatLightIcon from '@/assets/light_icons/chat.svg';
+import messagesLightIcon from '@/assets/light_icons/messages.svg';
+import geminiLightIcon from '@/assets/light_icons/gemini.svg';
 
 interface Provider {
   name: string;
@@ -81,6 +84,18 @@ export const ProvidersPage: React.FC = () => {
     customHeaders: '',
     extraBody: '',
   });
+
+  const getIcon = (iconType: 'chat' | 'messages' | 'gemini') => {
+    const isDark = theme === 'dark';
+    switch (iconType) {
+      case 'chat':
+        return isDark ? chatDarkIcon : chatLightIcon;
+      case 'messages':
+        return isDark ? messagesDarkIcon : messagesLightIcon;
+      case 'gemini':
+        return isDark ? geminiDarkIcon : geminiLightIcon;
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -361,7 +376,7 @@ export const ProvidersPage: React.FC = () => {
 
               <div className="flex items-center gap-3">
                 <Label htmlFor="api-chat" className="text-xs w-[130px] flex items-center gap-1.5">
-                  <img src={chatIcon} alt="Chat" className="w-4 h-4" style={{ filter: theme === 'light' ? 'invert(1)' : 'none' }} />
+                  <img src={getIcon('chat')} alt="Chat" className="w-4 h-4" />
                   Chat
                 </Label>
                 <Switch
@@ -388,7 +403,7 @@ export const ProvidersPage: React.FC = () => {
 
               <div className="flex items-center gap-3">
                 <Label htmlFor="api-messages" className="text-xs w-[130px] flex items-center gap-1.5">
-                  <img src={messagesIcon} alt="Messages" className="w-4 h-4" />
+                  <img src={getIcon('messages')} alt="Messages" className="w-4 h-4" />
                   Messages
                 </Label>
                 <Switch
@@ -415,7 +430,7 @@ export const ProvidersPage: React.FC = () => {
 
               <div className="flex items-center gap-3">
                 <Label htmlFor="api-gemini" className="text-xs w-[130px] flex items-center gap-1.5">
-                  <img src={geminiIcon} alt="Gemini" className="w-4 h-4" />
+                  <img src={getIcon('gemini')} alt="Gemini" className="w-4 h-4" />
                   Gemini
                 </Label>
                 <Switch

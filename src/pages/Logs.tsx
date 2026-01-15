@@ -18,9 +18,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Search, Trash2, ChevronLeft, ChevronRight, Info, AlertTriangle, CheckCircle, XCircle, Loader2, ArrowLeftRight, Languages, CircleStop, Copy, CloudUpload, CloudDownload, PackageOpen, Brain } from 'lucide-react';
-import chatIcon from '@/assets/chat.svg';
-import messagesIcon from '@/assets/messages.svg';
-import geminiIcon from '@/assets/gemini.svg';
+import chatDarkIcon from '@/assets/dark_icons/chat.svg';
+import messagesDarkIcon from '@/assets/dark_icons/messages.svg';
+import geminiDarkIcon from '@/assets/dark_icons/gemini.svg';
+import chatLightIcon from '@/assets/light_icons/chat.svg';
+import messagesLightIcon from '@/assets/light_icons/messages.svg';
+import geminiLightIcon from '@/assets/light_icons/gemini.svg';
 import { useTheme } from '@/components/theme-provider';
 
 const activeSSEConnections = new Set<AbortController>();
@@ -223,13 +226,14 @@ export function LogsPage() {
   const safeText = (value?: string) => value || '-';
 
   const getApiIcon = (apiType?: string) => {
+    const isDark = theme === 'dark';
     switch (apiType) {
       case 'chat':
-        return chatIcon;
+        return isDark ? chatDarkIcon : chatLightIcon;
       case 'messages':
-        return messagesIcon;
+        return isDark ? messagesDarkIcon : messagesLightIcon;
       case 'gemini':
-        return geminiIcon;
+        return isDark ? geminiDarkIcon : geminiLightIcon;
       default:
         return null;
     }
@@ -238,14 +242,7 @@ export function LogsPage() {
   const renderApiIcon = (apiType?: string) => {
     const icon = getApiIcon(apiType);
     if (!icon) return null;
-    return (
-      <img 
-        src={icon} 
-        alt={apiType} 
-        className="w-4 h-4" 
-        style={{ filter: (apiType === 'chat' && theme === 'light') ? 'invert(1)' : 'none' }}
-      />
-    );
+    return <img src={icon} alt={apiType} className="w-4 h-4" />;
   };
 
   const handleCopy = (text: string) => {
