@@ -24,6 +24,27 @@
         ```
     *   **Note:** Do NOT use Vite-specific syntax. This is a Bun project.
 
+### 1.3 Build & Compilation
+*   **Executable Compilation:** ALWAYS use `compile.ts` script to build executables, NEVER use `bun build --compile` directly.
+    *   **REASON:** The CLI `bun build --compile` does NOT support bundler plugins. Only the JavaScript API (`Bun.build()`) supports plugins.
+    *   **CRITICAL:** The `bun-plugin-tailwind` plugin is required for Tailwind CSS to work in compiled executables. Without it, CSS will not be generated.
+    *   **bunfig.toml plugins:** The `[serve.static]` plugins in `bunfig.toml` only apply to the dev server, NOT production builds.
+    *   **Usage:**
+        ```bash
+        # Use package.json scripts (recommended)
+        bun run compile:macos
+        bun run compile:linux
+        bun run compile:all
+        
+        # Or call compile.ts directly
+        bun compile.ts --target bun-darwin-arm64 --outfile dist/my-app
+        ```
+    *   **DO NOT:**
+        ```bash
+        # ❌ WRONG - plugins will NOT be included
+        bun build index.ts --compile --target bun-darwin-arm64 --outfile dist/app
+        ```
+
 ---
 
 ## 2. Project Overview

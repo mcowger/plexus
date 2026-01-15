@@ -11,10 +11,10 @@
     "start": "NODE_ENV=production bun index.js --config ./config/plexus.yaml",
     "build": "bun build --target=bun --production --outdir=dist ./index.ts",
     "build:frontend": "bun build ./src/index.html --outdir ./dist/frontend --minify",
-    "compile:macos": "bun build index.ts --compile --target bun-darwin-arm64 --outfile dist/plexus2-macos",
-    "compile:linux": "bun build index.ts --compile --target bun-linux-x64-modern --outfile dist/plexus2-linux-x64",
-    "compile:windows": "bun build index.ts --compile --target bun-win-x64 --outfile dist/plexus2-windows-x64.exe",
-    "compile:linux-arm64": "bun build index.ts --compile --target bun-linux-arm64 --outfile dist/plexus2-linux-arm64",
+    "compile:macos": "bun compile.ts --target bun-darwin-arm64 --outfile dist/plexus2-macos",
+    "compile:linux": "bun compile.ts --target bun-linux-x64-modern --outfile dist/plexus2-linux-x64",
+    "compile:windows": "bun compile.ts --target bun-windows-x64 --outfile dist/plexus2-windows-x64.exe",
+    "compile:linux-arm64": "bun compile.ts --target bun-linux-arm64 --outfile dist/plexus2-linux-arm64",
     "compile:all": "bun run compile:macos && bun run compile:linux && bun run compile:windows && bun run compile:linux-arm64"
   },
   "dependencies": {

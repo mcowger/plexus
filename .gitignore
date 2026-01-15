@@ -3,3 +3,4 @@ config/plexus.yaml
 data/*
 dist/
 *.exe
+plexus2-*
