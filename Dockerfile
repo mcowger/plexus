@@ -8,15 +8,18 @@ WORKDIR /app
 # Copy workspace configuration and source code
 COPY package.json .
 COPY bun.lock .
+COPY tsconfig.json .
+COPY bunfig.toml .
+
+# Install dependencies early to leverage caching
+RUN bun install --frozen-lockfile --no-progress --verbose
+
 COPY public/ public/
 COPY server/ server/
 COPY src/ src/
 COPY index.ts .
 COPY server.ts .
 
-
-# Install dependencies
-RUN bun install --frozen-lockfile --no-progress --verbose
 # Compile for Linux x64
 RUN bun run compile:linux
 
