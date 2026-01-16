@@ -31,11 +31,10 @@ import geminiLightIcon from '@/assets/light_icons/gemini.svg';
 interface Provider {
   name: string;
   enabled: boolean;
-  apiTypes: string[];
   baseUrls: {
-    chat?: string;
-    messages?: string;
-    gemini?: string;
+    chat?: { url: string; enabled: boolean };
+    messages?: { url: string; enabled: boolean };
+    gemini?: { url: string; enabled: boolean };
   };
   auth: {
     type: 'bearer' | 'x-api-key';
@@ -65,15 +64,10 @@ export const ProvidersPage: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     enabled: true as boolean,
-    apiTypes: {
-      chat: false as boolean,
-      messages: false as boolean,
-      gemini: false as boolean,
-    },
     baseUrls: {
-      chat: '',
-      messages: '',
-      gemini: '',
+      chat: { url: '', enabled: false } as { url: string; enabled: boolean },
+      messages: { url: '', enabled: false } as { url: string; enabled: boolean },
+      gemini: { url: '', enabled: false } as { url: string; enabled: boolean },
     },
     auth: {
       type: 'bearer' as 'bearer' | 'x-api-key',
@@ -119,8 +113,7 @@ export const ProvidersPage: React.FC = () => {
     setFormData({
       name: '',
       enabled: true,
-      apiTypes: { chat: false, messages: false, gemini: false },
-      baseUrls: { chat: '', messages: '', gemini: '' },
+      baseUrls: { chat: { url: '', enabled: false }, messages: { url: '', enabled: false }, gemini: { url: '', enabled: false } },
       auth: { type: 'bearer', apiKey: '' },
       models: [],
       discount: 1.0,
@@ -135,15 +128,10 @@ export const ProvidersPage: React.FC = () => {
     setFormData({
       name: provider.name,
       enabled: provider.enabled,
-      apiTypes: {
-        chat: provider.apiTypes.includes('chat'),
-        messages: provider.apiTypes.includes('messages'),
-        gemini: provider.apiTypes.includes('gemini'),
-      },
       baseUrls: {
-        chat: provider.baseUrls.chat || '',
-        messages: provider.baseUrls.messages || '',
-        gemini: provider.baseUrls.gemini || '',
+        chat: provider.baseUrls.chat || { url: '', enabled: false },
+        messages: provider.baseUrls.messages || { url: '', enabled: false },
+        gemini: provider.baseUrls.gemini || { url: '', enabled: false },
       },
       auth: {
         type: provider.auth.type,
@@ -194,19 +182,13 @@ export const ProvidersPage: React.FC = () => {
       const configYaml = await api.getConfig();
       const config = parse(configYaml) as ConfigData;
 
-      const activeApiTypes: string[] = [];
-      if (formData.apiTypes.chat) activeApiTypes.push('chat');
-      if (formData.apiTypes.messages) activeApiTypes.push('messages');
-      if (formData.apiTypes.gemini) activeApiTypes.push('gemini');
-
       const newProvider: Provider = {
         name: formData.name,
         enabled: formData.enabled,
-        apiTypes: activeApiTypes,
         baseUrls: {
-          chat: formData.baseUrls.chat || undefined,
-          messages: formData.baseUrls.messages || undefined,
-          gemini: formData.baseUrls.gemini || undefined,
+          chat: formData.baseUrls.chat?.url ? { url: formData.baseUrls.chat.url, enabled: formData.baseUrls.chat.enabled } : undefined,
+          messages: formData.baseUrls.messages?.url ? { url: formData.baseUrls.messages.url, enabled: formData.baseUrls.messages.enabled } : undefined,
+          gemini: formData.baseUrls.gemini?.url ? { url: formData.baseUrls.gemini.url, enabled: formData.baseUrls.gemini.enabled } : undefined,
         },
         auth: {
           type: formData.auth.type,
@@ -301,11 +283,13 @@ export const ProvidersPage: React.FC = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {provider.apiTypes.map((type) => (
-                        <Badge key={type} variant="outline" className="mr-1">
-                          {type}
-                        </Badge>
-                      ))}
+                      {Object.entries(provider.baseUrls)
+                        .filter(([_, config]) => config && config.enabled)
+                        .map(([type, _]) => (
+                          <Badge key={type} variant="outline" className="mr-1">
+                            {type}
+                          </Badge>
+                        ))}
                     </TableCell>
                     <TableCell>{provider.models.length} configured</TableCell>
                     <TableCell className="text-right">
@@ -381,21 +365,21 @@ export const ProvidersPage: React.FC = () => {
                 </Label>
                 <Switch
                   id="api-chat"
-                  checked={formData.apiTypes.chat}
+                  checked={formData.baseUrls.chat?.enabled || false}
                   onCheckedChange={(checked) =>
                     setFormData({
                       ...formData,
-                      apiTypes: { ...formData.apiTypes, chat: checked },
+                      baseUrls: { ...formData.baseUrls, chat: { ...formData.baseUrls.chat, enabled: checked } },
                     })
                   }
                 />
                 <Input
                   placeholder="https://api.openai.com/v1/chat/completions"
-                  value={formData.baseUrls.chat}
+                  value={formData.baseUrls.chat?.url || ''}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      baseUrls: { ...formData.baseUrls, chat: e.target.value },
+                      baseUrls: { ...formData.baseUrls, chat: { ...formData.baseUrls.chat, url: e.target.value } },
                     })
                   }
                 />
@@ -408,21 +392,21 @@ export const ProvidersPage: React.FC = () => {
                 </Label>
                 <Switch
                   id="api-messages"
-                  checked={formData.apiTypes.messages}
+                  checked={formData.baseUrls.messages?.enabled || false}
                   onCheckedChange={(checked) =>
                     setFormData({
                       ...formData,
-                      apiTypes: { ...formData.apiTypes, messages: checked },
+                      baseUrls: { ...formData.baseUrls, messages: { ...formData.baseUrls.messages, enabled: checked } },
                     })
                   }
                 />
                 <Input
                   placeholder="https://api.anthropic.com/v1/messages"
-                  value={formData.baseUrls.messages}
+                  value={formData.baseUrls.messages?.url || ''}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      baseUrls: { ...formData.baseUrls, messages: e.target.value },
+                      baseUrls: { ...formData.baseUrls, messages: { ...formData.baseUrls.messages, url: e.target.value } },
                     })
                   }
                 />
@@ -435,21 +419,21 @@ export const ProvidersPage: React.FC = () => {
                 </Label>
                 <Switch
                   id="api-gemini"
-                  checked={formData.apiTypes.gemini}
+                  checked={formData.baseUrls.gemini?.enabled || false}
                   onCheckedChange={(checked) =>
                     setFormData({
                       ...formData,
-                      apiTypes: { ...formData.apiTypes, gemini: checked },
+                      baseUrls: { ...formData.baseUrls, gemini: { ...formData.baseUrls.gemini, enabled: checked } },
                     })
                   }
                 />
                 <Input
                   placeholder="https://generativelanguage.googleapis.com/v1beta/models"
-                  value={formData.baseUrls.gemini}
+                  value={formData.baseUrls.gemini?.url || ''}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      baseUrls: { ...formData.baseUrls, gemini: e.target.value },
+                      baseUrls: { ...formData.baseUrls, gemini: { ...formData.baseUrls.gemini, url: e.target.value } },
                     })
                   }
                 />

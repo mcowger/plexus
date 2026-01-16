@@ -12,9 +12,8 @@ const mockConfig: PlexusConfig = {
     {
       name: "anthropic",
       enabled: true,
-      apiTypes: ["messages"],
       baseUrls: {
-        messages: "https://api.anthropic.com/v1/messages",
+        messages: { url: "https://api.anthropic.com/v1/messages", enabled: true },
       },
       auth: {
         type: "x-api-key",

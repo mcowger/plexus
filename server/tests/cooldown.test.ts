@@ -41,16 +41,14 @@ describe("Cooldown Manager", () => {
         {
           name: "test-provider",
           enabled: true,
-          apiTypes: ["chat"],
-          baseUrls: { chat: "https://api.test.com" },
+          baseUrls: { chat: { url: "https://api.test.com", enabled: true } },
           auth: { type: "bearer", apiKey: "{env:TEST_KEY}" },
           models: ["test-model"],
         },
         {
           name: "provider-with-overrides",
           enabled: true,
-          apiTypes: ["chat"],
-          baseUrls: { chat: "https://api.test2.com" },
+          baseUrls: { chat: { url: "https://api.test2.com", enabled: true } },
           auth: { type: "bearer", apiKey: "{env:TEST_KEY_2}" },
           models: ["test-model-2"],
           cooldown: {

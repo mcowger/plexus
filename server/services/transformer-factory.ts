@@ -20,7 +20,7 @@ import { streamSanitizer } from "./stream-sanitizer";
 export type ApiType = "chat" | "messages" | "gemini";
 
 /**
- * Get API type for a provider based on its configured apiTypes
+ * Get API type for a provider based on its configured baseUrls
  * Prefers the client's requested API type if supported by the provider.
  * Falls back to 'chat' as the primary default.
  */
@@ -31,12 +31,12 @@ export function getProviderApiType(
   // 1. If we have a preference and it's supported, use it
   if (
     preferredApiType &&
-    (providerApiTypes as string[]).includes(preferredApiType)
+    providerApiTypes.includes(preferredApiType)
   ) {
     return preferredApiType;
   }
 
-  // 2. Otherwise, prefer 'chat' (OpenAI) as the most common/universal format
+  // 2. Otherwise, prefer 'chat' (OpenAI) as most common/universal format
   if (providerApiTypes.includes("chat")) {
     return "chat";
   }

@@ -13,7 +13,6 @@ const mockConfig: any = {
     {
       name: "openai",
       enabled: true,
-      apiTypes: ["chat"],
       baseUrls: {
         chat: "https://api.openai.com/v1/chat/completions",
         messages: "https://api.openai.com/v1/messages",
@@ -27,7 +26,6 @@ const mockConfig: any = {
     {
       name: "disabled-provider",
       enabled: false,
-      apiTypes: ["chat"],
       baseUrls: {
         chat: "https://api.disabled.com/v1/chat/completions",
         messages: "https://api.disabled.com/v1/messages",

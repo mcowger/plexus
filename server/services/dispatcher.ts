@@ -104,9 +104,8 @@ export class Dispatcher {
       requestContext.actualProvider = provider.name;
       requestContext.actualModel = model;
 
-      // Step 2: Determine provider's native API type
       const providerApiType = getProviderApiType(
-        provider.apiTypes || ["chat"],
+        Object.keys(provider.baseUrls).filter(key => provider.baseUrls[key as keyof typeof provider.baseUrls]?.enabled) || ["chat"],
         clientApiType
       );
 
@@ -467,9 +466,12 @@ export class Dispatcher {
     apiType: ApiType
   ): string | undefined {
     if (apiType === "messages") {
-      return provider.baseUrls.messages;
+      return provider.baseUrls.messages?.url;
     }
-    return provider.baseUrls.chat;
+    if (apiType === "gemini") {
+      return provider.baseUrls.gemini?.url;
+    }
+    return provider.baseUrls.chat?.url;
   }
 
   /**

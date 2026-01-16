@@ -38,9 +38,10 @@ logging:
 providers:
   - name: "openai"
     enabled: true
-    apiTypes: ["chat"] # Supported API formats
     baseUrls:
-      chat: "https://api.openai.com/v1/chat/completions"
+      chat:
+        url: "https://api.openai.com/v1/chat/completions"
+        enabled: true
     auth:
       type: "bearer"           # Auth style: bearer or x-api-key
       apiKey: "{env:OPENAI_API_KEY}" # Environment variable name for the key
@@ -51,9 +52,10 @@ providers:
 
   - name: "anthropic"
     enabled: true
-    apiTypes: ["messages"]
     baseUrls:
-      messages: "https://api.anthropic.com/v1/messages"
+      messages:
+        url: "https://api.anthropic.com/v1/messages"
+        enabled: true
     auth:
       type: "x-api-key"
       apiKey: "{env:ANTHROPIC_API_KEY}"

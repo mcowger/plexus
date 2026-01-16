@@ -14,8 +14,7 @@ describe("TargetSelector", () => {
     mockProvider1 = {
       name: "provider-a",
       enabled: true,
-      apiTypes: ["chat"],
-      baseUrls: { chat: "https://api-a.com" },
+      baseUrls: { chat: { url: "https://api-a.com", enabled: true } },
       auth: { type: "bearer", apiKey: "{env:KEY_A}" },
       models: ["model-1"],
     } as ProviderConfig;
@@ -23,8 +22,7 @@ describe("TargetSelector", () => {
     mockProvider2 = {
       name: "provider-b",
       enabled: true,
-      apiTypes: ["chat"],
-      baseUrls: { chat: "https://api-b.com" },
+      baseUrls: { chat: { url: "https://api-b.com", enabled: true } },
       auth: { type: "bearer", apiKey: "{env:KEY_B}" },
       models: ["model-2"],
     } as ProviderConfig;
@@ -32,8 +30,7 @@ describe("TargetSelector", () => {
     mockProvider3 = {
       name: "provider-c",
       enabled: true,
-      apiTypes: ["chat"],
-      baseUrls: { chat: "https://api-c.com" },
+      baseUrls: { chat: { url: "https://api-c.com", enabled: true } },
       auth: { type: "bearer", apiKey: "{env:KEY_C}" },
       models: ["model-3"],
     } as ProviderConfig;

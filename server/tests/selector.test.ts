@@ -6,8 +6,7 @@ import type { ProviderConfig } from "../types/config";
 const mockProvider1: ProviderConfig = {
   name: "provider1",
   enabled: true,
-  apiTypes: ["chat"],
-  baseUrls: { chat: "https://api.provider1.com" },
+  baseUrls: { chat: { url: "https://api.provider1.com", enabled: true } },
   auth: { type: "bearer", apiKey: "{env:KEY1}" },
   models: ["model1"],
 };
@@ -15,8 +14,7 @@ const mockProvider1: ProviderConfig = {
 const mockProvider2: ProviderConfig = {
   name: "provider2",
   enabled: true,
-  apiTypes: ["chat"],
-  baseUrls: { chat: "https://api.provider2.com" },
+  baseUrls: { chat: { url: "https://api.provider2.com", enabled: true } },
   auth: { type: "bearer", apiKey: "{env:KEY2}" },
   models: ["model2"],
 };

@@ -90,15 +90,19 @@ export const ProviderCooldownSchema = z.object({
 
 export type ProviderCooldown = z.infer<typeof ProviderCooldownSchema>;
 
+const BaseUrlConfigSchema = z.object({
+  url: z.string(),
+  enabled: z.boolean().default(true),
+});
+
 // Provider configuration (Phase 2+)
 export const ProviderConfigSchema = z.object({
   name: z.string(),
   enabled: z.boolean(),
-  apiTypes: z.array(z.enum(["chat", "messages", "gemini"])),
   baseUrls: z.object({
-    chat: z.string().optional(),
-    messages: z.string().optional(),
-    gemini: z.string().optional(),
+    chat: BaseUrlConfigSchema.optional(),
+    messages: BaseUrlConfigSchema.optional(),
+    gemini: BaseUrlConfigSchema.optional(),
   }),
   auth: ProviderAuthSchema,
   models: z.array(z.string()),

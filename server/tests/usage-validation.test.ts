@@ -11,7 +11,6 @@ const mockConfig: any = {
     {
       name: "anthropic-mock",
       enabled: true,
-      apiTypes: ["messages"],
       baseUrls: {
         chat: "https://api.anthropic.com/v1/chat/completions",
         messages: "https://api.anthropic.com/v1/messages",
@@ -25,7 +24,6 @@ const mockConfig: any = {
     {
       name: "openai-mock",
       enabled: true,
-      apiTypes: ["chat"],
       baseUrls: { chat: "https://api.openai.com/v1/chat/completions", messages: "https://api.openai.com/v1/chat/completions" },
       auth: { type: "bearer", apiKey: "test" },
       models: ["gpt-4o"],

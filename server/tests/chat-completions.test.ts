@@ -12,9 +12,8 @@ const mockConfig: PlexusConfig = {
     {
       name: "openai",
       enabled: true,
-      apiTypes: ["chat"],
       baseUrls: {
-        chat: "https://api.openai.com/v1/chat/completions",
+        chat: { url: "https://api.openai.com/v1/chat/completions", enabled: true },
       },
       auth: {
         type: "bearer",

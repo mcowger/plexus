@@ -6,9 +6,8 @@ import type { ProviderConfig } from "../types/config";
 const mockProviderConfig: ProviderConfig = {
   name: "test-provider",
   enabled: true,
-  apiTypes: ["chat"],
   baseUrls: {
-    chat: "https://api.test.com/v1/chat/completions",
+    chat: { url: "https://api.test.com/v1/chat/completions", enabled: true },
   },
   auth: {
     type: "bearer",
