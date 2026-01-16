@@ -440,6 +440,7 @@ if (this.eventEmitter) {
             ...existingEntry,
             usage,
             cost,
+            metrics,
             pending: false, // Request is no longer pending
             updated: true // Flag to indicate this was an update
           };
