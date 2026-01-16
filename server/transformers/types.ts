@@ -67,6 +67,12 @@ export interface UnifiedChatRequest {
   stop?: string | string[];
   stream?: boolean;
   tools?: UnifiedTool[];
+  /** Response modalities - e.g., ["TEXT"], ["IMAGE", "TEXT"] */
+  modalities?: string[];
+  /** Image generation configuration */
+  image_config?: {
+    aspect_ratio?: string;
+  };
   tool_choice?:
     | "auto"
     | "none"
@@ -137,6 +143,13 @@ export interface UnifiedUsage {
     cache_creation_tokens?: number;
 }
 
+export interface ImageOutput {
+  /** Base64-encoded image data */
+  data: string;
+  /** MIME type of the image */
+  mimeType: string;
+}
+
 export interface UnifiedChatResponse {
   id: string;
   model: string;
@@ -155,6 +168,8 @@ export interface UnifiedChatResponse {
     content: string;
     signature?: string;
   };
+  /** Generated images from the response */
+  images?: ImageOutput[];
   usage?: UnifiedUsage;
   tool_calls?: Array<{
     id: string;

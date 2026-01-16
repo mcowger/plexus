@@ -7,7 +7,8 @@ import {
   MessageContent,
   UnifiedUsage,
   ReconstructedMessagesResponse,
-  AnthropicContentBlock
+  AnthropicContentBlock,
+  ImageOutput
 } from "./types";
 import { logger } from "../utils/logger";
 import { getThinkLevel, formatBase64 } from "./utils";
@@ -142,6 +143,8 @@ export class AnthropicTransformer implements Transformer {
         ? this.convertAnthropicToolsToUnified(input.tools)
         : undefined,
       tool_choice: input.tool_choice,
+      modalities: input.modalities,
+      image_config: input.image_config,
     };
 
     // Map Thinking/Reasoning Configuration
@@ -248,6 +251,20 @@ export class AnthropicTransformer implements Transformer {
 
     if (response.content) {
       content.push({ type: "text", text: response.content });
+    }
+
+    // Include images if present (for future Anthropic image generation support)
+    if (response.images && response.images.length > 0) {
+      for (const img of response.images) {
+        content.push({
+          type: "image",
+          source: {
+          type: "base64",
+            media_type: img.mimeType,
+         data: img.data,
+          },
+        });
+      }
     }
 
     if (response.tool_calls) {
@@ -442,6 +459,7 @@ export class AnthropicTransformer implements Transformer {
     let text = "";
     let reasoning = "";
     const toolCalls: any[] = [];
+    const images: ImageOutput[] = [];
 
     for (const block of contentBlocks) {
       if (block.type === "text") {
@@ -449,14 +467,22 @@ export class AnthropicTransformer implements Transformer {
       } else if (block.type === "thinking") {
         reasoning += block.thinking;
       } else if (block.type === "tool_use") {
-        toolCalls.push({
-          id: block.id,
+   toolCalls.push({
+       id: block.id,
           type: "function",
           function: {
-            name: block.name,
+         name: block.name,
             arguments: JSON.stringify(block.input),
           },
         });
+      } else if (block.type === "image" && block.source) {
+        // Handle potential future image generation from Anthropic
+        if (block.source.type === "base64") {
+        images.push({
+            data: block.source.data,
+            mimeType: block.source.media_type || "image/png",
+          });
+        }
       }
     }
 
@@ -468,6 +494,7 @@ export class AnthropicTransformer implements Transformer {
       content: text || null,
       reasoning_content: reasoning || null,
       tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+    images: images.length > 0 ? images : undefined,
       usage,
     };
   }

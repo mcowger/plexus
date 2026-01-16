@@ -1,10 +1,12 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { CostCalculator } from "./cost-calculator";
 import type { PricingConfigType } from "../types/config";
+import type { ConfigManager } from "./config-manager";
 
 describe("CostCalculator", () => {
   let calculator: CostCalculator;
   let pricingConfig: PricingConfigType;
+  let mockConfigManager: ConfigManager;
 
   beforeEach(() => {
     pricingConfig = {
@@ -34,7 +36,13 @@ describe("CostCalculator", () => {
         "azure-openai": 0.85,
       },
     };
-    calculator = new CostCalculator(pricingConfig);
+    
+    // Create mock ConfigManager
+    mockConfigManager = {
+      getCurrentConfig: () => ({ pricing: pricingConfig }),
+    } as unknown as ConfigManager;
+    
+    calculator = new CostCalculator(mockConfigManager);
   });
 
   describe("calculateCost", () => {
@@ -148,7 +156,7 @@ describe("CostCalculator", () => {
   });
 
   describe("updateConfig", () => {
-    test("updates pricing configuration", () => {
+    test("updates pricing configuration via ConfigManager", async () => {
       const newConfig: PricingConfigType = {
         models: {
           "new-model": {
@@ -158,12 +166,12 @@ describe("CostCalculator", () => {
         },
       };
 
-      calculator.updateConfig(newConfig);
+      // Update the mock ConfigManager to return new config
+      (mockConfigManager as any).getCurrentConfig = () => ({ pricing: newConfig });
 
       // Test that new config is used
-      calculator.getEstimatedCostPer1M("new-model", "openai").then((cost) => {
-        expect(cost).toBeCloseTo(1.5, 2); // (1.00 + 2.00) / 2
-      });
+      const cost = await calculator.getEstimatedCostPer1M("new-model", "openai");
+      expect(cost).toBeCloseTo(1.5, 2); // (1.00 + 2.00) / 2
     });
   });
 });

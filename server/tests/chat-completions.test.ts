@@ -57,8 +57,12 @@ const mockConfig: PlexusConfig = {
   },
 };
 
-const cooldownManager = new CooldownManager(mockConfig);
-const healthMonitor = new HealthMonitor(mockConfig, cooldownManager);
+const mockConfigManager: any = {
+  getCurrentConfig: () => mockConfig,
+};
+
+const cooldownManager = new CooldownManager(mockConfigManager);
+const healthMonitor = new HealthMonitor(mockConfigManager, cooldownManager);
 const mockContext: ServerContext = {
   config: mockConfig,
   cooldownManager,

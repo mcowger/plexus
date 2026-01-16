@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { HealthMonitor } from "../services/health-monitor";
 import { CooldownManager } from "../services/cooldown-manager";
 import type { PlexusConfig } from "../types/config";
+import type { ConfigManager } from "../services/config-manager";
 import { unlink } from "node:fs/promises";
 
 // Mock logger to avoid noise in tests
@@ -24,6 +25,7 @@ mock.module("../utils/logger", () => ({
 
 describe("Health Monitor", () => {
   let mockConfig: PlexusConfig;
+  let mockConfigManager: ConfigManager;
   let cooldownManager: CooldownManager;
   let healthMonitor: HealthMonitor;
   const testStoragePath = "./test-health-cooldowns.json";
@@ -93,8 +95,13 @@ describe("Health Monitor", () => {
       },
     };
 
-    cooldownManager = new CooldownManager(mockConfig);
-    healthMonitor = new HealthMonitor(mockConfig, cooldownManager);
+    // Create mock ConfigManager
+    mockConfigManager = {
+      getCurrentConfig: () => mockConfig,
+    } as unknown as ConfigManager;
+
+    cooldownManager = new CooldownManager(mockConfigManager);
+    healthMonitor = new HealthMonitor(mockConfigManager, cooldownManager);
   });
 
   afterEach(async () => {
@@ -214,7 +221,8 @@ describe("Health Monitor", () => {
       mockConfig.providers.forEach((p) => {
         p.enabled = false;
       });
-      healthMonitor.updateConfig(mockConfig);
+      // Update mock ConfigManager to return modified config
+      (mockConfigManager as any).getCurrentConfig = () => mockConfig;
 
       const health = healthMonitor.getSystemHealth();
 
@@ -256,11 +264,12 @@ describe("Health Monitor", () => {
   });
 
   describe("updateConfig", () => {
-    test("should update configuration", () => {
+    test("should update configuration via ConfigManager", () => {
       const newConfig = { ...mockConfig };
       newConfig.resilience.health.degradedThreshold = 0.7;
 
-      healthMonitor.updateConfig(newConfig);
+      // Update mock ConfigManager to return new config
+      (mockConfigManager as any).getCurrentConfig = () => newConfig;
 
       // Should use new threshold
       cooldownManager.setCooldown({
@@ -301,8 +310,11 @@ describe("Health Monitor", () => {
         },
       ];
 
-      cooldownManager = new CooldownManager(mockConfig);
-      healthMonitor = new HealthMonitor(mockConfig, cooldownManager);
+      // Update mock ConfigManager to return new providers list
+      (mockConfigManager as any).getCurrentConfig = () => mockConfig;
+
+      cooldownManager = new CooldownManager(mockConfigManager);
+      healthMonitor = new HealthMonitor(mockConfigManager, cooldownManager);
 
       cooldownManager.setCooldown({
         provider: "provider-1",
@@ -342,8 +354,11 @@ describe("Health Monitor", () => {
         },
       ];
 
-      cooldownManager = new CooldownManager(mockConfig);
-      healthMonitor = new HealthMonitor(mockConfig, cooldownManager);
+      // Update mock ConfigManager to return new providers list
+      (mockConfigManager as any).getCurrentConfig = () => mockConfig;
+
+      cooldownManager = new CooldownManager(mockConfigManager);
+      healthMonitor = new HealthMonitor(mockConfigManager, cooldownManager);
 
       // Even with disabled providers, only enabled-1 matters
       const health = healthMonitor.getSystemHealth();

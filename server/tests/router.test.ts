@@ -1,6 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import { Router } from "../services/router";
 import type { PlexusConfig } from "../types/config";
+import type { ConfigManager } from "../services/config-manager";
 
 const mockConfig: any = {
   server: { port: 4000, host: "localhost" },
@@ -74,7 +75,10 @@ const mockConfig: any = {
 describe("Router", () => {
   describe("Direct Alias Resolution", () => {
     test("resolves direct alias to target", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("fast");
 
       expect(result.success).toBe(true);
@@ -86,7 +90,10 @@ describe("Router", () => {
     });
 
     test("resolves multi-target alias", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("smart");
 
       expect(result.success).toBe(true);
@@ -98,7 +105,10 @@ describe("Router", () => {
     });
 
     test("resolution respects selector strategy", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       
       // Test in_order selector - should always return first target
       for (let i = 0; i < 10; i++) {
@@ -113,7 +123,10 @@ describe("Router", () => {
 
   describe("Additional Alias Resolution", () => {
     test("resolves additional alias to canonical alias", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("quick");
 
       expect(result.success).toBe(true);
@@ -125,7 +138,10 @@ describe("Router", () => {
     });
 
     test("resolves all additional aliases correctly", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       
       const aliases = ["quick", "cheap"];
       for (const alias of aliases) {
@@ -141,7 +157,10 @@ describe("Router", () => {
 
   describe("Passthrough Resolution", () => {
     test("resolves provider/model format", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("openai/gpt-4o");
 
       expect(result.success).toBe(true);
@@ -153,7 +172,10 @@ describe("Router", () => {
     });
 
     test("rejects passthrough with disabled provider", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("disabled-provider/disabled-model");
 
       expect(result.success).toBe(false);
@@ -163,7 +185,10 @@ describe("Router", () => {
     });
 
     test("rejects passthrough with unknown provider", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("unknown-provider/some-model");
 
       expect(result.success).toBe(false);
@@ -173,7 +198,10 @@ describe("Router", () => {
     });
 
     test("rejects passthrough with unknown model", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("openai/unknown-model");
 
       expect(result.success).toBe(false);
@@ -209,7 +237,10 @@ describe("Router", () => {
 
   describe("Error Cases", () => {
     test("returns error for unknown alias", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("unknown-model");
 
       expect(result.success).toBe(false);
@@ -220,7 +251,10 @@ describe("Router", () => {
     });
 
     test("returns error when all targets are disabled", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("disabled-alias");
 
       expect(result.success).toBe(false);
@@ -230,7 +264,10 @@ describe("Router", () => {
     });
 
     test("alias names are case sensitive", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("FAST");
 
       expect(result.success).toBe(false);
@@ -242,7 +279,12 @@ describe("Router", () => {
 
   describe("Configuration Updates", () => {
     test("rebuilds maps on config update", () => {
-      const router = new Router(mockConfig);
+      // Create mock ConfigManager
+      const mockConfigManager: any = {
+        getCurrentConfig: () => mockConfig,
+      };
+      
+      const router = new Router(mockConfigManager);
       
       // Initially should resolve
       let result = router.resolve("fast");
@@ -260,7 +302,9 @@ describe("Router", () => {
         ],
       };
       
-      router.updateConfig(newConfig);
+      // Update the mock ConfigManager to return the new config
+      mockConfigManager.getCurrentConfig = () => newConfig;
+      router.updateConfig();
 
       // Old alias should no longer work
       result = router.resolve("fast");
@@ -274,7 +318,10 @@ describe("Router", () => {
 
   describe("getAllAliases", () => {
     test("returns all canonical aliases", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const aliases = router.getAllAliases();
       
       const canonicalIds = aliases
@@ -288,7 +335,10 @@ describe("Router", () => {
     });
 
     test("returns all additional aliases", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const aliases = router.getAllAliases();
       
       const additionalAliases = aliases
@@ -302,7 +352,10 @@ describe("Router", () => {
     });
 
     test("additional aliases reference canonical alias", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const aliases = router.getAllAliases();
       
       const quickAlias = aliases.find((a) => a.id === "quick");
@@ -317,7 +370,10 @@ describe("Router", () => {
         models: [],
       };
       
-      const router = new Router(emptyConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => emptyConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const aliases = router.getAllAliases();
       
       expect(aliases).toEqual([]);
@@ -340,7 +396,10 @@ describe("Router", () => {
         ],
       };
 
-      const router = new Router(configWithMixedProviders);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => configWithMixedProviders,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       const result = router.resolve("mixed");
 
       expect(result.success).toBe(true);
@@ -351,7 +410,10 @@ describe("Router", () => {
     });
 
     test("multiple enabled targets with same weights", () => {
-      const router = new Router(mockConfig);
+      const mockConfigManager: ConfigManager = {
+        getCurrentConfig: () => mockConfig,
+      } as unknown as ConfigManager;
+      const router = new Router(mockConfigManager);
       
       // Run many times to ensure both targets can be selected
       const providers = new Set<string>();

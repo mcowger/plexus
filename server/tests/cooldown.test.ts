@@ -80,7 +80,11 @@ describe("Cooldown Manager", () => {
       },
     };
 
-    manager = new CooldownManager(mockConfig);
+    const mockConfigManager: any = {
+      getCurrentConfig: () => mockConfig,
+    };
+
+    manager = new CooldownManager(mockConfigManager);
   });
 
   afterEach(async () => {

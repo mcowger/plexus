@@ -21,9 +21,10 @@ import {
 } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { parse, stringify } from 'yaml';
-import { Settings2, Trash2, Search, X, Copy, Weight } from 'lucide-react';
+import { Settings2, Trash2, Search, X, Copy, Weight, Move } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tag, TagInput } from 'emblor';
+import SortableList, { SortableItem } from 'react-easy-sort';
 
 interface ModelTarget {
   provider: string;
@@ -180,6 +181,15 @@ export const ModelsPage: React.FC = () => {
       ...formData,
       targets: formData.targets.filter((_, i) => i !== index),
     });
+  };
+
+  const onSortEnd = (oldIndex: number, newIndex: number) => {
+    const newTargets = [...formData.targets];
+    const movedItem = newTargets.splice(oldIndex, 1)[0];
+    if (movedItem) {
+      newTargets.splice(newIndex, 0, movedItem);
+      setFormData({ ...formData, targets: newTargets });
+    }
   };
 
   const filteredAliases = aliases.filter(alias => {
@@ -410,103 +420,111 @@ export const ModelsPage: React.FC = () => {
                 </Button>
               </div>
 
-              {formData.targets.map((target, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <select
-                      className="w-full rounded-md border border-input bg-background px-3 py-2"
-                      value={target.provider}
-                      onChange={(e) => {
-                        const newTargets = [...formData.targets];
-                        newTargets[index] = { ...target, provider: e.target.value, model: '' };
-                        setFormData({ ...formData, targets: newTargets });
-                      }}
-                    >
-                      <option value="">Provider...</option>
-                      {providers.map((p) => (
-                        <option key={p.name} value={p.name}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              <SortableList onSortEnd={onSortEnd} className="space-y-4" draggedItemClassName="opacity-50">
+                {formData.targets.map((target, index) => (
+                  <SortableItem key={index}>
+                    <div className="flex items-center gap-4">
+                      <div className="cursor-grab active:cursor-grabbing" aria-label="Drag to reorder">
+                        <Move className="h-5 w-5 text-muted-foreground" />
+                      </div>
 
-                  <div className="flex-1">
-                    <select
-                      className="w-full rounded-md border border-input bg-background px-3 py-2"
-                      value={target.model}
-                      onChange={(e) => {
-                        const newTargets = [...formData.targets];
-                        newTargets[index] = { ...target, model: e.target.value };
-                        setFormData({ ...formData, targets: newTargets });
-                      }}
-                      disabled={!target.provider}
-                    >
-                      <option value="">Model...</option>
-                      {getProviderModels(target.provider).map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div className="flex-1">
+                        <select
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={target.provider}
+                          onChange={(e) => {
+                            const newTargets = [...formData.targets];
+                            newTargets[index] = { ...target, provider: e.target.value, model: '' };
+                            setFormData({ ...formData, targets: newTargets });
+                          }}
+                        >
+                          <option value="">Provider...</option>
+                          {providers.map((p) => (
+                            <option key={p.name} value={p.name}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  {formData.selector === 'random' && (
-                    <div className="flex items-center gap-2">
-                      <Weight className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="number"
-                        min="0"
-                        step="1"
-                        className="w-12"
-                        value={target.weight}
-                        onChange={(e) => {
-                          const newTargets = [...formData.targets];
-                          newTargets[index] = { ...target, weight: parseInt(e.target.value) || 0 };
-                          setFormData({ ...formData, targets: newTargets });
-                        }}
-                      />
-                    </div>
-                  )}
+                      <div className="flex-1">
+                        <select
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={target.model}
+                          onChange={(e) => {
+                            const newTargets = [...formData.targets];
+                            newTargets[index] = { ...target, model: e.target.value };
+                            setFormData({ ...formData, targets: newTargets });
+                          }}
+                          disabled={!target.provider}
+                        >
+                          <option value="">Model...</option>
+                          {getProviderModels(target.provider).map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                      {formData.selector === 'random' && (
                         <div className="flex items-center gap-2">
-                          <Label htmlFor={`sanitizer-${index}`} className="text-xs text-muted-foreground cursor-pointer">
-                            Sanitize
-                          </Label>
-                          <Switch
-                            id={`sanitizer-${index}`}
-                            checked={target.needs_sanitizer || false}
-                            onCheckedChange={(checked) => {
+                          <Weight className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            className="w-12"
+                            value={target.weight}
+                            onChange={(e) => {
                               const newTargets = [...formData.targets];
-                              newTargets[index] = { ...target, needs_sanitizer: checked };
+                              newTargets[index] = { ...target, weight: parseInt(e.target.value) || 0 };
                               setFormData({ ...formData, targets: newTargets });
                             }}
                           />
                         </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Corrects for providers that emit invalid SSE stream endings</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                      )}
 
-                  <div className="flex items-center gap-1">
-                    <div className="h-6 w-[1px] bg-border" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={() => removeTarget(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor={`sanitizer-${index}`} className="text-xs text-muted-foreground cursor-pointer">
+                                Sanitize
+                              </Label>
+                              <Switch
+                                id={`sanitizer-${index}`}
+                                checked={target.needs_sanitizer || false}
+                                onCheckedChange={(checked) => {
+                                  const newTargets = [...formData.targets];
+                                  newTargets[index] = { ...target, needs_sanitizer: checked };
+                                  setFormData({ ...formData, targets: newTargets });
+                                }}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Corrects for providers that emit invalid SSE stream endings</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <div className="flex items-center gap-1">
+                        <div className="h-6 w-[1px] bg-border" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={() => removeTarget(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </SortableItem>
+                ))}
+              </SortableList>
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, MessageContent, UnifiedUsage, ReconstructedChatResponse, ReconstructedMessagesResponse, AnthropicContentBlock } from "./types";
+import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage, MessageContent, UnifiedUsage, ReconstructedChatResponse, ReconstructedMessagesResponse, AnthropicContentBlock, ImageOutput } from "./types";
 import { logger } from "../utils/logger";
 import { Content, Part, Tool } from "@google/genai";
 import { createParser, EventSourceMessage } from "eventsource-parser";
@@ -10,10 +10,47 @@ import { encode } from "eventsource-encoder";
  * Handles transformation between Google Gemini's GenerateContent API and the internal Unified format.
  * Maps Gemini's part-based content system (text, inlineData, functionCall) to Unified messages.
  */
+
+/** Safety setting for Gemini API */
+export interface SafetySetting {
+  category: string;
+  threshold: string;
+}
+
+/** Default permissive safety settings - all categories set to BLOCK_NONE */
+const DEFAULT_SAFETY_SETTINGS: SafetySetting[] = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" },
+];
+
+/** Constant for bypassing thought signature validation */
+const SKIP_THOUGHT_SIGNATURE_VALIDATOR = "skip_thought_signature_validator";
+
+/** Atomic counter for generating unique function call IDs */
+let functionCallIdCounter = 0;
+
+/**
+ * Generates a unique function call ID
+ * Format: {functionName}_{timestamp}_{counter}
+ */
+function generateFunctionCallId(functionName: string): string {
+  const timestamp = Date.now();
+  const counter = ++functionCallIdCounter;
+  return `${functionName}_${timestamp}_${counter}`;
+}
+
 export interface GenerateContentRequest {
   contents: Content[];
   tools?: Tool[];
-  toolConfig?: any;
+  toolConfig?: {
+    functionCallingConfig?: {
+      mode?: "AUTO" | "NONE" | "ANY";
+      allowedFunctionNames?: string[];
+    };
+  };
   generationConfig?: {
     temperature?: number;
     maxOutputTokens?: number;
@@ -21,13 +58,19 @@ export interface GenerateContentRequest {
     topK?: number;
     stopSequences?: string[];
     responseMimeType?: string;
+    responseJsonSchema?: any;
+    responseModalities?: string[];
     thinkingConfig?: {
       includeThoughts?: boolean;
       thinkingBudget?: number;
     };
+    imageConfig?: {
+      aspectRatio?: string;
+    };
     [key: string]: any;
   };
   systemInstruction?: Content;
+  safetySettings?: SafetySetting[];
   model?: string;
 }
 
@@ -65,12 +108,34 @@ export class GeminiTransformer implements Transformer {
       model,
       max_tokens: generationConfig.maxOutputTokens,
       temperature: generationConfig.temperature,
+      top_p: generationConfig.topP,
+      stop: generationConfig.stopSequences,
       stream: false,
       tool_choice: undefined,
     };
 
     if (input.stream) {
       unifiedChatRequest.stream = true;
+    }
+
+    // Map toolConfig to tool_choice
+    if (input.toolConfig?.functionCallingConfig) {
+      const fcc = input.toolConfig.functionCallingConfig;
+      if (fcc.mode === "NONE") {
+        unifiedChatRequest.tool_choice = "none";
+      } else if (fcc.mode === "AUTO") {
+        unifiedChatRequest.tool_choice = "auto";
+      } else if (fcc.mode === "ANY") {
+        // Check if specific function is targeted
+        if (fcc.allowedFunctionNames?.length === 1) {
+          unifiedChatRequest.tool_choice = {
+            type: "function",
+            function: { name: fcc.allowedFunctionNames[0] },
+          };
+        } else {
+          unifiedChatRequest.tool_choice = "required";
+        }
+      }
     }
 
     // Map response format
@@ -135,13 +200,12 @@ export class GeminiTransformer implements Transformer {
               });
             } else if (part.functionCall) {
               if (!message.tool_calls) message.tool_calls = [];
+              const functionName = part.functionCall.name || "unknown";
               message.tool_calls.push({
-                id:
-                  part.functionCall.name ||
-                  "call_" + Math.random().toString(36).substring(7),
+                id: generateFunctionCallId(functionName),
                 type: "function",
                 function: {
-                  name: part.functionCall.name || "unknown",
+                  name: functionName,
                   arguments: JSON.stringify(part.functionCall.args),
                 },
               });
@@ -254,16 +318,25 @@ export class GeminiTransformer implements Transformer {
             } else if (c.type === "image_url") {
               if (c.image_url.url.startsWith("data:")) {
                 const [meta, data] = c.image_url.url.split(",");
-                parts.push({
-                  inlineData: { mimeType: "image/jpeg", data: data || "" },
-                });
+                // Extract MIME type from data URL (format: data:mime/type;base64,...)
+                const mimeTypeMatch = meta?.match(/^data:([^;]+)/);
+                const mimeType = mimeTypeMatch?.[1] || c.media_type || "image/jpeg";
+                const part: any = {
+                  inlineData: { mimeType, data: data || "" },
+                };
+                // Skip thought signature validation for inline images
+                part.thoughtSignature = SKIP_THOUGHT_SIGNATURE_VALIDATOR;
+                parts.push(part);
               } else {
-                parts.push({
+                const part: any = {
                   fileData: {
                     mimeType: c.media_type || "image/jpeg",
                     fileUri: c.image_url.url,
                   },
-                });
+                };
+                // Skip thought signature validation for file data
+                part.thoughtSignature = SKIP_THOUGHT_SIGNATURE_VALIDATOR;
+                parts.push(part);
               }
             }
           });
@@ -277,8 +350,13 @@ export class GeminiTransformer implements Transformer {
                 args: JSON.parse(tc.function.arguments),
               },
             };
-            if (index === 0 && msg.thinking?.signature)
+            // Apply thought signature or skip validator for function calls
+            if (index === 0 && msg.thinking?.signature) {
               part.thoughtSignature = msg.thinking.signature;
+            } else {
+              // Function calls without signatures should skip validation
+              part.thoughtSignature = SKIP_THOUGHT_SIGNATURE_VALIDATOR;
+            }
             parts.push(part);
           });
         }
@@ -302,12 +380,39 @@ export class GeminiTransformer implements Transformer {
 
     // Transform Unified tools to Gemini function declarations
     if (request.tools && request.tools.length > 0) {
-      tools.push({
-        functionDeclarations: request.tools.map((t) => ({
-          name: t.function.name,
-          description: t.function.description,
-          parameters: t.function.parameters as any,
-        })),
+      const functionDeclarations: Array<{
+        name: string;
+        description?: string;
+        parameters?: any;
+      }> = [];
+      
+      for (const t of request.tools) {
+        // Handle Google Search tool passthrough
+        if (t.function.name === "google_search" || t.function.name === "googleSearch") {
+          tools.push({ googleSearch: {} } as any);
+        } else {
+          functionDeclarations.push({
+            name: t.function.name,
+            description: t.function.description,
+            parameters: t.function.parameters as any,
+          });
+        }
+      }
+      
+      if (functionDeclarations.length > 0) {
+        tools.push({ functionDeclarations });
+      }
+    }
+
+    // Log info for unsupported parameters
+    if (request.presence_penalty !== undefined) {
+      logger.info("Gemini does not support presence_penalty parameter, ignoring", {
+        presence_penalty: request.presence_penalty,
+      });
+    }
+    if (request.frequency_penalty !== undefined) {
+      logger.info("Gemini does not support frequency_penalty parameter, ignoring", {
+        frequency_penalty: request.frequency_penalty,
       });
     }
 
@@ -317,8 +422,69 @@ export class GeminiTransformer implements Transformer {
       generationConfig: {
         maxOutputTokens: request.max_tokens,
         temperature: request.temperature,
+        topP: request.top_p,
+        stopSequences: request.stop
+          ? Array.isArray(request.stop)
+            ? request.stop
+            : [request.stop]
+          : undefined,
       },
     };
+
+    // Map response_format to responseMimeType/responseJsonSchema
+    if (request.response_format) {
+      if (request.response_format.type === "json_object" || request.response_format.type === "json_schema") {
+        req.generationConfig!.responseMimeType = "application/json";
+        if (request.response_format.json_schema) {
+          req.generationConfig!.responseJsonSchema = request.response_format.json_schema;
+        }
+      }
+    }
+
+    // Map reasoning config to thinkingConfig
+    if (request.reasoning) {
+      req.generationConfig!.thinkingConfig = {
+        includeThoughts: request.reasoning.enabled,
+        thinkingBudget: request.reasoning.max_tokens,
+      };
+    }
+
+    // Map modalities to responseModalities
+    if (request.modalities && request.modalities.length > 0) {
+      req.generationConfig!.responseModalities = request.modalities.map(m => m.toUpperCase());
+    }
+
+    // Map image_config to imageConfig
+    if (request.image_config?.aspect_ratio) {
+      req.generationConfig!.imageConfig = {
+        aspectRatio: request.image_config.aspect_ratio,
+      };
+      // Ensure IMAGE modality is included when aspect_ratio is set
+      if (!req.generationConfig!.responseModalities) {
+        req.generationConfig!.responseModalities = ["IMAGE", "TEXT"];
+      }
+    }
+
+    // Map tool_choice to toolConfig
+    if (request.tool_choice) {
+      if (request.tool_choice === "none") {
+        req.toolConfig = { functionCallingConfig: { mode: "NONE" } };
+      } else if (request.tool_choice === "auto") {
+        req.toolConfig = { functionCallingConfig: { mode: "AUTO" } };
+      } else if (request.tool_choice === "required") {
+        req.toolConfig = { functionCallingConfig: { mode: "ANY" } };
+      } else if (typeof request.tool_choice === "object" && request.tool_choice.function?.name) {
+        req.toolConfig = {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: [request.tool_choice.function.name],
+          },
+        };
+      }
+    }
+
+    // Attach default safety settings
+    req.safetySettings = DEFAULT_SAFETY_SETTINGS;
 
     return req;
   }
@@ -333,6 +499,7 @@ export class GeminiTransformer implements Transformer {
     let content = "";
     let reasoning_content = "";
     const tool_calls: any[] = [];
+    const images: ImageOutput[] = [];
     let thoughtSignature: string | undefined;
 
     parts.forEach((part: any) => {
@@ -341,15 +508,21 @@ export class GeminiTransformer implements Transformer {
         else content += part.text;
       }
       if (part.functionCall) {
+        const functionName = part.functionCall.name || "unknown";
         tool_calls.push({
-          id:
-            part.functionCall.name ||
-            "call_" + Math.random().toString(36).substring(7),
+          id: generateFunctionCallId(functionName),
           type: "function",
           function: {
-            name: part.functionCall.name,
+            name: functionName,
             arguments: JSON.stringify(part.functionCall.args),
           },
+        });
+      }
+      // Handle image outputs from Gemini
+      if (part.inlineData) {
+        images.push({
+          data: part.inlineData.data,
+          mimeType: part.inlineData.mimeType || "image/png",
         });
       }
       if (part.thoughtSignature) thoughtSignature = part.thoughtSignature;
@@ -365,6 +538,7 @@ export class GeminiTransformer implements Transformer {
       thinking: thoughtSignature
         ? { content: reasoning_content, signature: thoughtSignature }
         : undefined,
+      images: images.length > 0 ? images : undefined,
       tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
       usage,
     };
@@ -382,6 +556,17 @@ export class GeminiTransformer implements Transformer {
       parts.push(part);
     }
     if (response.content) parts.push({ text: response.content });
+    // Include images in response
+    if (response.images) {
+      response.images.forEach((img) => {
+        parts.push({
+          inlineData: {
+            mimeType: img.mimeType,
+            data: img.data,
+          },
+        });
+      });
+    }
     if (response.tool_calls) {
       response.tool_calls.forEach((tc, index) => {
         const part: any = {
@@ -449,6 +634,7 @@ export class GeminiTransformer implements Transformer {
                   controller.enqueue(chunk);
                 }
                 if (part.functionCall) {
+                  const functionName = part.functionCall.name || "unknown";
                   const chunk = {
                     id: data.responseId,
                     model: data.modelVersion,
@@ -456,10 +642,10 @@ export class GeminiTransformer implements Transformer {
                       role: "assistant",
                       tool_calls: [
                         {
-                          id: part.functionCall.name,
+                          id: generateFunctionCallId(functionName),
                           type: "function",
                           function: {
-                            name: part.functionCall.name,
+                            name: functionName,
                             arguments: JSON.stringify(part.functionCall.args),
                           },
                         },
@@ -600,18 +786,19 @@ export class GeminiTransformer implements Transformer {
           }
             }
 
-         // Capture function calls
+            // Capture function calls
             if (part.functionCall) {
-          const callId = part.functionCall.name || `call_${Math.random().toString(36).substring(7)}`;
-            toolCallsMap.set(callId, {
-           id: callId,
+              const functionName = part.functionCall.name || "unknown";
+              const callId = generateFunctionCallId(functionName);
+              toolCallsMap.set(callId, {
+                id: callId,
                 type: "function",
                 function: {
-                  name: part.functionCall.name,
+                  name: functionName,
                   arguments: JSON.stringify(part.functionCall.args || {}),
                 },
               });
-         }
+            }
           }
 
           // Capture finish reason

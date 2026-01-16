@@ -1,4 +1,4 @@
-import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedUsage, ReconstructedChatResponse } from "./types";
+import { Transformer, UnifiedChatRequest, UnifiedChatResponse, UnifiedUsage, ReconstructedChatResponse, ImageOutput } from "./types";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
 
@@ -20,7 +20,7 @@ export class OpenAITransformer implements Transformer {
       max_tokens: input.max_tokens,
       temperature: input.temperature,
       top_p: input.top_p,
-      presence_penalty: input.presence_penalty,
+    presence_penalty: input.presence_penalty,
       frequency_penalty: input.frequency_penalty,
       stop: input.stop,
       stream: input.stream,
@@ -28,6 +28,8 @@ export class OpenAITransformer implements Transformer {
       tool_choice: input.tool_choice,
       reasoning: input.reasoning,
       response_format: input.response_format,
+      modalities: input.modalities,
+      image_config: input.image_config,
       n: input.n,
       logit_bias: input.logit_bias,
       logprobs: input.logprobs,
@@ -49,7 +51,9 @@ export class OpenAITransformer implements Transformer {
       stream: request.stream,
       tools: request.tools,
       tool_choice: request.tool_choice,
-      response_format: request.response_format,
+    response_format: request.response_format,
+  modalities: request.modalities,
+      image_config: request.image_config,
       n: request.n,
       logit_bias: request.logit_bias,
       logprobs: request.logprobs,
@@ -102,8 +106,16 @@ export class OpenAITransformer implements Transformer {
   async transformResponse(response: any): Promise<UnifiedChatResponse> {
     const choice = response.choices?.[0];
     const message = choice?.message;
-
     const usage = response.usage ? this.parseUsage(response.usage) : undefined;
+
+    // Parse images if present (for future OpenAI image generation support)
+    let images: ImageOutput[] | undefined;
+    if (message?.images && Array.isArray(message.images)) {
+      images = message.images.map((img: any) => ({
+        data: img.data || img.b64_json || "",
+        mimeType: img.mime_type || "image/png",
+      }));
+    }
 
     return {
       id: response.id,
@@ -112,11 +124,27 @@ export class OpenAITransformer implements Transformer {
       content: message?.content || null,
       reasoning_content: message?.reasoning_content || null,
       tool_calls: message?.tool_calls,
+      images,
       usage,
     };
   }
 
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
+    const message: any = {
+      role: "assistant",
+      content: response.content,
+      reasoning_content: response.reasoning_content,
+      tool_calls: response.tool_calls,
+    };
+
+    // Include images if present
+    if (response.images && response.images.length > 0) {
+      message.images = response.images.map((img) => ({
+        b64_json: img.data,
+        mime_type: img.mimeType,
+      }));
+    }
+
     return {
       id: response.id,
       object: "chat.completion",
@@ -125,12 +153,7 @@ export class OpenAITransformer implements Transformer {
       choices: [
         {
           index: 0,
-          message: {
-            role: "assistant",
-            content: response.content,
-            reasoning_content: response.reasoning_content,
-            tool_calls: response.tool_calls,
-          },
+          message,
           finish_reason: response.tool_calls ? "tool_calls" : "stop",
         },
       ],
