@@ -165,11 +165,23 @@ export class Dispatcher {
       );
 
       // Step 5: Get the appropriate endpoint URL
-      const endpointUrl = this.getEndpointUrl(provider, providerApiType);
+      let endpointUrl = this.getEndpointUrl(provider, providerApiType);
       if (!endpointUrl) {
         throw new Error(
           `Provider '${provider.name}' has no ${providerApiType} endpoint configured`
         );
+      }
+
+      // For Gemini, append the dynamic path (model:action) from transformer
+      if (providerApiType === "gemini") {
+        const geminiTransformer = transformerFactory.getTransformer("gemini");
+        const dynamicPath = geminiTransformer.getEndpoint(unifiedRequest);
+        // Remove /v1beta prefix if the base URL already includes it
+        const pathToAppend = endpointUrl.includes('/v1beta') 
+          ? dynamicPath.replace('/v1beta/', '')
+          : dynamicPath.replace('/v1beta/', 'v1beta/');
+        endpointUrl = `${endpointUrl.replace(/\/$/, '')}/${pathToAppend}`;
+        requestLogger.debug("Constructed Gemini endpoint URL", { endpointUrl });
       }
 
       // Step 6: Create provider client and make request
@@ -456,6 +468,19 @@ export class Dispatcher {
     apiKeyName?: string
   ): Promise<Response> {
     return this.dispatch(request, requestId, "messages", clientIp, apiKeyName);
+  }
+
+  /**
+   * Dispatch a Gemini request (Gemini native format)
+   * Convenience method that calls dispatch with clientApiType="gemini"
+   */
+  async dispatchGemini(
+    request: any,
+    requestId: string,
+    clientIp?: string,
+    apiKeyName?: string
+  ): Promise<Response> {
+    return this.dispatch(request, requestId, "gemini", clientIp, apiKeyName);
   }
 
   /**

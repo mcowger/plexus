@@ -2,6 +2,7 @@ import { logger } from "./server/utils/logger";
 import { handleHealth, handleReady } from "./server/routes/health";
 import { handleChatCompletions } from "./server/routes/chat-completions";
 import { handleMessages } from "./server/routes/messages";
+import { handleGemini } from "./server/routes/gemini";
 import { handleModels } from "./server/routes/models";
 // Phase 8 Management Routes
 import { handleConfig } from "./server/routes/v0/config";
@@ -206,6 +207,22 @@ export async function createServer(
         GET: async (req) => {
           const requestId = createRequestId();
           return withCORS(await handleModels(req, context.config, requestId));
+        },
+      },
+
+      // Gemini v1beta API route
+      "/v1beta/models/:modelWithAction": {
+        POST: async (req, server) => {
+          const { clientIp, requestId } = getRequestContext(req, server);
+          const url = new URL(req.url);
+          const pathParts = url.pathname.split('/');
+          // Expected format: /v1beta/models/:modelWithAction
+          // pathParts: ['', 'v1beta', 'models', 'gemini-1.5-pro:streamGenerateContent']
+          const modelWithAction = pathParts[3];
+          
+          return withCORS(
+            await handleGemini(req, context, requestId, clientIp, modelWithAction)
+          );
         },
       },
 
