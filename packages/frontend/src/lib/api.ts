@@ -3,6 +3,40 @@ import { formatNumber } from './format';
 
 const API_BASE = ''; // Proxied via server.ts
 
+/**
+ * Extract supported API types from the provider configuration.
+ * Infers types from api_base_url field: if it's a record/map, the keys are the supported types.
+ * If it's a string, we infer the type from the URL pattern.
+ * @param apiBaseUrl The api_base_url from provider configuration
+ * @returns Array of supported API types (e.g., ["chat"], ["messages"], ["chat", "messages"])
+ */
+function inferProviderTypes(apiBaseUrl?: string | Record<string, string>): string[] {
+  if (!apiBaseUrl) {
+    return ['chat']; // Default fallback
+  }
+
+  if (typeof apiBaseUrl === 'string') {
+    // Single URL - infer type from URL pattern
+    const url = apiBaseUrl.toLowerCase();
+
+    // Check for known patterns
+    if (url.includes('anthropic.com')) {
+      return ['messages'];
+    } else if (url.includes('generativelanguage.googleapis.com')) {
+      return ['gemini'];
+    } else {
+      // Default to 'chat' for OpenAI-compatible APIs
+      return ['chat'];
+    }
+  } else {
+    // Record/map format - keys are the supported types
+    return Object.keys(apiBaseUrl).filter(key => {
+      const value = apiBaseUrl[key];
+      return typeof value === 'string' && value.length > 0;
+    });
+  }
+}
+
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const headers = new Headers(options.headers || {});
   const adminKey = localStorage.getItem('plexus_admin_key');
@@ -81,7 +115,7 @@ export interface Alias {
     aliases?: string[];
     selector?: string;
     priority?: 'selector' | 'api_match';
-    targets: Array<{ provider: string; model: string; apiType?: string[] }>;
+    targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
 }
 
 export interface InferenceError {
@@ -142,7 +176,7 @@ interface BackendResponse<T> {
 
 interface PlexusConfig {
     providers: Record<string, {
-        type: string | string[];
+        type?: string | string[]; // Optional for backward compatibility, but will be inferred from api_base_url
         api_key?: string;
         api_base_url?: string | Record<string, string>;
         display_name?: string;
@@ -642,10 +676,13 @@ export const api = {
                 }, {} as Record<string, any>);
             }
 
+            // Infer type from api_base_url if not explicitly provided
+            const inferredTypes = val.type || inferProviderTypes(val.api_base_url);
+
             return {
                 id: key,
                 name: val.display_name || key,
-                type: val.type,
+                type: inferredTypes,
                 apiBaseUrl: val.api_base_url,
                 apiKey: val.api_key || '',
                 enabled: val.enabled !== false, // Default to true if not present
@@ -721,8 +758,15 @@ export const api = {
           delete config.providers[oldId];
       }
 
+      // Don't save type field - it will be inferred from api_base_url
+      // Only include it if it's explicitly different from what would be inferred
+      const inferredTypes = inferProviderTypes(provider.apiBaseUrl);
+      const shouldIncludeType = JSON.stringify(inferredTypes) !== JSON.stringify(
+        Array.isArray(provider.type) ? provider.type : [provider.type]
+      );
+
       config.providers[provider.id] = {
-          type: provider.type,
+          ...(shouldIncludeType && { type: provider.type }),
           api_key: provider.apiKey,
           api_base_url: provider.apiBaseUrl,
           display_name: provider.name,

@@ -52,7 +52,6 @@ const ModelProviderConfigSchema = z.object({
 });
 
 const ProviderConfigSchema = z.object({
-  type: z.union([z.string(), z.array(z.string())]),
   display_name: z.string().optional(),
   api_base_url: z.union([z.string().url(), z.record(z.string())]),
   api_key: z.string().optional(),
@@ -73,6 +72,7 @@ const ProviderConfigSchema = z.object({
 const ModelTargetSchema = z.object({
   provider: z.string(),
   model: z.string(),
+  enabled: z.boolean().default(true).optional(),
 });
 
 const ModelConfigSchema = z.object({
@@ -99,6 +99,37 @@ export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
+
+/**
+ * Extract supported API types from the provider configuration.
+ * Infers types from api_base_url field: if it's a record/map, the keys are the supported types.
+ * If it's a string, we infer the type from the URL pattern.
+ * @param provider The provider configuration
+ * @returns Array of supported API types (e.g., ["chat"], ["messages"], ["chat", "messages"])
+ */
+export function getProviderTypes(provider: ProviderConfig): string[] {
+  if (typeof provider.api_base_url === 'string') {
+    // Single URL - infer type from URL pattern
+    const url = provider.api_base_url.toLowerCase();
+
+    // Check for known patterns
+    if (url.includes('anthropic.com')) {
+      return ['messages'];
+    } else if (url.includes('generativelanguage.googleapis.com')) {
+      return ['gemini'];
+    } else {
+      // Default to 'chat' for OpenAI-compatible APIs
+      return ['chat'];
+    }
+  } else {
+    // Record/map format - keys are the supported types
+    const urlMap = provider.api_base_url as Record<string, string>;
+    return Object.keys(urlMap).filter(key => {
+      const value = urlMap[key];
+      return typeof value === 'string' && value.length > 0;
+    });
+  }
+}
 
 // --- Loader ---
 

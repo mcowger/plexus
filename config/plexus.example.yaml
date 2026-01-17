@@ -9,10 +9,18 @@
 # --------------------
 # Define your upstream AI providers here.
 #
-#   type:         The transformer architecture used by the provider.
-#                 Common values: chat, messages, gemini.
 #   display_name: A friendly name for logging and metadata.
 #   api_base_url: The root endpoint for the provider's API.
+#                 Plexus automatically infers the API type (chat/messages/gemini) from this URL:
+#                 - URLs containing 'anthropic.com' are treated as 'messages' (Anthropic format)
+#                 - URLs containing 'generativelanguage.googleapis.com' are treated as 'gemini'
+#                 - All other URLs default to 'chat' (OpenAI-compatible format)
+#
+#                 For providers that support multiple formats, use a map:
+#                 api_base_url:
+#                   chat: https://api.example.com/v1
+#                   messages: https://api.example.com/anthropic/v1
+#
 #   api_key:      Your authentication token for the provider (required).
 #   models:       A list of raw model identifiers supported by this provider.
 #                 OR a map of model names to configuration (e.g. pricing).
@@ -46,8 +54,8 @@ adminKey: "change-me-to-a-secure-admin-password"
 
 providers:
   # Standard OpenAI Configuration
+  # API type is automatically inferred as 'chat' from the URL
   openai:
-    type: chat
     display_name: OpenAI
     api_base_url: https://api.openai.com/v1
     api_key: "your-openai-api-key-here"
@@ -57,8 +65,8 @@ providers:
       - o1-preview
 
   # Standard Anthropic Configuration
+  # API type is automatically inferred as 'messages' from the URL
   anthropic:
-    type: messages
     display_name: Anthropic Claude
     api_base_url: https://api.anthropic.com/v1
     api_key: "your-anthropic-api-key-here"
@@ -68,8 +76,8 @@ providers:
       - claude-3-opus-latest
 
   # Standard Google Gemini Configuration
+  # API type is automatically inferred as 'gemini' from the URL
   gemini:
-    type: gemini
     display_name: Google Gemini
     api_base_url: https://generativelanguage.googleapis.com
     api_key: "your-gemini-api-key-here"
@@ -81,7 +89,6 @@ providers:
   # Example with Pricing Configuration
   # Pricing is per 1M tokens.
   openai_cost_tracked:
-    type: chat
     display_name: OpenAI (Tracked)
     api_base_url: https://api.openai.com/v1
     api_key: "your-openai-api-key-here"
@@ -100,7 +107,6 @@ providers:
   # Example with Tiered Pricing Configuration (Defined Strategy)
   # Pricing changes based on input token usage volume.
   tiered_pricing_example:
-    type: chat
     display_name: Tiered Pricing Provider
     api_base_url: https://api.example.com/v1
     api_key: "your-api-key"
@@ -121,8 +127,8 @@ providers:
               output_per_m: 12.00
 
   # Example of a Chat-compatible provider (e.g. Together, DeepSeek, Groq)
+  # API type is automatically inferred as 'chat'
   deepseek:
-    type: chat
     display_name: DeepSeek
     api_base_url: https://api.deepseek.com
     api_key: "your-deepseek-api-key-here"
@@ -132,10 +138,10 @@ providers:
 
   # Example of a multi-protocol provider
   # This provider supports both OpenAI (chat) and Anthropic (messages) formats
+  # Use a map to specify different URLs for each format
   synthetic:
-    type: ["chat", "messages"]
     display_name: Synthetic Provider
-    # Map API types to specific base URLs
+    # Map API types to specific base URLs - types are inferred from the keys
     api_base_url:
       chat: https://api.synthetic.new/openai/v1
       messages: https://api.synthetic.new/messages/v1
@@ -150,7 +156,6 @@ providers:
 
   # Example with custom headers and OpenRouter pricing lookup
   openrouter:
-    type: chat
     display_name: OpenRouter
     api_base_url: https://openrouter.ai/api/v1
     api_key: "your-openrouter-key-here"
@@ -229,6 +234,7 @@ providers:
 
   # Example using InOrder Selector (Defined Order with Fallback)
   # Requests route to 'kilo' first, then 'naga', then 'synthetic' if earlier ones are unavailable
+  # Individual targets can be disabled without removing them from the config
   minimax-m2.1:
     selector: in_order
     targets:
@@ -238,6 +244,21 @@ providers:
         model: minimax-m2.1
       - provider: synthetic
         model: "hf:MiniMaxAI/MiniMax-M2.1"
+
+  # Example with disabled target
+  # The first target is disabled, so routing will skip it
+  example-with-disabled-target:
+    selector: cost
+    targets:
+      - provider: kilo
+        model: minimax/minimax-m2.1
+        enabled: false  # This target is temporarily disabled
+      - provider: naga
+        model: minimax-m2.1
+        enabled: true   # Optional: true is the default
+      - provider: synthetic
+        model: "hf:MiniMaxAI/MiniMax-M2.1"
+        # enabled field omitted - defaults to true
 
   # OAuth Provider Routing Example
   # Route requests to OAuth-authenticated Antigravity accounts

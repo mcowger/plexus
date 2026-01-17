@@ -7,6 +7,7 @@ import { RouteResult } from "./router";
 import { DebugManager } from "./debug-manager";
 import { UsageStorageService } from "./usage-storage";
 import { CooldownParserRegistry } from "./cooldown-parsers";
+import { getProviderTypes } from "../config";
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
@@ -127,12 +128,10 @@ export class Dispatcher {
   }
 
   /**
-   * Normalizes route config type to array format
+   * Extracts provider types using the helper function that infers from api_base_url
    */
   private extractProviderTypes(route: RouteResult): string[] {
-    return Array.isArray(route.config.type)
-      ? route.config.type
-      : [route.config.type];
+    return getProviderTypes(route.config);
   }
 
   /**

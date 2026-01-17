@@ -24,6 +24,32 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
     }
 };
 
+/**
+ * Infer provider API types from api_base_url
+ * Matches the backend inference logic
+ */
+const inferProviderTypes = (apiBaseUrl?: string | Record<string, string>): string[] => {
+  if (!apiBaseUrl) {
+    return ['chat']; // Default fallback
+  }
+
+  if (typeof apiBaseUrl === 'string') {
+    const url = apiBaseUrl.toLowerCase();
+    if (url.includes('anthropic.com')) {
+      return ['messages'];
+    } else if (url.includes('generativelanguage.googleapis.com')) {
+      return ['gemini'];
+    } else {
+      return ['chat'];
+    }
+  } else {
+    return Object.keys(apiBaseUrl).filter(key => {
+      const value = apiBaseUrl[key];
+      return typeof value === 'string' && value.length > 0;
+    });
+  }
+};
+
 const EMPTY_PROVIDER: Provider = {
     id: '',
     name: '',
@@ -44,7 +70,6 @@ export const Providers = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Accordion state for Modal
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isModelsOpen, setIsModelsOpen] = useState(false);
   const [openModelIdx, setOpenModelIdx] = useState<string | null>(null);
 
@@ -108,47 +133,20 @@ export const Providers = () => {
   const handleToggleEnabled = async (provider: Provider, newState: boolean) => {
       const updated = providers.map(p => p.id === provider.id ? { ...p, enabled: newState } : p);
       setProviders(updated);
-      
+
       try {
           const p = { ...provider, enabled: newState };
           await api.saveProvider(p, provider.id);
       } catch (e) {
           console.error("Toggle error", e);
           alert("Failed to update provider status: " + e);
-          loadData(); 
+          loadData();
       }
-  };
-
-  const toggleApi = (apiType: string) => {
-      const currentTypes = Array.isArray(editingProvider.type) ? editingProvider.type : (editingProvider.type ? [editingProvider.type] : []);
-      const idx = currentTypes.indexOf(apiType);
-      
-      let newBaseUrl: any = editingProvider.apiBaseUrl;
-      
-      // Normalize apiBaseUrl to object if we are modifying it
-      if (typeof newBaseUrl !== 'object' || newBaseUrl === null) {
-          if (currentTypes.length === 1 && typeof newBaseUrl === 'string') {
-               newBaseUrl = { [currentTypes[0]]: newBaseUrl };
-          } else {
-               newBaseUrl = {};
-          }
-      } else {
-          newBaseUrl = { ...newBaseUrl };
-      }
-
-      const newTypes = [...currentTypes];
-      if (idx > -1) {
-          newTypes.splice(idx, 1);
-          delete newBaseUrl[apiType];
-      } else {
-          newTypes.push(apiType);
-      }
-      setEditingProvider({ ...editingProvider, type: newTypes, apiBaseUrl: newBaseUrl });
   };
 
   const updateApiUrl = (apiType: string, url: string) => {
       let newBaseUrl: any = editingProvider.apiBaseUrl;
-      
+
       if (typeof newBaseUrl !== 'object' || newBaseUrl === null) {
           const currentTypes = Array.isArray(editingProvider.type) ? editingProvider.type : (editingProvider.type ? [editingProvider.type] : []);
           if (currentTypes.length === 1 && typeof newBaseUrl === 'string') {
@@ -159,9 +157,18 @@ export const Providers = () => {
       } else {
           newBaseUrl = { ...newBaseUrl };
       }
-      
-      newBaseUrl[apiType] = url;
-      setEditingProvider({ ...editingProvider, apiBaseUrl: newBaseUrl });
+
+      // Update or remove the URL for this API type
+      if (url && url.trim()) {
+          newBaseUrl[apiType] = url;
+      } else {
+          delete newBaseUrl[apiType];
+      }
+
+      // Infer types from the updated api_base_url
+      const inferredTypes = inferProviderTypes(newBaseUrl);
+
+      setEditingProvider({ ...editingProvider, type: inferredTypes, apiBaseUrl: newBaseUrl });
   };
 
   const getApiUrlValue = (apiType: string) => {
@@ -314,86 +321,86 @@ export const Providers = () => {
             </div>
         }
       >
-          <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
-              <div className="grid gap-4 grid-cols-2">
-                  <Input 
-                    label="Unique ID" 
-                    value={editingProvider.id} 
+          <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px'}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end'}}>
+                  <Input
+                    label="Unique ID"
+                    value={editingProvider.id}
                     onChange={(e) => setEditingProvider({...editingProvider, id: e.target.value})}
                     placeholder="e.g. openai"
                     disabled={!!originalId}
                   />
-                  <Input 
-                    label="Display Name" 
-                    value={editingProvider.name} 
+                  <Input
+                    label="Display Name"
+                    value={editingProvider.name}
                     onChange={(e) => setEditingProvider({...editingProvider, name: e.target.value})}
                     placeholder="e.g. OpenAI Production"
                   />
-              </div>
-
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                   <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0, marginRight: '8px'}}>Enabled</label>
-                   <Switch 
-                      checked={editingProvider.enabled !== false}
-                      onChange={(checked) => setEditingProvider({...editingProvider, enabled: checked})}
-                   />
-              </div>
-
-              <div className="flex flex-col gap-2">
-
-                  <label className="font-body text-[13px] font-medium text-text-secondary">Supported APIs & Base URLs</label>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--color-bg-subtle)', padding: '16px', borderRadius: 'var(--radius-md)'}}>
-                      {KNOWN_APIS.map(apiType => {
-                          const isEnabled = (Array.isArray(editingProvider.type) ? editingProvider.type : [editingProvider.type]).includes(apiType);
-                          return (
-                              <div key={apiType} style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                                  <div style={{display: 'flex', alignItems: 'center', gap: '8px', width: '100px', flexShrink: 0}}>
-                                      <input 
-                                        type="checkbox" 
-                                        checked={isEnabled} 
-                                        onChange={() => toggleApi(apiType)}
-                                      />
-                                      <span style={{fontSize: '13px', fontWeight: 600, textTransform: 'capitalize'}}>{apiType}</span>
-                                  </div>
-                                  <div style={{flex: 1}}>
-                                    <Input 
-                                        placeholder={`${apiType} API Base URL (optional)`}
-                                        disabled={!isEnabled}
-                                        value={getApiUrlValue(apiType)}
-                                        onChange={(e) => updateApiUrl(apiType, e.target.value)}
-                                    />
-                                  </div>
-                              </div>
-                          );
-                      })}
+                  <div className="flex flex-col gap-2">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Enabled</label>
+                      <div style={{height: '38px', display: 'flex', alignItems: 'center'}}>
+                          <Switch
+                            checked={editingProvider.enabled !== false}
+                            onChange={(checked) => setEditingProvider({...editingProvider, enabled: checked})}
+                          />
+                      </div>
                   </div>
               </div>
 
-              <Input 
-                label="API Key" 
-                type="password" 
-                value={editingProvider.apiKey} 
-                onChange={(e) => setEditingProvider({...editingProvider, apiKey: e.target.value})}
-                placeholder="sk-..."
-              />
+              {/* Separator */}
+              <div style={{height: '1px', background: 'var(--color-border-glass)', margin: '4px 0'}} />
 
-              {/* Advanced Accordion */}
-              <div className="border border-border-glass rounded-md">
-                  <div 
-                    className="p-3 px-4 flex items-center gap-3 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass" 
-                    onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                  >
-                      {isAdvancedOpen ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
-                      <span style={{fontWeight: 600, fontSize: '14px'}}>Advanced Configuration</span>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
+                  {/* Left: APIs & Base URLs */}
+                  <div className="flex flex-col gap-1">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Supported APIs & Base URLs</label>
+                      <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontStyle: 'italic'}}>
+                          API types are automatically inferred from the URLs you provide.
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
+                          {KNOWN_APIS.map(apiType => {
+                              const inferredTypes = inferProviderTypes(editingProvider.apiBaseUrl);
+                              const isInferred = inferredTypes.includes(apiType);
+
+                              return (
+                                  <div key={apiType} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                      <div style={{display: 'flex', alignItems: 'center', gap: '6px', width: '80px', flexShrink: 0}}>
+                                          {isInferred && (
+                                              <Badge
+                                                status="connected"
+                                                style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 8px' }}
+                                                className="[&_.connection-dot]:hidden"
+                                              >
+                                                  {apiType}
+                                              </Badge>
+                                          )}
+                                          {!isInferred && (
+                                              <span style={{fontSize: '12px', opacity: 0.5, textTransform: 'capitalize'}}>{apiType}</span>
+                                          )}
+                                      </div>
+                                      <div style={{flex: 1}}>
+                                        <Input
+                                            placeholder={`${apiType} URL`}
+                                            value={getApiUrlValue(apiType)}
+                                            onChange={(e) => updateApiUrl(apiType, e.target.value)}
+                                        />
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
                   </div>
-                  {isAdvancedOpen && (
-                      <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px solid var(--color-border-glass)'}}>
+
+                  {/* Right: Advanced Configuration */}
+                  <div className="flex flex-col gap-1">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Advanced Configuration</label>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                           <div style={{width: '200px'}}>
-                            <Input 
-                                label="Discount (0.0 - 1.0)" 
-                                type="number" 
-                                step="0.01" 
-                                min="0" 
+                            <Input
+                                label="Discount (0.0 - 1.0)"
+                                type="number"
+                                step="0.01"
+                                min="0"
                                 max="1"
                                 value={editingProvider.discount || ''}
                                 onChange={(e) => setEditingProvider({...editingProvider, discount: parseFloat(e.target.value)})}
@@ -401,13 +408,13 @@ export const Providers = () => {
                           </div>
 
                           <div>
-                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
                                   <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Custom Headers</label>
                                   <Button size="sm" variant="secondary" onClick={() => addKV('headers')}><Plus size={14}/></Button>
                               </div>
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                                   {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
-                                      <div key={idx} style={{display: 'flex', gap: '8px'}}>
+                                      <div key={idx} style={{display: 'flex', gap: '6px'}}>
                                           <Input placeholder="Header Name" value={key} onChange={(e) => updateKV('headers', key, e.target.value, val)} style={{flex: 1}}/>
                                           <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
                                                   const rawValue = e.target.value;
@@ -419,20 +426,20 @@ export const Providers = () => {
                                                   }
                                                   updateKV('headers', key, key, parsedValue);
                                               }} style={{flex: 1}}/>
-                                          <Button variant="ghost" size="sm" onClick={() => removeKV('headers', key)}><Trash2 size={16} style={{color: 'var(--color-danger)'}}/></Button>
+                                          <Button variant="ghost" size="sm" onClick={() => removeKV('headers', key)} style={{padding: '4px'}}><Trash2 size={14} style={{color: 'var(--color-danger)'}}/></Button>
                                       </div>
                                   ))}
                               </div>
                           </div>
 
                           <div>
-                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
                                   <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Extra Body Fields</label>
                                   <Button size="sm" variant="secondary" onClick={() => addKV('extraBody')}><Plus size={14}/></Button>
                               </div>
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                                   {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
-                                      <div key={idx} style={{display: 'flex', gap: '8px'}}>
+                                      <div key={idx} style={{display: 'flex', gap: '6px'}}>
                                           <Input placeholder="Field Name" value={key} onChange={(e) => updateKV('extraBody', key, e.target.value, val)} style={{flex: 1}}/>
                                           <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
                                                   const rawValue = e.target.value;
@@ -444,51 +451,59 @@ export const Providers = () => {
                                                   }
                                                   updateKV('extraBody', key, key, parsedValue);
                                               }} style={{flex: 1}}/>
-                                          <Button variant="ghost" size="sm" onClick={() => removeKV('extraBody', key)}><Trash2 size={16} style={{color: 'var(--color-danger)'}}/></Button>
+                                          <Button variant="ghost" size="sm" onClick={() => removeKV('extraBody', key)} style={{padding: '4px'}}><Trash2 size={14} style={{color: 'var(--color-danger)'}}/></Button>
                                       </div>
                                   ))}
                               </div>
                           </div>
                       </div>
-                  )}
+                  </div>
               </div>
+
+              <Input
+                label="API Key"
+                type="password"
+                value={editingProvider.apiKey}
+                onChange={(e) => setEditingProvider({...editingProvider, apiKey: e.target.value})}
+                placeholder="sk-..."
+              />
 
               {/* Models Accordion */}
               <div className="border border-border-glass rounded-md">
-                  <div 
-                    className="p-3 px-4 flex items-center gap-3 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass" 
+                  <div
+                    className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
                     onClick={() => setIsModelsOpen(!isModelsOpen)}
                   >
-                      {isModelsOpen ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
-                      <span style={{fontWeight: 600, fontSize: '14px', flex: 1}}>Provider Models</span>
+                      {isModelsOpen ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+                      <span style={{fontWeight: 600, fontSize: '13px', flex: 1}}>Provider Models</span>
                       <Badge status="connected">{Object.keys(editingProvider.models || {}).length} Models</Badge>
                   </div>
                   {isModelsOpen && (
-                      <div style={{padding: '16px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-deep)'}}>
-                          <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                      <div style={{padding: '8px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-deep)'}}>
+                          <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                               {Object.entries(editingProvider.models || {}).map(([mId, mCfg]: [string, any]) => (
                                   <div key={mId} style={{border: '1px solid var(--color-border-glass)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-surface)'}}>
-                                      <div 
-                                        style={{padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer'}}
+                                      <div
+                                        style={{padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}
                                         onClick={() => setOpenModelIdx(openModelIdx === mId ? null : mId)}
                                       >
-                                          {openModelIdx === mId ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
-                                          <span style={{fontWeight: 600, fontSize: '13px', flex: 1}}>{mId}</span>
-                                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); removeModel(mId); }} style={{color: 'var(--color-danger)', padding: '4px'}}><X size={14}/></Button>
+                                          {openModelIdx === mId ? <ChevronDown size={12}/> : <ChevronRight size={12}/>}
+                                          <span style={{fontWeight: 600, fontSize: '12px', flex: 1}}>{mId}</span>
+                                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); removeModel(mId); }} style={{color: 'var(--color-danger)', padding: '2px'}}><X size={12}/></Button>
                                       </div>
                                       {openModelIdx === mId && (
-                                          <div style={{padding: '16px', borderTop: '1px solid var(--color-border-glass)', display: 'flex', flexDirection: 'column', gap: '16px'}}>
-                                              <Input 
-                                                label="Model ID" 
-                                                value={mId} 
+                                          <div style={{padding: '8px', borderTop: '1px solid var(--color-border-glass)', display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                                              <Input
+                                                label="Model ID"
+                                                value={mId}
                                                 onChange={(e) => updateModelId(mId, e.target.value)}
                                               />
-                                              
+
                                               <div className="grid gap-4 grid-cols-2">
-                                                  <div className="flex flex-col gap-2">
+                                                  <div className="flex flex-col gap-1">
                                                       <label className="font-body text-[13px] font-medium text-text-secondary">Pricing Source</label>
-                                                      <select 
-                                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                                      <select
+                                                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                                         value={mCfg.pricing?.source || 'simple'}
                                                         onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, source: e.target.value } })}
                                                       >
@@ -497,11 +512,11 @@ export const Providers = () => {
                                                           <option value="defined">Ranges (Complex)</option>
                                                       </select>
                                                   </div>
-                                                  <div className="flex flex-col gap-2">
+                                                  <div className="flex flex-col gap-1">
                                                       <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
-                                                      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px'}}>
+                                                      <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
                                                           {KNOWN_APIS.map(apiType => (
-                                                              <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px'}}>
+                                                              <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px'}}>
                                                                   <input 
                                                                     type="checkbox" 
                                                                     checked={(mCfg.access_via || []).includes(apiType)}

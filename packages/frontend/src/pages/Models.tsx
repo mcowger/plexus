@@ -4,6 +4,7 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { Switch } from '../components/ui/Switch';
 import { Search, Plus, Trash2, Edit2 } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
@@ -60,7 +61,7 @@ export const Models = () => {
 
   const handleSave = async () => {
       if (!editingAlias.id) return;
-      
+
       setIsSaving(true);
       try {
           await api.saveAlias(editingAlias, originalId || undefined);
@@ -74,13 +75,33 @@ export const Models = () => {
       }
   };
 
-  const updateTarget = (index: number, field: 'provider' | 'model', value: string) => {
+  const handleToggleTarget = async (alias: Alias, targetIndex: number, newState: boolean) => {
+      // Create a copy of the alias with updated target
+      const updatedAlias = JSON.parse(JSON.stringify(alias));
+      updatedAlias.targets[targetIndex].enabled = newState;
+
+      // Update local state immediately for responsiveness
+      const updatedAliases = aliases.map(a => a.id === alias.id ? updatedAlias : a);
+      setAliases(updatedAliases);
+
+      try {
+          await api.saveAlias(updatedAlias, alias.id);
+      } catch (e) {
+          console.error("Toggle error", e);
+          alert("Failed to update target status: " + e);
+          loadData(); // Reload on error
+      }
+  };
+
+  const updateTarget = (index: number, field: 'provider' | 'model' | 'enabled', value: string | boolean) => {
       const newTargets = [...editingAlias.targets];
       // When provider changes, clear model
       if (field === 'provider') {
-          newTargets[index] = { provider: value, model: '' };
-      } else {
-          newTargets[index] = { ...newTargets[index], [field]: value };
+          newTargets[index] = { provider: value as string, model: '', enabled: newTargets[index].enabled };
+      } else if (field === 'enabled') {
+          newTargets[index] = { ...newTargets[index], enabled: value as boolean };
+      } else if (field === 'model') {
+          newTargets[index] = { ...newTargets[index], model: value as string };
       }
       setEditingAlias({ ...editingAlias, targets: newTargets });
   };
@@ -88,7 +109,7 @@ export const Models = () => {
   const addTarget = () => {
       setEditingAlias({
           ...editingAlias,
-          targets: [...editingAlias.targets, { provider: '', model: '' }]
+          targets: [...editingAlias.targets, { provider: '', model: '', enabled: true }]
       });
   };
 
@@ -180,20 +201,39 @@ export const Models = () => {
                                 </span>
                             </td>
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px'}}>
-                                {alias.targets.map((t, i) => {
-                                    const provider = providers.find(p => p.id === t.provider);
-                                    const isDisabled = provider?.enabled === false;
-                                    return (
-                                        <div key={i} style={{
-                                            fontSize: '12px', 
-                                            color: isDisabled ? 'var(--color-danger)' : 'var(--color-text-secondary)',
-                                            textDecoration: isDisabled ? 'line-through' : 'none',
-                                            opacity: isDisabled ? 0.7 : 1
-                                        }}>
-                                            {t.provider} &rarr; {t.model} {isDisabled && <span style={{textDecoration: 'none', display: 'inline-block', marginLeft: '4px', fontStyle: 'italic'}}>(provider disabled)</span>}
-                                        </div>
-                                    );
-                                })}
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                                    {alias.targets.map((t, i) => {
+                                        const provider = providers.find(p => p.id === t.provider);
+                                        const isProviderDisabled = provider?.enabled === false;
+                                        const isTargetDisabled = t.enabled === false;
+                                        const isDisabled = isProviderDisabled || isTargetDisabled;
+
+                                        return (
+                                            <div key={i} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                fontSize: '12px',
+                                                color: isDisabled ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                                                textDecoration: isDisabled ? 'line-through' : 'none',
+                                                opacity: isDisabled ? 0.7 : 1
+                                            }}>
+                                                <div onClick={(e) => e.stopPropagation()} style={{display: 'flex', alignItems: 'center'}}>
+                                                    <Switch
+                                                      checked={t.enabled !== false}
+                                                      onChange={(val) => handleToggleTarget(alias, i, val)}
+                                                      size="sm"
+                                                      disabled={isProviderDisabled}
+                                                    />
+                                                </div>
+                                                <div style={{flex: 1}}>
+                                                    {t.provider} &rarr; {t.model}
+                                                    {isProviderDisabled && <span style={{textDecoration: 'none', display: 'inline-block', marginLeft: '4px', fontStyle: 'italic'}}>(provider disabled)</span>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </td>
                         </tr>
                     ))}
@@ -219,62 +259,66 @@ export const Models = () => {
             </div>
         }
       >
-          <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-              <div className="grid grid-cols-2 gap-4">
-                  <Input 
-                    label="Primary Name (ID)" 
-                    value={editingAlias.id} 
-                    onChange={(e) => setEditingAlias({...editingAlias, id: e.target.value})}
-                    placeholder="e.g. gpt-4-turbo"
-                  />
-                  
-                  <div className="flex flex-col gap-2">
+          <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px'}}>
+              <div className="grid grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Primary Name (ID)</label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        value={editingAlias.id}
+                        onChange={(e) => setEditingAlias({...editingAlias, id: e.target.value})}
+                        placeholder="e.g. gpt-4-turbo"
+                      />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
                       <label className="font-body text-[13px] font-medium text-text-secondary">Selector Strategy</label>
                       <select
-                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                         value={editingAlias.selector || 'random'}
                         onChange={(e) => setEditingAlias({...editingAlias, selector: e.target.value})}
                       >
                           <option value="random">Random</option>
-                          <option value="in_order">In Order (Defined Priority)</option>
+                          <option value="in_order">In Order</option>
                           <option value="cost">Lowest Cost</option>
                           <option value="latency">Lowest Latency</option>
                           <option value="usage">Usage Balanced</option>
                           <option value="performance">Best Performance</option>
                       </select>
                   </div>
+
+                  <div className="flex flex-col gap-1">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Priority</label>
+                      <select
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        value={editingAlias.priority || 'selector'}
+                        onChange={(e) => setEditingAlias({...editingAlias, priority: e.target.value as any})}
+                      >
+                          <option value="selector">Selector</option>
+                          <option value="api_match">API Match</option>
+                      </select>
+                  </div>
               </div>
 
-               <div className="flex flex-col gap-2">
-                  <label className="font-body text-[13px] font-medium text-text-secondary">Priority</label>
-                  <select 
-                    className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
-                    value={editingAlias.priority || 'selector'}
-                    onChange={(e) => setEditingAlias({...editingAlias, priority: e.target.value as any})}
-                  >
-                      <option value="selector">Selector (Use strategy)</option>
-                      <option value="api_match">API Match (Prioritize incoming API format)</option>
-                  </select>
-                  <p className="text-xs text-text-muted mt-1">"Selector" uses the strategy defined above. "API Match" tries to match the provider type to the incoming request format (e.g. OpenAI &rarr; OpenAI).</p>
-              </div>
+              <p className="text-xs text-text-muted" style={{marginTop: '-4px'}}>Priority: "Selector" uses the strategy above. "API Match" matches provider type to incoming request format.</p>
 
-              <div className="h-px bg-border-glass my-4" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
+              <div className="h-px bg-border-glass" style={{margin: '4px 0'}}></div>
 
               <div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
                       <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Additional Aliases</label>
                       <Button size="sm" variant="secondary" onClick={addAlias} leftIcon={<Plus size={14}/>}>Add Alias</Button>
                   </div>
-                  
+
                   {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
-                      <div className="text-text-muted italic text-center text-sm p-4">No additional aliases</div>
+                      <div className="text-text-muted italic text-center text-sm py-2">No additional aliases</div>
                   )}
 
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                       {editingAlias.aliases?.map((alias, idx) => (
                           <div key={idx} style={{display: 'flex', gap: '8px'}}>
-                              <Input 
-                                value={alias} 
+                              <Input
+                                value={alias}
                                 onChange={(e) => updateAlias(idx, e.target.value)}
                                 placeholder="e.g. gpt4"
                                 style={{flex: 1}}
@@ -287,58 +331,71 @@ export const Models = () => {
                   </div>
               </div>
 
-              <div className="h-px bg-border-glass my-4" style={{margin: '8px 0', borderBottom: '1px solid var(--color-border)'}}></div>
+              <div className="h-px bg-border-glass" style={{margin: '4px 0'}}></div>
 
               <div>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
                       <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Targets</label>
                       <Button size="sm" variant="secondary" onClick={addTarget} leftIcon={<Plus size={14}/>}>Add Target</Button>
                   </div>
-                  
+
                   {editingAlias.targets.length === 0 && (
-                       <div className="text-text-muted italic text-center text-sm p-4">No targets configured (Model will not work)</div>
+                       <div className="text-text-muted italic text-center text-sm py-2">No targets configured (Model will not work)</div>
                   )}
 
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                       {editingAlias.targets.map((target, idx) => (
-                          <Card key={idx} style={{padding: '12px', backgroundColor: 'var(--color-bg-subtle)'}}>
-                              <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
-                                  <div style={{flex: 1}}>
-                                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{fontSize: '11px'}}>Provider</label>
-                                      <select 
-                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
-                                        value={target.provider}
-                                        onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
-                                      >
-                                          <option value="">Select Provider...</option>
-                                          {providers.map(p => (
-                                              <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
-                                          ))}
-                                      </select>
-                                  </div>
-                                  <div style={{flex: 1}}>
-                                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{fontSize: '11px'}}>Model</label>
-                                      <select 
-                                        className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" 
-                                        value={target.model}
-                                        onChange={(e) => updateTarget(idx, 'model', e.target.value)}
-                                        disabled={!target.provider}
-                                      >
-                                          <option value="">Select Model...</option>
-                                          {availableModels
-                                            .filter(m => m.providerId === target.provider)
-                                            .map(m => (
-                                              <option key={m.id} value={m.id}>{m.name}</option>
-                                          ))}
-                                      </select>
-                                  </div>
-                                  <div style={{marginTop: '24px'}}>
-                                      <Button variant="ghost" size="sm" onClick={() => removeTarget(idx)} style={{color: 'var(--color-danger)'}}>
-                                          <Trash2 size={16} />
-                                      </Button>
-                                  </div>
+                          <div key={idx} style={{
+                              display: 'flex',
+                              gap: '6px',
+                              alignItems: 'center',
+                              padding: '4px 8px',
+                              backgroundColor: 'var(--color-bg-subtle)',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--color-border-glass)'
+                          }}>
+                              <div style={{flex: '0 0 120px', maxWidth: '120px'}}>
+                                  <select
+                                    className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                                    style={{padding: '4px 8px', height: '28px'}}
+                                    value={target.provider}
+                                    onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
+                                  >
+                                      <option value="">Select Provider...</option>
+                                      {providers.map(p => (
+                                          <option key={p.id} value={p.id}>{p.name}</option>
+                                      ))}
+                                  </select>
                               </div>
-                          </Card>
+                              <div style={{flex: 1}}>
+                                  <select
+                                    className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                                    style={{padding: '4px 8px', height: '28px'}}
+                                    value={target.model}
+                                    onChange={(e) => updateTarget(idx, 'model', e.target.value)}
+                                    disabled={!target.provider}
+                                  >
+                                      <option value="">Select Model...</option>
+                                      {availableModels
+                                        .filter(m => m.providerId === target.provider)
+                                        .map(m => (
+                                          <option key={m.id} value={m.id}>{m.name}</option>
+                                      ))}
+                                  </select>
+                              </div>
+                              <div>
+                                  <Switch
+                                    checked={target.enabled !== false}
+                                    onChange={(val) => updateTarget(idx, 'enabled', val)}
+                                    size="sm"
+                                  />
+                              </div>
+                              <div>
+                                  <Button variant="ghost" size="sm" onClick={() => removeTarget(idx)} style={{color: 'var(--color-danger)', padding: '4px', minHeight: 'auto'}}>
+                                      <Trash2 size={14} />
+                                  </Button>
+                              </div>
+                          </div>
                       ))}
                   </div>
               </div>

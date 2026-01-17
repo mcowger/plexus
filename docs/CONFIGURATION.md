@@ -11,15 +11,13 @@ The configuration file is YAML-based and sits at the heart of how Plexus routes 
 ```yaml
 providers:
   openai_direct:
-    type: chat
     api_base_url: https://api.openai.com/v1
     api_key: your_openai_key
     models:
       - gpt-4o
       - gpt-4o-mini
-      
+
   my_anthropic:
-    type: messages
     api_base_url: https://api.anthropic.com/v1
     api_key: your_anthropic_key
     models:
@@ -31,12 +29,12 @@ models:
     targets:
       - provider: openai_direct
         model: gpt-4o-mini
-  
+
   smart-model:
     targets:
       - provider: my_anthropic
         model: claude-3-5-sonnet-latest
-        
+
   balanced-model:
     selector: random
     targets:
@@ -85,16 +83,21 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 **Basic Configuration Fields:**
 
-- **`type`**: The API format(s) supported by this provider. Can be:
-  - A single string: `"chat"`, `"messages"`, or `"gemini"`
-  - An array for multi-protocol providers: `["chat", "messages"]`
-  
+- **`api_base_url`**: The base URL for the provider's API. **The API type is automatically inferred from this field:**
+  - Single URL string: Plexus infers the type from the URL pattern:
+    - URLs containing `anthropic.com` → `messages` format
+    - URLs containing `generativelanguage.googleapis.com` → `gemini` format
+    - All other URLs → `chat` format (OpenAI-compatible)
+  - Object mapping for multi-protocol providers:
+    ```yaml
+    api_base_url:
+      chat: https://api.example.com/v1
+      messages: https://api.example.com/anthropic/v1
+    ```
+    The keys (`chat`, `messages`) define the supported API types.
+
 - **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
 
-- **`api_base_url`**: The base URL for the provider's API. Can be:
-  - A single URL string for single-protocol providers
-  - An object mapping API types to specific URLs for multi-protocol providers
-  
 - **`api_key`**: (Optional) The authentication key for this provider. Required unless `oauth_provider` is specified.
 
 - **`oauth_provider`**: (Optional) The OAuth provider to use for authentication instead of a static API key. Currently supported: `"antigravity" | "claude-code"`. When specified, Plexus will use OAuth 2.0 tokens for authentication.

@@ -1,5 +1,5 @@
 import { logger } from 'src/utils/logger';
-import { getConfig, ProviderConfig } from '../config';
+import { getConfig, ProviderConfig, getProviderTypes } from '../config';
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
 
@@ -37,14 +37,19 @@ export class Router {
             // Load balancing: pick target using selector
             const targets = alias.targets;
             if (targets && targets.length > 0) {
-                // Filter out disabled providers
+                // Filter out disabled targets and disabled providers
                 const enabledTargets = targets.filter(target => {
+                    // First check if the target itself is disabled
+                    if (target.enabled === false) {
+                        return false;
+                    }
+                    // Then check if the provider is disabled
                     const providerConfig = config.providers[target.provider];
                     return providerConfig && providerConfig.enabled !== false;
                 });
 
                 if (enabledTargets.length === 0) {
-                    throw new Error(`All providers for model alias '${modelName}' are disabled.`);
+                    throw new Error(`All targets for model alias '${modelName}' are disabled.`);
                 }
 
                 let healthyTargets = CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
@@ -66,10 +71,8 @@ export class Router {
                         const providerConfig = config.providers[target.provider];
                         if (!providerConfig) return false;
 
-                        // Supported types for the provider
-                        const providerTypes = Array.isArray(providerConfig.type)
-                            ? providerConfig.type
-                            : [providerConfig.type];
+                        // Get supported types for the provider (inferred from api_base_url)
+                        const providerTypes = getProviderTypes(providerConfig);
 
                         // Supported types for this specific model
                         let modelSpecificTypes: string[] | undefined = undefined;
