@@ -21,7 +21,7 @@ describe('InOrderSelector', () => {
       { provider: 'p3', model: 'm3' },
     ];
     const selected = selector.select(targets);
-    expect(selected).toEqual(targets[0]);
+    expect(selected).toEqual(targets[0] ?? null);
   });
 
   it('should always return the first target in defined order', () => {
@@ -32,7 +32,7 @@ describe('InOrderSelector', () => {
     ];
     // Call multiple times to ensure consistent ordering
     for (let i = 0; i < 5; i++) {
-      expect(selector.select(targets)).toEqual(targets[0]);
+      expect(selector.select(targets)).toEqual(targets[0] ?? null);
     }
   });
 });

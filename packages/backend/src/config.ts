@@ -56,8 +56,6 @@ const ProviderConfigSchema = z.object({
   display_name: z.string().optional(),
   api_base_url: z.union([z.string().url(), z.record(z.string())]),
   api_key: z.string().optional(),
-  oauth_provider: z.string().optional(),
-  oauth_account_pool: z.array(z.string()).min(1).optional(),
   enabled: z.boolean().default(true).optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
@@ -68,34 +66,8 @@ const ProviderConfigSchema = z.object({
   extraBody: z.record(z.any()).optional(),
   force_transformer: z.string().optional(),
 }).refine(
-  (data) => {
-    // Either api_key OR oauth_provider must be present, but not neither
-    if (!data.api_key && !data.oauth_provider) {
-      return false;
-    }
-    // If oauth_provider is specified, oauth_account_pool is required
-    if (data.oauth_provider && !data.oauth_account_pool) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: "Either 'api_key' must be specified, OR both 'oauth_provider' and 'oauth_account_pool' must be specified",
-  }
-).refine(
-  (data) => {
-    // Claude Code OAuth must use type 'messages'
-    if (data.oauth_provider === 'claude-code') {
-      const types = Array.isArray(data.type) ? data.type : [data.type];
-      if (!types.includes('messages')) {
-        return false;
-      }
-    }
-    return true;
-  },
-  {
-    message: "Claude Code OAuth provider must use type 'messages'",
-  }
+  (data) => !!data.api_key,
+  { message: "'api_key' must be specified for provider" }
 );
 
 const ModelTargetSchema = z.object({

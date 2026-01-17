@@ -4,7 +4,7 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
-import { Search, Plus, Trash2, Edit2, Copy, RefreshCw, Eye, EyeOff, Check } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, Copy, RefreshCw, Check } from 'lucide-react';
 
 const EMPTY_KEY: KeyConfig = {
     key: '',
@@ -190,14 +190,18 @@ export const Keys = () => {
         }
       >
           <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-              <Input 
-                label="Key Name (ID)" 
-                value={editingKey.key} 
-                onChange={(e) => setEditingKey({...editingKey, key: e.target.value})}
-                placeholder="e.g. production-app-1"
-                disabled={!!originalKeyName} // Don't allow changing ID after creation to match Provider pattern, or allow? Typically IDs are stable.
-                helpText={originalKeyName ? "Key ID cannot be changed once created." : "A unique identifier for this key."}
-              />
+              <div className="flex flex-col gap-2">
+                <Input
+                  label="Key Name (ID)"
+                  value={editingKey.key}
+                  onChange={(e) => setEditingKey({...editingKey, key: e.target.value})}
+                  placeholder="e.g. production-app-1"
+                  disabled={!!originalKeyName} // Don't allow changing ID after creation to match Provider pattern, or allow? Typically IDs are stable.
+                />
+                <p className="text-xs text-text-muted">
+                  {originalKeyName ? "Key ID cannot be changed once created." : "A unique identifier for this key."}
+                </p>
+              </div>
               
               <div className="flex flex-col gap-2">
                   <label className="font-body text-[13px] font-medium text-text-secondary">Secret Key</label>

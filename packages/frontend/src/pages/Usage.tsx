@@ -77,7 +77,7 @@ export const Usage = () => {
             dataKey={dataKey}
             nameKey="name"
           >
-            {data.map((entry, index) => (
+            {data.map((_entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>

@@ -10,7 +10,6 @@ import { CooldownParserRegistry } from "./cooldown-parsers";
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
-  private accountRotationIndex = new Map<string, number>(); // Track last used index per provider
 
   setUsageStorage(storage: UsageStorageService) {
     this.usageStorage = storage;
@@ -20,144 +19,29 @@ export class Dispatcher {
     const route = Router.resolve(request.model, request.incomingApiType);
 
     // Determine Target API Type
-    const providerTypes = Array.isArray(route.config.type)
-      ? route.config.type
-      : [route.config.type];
-
-    // Check if model specific access_via is defined
-    const modelSpecificTypes = route.modelConfig?.access_via;
-    
-    // The available types for this specific routing
-    // If model specific types are defined and not empty, use them. Otherwise fallback to provider types.
-    const availableTypes = (modelSpecificTypes && modelSpecificTypes.length > 0) 
-      ? modelSpecificTypes 
-      : providerTypes;
-
-    let targetApiType = availableTypes[0]; // Default to first one
-
-    if (!targetApiType) {
-        throw new Error(`No available API type found for provider '${route.provider}' and model '${route.model}'. Check configuration.`);
-    }
-    let selectionReason = "default (first available)";
-
-    // Try to match incoming
-    if (request.incomingApiType) {
-        const incoming = request.incomingApiType.toLowerCase();
-        // Case-insensitive match
-        const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
-        if (match) {
-            targetApiType = match;
-            selectionReason = `matched incoming request type '${incoming}'`;
-        } else {
-            selectionReason = `incoming type '${incoming}' not supported, defaulted to '${targetApiType}'`;
-        }
-    }
-    
-    logger.info(`Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`);
-
-    // 2. Get Transformer
-    // Check if provider has force_transformer override
-    const transformerType = route.config.force_transformer || targetApiType;
-    if (route.config.force_transformer) {
-        logger.info(`Dispatcher: Using forced transformer '${transformerType}' instead of '${targetApiType}' for provider '${route.provider}'`);
-    }
-    const transformer = TransformerFactory.getTransformer(transformerType);
-
-    // 3. Select OAuth account (if applicable) before transforming request
-    let selectedOAuthAccountId: string | undefined;
-    if (route.config.oauth_provider && this.usageStorage) {
-      const accountPool = route.config.oauth_account_pool!;
-      const selected = this.selectOAuthAccount(
-        route.provider,
-        route.config.oauth_provider,
-        accountPool
-      );
-
-      if (!selected) {
-        throw new Error(`Failed to select OAuth account for provider '${route.provider}'`);
-      }
-      selectedOAuthAccountId = selected;
-    }
-
-    // 4. Transform Request
-    // Override model in request to the target model, and populate OAuth metadata with selected account
-    const requestWithTargetModel = this.populateOAuthMetadata(
-      { ...request, model: route.model },
+    const { targetApiType, selectionReason } = this.selectTargetApiType(
       route,
-      selectedOAuthAccountId
+      request.incomingApiType
     );
 
-    let providerPayload;
+    logger.info(
+      `Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`
+    );
 
-    // Pass-through Optimization
-    // Only use pass-through if incoming API matches target API AND no force_transformer is set
-    const isCompatible =
-      !!request.incomingApiType?.toLowerCase() &&
-      request.incomingApiType?.toLowerCase() ===
-        targetApiType.toLowerCase();
+    // 2. Get Transformer
+    const transformerType = this.resolveTransformerType(route, targetApiType);
+    const transformer = TransformerFactory.getTransformer(transformerType);
 
-    let bypassTransformation = false;
+    // 3. Transform Request
+    const requestWithTargetModel = { ...request, model: route.model };
 
-    if (isCompatible && request.originalBody && !route.config.force_transformer) {
-      logger.info(
-        `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
+    const { payload: providerPayload, bypassTransformation } =
+      await this.transformRequestPayload(
+        requestWithTargetModel,
+        route,
+        transformer,
+        targetApiType
       );
-      providerPayload = JSON.parse(JSON.stringify(request.originalBody));
-      providerPayload.model = route.model;
-
-      // Add metadata from requestWithTargetModel (includes OAuth metadata like user_id)
-      if (requestWithTargetModel.metadata) {
-        const apiMetadata = this.getApiMetadata(requestWithTargetModel.metadata, route.config.oauth_provider);
-        if (Object.keys(apiMetadata).length > 0) {
-          providerPayload.metadata = apiMetadata;
-        }
-      }
-
-      // Inject Claude Code system instruction if using Claude Code OAuth (pass-through path)
-      // This is REQUIRED for Claude Code OAuth authentication
-      if (route.config.oauth_provider === 'claude-code' &&
-          requestWithTargetModel.metadata?.user_id &&
-          typeof requestWithTargetModel.metadata.user_id === 'string' &&
-          requestWithTargetModel.metadata.user_id.includes('_account_') &&
-          requestWithTargetModel.metadata.user_id.includes('_session_')) {
-
-        const claudeCodeInstruction = {
-          type: "text",
-          text: "You are Claude Code, Anthropic's official CLI for Claude."
-        };
-
-        // Anthropic's system field can be a string or an array of content blocks
-        // For Claude Code, we need to use array format and prepend the instruction
-        const systemArray: any[] = [claudeCodeInstruction];
-
-        if (providerPayload.system) {
-          // If system is already an array, prepend to it
-          if (Array.isArray(providerPayload.system)) {
-            providerPayload.system.unshift(claudeCodeInstruction);
-          } else {
-            // If it's a string, convert to array format and append
-            systemArray.push({ type: "text", text: providerPayload.system });
-            providerPayload.system = systemArray;
-          }
-        } else {
-          // No existing system message, create new one with Claude Code instruction
-          providerPayload.system = systemArray;
-        }
-      }
-
-      bypassTransformation = true;
-    } else {
-      if (route.config.force_transformer) {
-        logger.info(`Pass-through optimization bypassed due to force_transformer: ${route.config.force_transformer}`);
-      }
-      providerPayload = await transformer.transformRequest(
-        requestWithTargetModel
-      );
-    }
-
-    if (route.config.extraBody) {
-      providerPayload = { ...providerPayload, ...route.config.extraBody };
-    }
 
     // Capture transformed request
     if (request.requestId) {
@@ -165,50 +49,7 @@ export class Dispatcher {
     }
 
     // 4. Execute Request
-    // Resolve base URL based on target API type
-    let rawBaseUrl: string;
-    
-    if (typeof route.config.api_base_url === 'string') {
-        rawBaseUrl = route.config.api_base_url;
-    } else {
-        // It's a record/map
-        const typeKey = targetApiType.toLowerCase();
-        // Check exact match first, then fallback to just looking for keys that might match?
-        // Actually the config keys should probably match the api types (chat, messages, etc)
-        const specificUrl = route.config.api_base_url[typeKey];
-        const defaultUrl = route.config.api_base_url['default'];
-        
-        if (specificUrl) {
-            rawBaseUrl = specificUrl;
-            logger.debug(`Dispatcher: Using specific base URL for '${targetApiType}'.`);
-        } else if (defaultUrl) {
-            rawBaseUrl = defaultUrl;
-            logger.debug(`Dispatcher: Using default base URL.`);
-        } else {
-             // If we can't find a specific URL for this type, and no default, fall back to the first one?
-             // Or throw error.
-             const firstKey = Object.keys(route.config.api_base_url)[0];
-             
-             if (firstKey) {
-                 const firstUrl = route.config.api_base_url[firstKey];
-                 if (firstUrl) {
-                    rawBaseUrl = firstUrl;
-                    logger.warn(`No specific base URL found for api type '${targetApiType}'. using '${firstKey}' as fallback.`);
-                 } else {
-                    throw new Error(`No base URL configured for api type '${targetApiType}' and no default found.`);
-                 }
-             } else {
-                 throw new Error(`No base URL configured for api type '${targetApiType}' and no default found.`);
-             }
-        }
-    }
-
-    // Ensure api_base_url doesn't end with slash if endpoint starts with slash, or handle cleanly
-    const baseUrl = rawBaseUrl.replace(/\/$/, "");
-    const endpoint = transformer.getEndpoint
-      ? transformer.getEndpoint(requestWithTargetModel)
-      : transformer.defaultEndpoint;
-    const url = `${baseUrl}${endpoint}`;
+    const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
 
     const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
 
@@ -220,168 +61,33 @@ export class Dispatcher {
 
     logger.silly("Upstream Request Payload", providerPayload);
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(providerPayload),
-    });
+    const response = await this.executeProviderRequest(url, headers, providerPayload);
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error(`Provider error: ${response.status} ${errorText}`);
-
-      const cooldownManager = CooldownManager.getInstance();
-
-      // Extract account ID if OAuth was used (from the transformed request with metadata)
-      const accountId = requestWithTargetModel.metadata?.selected_oauth_account as string | undefined;
-
-      if (response.status >= 500 || [401, 403, 408, 429].includes(response.status)) {
-        let cooldownDuration: number | undefined;
-
-        // For 429 errors, try to parse provider-specific cooldown duration
-        if (response.status === 429) {
-          // Get provider type for parser lookup
-          const providerTypes = Array.isArray(route.config.type)
-            ? route.config.type
-            : [route.config.type];
-          const providerType = providerTypes[0];
-
-          // Try to parse cooldown duration from error message
-          const parsedDuration = CooldownParserRegistry.parseCooldown(providerType, errorText);
-
-          if (parsedDuration) {
-            cooldownDuration = parsedDuration;
-            logger.info(`Parsed cooldown duration: ${cooldownDuration}ms (${cooldownDuration / 1000}s)`);
-          } else {
-            logger.debug(`No cooldown duration parsed from error, using default`);
-          }
-        }
-
-        // Mark provider/account as failed with optional duration
-        // For non-429 errors, cooldownDuration will be undefined and default (10 minutes) will be used
-        cooldownManager.markProviderFailure(route.provider, accountId, cooldownDuration);
-      }
-
-      throw new Error(`Provider failed: ${response.status} ${errorText}`);
+      await this.handleProviderError(response, route, errorText);
     }
 
-    // 5. Handle Streaming Response
+    // 5. Handle Response
     if (request.stream) {
-      logger.info("Streaming response detected");
-
-      let rawStream = response.body!;
-
-      // Dispatcher just returns the raw stream - no transformation here
-      return {
-        id: "stream-" + Date.now(),
-        model: request.model,
-        content: null,
-        stream: rawStream,
-        bypassTransformation: bypassTransformation,
-        plexus: {
-          provider: route.provider,
-          model: route.model,
-          apiType: targetApiType,
-          pricing: route.modelConfig?.pricing,
-          providerDiscount: route.config.discount,
-          canonicalModel: route.canonicalModel,
-        },
-      };
-    } 
-    // Non-streaming response
-    else {
-      const responseBody = JSON.parse(await response.text());
-      logger.silly("Upstream Response Payload", responseBody);
-
-      if (request.requestId) {
-        DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
-      }
-
-      let unifiedResponse: UnifiedChatResponse;
-
-      if (bypassTransformation) {
-        // We still need unified response for usage stats, so we transform purely for that
-        // But we set the bypass flag and attach raw response
-        const syntheticResponse = await transformer.transformResponse(
-          responseBody
-        );
-        unifiedResponse = {
-          ...syntheticResponse,
-          bypassTransformation: true,
-          rawResponse: responseBody,
-        };
-      } else {
-        unifiedResponse = await transformer.transformResponse(responseBody);
-      }
-
-      unifiedResponse.plexus = {
-        provider: route.provider,
-        model: route.model,
-        apiType: targetApiType,
-        pricing: route.modelConfig?.pricing,
-        providerDiscount: route.config.discount,
-        canonicalModel: route.canonicalModel,
-      };
-
-      return unifiedResponse;
-    }
-  }
-  /**
-   * Select next healthy OAuth account using round-robin strategy
-   * @private
-   */
-  private selectOAuthAccount(provider: string, oauthProvider: string, accountPool: string[]): string | null {
-    if (!accountPool || accountPool.length === 0) {
-      throw new Error(`OAuth account pool is empty for provider '${provider}'`);
-    }
-
-    const cooldownManager = CooldownManager.getInstance();
-
-    // Filter out accounts on cooldown
-    const healthyAccounts = accountPool.filter(accountId =>
-      cooldownManager.isProviderHealthy(provider, accountId)
-    );
-
-    if (healthyAccounts.length === 0) {
-      // All accounts are on cooldown, provide helpful error with cooldown info
-      const cooldowns = cooldownManager.getCooldowns()
-        .filter(cd => cd.provider === provider && cd.accountId)
-        .map(cd => `${cd.accountId}: ${Math.ceil(cd.timeRemainingMs / 1000)}s`)
-        .join(', ');
-
-      throw new Error(
-        `All OAuth accounts for provider '${provider}' are on cooldown. ` +
-        `Retry after cooldowns expire: ${cooldowns}`
+      return this.handleStreamingResponse(
+        response,
+        request,
+        route,
+        targetApiType,
+        bypassTransformation
+      );
+    } else {
+      return await this.handleNonStreamingResponse(
+        response,
+        request,
+        route,
+        targetApiType,
+        transformer,
+        bypassTransformation
       );
     }
-
-    // Get current rotation index for this provider
-    const currentIndex = this.accountRotationIndex.get(provider) || 0;
-
-    // Find next healthy account using round-robin (wrap around if needed)
-    let attempts = 0;
-    let nextIndex = currentIndex;
-
-    while (attempts < accountPool.length) {
-      nextIndex = (nextIndex + 1) % accountPool.length;
-      const candidate = accountPool[nextIndex];
-
-      if (healthyAccounts.includes(candidate)) {
-        // Found healthy account, update index and return
-        this.accountRotationIndex.set(provider, nextIndex);
-        logger.info(`Selected OAuth account '${candidate}' for provider '${provider}' (round-robin index: ${nextIndex})`);
-        return candidate;
-      }
-
-      attempts++;
-    }
-
-    // Fallback to first healthy account (shouldn't reach here, but just in case)
-    logger.warn(`Round-robin selection failed for provider '${provider}', using first healthy account`);
-    this.accountRotationIndex.set(provider, accountPool.indexOf(healthyAccounts[0]));
-    return healthyAccounts[0];
   }
-
   setupHeaders(route: RouteResult, apiType: string, request: UnifiedChatRequest): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -394,63 +100,8 @@ export class Dispatcher {
       headers["Accept"] = "application/json";
     }
 
-    // Check if this provider uses OAuth
-    if (route.config.oauth_provider && this.usageStorage) {
-      // Use the already-selected account from request metadata
-      const selectedAccountId = request.metadata?.selected_oauth_account;
-
-      if (!selectedAccountId) {
-        throw new Error(`OAuth account was not selected for provider '${route.provider}'. This is a bug in the dispatcher.`);
-      }
-
-      // Get credential for selected account
-      const credential = this.usageStorage.getOAuthCredential(
-        route.config.oauth_provider,
-        selectedAccountId
-      );
-
-      if (credential) {
-        // Check if token is expired or expiring soon (within 5 minutes)
-        const isExpired = Date.now() >= credential.expires_at;
-        const isExpiringSoon = Date.now() >= (credential.expires_at - 5 * 60 * 1000);
-
-        if (isExpired) {
-          throw new Error(`OAuth token for account '${selectedAccountId}' has expired. Please re-authenticate.`);
-        }
-
-        if (isExpiringSoon) {
-          logger.warn(`OAuth token for account '${selectedAccountId}' is expiring soon. Refresh process should handle this.`);
-        }
-
-        // Use the OAuth access token
-        headers["Authorization"] = `Bearer ${credential.access_token}`;
-        logger.debug(`Using OAuth token for account: ${selectedAccountId}`);
-
-        // Add Claude Code specific headers
-        if (route.config.oauth_provider === 'claude-code') {
-          headers["Anthropic-Beta"] = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
-          headers["Anthropic-Version"] = "2023-06-01";
-          headers["Anthropic-Dangerous-Direct-Browser-Access"] = "true";
-          headers["User-Agent"] = "claude-cli/1.0.83 (external, cli)";
-          headers["X-App"] = "cli";
-          headers["X-Stainless-Helper-Method"] = "stream";
-          headers["X-Stainless-Retry-Count"] = "0";
-          headers["X-Stainless-Runtime-Version"] = "v24.3.0";
-          headers["X-Stainless-Package-Version"] = "0.55.1";
-          headers["X-Stainless-Runtime"] = "node";
-          headers["X-Stainless-Lang"] = "js";
-          headers["X-Stainless-Arch"] = "arm64";
-          headers["X-Stainless-Os"] = "MacOS";
-          headers["X-Stainless-Timeout"] = "60";
-          headers["Connection"] = "keep-alive";
-          headers["Accept-Encoding"] = "gzip, deflate, br, zstd";
-          logger.debug('Added Claude Code OAuth headers');
-        }
-      } else {
-        throw new Error(`OAuth credentials not found for account '${selectedAccountId}'. Please authenticate.`);
-      }
-    } else if (route.config.api_key) {
-      // Use static API key
+    // Use static API key
+    if (route.config.api_key) {
       const type = apiType.toLowerCase();
       if (type === "messages") {
         headers["x-api-key"] = route.config.api_key;
@@ -462,7 +113,7 @@ export class Dispatcher {
         headers["Authorization"] = `Bearer ${route.config.api_key}`;
       }
     } else {
-      throw new Error(`No authentication configured for provider '${route.provider}'. Either api_key or oauth_provider must be set.`);
+      throw new Error(`No API key configured for provider '${route.provider}'`);
     }
 
     if (route.config.headers) {
@@ -471,77 +122,347 @@ export class Dispatcher {
     return headers;
   }
 
-  /**
-   * Filters metadata to only include fields that should be sent to the API
-   * Removes internal Plexus fields like selected_oauth_account
-   * @private
-   */
-  private getApiMetadata(metadata: Record<string, any>, oauthProvider?: string): Record<string, any> {
-    const apiMetadata: Record<string, any> = {};
-
-    // List of internal fields that should NOT be sent to the API
-    const internalFields = ['selected_oauth_account', 'oauth_project_id'];
-
-    for (const [key, value] of Object.entries(metadata)) {
-      if (!internalFields.includes(key)) {
-        apiMetadata[key] = value;
-      }
-    }
-
-    return apiMetadata;
+  private getApiMetadata(metadata: Record<string, any>): Record<string, any> {
+    return metadata || {};
   }
 
   /**
-   * Populates OAuth metadata into the request if OAuth provider is configured
-   * @private
+   * Normalizes route config type to array format
    */
-  private populateOAuthMetadata(
+  private extractProviderTypes(route: RouteResult): string[] {
+    return Array.isArray(route.config.type)
+      ? route.config.type
+      : [route.config.type];
+  }
+
+  /**
+   * Determines which API type to use based on configuration and incoming request type
+   * @returns Selected API type and human-readable reason for selection
+   */
+  private selectTargetApiType(
+    route: RouteResult,
+    incomingApiType?: string
+  ): { targetApiType: string; selectionReason: string } {
+    const providerTypes = this.extractProviderTypes(route);
+
+    // Check if model specific access_via is defined
+    const modelSpecificTypes = route.modelConfig?.access_via;
+
+    // The available types for this specific routing
+    // If model specific types are defined and not empty, use them. Otherwise fallback to provider types.
+    const availableTypes =
+      modelSpecificTypes && modelSpecificTypes.length > 0
+        ? modelSpecificTypes
+        : providerTypes;
+
+    let targetApiType = availableTypes[0]; // Default to first one
+
+    if (!targetApiType) {
+      throw new Error(
+        `No available API type found for provider '${route.provider}' and model '${route.model}'. Check configuration.`
+      );
+    }
+    let selectionReason = "default (first available)";
+
+    // Try to match incoming
+    if (incomingApiType) {
+      const incoming = incomingApiType.toLowerCase();
+      // Case-insensitive match
+      const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
+      if (match) {
+        targetApiType = match;
+        selectionReason = `matched incoming request type '${incoming}'`;
+      } else {
+        selectionReason = `incoming type '${incoming}' not supported, defaulted to '${targetApiType}'`;
+      }
+    }
+
+    return { targetApiType, selectionReason };
+  }
+
+  /**
+   * Determines which transformer to use, respecting force_transformer override
+   */
+  private resolveTransformerType(route: RouteResult, targetApiType: string): string {
+    const transformerType = route.config.force_transformer || targetApiType;
+    if (route.config.force_transformer) {
+      logger.info(
+        `Dispatcher: Using forced transformer '${transformerType}' instead of '${targetApiType}' for provider '${route.provider}'`
+      );
+    }
+    return transformerType;
+  }
+
+  /**
+   * Resolves the provider base URL from configuration, handling both string and record formats
+   * @returns Normalized base URL without trailing slash
+   */
+  private resolveBaseUrl(route: RouteResult, targetApiType: string): string {
+    let rawBaseUrl: string;
+
+    if (typeof route.config.api_base_url === "string") {
+      rawBaseUrl = route.config.api_base_url;
+    } else {
+      // It's a record/map
+      const typeKey = targetApiType.toLowerCase();
+      // Check exact match first, then fallback to just looking for keys that might match?
+      // Actually the config keys should probably match the api types (chat, messages, etc)
+      const specificUrl = route.config.api_base_url[typeKey];
+      const defaultUrl = route.config.api_base_url["default"];
+
+      if (specificUrl) {
+        rawBaseUrl = specificUrl;
+        logger.debug(`Dispatcher: Using specific base URL for '${targetApiType}'.`);
+      } else if (defaultUrl) {
+        rawBaseUrl = defaultUrl;
+        logger.debug(`Dispatcher: Using default base URL.`);
+      } else {
+        // If we can't find a specific URL for this type, and no default, fall back to the first one?
+        // Or throw error.
+        const firstKey = Object.keys(route.config.api_base_url)[0];
+
+        if (firstKey) {
+          const firstUrl = route.config.api_base_url[firstKey];
+          if (firstUrl) {
+            rawBaseUrl = firstUrl;
+            logger.warn(
+              `No specific base URL found for api type '${targetApiType}'. using '${firstKey}' as fallback.`
+            );
+          } else {
+            throw new Error(
+              `No base URL configured for api type '${targetApiType}' and no default found.`
+            );
+          }
+        } else {
+          throw new Error(
+            `No base URL configured for api type '${targetApiType}' and no default found.`
+          );
+        }
+      }
+    }
+
+    // Ensure api_base_url doesn't end with slash
+    return rawBaseUrl.replace(/\/$/, "");
+  }
+
+  /**
+   * Determines if pass-through optimization should be used
+   */
+  private shouldUsePassThrough(
+    request: UnifiedChatRequest,
+    targetApiType: string,
+    route: RouteResult
+  ): boolean {
+    const isCompatible =
+      !!request.incomingApiType?.toLowerCase() &&
+      request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase();
+
+    return isCompatible && !!request.originalBody && !route.config.force_transformer;
+  }
+
+  /**
+   * Transforms the request payload or uses pass-through optimization
+   * @returns Transformed payload and bypass flag
+   */
+  private async transformRequestPayload(
     request: UnifiedChatRequest,
     route: RouteResult,
-    selectedAccountId?: string
-  ): UnifiedChatRequest {
-    // If OAuth is used, add OAuth metadata to request for transformer access
-    if (route.config.oauth_provider && this.usageStorage && selectedAccountId) {
-      const credential = this.usageStorage.getOAuthCredential(
-        route.config.oauth_provider,
-        selectedAccountId
+    transformer: any,
+    targetApiType: string
+  ): Promise<{ payload: any; bypassTransformation: boolean }> {
+    let providerPayload: any;
+    let bypassTransformation = false;
+
+    if (this.shouldUsePassThrough(request, targetApiType, route)) {
+      logger.info(
+        `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
       );
+      providerPayload = JSON.parse(JSON.stringify(request.originalBody));
+      providerPayload.model = route.model;
 
-      // Always set selected_oauth_account for setupHeaders to use
-      const updatedMetadata: any = {
-        ...request.metadata,
-        selected_oauth_account: selectedAccountId
-      };
-
-      // Add project_id if available (for Antigravity)
-      if (credential && credential.project_id) {
-        updatedMetadata.oauth_project_id = credential.project_id;
-      }
-
-      // Generate user_id for Claude Code OAuth (required for credential validation)
-      if (route.config.oauth_provider === 'claude-code' && credential) {
-        // Parse metadata to get account UUID
-        let accountUuid = '';
-        try {
-          const metadata = JSON.parse(credential.metadata || '{}');
-          accountUuid = metadata.account_uuid || '';
-        } catch (e) {
-          logger.warn(`Failed to parse metadata for ${selectedAccountId}`, e);
-        }
-
-        if (accountUuid) {
-          const { generateClaudeCodeUserId } = require('../utils/oauth-helpers.js');
-          updatedMetadata.user_id = generateClaudeCodeUserId(accountUuid);
-        } else {
-          logger.warn(`Missing account_uuid for Claude Code OAuth account ${selectedAccountId}`);
+      // Add metadata from request
+      if (request.metadata) {
+        const apiMetadata = this.getApiMetadata(request.metadata);
+        if (Object.keys(apiMetadata).length > 0) {
+          providerPayload.metadata = apiMetadata;
         }
       }
 
-      return {
-        ...request,
-        metadata: updatedMetadata
-      };
+      bypassTransformation = true;
+    } else {
+      if (route.config.force_transformer) {
+        logger.info(
+          `Pass-through optimization bypassed due to force_transformer: ${route.config.force_transformer}`
+        );
+      }
+      providerPayload = await transformer.transformRequest(request);
     }
-    return request;
+
+    if (route.config.extraBody) {
+      providerPayload = { ...providerPayload, ...route.config.extraBody };
+    }
+
+    return { payload: providerPayload, bypassTransformation };
+  }
+
+  /**
+   * Constructs the full provider request URL
+   */
+  private buildRequestUrl(
+    route: RouteResult,
+    transformer: any,
+    request: UnifiedChatRequest,
+    targetApiType: string
+  ): string {
+    const baseUrl = this.resolveBaseUrl(route, targetApiType);
+    const endpoint = transformer.getEndpoint
+      ? transformer.getEndpoint(request)
+      : transformer.defaultEndpoint;
+    return `${baseUrl}${endpoint}`;
+  }
+
+  /**
+   * Executes the HTTP POST request to the provider
+   */
+  private async executeProviderRequest(
+    url: string,
+    headers: Record<string, string>,
+    payload: any
+  ): Promise<Response> {
+    return await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Handles failed provider responses with cooldown logic
+   */
+  private async handleProviderError(
+    response: Response,
+    route: RouteResult,
+    errorText: string
+  ): Promise<never> {
+    logger.error(`Provider error: ${response.status} ${errorText}`);
+
+    const cooldownManager = CooldownManager.getInstance();
+
+    if (response.status >= 500 || [401, 403, 408, 429].includes(response.status)) {
+      let cooldownDuration: number | undefined;
+
+      // For 429 errors, try to parse provider-specific cooldown duration
+      if (response.status === 429) {
+        // Get provider type for parser lookup
+        const providerTypes = this.extractProviderTypes(route);
+        const providerType = providerTypes[0];
+
+        // Try to parse cooldown duration from error message
+        if (providerType) {
+          const parsedDuration = CooldownParserRegistry.parseCooldown(
+            providerType,
+            errorText
+          );
+
+          if (parsedDuration) {
+            cooldownDuration = parsedDuration;
+            logger.info(
+              `Parsed cooldown duration: ${cooldownDuration}ms (${cooldownDuration / 1000}s)`
+            );
+          } else {
+            logger.debug(`No cooldown duration parsed from error, using default`);
+          }
+        }
+      }
+
+      // Mark provider as failed with optional duration
+      // For non-429 errors, cooldownDuration will be undefined and default (10 minutes) will be used
+      cooldownManager.markProviderFailure(route.provider, undefined, cooldownDuration);
+    }
+
+    throw new Error(`Provider failed: ${response.status} ${errorText}`);
+  }
+
+  /**
+   * Enriches response with Plexus metadata
+   */
+  private enrichResponseWithMetadata(
+    response: UnifiedChatResponse,
+    route: RouteResult,
+    targetApiType: string
+  ): void {
+    response.plexus = {
+      provider: route.provider,
+      model: route.model,
+      apiType: targetApiType,
+      pricing: route.modelConfig?.pricing,
+      providerDiscount: route.config.discount,
+      canonicalModel: route.canonicalModel,
+    };
+  }
+
+  /**
+   * Handles streaming responses
+   */
+  private handleStreamingResponse(
+    response: Response,
+    request: UnifiedChatRequest,
+    route: RouteResult,
+    targetApiType: string,
+    bypassTransformation: boolean
+  ): UnifiedChatResponse {
+    logger.info("Streaming response detected");
+
+    const rawStream = response.body!;
+
+    const streamResponse: UnifiedChatResponse = {
+      id: "stream-" + Date.now(),
+      model: request.model,
+      content: null,
+      stream: rawStream,
+      bypassTransformation: bypassTransformation,
+    };
+
+    this.enrichResponseWithMetadata(streamResponse, route, targetApiType);
+
+    return streamResponse;
+  }
+
+  /**
+   * Handles non-streaming responses
+   */
+  private async handleNonStreamingResponse(
+    response: Response,
+    request: UnifiedChatRequest,
+    route: RouteResult,
+    targetApiType: string,
+    transformer: any,
+    bypassTransformation: boolean
+  ): Promise<UnifiedChatResponse> {
+    const responseBody = JSON.parse(await response.text());
+    logger.silly("Upstream Response Payload", responseBody);
+
+    if (request.requestId) {
+      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+    }
+
+    let unifiedResponse: UnifiedChatResponse;
+
+    if (bypassTransformation) {
+      // We still need unified response for usage stats, so we transform purely for that
+      // But we set the bypass flag and attach raw response
+      const syntheticResponse = await transformer.transformResponse(responseBody);
+      unifiedResponse = {
+        ...syntheticResponse,
+        bypassTransformation: true,
+        rawResponse: responseBody,
+      };
+    } else {
+      unifiedResponse = await transformer.transformResponse(responseBody);
+    }
+
+    this.enrichResponseWithMetadata(unifiedResponse, route, targetApiType);
+
+    return unifiedResponse;
   }
 }

@@ -11,7 +11,6 @@ import { Config } from './pages/Config';
 import { SystemLogs } from './pages/SystemLogs';
 import { Debug } from './pages/Debug';
 import { Errors } from './pages/Errors';
-import OAuth from './pages/OAuth';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SidebarProvider } from './contexts/SidebarContext';
@@ -66,7 +65,6 @@ const AppRoutes = () => {
                             <Route path="/system-logs" element={<SystemLogs />} />
                             <Route path="/debug" element={<Debug />} />
                             <Route path="/errors" element={<Errors />} />
-                            <Route path="/oauth" element={<OAuth />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </MainLayout>

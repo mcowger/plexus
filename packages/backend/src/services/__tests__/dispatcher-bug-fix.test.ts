@@ -29,7 +29,7 @@ const fetchMock = mock(async (url: string, options: any) => {
         headers: { "Content-Type": "application/json" }
     });
 });
-global.fetch = fetchMock;
+global.fetch = fetchMock as any;
 
 describe("Dispatcher Bug Fixes", () => {
     
@@ -77,9 +77,9 @@ describe("Dispatcher Bug Fixes", () => {
 
         expect(response).toBeDefined();
         expect(response.model).toBe("claude-haiku-4.5-20251001");
-        
+
         // Check that the provider type 'chat' was used (since 'access_via' was empty)
-        expect(response.plexus.apiType).toBe("chat");
+        expect(response.plexus?.apiType).toBe("chat");
         
         // Verify fetch was called
         expect(fetchMock).toHaveBeenCalled();

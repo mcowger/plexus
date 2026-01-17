@@ -1,16 +1,5 @@
 import humanFormat from 'human-format';
 
-// Time scale for human-readable time formatting
-const timeScale = new humanFormat.Scale({
-    s: 1,
-    m: 60,
-    h: 3600,
-    d: 86400,
-    w: 604800,
-    mo: 2592000,
-    y: 31536000
-});
-
 /**
  * Format a duration in seconds to human-readable format (e.g., "2h 30m", "45m", "30s", "3mo 2w", "1y 2mo")
  */

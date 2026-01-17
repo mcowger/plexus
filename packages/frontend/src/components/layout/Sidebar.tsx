@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug, Database, LogOut, AlertTriangle, Key, Shield, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -123,7 +123,6 @@ export const Sidebar: React.FC = () => {
             <NavItem to="/providers" icon={Server} label="Providers" isCollapsed={isCollapsed} />
             <NavItem to="/models" icon={Box} label="Models" isCollapsed={isCollapsed} />
             <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
-            <NavItem to="/oauth" icon={Shield} label="OAuth" isCollapsed={isCollapsed} />
             <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
             <NavItem to="/system-logs" icon={FileText} label="System Logs" isCollapsed={isCollapsed} />
         </div>

@@ -47,8 +47,8 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
 
         const cooldowns = cooldownManager.getCooldowns();
         expect(cooldowns.length).toBe(1);
-        expect(cooldowns[0].provider).toBe(provider);
-        expect(cooldowns[0].accountId).toBe(accountId);
+        expect(cooldowns[0]?.provider).toBe(provider);
+        expect(cooldowns[0]?.accountId).toBe(accountId);
     });
 
     test("Provider-level cooldown (no accountId) is tracked independently", () => {
@@ -108,7 +108,7 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
         expect(cooldowns.length).toBe(1);
 
         // Check that timeRemainingMs is close to customDuration (within 100ms margin)
-        const timeRemaining = cooldowns[0].timeRemainingMs;
+        const timeRemaining = cooldowns[0]?.timeRemainingMs;
         expect(timeRemaining).toBeGreaterThan(customDuration - 100);
         expect(timeRemaining).toBeLessThanOrEqual(customDuration);
     });
@@ -124,7 +124,7 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
         expect(cooldowns.length).toBe(1);
 
         // Check that timeRemainingMs is close to default duration
-        const timeRemaining = cooldowns[0].timeRemainingMs;
+        const timeRemaining = cooldowns[0]?.timeRemainingMs;
         expect(timeRemaining).toBeGreaterThan(defaultDuration - 1000);
         expect(timeRemaining).toBeLessThanOrEqual(defaultDuration);
     });

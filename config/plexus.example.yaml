@@ -13,18 +13,10 @@
 #                 Common values: chat, messages, gemini.
 #   display_name: A friendly name for logging and metadata.
 #   api_base_url: The root endpoint for the provider's API.
-#   api_key:      Your authentication token for the provider.
-#                 OR use OAuth authentication (see below).
+#   api_key:      Your authentication token for the provider (required).
 #   models:       A list of raw model identifiers supported by this provider.
 #                 OR a map of model names to configuration (e.g. pricing).
 #   headers:      (Optional) Custom HTTP headers to include in every request.
-#
-#   OAuth Authentication (Alternative to api_key):
-#   oauth_provider:      The OAuth system to use (e.g., 'antigravity').
-#   oauth_account_pool:  Array of authenticated account emails (min 1 required).
-#                        Enables automatic load balancing with per-account
-#                        rate limit handling. Authenticate accounts via the
-#                        OAuth page in the Plexus dashboard (/ui/oauth).
 #
 # 2. MODELS SECTION (ALIASES)
 # ---------------------------
@@ -177,138 +169,6 @@ providers:
           discount: 0.1
     headers:
       "HTTP-Referer": "https://your-app.com"
-      "X-Title": "My Plexus App"
-
-  # OAuth Provider with Multiple Accounts (Google Antigravity Example)
-  # ===================================================================
-  # OAuth providers support multiple authenticated accounts per provider.
-  # This enables automatic load balancing with per-account rate limit handling.
-  #
-  # Key Features:
-  # - Round-robin load balancing across healthy accounts
-  # - Per-account cooldown tracking (not per-provider)
-  # - Automatic failover to healthy accounts when one hits rate limits
-  # - Dynamic cooldown duration parsing from API error responses
-  #
-  # Setup Instructions:
-  # 1. Visit the OAuth page in the Plexus dashboard (/ui/oauth)
-  # 2. Click "Connect to Google Antigravity" for each account you want to add
-  # 3. Complete the OAuth flow for each Google account
-  # 4. Add the authenticated email addresses to oauth_account_pool below
-  my-antigravity:
-    type: antigravity
-    display_name: Google Antigravity (Multi-Account)
-    api_base_url: https://cloudcode-pa.googleapis.com
-    # oauth_provider: Specifies which OAuth system to use
-    oauth_provider: antigravity
-    # oauth_account_pool: List of authenticated account emails
-    # - REQUIRED: Must contain at least 1 account
-    # - Add multiple accounts for automatic load balancing
-    # - Requests distribute round-robin across healthy accounts
-    # - Accounts on cooldown are automatically skipped
-    oauth_account_pool:
-      - user1@company.com
-      - user2@company.com
-      - user3@company.com
-    models:
-      gemini-2.0-flash-thinking-exp:
-        pricing:
-          source: simple
-          input: 0    # Free tier pricing
-          output: 0   # Free tier pricing
-        access_via: [antigravity]
-      gemini-2.0-flash-exp:
-        pricing:
-          source: simple
-          input: 0
-          output: 0
-        access_via: [antigravity]
-
-  # OAuth Provider with Single Account (Minimum Configuration)
-  my-antigravity-single:
-    type: antigravity
-    display_name: Google Antigravity (Single Account)
-    api_base_url: https://cloudcode-pa.googleapis.com
-    oauth_provider: antigravity
-    # Even with single account, oauth_account_pool is required
-    oauth_account_pool:
-      - primary-user@company.com
-    models:
-      - gemini-2.0-flash-thinking-exp
-
-  # Claude Code OAuth Provider Example
-  # ===================================================================
-  # Claude Code OAuth enables authentication to Anthropic's API using OAuth 2.0
-  # via the Claude Code CLI credentials system.
-  #
-  # Key Features:
-  # - OAuth 2.0 with PKCE authentication flow
-  # - Multi-account support with automatic load balancing
-  # - Automatic token refresh (4 hours before expiry)
-  # - Per-account cooldown tracking for rate limit handling
-  # - Organization-level authentication via claude.ai
-  #
-  # Setup Instructions:
-  # 1. Visit the OAuth page in the Plexus dashboard (/ui/oauth)
-  # 2. Click "Connect to Claude Code"
-  # 3. Sign in with your Anthropic account (claude.ai)
-  # 4. Grant the required permissions
-  # 5. Add your authenticated email(s) to oauth_account_pool below
-  #
-  # Requirements:
-  # - type MUST be 'messages' (Claude Code OAuth only works with Messages API)
-  # - api_base_url should be https://api.anthropic.com/v1
-  # - oauth_provider MUST be 'claude-code'
-  # - oauth_account_pool is REQUIRED (minimum 1 account)
-  my-claude-code:
-    type: messages
-    display_name: Claude Code (Multi-Account)
-    api_base_url: https://api.anthropic.com/v1
-    # oauth_provider: Specifies Claude Code OAuth authentication
-    oauth_provider: claude-code
-    # oauth_account_pool: List of authenticated Anthropic account emails
-    # - REQUIRED: Must contain at least 1 account
-    # - Add multiple accounts for automatic load balancing
-    # - Requests distribute round-robin across healthy accounts
-    # - Accounts on cooldown are automatically skipped
-    oauth_account_pool:
-      - user1@company.com
-      - user2@company.com
-      - user3@company.com
-    models:
-      claude-sonnet-4-5:
-        pricing:
-          source: simple
-          input: 3.00    # $3 per 1M input tokens
-          output: 15.00  # $15 per 1M output tokens
-        access_via: [messages]
-      claude-opus-4-5:
-        pricing:
-          source: simple
-          input: 15.00   # $15 per 1M input tokens
-          output: 75.00  # $75 per 1M output tokens
-        access_via: [messages]
-      claude-3-5-sonnet-latest:
-        pricing:
-          source: simple
-          input: 3.00
-          output: 15.00
-        access_via: [messages]
-
-  # Claude Code OAuth with Single Account (Minimum Configuration)
-  my-claude-code-single:
-    type: messages
-    display_name: Claude Code (Single Account)
-    api_base_url: https://api.anthropic.com/v1
-    oauth_provider: claude-code
-    oauth_account_pool:
-      - primary-user@company.com
-    models:
-      - claude-sonnet-4-5
-      - claude-opus-4-5
-
-models:
-  # Basic alias routing to a single target
   smart-model:
     targets:
       - provider: anthropic

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -31,7 +30,6 @@ export const Dashboard = () => {
     cachedTokens: 0,
     totalCost: 0
   });
-  const navigate = useNavigate();
 
   const loadData = async () => {
       const [statsData, usage, cooldownsData, metricsData] = await Promise.all([

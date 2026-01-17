@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api, Provider, Cooldown } from '../lib/api';
+import { api, Provider } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Edit2, Trash2, AlertTriangle, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
 
@@ -38,7 +38,6 @@ const EMPTY_PROVIDER: Provider = {
 
 export const Providers = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
@@ -57,12 +56,8 @@ export const Providers = () => {
 
   const loadData = async () => {
     try {
-        const [p, c] = await Promise.all([
-            api.getProviders(),
-            api.getCooldowns()
-        ]);
+        const p = await api.getProviders();
         setProviders(p);
-        setCooldowns(c);
     } catch (e) {
         console.error("Failed to load data", e);
     }

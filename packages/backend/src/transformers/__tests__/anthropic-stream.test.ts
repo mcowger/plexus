@@ -53,8 +53,9 @@ describe("AnthropicTransformer Stream Formatting", () => {
 
     expect(messageDeltaEvent).toBeDefined();
 
-    const jsonStr = messageDeltaEvent!.split("data: ")[1];
-    const data = JSON.parse(jsonStr);
+    const jsonStr = messageDeltaEvent?.split("data: ")[1];
+    expect(jsonStr).toBeDefined();
+    const data = JSON.parse(jsonStr!);
 
     expect(data.type).toBe("message_delta");
     expect(data.usage).toBeDefined();
@@ -79,6 +80,7 @@ describe("AnthropicTransformer Stream Formatting", () => {
           id: "msg_2",
           model: "claude",
           created: 1234567890,
+          delta: {},
           finish_reason: "stop",
           usage: {
             input_tokens: 7,
@@ -111,8 +113,9 @@ describe("AnthropicTransformer Stream Formatting", () => {
 
     expect(messageDeltaEvent).toBeDefined();
 
-    const jsonStr = messageDeltaEvent!.split("data: ")[1];
-    const data = JSON.parse(jsonStr);
+    const jsonStr = messageDeltaEvent?.split("data: ")[1];
+    expect(jsonStr).toBeDefined();
+    const data = JSON.parse(jsonStr!);
 
     expect(data.type).toBe("message_delta");
     expect(data.usage).toBeDefined();
@@ -162,8 +165,9 @@ describe("AnthropicTransformer Stream Formatting", () => {
 
     expect(messageDeltaEvent).toBeDefined();
 
-    const jsonStr = messageDeltaEvent!.split("data: ")[1];
-    const data = JSON.parse(jsonStr);
+    const jsonStr = messageDeltaEvent?.split("data: ")[1];
+    expect(jsonStr).toBeDefined();
+    const data = JSON.parse(jsonStr!);
 
     expect(data.usage).toBeDefined();
     expect(data.usage.thinkingTokens).toBe(0);

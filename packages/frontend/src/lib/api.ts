@@ -53,6 +53,7 @@ export interface PieChartDataPoint {
   name: string;
   requests: number;
   tokens: number;
+  [key: string]: string | number; // Index signature for recharts compatibility
 }
 
 export interface Provider {
@@ -106,6 +107,7 @@ export interface UsageRecord {
     date: string;
     sourceIp?: string;
     apiKey?: string;
+    attribution?: string;
     incomingApiType?: string;
     provider?: string;
     incomingModelAlias?: string;
@@ -146,6 +148,9 @@ interface PlexusConfig {
         display_name?: string;
         models?: string[] | Record<string, any>;
         enabled?: boolean; // Custom field we might want to preserve if we could
+        discount?: number;
+        headers?: Record<string, string>;
+        extraBody?: Record<string, any>;
     }>;
     models?: Record<string, any>;
     keys?: Record<string, KeyConfig>;
@@ -979,244 +984,6 @@ export const api = {
       } catch (e) {
           console.error("API Error setDebugMode", e);
           throw e;
-      }
-  },
-
-  // OAuth Management
-  getOAuthStatus: async (provider: string = 'antigravity'): Promise<{
-      configured: boolean;
-      provider?: string;
-      user?: string;
-      project_id?: string;
-      expires_at?: number;
-      expires_in_seconds?: number;
-      is_expired?: boolean;
-      auth_url?: string;
-      message?: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/status?provider=${provider}`);
-          if (!res.ok) throw new Error('Failed to fetch OAuth status');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error getOAuthStatus", e);
-          return { configured: false, message: 'Error fetching OAuth status' };
-      }
-  },
-
-  initiateOAuthFlow: async (provider: string = 'antigravity'): Promise<{
-      auth_url: string;
-      instructions: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/authorize?provider=${provider}`);
-          if (!res.ok) throw new Error('Failed to initiate OAuth flow');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error initiateOAuthFlow", e);
-          throw e;
-      }
-  },
-
-  finalizeOAuth: async (code: string, state: string): Promise<{
-      success: boolean;
-      email?: string;
-      project_id?: string;
-      error?: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/finalize`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code, state })
-          });
-          
-          if (!res.ok) {
-              const error = await res.json();
-              return { success: false, error: error.error || 'Failed to finalize OAuth flow' };
-          }
-          return await res.json();
-      } catch (e) {
-          console.error("API Error finalizeOAuth", e);
-          return { success: false, error: 'Failed to finalize OAuth flow' };
-      }
-  },
-
-  deleteOAuthCredentials: async (provider: string, userIdentifier: string): Promise<boolean> => {
-      try {
-          const res = await fetchWithAuth(
-              `${API_BASE}/v0/oauth/credentials?provider=${provider}&user_identifier=${encodeURIComponent(userIdentifier)}`,
-              { method: 'DELETE' }
-          );
-          return res.ok;
-      } catch (e) {
-          console.error("API Error deleteOAuthCredentials", e);
-          return false;
-      }
-  },
-
-  refreshOAuthToken: async (): Promise<{ success: boolean; message: string }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/refresh`, {
-              method: 'POST'
-          });
-          if (!res.ok) throw new Error('Failed to refresh OAuth token');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error refreshOAuthToken", e);
-          return { success: false, message: 'Failed to trigger token refresh' };
-      }
-  },
-
-  getOAuthRefreshStatus: async (): Promise<{
-      available: boolean;
-      running?: boolean;
-      checkInterval?: number;
-      refreshThreshold?: number;
-      message?: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/refresh/status`);
-          if (!res.ok) throw new Error('Failed to fetch refresh status');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error getOAuthRefreshStatus", e);
-          return { available: false, message: 'Error fetching refresh status' };
-      }
-  },
-
-  // Multi-Account OAuth Management
-  getOAuthCredentialsGrouped: async (provider?: string): Promise<{
-      providers: Array<{
-          provider: string;
-          accounts: Array<{
-              user_identifier: string;
-              expires_at: number;
-              expires_in_seconds: number;
-              is_expired: boolean;
-              project_id?: string;
-              on_cooldown: boolean;
-              cooldown_expiry?: number;
-              cooldown_remaining_seconds?: number;
-              status: 'active' | 'expiring' | 'expired' | 'cooldown';
-              last_refreshed_at: number;
-              token_age_seconds: number;
-              refresh_token_expires_at: number;
-              refresh_token_expires_in_seconds: number;
-          }>;
-      }>;
-  }> => {
-      try {
-          const url = provider
-              ? `${API_BASE}/v0/oauth/credentials/grouped?provider=${provider}`
-              : `${API_BASE}/v0/oauth/credentials/grouped`;
-          const res = await fetchWithAuth(url);
-          if (!res.ok) throw new Error('Failed to fetch OAuth credentials');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error getOAuthCredentialsGrouped", e);
-          return { providers: [] };
-      }
-  },
-
-  // Claude Code OAuth Management
-  initiateClaudeCodeAuth: async (): Promise<{
-      auth_url: string;
-      state: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/authorize`, {
-              method: 'POST'
-          });
-          if (!res.ok) throw new Error('Failed to initiate Claude Code OAuth flow');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error initiateClaudeCodeAuth", e);
-          throw e;
-      }
-  },
-
-  finalizeClaudeCodeAuth: async (code: string, state: string): Promise<{
-      success: boolean;
-      email?: string;
-      organization?: string;
-      error?: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/finalize`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code, state })
-          });
-          
-          if (!res.ok) {
-              const error = await res.json();
-              return { success: false, error: error.error || 'Failed to finalize OAuth flow' };
-          }
-          return await res.json();
-      } catch (e) {
-          console.error("API Error finalizeClaudeCodeAuth", e);
-          return { success: false, error: 'Failed to finalize OAuth flow' };
-      }
-  },
-
-  getClaudeCodeAccounts: async (): Promise<{
-      accounts: Array<{
-          email: string;
-          organization_name: string;
-          organization_uuid: string;
-          account_uuid: string;
-          expires_at: number;
-          expires_in_seconds: number;
-          is_expired: boolean;
-          on_cooldown: boolean;
-          cooldown_remaining_seconds?: number;
-          status: 'active' | 'expired' | 'cooldown';
-          last_refreshed_at: number;
-      }>;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/accounts`);
-          if (!res.ok) throw new Error('Failed to fetch Claude Code accounts');
-          return await res.json();
-      } catch (e) {
-          console.error("API Error getClaudeCodeAccounts", e);
-          return { accounts: [] };
-      }
-  },
-
-  refreshClaudeCodeToken: async (email: string): Promise<{
-      success: boolean;
-      expires_at?: number;
-      error?: string;
-  }> => {
-      try {
-          const res = await fetchWithAuth(`${API_BASE}/v0/oauth/claude/refresh`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email })
-          });
-          if (!res.ok) {
-              const error = await res.json();
-              return { success: false, error: error.error || 'Failed to refresh token' };
-          }
-          return await res.json();
-      } catch (e) {
-          console.error("API Error refreshClaudeCodeToken", e);
-          return { success: false, error: 'Failed to refresh token' };
-      }
-  },
-
-  deleteClaudeCodeAccount: async (email: string): Promise<boolean> => {
-      try {
-          const res = await fetchWithAuth(
-              `${API_BASE}/v0/oauth/claude/${encodeURIComponent(email)}`,
-              { method: 'DELETE' }
-          );
-          return res.ok;
-      } catch (e) {
-          console.error("API Error deleteClaudeCodeAccount", e);
-          return false;
       }
   }
 };

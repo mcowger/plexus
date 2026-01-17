@@ -25,21 +25,21 @@ export class AntigravityCooldownParser implements CooldownParser {
         try {
             // Pattern 1: "reset after Xs" or "reset after X seconds"
             const secondsMatch = errorText.match(/reset after (\d+)\s*(?:s|seconds?)/i);
-            if (secondsMatch) {
+            if (secondsMatch?.[1]) {
                 const seconds = parseInt(secondsMatch[1], 10);
                 return seconds * 1000;
             }
 
             // Pattern 2: "reset after X minutes" or "reset after X mins"
             const minutesMatch = errorText.match(/reset after (\d+)\s*(?:m|mins?|minutes?)/i);
-            if (minutesMatch) {
+            if (minutesMatch?.[1]) {
                 const minutes = parseInt(minutesMatch[1], 10);
                 return minutes * 60 * 1000;
             }
 
             // Pattern 3: "reset after X hours" or "reset after X hrs"
             const hoursMatch = errorText.match(/reset after (\d+)\s*(?:h|hrs?|hours?)/i);
-            if (hoursMatch) {
+            if (hoursMatch?.[1]) {
                 const hours = parseInt(hoursMatch[1], 10);
                 return hours * 60 * 60 * 1000;
             }

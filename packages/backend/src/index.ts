@@ -13,11 +13,6 @@ import { SelectorFactory } from './services/selectors/factory';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
-import { oauthRoutes } from './routes/oauth';
-import { claudeOAuthRoutes } from './routes/oauth/claude';
-import { OAuthService } from './services/oauth-service';
-import { ClaudeOAuthService } from './services/oauth-service-claude';
-import { TokenRefreshService } from './services/token-refresh-service';
 
 /**
  * Plexus Backend Server
@@ -45,20 +40,6 @@ fastify.register(cors, {
 
 const dispatcher = new Dispatcher();
 const usageStorage = new UsageStorageService();
-
-// Initialize OAuth services
-const oauthService = new OAuthService(
-    usageStorage,
-    process.env.EXTERNAL_PLEXUS_URL || `http://localhost:${process.env.PORT || '4000'}`
-);
-
-const claudeOAuthService = new ClaudeOAuthService(
-    usageStorage,
-    process.env.EXTERNAL_PLEXUS_URL || `http://localhost:${process.env.PORT || '4000'}`
-);
-
-// Initialize Token Refresh Service
-const tokenRefreshService = new TokenRefreshService(usageStorage, oauthService, claudeOAuthService);
 
 // Initialize singletons with storage dependencies
 dispatcher.setUsageStorage(usageStorage);
@@ -123,10 +104,6 @@ await registerInferenceRoutes(fastify, dispatcher, usageStorage);
 // --- Management API (v0) ---
 await registerManagementRoutes(fastify, usageStorage);
 
-// --- OAuth API (v0) ---
-await oauthRoutes(fastify, oauthService, usageStorage, tokenRefreshService);
-await claudeOAuthRoutes(fastify, claudeOAuthService);
-
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));
 
@@ -183,10 +160,6 @@ const start = async () => {
     try {
         await fastify.listen({ port, host });
         logger.info(`Server starting on port ${port}`);
-
-        // Start the token refresh service
-        tokenRefreshService.start();
-        logger.info('Token refresh service started');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
