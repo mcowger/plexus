@@ -15,7 +15,41 @@ export interface RouteResult {
 export class Router {
     static resolve(modelName: string, incomingApiType?: string): RouteResult {
         const config = getConfig();
-        
+
+        // 0. Check for direct provider/model syntax (e.g., "stima/gemini-2.5-flash")
+        if (modelName.includes('/')) {
+            const firstSlashIndex = modelName.indexOf('/');
+            const providerId = modelName.substring(0, firstSlashIndex);
+            const providerModel = modelName.substring(firstSlashIndex + 1);
+
+            // Validate that the provider exists
+            const providerConfig = config.providers[providerId];
+            if (!providerConfig) {
+                throw new Error(`Direct routing failed: Provider '${providerId}' not found in configuration`);
+            }
+
+            if (providerConfig.enabled === false) {
+                throw new Error(`Direct routing failed: Provider '${providerId}' is disabled`);
+            }
+
+            // Extract model config if available
+            let modelConfig = undefined;
+            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+                modelConfig = providerConfig.models[providerModel];
+            }
+
+            logger.info(`Router: Direct routing to '${providerId}/${providerModel}' (bypassing selector)`);
+
+            return {
+                provider: providerId,
+                model: providerModel,
+                config: providerConfig,
+                modelConfig,
+                incomingModelAlias: modelName,
+                canonicalModel: modelName
+            };
+        }
+
         // 1. Check aliases
         let alias = config.models?.[modelName];
         let canonicalModel = modelName;
