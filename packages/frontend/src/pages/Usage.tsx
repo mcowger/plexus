@@ -108,9 +108,9 @@ export const Usage = () => {
       </div>
 
       {/* All Charts in 4-Column Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))' }}>
         {/* Time Series - Requests */}
-        <Card className="min-w-0" title="Requests over Time">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Requests over Time">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -133,7 +133,7 @@ export const Usage = () => {
         </Card>
 
         {/* Time Series - Tokens */}
-        <Card className="min-w-0" title="Token Usage">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Token Usage">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -160,7 +160,7 @@ export const Usage = () => {
         </Card>
 
         {/* Model Distribution - Requests */}
-        <Card className="min-w-0" title="Usage by Model Alias (Requests)">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by Model Alias (Requests)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('requests', modelData)}
@@ -168,7 +168,7 @@ export const Usage = () => {
         </Card>
 
         {/* Model Distribution - Tokens */}
-        <Card className="min-w-0" title="Usage by Model Alias (Tokens)">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by Model Alias (Tokens)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('tokens', modelData)}
@@ -176,7 +176,7 @@ export const Usage = () => {
         </Card>
 
         {/* Provider Distribution - Requests */}
-        <Card className="min-w-0" title="Usage by Provider (Requests)">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by Provider (Requests)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('requests', providerData)}
@@ -184,7 +184,7 @@ export const Usage = () => {
         </Card>
 
         {/* Provider Distribution - Tokens */}
-        <Card className="min-w-0" title="Usage by Provider (Tokens)">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by Provider (Tokens)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('tokens', providerData)}
@@ -192,7 +192,7 @@ export const Usage = () => {
         </Card>
 
         {/* API Key Distribution - Requests */}
-        <Card className="min-w-0" title="Usage by API Key (Requests)">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by API Key (Requests)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('requests', keyData)}
@@ -200,7 +200,7 @@ export const Usage = () => {
         </Card>
 
         {/* API Key Distribution - Tokens */}
-        <Card className="min-w-0" title="Usage by API Key (Tokens)">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by API Key (Tokens)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('tokens', keyData)}
