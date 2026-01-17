@@ -3,6 +3,8 @@ import { logger } from "../../utils/logger";
 import { BaseInspector } from "./base";
 import { DebugManager } from "../debug-manager";
 
+const MAX_DEBUG_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
+
 export class DebugLoggingInspector extends BaseInspector {
   private debugManager = DebugManager.getInstance();
   private mode: 'raw' | 'transformed';
@@ -19,26 +21,46 @@ export class DebugLoggingInspector extends BaseInspector {
       return inspector;
     }
 
-    let rawBody = "";
+    const bodyChunks: string[] = [];
+    let totalSize = 0;
+    let truncated = false;
 
     inspector.on("data", (chunk: any) => {
       logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} received chunk, length: ${chunk.length || chunk.toString().length}: ${chunk.toString()}`);
+
+      if (truncated) return;
+
+      let chunkStr: string;
       if (typeof chunk === 'string') {
-        rawBody += chunk;
+        chunkStr = chunk;
       } else if (Buffer.isBuffer(chunk)) {
-        rawBody += chunk.toString('utf8');
+        chunkStr = chunk.toString('utf8');
       } else if (chunk instanceof Uint8Array) {
-        rawBody += new TextDecoder().decode(chunk);
+        chunkStr = new TextDecoder().decode(chunk);
       } else {
         try {
-            rawBody += String(chunk);
+          chunkStr = String(chunk);
         } catch (e) {
-            logger.warn(`[Inspector:${this.mode}] Failed to convert chunk to string`);
+          logger.warn(`[Inspector:${this.mode}] Failed to convert chunk to string`);
+          return;
         }
       }
+
+      const newSize = totalSize + chunkStr.length;
+
+      if (newSize > MAX_DEBUG_BUFFER_SIZE) {
+        truncated = true;
+        bodyChunks.push('\n\n[DEBUG OUTPUT TRUNCATED - Exceeded 10MB limit]');
+        logger.warn(`[Inspector:Debug] Request ${this.requestId} debug output truncated at ${totalSize} bytes`);
+        return;
+      }
+
+      totalSize = newSize;
+      bodyChunks.push(chunkStr);
     });
 
     inspector.on("end", () => {
+      const rawBody = bodyChunks.join('');
       logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} raw body collected, length: ${rawBody.length}:\n${rawBody}`);
       try {
         let reconstructed: any = null;

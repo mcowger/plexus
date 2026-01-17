@@ -7,7 +7,6 @@ import { UsageRecord } from "../../types/usage";
 import { calculateCosts } from "../../utils/calculate-costs";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { DebugManager } from "../debug-manager";
-import { countTokens } from "../../transformers/utils";
 
 export class UsageInspector extends BaseInspector {
     private usageStorage: UsageStorageService;
@@ -48,51 +47,21 @@ export class UsageInspector extends BaseInspector {
             foundUsage: false
         };
 
-        // Content accumulators for Anthropic token imputation
-        let accumulatedText = "";
-        let seenThinking = false;
-
         const parser = createParser({
             onEvent: (event: EventSourceMessage) => {
                 if (event.data === "[DONE]") return;
 
-                const isAnthropic = transformer.name === "messages";
-                let jsonParsed: any = null;
-
-                // Optimization: Skip non-usage chunks unless we need them for content tracking (Anthropic)
-                if (!isAnthropic && !event.data.toLowerCase().includes("usage")) {
+                // Optimization: Skip non-usage chunks for all providers
+                if (!event.data.toLowerCase().includes("usage")) {
                     return;
                 }
 
                 try {
-                    // We might need the full JSON for content extraction
-                    // Or we just rely on extractUsage.
-                    // But for content extraction, we need parsing.
-                    if (isAnthropic || event.data.toLowerCase().includes("usage")) {
-                         jsonParsed = JSON.parse(event.data);
-                    }
+                    // Parse only to enable usage extraction
+                    JSON.parse(event.data);
                 } catch (e) {
                     return;
                 }
-
-                // --- Content Tracking for Anthropic Imputation ---
-                if (isAnthropic && jsonParsed) {
-                     // 1. Check for thinking content
-                     if (jsonParsed.type === 'content_block_start') {
-                         if (jsonParsed.content_block?.type === 'thinking') {
-                             seenThinking = true;
-                         }
-                     }
-                     if (jsonParsed.type === 'content_block_delta') {
-                         if (jsonParsed.delta?.type === 'thinking_delta') {
-                             seenThinking = true;
-                         }
-                         if (jsonParsed.delta?.type === 'text_delta') {
-                             accumulatedText += (jsonParsed.delta.text || "");
-                         }
-                     }
-                }
-                // -------------------------------------------------
 
                 // Use the transformer to extract usage if present
                 const usage = transformer.extractUsage(event.data);
@@ -122,21 +91,6 @@ export class UsageInspector extends BaseInspector {
 
         inspector.on('end', () => {
             try {
-                // Apply Anthropic Imputation Logic if needed (fallback when provider doesn't report reasoning tokens)
-                if (transformer.name === "messages" && seenThinking && stats.reasoningTokens === 0) {
-                    const realOutputTokens = countTokens(accumulatedText);
-                    const totalOutputTokens = stats.outputTokens;
-                    
-                    // If the reported total is significantly larger than the text count,
-                    // we assume the difference is reasoning.
-                    const imputedThinkingTokens = Math.max(0, totalOutputTokens - realOutputTokens);
-                    
-                    if (imputedThinkingTokens > 0) {
-                        stats.outputTokens = realOutputTokens;
-                        stats.reasoningTokens = imputedThinkingTokens;
-                    }
-                }
-
                 if (stats.foundUsage) {
                     this.usageRecord.tokensInput = stats.inputTokens;
                     this.usageRecord.tokensOutput = stats.outputTokens;
