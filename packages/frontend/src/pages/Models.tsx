@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
-import { Search, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, GripVertical } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
     id: '',
@@ -136,6 +136,29 @@ export const Models = () => {
       const newAliases = [...(editingAlias.aliases || [])];
       newAliases.splice(index, 1);
       setEditingAlias({ ...editingAlias, aliases: newAliases });
+  };
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
+      e.preventDefault();
+      const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+
+      if (dragIndex === dropIndex) return;
+
+      const newTargets = [...editingAlias.targets];
+      const [draggedItem] = newTargets.splice(dragIndex, 1);
+      newTargets.splice(dropIndex, 0, draggedItem);
+
+      setEditingAlias({ ...editingAlias, targets: newTargets });
   };
 
   const filteredAliases = aliases.filter(a => a.id.toLowerCase().includes(search.toLowerCase()));
@@ -345,15 +368,39 @@ export const Models = () => {
 
                   <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                       {editingAlias.targets.map((target, idx) => (
-                          <div key={idx} style={{
+                          <div
+                              key={idx}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, idx)}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, idx)}
+                              style={{
                               display: 'flex',
                               gap: '6px',
                               alignItems: 'center',
                               padding: '4px 8px',
                               backgroundColor: 'var(--color-bg-subtle)',
                               borderRadius: 'var(--radius-sm)',
-                              border: '1px solid var(--color-border-glass)'
-                          }}>
+                              border: '1px solid var(--color-border-glass)',
+                              cursor: 'grab'
+                          }}
+                          onDragStartCapture={(e) => {
+                              (e.currentTarget as HTMLDivElement).style.opacity = '0.5';
+                              (e.currentTarget as HTMLDivElement).style.cursor = 'grabbing';
+                          }}
+                          onDragEndCapture={(e) => {
+                              (e.currentTarget as HTMLDivElement).style.opacity = '1';
+                              (e.currentTarget as HTMLDivElement).style.cursor = 'grab';
+                          }}
+                          >
+                              <div style={{
+                                  cursor: 'grab',
+                                  color: 'var(--color-text-secondary)',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                              }}>
+                                  <GripVertical size={16} />
+                              </div>
                               <div style={{flex: '0 0 120px', maxWidth: '120px'}}>
                                   <select
                                     className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
