@@ -218,6 +218,9 @@ export class UsageStorageService extends EventEmitter {
             try {
                 this.db.run("ALTER TABLE request_usage ADD COLUMN attribution TEXT;");
             } catch (e) { /* ignore if exists */ }
+            try {
+                this.db.run("ALTER TABLE request_usage ADD COLUMN is_passthrough INTEGER;");
+            } catch (e) { /* ignore if exists */ }
 
             // Provider Performance Table - stores last 10 request latencies and throughput
             this.db.run(`
