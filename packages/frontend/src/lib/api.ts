@@ -1038,5 +1038,20 @@ export const api = {
           console.error("API Error setDebugMode", e);
           throw e;
       }
+  },
+
+  testModel: async (provider: string, model: string): Promise<{ success: boolean; error?: string; durationMs: number; response?: string }> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/test`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ provider, model })
+          });
+          if (!res.ok) throw new Error('Failed to test model');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error testModel", e);
+          throw e;
+      }
   }
 };

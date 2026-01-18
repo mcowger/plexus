@@ -7,8 +7,10 @@ import { registerPerformanceRoutes } from './management/performance';
 import { registerDebugRoutes } from './management/debug';
 import { registerErrorRoutes } from './management/errors';
 import { registerSystemLogRoutes } from './management/system-logs';
+import { registerTestRoutes } from './management/test';
+import { Dispatcher } from '../services/dispatcher';
 
-export async function registerManagementRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService) {
+export async function registerManagementRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService, dispatcher: Dispatcher) {
     await registerConfigRoutes(fastify);
     await registerUsageRoutes(fastify, usageStorage);
     await registerCooldownRoutes(fastify);
@@ -16,4 +18,5 @@ export async function registerManagementRoutes(fastify: FastifyInstance, usageSt
     await registerDebugRoutes(fastify, usageStorage);
     await registerErrorRoutes(fastify, usageStorage);
     await registerSystemLogRoutes(fastify);
+    await registerTestRoutes(fastify, dispatcher);
 }

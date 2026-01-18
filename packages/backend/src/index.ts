@@ -102,7 +102,7 @@ fastify.setErrorHandler((error, request, reply) => {
 await registerInferenceRoutes(fastify, dispatcher, usageStorage);
 
 // --- Management API (v0) ---
-await registerManagementRoutes(fastify, usageStorage);
+await registerManagementRoutes(fastify, usageStorage, dispatcher);
 
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));

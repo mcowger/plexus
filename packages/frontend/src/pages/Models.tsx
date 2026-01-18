@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
-import { Search, Plus, Trash2, Edit2, GripVertical } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
     id: '',
@@ -20,12 +20,15 @@ export const Models = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [search, setSearch] = useState('');
-  
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAlias, setEditingAlias] = useState<Alias>(EMPTY_ALIAS);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Test State - track by alias id + target index
+  const [testStates, setTestStates] = useState<Record<string, { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }>>({});
 
   useEffect(() => {
     loadData();
@@ -90,6 +93,53 @@ export const Models = () => {
           console.error("Toggle error", e);
           alert("Failed to update target status: " + e);
           loadData(); // Reload on error
+      }
+  };
+
+  const handleTestTarget = async (aliasId: string, targetIndex: number, provider: string, model: string) => {
+      const testKey = `${aliasId}-${targetIndex}`;
+
+      // Set loading state
+      setTestStates(prev => ({
+          ...prev,
+          [testKey]: { loading: true, showResult: true }
+      }));
+
+      try {
+          const result = await api.testModel(provider, model);
+
+          setTestStates(prev => ({
+              ...prev,
+              [testKey]: {
+                  loading: false,
+                  result: result.success ? 'success' : 'error',
+                  message: result.success
+                      ? `Success (${result.durationMs}ms)`
+                      : result.error || 'Test failed',
+                  showResult: true
+              }
+          }));
+
+          // Auto-hide success results after 3 seconds
+          if (result.success) {
+              setTimeout(() => {
+                  setTestStates(prev => ({
+                      ...prev,
+                      [testKey]: { ...prev[testKey], showResult: false }
+                  }));
+              }, 3000);
+          }
+      } catch (e) {
+          console.error("Test error", e);
+          setTestStates(prev => ({
+              ...prev,
+              [testKey]: {
+                  loading: false,
+                  result: 'error',
+                  message: String(e),
+                  showResult: true
+              }
+          }));
       }
   };
 
@@ -200,9 +250,9 @@ export const Models = () => {
                 </thead>
                 <tbody>
                     {filteredAliases.map(alias => (
-                        <tr key={alias.id} onClick={() => handleEdit(alias)} style={{cursor: 'pointer'}} className="hover:bg-bg-hover">
+                        <tr key={alias.id} className="hover:bg-bg-hover">
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{fontWeight: 600, paddingLeft: '24px'}}>
-                                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                <div onClick={() => handleEdit(alias)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
                                     <Edit2 size={12} style={{opacity: 0.5}} />
                                     {alias.id}
                                 </div>
@@ -230,6 +280,8 @@ export const Models = () => {
                                         const isProviderDisabled = provider?.enabled === false;
                                         const isTargetDisabled = t.enabled === false;
                                         const isDisabled = isProviderDisabled || isTargetDisabled;
+                                        const testKey = `${alias.id}-${i}`;
+                                        const testState = testStates[testKey];
 
                                         return (
                                             <div key={i} style={{
@@ -241,6 +293,31 @@ export const Models = () => {
                                                 textDecoration: isDisabled ? 'line-through' : 'none',
                                                 opacity: isDisabled ? 0.7 : 1
                                             }}>
+                                                <div onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    if (!isDisabled) {
+                                                        handleTestTarget(alias.id, i, t.provider, t.model);
+                                                    }
+                                                }} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                                    opacity: isDisabled ? 0.5 : 1,
+                                                    transition: 'opacity 0.2s',
+                                                    pointerEvents: 'auto',
+                                                    marginRight: '16px'
+                                                }}>
+                                                    {testState?.loading ? (
+                                                        <Loader2 size={14} style={{color: 'var(--color-text-secondary)', animation: 'spin 1s linear infinite'}} />
+                                                    ) : testState?.showResult && testState.result === 'success' ? (
+                                                        <CheckCircle size={14} style={{color: 'var(--color-success)'}} />
+                                                    ) : testState?.showResult && testState.result === 'error' ? (
+                                                        <XCircle size={14} style={{color: 'var(--color-danger)'}} />
+                                                    ) : (
+                                                        <Play size={14} style={{color: 'var(--color-primary)', opacity: isDisabled ? 0 : 0.6}} />
+                                                    )}
+                                                </div>
                                                 <div onClick={(e) => e.stopPropagation()} style={{display: 'flex', alignItems: 'center'}}>
                                                     <Switch
                                                       checked={t.enabled !== false}
@@ -252,6 +329,18 @@ export const Models = () => {
                                                 <div style={{flex: 1}}>
                                                     {t.provider} &rarr; {t.model}
                                                     {isProviderDisabled && <span style={{textDecoration: 'none', display: 'inline-block', marginLeft: '4px', fontStyle: 'italic'}}>(provider disabled)</span>}
+                                                    {testState?.showResult && testState.message && (
+                                                        <span style={{
+                                                            textDecoration: 'none',
+                                                            display: 'inline-block',
+                                                            marginLeft: '8px',
+                                                            fontSize: '11px',
+                                                            fontStyle: 'italic',
+                                                            color: testState.result === 'success' ? 'var(--color-success)' : 'var(--color-danger)'
+                                                        }}>
+                                                            {testState.message}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
