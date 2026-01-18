@@ -9,6 +9,7 @@ import { OpenAITransformer, AnthropicTransformer, GeminiTransformer } from '../.
 const TEST_TEMPLATES = {
     chat: (modelPath: string) => ({
         model: modelPath,
+        stream: false,
         messages: [
             {
                 role: 'system',
@@ -23,6 +24,7 @@ const TEST_TEMPLATES = {
 
     messages: (modelPath: string) => ({
         model: modelPath,
+        stream: false,
         max_tokens: 100,
         system: 'You are a helpful assistant.',
         messages: [
