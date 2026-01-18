@@ -124,7 +124,16 @@ export interface InferenceError {
     date: string;
     error_message: string;
     error_stack?: string;
-    details?: string;
+    details?: string | {
+        apiType?: string;
+        provider?: string;
+        targetModel?: string;
+        targetApiType?: string;
+        url?: string;
+        headers?: Record<string, string>;
+        statusCode?: number;
+        providerResponse?: string;
+    };
     created_at: number;
 }
 

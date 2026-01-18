@@ -66,7 +66,7 @@ export class Dispatcher {
 
     if (!response.ok) {
       const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText);
+      await this.handleProviderError(response, route, errorText, url, headers, targetApiType);
     }
 
     // 5. Handle Response
@@ -341,7 +341,10 @@ export class Dispatcher {
   private async handleProviderError(
     response: Response,
     route: RouteResult,
-    errorText: string
+    errorText: string,
+    url?: string,
+    headers?: Record<string, string>,
+    targetApiType?: string
   ): Promise<never> {
     logger.error(`Provider error: ${response.status} ${errorText}`);
 
@@ -379,7 +382,55 @@ export class Dispatcher {
       cooldownManager.markProviderFailure(route.provider, undefined, cooldownDuration);
     }
 
-    throw new Error(`Provider failed: ${response.status} ${errorText}`);
+    // Create enriched error with routing context
+    const error = new Error(`Provider failed: ${response.status} ${errorText}`) as any;
+    error.routingContext = {
+      provider: route.provider,
+      targetModel: route.model,
+      targetApiType: targetApiType,
+      url: url,
+      headers: this.sanitizeHeaders(headers || {}),
+      statusCode: response.status,
+      providerResponse: errorText
+    };
+
+    throw error;
+  }
+
+  /**
+   * Sanitize headers to remove sensitive information before logging
+   */
+  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+    const sanitized = { ...headers };
+
+    // Mask sensitive headers
+    if (sanitized['x-api-key']) {
+      sanitized['x-api-key'] = this.maskSecret(sanitized['x-api-key']);
+    }
+    if (sanitized['Authorization']) {
+      sanitized['Authorization'] = this.maskSecret(sanitized['Authorization']);
+    }
+    if (sanitized['x-goog-api-key']) {
+      sanitized['x-goog-api-key'] = this.maskSecret(sanitized['x-goog-api-key']);
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Mask secret values, showing only first and last few characters
+   */
+  private maskSecret(value: string): string {
+    if (value.length <= 8) return '***';
+
+    // For Bearer tokens, preserve the "Bearer " prefix
+    if (value.startsWith('Bearer ')) {
+      const token = value.substring(7);
+      if (token.length <= 8) return 'Bearer ***';
+      return `Bearer ${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
+    }
+
+    return `${value.substring(0, 4)}...${value.substring(value.length - 4)}`;
   }
 
   /**

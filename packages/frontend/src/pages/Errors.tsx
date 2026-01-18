@@ -114,6 +114,18 @@ export const Errors: React.FC = () => {
         return JSON.stringify(content, null, 2);
     };
 
+    const parseDetails = (details: any) => {
+        if (!details) return null;
+        if (typeof details === 'string') {
+            try {
+                return JSON.parse(details);
+            } catch {
+                return { raw: details };
+            }
+        }
+        return details;
+    };
+
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
             <header className="flex justify-between items-center p-6 shrink-0">
@@ -203,30 +215,112 @@ export const Errors: React.FC = () => {
                                         <span className="ml-2">{new Date(selectedError.date).toLocaleString()}</span>
                                     </div>
                                 </div>
+                                {(() => {
+                                    const details = parseDetails(selectedError.details);
+                                    if (details && (details.provider || details.targetModel || details.url)) {
+                                        return (
+                                            <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+                                                <h4 className="text-sm font-semibold text-yellow-500 mb-2">Routing Information</h4>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    {details.provider && (
+                                                        <div>
+                                                            <span className="text-[var(--color-text-muted)]">Provider:</span>
+                                                            <span className="ml-2 font-mono text-blue-400">{details.provider}</span>
+                                                        </div>
+                                                    )}
+                                                    {details.targetModel && (
+                                                        <div>
+                                                            <span className="text-[var(--color-text-muted)]">Target Model:</span>
+                                                            <span className="ml-2 font-mono text-blue-400">{details.targetModel}</span>
+                                                        </div>
+                                                    )}
+                                                    {details.targetApiType && (
+                                                        <div>
+                                                            <span className="text-[var(--color-text-muted)]">Target API:</span>
+                                                            <span className="ml-2 font-mono text-blue-400">{details.targetApiType}</span>
+                                                        </div>
+                                                    )}
+                                                    {details.statusCode && (
+                                                        <div>
+                                                            <span className="text-[var(--color-text-muted)]">Status Code:</span>
+                                                            <span className="ml-2 font-mono text-red-400">{details.statusCode}</span>
+                                                        </div>
+                                                    )}
+                                                    {details.url && (
+                                                        <div className="col-span-2">
+                                                            <span className="text-[var(--color-text-muted)]">Request URL:</span>
+                                                            <div className="ml-2 font-mono text-xs text-blue-400 break-all mt-1">{details.url}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                              </div>
 
-                             <AccordionPanel 
-                                title="Message" 
-                                content={selectedError.error_message} 
+                             <AccordionPanel
+                                title="Message"
+                                content={selectedError.error_message}
                                 color="text-red-400"
                                 defaultOpen={true}
                                 language="plaintext"
                             />
-                             <AccordionPanel 
-                                title="Stack Trace" 
-                                content={selectedError.error_stack || '(No stack trace available)'} 
+                             <AccordionPanel
+                                title="Stack Trace"
+                                content={selectedError.error_stack || '(No stack trace available)'}
                                 color="text-orange-400"
                                 defaultOpen={true}
                                 language="plaintext"
                             />
-                             {selectedError.details && (
-                                <AccordionPanel 
-                                    title="Additional Details" 
-                                    content={formatContent(selectedError.details)} 
-                                    color="text-blue-400"
-                                    defaultOpen={true}
-                                />
-                             )}
+                             {(() => {
+                                const details = parseDetails(selectedError.details);
+                                if (details?.providerResponse) {
+                                    return (
+                                        <AccordionPanel
+                                            title="Provider Response"
+                                            content={details.providerResponse}
+                                            color="text-purple-400"
+                                            defaultOpen={false}
+                                            language="plaintext"
+                                        />
+                                    );
+                                }
+                                return null;
+                             })()}
+                             {(() => {
+                                const details = parseDetails(selectedError.details);
+                                if (details?.headers) {
+                                    return (
+                                        <AccordionPanel
+                                            title="Request Headers"
+                                            content={formatContent(details.headers)}
+                                            color="text-cyan-400"
+                                            defaultOpen={false}
+                                        />
+                                    );
+                                }
+                                return null;
+                             })()}
+                             {selectedError.details && (() => {
+                                const details = parseDetails(selectedError.details);
+                                // Show full details if there are fields we haven't displayed elsewhere
+                                const displayedFields = ['provider', 'targetModel', 'targetApiType', 'url', 'statusCode', 'providerResponse', 'headers'];
+                                const hasOtherFields = details && Object.keys(details).some(key => !displayedFields.includes(key));
+
+                                if (hasOtherFields) {
+                                    return (
+                                        <AccordionPanel
+                                            title="Additional Details"
+                                            content={formatContent(details)}
+                                            color="text-blue-400"
+                                            defaultOpen={false}
+                                        />
+                                    );
+                                }
+                                return null;
+                             })()}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">

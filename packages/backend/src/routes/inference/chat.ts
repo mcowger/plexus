@@ -61,7 +61,14 @@ export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Di
             usageRecord.responseStatus = 'error';
             usageRecord.durationMs = Date.now() - startTime;
             usageStorage.saveRequest(usageRecord as UsageRecord);
-            usageStorage.saveError(requestId, e, { apiType: 'chat' });
+
+            // Extract routing context if available from enriched error
+            const errorDetails = {
+                apiType: 'chat',
+                ...(e.routingContext || {})
+            };
+
+            usageStorage.saveError(requestId, e, errorDetails);
 
             logger.error('Error processing OpenAI request', e);
             return reply.code(500).send({ error: { message: e.message, type: 'api_error' } });

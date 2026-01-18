@@ -59,7 +59,14 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
             usageRecord.responseStatus = 'error';
             usageRecord.durationMs = Date.now() - startTime;
             usageStorage.saveRequest(usageRecord as UsageRecord);
-            usageStorage.saveError(requestId, e, { apiType: 'messages' });
+
+            // Extract routing context if available from enriched error
+            const errorDetails = {
+                apiType: 'messages',
+                ...(e.routingContext || {})
+            };
+
+            usageStorage.saveError(requestId, e, errorDetails);
 
             logger.error('Error processing Anthropic request', e);
             return reply.code(500).send({ type: 'error', error: { type: 'api_error', message: e.message } });

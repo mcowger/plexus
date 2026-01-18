@@ -69,7 +69,14 @@ export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: 
             usageRecord.responseStatus = 'error';
             usageRecord.durationMs = Date.now() - startTime;
             usageStorage.saveRequest(usageRecord as UsageRecord);
-            usageStorage.saveError(requestId, e, { apiType: 'gemini' });
+
+            // Extract routing context if available from enriched error
+            const errorDetails = {
+                apiType: 'gemini',
+                ...(e.routingContext || {})
+            };
+
+            usageStorage.saveError(requestId, e, errorDetails);
 
             logger.error('Error processing Gemini request', e);
             return reply.code(500).send({ error: { message: e.message, code: 500, status: "INTERNAL" } });
