@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.8.0 - 2026-01-18
+
+### v0.8.0: Direct Model Routing and Granular Cooldown Management
+
+## Main Features
+
+- **Direct Model Routing**: Implemented logic for direct routing of model requests. [[f165847](https://github.com/mcowger/plexus/commit/f165847)]
+- **Per-Model Cooldowns**: Added support for configuring cooldown periods on a per-model basis to optimize resource allocation. [[45cddd8](https://github.com/mcowger/plexus/commit/45cddd8)]
+- **OAuth Deprecation**: Refactored the codebase to remove OAuth-related components and legacy code. [[1b74438](https://github.com/mcowger/plexus/commit/1b74438)]
+
+## Refinement and Performance
+
+- **Performance Optimizations**: General performance enhancements throughout the system. [[ebc01a9](https://github.com/mcowger/plexus/commit/ebc01a9)]
+- **Transformer Refactoring**: Internal architectural cleanup of the transformer modules. [[56db99b](https://github.com/mcowger/plexus/commit/56db99b)]
+- **UI Improvements**:
+    - Added drag handles for improved layout control. [[32d66be](https://github.com/mcowger/plexus/commit/32d66be)]
+    - Reduced visual footprint of graphs and dialog boxes for higher density views. [[d5d7d88](https://github.com/mcowger/plexus/commit/d5d7d88), [4f2ef0d](https://github.com/mcowger/plexus/commit/4f2ef0d)]
+    - Enhanced testing button visibility and functionality. [[268c1cc](https://github.com/mcowger/plexus/commit/268c1cc)]
+
+## Bug Fixes and Stability
+
+- **Database Initialization**: Resolved issues related to DB init sequences. [[ebd045f](https://github.com/mcowger/plexus/commit/ebd045f)]
+- **Error Handling**: Improved error messaging and verbosity. [[9309971](https://github.com/mcowger/plexus/commit/9309971)]
+- **Test Coverage**: Fixed various regression tests and CI stability issues. [[4d84b61](https://github.com/mcowger/plexus/commit/4d84b61)]
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.7.7 - 2026-01-08
 
 ### Release v0.7.7: OAuth Refresh Token Rotation
