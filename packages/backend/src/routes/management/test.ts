@@ -1,7 +1,55 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../../services/dispatcher';
-import { OpenAITransformer } from '../../transformers';
+import { OpenAITransformer, AnthropicTransformer, GeminiTransformer } from '../../transformers';
+
+/**
+ * Test request templates for each API type
+ */
+const TEST_TEMPLATES = {
+    chat: (modelPath: string) => ({
+        model: modelPath,
+        messages: [
+            {
+                role: 'system',
+                content: 'You are a helpful assistant.'
+            },
+            {
+                role: 'user',
+                content: 'Just respond with the word acknowledged'
+            }
+        ]
+    }),
+
+    messages: (modelPath: string) => ({
+        model: modelPath,
+        max_tokens: 100,
+        system: 'You are a helpful assistant.',
+        messages: [
+            { role: 'user', content: 'Just respond with the word acknowledged' }
+        ]
+    }),
+
+    gemini: (modelPath: string) => ({
+        model: modelPath,
+        contents: [
+            {
+                role: 'user',
+                parts: [
+                    { text: 'Just respond with the word acknowledged' }
+                ]
+            }
+        ],
+        system_instruction: {
+            parts: [
+                { text: 'You are a helpful assistant.' }
+            ]
+        },
+        generationConfig: {
+            maxOutputTokens: 100
+        }
+    })
+};
 
 export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: Dispatcher) {
     /**
@@ -13,7 +61,7 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
         const startTime = Date.now();
 
         try {
-            const body = request.body as { provider: string; model: string };
+            const body = request.body as { provider: string; model: string; apiType?: string };
 
             logger.info('Test endpoint called with body:', body);
 
@@ -24,27 +72,45 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
                 });
             }
 
-            logger.info(`Testing model: ${body.provider}/${body.model}`);
+            // Default to 'chat' if no apiType specified
+            const apiType = body.apiType || 'chat';
 
-            // Create a simple test request using OpenAI format
+            logger.info(`Testing model: ${body.provider}/${body.model} via ${apiType} API`);
+
+            // Validate API type
+            if (!['chat', 'messages', 'gemini'].includes(apiType)) {
+                return reply.code(400).send({
+                    success: false,
+                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini`
+                });
+            }
+
+            // Create a simple test request using the appropriate format
             // Use provider/model format for direct routing (bypasses alias resolution)
             const directModelPath = `${body.provider}/${body.model}`;
             logger.info(`Direct model path: ${directModelPath}`);
 
-            const testRequest = {
-                model: directModelPath,
-                messages: [
-                    { role: 'user', content: 'Say "test successful" if you can read this.' }
-                ],
-                max_tokens: 50
-            };
+            const testRequest = TEST_TEMPLATES[apiType as keyof typeof TEST_TEMPLATES](directModelPath);
 
             logger.info('Creating transformer...');
-            const transformer = new OpenAITransformer();
+            let transformer;
+            switch (apiType) {
+                case 'chat':
+                    transformer = new OpenAITransformer();
+                    break;
+                case 'messages':
+                    transformer = new AnthropicTransformer();
+                    break;
+                case 'gemini':
+                    transformer = new GeminiTransformer();
+                    break;
+                default:
+                    transformer = new OpenAITransformer();
+            }
 
             logger.info('Parsing request...');
             const unifiedRequest = await transformer.parseRequest(testRequest);
-            unifiedRequest.incomingApiType = 'chat';
+            unifiedRequest.incomingApiType = apiType;
             unifiedRequest.originalBody = testRequest;
             unifiedRequest.requestId = requestId;
 
@@ -55,19 +121,18 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
 
             logger.info(`Test completed in ${durationMs}ms`);
 
-            // Check if successful
-            if (unifiedResponse.error) {
-                return reply.code(200).send({
-                    success: false,
-                    error: unifiedResponse.error.message || 'Test failed',
-                    durationMs
-                });
-            }
+            // Extract response text
+            const responseText = unifiedResponse.content
+                ? (typeof unifiedResponse.content === 'string'
+                    ? unifiedResponse.content.substring(0, 100)
+                    : 'Success')
+                : 'Success';
 
             return reply.code(200).send({
                 success: true,
                 durationMs,
-                response: unifiedResponse.content?.[0]?.text?.substring(0, 100) || 'Success'
+                apiType,
+                response: responseText
             });
         } catch (e: any) {
             const durationMs = Date.now() - startTime;
@@ -77,7 +142,8 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             return reply.code(200).send({
                 success: false,
                 error: e.message || 'Unknown error',
-                durationMs
+                durationMs,
+                apiType: (request.body as any)?.apiType || 'chat'
             });
         }
     });

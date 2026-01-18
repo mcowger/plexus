@@ -101,7 +101,7 @@ export const Models = () => {
       }
   };
 
-  const handleTestTarget = async (aliasId: string, targetIndex: number, provider: string, model: string) => {
+  const handleTestTarget = async (aliasId: string, targetIndex: number, provider: string, model: string, apiTypes: string[]) => {
       const testKey = `${aliasId}-${targetIndex}`;
 
       // Set loading state
@@ -111,22 +111,33 @@ export const Models = () => {
       }));
 
       try {
-          const result = await api.testModel(provider, model);
+          // Test each supported API type
+          const results = await Promise.all(
+              apiTypes.map(apiType => api.testModel(provider, model, apiType))
+          );
+
+          // Check if all tests succeeded
+          const allSuccess = results.every(r => r.success);
+          const firstError = results.find(r => !r.success);
+
+          // Calculate total duration
+          const totalDuration = results.reduce((sum, r) => sum + r.durationMs, 0);
+          const avgDuration = Math.round(totalDuration / results.length);
 
           setTestStates(prev => ({
               ...prev,
               [testKey]: {
                   loading: false,
-                  result: result.success ? 'success' : 'error',
-                  message: result.success
-                      ? `Success (${result.durationMs}ms)`
-                      : result.error || 'Test failed',
+                  result: allSuccess ? 'success' : 'error',
+                  message: allSuccess
+                      ? `Success (${avgDuration}ms avg, ${apiTypes.length} API${apiTypes.length > 1 ? 's' : ''})`
+                      : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
                   showResult: true
               }
           }));
 
           // Auto-hide success results after 3 seconds
-          if (result.success) {
+          if (allSuccess) {
               setTimeout(() => {
                   setTestStates(prev => ({
                       ...prev,
@@ -324,7 +335,7 @@ export const Models = () => {
                                                     e.stopPropagation();
                                                     e.preventDefault();
                                                     if (!isDisabled) {
-                                                        handleTestTarget(alias.id, i, t.provider, t.model);
+                                                        handleTestTarget(alias.id, i, t.provider, t.model, t.apiType || ['chat']);
                                                     }
                                                 }} style={{
                                                     display: 'flex',
@@ -355,6 +366,18 @@ export const Models = () => {
                                                 </div>
                                                 <div style={{flex: 1}}>
                                                     {t.provider} &rarr; {t.model}
+                                                    {t.apiType && t.apiType.length > 0 && (
+                                                        <span style={{
+                                                            textDecoration: 'none',
+                                                            display: 'inline-block',
+                                                            marginLeft: '8px',
+                                                            fontSize: '10px',
+                                                            color: 'var(--color-text-secondary)',
+                                                            opacity: 0.7
+                                                        }}>
+                                                            [{t.apiType.join(', ')}]
+                                                        </span>
+                                                    )}
                                                     {isProviderDisabled && <span style={{textDecoration: 'none', display: 'inline-block', marginLeft: '4px', fontStyle: 'italic'}}>(provider disabled)</span>}
                                                     {testState?.showResult && testState.message && (
                                                         <span style={{

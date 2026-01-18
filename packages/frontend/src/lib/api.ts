@@ -871,12 +871,16 @@ export const api = {
             Object.entries(config.models).forEach(([key, val]) => {
                 const targets = (val.targets || []).map((t: { provider: string; model: string }) => {
                     const providerConfig = providers[t.provider];
-                    let apiType: string | string[] = providerConfig?.type || 'unknown';
+
+                    // Infer type from api_base_url if not explicitly provided
+                    const inferredTypes = providerConfig?.type || inferProviderTypes(providerConfig?.api_base_url);
+                    let apiType: string | string[] = inferredTypes;
 
                     // Check for specific model config overrides (access_via)
                     if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
                         const modelConfig = providerConfig.models[t.model];
-                        if (modelConfig && modelConfig.access_via) {
+                        // Only use access_via if it exists AND is non-empty
+                        if (modelConfig && modelConfig.access_via && modelConfig.access_via.length > 0) {
                             apiType = modelConfig.access_via;
                         }
                     }
@@ -1041,12 +1045,12 @@ export const api = {
       }
   },
 
-  testModel: async (provider: string, model: string): Promise<{ success: boolean; error?: string; durationMs: number; response?: string }> => {
+  testModel: async (provider: string, model: string, apiType?: string): Promise<{ success: boolean; error?: string; durationMs: number; response?: string; apiType?: string }> => {
       try {
           const res = await fetchWithAuth(`${API_BASE}/v0/management/test`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ provider, model })
+              body: JSON.stringify({ provider, model, apiType })
           });
           if (!res.ok) throw new Error('Failed to test model');
           return await res.json();
