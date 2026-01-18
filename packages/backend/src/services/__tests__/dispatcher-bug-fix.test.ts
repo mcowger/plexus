@@ -89,8 +89,7 @@ describe("Dispatcher Bug Fixes", () => {
         const mockConfig = {
             providers: {
                 "naga": {
-                    type: [], // Empty provider types!
-                    api_base_url: "https://api.naga.ac/v1",
+                    api_base_url: {}, // Empty record - no API types available!
                     api_key: "test-key-123", // Add API key for authentication
                     models: {
                         "claude-haiku-4.5-20251001": {
