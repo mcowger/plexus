@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api, Alias, Provider, Model } from '../lib/api';
+import { api, Alias, Provider, Model, Cooldown } from '../lib/api';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
-import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2, Clock } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
     id: '',
@@ -19,6 +19,7 @@ export const Models = () => {
   const [aliases, setAliases] = useState<Alias[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [search, setSearch] = useState('');
 
   // Modal State
@@ -32,18 +33,22 @@ export const Models = () => {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 10000); // Poll every 10s for cooldowns
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
     try {
-        const [a, p, m] = await Promise.all([
+        const [a, p, m, c] = await Promise.all([
             api.getAliases(),
             api.getProviders(),
-            api.getModels()
+            api.getModels(),
+            api.getCooldowns()
         ]);
         setAliases(a);
         setProviders(p);
         setAvailableModels(m);
+        setCooldowns(c);
     } catch (e) {
         console.error("Failed to load data", e);
     }
@@ -283,6 +288,15 @@ export const Models = () => {
                                         const testKey = `${alias.id}-${i}`;
                                         const testState = testStates[testKey];
 
+                                        // Check if this specific provider+model is on cooldown
+                                        const cooldown = cooldowns.find(c =>
+                                            c.provider === t.provider &&
+                                            c.model === t.model &&
+                                            !c.accountId // Only show provider-level cooldowns here
+                                        );
+                                        const isCoolingDown = !!cooldown;
+                                        const cooldownMinutes = cooldown ? Math.ceil(cooldown.timeRemainingMs / 60000) : 0;
+
                                         return (
                                             <div key={i} style={{
                                                 display: 'flex',
@@ -293,6 +307,19 @@ export const Models = () => {
                                                 textDecoration: isDisabled ? 'line-through' : 'none',
                                                 opacity: isDisabled ? 0.7 : 1
                                             }}>
+                                                {isCoolingDown && (
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        color: 'var(--color-warning)',
+                                                        fontSize: '11px',
+                                                        fontWeight: 500
+                                                    }} title={`On cooldown for ${cooldownMinutes} minute${cooldownMinutes !== 1 ? 's' : ''}`}>
+                                                        <Clock size={12} />
+                                                        <span>{cooldownMinutes}m</span>
+                                                    </div>
+                                                )}
                                                 <div onClick={(e) => {
                                                     e.stopPropagation();
                                                     e.preventDefault();

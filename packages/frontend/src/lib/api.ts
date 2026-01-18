@@ -139,6 +139,7 @@ export interface InferenceError {
 
 export interface Cooldown {
     provider: string;
+    model: string;
     accountId?: string;
     expiry: number;
     timeRemainingMs: number;

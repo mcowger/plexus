@@ -182,31 +182,35 @@ export const Dashboard = () => {
               >
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                       {(() => {
-                          // Group cooldowns by provider
+                          // Group cooldowns by provider+model
                           const groupedCooldowns = cooldowns.reduce((acc, c) => {
-                              if (!acc[c.provider]) {
-                                  acc[c.provider] = [];
+                              const key = `${c.provider}:${c.model}`;
+                              if (!acc[key]) {
+                                  acc[key] = [];
                               }
-                              acc[c.provider].push(c);
+                              acc[key].push(c);
                               return acc;
                           }, {} as Record<string, Cooldown[]>);
 
-                          return Object.entries(groupedCooldowns).map(([provider, providerCooldowns]) => {
-                              const hasAccountId = providerCooldowns.some(c => c.accountId);
-                              const maxTime = Math.max(...providerCooldowns.map(c => c.timeRemainingMs));
+                          return Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
+                              const [provider, model] = key.split(':');
+                              const hasAccountId = modelCooldowns.some(c => c.accountId);
+                              const maxTime = Math.max(...modelCooldowns.map(c => c.timeRemainingMs));
                               const minutes = Math.ceil(maxTime / 60000);
 
                               let statusText: string;
-                              if (hasAccountId && providerCooldowns.length > 1) {
-                                  statusText = `has ${providerCooldowns.length} accounts on cooldown for up to ${minutes} minutes`;
-                              } else if (hasAccountId && providerCooldowns.length === 1) {
-                                  statusText = `has 1 account on cooldown for ${minutes} minutes`;
+                              const modelDisplay = model || 'all models';
+
+                              if (hasAccountId && modelCooldowns.length > 1) {
+                                  statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown for up to ${minutes} minutes`;
+                              } else if (hasAccountId && modelCooldowns.length === 1) {
+                                  statusText = `${modelDisplay} has 1 account on cooldown for ${minutes} minutes`;
                               } else {
-                                  statusText = `is on cooldown for ${minutes} minutes`;
+                                  statusText = `${modelDisplay} is on cooldown for ${minutes} minutes`;
                               }
 
                               return (
-                                  <div key={provider} style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', backgroundColor: 'rgba(255, 171, 0, 0.1)', borderRadius: '4px'}}>
+                                  <div key={key} style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', backgroundColor: 'rgba(255, 171, 0, 0.1)', borderRadius: '4px'}}>
                                       <AlertTriangle size={16} color="var(--color-warning)"/>
                                       <span style={{fontWeight: 500}}>{provider}</span>
                                       <span style={{color: 'var(--color-text-secondary)'}}>{statusText}</span>

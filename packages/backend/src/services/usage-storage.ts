@@ -119,8 +119,38 @@ export class UsageStorageService extends EventEmitter {
                     // Check if it has the old schema (no account_id)
                     const columns = this.db.prepare("PRAGMA table_info(provider_cooldowns)").all() as { name: string }[];
                     const hasAccountId = columns.some(col => col.name === 'account_id');
+                    const hasModel = columns.some(col => col.name === 'model');
 
-                    if (!hasAccountId) {
+                    if (!hasModel) {
+                        logger.info("Migrating provider_cooldowns table to support per-model cooldowns");
+
+                        // Rename old table
+                        this.db.run("ALTER TABLE provider_cooldowns RENAME TO provider_cooldowns_old");
+
+                        // Create new table with updated schema including model
+                        this.db.run(`
+                            CREATE TABLE provider_cooldowns (
+                                provider TEXT NOT NULL,
+                                model TEXT NOT NULL,
+                                account_id TEXT,
+                                expiry INTEGER,
+                                created_at INTEGER,
+                                PRIMARY KEY (provider, model, account_id)
+                            )
+                        `);
+
+                        // Migrate existing data (set model to empty string for backward compatibility)
+                        // Empty string for model means "all models" for that provider
+                        this.db.run(`
+                            INSERT INTO provider_cooldowns (provider, model, account_id, expiry, created_at)
+                            SELECT provider, '', COALESCE(account_id, ''), expiry, created_at FROM provider_cooldowns_old
+                        `);
+
+                        // Drop old table
+                        this.db.run("DROP TABLE provider_cooldowns_old");
+
+                        logger.info("provider_cooldowns migration completed");
+                    } else if (!hasAccountId) {
                         logger.info("Migrating provider_cooldowns table to support per-account cooldowns");
 
                         // Rename old table
@@ -130,17 +160,18 @@ export class UsageStorageService extends EventEmitter {
                         this.db.run(`
                             CREATE TABLE provider_cooldowns (
                                 provider TEXT NOT NULL,
+                                model TEXT NOT NULL,
                                 account_id TEXT,
                                 expiry INTEGER,
                                 created_at INTEGER,
-                                PRIMARY KEY (provider, account_id)
+                                PRIMARY KEY (provider, model, account_id)
                             )
                         `);
 
-                        // Migrate existing data (set account_id to NULL for existing cooldowns)
+                        // Migrate existing data
                         this.db.run(`
-                            INSERT INTO provider_cooldowns (provider, account_id, expiry, created_at)
-                            SELECT provider, NULL, expiry, created_at FROM provider_cooldowns_old
+                            INSERT INTO provider_cooldowns (provider, model, account_id, expiry, created_at)
+                            SELECT provider, '', '', expiry, created_at FROM provider_cooldowns_old
                         `);
 
                         // Drop old table
@@ -153,10 +184,11 @@ export class UsageStorageService extends EventEmitter {
                     this.db.run(`
                         CREATE TABLE provider_cooldowns (
                             provider TEXT NOT NULL,
+                            model TEXT NOT NULL,
                             account_id TEXT,
                             expiry INTEGER,
                             created_at INTEGER,
-                            PRIMARY KEY (provider, account_id)
+                            PRIMARY KEY (provider, model, account_id)
                         )
                     `);
                 }
@@ -166,10 +198,11 @@ export class UsageStorageService extends EventEmitter {
                 this.db.run(`
                     CREATE TABLE IF NOT EXISTS provider_cooldowns (
                         provider TEXT NOT NULL,
+                        model TEXT NOT NULL,
                         account_id TEXT,
                         expiry INTEGER,
                         created_at INTEGER,
-                        PRIMARY KEY (provider, account_id)
+                        PRIMARY KEY (provider, model, account_id)
                     )
                 `);
             }
