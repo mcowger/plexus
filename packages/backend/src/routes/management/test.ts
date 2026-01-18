@@ -88,8 +88,8 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             }
 
             // Create a simple test request using the appropriate format
-            // Use provider/model format for direct routing (bypasses alias resolution)
-            const directModelPath = `${body.provider}/${body.model}`;
+            // Use direct/provider/model format for direct routing (bypasses alias resolution)
+            const directModelPath = `direct/${body.provider}/${body.model}`;
             logger.info(`Direct model path: ${directModelPath}`);
 
             const testRequest = TEST_TEMPLATES[apiType as keyof typeof TEST_TEMPLATES](directModelPath);

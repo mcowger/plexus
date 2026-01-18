@@ -16,11 +16,18 @@ export class Router {
     static resolve(modelName: string, incomingApiType?: string): RouteResult {
         const config = getConfig();
 
-        // 0. Check for direct provider/model syntax (e.g., "stima/gemini-2.5-flash")
-        if (modelName.includes('/')) {
-            const firstSlashIndex = modelName.indexOf('/');
-            const providerId = modelName.substring(0, firstSlashIndex);
-            const providerModel = modelName.substring(firstSlashIndex + 1);
+        // 0. Check for direct provider/model syntax (e.g., "direct/stima/gemini-2.5-flash")
+        // Requires "direct/" prefix to avoid conflicts with model names containing slashes
+        if (modelName.startsWith('direct/')) {
+            const withoutPrefix = modelName.substring(7); // Remove "direct/" prefix
+            const firstSlashIndex = withoutPrefix.indexOf('/');
+
+            if (firstSlashIndex === -1) {
+                throw new Error(`Direct routing failed: Invalid format '${modelName}'. Expected 'direct/provider/model'`);
+            }
+
+            const providerId = withoutPrefix.substring(0, firstSlashIndex);
+            const providerModel = withoutPrefix.substring(firstSlashIndex + 1);
 
             // Validate that the provider exists
             const providerConfig = config.providers[providerId];
