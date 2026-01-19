@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
-import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2, Clock } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2, Clock, Zap } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
     id: '',
@@ -27,6 +27,12 @@ export const Models = () => {
   const [editingAlias, setEditingAlias] = useState<Alias>(EMPTY_ALIAS);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Auto Add Modal State
+  const [isAutoAddModalOpen, setIsAutoAddModalOpen] = useState(false);
+  const [substring, setSubstring] = useState('');
+  const [filteredModels, setFilteredModels] = useState<Array<{ model: Model; provider: Provider }>>([]);
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
 
   // Test State - track by alias id + target index
   const [testStates, setTestStates] = useState<Record<string, { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }>>({});
@@ -183,6 +189,70 @@ export const Models = () => {
       const newTargets = [...editingAlias.targets];
       newTargets.splice(index, 1);
       setEditingAlias({ ...editingAlias, targets: newTargets });
+  };
+
+  const handleOpenAutoAdd = () => {
+      setSubstring(editingAlias.id || '');
+      setFilteredModels([]);
+      setSelectedModels(new Set());
+      setIsAutoAddModalOpen(true);
+  };
+
+  const handleSearchModels = () => {
+      if (!substring.trim()) {
+          setFilteredModels([]);
+          return;
+      }
+
+      const searchLower = substring.toLowerCase();
+
+      const matches: Array<{ model: Model; provider: Provider }> = [];
+      availableModels.forEach(model => {
+          const provider = providers.find(p => p.id === model.providerId);
+          if (provider && (model.name.toLowerCase().includes(searchLower) || provider.name.toLowerCase().includes(searchLower))) {
+              matches.push({ model, provider: { ...provider } });
+          }
+      });
+
+      setFilteredModels(matches);
+  };
+
+  const handleToggleModelSelection = (modelId: string, providerId: string) => {
+      const key = `${providerId}:${modelId}`;
+      const newSelection = new Set(selectedModels);
+      if (newSelection.has(key)) {
+          newSelection.delete(key);
+      } else {
+          newSelection.add(key);
+      }
+      setSelectedModels(newSelection);
+  };
+
+  const handleAddSelectedModels = () => {
+      const newTargets = [...editingAlias.targets];
+
+      selectedModels.forEach(key => {
+          const [providerId, modelId] = key.split(':');
+          const provider = providers.find(p => p.id === providerId);
+          const model = availableModels.find(m => m.id === modelId && m.providerId === providerId);
+
+          if (provider && model) {
+              const alreadyExists = editingAlias.targets.some(t => t.provider === providerId && t.model === modelId);
+              if (!alreadyExists) {
+                  newTargets.push({
+                      provider: providerId,
+                      model: modelId,
+                      enabled: true
+                  });
+              }
+          }
+      });
+
+      setEditingAlias({ ...editingAlias, targets: newTargets });
+      setIsAutoAddModalOpen(false);
+      setSubstring('');
+      setFilteredModels([]);
+      setSelectedModels(new Set());
   };
 
   const addAlias = () => {
@@ -498,7 +568,10 @@ export const Models = () => {
               <div>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
                       <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Targets</label>
-                      <Button size="sm" variant="secondary" onClick={addTarget} leftIcon={<Plus size={14}/>}>Add Target</Button>
+                      <div style={{display: 'flex', gap: '8px'}}>
+                          <Button size="sm" variant="secondary" onClick={handleOpenAutoAdd} leftIcon={<Zap size={14}/>}>Auto Add</Button>
+                          <Button size="sm" variant="secondary" onClick={addTarget} leftIcon={<Plus size={14}/>}>Add Target</Button>
+                      </div>
                   </div>
 
                   {editingAlias.targets.length === 0 && (
@@ -585,6 +658,118 @@ export const Models = () => {
                       ))}
                   </div>
               </div>
+          </div>
+      </Modal>
+
+      <Modal
+        isOpen={isAutoAddModalOpen}
+        onClose={() => setIsAutoAddModalOpen(false)}
+        title="Auto Add Targets"
+        size="lg"
+        footer={
+            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
+                <Button variant="ghost" onClick={() => setIsAutoAddModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddSelectedModels} disabled={selectedModels.size === 0}>
+                    Add {selectedModels.size} Target{selectedModels.size !== 1 ? 's' : ''}
+                </Button>
+            </div>
+        }
+      >
+          <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+              <div style={{display: 'flex', gap: '8px'}}>
+                  <Input
+                    placeholder="Search models (e.g. 'gpt-4', 'claude')"
+                    value={substring}
+                    onChange={(e) => setSubstring(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearchModels()}
+                    style={{flex: 1}}
+                  />
+                  <Button onClick={handleSearchModels}>Search</Button>
+              </div>
+
+              {filteredModels.length > 0 ? (
+                  <div style={{
+                      maxHeight: '400px',
+                      overflowY: 'auto',
+                      border: '1px solid var(--color-border-glass)',
+                      borderRadius: 'var(--radius-sm)'
+                  }}>
+                      <table className="w-full border-collapse font-body text-[13px]">
+                          <thead style={{position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-hover)', zIndex: 10}}>
+                              <tr>
+                                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{width: '40px'}}>
+                                      <input
+                                        type="checkbox"
+                                        checked={filteredModels.length > 0 && filteredModels.every(m =>
+                                            selectedModels.has(`${m.provider.id}:${m.model.id}`) ||
+                                            editingAlias.targets.some(t => t.provider === m.provider.id && t.model === m.model.id)
+                                        )}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                const newSelection = new Set(selectedModels);
+                                                filteredModels.forEach(m => {
+                                                    const key = `${m.provider.id}:${m.model.id}`;
+                                                    if (!editingAlias.targets.some(t => t.provider === m.provider.id && t.model === m.model.id)) {
+                                                        newSelection.add(key);
+                                                    }
+                                                });
+                                                setSelectedModels(newSelection);
+                                            } else {
+                                                const newSelection = new Set(selectedModels);
+                                                filteredModels.forEach(m => {
+                                                    newSelection.delete(`${m.provider.id}:${m.model.id}`);
+                                                });
+                                                setSelectedModels(newSelection);
+                                            }
+                                        }}
+                                      />
+                                  </th>
+                                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Provider</th>
+                                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Model</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {filteredModels.map(({ model, provider }) => {
+                                  const key = `${provider.id}:${model.id}`;
+                                  const alreadyExists = editingAlias.targets.some(t => t.provider === provider.id && t.model === model.id);
+                                  const isSelected = selectedModels.has(key);
+                                  const isDisabled = alreadyExists;
+
+                                  return (
+                                      <tr key={key} className="hover:bg-bg-hover" style={{opacity: isDisabled ? 0.5 : 1}}>
+                                          <td className="px-4 py-3 text-left text-text">
+                                              <input
+                                                type="checkbox"
+                                                checked={isSelected || alreadyExists}
+                                                disabled={isDisabled}
+                                                onChange={() => handleToggleModelSelection(model.id, provider.id)}
+                                              />
+                                          </td>
+                                          <td className="px-4 py-3 text-left text-text">{provider.name}</td>
+                                          <td className="px-4 py-3 text-left text-text">
+                                              {model.name}
+                                              {alreadyExists && (
+                                                  <span style={{
+                                                      marginLeft: '8px',
+                                                      fontSize: '11px',
+                                                      color: 'var(--color-text-secondary)',
+                                                      fontStyle: 'italic'
+                                                  }}>
+                                                      (already added)
+                                                  </span>
+                                              )}
+                                          </td>
+                                      </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                  </div>
+              ) : substring ? (
+                  <div className="text-text-muted italic text-center text-sm py-8">No models found matching "{substring}"</div>
+              ) : (
+                  <div className="text-text-muted italic text-center text-sm py-8">Enter a search term to find models</div>
+              )}
           </div>
       </Modal>
     </div>

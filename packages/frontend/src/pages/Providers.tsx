@@ -727,12 +727,12 @@ export const Providers = () => {
                                                       </div>
                                                       <div style={{width: '10%', minWidth: '80px'}}>
                                                           <Input 
-                                                            label="Discount (0-1)" 
-                                                            type="number" 
+                                                            label="Discount (0-1)"
+                                                            type="number"
                                                             step="0.01"
                                                             min="0"
                                                             max="1"
-                                                            placeholder="0.2"
+                                                            placeholder=""
                                                             value={mCfg.pricing.discount ?? ''}
                                                             onChange={(e) => {
                                                               const val = e.target.value;
