@@ -505,7 +505,33 @@ export const Providers = () => {
                                                       <select
                                                         className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                                         value={mCfg.pricing?.source || 'simple'}
-                                                        onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, source: e.target.value } })}
+                                                        onChange={(e) => {
+                                                          const newSource = e.target.value;
+                                                          let newPricing: any;
+                                                          
+                                                          // Create a clean pricing object based on the selected source
+                                                          if (newSource === 'simple') {
+                                                            newPricing = {
+                                                              source: 'simple',
+                                                              input: mCfg.pricing?.input || 0,
+                                                              output: mCfg.pricing?.output || 0,
+                                                              cached: mCfg.pricing?.cached || 0
+                                                            };
+                                                          } else if (newSource === 'openrouter') {
+                                                            newPricing = {
+                                                              source: 'openrouter',
+                                                              slug: mCfg.pricing?.slug || '',
+                                                              ...(mCfg.pricing?.discount !== undefined && { discount: mCfg.pricing.discount })
+                                                            };
+                                                          } else if (newSource === 'defined') {
+                                                            newPricing = {
+                                                              source: 'defined',
+                                                              range: mCfg.pricing?.range || []
+                                                            };
+                                                          }
+                                                          
+                                                          updateModelConfig(mId, { pricing: newPricing });
+                                                        }}
                                                       >
                                                           <option value="simple">Simple</option>
                                                           <option value="openrouter">OpenRouter</option>
@@ -561,12 +587,30 @@ export const Providers = () => {
                                               )}
 
                                               {mCfg.pricing?.source === 'openrouter' && (
-                                                  <div style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)'}}>
+                                                  <div style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '12px'}}>
                                                       <Input 
                                                         label="OpenRouter Model Slug" 
-                                                        placeholder="e.g. anthropic/claude-3-opus"
+                                                        placeholder="e.g. anthropic/claude-3.5-sonnet"
                                                         value={mCfg.pricing.slug || ''}
                                                         onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, slug: e.target.value } })}
+                                                      />
+                                                      <Input 
+                                                        label="Model-Level Discount (0-1)" 
+                                                        type="number" 
+                                                        step="0.01"
+                                                        min="0"
+                                                        max="1"
+                                                        placeholder="Optional (e.g., 0.2 for 20% off)"
+                                                        value={mCfg.pricing.discount ?? ''}
+                                                        onChange={(e) => {
+                                                          const val = e.target.value;
+                                                          if (val === '') {
+                                                            const { discount, ...rest } = mCfg.pricing;
+                                                            updateModelConfig(mId, { pricing: rest });
+                                                          } else {
+                                                            updateModelConfig(mId, { pricing: { ...mCfg.pricing, discount: parseFloat(val) } });
+                                                          }
+                                                        }}
                                                       />
                                                   </div>
                                               )}
