@@ -8,12 +8,12 @@
 
 Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemini, etc.) under a single API. Switch models and providers without rewriting client code.
 
-## Key Features
+### Recent Updates (v0.8.5)
 
-- **Unified API**: OpenAI, Anthropic, and Gemini endpoints with intelligent protocol transformation
-- **Smart Routing**: Model aliasing, load balancing (random, cost, performance, latency), automatic cooldown
-- **Observability**: Real-time TTFT, TPS, costs, error rates, and debug mode
-- **Security**: API key authentication, OAuth 2.0, multi-key rotation, admin protection
+- **Bulk Model Import**: Import models directly in provider configuration
+- **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format  
+- **Per-Model Cooldowns**: Configure cooldown periods per target within model aliases
+- **InOrder Selector**: Prioritized fallback logic with automatic health recovery
 
 ## Quick Start
 

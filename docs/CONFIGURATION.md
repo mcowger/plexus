@@ -44,6 +44,43 @@ models:
         model: claude-3-5-sonnet-latest
 ```
 
+## Direct Model Routing
+
+As of v0.8.0, Plexus supports **Direct Model Routing**. This allows you to route requests directly to a provider's model without creating an alias in the `models` section. This uses the special `direct/` prefix format.
+
+**Format:** `direct/<provider-key>/<model-name>`
+
+**Example:**
+```yaml
+providers:
+  openai_direct:
+    api_base_url: https://api.openai.com/v1
+    api_key: your_openai_key
+    models:
+      - gpt-4o-mini
+
+# Clients can directly use: {"model": "direct/openai_direct/gpt-4o-mini", ...}
+```
+
+**How it works:**
+1. When a request comes in with a model starting with `direct/`, Plexus parses the format
+2. Extracts the provider key and model name from the path
+3. Validates that the provider exists and is enabled
+4. Bypasses alias resolution and selector logic
+5. Routes directly to the specified provider/model combination
+
+**Benefits:**
+- Bypasses the alias system for simple, direct routing
+- Useful for testing and debugging specific provider/model combinations
+- Access models that aren't explicitly defined in the `models` section
+- Used by the UI testing feature to test provider connections
+
+**Notes:**
+- The provider must exist in the `providers` section and be enabled
+- The model must be listed in the provider's `models` configuration
+- This bypasses any selector logic (random, cost, performance, etc.)
+- This bypasses any `additional_aliases` configuration
+
 ## Routing & Dispatching Lifecycle
 
 When a request enters Plexus, it follows a two-stage process to determine the destination and the protocol. The order of these stages can be configured using the `priority` field in the model configuration.
@@ -98,9 +135,7 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
 
-- **`api_key`**: (Optional) The authentication key for this provider. Required unless `oauth_provider` is specified.
-
-- **`oauth_provider`**: (Optional) The OAuth provider to use for authentication instead of a static API key. Currently supported: `"antigravity" | "claude-code"`. When specified, Plexus will use OAuth 2.0 tokens for authentication.
+ - **`api_key`**: (Required) The authentication key for this provider.
 
 - **`enabled`**: (Optional, default: `true`) Set to `false` to temporarily disable a provider.
 
@@ -182,9 +217,10 @@ This section defines the "virtual" models or aliases that clients will use when 
   - Maximizing pass-through optimization for better performance
   - Ensuring high-fidelity interactions by avoiding translation
 
-- **`targets`**: A list of provider/model pairs that back this alias.
-  - `provider`: Must match a key defined in the `providers` section.
-  - `model`: The specific model name to use on that provider.
+ - **`targets`**: A list of provider/model pairs that back this alias.
+   - `provider`: Must match a key defined in the `providers` section.
+   - `model`: The specific model name to use on that provider.
+   - **`cooldown_seconds`**: (Optional) Cooldown period in seconds for this specific target. When a target encounters an error or becomes unavailable, it will be marked as unhealthy for this duration before retry attempts. This allows you to configure different cooldown periods per-target within the same model alias.
 
 **Example with API Priority Matching:**
 
@@ -352,145 +388,4 @@ The `adminKey` acts as a shared secret for administrative access:
 1.  **Dashboard Access**: Users will be prompted to enter this key to access the web interface.
 2.  **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.
 3.  **Startup Requirement**: The Plexus server will fail to start if this key is missing from the configuration.
-
----
-
-## OAuth Authentication
-
-Plexus supports OAuth 2.0 authentication for providers like Google Antigravity and Anthropic Claude Code. Instead of using a static API key, OAuth allows Plexus to obtain and automatically refresh access tokens on your behalf.
-
-### Configuring an OAuth Provider
-
-To use OAuth authentication, specify `oauth_provider` instead of `api_key` in your provider configuration.
-
-#### Google Antigravity
-
-
-```yaml
-providers:
-  antigravity:
-    type: antigravity                              # Use gemini for API compatibility
-    display_name: Google Antigravity
-    api_base_url: https://cloudcode-pa.googleapis.com
-    oauth_provider: antigravity
-    oauth_account_pool:                       # List authenticated account emails
-      - your-email@gmail.com
-    models:
-      claude-opus-4.5:                        # Example model mapping
-        pricing:
-          source: openrouter
-          slug: anthropic/claude-opus-4.5
-```
-
-#### Anthropic Claude Code
-
-For Claude Code OAuth, use `type: messages` for the standard Anthropic Messages API:
-
-```yaml
-providers:
-  my-claude-code:
-    type: messages
-    display_name: Claude Code OAuth
-    api_base_url: https://api.anthropic.com/v1
-    oauth_provider: claude-code
-    oauth_account_pool:                       # List authenticated account emails
-      - your-email@example.com
-    models:
-      claude-sonnet-4-5:
-        pricing:
-          source: simple
-          input: 0.003
-          output: 0.015
-        access_via: [messages]
-      claude-opus-4-5:
-        pricing:
-          source: simple
-          input: 0.015
-          output: 0.075
-        access_via: [messages]
-```
-
-### OAuth Environment Variables
-
-OAuth functionality can be configured using environment variables. If not set, the following defaults are
-
-- **`ANTIGRAVITY_CLIENT_ID`**: Google OAuth client ID for Antigravity
-  - Default: `1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com`
-
-- **`ANTIGRAVITY_CLIENT_SECRET`**: Google OAuth client secret for Antigravity
-  - Default: `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`
-
-**Example** (if you need to override the defaults):
-
-```bash
-export ANTIGRAVITY_CLIENT_ID=your-client-id
-export ANTIGRAVITY_CLIENT_SECRET=your-client-secret
-```
-
-### OAuth Flow
-
-#### Antigravity OAuth Flow
-
-1. **Initiate Authentication**: Visit the OAuth management page in the Plexus UI, or directly access `/v0/oauth/authorize?provider=antigravity`
-2. **Google Sign-In**: You'll be redirected to Google to authenticate
-3. **Callback**: After authentication, you'll be redirected back to Plexus at `/v0/oauth/callback`
-4. **Automatic Refresh**: Plexus will automatically refresh tokens in the background before they expire
-
-#### Claude Code OAuth Flow
-
-1. **Initiate Authentication**: Visit the OAuth management page in the Plexus UI, or send a POST request to `/v0/oauth/claude/authorize`
-2. **Claude Sign-In**: You'll be redirected to Claude.ai to authenticate
-3. **Loopback Callback**: Claude redirects to `http://localhost:54545/callback` (the loopback server)
-4. **Backend Callback**: The loopback server extracts OAuth parameters and redirects to `/v0/oauth/claude/callback`
-5. **Automatic Refresh**: Plexus will automatically refresh tokens in the background before they expire (tokens expire after 1 hour, refresh tokens expire after 90 days)
-
-### OAuth Management Endpoints
-
-#### Antigravity Endpoints
-
-- **`GET /v0/oauth/authorize?provider=antigravity`**: Start OAuth flow
-- **`GET /v0/oauth/callback`**: OAuth callback endpoint (used by Google)
-- **`GET /v0/oauth/status?provider=antigravity`**: Check OAuth status and token expiry
-- **`GET /v0/oauth/credentials/grouped`**: Get all OAuth accounts grouped by provider (for UI)
-- **`DELETE /v0/oauth/credentials?provider=antigravity&user_identifier=email`**: Remove stored credentials
-- **`POST /v0/oauth/refresh`**: Manually trigger token refresh
-- **`GET /v0/oauth/refresh/status`**: Check token refresh service status
-
-#### Claude Code Endpoints
-
-- **`POST /v0/oauth/claude/authorize`**: Start Claude Code OAuth flow
-- **`GET /v0/oauth/claude/callback`**: OAuth callback endpoint (receives redirect from loopback server)
-- **`GET /v0/oauth/claude/accounts`**: Get all Claude Code OAuth accounts
-- **`POST /v0/oauth/claude/refresh`**: Manually refresh a specific account's token (requires `email` in request body)
-- **`DELETE /v0/oauth/claude/:email`**: Remove stored credentials for a specific account
-
-### Multi-Account Support
-
-Both Antigravity and Claude Code support multiple OAuth accounts through the `oauth_account_pool` configuration. This enables:
-
-- **Load Balancing**: Distribute requests across multiple accounts
-- **Per-Account Cooldowns**: When one account hits rate limits, requests automatically route to healthy accounts
-- **Account Management**: View and manage all authenticated accounts through the OAuth management UI
-
-**Example with multiple accounts:**
-
-```yaml
-providers:
-  my-claude-code:
-    type: messages
-    api_base_url: https://api.anthropic.com/v1
-    oauth_provider: claude-code
-    oauth_account_pool:
-      - alice@example.com
-      - bob@example.com
-      - charlie@example.com
-    models:
-      claude-sonnet-4-5:
-        access_via: [messages]
-```
-
-### Supported OAuth Providers
-
-- **`antigravity`**: Google Antigravity (Code Assist) - Uses Google OAuth with special scopes for accessing Gemini models via the Antigravity API
-- **`claude-code`**: Anthropic Claude Code - Uses Anthropic OAuth for accessing Claude models via the Claude API with extended rate limits
 
