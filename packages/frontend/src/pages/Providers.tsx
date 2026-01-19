@@ -5,7 +5,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download } from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
@@ -63,6 +63,20 @@ const EMPTY_PROVIDER: Provider = {
     models: {}
 };
 
+interface FetchedModel {
+  id: string;
+  name?: string;
+  context_length?: number;
+  created?: number;
+  object?: string;
+  owned_by?: string;
+  description?: string;
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+  };
+}
+
 export const Providers = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,6 +87,14 @@ export const Providers = () => {
   // Accordion state for Modal
   const [isModelsOpen, setIsModelsOpen] = useState(false);
   const [openModelIdx, setOpenModelIdx] = useState<string | null>(null);
+
+  // Fetch Models Modal state
+  const [isFetchModelsModalOpen, setIsFetchModelsModalOpen] = useState(false);
+  const [modelsUrl, setModelsUrl] = useState('');
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>([]);
+  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -240,6 +262,103 @@ export const Providers = () => {
       const models = { ...(editingProvider.models as Record<string, any>) };
       delete models[modelId];
       setEditingProvider({ ...editingProvider, models });
+  };
+
+  // Generate default models URL from chat URL
+  const generateModelsUrl = (): string => {
+    const chatUrl = getApiUrlValue('chat');
+    if (!chatUrl) return '';
+    
+    // Remove /chat/completions suffix and add /models
+    const baseUrl = chatUrl.replace(/\/chat\/completions\/?$/, '');
+    return `${baseUrl}/models`;
+  };
+
+  // Open fetch models modal
+  const handleOpenFetchModels = () => {
+    const defaultUrl = generateModelsUrl();
+    setModelsUrl(defaultUrl);
+    setFetchedModels([]);
+    setSelectedModelIds(new Set());
+    setFetchError(null);
+    setIsFetchModelsModalOpen(true);
+  };
+
+  // Fetch models from URL
+  const handleFetchModels = async () => {
+    if (!modelsUrl) {
+      setFetchError('Please enter a URL');
+      return;
+    }
+
+    setIsFetchingModels(true);
+    setFetchError(null);
+    
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Bearer token if available
+      if (editingProvider.apiKey) {
+        headers['Authorization'] = `Bearer ${editingProvider.apiKey}`;
+      }
+
+      const response = await fetch(modelsUrl, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.data || !Array.isArray(data.data)) {
+        throw new Error('Invalid response format: expected { data: [...] }');
+      }
+
+      setFetchedModels(data.data);
+      setSelectedModelIds(new Set());
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
+      setFetchError(error instanceof Error ? error.message : 'Failed to fetch models');
+      setFetchedModels([]);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
+  // Toggle model selection
+  const toggleModelSelection = (modelId: string) => {
+    const newSelection = new Set(selectedModelIds);
+    if (newSelection.has(modelId)) {
+      newSelection.delete(modelId);
+    } else {
+      newSelection.add(modelId);
+    }
+    setSelectedModelIds(newSelection);
+  };
+
+  // Add selected models to provider
+  const handleAddSelectedModels = () => {
+    const models = { ...(typeof editingProvider.models === 'object' && !Array.isArray(editingProvider.models) ? editingProvider.models : {}) };
+    
+    fetchedModels.forEach(model => {
+      if (selectedModelIds.has(model.id)) {
+        // Only add if not already exists
+        if (!models[model.id]) {
+          models[model.id] = {
+            pricing: { source: 'simple', input: 0, output: 0 },
+            access_via: []
+          };
+        }
+      }
+    });
+
+    setEditingProvider({ ...editingProvider, models });
+    setIsFetchModelsModalOpen(false);
   };
 
   return (
@@ -478,6 +597,15 @@ export const Providers = () => {
                       {isModelsOpen ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                       <span style={{fontWeight: 600, fontSize: '13px', flex: 1}}>Provider Models</span>
                       <Badge status="connected">{Object.keys(editingProvider.models || {}).length} Models</Badge>
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        onClick={(e) => { e.stopPropagation(); handleOpenFetchModels(); }}
+                        leftIcon={<Download size={14}/>}
+                        style={{marginLeft: '8px'}}
+                      >
+                        Fetch Models
+                      </Button>
                   </div>
                   {isModelsOpen && (
                       <div style={{padding: '8px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-deep)'}}>
@@ -712,6 +840,159 @@ export const Providers = () => {
                   )}
               </div>
           </div>
+      </Modal>
+
+      {/* Fetch Models Modal */}
+      <Modal
+        isOpen={isFetchModelsModalOpen}
+        onClose={() => setIsFetchModelsModalOpen(false)}
+        title="Fetch Models from Provider"
+        size="md"
+        footer={
+          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
+            <Button variant="ghost" onClick={() => setIsFetchModelsModalOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleAddSelectedModels} 
+              disabled={selectedModelIds.size === 0}
+            >
+              Add {selectedModelIds.size} Model{selectedModelIds.size !== 1 ? 's' : ''}
+            </Button>
+          </div>
+        }
+      >
+        <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+          <div style={{display: 'flex', gap: '8px', alignItems: 'end'}}>
+            <div style={{flex: 1}}>
+              <Input
+                label="Models Endpoint URL"
+                value={modelsUrl}
+                onChange={(e) => setModelsUrl(e.target.value)}
+                placeholder="https://api.example.com/v1/models"
+              />
+            </div>
+            <Button 
+              onClick={handleFetchModels} 
+              isLoading={isFetchingModels}
+              leftIcon={<Download size={16}/>}
+            >
+              Fetch
+            </Button>
+          </div>
+
+          {fetchError && (
+            <div style={{
+              padding: '12px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--color-danger)',
+              fontSize: '13px'
+            }}>
+              {fetchError}
+            </div>
+          )}
+
+          {fetchedModels.length > 0 && (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Available Models ({fetchedModels.length})
+                </label>
+                <div style={{display: 'flex', gap: '8px'}}>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => setSelectedModelIds(new Set(fetchedModels.map(m => m.id)))}
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => setSelectedModelIds(new Set())}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+
+              <div style={{
+                maxHeight: '400px',
+                overflowY: 'auto',
+                border: '1px solid var(--color-border-glass)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--color-bg-deep)'
+              }}>
+                {fetchedModels.map((model) => {
+                  const contextLengthK = model.context_length 
+                    ? `${(model.context_length / 1000).toFixed(0)}K` 
+                    : null;
+                  
+                  return (
+                    <div
+                      key={model.id}
+                      style={{
+                        padding: '12px',
+                        borderBottom: '1px solid var(--color-border-glass)',
+                        cursor: 'pointer',
+                        background: selectedModelIds.has(model.id) ? 'var(--color-bg-hover)' : 'transparent',
+                        transition: 'background 0.2s'
+                      }}
+                      onClick={() => toggleModelSelection(model.id)}
+                      className="hover:bg-bg-hover"
+                    >
+                      <div style={{display: 'flex', alignItems: 'start', gap: '12px'}}>
+                        <input
+                          type="checkbox"
+                          checked={selectedModelIds.has(model.id)}
+                          onChange={() => toggleModelSelection(model.id)}
+                          style={{marginTop: '2px', cursor: 'pointer'}}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div style={{flex: 1}}>
+                          <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}}>
+                            <span style={{fontWeight: 600, fontSize: '13px', color: 'var(--color-text)'}}>
+                              {model.id}
+                            </span>
+                            {contextLengthK && (
+                              <Badge status="connected" style={{fontSize: '10px', padding: '2px 6px'}}>
+                                {contextLengthK}
+                              </Badge>
+                            )}
+                          </div>
+                          {model.name && model.name !== model.id && (
+                            <div style={{fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '2px'}}>
+                              {model.name}
+                            </div>
+                          )}
+                          {model.description && (
+                            <div style={{fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', lineHeight: '1.4'}}>
+                              {model.description.length > 150 
+                                ? `${model.description.substring(0, 150)}...` 
+                                : model.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!isFetchingModels && fetchedModels.length === 0 && !fetchError && (
+            <div style={{
+              padding: '32px',
+              textAlign: 'center',
+              color: 'var(--color-text-secondary)',
+              fontSize: '13px',
+              fontStyle: 'italic'
+            }}>
+              Enter a URL and click Fetch to load available models
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
