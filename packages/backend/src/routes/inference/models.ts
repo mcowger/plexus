@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getConfig } from '../../config';
+import { PricingManager } from '../../services/pricing-manager';
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
     /**
@@ -32,6 +33,29 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         return reply.send({
             object: 'list',
             data: models
+        });
+    });
+
+    /**
+     * GET /v1/openrouter/models
+     * Returns a list of OpenRouter model slugs, optionally filtered by a search query.
+     * Query parameter: ?q=search-term
+     */
+    fastify.get('/v1/openrouter/models', async (request, reply) => {
+        const pricingManager = PricingManager.getInstance();
+        
+        if (!pricingManager.isInitialized()) {
+            return reply.status(503).send({
+                error: 'OpenRouter pricing data not yet loaded'
+            });
+        }
+
+        const query = (request.query as { q?: string }).q || '';
+        const slugs = pricingManager.searchModelSlugs(query);
+        
+        return reply.send({
+            data: slugs,
+            count: slugs.length
         });
     });
 }

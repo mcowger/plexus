@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/Badge';
 import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
+import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini'];
 
@@ -587,31 +588,35 @@ export const Providers = () => {
                                               )}
 
                                               {mCfg.pricing?.source === 'openrouter' && (
-                                                  <div style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                                                      <Input 
-                                                        label="OpenRouter Model Slug" 
-                                                        placeholder="e.g. anthropic/claude-3.5-sonnet"
-                                                        value={mCfg.pricing.slug || ''}
-                                                        onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, slug: e.target.value } })}
-                                                      />
-                                                      <Input 
-                                                        label="Model-Level Discount (0-1)" 
-                                                        type="number" 
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="1"
-                                                        placeholder="Optional (e.g., 0.2 for 20% off)"
-                                                        value={mCfg.pricing.discount ?? ''}
-                                                        onChange={(e) => {
-                                                          const val = e.target.value;
-                                                          if (val === '') {
-                                                            const { discount, ...rest } = mCfg.pricing;
-                                                            updateModelConfig(mId, { pricing: rest });
-                                                          } else {
-                                                            updateModelConfig(mId, { pricing: { ...mCfg.pricing, discount: parseFloat(val) } });
-                                                          }
-                                                        }}
-                                                      />
+                                                  <div style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)', display: 'flex', gap: '12px', alignItems: 'end'}}>
+                                                      <div style={{flex: '1'}}>
+                                                          <OpenRouterSlugInput 
+                                                            label="OpenRouter Model Slug" 
+                                                            placeholder="e.g. anthropic/claude-3.5-sonnet or just 'claude-sonnet'"
+                                                            value={mCfg.pricing.slug || ''}
+                                                            onChange={(value) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, slug: value } })}
+                                                          />
+                                                      </div>
+                                                      <div style={{width: '10%', minWidth: '80px'}}>
+                                                          <Input 
+                                                            label="Discount (0-1)" 
+                                                            type="number" 
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="1"
+                                                            placeholder="0.2"
+                                                            value={mCfg.pricing.discount ?? ''}
+                                                            onChange={(e) => {
+                                                              const val = e.target.value;
+                                                              if (val === '') {
+                                                                const { discount, ...rest } = mCfg.pricing;
+                                                                updateModelConfig(mId, { pricing: rest });
+                                                              } else {
+                                                                updateModelConfig(mId, { pricing: { ...mCfg.pricing, discount: parseFloat(val) } });
+                                                              }
+                                                            }}
+                                                          />
+                                                      </div>
                                                   </div>
                                               )}
 

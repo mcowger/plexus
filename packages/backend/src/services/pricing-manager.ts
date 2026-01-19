@@ -77,4 +77,25 @@ export class PricingManager {
     public isInitialized(): boolean {
         return this.initialized;
     }
+
+    public getAllModelSlugs(): string[] {
+        return Array.from(this.pricingMap.keys());
+    }
+
+    public searchModelSlugs(query: string): string[] {
+        if (!query) {
+            return this.getAllModelSlugs();
+        }
+        const lowerQuery = query.toLowerCase();
+        return Array.from(this.pricingMap.keys())
+            .filter(slug => slug.toLowerCase().includes(lowerQuery))
+            .sort((a, b) => {
+                // Prioritize matches that start with the query
+                const aStarts = a.toLowerCase().startsWith(lowerQuery);
+                const bStarts = b.toLowerCase().startsWith(lowerQuery);
+                if (aStarts && !bStarts) return -1;
+                if (!aStarts && bStarts) return 1;
+                return a.localeCompare(b);
+            });
+    }
 }

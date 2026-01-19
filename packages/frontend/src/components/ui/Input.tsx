@@ -12,7 +12,7 @@ export const Input: React.FC<InputProps> = ({ label, error, className, id, ...pr
   return (
     <div className={clsx('flex flex-col gap-2', { 'input-has-error': !!error })}>
       {label && (
-        <label htmlFor={inputId} className="font-body text-[13px] font-medium text-text-secondary">
+        <label htmlFor={inputId} className="font-body text-[13px] font-medium text-text-secondary whitespace-nowrap">
           {label}
         </label>
       )}

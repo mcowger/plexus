@@ -1,0 +1,74 @@
+{
+  "data": [
+    {
+      "id": "anthropic/claude-3.5-sonnet",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015"
+      }
+    },
+    {
+      "id": "anthropic/claude-3-opus",
+      "pricing": {
+        "prompt": "0.000015",
+        "completion": "0.000075"
+      }
+    },
+    {
+      "id": "anthropic/claude-3-sonnet",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015"
+      }
+    },
+    {
+      "id": "anthropic/claude-3-haiku",
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.00000125"
+      }
+    },
+    {
+      "id": "openai/gpt-4-turbo",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00003"
+      }
+    },
+    {
+      "id": "openai/gpt-4",
+      "pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00006"
+      }
+    },
+    {
+      "id": "openai/gpt-3.5-turbo",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000015"
+      }
+    },
+    {
+      "id": "google/gemini-pro",
+      "pricing": {
+        "prompt": "0.000000125",
+        "completion": "0.000000375"
+      }
+    },
+    {
+      "id": "meta-llama/llama-3-70b-instruct",
+      "pricing": {
+        "prompt": "0.00000059",
+        "completion": "0.00000079"
+      }
+    },
+    {
+      "id": "mistralai/mistral-large",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.000024"
+      }
+    }
+  ]
+}
