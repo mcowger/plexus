@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.8.5 - 2026-01-19
+
+### v0.8.5: Bulk Model Import and Enhanced Provider Interface Capabilities
+
+### New Features
+
+- **Bulk Model Import**: Introduced functionality to bulk import models directly within the provider configuration ([a3c0d9a](https://github.com/mcowger/plexus/commit/a3c0d9a)).
+- **Automated Model Addition**: Added a new model auto-add feature supporting search and multi-select UI patterns ([4c88193](https://github.com/mcowger/plexus/commit/4c88193)).
+- **OpenRouter Slug Autocomplete**: Implemented substring-based search and autocomplete for OpenRouter model slugs ([2e816c9](https://github.com/mcowger/plexus/commit/2e816c9)).
+
+### Minor Changes & Bug Fixes
+
+- **Direct Model Access**: Refactored logic for direct model access patterns ([c5061be](https://github.com/mcowger/plexus/commit/c5061be)).
+- **UI Enhancements**: Fetched models are now sorted alphabetically by their ID ([0e8b246](https://github.com/mcowger/plexus/commit/0e8b246)).
+- **Testing Infrastructure**: Enhanced model testing routines with API-specific templates ([88d3634](https://github.com/mcowger/plexus/commit/88d3634)) and forced non-streaming modes for internal tests ([797b2f6](https://github.com/mcowger/plexus/commit/797b2f6)).
+- **Stability Fixes**: Resolved test mock pollution by removing the global `PricingManager` mock ([5ee1c9b](https://github.com/mcowger/plexus/commit/5ee1c9b)) and corrected pricing source field validation in the provider UI ([daa6880](https://github.com/mcowger/plexus/commit/daa6880)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.8.0 - 2026-01-18
 
 ### v0.8.0: Direct Model Routing and Granular Cooldown Management
