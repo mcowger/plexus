@@ -8,30 +8,6 @@ import { UsageRecord } from "../../types/usage";
 import { PricingManager } from "../../services/pricing-manager";
 import path from "path";
 
-// Mock PricingManager
-mock.module("../../services/pricing-manager", () => {
-    const pricingMap = new Map();
-    pricingMap.set("minimax/minimax-m2.1", {
-        prompt: "0.0000003",
-        completion: "0.0000012",
-        input_cache_read: "0.00000003"
-    });
-    pricingMap.set("z-ai/glm-4.7", {
-        prompt: "0.0000004",
-        completion: "0.0000015"
-    });
-
-    return {
-        PricingManager: {
-            getInstance: () => ({
-                getPricing: (slug: string) => pricingMap.get(slug),
-                loadPricing: () => Promise.resolve(),
-                isInitialized: () => true
-            })
-        }
-    };
-});
-
 describe("handleResponse - OpenRouter Pricing", () => {
     const mockStorage = {
         saveRequest: mock(),
@@ -63,22 +39,22 @@ describe("handleResponse - OpenRouter Pricing", () => {
         cache_creation_tokens: 0
     };
 
+    const testDataPath = path.join(__dirname, "fixtures/openrouter-models.json");
+
     beforeAll(async () => {
-        // Load pricing from the test models.json file
-        const modelsPath = path.resolve(process.cwd(), "packages/backend/src/__tests__/models.json");
-        await PricingManager.getInstance().loadPricing(modelsPath);
+        await PricingManager.getInstance().loadPricing(testDataPath);
     });
 
     test("should calculate costs for 'openrouter' pricing strategy (GPT-3.5 Turbo)", async () => {
-        const slug = "minimax/minimax-m2.1";
+        const slug = "anthropic/claude-3.5-sonnet";
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-or-1",
-            model: "minimax-m2.1",
+            model: "claude-3.5-sonnet",
             content: "Hello",
             plexus: {
                 provider: "openrouter",
-                model: "minimax/minimax-m2.1",
+                model: "anthropic/claude-3.5-sonnet",
                 apiType: "openai",
                 pricing: {
                     source: 'openrouter',
@@ -109,22 +85,22 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        expect(usageRecord.costInput).toBeCloseTo(0.0003, 8);
-        expect(usageRecord.costOutput).toBeCloseTo(0.0006, 8);
-        expect(usageRecord.costCached).toBeCloseTo(0.00003, 8);
-        expect(usageRecord.costTotal).toBeCloseTo(0.00093, 8);
+        expect(usageRecord.costInput).toBeCloseTo(0.003, 8);
+        expect(usageRecord.costOutput).toBeCloseTo(0.0075, 8);
+        expect(usageRecord.costCached).toBeCloseTo(0.0003, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.0108, 8);
     });
 
     test("should calculate costs for 'openrouter' pricing strategy (Missing Cache Rate)", async () => {
-        const slug = "z-ai/glm-4.7";
+        const slug = "openai/gpt-4";
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-or-2",
-            model: "glm-4.7",
+            model: "gpt-4",
             content: "Hello",
             plexus: {
                 provider: "openrouter",
-                model: "z-ai/glm-4.7",
+                model: "openai/gpt-4",
                 apiType: "openai",
                 pricing: {
                     source: 'openrouter',
@@ -155,10 +131,10 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        expect(usageRecord.costInput).toBeCloseTo(0.0004, 8);
-        expect(usageRecord.costOutput).toBeCloseTo(0.00075, 8);
+        expect(usageRecord.costInput).toBeCloseTo(0.03, 8);
+        expect(usageRecord.costOutput).toBeCloseTo(0.03, 8);
         expect(usageRecord.costCached).toBe(0);
-        expect(usageRecord.costTotal).toBeCloseTo(0.00115, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.06, 8);
     });
 
     test("should handle missing pricing slug gracefully", async () => {
@@ -202,15 +178,15 @@ describe("handleResponse - OpenRouter Pricing", () => {
     });
 
     test("should calculate costs for 'openrouter' pricing strategy with DISCOUNT", async () => {
-        const slug = "minimax/minimax-m2.1";
+        const slug = "anthropic/claude-3.5-sonnet";
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-or-discount",
-            model: "minimax-m2.1",
+            model: "claude-3.5-sonnet",
             content: "Hello",
             plexus: {
                 provider: "openrouter",
-                model: "minimax/minimax-m2.1",
+                model: "anthropic/claude-3.5-sonnet",
                 apiType: "openai",
                 pricing: {
                     source: 'openrouter',
@@ -242,25 +218,25 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        expect(usageRecord.costInput).toBeCloseTo(0.00027, 8);
-        expect(usageRecord.costOutput).toBeCloseTo(0.00054, 8);
-        expect(usageRecord.costCached).toBeCloseTo(0.000027, 8);
-        expect(usageRecord.costTotal).toBeCloseTo(0.000837, 8);
+        expect(usageRecord.costInput).toBeCloseTo(0.0027, 8);
+        expect(usageRecord.costOutput).toBeCloseTo(0.00675, 8);
+        expect(usageRecord.costCached).toBeCloseTo(0.00027, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.00972, 8);
         
         const metadata = JSON.parse(usageRecord.costMetadata || "{}");
         expect(metadata.discount).toBe(0.1);
     });
 
     test("should calculate costs for 'openrouter' pricing strategy with PROVIDER-LEVEL DISCOUNT", async () => {
-        const slug = "minimax/minimax-m2.1";
+        const slug = "anthropic/claude-3.5-sonnet";
 
         const unifiedResponse: UnifiedChatResponse = {
             id: "resp-or-provider-discount",
-            model: "minimax-m2.1",
+            model: "claude-3.5-sonnet",
             content: "Hello",
             plexus: {
                 provider: "openrouter",
-                model: "minimax/minimax-m2.1",
+                model: "anthropic/claude-3.5-sonnet",
                 apiType: "openai",
                 pricing: {
                     source: 'openrouter',
@@ -292,10 +268,10 @@ describe("handleResponse - OpenRouter Pricing", () => {
             "chat"
         );
 
-        expect(usageRecord.costInput).toBeCloseTo(0.00024, 8);
-        expect(usageRecord.costOutput).toBeCloseTo(0.00048, 8);
-        expect(usageRecord.costCached).toBeCloseTo(0.000024, 8);
-        expect(usageRecord.costTotal).toBeCloseTo(0.000744, 8);
+        expect(usageRecord.costInput).toBeCloseTo(0.0024, 8);
+        expect(usageRecord.costOutput).toBeCloseTo(0.006, 8);
+        expect(usageRecord.costCached).toBeCloseTo(0.00024, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.00864, 8);
         
         const metadata = JSON.parse(usageRecord.costMetadata || "{}");
         expect(metadata.discount).toBe(0.2);
