@@ -57,7 +57,14 @@ jobs:
 
       - name: Extract Release Notes
         run: |
-          awk '/^## / { if (p) exit; p=1; next } p' CHANGELOG.md > RELEASE_NOTES.md
+          awk '/^## v[0-9]+\.[0-9]+\.[0-9]+/ { if (p) exit; p=1; next } p' CHANGELOG.md > RELEASE_NOTES.md
+
+      - name: Validate Release Notes
+        run: |
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "ERROR: Release notes file is empty!"
+            exit 1
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v1

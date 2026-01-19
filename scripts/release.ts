@@ -213,6 +213,10 @@ async function main() {
 
   if (!notes) {
       notes = await ask("Release Notes (Markdown supported)");
+      if (!notes || notes.trim().length === 0) {
+          console.log(`\n${pc.red("❌ Release notes cannot be empty. Exiting.")}`);
+          process.exit(1);
+      }
   }
 
   rl.close();
