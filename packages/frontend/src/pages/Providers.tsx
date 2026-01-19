@@ -319,7 +319,9 @@ export const Providers = () => {
         throw new Error('Invalid response format: expected { data: [...] }');
       }
 
-      setFetchedModels(data.data);
+      // Sort models alphabetically by ID
+      const sortedModels = [...data.data].sort((a, b) => a.id.localeCompare(b.id));
+      setFetchedModels(sortedModels);
       setSelectedModelIds(new Set());
     } catch (error) {
       console.error('Failed to fetch models:', error);
