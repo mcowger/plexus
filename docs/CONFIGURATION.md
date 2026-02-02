@@ -194,11 +194,10 @@ For providers that support multiple API endpoints (e.g., both OpenAI chat comple
 ```yaml
 providers:
   synthetic:
-    # Declare multiple supported API types
-    type: ["chat", "messages", "embeddings"]
     display_name: Synthetic Provider
     
     # Map each API type to its specific base URL
+    # API types are automatically inferred from the keys
     api_base_url:
       chat: https://api.synthetic.new/openai/v1
       messages: https://api.synthetic.new/anthropic/v1
@@ -227,7 +226,6 @@ When using multi-protocol providers with API priority matching (`priority: api_m
 ```yaml
 providers:
   openai:
-    type: chat
     display_name: OpenAI
     api_base_url: https://api.openai.com/v1
     api_key: "sk-..."
