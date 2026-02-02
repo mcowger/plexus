@@ -26,7 +26,9 @@ export async function handleResponse(
   usageRecord: Partial<UsageRecord>,
   usageStorage: UsageStorageService,
   startTime: number,
-  apiType: "chat" | "messages" | "gemini"
+  apiType: "chat" | "messages" | "gemini",
+  shouldEstimateTokens: boolean = false,
+  originalRequest?: any
 ) {
   // Populate usage record with metadata from the dispatcher's selection
   usageRecord.selectedModelName =
@@ -44,6 +46,18 @@ export async function handleResponse(
   // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
   const providerApiType = (unifiedResponse.plexus?.apiType || "chat").toLowerCase();
 
+  // Enable ephemeral debug capture if token estimation is needed
+  const debugManager = DebugManager.getInstance();
+  const wasDebugEnabled = debugManager.isEnabled();
+  
+  if (shouldEstimateTokens) {
+    debugManager.markEphemeral(usageRecord.requestId!);
+    // Temporarily enable debug mode for this request if not already enabled
+    if (!wasDebugEnabled) {
+      debugManager.setEnabled(true);
+    }
+  }
+
   // --- Scenario A: Streaming Response ---
   if (unifiedResponse.stream) {
     let finalClientStream: ReadableStream;
@@ -51,21 +65,26 @@ export async function handleResponse(
 
     // TAP THE RAW STREAM for debugging
     // We want to capture the stream BEFORE any transformation to log the true "Raw Response".
-    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType);
+    const shouldDebug = debugManager.isEnabled() || shouldEstimateTokens;
+    const rawLogInspector = shouldDebug 
+        ? new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType)
+        : null;
     
-    const tapStream = new TransformStream({
-      transform(chunk, controller) {
-        // Feed the inspector (Node PassThrough)
-        rawLogInspector.write(chunk);
-        controller.enqueue(chunk);
-      },
-      flush() {
-        rawLogInspector.end();
-      }
-    });
-    
-    // Replace the original stream with the tapped stream
-    rawStream = rawStream.pipeThrough(tapStream);
+    if (rawLogInspector) {
+        const tapStream = new TransformStream({
+          transform(chunk, controller) {
+            // Feed the inspector (Node PassThrough)
+            rawLogInspector.write(chunk);
+            controller.enqueue(chunk);
+          },
+          flush() {
+            rawLogInspector.end();
+          }
+        });
+        
+        // Replace the original stream with the tapped stream
+        rawStream = rawStream.pipeThrough(tapStream);
+    }
 
     if (unifiedResponse.bypassTransformation) {
       // Direct pass-through: No changes to the provider's raw bytes
@@ -128,7 +147,10 @@ export async function handleResponse(
       usageRecord,
       pricing,
       providerDiscount,
-      startTime
+      startTime,
+      shouldEstimateTokens,
+      streamApiType,
+      originalRequest
     ).createInspector(streamApiType);
 
     // Convert Web Stream to Node Stream for piping
@@ -137,6 +159,16 @@ export async function handleResponse(
     // Pipeline: Source -> Usage -> Client
     // rawLogInspector is already tapped via the TransformStream above
     const pipeline = nodeStream.pipe(usageInspector);
+
+    // Restore debug mode state when the stream ends (not before!)
+    if (shouldEstimateTokens && !wasDebugEnabled) {
+      pipeline.on('end', () => {
+        debugManager.setEnabled(false);
+      });
+      pipeline.on('error', () => {
+        debugManager.setEnabled(false);
+      });
+    }
 
     usageRecord.responseStatus = "success";
 

@@ -29,5 +29,6 @@ export interface UsageRecord {
     hasDebug?: boolean;
     hasError?: boolean;
     isPassthrough?: boolean;
+    tokensEstimated?: number; // 0 = actual usage from provider, 1 = estimated
     createdAt?: number;
 }

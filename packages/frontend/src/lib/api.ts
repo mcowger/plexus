@@ -97,6 +97,7 @@ export interface Provider {
   apiBaseUrl?: string | Record<string, string>;
   apiKey: string;
   enabled: boolean;
+  estimateTokens?: boolean;
   discount?: number;
   headers?: Record<string, string>;
   extraBody?: Record<string, any>;
@@ -192,6 +193,7 @@ interface PlexusConfig {
         display_name?: string;
         models?: string[] | Record<string, any>;
         enabled?: boolean; // Custom field we might want to preserve if we could
+        estimateTokens?: boolean;
         discount?: number;
         headers?: Record<string, string>;
         extraBody?: Record<string, any>;
@@ -696,6 +698,7 @@ export const api = {
                 apiBaseUrl: val.api_base_url,
                 apiKey: val.api_key || '',
                 enabled: val.enabled !== false, // Default to true if not present
+                estimateTokens: val.estimateTokens || false,
                 discount: val.discount,
                 headers: val.headers,
                 extraBody: val.extraBody,
@@ -780,6 +783,7 @@ export const api = {
           api_key: provider.apiKey,
           api_base_url: provider.apiBaseUrl,
           display_name: provider.name,
+          estimateTokens: provider.estimateTokens,
           discount: provider.discount,
           headers: provider.headers,
           extraBody: provider.extraBody,

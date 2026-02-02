@@ -448,6 +448,7 @@ export class Dispatcher {
       pricing: route.modelConfig?.pricing,
       providerDiscount: route.config.discount,
       canonicalModel: route.canonicalModel,
+      config: route.config,
     };
   }
 

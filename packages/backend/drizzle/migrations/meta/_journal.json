@@ -8,6 +8,13 @@
       "when": 1770000989038,
       "tag": "0000_elite_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1770010868801,
+      "tag": "0001_absent_spencer_smythe",
+      "breakpoints": true
     }
   ]
 }

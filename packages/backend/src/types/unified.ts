@@ -125,6 +125,7 @@ export interface UnifiedChatResponse {
       pricing?: any;
       providerDiscount?: number;
       canonicalModel?: string;
+      config?: any;
   };
   reasoning_content?: string | null;
   thinking?: {

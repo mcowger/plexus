@@ -10,6 +10,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates (v0.8.5)
 
+- **Token Estimation**: Automatic token counting for providers that don't return usage data
 - **Bulk Model Import**: Import models directly in provider configuration
 - **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format  
 - **Per-Model Cooldowns**: Configure cooldown periods per target within model aliases

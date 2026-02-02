@@ -55,6 +55,9 @@ export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: 
 
             const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
             
+            // Determine if token estimation is needed
+            const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
+            
             return await handleResponse(
                 request,
                 reply,
@@ -63,7 +66,9 @@ export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: 
                 usageRecord,
                 usageStorage,
                 startTime,
-                'gemini'
+                'gemini',
+                shouldEstimateTokens,
+                body
             );
         } catch (e: any) {
             usageRecord.responseStatus = 'error';

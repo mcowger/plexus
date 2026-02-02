@@ -34,21 +34,42 @@ import * as schema from './sqlite';
 - Cause data loss or corruption
 - Create inconsistencies between development and production environments
 
-#### Always Create NEW Migrations
+#### NEVER Manually Create Migration Files
 
-When schema changes are needed:
+**You must NEVER manually create migration SQL files or edit the migration journal (`meta/_journal.json`).** Always use `drizzle-kit generate` to create migrations automatically. Manual migration creation causes critical issues:
 
-1. **Edit the appropriate schema file** in `postgres/` or `sqlite/`
-2. **Generate a new migration**:
+- Drizzle-kit ignores migrations not in the journal
+- Running `drizzle-kit generate` will create conflicting migrations
+- The migration system becomes out of sync with the schema
+- Causes failed deployments and database corruption
+
+#### The ONLY Correct Migration Workflow
+
+When schema changes are needed, follow these steps **exactly**:
+
+1. **Edit the schema files** in `postgres/` or `sqlite/` subdirectories
+2. **Generate migrations for BOTH databases**:
    ```bash
-   # For PostgreSQL
-   PLEXUS_DB_TYPE=postgres bunx drizzle-kit generate
+   cd packages/backend
    
-   # For SQLite (default)
+   # Generate SQLite migration
    bunx drizzle-kit generate
+   
+   # Generate PostgreSQL migration
+   bunx drizzle-kit generate --config drizzle.config.pg.ts
    ```
-3. **Review the new migration** in `drizzle/migrations/` or `drizzle/migrations_pg/`
-4. **Test the migration** in development before deploying
+3. **Review the generated migrations**:
+   - Check `drizzle/migrations/XXXX_description.sql` (SQLite)
+   - Check `drizzle/migrations_pg/XXXX_description.sql` (PostgreSQL)
+   - Verify both the SQL file AND the journal entry were created
+4. **Test the migrations** - restart the server and verify no errors
+5. **Commit all generated files** - SQL, snapshots, and journal changes
+
+**NEVER:**
+- Create `.sql` files manually
+- Edit `meta/_journal.json` manually  
+- Skip generating migrations for both databases
+- Modify the database schema directly with SQL commands
 
 #### Live Database Safety
 

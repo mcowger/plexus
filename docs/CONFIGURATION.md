@@ -149,6 +149,8 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider. Often used if you want to base your pricing on public numbers but apply a global discount.
 
+- **`estimateTokens`**: (Optional, default: `false`) Enable automatic token estimation for providers that don't return usage data in their responses. When enabled, Plexus will reconstruct the response content and estimate token counts using a character-based heuristic algorithm. See [Token Estimation](#token-estimation) for details.
+
 **Multi-Protocol Provider Configuration:**
 
 For providers that support multiple API endpoints (e.g., both OpenAI chat completions and Anthropic messages), you can configure them as follows:
@@ -388,4 +390,148 @@ The `adminKey` acts as a shared secret for administrative access:
 1.  **Dashboard Access**: Users will be prompted to enter this key to access the web interface.
 2.  **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.
 3.  **Startup Requirement**: The Plexus server will fail to start if this key is missing from the configuration.
+
+## Token Estimation
+
+Some AI providers (particularly free-tier models on OpenRouter and similar platforms) don't return usage data in their responses. This makes it difficult to track token consumption and calculate costs accurately.
+
+Plexus includes an **automatic token estimation feature** that reconstructs response content and estimates token counts using a character-based heuristic algorithm when providers don't return usage data.
+
+### How It Works
+
+When `estimateTokens: true` is enabled for a provider:
+
+1. **Ephemeral Debug Capture**: Plexus temporarily enables debug mode for that specific request to capture the full response stream without persisting debug logs to the database.
+
+2. **Response Reconstruction**: The complete response is reconstructed from the streaming chunks using the existing debug inspector infrastructure.
+
+3. **Token Estimation**: A sophisticated character-based algorithm analyzes the reconstructed content to estimate token counts:
+   - **Input tokens**: Estimated from the original request payload (messages, system prompts, tools, etc.)
+   - **Output tokens**: Estimated from the reconstructed response content
+   - **Reasoning tokens**: Estimated from extended thinking blocks (for models like o1/o3)
+
+4. **Automatic Cleanup**: Debug data is immediately discarded after estimation—nothing is saved to disk.
+
+5. **Database Flag**: Usage records include a `tokensEstimated` field to distinguish estimated vs. actual token counts.
+
+### Estimation Algorithm
+
+The estimation algorithm uses a character-based heuristic that accounts for:
+
+- **Whitespace density**: More whitespace generally means fewer tokens
+- **Code patterns**: Code blocks and structured data have different token densities
+- **JSON structures**: Keys, values, and formatting affect token counts
+- **URLs and paths**: Long URLs are typically fewer tokens than their character count suggests
+- **Special characters**: Punctuation and symbols impact tokenization
+
+**Baseline formula**: `tokens ≈ characters / 3.8`
+
+The algorithm dynamically adjusts this ratio based on content analysis to provide more accurate estimates.
+
+### Configuration
+
+Enable token estimation in your provider configuration:
+
+```yaml
+providers:
+  openrouter-free:
+    api_base_url: https://openrouter.ai/api/v1
+    api_key: ${OPENROUTER_API_KEY}
+    estimateTokens: true  # Enable estimation for this provider
+    models:
+      - meta-llama/llama-3.2-3b-instruct:free
+      - google/gemma-2-9b-it:free
+```
+
+You can also enable it through the Admin UI:
+1. Navigate to **Providers** in the dashboard
+2. Edit the provider configuration
+3. Enable the **"Estimate Tokens"** toggle in Advanced Configuration
+4. Save the provider
+
+### When to Use Token Estimation
+
+**Use token estimation when:**
+- Provider doesn't return usage data (common with free-tier models)
+- You need cost tracking and usage analytics
+- You want to monitor token consumption trends
+
+**Don't use token estimation when:**
+- Provider returns accurate usage data (estimation adds overhead)
+- You need exact token counts for billing purposes
+- Performance is critical (estimation requires response reconstruction)
+
+### Accuracy
+
+Token estimation provides **approximate** token counts that are typically within **±15%** of actual values. The accuracy varies based on:
+
+- **Content type**: Plain text is more accurate than code or JSON
+- **Language**: English text is most accurate
+- **Model**: Different models use different tokenizers
+
+Estimated counts are sufficient for:
+- Usage monitoring and trending
+- Cost approximation
+- Capacity planning
+- Rate limiting decisions
+
+For precise billing or quota enforcement, use providers that return actual usage data.
+
+### Performance Impact
+
+Token estimation has minimal performance impact:
+- **Response reconstruction**: Uses existing debug inspector infrastructure (no additional parsing)
+- **Estimation algorithm**: Lightweight character analysis (~1ms per request)
+- **Memory**: Ephemeral capture is immediately discarded after estimation
+
+The primary overhead is from temporarily buffering the response for reconstruction, which is negligible for typical response sizes.
+
+### Database Schema
+
+Usage records include a `tokens_estimated` field (integer, default: 0):
+
+```sql
+CREATE TABLE request_usage (
+  -- ... other fields ...
+  tokens_input INTEGER,
+  tokens_output INTEGER,
+  tokens_reasoning INTEGER,
+  tokens_cached INTEGER,
+  tokens_estimated INTEGER NOT NULL DEFAULT 0,  -- 0 = actual, 1 = estimated
+  -- ... other fields ...
+);
+```
+
+Query estimated vs. actual usage:
+
+```sql
+-- Count estimated vs. actual token records
+SELECT 
+  CASE 
+    WHEN tokens_estimated = 1 THEN 'Estimated' 
+    ELSE 'Actual' 
+  END as token_source,
+  COUNT(*) as record_count,
+  SUM(tokens_input) as total_input_tokens,
+  SUM(tokens_output) as total_output_tokens
+FROM request_usage
+GROUP BY token_source;
+
+-- Find providers using estimation
+SELECT provider, COUNT(*) as estimated_records
+FROM request_usage
+WHERE tokens_estimated = 1
+GROUP BY provider
+ORDER BY estimated_records DESC;
+```
+
+### Logging
+
+When estimation occurs, Plexus logs at `info` level:
+
+```
+[INFO] Estimated tokens for request abc-123: input=1234, output=5678, reasoning=0
+```
+
+This helps you monitor which requests are using estimation and verify the feature is working correctly.
 

@@ -7,6 +7,7 @@ import { UsageRecord } from "../../types/usage";
 import { calculateCosts } from "../../utils/calculate-costs";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { DebugManager } from "../debug-manager";
+import { estimateTokensFromReconstructed, estimateInputTokens } from "../../utils/estimate-tokens";
 
 export class UsageInspector extends BaseInspector {
     private usageStorage: UsageStorageService;
@@ -14,6 +15,9 @@ export class UsageInspector extends BaseInspector {
     private pricing: any;
     private providerDiscount?: number;
     private startTime: number;
+    private shouldEstimateTokens: boolean;
+    private apiType: string;
+    private originalRequest?: any;
 
     constructor(
         requestId: string,
@@ -21,7 +25,10 @@ export class UsageInspector extends BaseInspector {
         usageRecord: Partial<UsageRecord>,
         pricing: any,
         providerDiscount: number | undefined,
-        startTime: number
+        startTime: number,
+        shouldEstimateTokens: boolean = false,
+        apiType: string = 'chat',
+        originalRequest?: any
     ) {
         super(requestId);
         this.usageStorage = usageStorage;
@@ -29,6 +36,9 @@ export class UsageInspector extends BaseInspector {
         this.pricing = pricing;
         this.providerDiscount = providerDiscount;
         this.startTime = startTime;
+        this.shouldEstimateTokens = shouldEstimateTokens;
+        this.apiType = apiType;
+        this.originalRequest = originalRequest;
     }
 
     createInspector(apiType: string): PassThrough {
@@ -96,6 +106,49 @@ export class UsageInspector extends BaseInspector {
                     this.usageRecord.tokensOutput = stats.outputTokens;
                     this.usageRecord.tokensCached = stats.cachedTokens;
                     this.usageRecord.tokensReasoning = stats.reasoningTokens;
+                }
+
+                // Estimate tokens if no usage data was found and estimation is enabled
+                if (!stats.foundUsage && this.shouldEstimateTokens) {
+                    logger.info(`[Inspector:Usage] No usage data found for ${this.requestId}, attempting estimation`);
+                    
+                    const debugManager = DebugManager.getInstance();
+                    const reconstructed = debugManager.getReconstructedRawResponse(this.requestId);
+                    
+                    if (reconstructed) {
+                        try {
+                            const estimated = estimateTokensFromReconstructed(reconstructed, this.apiType);
+                            
+                            // Estimate input tokens from original request if available
+                            if (this.originalRequest) {
+                                const inputEstimate = estimateInputTokens(this.originalRequest, this.apiType);
+                                stats.inputTokens = inputEstimate;
+                            }
+                            
+                            stats.outputTokens = estimated.output;
+                            stats.reasoningTokens = estimated.reasoning;
+                            
+                            // Update usage record with estimates
+                            this.usageRecord.tokensInput = stats.inputTokens;
+                            this.usageRecord.tokensOutput = stats.outputTokens;
+                            this.usageRecord.tokensReasoning = stats.reasoningTokens;
+                            
+                            // Mark tokens as estimated (1 = estimated, 0 = actual)
+                            this.usageRecord.tokensEstimated = 1;
+                            
+                            logger.info(
+                                `[Inspector:Usage] Estimated tokens for ${this.requestId}: ` +
+                                `input=${stats.inputTokens}, output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
+                            );
+                        } catch (err) {
+                            logger.error(`[Inspector:Usage] Token estimation failed for ${this.requestId}:`, err);
+                        }
+                    } else {
+                        logger.warn(`[Inspector:Usage] No reconstructed response available for estimation on ${this.requestId}`);
+                    }
+                    
+                    // Clean up ephemeral debug data
+                    debugManager.discardEphemeral(this.requestId);
                 }
 
                 // Finalize stats
