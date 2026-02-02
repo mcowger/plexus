@@ -14,6 +14,16 @@ let sqlClient: postgres.Sql | null = null;
 let currentDialect: SupportedDialect | null = null;
 let currentSchema: any = null;
 
+function createDrizzleLogger() {
+  return {
+    logQuery(query: string, params: unknown[]) {
+      if (process.env.LOG_LEVEL === 'debug') {
+        logger.debug(`Query: ${query}`);
+      }
+    },
+  };
+}
+
 function parseConnectionString(uri: string): { dialect: SupportedDialect; connectionString: string } {
   if (uri.startsWith('sqlite://')) {
     return { dialect: 'sqlite', connectionString: uri.replace('sqlite://', '') };
@@ -80,12 +90,13 @@ export function initializeDatabase(connectionString?: string) {
     currentSchema = sqliteSchema;
     dbInstance = drizzle(sqlite, {
       schema: { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance },
-      logger: process.env.LOG_LEVEL === 'debug',
+      logger: createDrizzleLogger(),
     });
   } else {
     sqlClient = postgres(connStr, {
       ssl: false,
       max: 10,
+      onnotice: () => {},
     });
 
     const pgSchema = require('../../drizzle/schema/postgres/index');
@@ -94,7 +105,7 @@ export function initializeDatabase(connectionString?: string) {
     currentSchema = pgSchema;
     dbInstance = drizzlePg(sqlClient, {
       schema: { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance },
-      logger: process.env.LOG_LEVEL === 'debug',
+      logger: createDrizzleLogger(),
     });
   }
   
