@@ -46,4 +46,4 @@ gha-creds-*.json
 plexus-linux
 plexus-macos
 plexus.exe
-sampledata/
+sampledata/*.db

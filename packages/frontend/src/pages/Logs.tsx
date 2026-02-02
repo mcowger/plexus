@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy, Variable } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -225,9 +225,8 @@ export const Logs = () => {
 
     return (
         <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
-            <div className="mb-8">
-                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Logs</h1>
-                <Badge status="neutral">{total} Records</Badge>
+            <div className="mb-4">
+                <h1 className="font-heading text-3xl font-bold text-text m-0">Logs</h1>
             </div>
 
             <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
@@ -321,7 +320,9 @@ export const Logs = () => {
                                             style={{ cursor: 'help' }}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                {log.incomingApiType && apiLogos[log.incomingApiType] ? (
+                                                {log.incomingApiType === 'embeddings' ? (
+                                                    <Variable size={16} className="text-green-500" />
+                                                ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
                                                     <img
                                                         src={apiLogos[log.incomingApiType]}
                                                         alt={log.incomingApiType}
@@ -329,7 +330,9 @@ export const Logs = () => {
                                                     />
                                                 ) : '?'}
                                                 <span>→</span>
-                                                {log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
+                                                {log.outgoingApiType === 'embeddings' ? (
+                                                    <Variable size={16} className="text-green-500" />
+                                                ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
                                                     <img
                                                         src={apiLogos[log.outgoingApiType]}
                                                         alt={log.outgoingApiType}

@@ -1,5 +1,101 @@
 # Changelog
 
+## v0.9.0 - 2026-02-02
+
+### v0.9.0: OpenAI-Compatible Embeddings API Support
+
+### Main Features
+
+- **Embeddings API**: Added full OpenAI-compatible `/v1/embeddings` endpoint support ([7299ac1](https://github.com/mcowger/plexus/commit/7299ac1))
+  - Universal OpenAI embeddings format works with any provider (OpenAI, Voyage AI, Cohere, Google, etc.)
+  - Full usage tracking with token counts, costs, and duration metrics
+  - Authentication support (Bearer tokens and x-api-key headers)
+  - Attribution tracking for fine-grained usage analytics
+  - Pass-through optimization (no protocol transformation needed)
+
+- **Model Type System**: Introduced `type` field to distinguish chat from embeddings models ([7299ac1](https://github.com/mcowger/plexus/commit/7299ac1))
+  - Models can be configured as `type: chat` (default) or `type: embeddings`
+  - Provider models support type specification in model configuration
+  - Router automatically filters by model type when routing embeddings requests
+  - Ensures embeddings models are only accessible via embeddings API
+
+- **UI Enhancements for Embeddings**:
+  - Added dedicated "Type" column in Models page showing chat/embeddings badges
+  - Embeddings badge styling with green color (#10b981)
+  - Model Type dropdown in both Models and Providers edit modals
+  - Access Via checkboxes automatically hidden for embeddings models
+  - Variable icon (lucide-react) for embeddings in Logs page
+  - Improved API type badge spacing and consistency
+
+### Backend Changes
+
+- **New Components**:
+  - `EmbeddingsTransformer`: Pass-through transformer for embeddings requests/responses
+  - `dispatchEmbeddings()`: Dedicated dispatcher method for embeddings
+  - Embeddings route with full usage tracking and cost calculation
+  - 21 comprehensive tests covering transformer and route logic
+
+- **Configuration Schema Updates**:
+  - Added `type: 'chat' | 'embeddings'` to `ModelConfigSchema`
+  - Added `type: 'chat' | 'embeddings'` to `ModelProviderConfigSchema`
+  - Router filters targets by model type for embeddings requests
+
+### Frontend Changes
+
+- **Providers Page**:
+  - Added 'embeddings' to known APIs with green badge
+  - Model Type dropdown in provider model configuration
+  - Smart UI hides API checkboxes for embeddings models
+  - Shows info message for embeddings: "Embeddings models automatically use the 'embeddings' API only"
+
+- **Models Page**:
+  - Dedicated "Type" column displaying chat/embeddings badges
+  - Model Type selector in alias edit modal
+  - Type field persists correctly on save
+
+- **Logs Page**:
+  - Variable icon for embeddings API type (both incoming and outgoing)
+  - Proper display of embeddings requests with pass-through mode
+
+### Bug Fixes
+
+- Fixed `outgoingApiType` not being set in embeddings usage records ([d516a75](https://github.com/mcowger/plexus/commit/d516a75))
+- Fixed `isPassthrough` flag for embeddings requests ([d516a75](https://github.com/mcowger/plexus/commit/d516a75))
+- Fixed saveAlias/getAliases to persist model type field
+- Fixed API type badge spacing inconsistencies in Providers page
+
+### Configuration Example
+
+```yaml
+providers:
+  voyage:
+    api_base_url: https://api.voyageai.com/v1
+    api_key: ${VOYAGE_API_KEY}
+    models:
+      voyage-3:
+        type: embeddings
+        pricing:
+          source: simple
+          input: 0.00006
+          output: 0
+
+models:
+  embeddings-model:
+    type: embeddings
+    selector: cost
+    targets:
+      - provider: openai
+        model: text-embedding-3-small
+      - provider: voyage
+        model: voyage-3
+```
+
+All 185 backend tests passing ✓
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.8.5 - 2026-01-19
 
 ### v0.8.5: Bulk Model Import and Enhanced Provider Interface Capabilities

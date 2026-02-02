@@ -10,7 +10,7 @@ import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download } from 'luc
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 
-const KNOWN_APIS = ['chat', 'messages', 'gemini'];
+const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings'];
 
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
     switch (apiType.toLowerCase()) {
@@ -20,6 +20,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
             return { backgroundColor: '#ebebeb', color: '#333', border: 'none' };
         case 'gemini':
             return { backgroundColor: '#5084ff', color: 'white', border: 'none' };
+        case 'embeddings':
+            return { backgroundColor: '#10b981', color: 'white', border: 'none' };
         default:
             return {};
     }
@@ -487,19 +489,14 @@ export const Providers = () => {
 
                               return (
                                   <div key={apiType} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                      <div style={{display: 'flex', alignItems: 'center', gap: '6px', width: '80px', flexShrink: 0}}>
-                                          {isInferred && (
-                                              <Badge
-                                                status="connected"
-                                                style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 8px' }}
-                                                className="[&_.connection-dot]:hidden"
-                                              >
-                                                  {apiType}
-                                              </Badge>
-                                          )}
-                                          {!isInferred && (
-                                              <span style={{fontSize: '12px', opacity: 0.5, textTransform: 'capitalize'}}>{apiType}</span>
-                                          )}
+                                      <div style={{display: 'flex', alignItems: 'center', gap: '6px', width: '100px', flexShrink: 0}}>
+                                          <Badge
+                                            status={isInferred ? "connected" : "disconnected"}
+                                            style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 8px', opacity: isInferred ? 1 : 0.5 }}
+                                            className="[&_.connection-dot]:hidden"
+                                          >
+                                              {apiType}
+                                          </Badge>
                                       </div>
                                       <div style={{flex: 1}}>
                                         <Input
@@ -642,7 +639,27 @@ export const Providers = () => {
                                                 onChange={(e) => updateModelId(mId, e.target.value)}
                                               />
 
-                                              <div className="grid gap-4 grid-cols-2">
+                                              <div className="grid gap-4 grid-cols-3">
+                                                  <div className="flex flex-col gap-1">
+                                                      <label className="font-body text-[13px] font-medium text-text-secondary">Model Type</label>
+                                                      <select
+                                                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                                        value={mCfg.type || 'chat'}
+                                                        onChange={(e) => {
+                                                          const newType = e.target.value as 'chat' | 'embeddings';
+                                                          // If switching to embeddings, clear non-embeddings APIs from access_via
+                                                          if (newType === 'embeddings') {
+                                                            const filteredAccessVia = (mCfg.access_via || []).filter((api: string) => api === 'embeddings');
+                                                            updateModelConfig(mId, { type: newType, access_via: filteredAccessVia.length > 0 ? filteredAccessVia : ['embeddings'] });
+                                                          } else {
+                                                            updateModelConfig(mId, { type: newType });
+                                                          }
+                                                        }}
+                                                      >
+                                                          <option value="chat">Chat</option>
+                                                          <option value="embeddings">Embeddings</option>
+                                                      </select>
+                                                  </div>
                                                   <div className="flex flex-col gap-1">
                                                       <label className="font-body text-[13px] font-medium text-text-secondary">Pricing Source</label>
                                                       <select
@@ -681,32 +698,47 @@ export const Providers = () => {
                                                           <option value="defined">Ranges (Complex)</option>
                                                       </select>
                                                   </div>
-                                                  <div className="flex flex-col gap-1">
-                                                      <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
-                                                      <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
-                                                          {KNOWN_APIS.map(apiType => (
-                                                              <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px'}}>
-                                                                  <input 
-                                                                    type="checkbox" 
-                                                                    checked={(mCfg.access_via || []).includes(apiType)}
-                                                                    onChange={() => {
-                                                                        const current = mCfg.access_via || [];
-                                                                        const next = current.includes(apiType) ? current.filter((a: string) => a !== apiType) : [...current, apiType];
-                                                                        updateModelConfig(mId, { access_via: next });
-                                                                    }}
-                                                                  />
-                                                                  <span className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium" style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 6px', opacity: (mCfg.access_via || []).includes(apiType) ? 1 : 0.5 }}>
-                                                                    {apiType}
-                                                                  </span>
-                                                              </label>
-                                                          ))}
-                                                      </div>
-                                                      {(!mCfg.access_via || mCfg.access_via.length === 0) && (
-                                                          <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic'}}>
-                                                              No APIs selected. Defaults to ALL supported APIs.
+                                                  {mCfg.type !== 'embeddings' && (
+                                                      <div className="flex flex-col gap-1">
+                                                          <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
+                                                          <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
+                                                              {KNOWN_APIS.map(apiType => {
+                                                                  const isEmbeddingsModel = mCfg.type === 'embeddings';
+                                                                  const isDisabled = isEmbeddingsModel && apiType !== 'embeddings';
+                                                                  
+                                                                  return (
+                                                                      <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}>
+                                                                          <input 
+                                                                            type="checkbox" 
+                                                                            checked={(mCfg.access_via || []).includes(apiType)}
+                                                                            disabled={isDisabled}
+                                                                            onChange={() => {
+                                                                                const current = mCfg.access_via || [];
+                                                                                const next = current.includes(apiType) ? current.filter((a: string) => a !== apiType) : [...current, apiType];
+                                                                                updateModelConfig(mId, { access_via: next });
+                                                                            }}
+                                                                          />
+                                                                          <span className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium" style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 6px', opacity: (mCfg.access_via || []).includes(apiType) ? 1 : 0.5 }}>
+                                                                            {apiType}
+                                                                          </span>
+                                                                      </label>
+                                                                  );
+                                                              })}
                                                           </div>
-                                                      )}
-                                                  </div>
+                                                          {(!mCfg.access_via || mCfg.access_via.length === 0) && (
+                                                              <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic'}}>
+                                                                  No APIs selected. Defaults to ALL supported APIs.
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  )}
+                                                  {mCfg.type === 'embeddings' && (
+                                                      <div className="flex flex-col gap-1">
+                                                          <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
+                                                              ℹ️ Embeddings models automatically use the 'embeddings' API only.
+                                                          </div>
+                                                      </div>
+                                                  )}
                                               </div>
 
                                               {mCfg.pricing?.source === 'simple' && (
