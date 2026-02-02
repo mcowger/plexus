@@ -123,10 +123,10 @@ export interface Alias {
 
 export interface InferenceError {
     id: number;
-    request_id: string;
+    requestId: string;
     date: string;
-    error_message: string;
-    error_stack?: string;
+    errorMessage: string;
+    errorStack?: string;
     details?: string | {
         apiType?: string;
         provider?: string;
@@ -137,7 +137,7 @@ export interface InferenceError {
         statusCode?: number;
         providerResponse?: string;
     };
-    created_at: number;
+    createdAt: number;
 }
 
 export interface Cooldown {

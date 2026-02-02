@@ -64,7 +64,7 @@ export const Errors: React.FC = () => {
         setIsDeleting(true);
         try {
             await api.deleteError(selectedRequestIdForDelete);
-            setErrors(errors.filter(e => e.request_id !== selectedRequestIdForDelete));
+            setErrors(errors.filter(e => e.requestId !== selectedRequestIdForDelete));
             if (selectedId === selectedRequestIdForDelete) {
                 setSelectedId(null);
                 setSelectedError(null);
@@ -86,7 +86,7 @@ export const Errors: React.FC = () => {
 
     useEffect(() => {
         if (selectedId) {
-            const found = errors.find(e => e.request_id === selectedId);
+            const found = errors.find(e => e.requestId === selectedId);
             if (found) {
                 setSelectedError(found);
             } else {
@@ -160,10 +160,10 @@ export const Errors: React.FC = () => {
                         {errors.map(err => (
                             <div 
                                 key={err.id}
-                                onClick={() => setSelectedId(err.request_id)}
+                                onClick={() => setSelectedId(err.requestId)}
                                 className={clsx(
                                     "p-3 rounded-md cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover group",
-                                    selectedId === err.request_id && "bg-bg-glass border-border-glass shadow-sm"
+                                    selectedId === err.requestId && "bg-bg-glass border-border-glass shadow-sm"
                                 )}
                             >
                                 <div className="w-full">
@@ -175,7 +175,7 @@ export const Errors: React.FC = () => {
                                             </span>
                                         </div>
                                         <button 
-                                            onClick={(e) => handleDelete(e, err.request_id)}
+                                            onClick={(e) => handleDelete(e, err.requestId)}
                                             className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0 transition-opacity"
                                             title="Delete error log"
                                         >
@@ -183,10 +183,10 @@ export const Errors: React.FC = () => {
                                         </button>
                                     </div>
                                     <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1 font-mono text-xs text-[var(--color-text-muted)]">
-                                        {err.request_id?.substring(0, 8) ?? '-'}...
+                                        {err.requestId?.substring(0, 8) ?? '-'}...
                                     </div>
-                                    <div className="mt-1 text-sm text-red-400 truncate" title={err.error_message}>
-                                        {err.error_message}
+                                    <div className="mt-1 text-sm text-red-400 truncate" title={err.errorMessage}>
+                                        {err.errorMessage}
                                     </div>
                                 </div>
                             </div>
@@ -208,7 +208,7 @@ export const Errors: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <span className="text-[var(--color-text-muted)]">Request ID:</span>
-                                        <span className="ml-2 font-mono">{selectedError.request_id}</span>
+                                        <span className="ml-2 font-mono">{selectedError.requestId}</span>
                                     </div>
                                     <div>
                                         <span className="text-[var(--color-text-muted)]">Time:</span>
@@ -262,14 +262,14 @@ export const Errors: React.FC = () => {
 
                              <AccordionPanel
                                 title="Message"
-                                content={selectedError.error_message}
+                                content={selectedError.errorMessage}
                                 color="text-red-400"
                                 defaultOpen={true}
                                 language="plaintext"
                             />
                              <AccordionPanel
                                 title="Stack Trace"
-                                content={selectedError.error_stack || '(No stack trace available)'}
+                                content={selectedError.errorStack || '(No stack trace available)'}
                                 color="text-orange-400"
                                 defaultOpen={true}
                                 language="plaintext"
