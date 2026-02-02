@@ -116,7 +116,7 @@ export interface Alias {
     aliases?: string[];
     selector?: string;
     priority?: 'selector' | 'api_match';
-    type?: 'chat' | 'embeddings';
+    type?: 'chat' | 'embeddings' | 'transcriptions';
     targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
 }
 

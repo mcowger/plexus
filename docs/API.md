@@ -23,6 +23,17 @@ Plexus 2 provides compatibility layers for major AI provider formats.
 - **Model Type:** Models must be configured with `type: embeddings` to be accessible via this endpoint.
 - **Pass-through:** Embeddings requests are always pass-through (no protocol transformation needed).
 
+### Audio Transcriptions Compatible (OpenAI)
+- **Endpoint:** `POST /v1/audio/transcriptions`
+- **Description:** Compatible with the OpenAI Audio Transcriptions API. Accepts multipart/form-data with audio files and transcribes them to text.
+- **Documentation:** See [OpenAI Audio API Reference](https://platform.openai.com/docs/api-reference/audio/createTranscription) for request and response formats.
+- **Model Type:** Models must be configured with `type: transcriptions` to be accessible via this endpoint.
+- **Supported Models:** `whisper-1`, `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`, and compatible models.
+- **Supported Formats:** Audio files up to 25MB in formats: mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm.
+- **Response Formats:** Currently supports `json` and `text` formats. Additional formats (srt, vtt, verbose_json, diarized_json) coming in future versions.
+- **Streaming:** Not supported in v1 (coming in future versions).
+- **Pass-through:** Transcription requests are always pass-through (no protocol transformation needed).
+
 ### Gemini Compatible (Google)
 - **Endpoint:** `POST /v1beta/models/{model}:{action}`
 - **Description:** Compatible with the Google Generative Language API (Gemini).

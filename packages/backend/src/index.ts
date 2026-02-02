@@ -1,5 +1,6 @@
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
 import { logger } from './utils/logger';
@@ -25,7 +26,8 @@ import { runMigrations } from './db/migrate';
  */
 
 const fastify = Fastify({
-    logger: false // We use a custom winston-based logger
+    logger: false, // We use a custom winston-based logger
+    bodyLimit: 30 * 1024 * 1024 // 30MB to accommodate 25MB audio files + metadata
 });
 
 // --- Plugin Registration ---
@@ -36,6 +38,14 @@ fastify.register(cors, {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'x-goog-api-key'],
     exposedHeaders: ['Content-Type']
+});
+
+// Enable multipart/form-data support for file uploads (audio transcriptions)
+fastify.register(multipart, {
+    limits: {
+        fileSize: 25 * 1024 * 1024, // 25MB limit (OpenAI's limit)
+    },
+    attachFieldsToBody: true, // Makes form fields accessible via request.body
 });
 
 // --- Service Initialization ---

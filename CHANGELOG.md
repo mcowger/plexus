@@ -1,5 +1,66 @@
 # Changelog
 
+## v0.10.0 - 2026-02-02
+
+### v0.10.0: OpenAI-Compatible Audio Transcriptions Support
+
+### Main Features
+
+- **Audio Transcriptions API**: Added OpenAI-compatible `/v1/audio/transcriptions` endpoint support
+  - Multipart/form-data file upload support (up to 25MB)
+  - Compatible with OpenAI Whisper and GPT-4o transcription models
+  - Supports multiple audio formats: mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm
+  - JSON and text response formats (additional formats coming in future versions)
+  - Full usage tracking with token counts, costs, and duration metrics
+  - Pass-through optimization (no protocol transformation needed)
+  - Optional parameters: language, prompt, temperature
+
+- **Model Type System Extension**: Extended type field to support transcriptions models
+  - Models can now be configured as `type: chat`, `type: embeddings`, or `type: transcriptions`
+  - Provider models support transcription type specification
+  - Router automatically filters by model type when routing transcription requests
+  - Ensures transcription models are only accessible via transcriptions API
+
+- **UI Enhancements for Transcriptions**:
+  - Added transcriptions to known API types with purple badge (#a855f7) in Providers page
+  - Transcriptions type support in Models page Type column
+  - Model Type dropdown includes transcriptions option in edit modals
+  - AudioLines icon for transcriptions in Logs page (purple color)
+  - Consistent badge styling across all pages
+
+### Backend Implementation
+
+- Installed `@fastify/multipart` plugin for multipart/form-data support
+- Created `TranscriptionsTransformer` for request/response handling
+- Added `dispatchTranscription()` method to Dispatcher service
+- Implemented transcriptions route handler with comprehensive validation
+  - File size validation (25MB limit)
+  - MIME type validation
+  - Response format validation (json, text)
+- Updated configuration schema to support `'transcriptions'` model type
+
+### Frontend Updates
+
+- Updated `packages/frontend/src/pages/Providers.tsx` with transcriptions badge
+- Updated `packages/frontend/src/pages/Models.tsx` with type support
+- Updated `packages/frontend/src/pages/Logs.tsx` with AudioLines icon
+- Updated API types in `packages/frontend/src/lib/api.ts`
+
+### Documentation
+
+- Added `/v1/audio/transcriptions` endpoint documentation to API.md
+- Added transcriptions model configuration examples to CONFIGURATION.md
+- Updated README.md with transcriptions endpoint listing
+
+### Future Enhancements (Out of Scope for v1)
+
+- Streaming support (SSE events)
+- Additional response formats (srt, vtt, verbose_json, diarized_json)
+- Advanced features (timestamp_granularities, speaker diarization)
+- Duration-based pricing (currently using token-based approximation)
+
+All 185 backend tests continue to pass. Frontend builds successfully.
+
 ## v0.9.0 - 2026-02-02
 
 ### v0.9.0: OpenAI-Compatible Embeddings Support, Drizzle ORM Migration, and Token Estimation Improvements

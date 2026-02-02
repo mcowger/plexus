@@ -211,3 +211,47 @@ export interface UnifiedEmbeddingsResponse {
   };
   rawResponse?: any;
 }
+
+// Unified Transcription Request
+export interface UnifiedTranscriptionRequest {
+  requestId?: string;
+  file: Buffer;
+  filename: string;
+  mimeType: string;
+  model: string;
+  
+  // Optional parameters
+  language?: string;
+  prompt?: string;
+  response_format?: 'json' | 'text';  // Only json and text for v1
+  temperature?: number;
+  
+  // Internal tracking
+  incomingApiType?: string;
+  originalBody?: any;
+}
+
+// Unified Transcription Response
+export interface UnifiedTranscriptionResponse {
+  text: string;
+  
+  // Optional usage field (present in JSON response)
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+  
+  // Plexus metadata
+  plexus?: {
+    provider?: string;
+    model?: string;
+    apiType?: string;
+    pricing?: any;
+    providerDiscount?: number;
+    canonicalModel?: string;
+    config?: any;
+  };
+  
+  rawResponse?: any;
+}

@@ -10,7 +10,7 @@ import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download } from 'luc
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 
-const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings'];
+const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions'];
 
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
     switch (apiType.toLowerCase()) {
@@ -22,6 +22,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
             return { backgroundColor: '#5084ff', color: 'white', border: 'none' };
         case 'embeddings':
             return { backgroundColor: '#10b981', color: 'white', border: 'none' };
+        case 'transcriptions':
+            return { backgroundColor: '#a855f7', color: 'white', border: 'none' };
         default:
             return {};
     }
@@ -646,11 +648,14 @@ export const Providers = () => {
                                                         className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                                         value={mCfg.type || 'chat'}
                                                         onChange={(e) => {
-                                                          const newType = e.target.value as 'chat' | 'embeddings';
+                                                          const newType = e.target.value as 'chat' | 'embeddings' | 'transcriptions';
                                                           // If switching to embeddings, clear non-embeddings APIs from access_via
                                                           if (newType === 'embeddings') {
                                                             const filteredAccessVia = (mCfg.access_via || []).filter((api: string) => api === 'embeddings');
                                                             updateModelConfig(mId, { type: newType, access_via: filteredAccessVia.length > 0 ? filteredAccessVia : ['embeddings'] });
+                                                          } else if (newType === 'transcriptions') {
+                                                            const filteredAccessVia = (mCfg.access_via || []).filter((api: string) => api === 'transcriptions');
+                                                            updateModelConfig(mId, { type: newType, access_via: filteredAccessVia.length > 0 ? filteredAccessVia : ['transcriptions'] });
                                                           } else {
                                                             updateModelConfig(mId, { type: newType });
                                                           }
@@ -658,6 +663,7 @@ export const Providers = () => {
                                                       >
                                                           <option value="chat">Chat</option>
                                                           <option value="embeddings">Embeddings</option>
+                                                          <option value="transcriptions">Transcriptions</option>
                                                       </select>
                                                   </div>
                                                   <div className="flex flex-col gap-1">
@@ -698,13 +704,14 @@ export const Providers = () => {
                                                           <option value="defined">Ranges (Complex)</option>
                                                       </select>
                                                   </div>
-                                                  {mCfg.type !== 'embeddings' && (
+                                                  {mCfg.type !== 'embeddings' && mCfg.type !== 'transcriptions' && (
                                                       <div className="flex flex-col gap-1">
                                                           <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
                                                           <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
                                                               {KNOWN_APIS.map(apiType => {
                                                                   const isEmbeddingsModel = mCfg.type === 'embeddings';
-                                                                  const isDisabled = isEmbeddingsModel && apiType !== 'embeddings';
+                                                                  const isTranscriptionsModel = mCfg.type === 'transcriptions';
+                                                                  const isDisabled = (isEmbeddingsModel && apiType !== 'embeddings') || (isTranscriptionsModel && apiType !== 'transcriptions');
                                                                   
                                                                   return (
                                                                       <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}>
@@ -736,6 +743,13 @@ export const Providers = () => {
                                                       <div className="flex flex-col gap-1">
                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
                                                               ℹ️ Embeddings models automatically use the 'embeddings' API only.
+                                                          </div>
+                                                      </div>
+                                                  )}
+                                                  {mCfg.type === 'transcriptions' && (
+                                                      <div className="flex flex-col gap-1">
+                                                          <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
+                                                              ℹ️ Transcriptions models automatically use the 'transcriptions' API only.
                                                           </div>
                                                       </div>
                                                   )}

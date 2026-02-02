@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy, Variable } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy, Variable, AudioLines } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -322,6 +322,8 @@ export const Logs = () => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 {log.incomingApiType === 'embeddings' ? (
                                                     <Variable size={16} className="text-green-500" />
+                                                ) : log.incomingApiType === 'transcriptions' ? (
+                                                    <AudioLines size={16} className="text-purple-500" />
                                                 ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
                                                     <img
                                                         src={apiLogos[log.incomingApiType]}
@@ -332,6 +334,8 @@ export const Logs = () => {
                                                 <span>→</span>
                                                 {log.outgoingApiType === 'embeddings' ? (
                                                     <Variable size={16} className="text-green-500" />
+                                                ) : log.outgoingApiType === 'transcriptions' ? (
+                                                    <AudioLines size={16} className="text-purple-500" />
                                                 ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
                                                     <img
                                                         src={apiLogos[log.outgoingApiType]}

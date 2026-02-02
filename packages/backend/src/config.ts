@@ -49,7 +49,7 @@ const ModelProviderConfigSchema = z.object({
     output: 0,
   }),
   access_via: z.array(z.string()).optional(),
-  type: z.enum(['chat', 'embeddings']).optional(),
+  type: z.enum(['chat', 'embeddings', 'transcriptions']).optional(),
 });
 
 const ProviderConfigSchema = z.object({
@@ -82,7 +82,7 @@ const ModelConfigSchema = z.object({
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
-  type: z.enum(['chat', 'embeddings']).optional(),
+  type: z.enum(['chat', 'embeddings', 'transcriptions']).optional(),
 });
 
 const KeyConfigSchema = z.object({

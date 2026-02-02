@@ -1,4 +1,4 @@
-import { UnifiedChatRequest, UnifiedChatResponse } from "../types/unified";
+import { UnifiedChatRequest, UnifiedChatResponse, UnifiedTranscriptionRequest, UnifiedTranscriptionResponse } from "../types/unified";
 import { Router } from "./router";
 import { TransformerFactory } from "./transformer-factory";
 import { logger } from "../utils/logger";
@@ -593,5 +593,93 @@ export class Dispatcher {
     };
 
     return enrichedResponse;
+  }
+
+  /**
+   * Dispatches audio transcription requests
+   * Handles multipart/form-data file uploads to OpenAI-compatible transcription endpoints
+   */
+  async dispatchTranscription(request: UnifiedTranscriptionRequest): Promise<UnifiedTranscriptionResponse> {
+    // 1. Route using existing Router with 'transcriptions' as the API type
+    const route = await Router.resolve(request.model, 'transcriptions');
+
+    // 2. Build URL (transcriptions use /audio/transcriptions endpoint)
+    const baseUrl = this.resolveBaseUrl(route, 'transcriptions');
+    const url = `${baseUrl}/audio/transcriptions`;
+
+    // 3. Setup headers (multipart/form-data will be set by fetch automatically)
+    const headers: Record<string, string> = {};
+
+    if (route.config.api_key) {
+      headers["Authorization"] = `Bearer ${route.config.api_key}`;
+    }
+
+    if (route.config.headers) {
+      Object.assign(headers, route.config.headers);
+    }
+
+    // 4. Transform request to FormData
+    const { TranscriptionsTransformer } = await import('../transformers/transcriptions');
+    const transformer = new TranscriptionsTransformer();
+    const formData = await transformer.transformRequest(request);
+
+    logger.info(`Dispatching transcription ${request.model} to ${route.provider}:${route.model}`);
+    logger.silly("Transcription Request", { model: request.model, filename: request.filename });
+    
+    if (request.requestId) {
+      DebugManager.getInstance().addTransformedRequest(request.requestId, { 
+        model: request.model, 
+        filename: request.filename,
+        mimeType: request.mimeType,
+        language: request.language,
+        prompt: request.prompt,
+        response_format: request.response_format,
+        temperature: request.temperature
+      });
+    }
+
+    // 5. Execute request with FormData
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      await this.handleProviderError(response, route, errorText, url, headers, 'transcriptions');
+    }
+
+    // 6. Parse response based on format
+    const responseFormat = request.response_format || 'json';
+    let responseBody: any;
+    
+    if (responseFormat === 'text') {
+      responseBody = await response.text();
+    } else {
+      responseBody = await response.json();
+    }
+    
+    logger.silly("Transcription Response", responseBody);
+    
+    if (request.requestId) {
+      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+    }
+
+    // 7. Transform response to unified format
+    const unifiedResponse = await transformer.transformResponse(responseBody, responseFormat);
+
+    // 8. Add plexus metadata
+    unifiedResponse.plexus = {
+      provider: route.provider,
+      model: route.model,
+      apiType: 'transcriptions',
+      pricing: route.modelConfig?.pricing,
+      providerDiscount: route.config.discount,
+      canonicalModel: route.canonicalModel,
+      config: route.config,
+    };
+
+    return unifiedResponse;
   }
 }

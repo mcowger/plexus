@@ -64,6 +64,13 @@ models:
         model: text-embedding-3-small
       - provider: voyage
         model: voyage-3
+
+  # Audio transcription model
+  transcription-model:
+    type: transcriptions
+    targets:
+      - provider: openai_direct
+        model: whisper-1
 ```
 
 ## Direct Model Routing
@@ -240,9 +247,10 @@ This section defines the "virtual" models or aliases that clients will use when 
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
 
-- **`type`**: (Optional) The type of model - either `chat` (default) or `embeddings`. This determines which API endpoints can access this model:
+- **`type`**: (Optional) The type of model - either `chat` (default), `embeddings`, or `transcriptions`. This determines which API endpoints can access this model:
   - `chat`: Accessible via `/v1/chat/completions` and `/v1/messages` endpoints
   - `embeddings`: Only accessible via `/v1/embeddings` endpoint
+  - `transcriptions`: Only accessible via `/v1/audio/transcriptions` endpoint
   
   **Example:**
   ```yaml
@@ -252,6 +260,12 @@ This section defines the "virtual" models or aliases that clients will use when 
       targets:
         - provider: openai
           model: text-embedding-3-small
+    
+    my-transcription:
+      type: transcriptions
+      targets:
+        - provider: openai
+          model: whisper-1
   ```
 
 - **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration. Can be used for tools like Claude Code that are picky about model names, or clients that have fixed lists of models that you want to remap.
