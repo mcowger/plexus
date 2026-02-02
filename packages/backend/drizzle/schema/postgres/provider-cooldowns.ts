@@ -3,10 +3,9 @@ import { pgTable, text, bigint, primaryKey, index } from 'drizzle-orm/pg-core';
 export const providerCooldowns = pgTable('provider_cooldowns', {
   provider: text('provider').notNull(),
   model: text('model').notNull(),
-  accountId: text('account_id').notNull().default(''),
   expiry: bigint('expiry', { mode: 'number' }).notNull(),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 }, (table) => ({
-  pk: primaryKey({ columns: [table.provider, table.model, table.accountId] }),
+  pk: primaryKey({ columns: [table.provider, table.model] }),
   expiryIdx: index('idx_cooldowns_expiry').on(table.expiry),
 }));

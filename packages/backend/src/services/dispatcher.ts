@@ -379,7 +379,7 @@ export class Dispatcher {
 
       // Mark provider+model as failed with optional duration
       // For non-429 errors, cooldownDuration will be undefined and default (10 minutes) will be used
-      cooldownManager.markProviderFailure(route.provider, route.model, undefined, cooldownDuration);
+      cooldownManager.markProviderFailure(route.provider, route.model, cooldownDuration);
     }
 
     // Create enriched error with routing context

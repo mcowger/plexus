@@ -141,7 +141,6 @@ export interface InferenceError {
 export interface Cooldown {
     provider: string;
     model: string;
-    accountId?: string;
     expiry: number;
     timeRemainingMs: number;
 }
@@ -230,12 +229,12 @@ export const api = {
       }
   },
 
-  clearCooldown: async (provider?: string, accountId?: string): Promise<void> => {
+  clearCooldown: async (provider?: string, model?: string): Promise<void> => {
       let url: string;
       if (provider) {
           url = `${API_BASE}/v0/management/cooldowns/${provider}`;
-          if (accountId) {
-              url += `?accountId=${encodeURIComponent(accountId)}`;
+          if (model) {
+              url += `?model=${encodeURIComponent(model)}`;
           }
       } else {
           url = `${API_BASE}/v0/management/cooldowns`;

@@ -15,6 +15,13 @@
       "when": 1770010868801,
       "tag": "0001_absent_spencer_smythe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1770053372118,
+      "tag": "0002_nappy_ben_parker",
+      "breakpoints": true
     }
   ]
 }

@@ -17,8 +17,7 @@ export async function registerCooldownRoutes(fastify: FastifyInstance) {
         const query = request.query as any;
         const provider = params.provider;
         const model = query.model;
-        const accountId = query.accountId;
-        CooldownManager.getInstance().clearCooldown(provider, model, accountId);
+        CooldownManager.getInstance().clearCooldown(provider, model);
         return reply.send({ success: true });
     });
 }
