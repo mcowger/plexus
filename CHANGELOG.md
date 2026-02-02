@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.10.0 - 2026-02-02
+
+### v0.10.0: Support for OpenAI-Compatible Audio APIs and Improved Persistence Logic
+
+### Main New Features
+
+* **Audio Speech (TTS) API Support**: Added support for OpenAI-compatible text-to-speech API endpoints. ([2b3025a](https://github.com/mcowger/plexus/commit/2b3025a))
+* **Audio Transcriptions API Support**: Added support for OpenAI-compatible audio transcription API endpoints. ([62b019b](https://github.com/mcowger/plexus/commit/62b019b))
+
+### Smaller Changes and Bug Fixes
+
+* **UI Stability**: Added null checks for `request_id` fields in Error and Debug pages to prevent rendering issues. ([8d5bd01](https://github.com/mcowger/plexus/commit/8d5bd01))
+* **Logging Control**: Prevented debug log persistence when the system is not in debug mode. ([93c3909](https://github.com/mcowger/plexus/commit/93c3909))
+* **Embeddings Observability**: Added verbose debug logging for embeddings API requests. ([f9ba993](https://github.com/mcowger/plexus/commit/f9ba993))
+* **Configuration Persistence**: Fixed a bug where the `enabled` field was not correctly saved for model alias targets. ([c132fc6](https://github.com/mcowger/plexus/commit/c132fc6))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.11.0 - 2026-02-02
 
 ### v0.11.0: OpenAI-Compatible Audio Speech Support
