@@ -16,6 +16,13 @@ Plexus 2 provides compatibility layers for major AI provider formats.
 - **Description:** Compatible with the Anthropic Messages API.
 - **Documentation:** See [Anthropic API Reference](https://docs.anthropic.com/en/api/messages) for request and response formats.
 
+### Embeddings Compatible (OpenAI)
+- **Endpoint:** `POST /v1/embeddings`
+- **Description:** Compatible with the OpenAI Embeddings API. Works with any provider that supports OpenAI-compatible embeddings (OpenAI, Voyage AI, Cohere, Google, etc.).
+- **Documentation:** See [OpenAI Embeddings API Reference](https://platform.openai.com/docs/api-reference/embeddings) for request and response formats.
+- **Model Type:** Models must be configured with `type: embeddings` to be accessible via this endpoint.
+- **Pass-through:** Embeddings requests are always pass-through (no protocol transformation needed).
+
 ### Gemini Compatible (Google)
 - **Endpoint:** `POST /v1beta/models/{model}:{action}`
 - **Description:** Compatible with the Google Generative Language API (Gemini).

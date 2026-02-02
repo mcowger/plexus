@@ -104,6 +104,43 @@ export class Router {
                     throw new Error(`All providers for model alias '${modelName}' are currently on cooldown.`);
                 }
 
+                // Filter targets based on model type when incoming API is embeddings
+                if (incomingApiType === 'embeddings') {
+                    const embeddingsTargets = healthyTargets.filter(target => {
+                        const providerConfig = config.providers[target.provider];
+                        if (!providerConfig) return false;
+
+                        // Check if this specific model is marked as embeddings type
+                        if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+                            const modelConfig = providerConfig.models[target.model];
+                            if (modelConfig?.type === 'embeddings') {
+                                return true;
+                            }
+                            // If model has explicit type set to 'chat', exclude it
+                            if (modelConfig?.type === 'chat') {
+                                return false;
+                            }
+                        }
+
+                        // Check if alias is marked as embeddings type
+                        if (alias.type === 'embeddings') {
+                            return true;
+                        }
+
+                        // Check if provider supports embeddings via URL
+                        const providerTypes = getProviderTypes(providerConfig);
+                        return providerTypes.includes('embeddings');
+                    });
+
+                    if (embeddingsTargets.length > 0) {
+                        logger.info(`Router: Filtered to ${embeddingsTargets.length} embeddings-compatible targets (from ${healthyTargets.length} total).`);
+                        healthyTargets = embeddingsTargets;
+                    } else {
+                        logger.warn(`Router: No embeddings-compatible targets found for '${modelName}'. Falling back to all healthy targets.`);
+                    }
+                }
+
+                // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
                 // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
                 if (alias.priority === 'api_match' && incomingApiType) {
                     const normalizedIncoming = incomingApiType.toLowerCase();

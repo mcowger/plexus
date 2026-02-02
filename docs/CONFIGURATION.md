@@ -16,12 +16,24 @@ providers:
     models:
       - gpt-4o
       - gpt-4o-mini
+      - text-embedding-3-small
 
   my_anthropic:
     api_base_url: https://api.anthropic.com/v1
     api_key: your_anthropic_key
     models:
       - claude-3-5-sonnet-latest
+
+  voyage:
+    api_base_url: https://api.voyageai.com/v1
+    api_key: your_voyage_key
+    models:
+      voyage-3:
+        type: embeddings
+        pricing:
+          source: simple
+          input: 0.00006
+          output: 0
 
 models:
   # Define aliases and where they route
@@ -42,6 +54,16 @@ models:
         model: gpt-4o
       - provider: my_anthropic
         model: claude-3-5-sonnet-latest
+
+  # Embeddings model
+  embeddings-model:
+    type: embeddings
+    selector: cost
+    targets:
+      - provider: openai_direct
+        model: text-embedding-3-small
+      - provider: voyage
+        model: voyage-3
 ```
 
 ## Direct Model Routing
@@ -141,7 +163,21 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`models`**: The models available from this provider. Can be:
   - An array of model name strings: `["model-a", "model-b"]`
-  - An object mapping model names to configuration (for pricing or API access control)
+  - An object mapping model names to configuration (for pricing, API access control, or model type):
+    ```yaml
+    models:
+      gpt-4o:
+        pricing:
+          source: simple
+          input: 5.0
+          output: 15.0
+      text-embedding-3-small:
+        type: embeddings
+        pricing:
+          source: simple
+          input: 0.00002
+          output: 0
+    ```
 
 - **`headers`**: (Optional) Custom HTTP headers to include in every request to this provider.
 
@@ -153,30 +189,34 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 **Multi-Protocol Provider Configuration:**
 
-For providers that support multiple API endpoints (e.g., both OpenAI chat completions and Anthropic messages), you can configure them as follows:
+For providers that support multiple API endpoints (e.g., both OpenAI chat completions and embeddings), you can configure them as follows:
 
 ```yaml
 providers:
   synthetic:
-    # Declare multiple supported API types
-    type: ["chat", "messages"]
     display_name: Synthetic Provider
     
     # Map each API type to its specific base URL
+    # API types are automatically inferred from the keys
     api_base_url:
       chat: https://api.synthetic.new/openai/v1
-      messages: https://api.synthetic.new/messages/v1
+      messages: https://api.synthetic.new/anthropic/v1
+      embeddings: https://api.synthetic.new/openai/v1
     
     api_key: "your-synthetic-key"
     
     models:
-      # Specify which APIs each model supports
+      # Chat models - specify which APIs each model supports
       "hf:MiniMaxAI/MiniMax-M2.1":
         access_via: ["chat", "messages"]
       
-      # Models can be restricted to specific APIs
-      "legacy-model":
-        access_via: ["messages"]
+      # Embeddings models - automatically restricted to embeddings API
+      "hf:nomic-ai/nomic-embed-text-v1.5":
+        type: embeddings
+        pricing:
+          source: simple
+          input: 0
+          output: 0
 ```
 
 When using multi-protocol providers with API priority matching (`priority: api_match` in model configuration), Plexus will automatically filter for providers that natively support the incoming API type, maximizing compatibility and enabling pass-through optimization.
@@ -186,7 +226,6 @@ When using multi-protocol providers with API priority matching (`priority: api_m
 ```yaml
 providers:
   openai:
-    type: chat
     display_name: OpenAI
     api_base_url: https://api.openai.com/v1
     api_key: "sk-..."
@@ -200,6 +239,20 @@ providers:
 This section defines the "virtual" models or aliases that clients will use when making requests to Plexus.
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
+
+- **`type`**: (Optional) The type of model - either `chat` (default) or `embeddings`. This determines which API endpoints can access this model:
+  - `chat`: Accessible via `/v1/chat/completions` and `/v1/messages` endpoints
+  - `embeddings`: Only accessible via `/v1/embeddings` endpoint
+  
+  **Example:**
+  ```yaml
+  models:
+    my-embeddings:
+      type: embeddings
+      targets:
+        - provider: openai
+          model: text-embedding-3-small
+  ```
 
 - **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration. Can be used for tools like Claude Code that are picky about model names, or clients that have fixed lists of models that you want to remap.
 

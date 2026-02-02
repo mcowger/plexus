@@ -8,13 +8,13 @@
 
 Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemini, etc.) under a single API. Switch models and providers without rewriting client code.
 
-### Recent Updates (v0.8.5)
+### Recent Updates (v0.9.0)
 
+- **Embeddings API**: Full OpenAI-compatible `/v1/embeddings` endpoint support
+- **Model Type System**: Distinguish between chat and embeddings models with automatic API filtering
 - **Token Estimation**: Automatic token counting for providers that don't return usage data
 - **Bulk Model Import**: Import models directly in provider configuration
-- **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format  
-- **Per-Model Cooldowns**: Configure cooldown periods per target within model aliases
-- **InOrder Selector**: Prioritized fallback logic with automatic health recovery
+- **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format
 
 ### Database & ORM
 

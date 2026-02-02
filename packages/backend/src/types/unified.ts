@@ -173,3 +173,41 @@ export interface UnifiedChatStreamChunk {
     finish_reason?: string | null;
     usage?: UnifiedUsage;
 }
+
+// Unified Embeddings Request
+export interface UnifiedEmbeddingsRequest {
+  requestId?: string;
+  model: string;
+  input: string | string[];
+  encoding_format?: "float" | "base64";
+  dimensions?: number;
+  user?: string;
+  incomingApiType?: string;
+  originalBody?: any;
+  metadata?: Record<string, any>;
+}
+
+// Unified Embeddings Response
+export interface UnifiedEmbeddingsResponse {
+  object: "list";
+  data: Array<{
+    object: "embedding";
+    embedding: number[];
+    index: number;
+  }>;
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    total_tokens: number;
+  };
+  plexus?: {
+    provider?: string;
+    model?: string;
+    apiType?: string;
+    pricing?: any;
+    providerDiscount?: number;
+    canonicalModel?: string;
+    config?: any;
+  };
+  rawResponse?: any;
+}

@@ -116,6 +116,7 @@ export interface Alias {
     aliases?: string[];
     selector?: string;
     priority?: 'selector' | 'api_match';
+    type?: 'chat' | 'embeddings';
     targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
 }
 
@@ -141,6 +142,7 @@ export interface InferenceError {
 export interface Cooldown {
     provider: string;
     model: string;
+    accountId?: string | null;
     expiry: number;
     timeRemainingMs: number;
 }
@@ -816,6 +818,7 @@ export const api = {
           selector: alias.selector,
           priority: alias.priority || 'selector',
           additional_aliases: alias.aliases,
+          ...(alias.type && { type: alias.type }),
           targets: alias.targets.map(t => ({
               provider: t.provider,
               model: t.model
@@ -901,6 +904,7 @@ export const api = {
                     aliases: val.additional_aliases || [],
                     selector: val.selector,
                     priority: val.priority,
+                    type: val.type,
                     targets
                 });
             });
