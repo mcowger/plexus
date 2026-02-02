@@ -53,6 +53,50 @@ Plexus 2 provides compatibility layers for major AI provider formats.
   - SSE stream when `stream_format: "sse"` with `speech.audio.delta` and `speech.audio.done` events
 - **Pass-through:** Speech requests are always pass-through (no protocol transformation needed).
 
+### Image Generation Compatible (OpenAI)
+- **Endpoint:** `POST /v1/images/generations`
+- **Description:** Compatible with the OpenAI Images Generation API. Creates images from text prompts using any provider supporting OpenAI-compatible image generation (OpenAI, Stability AI, Flux, etc.).
+- **Documentation:** See [OpenAI Images API Reference](https://platform.openai.com/docs/api-reference/images/create) for request and response formats.
+- **Model Type:** Models must be configured with `type: image` to be accessible via this endpoint.
+- **Supported Models:** `dall-e-2`, `dall-e-3`, `gpt-image-1`, `gpt-image-1.5`, `flux-1-schnell`, `flux-2-pro`, and compatible image generation models.
+- **Request Body (JSON):**
+  - `model` (required): Image generation model identifier
+  - `prompt` (required): Text description of the desired image(s)
+  - `n` (optional): Number of images to generate (1-10). Default: 1
+  - `size` (optional): Image dimensions. Supported: `256x256`, `512x512`, `1024x1024`, `1792x1024`, `1024x1792`. Default varies by model
+  - `response_format` (optional): Output format (`url` or `b64_json`). Default: `url`
+  - `quality` (optional): Image quality (`standard`, `hd`, `high`, `medium`, `low`). Model dependent
+  - `style` (optional): Image style (`vivid`, `natural`). DALL-E 3 only
+  - `user` (optional): Unique identifier for end-user tracking
+- **Response:**
+  - JSON object with `created` timestamp and `data` array
+  - Each image object contains `url` (valid for 60 minutes) or `b64_json`
+  - Optional `revised_prompt` showing the actual prompt used
+  - Optional `usage` field with token counts (GPT Image models)
+- **Pass-through:** Image generation requests are always pass-through (no protocol transformation needed).
+
+### Image Editing Compatible (OpenAI)
+- **Endpoint:** `POST /v1/images/edits`
+- **Description:** Compatible with the OpenAI Images Edit API. Edits or extends an image given an original image and a prompt. Supports single image upload with optional mask.
+- **Documentation:** See [OpenAI Images Edit API Reference](https://platform.openai.com/docs/api-reference/images/createEdit) for request and response formats.
+- **Model Type:** Models must be configured with `type: image` to be accessible via this endpoint.
+- **Supported Models:** `dall-e-2`, `gpt-image-1`, `gpt-image-1.5`, and compatible image editing models.
+- **Request Body (multipart/form-data):**
+  - `image` (required): The image to edit. PNG file, less than 4MB
+  - `prompt` (required): Text description of the desired edit
+  - `mask` (optional): Additional image whose transparent areas indicate where to edit. Must match image dimensions
+  - `model` (optional): Model identifier. Provider dependent
+  - `n` (optional): Number of images to generate (1-10). Default: 1
+  - `size` (optional): Image dimensions. DALL-E 2 supports: `256x256`, `512x512`, `1024x1024`. Default: `1024x1024`
+  - `response_format` (optional): Output format (`url` or `b64_json`). Default: `url`
+  - `quality` (optional): Image quality for GPT Image models (`standard`, `high`, `medium`, `low`)
+  - `user` (optional): Unique identifier for end-user tracking
+- **Response:**
+  - JSON object with `created` timestamp and `data` array
+  - Each image object contains `url` (valid for 60 minutes) or `b64_json`
+  - Optional `revised_prompt` showing the actual prompt used
+- **Pass-through:** Image editing requests are always pass-through (no protocol transformation needed).
+
 ### Gemini Compatible (Google)
 - **Endpoint:** `POST /v1beta/models/{model}:{action}`
 - **Description:** Compatible with the Google Generative Language API (Gemini).

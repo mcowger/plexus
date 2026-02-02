@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.12.0 - 2026-02-02
+
+### v0.12.0: OpenAI-Compatible Image Generation and Editing APIs
+
+### Main Features
+
+- **Image Generation API**: Added OpenAI-compatible `/v1/images/generations` endpoint support
+  - Create images from text prompts using any OpenAI-compatible image generation provider
+  - Compatible with DALL-E 2, DALL-E 3, GPT Image models, Flux, and other providers
+  - Supports multiple images per request (n parameter)
+  - Configurable image sizes: 256x256, 512x512, 1024x1024, 1792x1024, 1024x1792
+  - Response formats: url (valid 60 minutes) or b64_json
+  - Quality control: standard, hd, high, medium, low (model dependent)
+  - Style control for DALL-E 3: vivid or natural
+  - Full usage tracking with costs and duration metrics
+  - Pass-through optimization (no protocol transformation needed)
+
+- **Image Editing API**: Added OpenAI-compatible `/v1/images/edits` endpoint support
+  - Edit or extend images using text prompts
+  - Single image upload support (PNG format, < 4MB)
+  - Optional mask support for selective editing
+  - Compatible with DALL-E 2 and GPT Image models
+  - Supports multiple output images per request
+  - Configurable image sizes and response formats
+  - Full usage tracking with costs and duration metrics
+  - Pass-through optimization (no protocol transformation needed)
+
+- **Model Type System Extension**: Extended type field to support image models
+  - Models can now be configured as `type: chat`, `type: embeddings`, `type: transcriptions`, `type: speech`, or `type: image`
+  - Provider models support image type specification
+  - Router automatically filters by model type when routing image requests
+  - Ensures image models are only accessible via image APIs
+
+- **UI Enhancements for Images**:
+  - Added 'images' to known API types with fuchsia/magenta badge (#d946ef) in Providers page
+  - Image type support in Models page Type column
+  - Model Type dropdown includes image option in edit modals
+  - Image icon for images in Logs page (fuchsia color)
+  - Consistent badge styling across all pages
+
+### Technical Implementation
+
+- **New Transformer**: `ImageTransformer` class for request/response handling
+  - Pass-through design for zero-overhead proxying
+  - FormData handling for image edit multipart uploads
+  - Support for both JSON and binary image responses
+
+- **Unified Types**: Added comprehensive TypeScript types
+  - `UnifiedImageGenerationRequest` / `UnifiedImageGenerationResponse`
+  - `UnifiedImageEditRequest` / `UnifiedImageEditResponse`
+
+- **Dispatcher Methods**: Added image-specific dispatch methods
+  - `dispatchImageGenerations()` for POST /v1/images/generations
+  - `dispatchImageEdits()` for POST /v1/images/edits
+
+- **Route Handlers**: New inference routes
+  - `POST /v1/images/generations` - Image generation endpoint
+  - `POST /v1/images/edits` - Image editing endpoint (multipart/form-data)
+
+- **Configuration Support**:
+  - Added 'image' to model type enum in config schema
+  - Updated API.md documentation with new endpoints
+  - Updated CONFIGURATION.md with image model configuration examples
+
 ## v0.10.0 - 2026-02-02
 
 ### v0.10.0: Support for OpenAI-Compatible Audio APIs and Improved Persistence Logic

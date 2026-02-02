@@ -10,6 +10,7 @@ import { registerGeminiRoute } from './gemini';
 import { registerEmbeddingsRoute } from './embeddings';
 import { registerTranscriptionsRoute } from './transcriptions';
 import { registerSpeechRoute } from './speech';
+import { registerImagesRoute } from './images';
 
 export async function registerInferenceRoutes(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService) {
     // Public Routes (Excluded from Auth)
@@ -79,5 +80,6 @@ export async function registerInferenceRoutes(fastify: FastifyInstance, dispatch
         await registerEmbeddingsRoute(protectedRoutes, dispatcher, usageStorage);
         await registerTranscriptionsRoute(protectedRoutes, dispatcher, usageStorage);
         await registerSpeechRoute(protectedRoutes, dispatcher, usageStorage);
+        await registerImagesRoute(protectedRoutes, dispatcher, usageStorage);
     });
 }

@@ -293,3 +293,92 @@ export interface UnifiedSpeechResponse {
   rawResponse?: any;
   isStreamed?: boolean;
 }
+
+// Unified Image Generation Request
+export interface UnifiedImageGenerationRequest {
+  requestId?: string;
+  model: string;
+  prompt: string;
+  n?: number;
+  size?: string;
+  response_format?: 'url' | 'b64_json';
+  quality?: string;
+  style?: string;
+  user?: string;
+  // Internal tracking
+  incomingApiType?: string;
+  originalBody?: any;
+  metadata?: Record<string, any>;
+}
+
+// Unified Image Generation Response
+export interface UnifiedImageGenerationResponse {
+  created: number;
+  data: Array<{
+    url?: string;
+    b64_json?: string;
+    revised_prompt?: string;
+  }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+  plexus?: {
+    provider?: string;
+    model?: string;
+    apiType?: string;
+    pricing?: any;
+    providerDiscount?: number;
+    canonicalModel?: string;
+    config?: any;
+  };
+  rawResponse?: any;
+}
+
+// Unified Image Edit Request
+export interface UnifiedImageEditRequest {
+  requestId?: string;
+  model: string;
+  prompt: string;
+  image: Buffer;
+  filename: string;
+  mimeType: string;
+  mask?: Buffer;
+  maskFilename?: string;
+  maskMimeType?: string;
+  n?: number;
+  size?: string;
+  response_format?: 'url' | 'b64_json';
+  quality?: string;
+  user?: string;
+  // Internal tracking
+  incomingApiType?: string;
+  originalBody?: any;
+  metadata?: Record<string, any>;
+}
+
+// Unified Image Edit Response
+export interface UnifiedImageEditResponse {
+  created: number;
+  data: Array<{
+    url?: string;
+    b64_json?: string;
+    revised_prompt?: string;
+  }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+  plexus?: {
+    provider?: string;
+    model?: string;
+    apiType?: string;
+    pricing?: any;
+    providerDiscount?: number;
+    canonicalModel?: string;
+    config?: any;
+  };
+  rawResponse?: any;
+}

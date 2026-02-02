@@ -78,6 +78,20 @@ models:
     targets:
       - provider: openai_direct
         model: tts-1-hd
+
+  # Image generation model
+  image-model:
+    type: image
+    targets:
+      - provider: openai_direct
+        model: dall-e-3
+
+  # Image editing model
+  image-edit-model:
+    type: image
+    targets:
+      - provider: openai_direct
+        model: gpt-image-1
 ```
 
 ## Direct Model Routing
@@ -254,10 +268,12 @@ This section defines the "virtual" models or aliases that clients will use when 
 
 - **Model Alias**: The key (e.g., `fast-model`, `gpt-4-turbo`) is the name clients send in the `model` field of their API request.
 
-- **`type`**: (Optional) The type of model - either `chat` (default), `embeddings`, or `transcriptions`. This determines which API endpoints can access this model:
+- **`type`**: (Optional) The type of model - either `chat` (default), `embeddings`, `transcriptions`, `speech`, or `image`. This determines which API endpoints can access this model:
   - `chat`: Accessible via `/v1/chat/completions` and `/v1/messages` endpoints
   - `embeddings`: Only accessible via `/v1/embeddings` endpoint
   - `transcriptions`: Only accessible via `/v1/audio/transcriptions` endpoint
+  - `speech`: Only accessible via `/v1/audio/speech` endpoint
+  - `image`: Accessible via `/v1/images/generations` and `/v1/images/edits` endpoints
   
   **Example:**
   ```yaml
@@ -273,6 +289,18 @@ This section defines the "virtual" models or aliases that clients will use when 
       targets:
         - provider: openai
           model: whisper-1
+
+    my-speech:
+      type: speech
+      targets:
+        - provider: openai
+          model: tts-1-hd
+
+    my-image-gen:
+      type: image
+      targets:
+        - provider: openai
+          model: dall-e-3
   ```
 
 - **`additional_aliases`**: (Optional) A list of alternative names that should also route to this model configuration. Can be used for tools like Claude Code that are picky about model names, or clients that have fixed lists of models that you want to remap.

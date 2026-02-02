@@ -1,4 +1,4 @@
-import { UnifiedChatRequest, UnifiedChatResponse, UnifiedTranscriptionRequest, UnifiedTranscriptionResponse, UnifiedSpeechRequest, UnifiedSpeechResponse } from "../types/unified";
+import { UnifiedChatRequest, UnifiedChatResponse, UnifiedTranscriptionRequest, UnifiedTranscriptionResponse, UnifiedSpeechRequest, UnifiedSpeechResponse, UnifiedImageGenerationRequest, UnifiedImageGenerationResponse, UnifiedImageEditRequest, UnifiedImageEditResponse } from "../types/unified";
 import { Router } from "./router";
 import { TransformerFactory } from "./transformer-factory";
 import { logger } from "../utils/logger";
@@ -763,6 +763,168 @@ export class Dispatcher {
       provider: route.provider,
       model: route.model,
       apiType: 'speech',
+      pricing: route.modelConfig?.pricing,
+      providerDiscount: route.config.discount,
+      canonicalModel: route.canonicalModel,
+      config: route.config,
+    };
+
+    return unifiedResponse;
+  }
+
+  /**
+   * Dispatches image generation requests
+   * Handles JSON body requests to OpenAI-compatible image generation endpoints
+   */
+  async dispatchImageGenerations(request: UnifiedImageGenerationRequest): Promise<UnifiedImageGenerationResponse> {
+    // 1. Route using existing Router with 'images' as the API type
+    const route = await Router.resolve(request.model, 'images');
+
+    // 2. Build URL (image generations use /images/generations endpoint)
+    const baseUrl = this.resolveBaseUrl(route, 'images');
+    const url = `${baseUrl}/images/generations`;
+
+    // 3. Setup headers
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+
+    if (route.config.api_key) {
+      headers["Authorization"] = `Bearer ${route.config.api_key}`;
+    }
+
+    if (route.config.headers) {
+      Object.assign(headers, route.config.headers);
+    }
+
+    // 4. Transform request (model substitution and optional params)
+    const { ImageTransformer } = await import('../transformers/image');
+    const transformer = new ImageTransformer();
+    const payload = await transformer.transformGenerationRequest({
+      ...request,
+      model: route.model,
+    });
+
+    if (route.config.extraBody) {
+      Object.assign(payload, route.config.extraBody);
+    }
+
+    logger.info(`Dispatching image generation ${request.model} to ${route.provider}:${route.model}`);
+    logger.silly("Image Generation Request Payload", payload);
+
+    if (request.requestId) {
+      DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+    }
+
+    // 5. Execute request
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      await this.handleProviderError(response, route, errorText, url, headers, 'images');
+    }
+
+    // 6. Parse JSON response
+    const responseBody = await response.json();
+    logger.silly("Image Generation Response", responseBody);
+
+    if (request.requestId) {
+      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+    }
+
+    // 7. Transform response
+    const unifiedResponse = await transformer.transformGenerationResponse(responseBody);
+
+    // 8. Add plexus metadata
+    unifiedResponse.plexus = {
+      provider: route.provider,
+      model: route.model,
+      apiType: 'images',
+      pricing: route.modelConfig?.pricing,
+      providerDiscount: route.config.discount,
+      canonicalModel: route.canonicalModel,
+      config: route.config,
+    };
+
+    return unifiedResponse;
+  }
+
+  /**
+   * Dispatches image editing requests
+   * Handles multipart/form-data requests to OpenAI-compatible image editing endpoints
+   * Supports single image upload with optional mask
+   */
+  async dispatchImageEdits(request: UnifiedImageEditRequest): Promise<UnifiedImageEditResponse> {
+    // 1. Route using existing Router with 'images' as the API type
+    const route = await Router.resolve(request.model, 'images');
+
+    // 2. Build URL (image edits use /images/edits endpoint)
+    const baseUrl = this.resolveBaseUrl(route, 'images');
+    const url = `${baseUrl}/images/edits`;
+
+    // 3. Setup headers (no Content-Type - fetch will set it for FormData)
+    const headers: Record<string, string> = {};
+
+    if (route.config.api_key) {
+      headers["Authorization"] = `Bearer ${route.config.api_key}`;
+    }
+
+    if (route.config.headers) {
+      Object.assign(headers, route.config.headers);
+    }
+
+    // 4. Transform request to FormData
+    const { ImageTransformer } = await import('../transformers/image');
+    const transformer = new ImageTransformer();
+    const formData = await transformer.transformEditRequest({
+      ...request,
+      model: route.model,
+    });
+
+    logger.info(`Dispatching image edit ${request.model} to ${route.provider}:${route.model}`);
+    logger.silly("Image Edit Request", { model: request.model, filename: request.filename, hasMask: !!request.mask });
+
+    if (request.requestId) {
+      DebugManager.getInstance().addTransformedRequest(request.requestId, {
+        model: request.model,
+        filename: request.filename,
+        hasMask: !!request.mask,
+      });
+    }
+
+    // 5. Execute request with FormData
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      await this.handleProviderError(response, route, errorText, url, headers, 'images');
+    }
+
+    // 6. Parse JSON response
+    const responseBody = await response.json();
+    logger.silly("Image Edit Response", responseBody);
+
+    if (request.requestId) {
+      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+    }
+
+    // 7. Transform response
+    const unifiedResponse = await transformer.transformEditResponse(responseBody);
+
+    // 8. Add plexus metadata
+    unifiedResponse.plexus = {
+      provider: route.provider,
+      model: route.model,
+      apiType: 'images',
       pricing: route.modelConfig?.pricing,
       providerDiscount: route.config.discount,
       canonicalModel: route.canonicalModel,
