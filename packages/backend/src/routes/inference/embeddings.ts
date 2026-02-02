@@ -6,6 +6,7 @@ import { UsageStorageService } from '../../services/usage-storage';
 import { UsageRecord } from '../../types/usage';
 import { getClientIp } from '../../utils/ip';
 import { calculateCosts } from '../../utils/calculate-costs';
+import { DebugManager } from '../../services/debug-manager';
 
 export async function registerEmbeddingsRoute(
   fastify: FastifyInstance,
@@ -45,6 +46,8 @@ export async function registerEmbeddingsRoute(
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
 
+      DebugManager.getInstance().startLog(requestId, body);
+
       const unifiedResponse = await dispatcher.dispatchEmbeddings(unifiedRequest);
 
       // Record usage
@@ -66,6 +69,10 @@ export async function registerEmbeddingsRoute(
       await usageStorage.saveRequest(usageRecord as UsageRecord);
 
       const formattedResponse = await transformer.formatResponse(unifiedResponse);
+      
+      DebugManager.getInstance().addTransformedResponse(requestId, formattedResponse);
+      DebugManager.getInstance().flush(requestId);
+      
       return reply.send(formattedResponse);
 
     } catch (e: any) {
