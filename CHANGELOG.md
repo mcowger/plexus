@@ -2,6 +2,30 @@
 
 ## v0.9.0 - 2026-02-02
 
+### v0.9.0: OpenAI-Compatible Embeddings Support, Drizzle ORM Migration, and Token Estimation Improvements
+
+### New Features
+
+- **Embeddings API Support**: Introduced OpenAI-compatible embeddings API support including full UI integration and passthrough request handling. ([7299ac1](https://github.com/mcowger/plexus/commit/7299ac1), [d516a75](https://github.com/mcowger/plexus/commit/d516a75), [a3ae36b](https://github.com/mcowger/plexus/commit/a3ae36b))
+- **Token Estimation UI**: Added visual indicators for estimated token counts within the logs user interface. ([286aa35](https://github.com/mcowger/plexus/commit/286aa35))
+
+### Improvements & Refactoring
+
+- **Drizzle ORM Migration**: Refactored the data layer to migrate from `better-sqlite3` to Drizzle ORM for better schema management. ([6842d1a](https://github.com/mcowger/plexus/commit/6842d1a))
+- **UsageStorageService**: Refactored to use dynamic schema loading and improved database connection handling. ([770e9c4](https://github.com/mcowger/plexus/commit/770e9c4))
+- **OAuth Cooldowns**: Removed OAuth cooldown constraints. ([4bd3542](https://github.com/mcowger/plexus/commit/4bd3542))
+- **Documentation & Configuration**: Updated documentation for the embeddings API, refined provider examples, and corrected example configuration structures. ([59db08f](https://github.com/mcowger/plexus/commit/59db08f), [bba6352](https://github.com/mcowger/plexus/commit/bba6352), [73e7c2f](https://github.com/mcowger/plexus/commit/73e7c2f), [ce77678](https://github.com/mcowger/plexus/commit/ce77678))
+
+### Bug Fixes
+
+- **Token Estimation**: Resolved failures in token estimation when debug mode is disabled and addressed usage estimation race conditions. ([c0ca4fa](https://github.com/mcowger/plexus/commit/c0ca4fa), [e9ed351](https://github.com/mcowger/plexus/commit/e9ed351), [8977aba](https://github.com/mcowger/plexus/commit/8977aba))
+- **Docker Paths**: Fixed migration path resolution in Docker images using environment variables. ([f17118b](https://github.com/mcowger/plexus/commit/f17118b))
+- **Maintenance**: Added database files to git ignore. ([4061438](https://github.com/mcowger/plexus/commit/4061438))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
+## v0.9.0 - 2026-02-02
+
 ### v0.9.0: OpenAI-Compatible Embeddings API Support
 
 ### Main Features
