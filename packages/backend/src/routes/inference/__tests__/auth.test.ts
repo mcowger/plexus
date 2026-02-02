@@ -31,7 +31,6 @@ describe("Auth Middleware", () => {
             updatePerformanceMetrics: mock()
         } as unknown as UsageStorageService;
         // Initialize singletons to avoid errors
-        CooldownManager.getInstance().setStorage(mockUsageStorage);
         DebugManager.getInstance().setStorage(mockUsageStorage);
         SelectorFactory.setUsageStorage(mockUsageStorage);
 
@@ -201,7 +200,6 @@ describe("Key Attribution", () => {
         } as unknown as UsageStorageService;
 
         // Initialize singletons
-        CooldownManager.getInstance().setStorage(mockUsageStorage);
         DebugManager.getInstance().setStorage(mockUsageStorage);
         SelectorFactory.setUsageStorage(mockUsageStorage);
 

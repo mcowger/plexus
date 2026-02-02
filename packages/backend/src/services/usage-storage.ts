@@ -1,9 +1,10 @@
-import { Database } from "bun:sqlite";
-import { logger } from "../utils/logger";
-import { UsageRecord } from "../types/usage";
-import fs from 'node:fs';
-import path from 'node:path';
+import { logger } from '../utils/logger';
+import { UsageRecord } from '../types/usage';
+import { getDatabase } from '../db/client';
+import * as schema from '../../drizzle/schema';
+import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
+import { eq, and, gte, lte, like, desc, sql } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 
 
@@ -26,452 +27,154 @@ export interface PaginationOptions {
 }
 
 export class UsageStorageService extends EventEmitter {
-    private db: Database;
+    private db;
 
     constructor(connectionString?: string) {
         super();
-        const effectiveConnectionString = connectionString || process.env.PLEXUS_DB_URL;
-        
-        if (effectiveConnectionString) {
-            this.db = new Database(effectiveConnectionString);
-            this.init();
-            return;
-        }
-
-        // Determine location
-        let dbDir = process.env.DATA_DIR;
-
-        if (!dbDir) {
-             // Fallback to config directory logic
-             // Check if we are in packages/backend (project root is ../../)
-             const possibleRoot = path.resolve(process.cwd(), '../../');
-             const localConfig = path.resolve(process.cwd(), 'config');
-             
-             if (fs.existsSync(path.join(possibleRoot, 'config', 'plexus.yaml'))) {
-                 dbDir = path.join(possibleRoot, 'config');
-             } else if (fs.existsSync(path.join(localConfig, 'plexus.yaml'))) {
-                 dbDir = localConfig;
-             } else {
-                 // Fallback to local data dir if all else fails
-                 dbDir = path.resolve(process.cwd(), 'data');
-             }
-        }
-        
-        // Ensure directory exists
-        if (!fs.existsSync(dbDir)) {
-            try {
-                fs.mkdirSync(dbDir, { recursive: true });
-            } catch (e) {
-                 logger.error(`Failed to create data directory at ${dbDir}, falling back to local data/`, e);
-                 dbDir = path.resolve(process.cwd(), 'data');
-                 fs.mkdirSync(dbDir, { recursive: true });
-            }
-        }
-
-        const dbPath = path.join(dbDir, "usage.sqlite");
-        logger.info(`Initializing database at ${dbPath}`);
-        
-        this.db = new Database(dbPath);
-        this.init();
+        this.db = getDatabase();
     }
 
-    getDb(): Database {
+    getDb() {
         return this.db;
     }
 
-    private init() {
+    async saveRequest(record: NewRequestUsage | UsageRecord) {
         try {
-            this.db.run(`
-                CREATE TABLE IF NOT EXISTS request_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    request_id TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    source_ip TEXT,
-                    api_key TEXT,
-                    incoming_api_type TEXT,
-                    provider TEXT,
-                    incoming_model_alias TEXT,
-                    canonical_model_name TEXT,
-                    selected_model_name TEXT,
-                    outgoing_api_type TEXT,
-                    tokens_input INTEGER,
-                    tokens_output INTEGER,
-                    tokens_reasoning INTEGER,
-                    tokens_cached INTEGER,
-                    cost_input REAL,
-                    cost_output REAL,
-                    cost_cached REAL,
-                    cost_total REAL,
-                    cost_source TEXT,
-                    cost_metadata TEXT,
-                    start_time INTEGER,
-                    duration_ms INTEGER,
-                    is_streamed INTEGER,
-                    response_status TEXT
-                );
-            `);
-            
-            // Migration: Recreate provider_cooldowns table with account_id support
-            // Check if old schema exists and migrate
-            try {
-                const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_cooldowns'").all();
-                if (tables.length > 0) {
-                    // Check if it has the old schema (no account_id)
-                    const columns = this.db.prepare("PRAGMA table_info(provider_cooldowns)").all() as { name: string }[];
-                    const hasAccountId = columns.some(col => col.name === 'account_id');
-                    const hasModel = columns.some(col => col.name === 'model');
+            const isStreamedValue = typeof record.isStreamed === 'boolean' ? (record.isStreamed ? 1 : 0) : record.isStreamed;
+            const isPassthroughValue = typeof record.isPassthrough === 'boolean' ? (record.isPassthrough ? 1 : 0) : record.isPassthrough;
 
-                    if (!hasModel) {
-                        logger.info("Migrating provider_cooldowns table to support per-model cooldowns");
+            await this.db.insert(schema.requestUsage).values({
+                ...record,
+                isStreamed: isStreamedValue,
+                isPassthrough: isPassthroughValue,
+                createdAt: record.createdAt || Date.now(),
+            });
 
-                        // Rename old table
-                        this.db.run("ALTER TABLE provider_cooldowns RENAME TO provider_cooldowns_old");
-
-                        // Create new table with updated schema including model
-                        this.db.run(`
-                            CREATE TABLE provider_cooldowns (
-                                provider TEXT NOT NULL,
-                                model TEXT NOT NULL,
-                                account_id TEXT,
-                                expiry INTEGER,
-                                created_at INTEGER,
-                                PRIMARY KEY (provider, model, account_id)
-                            )
-                        `);
-
-                        // Migrate existing data (set model to empty string for backward compatibility)
-                        // Empty string for model means "all models" for that provider
-                        this.db.run(`
-                            INSERT INTO provider_cooldowns (provider, model, account_id, expiry, created_at)
-                            SELECT provider, '', COALESCE(account_id, ''), expiry, created_at FROM provider_cooldowns_old
-                        `);
-
-                        // Drop old table
-                        this.db.run("DROP TABLE provider_cooldowns_old");
-
-                        logger.info("provider_cooldowns migration completed");
-                    } else if (!hasAccountId) {
-                        logger.info("Migrating provider_cooldowns table to support per-account cooldowns");
-
-                        // Rename old table
-                        this.db.run("ALTER TABLE provider_cooldowns RENAME TO provider_cooldowns_old");
-
-                        // Create new table with updated schema
-                        this.db.run(`
-                            CREATE TABLE provider_cooldowns (
-                                provider TEXT NOT NULL,
-                                model TEXT NOT NULL,
-                                account_id TEXT,
-                                expiry INTEGER,
-                                created_at INTEGER,
-                                PRIMARY KEY (provider, model, account_id)
-                            )
-                        `);
-
-                        // Migrate existing data
-                        this.db.run(`
-                            INSERT INTO provider_cooldowns (provider, model, account_id, expiry, created_at)
-                            SELECT provider, '', '', expiry, created_at FROM provider_cooldowns_old
-                        `);
-
-                        // Drop old table
-                        this.db.run("DROP TABLE provider_cooldowns_old");
-
-                        logger.info("provider_cooldowns migration completed");
-                    }
-                } else {
-                    // Create table with new schema
-                    this.db.run(`
-                        CREATE TABLE provider_cooldowns (
-                            provider TEXT NOT NULL,
-                            model TEXT NOT NULL,
-                            account_id TEXT,
-                            expiry INTEGER,
-                            created_at INTEGER,
-                            PRIMARY KEY (provider, model, account_id)
-                        )
-                    `);
-                }
-            } catch (error) {
-                logger.error("Failed to migrate provider_cooldowns table", error);
-                // Fall back to creating new table if migration fails
-                this.db.run(`
-                    CREATE TABLE IF NOT EXISTS provider_cooldowns (
-                        provider TEXT NOT NULL,
-                        model TEXT NOT NULL,
-                        account_id TEXT,
-                        expiry INTEGER,
-                        created_at INTEGER,
-                        PRIMARY KEY (provider, model, account_id)
-                    )
-                `);
-            }
-
-            this.db.run(`
-                CREATE TABLE IF NOT EXISTS debug_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    request_id TEXT NOT NULL,
-                    raw_request TEXT,
-                    transformed_request TEXT,
-                    raw_response TEXT,
-                    transformed_response TEXT,
-                    raw_response_snapshot TEXT,
-                    transformed_response_snapshot TEXT,
-                    created_at INTEGER
-                );
-            `);
-
-            this.db.run(`
-                CREATE TABLE IF NOT EXISTS inference_errors (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    request_id TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    error_message TEXT,
-                    error_stack TEXT,
-                    details TEXT,
-                    created_at INTEGER
-                );
-            `);
-
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN cost_source TEXT;");
-            } catch (e) { /* ignore if exists */ }
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN cost_metadata TEXT;");
-            } catch (e) { /* ignore if exists */ }
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN ttft_ms REAL;");
-            } catch (e) { /* ignore if exists */ }
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN tokens_per_sec REAL;");
-            } catch (e) { /* ignore if exists */ }
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN canonical_model_name TEXT;");
-            } catch (e) { /* ignore if exists */ }
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN attribution TEXT;");
-            } catch (e) { /* ignore if exists */ }
-            try {
-                this.db.run("ALTER TABLE request_usage ADD COLUMN is_passthrough INTEGER;");
-            } catch (e) { /* ignore if exists */ }
-
-            // Provider Performance Table - stores last 10 request latencies and throughput
-            this.db.run(`
-                CREATE TABLE IF NOT EXISTS provider_performance (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    created_at INTEGER NOT NULL,
-                    time_to_first_token_ms REAL,
-                    total_tokens INTEGER,
-                    duration_ms REAL,
-                    tokens_per_sec REAL,
-                    request_id TEXT
-                );
-            `);
-
-            // Create indexes for efficient querying
-            this.db.run(`
-                CREATE INDEX IF NOT EXISTS idx_provider_performance_lookup
-                ON provider_performance(provider, model, created_at DESC);
-            `);
-
-            logger.info("Storage initialized");
-        } catch (error) {
-            logger.error("Failed to initialize storage", error);
-        }
-    }
-
-    saveRequest(record: UsageRecord) {
-        try {
-            const query = this.db.prepare(`
-                INSERT INTO request_usage (
-                    request_id, date, source_ip, api_key, attribution, incoming_api_type,
-                    provider, incoming_model_alias, canonical_model_name, selected_model_name, outgoing_api_type,
-                    tokens_input, tokens_output, tokens_reasoning, tokens_cached,
-                    cost_input, cost_output, cost_cached, cost_total, cost_source, cost_metadata,
-                    start_time, duration_ms, is_streamed, response_status, is_passthrough,
-                    ttft_ms, tokens_per_sec
-                ) VALUES (
-                    $requestId, $date, $sourceIp, $apiKey, $attribution, $incomingApiType,
-                    $provider, $incomingModelAlias, $canonicalModelName, $selectedModelName, $outgoingApiType,
-                    $tokensInput, $tokensOutput, $tokensReasoning, $tokensCached,
-                    $costInput, $costOutput, $costCached, $costTotal, $costSource, $costMetadata,
-                    $startTime, $durationMs, $isStreamed, $responseStatus, $isPassthrough,
-                    $ttftMs, $tokensPerSec
-                )
-            `);
-
-            query.run({
-                $requestId: record.requestId,
-                $date: record.date,
-                $sourceIp: record.sourceIp,
-                $apiKey: record.apiKey,
-                $attribution: record.attribution,
-                $incomingApiType: record.incomingApiType,
-                $provider: record.provider,
-                $incomingModelAlias: record.incomingModelAlias,
-                $canonicalModelName: record.canonicalModelName,
-                $selectedModelName: record.selectedModelName,
-                $outgoingApiType: record.outgoingApiType,
-                $tokensInput: record.tokensInput,
-                $tokensOutput: record.tokensOutput,
-                $tokensReasoning: record.tokensReasoning,
-                $tokensCached: record.tokensCached,
-                $costInput: record.costInput,
-                $costOutput: record.costOutput,
-                $costCached: record.costCached,
-                $costTotal: record.costTotal,
-                $costSource: record.costSource,
-                $costMetadata: record.costMetadata,
-                $startTime: record.startTime,
-                $durationMs: record.durationMs,
-                $isStreamed: record.isStreamed ? 1 : 0,
-                $responseStatus: record.responseStatus,
-                $isPassthrough: record.isPassthrough ? 1 : 0,
-                $ttftMs: record.ttftMs,
-                $tokensPerSec: record.tokensPerSec
-            } as any);
-            
             logger.debug(`Usage record saved for request ${record.requestId}`);
             this.emit('created', record);
         } catch (error) {
-            logger.error("Failed to save usage record", error);
+            logger.error('Failed to save usage record', error);
         }
     }
 
-    saveDebugLog(record: DebugLogRecord) {
+    async saveDebugLog(record: DebugLogRecord) {
         try {
-            const query = this.db.prepare(`
-                INSERT INTO debug_logs (
-                    request_id, raw_request, transformed_request, 
-                    raw_response, transformed_response, 
-                    raw_response_snapshot, transformed_response_snapshot,
-                    created_at
-                ) VALUES (
-                    $requestId, $rawRequest, $transformedRequest, 
-                    $rawResponse, $transformedResponse, 
-                    $rawResponseSnapshot, $transformedResponseSnapshot,
-                    $createdAt
-                )
-            `);
-
-            query.run({
-                $requestId: record.requestId,
-                $rawRequest: record.rawRequest ? (typeof record.rawRequest === 'string' ? record.rawRequest : JSON.stringify(record.rawRequest)) : null,
-                $transformedRequest: record.transformedRequest ? (typeof record.transformedRequest === 'string' ? record.transformedRequest : JSON.stringify(record.transformedRequest)) : null,
-                $rawResponse: record.rawResponse ? (typeof record.rawResponse === 'string' ? record.rawResponse : JSON.stringify(record.rawResponse)) : null,
-                $transformedResponse: record.transformedResponse ? (typeof record.transformedResponse === 'string' ? record.transformedResponse : JSON.stringify(record.transformedResponse)) : null,
-                $rawResponseSnapshot: record.rawResponseSnapshot ? JSON.stringify(record.rawResponseSnapshot) : null,
-                $transformedResponseSnapshot: record.transformedResponseSnapshot ? JSON.stringify(record.transformedResponseSnapshot) : null,
-                $createdAt: record.createdAt || Date.now()
+            await this.db.insert(schema.debugLogs).values({
+                requestId: record.requestId,
+                rawRequest: record.rawRequest ? (typeof record.rawRequest === 'string' ? record.rawRequest : JSON.stringify(record.rawRequest)) : null,
+                transformedRequest: record.transformedRequest ? (typeof record.transformedRequest === 'string' ? record.transformedRequest : JSON.stringify(record.transformedRequest)) : null,
+                rawResponse: record.rawResponse ? (typeof record.rawResponse === 'string' ? record.rawResponse : JSON.stringify(record.rawResponse)) : null,
+                transformedResponse: record.transformedResponse ? (typeof record.transformedResponse === 'string' ? record.transformedResponse : JSON.stringify(record.transformedResponse)) : null,
+                rawResponseSnapshot: record.rawResponseSnapshot ? JSON.stringify(record.rawResponseSnapshot) : null,
+                transformedResponseSnapshot: record.transformedResponseSnapshot ? JSON.stringify(record.transformedResponseSnapshot) : null,
+                createdAt: record.createdAt || Date.now()
             });
-            
+
             logger.debug(`Debug log saved for request ${record.requestId}`);
         } catch (error) {
-            logger.error("Failed to save debug log", error);
+            logger.error('Failed to save debug log', error);
         }
     }
 
-    saveError(requestId: string, error: any, details?: any) {
+    async saveError(requestId: string, error: any, details?: any) {
         try {
-            const query = this.db.prepare(`
-                INSERT INTO inference_errors (
-                    request_id, date, error_message, error_stack, details, created_at
-                ) VALUES (
-                    $requestId, $date, $errorMessage, $errorStack, $details, $createdAt
-                )
-            `);
-
-            query.run({
-                $requestId: requestId,
-                $date: new Date().toISOString(),
-                $errorMessage: error.message || String(error),
-                $errorStack: error.stack || null,
-                $details: details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null,
-                $createdAt: Date.now()
+            await this.db.insert(schema.inferenceErrors).values({
+                requestId,
+                date: new Date().toISOString(),
+                errorMessage: error.message || String(error),
+                errorStack: error.stack || null,
+                details: details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null,
+                createdAt: Date.now(),
             });
-            
+
             logger.debug(`Inference error saved for request ${requestId}`);
         } catch (e) {
-            logger.error("Failed to save inference error", e);
+            logger.error('Failed to save inference error', e);
         }
     }
 
-    getErrors(limit: number = 50, offset: number = 0): any[] {
+    async getErrors(limit: number = 50, offset: number = 0): Promise<any[]> {
         try {
-            const query = this.db.prepare(`
-                SELECT * FROM inference_errors 
-                ORDER BY created_at DESC 
-                LIMIT $limit OFFSET $offset
-            `);
-            return query.all({ $limit: limit, $offset: offset });
+            const results = await this.db
+                .select()
+                .from(schema.inferenceErrors)
+                .orderBy(desc(schema.inferenceErrors.createdAt))
+                .limit(limit)
+                .offset(offset);
+            
+            return results;
         } catch (error) {
-            logger.error("Failed to get inference errors", error);
+            logger.error('Failed to get inference errors', error);
             return [];
         }
     }
 
-    deleteError(requestId: string): boolean {
+    async deleteError(requestId: string): Promise<boolean> {
         try {
-            const query = this.db.prepare(`
-                DELETE FROM inference_errors WHERE request_id = $requestId
-            `);
-            const result = query.run({ $requestId: requestId });
-            return result.changes > 0;
+            await this.db
+                .delete(schema.inferenceErrors)
+                .where(eq(schema.inferenceErrors.requestId, requestId));
+            return true;
         } catch (error) {
             logger.error(`Failed to delete error log for ${requestId}`, error);
             return false;
         }
     }
 
-    deleteAllErrors(): boolean {
+    async deleteAllErrors(): Promise<boolean> {
         try {
-            this.db.run("DELETE FROM inference_errors");
-            logger.info("Deleted all error logs");
+            await this.db.delete(schema.inferenceErrors);
+            logger.info('Deleted all error logs');
             return true;
         } catch (error) {
-            logger.error("Failed to delete all error logs", error);
+            logger.error('Failed to delete all error logs', error);
             return false;
         }
     }
 
-    getDebugLogs(limit: number = 50, offset: number = 0): { requestId: string, createdAt: number }[] {
+    async getDebugLogs(limit: number = 50, offset: number = 0): Promise<{ requestId: string, createdAt: number }[]> {
         try {
-            const query = this.db.prepare(`
-                SELECT request_id, created_at 
-                FROM debug_logs 
-                ORDER BY created_at DESC 
-                LIMIT $limit OFFSET $offset
-            `);
-            const results = query.all({ $limit: limit, $offset: offset }) as any[];
+            const results = await this.db
+                .select({
+                    requestId: schema.debugLogs.requestId,
+                    createdAt: schema.debugLogs.createdAt
+                })
+                .from(schema.debugLogs)
+                .orderBy(desc(schema.debugLogs.createdAt))
+                .limit(limit)
+                .offset(offset);
+
             return results.map(row => ({
-                requestId: row.request_id,
-                createdAt: row.created_at
+                requestId: row.requestId,
+                createdAt: row.createdAt
             }));
         } catch (error) {
-            logger.error("Failed to get debug logs", error);
+            logger.error('Failed to get debug logs', error);
             return [];
         }
     }
 
-    getDebugLog(requestId: string): DebugLogRecord | null {
+    async getDebugLog(requestId: string): Promise<DebugLogRecord | null> {
         try {
-            const query = this.db.prepare(`
-                SELECT * FROM debug_logs WHERE request_id = $requestId
-            `);
-            const row = query.get({ $requestId: requestId }) as any;
+            const results = await this.db
+                .select()
+                .from(schema.debugLogs)
+                .where(eq(schema.debugLogs.requestId, requestId));
+
+            if (!results || results.length === 0) return null;
+
+            const row = results[0];
             if (!row) return null;
 
             return {
-                requestId: row.request_id,
-                createdAt: row.created_at,
-                rawRequest: row.raw_request,
-                transformedRequest: row.transformed_request,
-                rawResponse: row.raw_response,
-                transformedResponse: row.transformed_response,
-                rawResponseSnapshot: row.raw_response_snapshot,
-                transformedResponseSnapshot: row.transformed_response_snapshot
+                requestId: row.requestId,
+                createdAt: row.createdAt,
+                rawRequest: row.rawRequest,
+                transformedRequest: row.transformedRequest,
+                rawResponse: row.rawResponse,
+                transformedResponse: row.transformedResponse,
+                rawResponseSnapshot: row.rawResponseSnapshot,
+                transformedResponseSnapshot: row.transformedResponseSnapshot
             };
         } catch (error) {
             logger.error(`Failed to get debug log for ${requestId}`, error);
@@ -479,175 +182,186 @@ export class UsageStorageService extends EventEmitter {
         }
     }
 
-    deleteDebugLog(requestId: string): boolean {
+    async deleteDebugLog(requestId: string): Promise<boolean> {
         try {
-            const query = this.db.prepare(`
-                DELETE FROM debug_logs WHERE request_id = $requestId
-            `);
-            const result = query.run({ $requestId: requestId });
-            return result.changes > 0;
+            await this.db
+                .delete(schema.debugLogs)
+                .where(eq(schema.debugLogs.requestId, requestId));
+            return true;
         } catch (error) {
             logger.error(`Failed to delete debug log for ${requestId}`, error);
             return false;
         }
     }
 
-    deleteAllDebugLogs(): boolean {
+    async deleteAllDebugLogs(): Promise<boolean> {
         try {
-            this.db.run("DELETE FROM debug_logs");
-            logger.info("Deleted all debug logs");
+            await this.db.delete(schema.debugLogs);
+            logger.info('Deleted all debug logs');
             return true;
         } catch (error) {
-            logger.error("Failed to delete all debug logs", error);
+            logger.error('Failed to delete all debug logs', error);
             return false;
         }
     }
 
-    getUsage(filters: UsageFilters, pagination: PaginationOptions): { data: UsageRecord[], total: number } {
-        let queryStr = `
-            SELECT request_usage.*, 
-            EXISTS(SELECT 1 FROM debug_logs WHERE debug_logs.request_id = request_usage.request_id) as has_debug,
-            EXISTS(SELECT 1 FROM inference_errors WHERE inference_errors.request_id = request_usage.request_id) as has_error
-            FROM request_usage 
-            WHERE 1=1
-        `;
-        let countQueryStr = "SELECT COUNT(*) as count FROM request_usage WHERE 1=1";
-        const params: any = {};
+    async getUsage(filters: UsageFilters, pagination: PaginationOptions): Promise<{ data: UsageRecord[], total: number }> {
+        const conditions = [];
 
         if (filters.startDate) {
-            queryStr += " AND date >= $startDate";
-            countQueryStr += " AND date >= $startDate";
-            params.$startDate = filters.startDate;
+            conditions.push(gte(schema.requestUsage.date, filters.startDate));
         }
         if (filters.endDate) {
-            queryStr += " AND date <= $endDate";
-            countQueryStr += " AND date <= $endDate";
-            params.$endDate = filters.endDate;
+            conditions.push(lte(schema.requestUsage.date, filters.endDate));
         }
         if (filters.incomingApiType) {
-            queryStr += " AND incoming_api_type = $incomingApiType";
-            countQueryStr += " AND incoming_api_type = $incomingApiType";
-            params.$incomingApiType = filters.incomingApiType;
+            conditions.push(eq(schema.requestUsage.incomingApiType, filters.incomingApiType));
         }
         if (filters.provider) {
-            queryStr += " AND provider LIKE $provider";
-            countQueryStr += " AND provider LIKE $provider";
-            params.$provider = `%${filters.provider}%`;
+            conditions.push(like(schema.requestUsage.provider, `%${filters.provider}%`));
         }
         if (filters.incomingModelAlias) {
-            queryStr += " AND incoming_model_alias LIKE $incomingModelAlias";
-            countQueryStr += " AND incoming_model_alias LIKE $incomingModelAlias";
-            params.$incomingModelAlias = `%${filters.incomingModelAlias}%`;
+            conditions.push(like(schema.requestUsage.incomingModelAlias, `%${filters.incomingModelAlias}%`));
         }
         if (filters.selectedModelName) {
-            queryStr += " AND selected_model_name LIKE $selectedModelName";
-            countQueryStr += " AND selected_model_name LIKE $selectedModelName";
-            params.$selectedModelName = `%${filters.selectedModelName}%`;
+            conditions.push(like(schema.requestUsage.selectedModelName, `%${filters.selectedModelName}%`));
         }
         if (filters.outgoingApiType) {
-            queryStr += " AND outgoing_api_type = $outgoingApiType";
-            countQueryStr += " AND outgoing_api_type = $outgoingApiType";
-            params.$outgoingApiType = filters.outgoingApiType;
+            conditions.push(eq(schema.requestUsage.outgoingApiType, filters.outgoingApiType));
         }
         if (filters.minDurationMs !== undefined) {
-            queryStr += " AND duration_ms >= $minDurationMs";
-            countQueryStr += " AND duration_ms >= $minDurationMs";
-            params.$minDurationMs = filters.minDurationMs;
+            conditions.push(gte(schema.requestUsage.durationMs, filters.minDurationMs));
         }
         if (filters.maxDurationMs !== undefined) {
-            queryStr += " AND duration_ms <= $maxDurationMs";
-            countQueryStr += " AND duration_ms <= $maxDurationMs";
-            params.$maxDurationMs = filters.maxDurationMs;
+            conditions.push(lte(schema.requestUsage.durationMs, filters.maxDurationMs));
         }
         if (filters.responseStatus) {
-            queryStr += " AND response_status = $responseStatus";
-            countQueryStr += " AND response_status = $responseStatus";
-            params.$responseStatus = filters.responseStatus;
+            conditions.push(eq(schema.requestUsage.responseStatus, filters.responseStatus));
         }
 
-        queryStr += " ORDER BY date DESC LIMIT $limit OFFSET $offset";
-        
-        const dataParams = { ...params, $limit: pagination.limit, $offset: pagination.offset };
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         try {
-            const countResult = this.db.query(countQueryStr).get(params) as { count: number };
-            const dataResult = this.db.query(queryStr).all(dataParams) as any[];
+            const data = await this.db
+                .select({
+                    requestId: schema.requestUsage.requestId,
+                    date: schema.requestUsage.date,
+                    sourceIp: schema.requestUsage.sourceIp,
+                    apiKey: schema.requestUsage.apiKey,
+                    attribution: schema.requestUsage.attribution,
+                    incomingApiType: schema.requestUsage.incomingApiType,
+                    provider: schema.requestUsage.provider,
+                    incomingModelAlias: schema.requestUsage.incomingModelAlias,
+                    canonicalModelName: schema.requestUsage.canonicalModelName,
+                    selectedModelName: schema.requestUsage.selectedModelName,
+                    outgoingApiType: schema.requestUsage.outgoingApiType,
+                    tokensInput: schema.requestUsage.tokensInput,
+                    tokensOutput: schema.requestUsage.tokensOutput,
+                    tokensReasoning: schema.requestUsage.tokensReasoning,
+                    tokensCached: schema.requestUsage.tokensCached,
+                    costInput: schema.requestUsage.costInput,
+                    costOutput: schema.requestUsage.costOutput,
+                    costCached: schema.requestUsage.costCached,
+                    costTotal: schema.requestUsage.costTotal,
+                    costSource: schema.requestUsage.costSource,
+                    costMetadata: schema.requestUsage.costMetadata,
+                    startTime: schema.requestUsage.startTime,
+                    durationMs: schema.requestUsage.durationMs,
+                    ttftMs: schema.requestUsage.ttftMs,
+                    tokensPerSec: schema.requestUsage.tokensPerSec,
+                    isStreamed: schema.requestUsage.isStreamed,
+                    isPassthrough: schema.requestUsage.isPassthrough,
+                    responseStatus: schema.requestUsage.responseStatus,
+                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.debugLogs} WHERE ${schema.debugLogs.requestId} = ${schema.requestUsage.requestId})`,
+                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.inferenceErrors} WHERE ${schema.inferenceErrors.requestId} = ${schema.requestUsage.requestId})`,
+                })
+                .from(schema.requestUsage)
+                .where(whereClause)
+                .orderBy(desc(schema.requestUsage.date))
+                .limit(pagination.limit)
+                .offset(pagination.offset);
 
-            // Map snake_case to camelCase for UsageRecord
-            const mappedData: UsageRecord[] = dataResult.map(row => ({
-                requestId: row.request_id,
+            const mappedData: UsageRecord[] = data.map((row) => ({
+                requestId: row.requestId,
                 date: row.date,
-                sourceIp: row.source_ip,
-                apiKey: row.api_key,
+                sourceIp: row.sourceIp,
+                apiKey: row.apiKey,
                 attribution: row.attribution,
-                incomingApiType: row.incoming_api_type,
+                incomingApiType: row.incomingApiType ?? '',
                 provider: row.provider,
-                incomingModelAlias: row.incoming_model_alias,
-                canonicalModelName: row.canonical_model_name,
-                selectedModelName: row.selected_model_name,
-                outgoingApiType: row.outgoing_api_type,
-                tokensInput: row.tokens_input,
-                tokensOutput: row.tokens_output,
-                tokensReasoning: row.tokens_reasoning,
-                tokensCached: row.tokens_cached,
-                costInput: row.cost_input,
-                costOutput: row.cost_output,
-                costCached: row.cost_cached,
-                costTotal: row.cost_total,
-                costSource: row.cost_source,
-                costMetadata: row.cost_metadata,
-                startTime: row.start_time,
-                durationMs: row.duration_ms,
-                isStreamed: !!row.is_streamed,
-                responseStatus: row.response_status,
-                ttftMs: row.ttft_ms,
-                tokensPerSec: row.tokens_per_sec,
-                hasDebug: !!row.has_debug,
-                hasError: !!row.has_error,
-                isPassthrough: !!row.is_passthrough
+                incomingModelAlias: row.incomingModelAlias,
+                canonicalModelName: row.canonicalModelName,
+                selectedModelName: row.selectedModelName,
+                outgoingApiType: row.outgoingApiType,
+                tokensInput: row.tokensInput,
+                tokensOutput: row.tokensOutput,
+                tokensReasoning: row.tokensReasoning,
+                tokensCached: row.tokensCached,
+                costInput: row.costInput,
+                costOutput: row.costOutput,
+                costCached: row.costCached,
+                costTotal: row.costTotal,
+                costSource: row.costSource,
+                costMetadata: row.costMetadata,
+                startTime: row.startTime,
+                durationMs: row.durationMs ?? 0,
+                isStreamed: !!row.isStreamed,
+                responseStatus: row.responseStatus ?? '',
+                ttftMs: row.ttftMs,
+                tokensPerSec: row.tokensPerSec,
+                hasDebug: row.hasDebug,
+                hasError: row.hasError,
+                isPassthrough: !!row.isPassthrough
             }));
+
+            const countResults = await this.db
+                .select({ count: sql<number>`count(*)` })
+                .from(schema.requestUsage)
+                .where(whereClause);
+
+            const total = countResults[0]?.count ?? 0;
 
             return {
                 data: mappedData,
-                total: countResult.count
+                total
             };
         } catch (error) {
-            logger.error("Failed to query usage", error);
+            logger.error('Failed to query usage', error);
             throw error;
         }
     }
 
-    deleteUsageLog(requestId: string): boolean {
+    async deleteUsageLog(requestId: string): Promise<boolean> {
         try {
-            const query = this.db.prepare(`
-                DELETE FROM request_usage WHERE request_id = $requestId
-            `);
-            const result = query.run({ $requestId: requestId });
-            return result.changes > 0;
+            await this.db
+                .delete(schema.requestUsage)
+                .where(eq(schema.requestUsage.requestId, requestId));
+            return true;
         } catch (error) {
             logger.error(`Failed to delete usage log for ${requestId}`, error);
             return false;
         }
     }
 
-    deleteAllUsageLogs(beforeDate?: Date): boolean {
+    async deleteAllUsageLogs(beforeDate?: Date): Promise<boolean> {
         try {
             if (beforeDate) {
-                const query = this.db.prepare("DELETE FROM request_usage WHERE date < $beforeDate");
-                query.run({ $beforeDate: beforeDate.toISOString() });
+                await this.db
+                    .delete(schema.requestUsage)
+                    .where(lte(schema.requestUsage.date, beforeDate.toISOString()));
                 logger.info(`Deleted usage logs older than ${beforeDate.toISOString()}`);
             } else {
-                this.db.run("DELETE FROM request_usage");
-                logger.info("Deleted all usage logs");
+                await this.db.delete(schema.requestUsage);
+                logger.info('Deleted all usage logs');
             }
             return true;
         } catch (error) {
-            logger.error("Failed to delete usage logs", error);
+            logger.error('Failed to delete usage logs', error);
             return false;
         }
     }
 
-    updatePerformanceMetrics(
+    async updatePerformanceMetrics(
         provider: string,
         model: string,
         timeToFirstTokenMs: number | null,
@@ -656,51 +370,36 @@ export class UsageStorageService extends EventEmitter {
         requestId: string
     ) {
         try {
-            // Calculate tokens per second if we have both values
             let tokensPerSec: number | null = null;
             if (outputTokens && durationMs > 0) {
                 tokensPerSec = (outputTokens / durationMs) * 1000;
             }
 
-            // Insert new performance record
-            const insertQuery = this.db.prepare(`
-                INSERT INTO provider_performance (
-                    provider, model, created_at, time_to_first_token_ms, 
-                    total_tokens, duration_ms, tokens_per_sec, request_id
-                ) VALUES (
-                    $provider, $model, $createdAt, $ttft, 
-                    $totalTokens, $durationMs, $tokensPerSec, $requestId
-                )
-            `);
-
-            insertQuery.run({
-                $provider: provider,
-                $model: model,
-                $createdAt: Date.now(),
-                $ttft: timeToFirstTokenMs,
-                $totalTokens: outputTokens,
-                $durationMs: durationMs,
-                $tokensPerSec: tokensPerSec,
-                $requestId: requestId
+            await this.db.insert(schema.providerPerformance).values({
+                provider,
+                model,
+                requestId,
+                timeToFirstTokenMs,
+                totalTokens: outputTokens,
+                durationMs,
+                tokensPerSec,
+                createdAt: Date.now()
             });
 
-            // Keep only the last 10 records per provider+model combination
-            // Delete older records beyond the 10th
-            const deleteQuery = this.db.prepare(`
-                DELETE FROM provider_performance
-                WHERE provider = $provider AND model = $model
-                AND id NOT IN (
-                    SELECT id FROM provider_performance
-                    WHERE provider = $provider AND model = $model
-                    ORDER BY created_at DESC
-                    LIMIT 10
-                )
-            `);
+            const subquery = this.db
+                .select({ id: schema.providerPerformance.id })
+                .from(schema.providerPerformance)
+                .where(and(
+                    sql`${schema.providerPerformance.provider} = ${provider}`,
+                    sql`${schema.providerPerformance.model} = ${model}`
+                ))
+                .orderBy(desc(schema.providerPerformance.createdAt))
+                .limit(10)
+                .as('sub');
 
-            deleteQuery.run({
-                $provider: provider,
-                $model: model
-            });
+            await this.db
+                .delete(schema.providerPerformance)
+                .where(sql`${schema.providerPerformance.id} NOT IN (SELECT id FROM ${subquery})`);
 
             logger.debug(`Performance metrics updated for ${provider}:${model}`);
         } catch (error) {
@@ -708,42 +407,77 @@ export class UsageStorageService extends EventEmitter {
         }
     }
 
-    getProviderPerformance(provider?: string, model?: string): any[] {
+    async getProviderPerformance(provider?: string, model?: string): Promise<any[]> {
         try {
-            let queryStr = `
-                SELECT 
-                    provider,
-                    model,
-                    AVG(time_to_first_token_ms) as avg_ttft_ms,
-                    MIN(time_to_first_token_ms) as min_ttft_ms,
-                    MAX(time_to_first_token_ms) as max_ttft_ms,
-                    AVG(tokens_per_sec) as avg_tokens_per_sec,
-                    MIN(tokens_per_sec) as min_tokens_per_sec,
-                    MAX(tokens_per_sec) as max_tokens_per_sec,
-                    COUNT(*) as sample_count,
-                    MAX(created_at) as last_updated
-                FROM provider_performance
-                WHERE 1=1
-            `;
-
-            const params: any = {};
-
+            const conditions = [];
+            
             if (provider) {
-                queryStr += " AND provider = $provider";
-                params.$provider = provider;
+                conditions.push(eq(schema.providerPerformance.provider, provider));
             }
-
             if (model) {
-                queryStr += " AND model = $model";
-                params.$model = model;
+                conditions.push(eq(schema.providerPerformance.model, model));
             }
 
-            queryStr += " GROUP BY provider, model ORDER BY provider, model";
+            const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-            const query = this.db.prepare(queryStr);
-            return query.all(params) as any[];
+            const results = await this.db
+                .select({
+                    provider: schema.providerPerformance.provider,
+                    model: schema.providerPerformance.model,
+                    avgTtftMs: sql<number>`AVG(${schema.providerPerformance.timeToFirstTokenMs})`,
+                    minTtftMs: sql<number>`MIN(${schema.providerPerformance.timeToFirstTokenMs})`,
+                    maxTtftMs: sql<number>`MAX(${schema.providerPerformance.timeToFirstTokenMs})`,
+                    avgTokensPerSec: sql<number>`AVG(${schema.providerPerformance.tokensPerSec})`,
+                    minTokensPerSec: sql<number>`MIN(${schema.providerPerformance.tokensPerSec})`,
+                    maxTokensPerSec: sql<number>`MAX(${schema.providerPerformance.tokensPerSec})`,
+                    sampleCount: sql<number>`COUNT(*)`,
+                    lastUpdated: sql<number>`MAX(${schema.providerPerformance.createdAt})`
+                })
+                .from(schema.providerPerformance)
+                .where(whereClause);
+                
+            const groupedResults = new Map<string, any>();
+            for (const row of results) {
+                const key = `${row.provider}:${row.model}`;
+                if (!groupedResults.has(key)) {
+                    groupedResults.set(key, {
+                        provider: row.provider,
+                        model: row.model,
+                        avgTtftMs: 0,
+                        minTtftMs: row.minTtftMs,
+                        maxTtftMs: row.maxTtftMs,
+                        avgTokensPerSec: 0,
+                        minTokensPerSec: row.minTokensPerSec,
+                        maxTokensPerSec: row.maxTokensPerSec,
+                        sampleCount: 0,
+                        lastUpdated: row.lastUpdated
+                    });
+                }
+                const entry = groupedResults.get(key);
+                if (entry && row.avgTtftMs !== null && row.avgTokensPerSec !== null) {
+                    entry.avgTtftMs += row.avgTtftMs;
+                    entry.avgTokensPerSec += row.avgTokensPerSec;
+                    entry.sampleCount += (row.sampleCount ?? 0);
+                    if (row.lastUpdated > entry.lastUpdated) {
+                        entry.lastUpdated = row.lastUpdated;
+                    }
+                }
+            }
+
+            return Array.from(groupedResults.values()).map(row => ({
+                provider: row.provider,
+                model: row.model,
+                avg_ttft_ms: row.sampleCount > 0 ? row.avgTtftMs / row.sampleCount : 0,
+                min_ttft_ms: row.minTtftMs,
+                max_ttft_ms: row.maxTtftMs,
+                avg_tokens_per_sec: row.sampleCount > 0 ? row.avgTokensPerSec / row.sampleCount : 0,
+                min_tokens_per_sec: row.minTokensPerSec,
+                max_tokens_per_sec: row.maxTokensPerSec,
+                sample_count: row.sampleCount,
+                last_updated: row.lastUpdated
+            }));
         } catch (error) {
-            logger.error("Failed to get provider performance", error);
+            logger.error('Failed to get provider performance', error);
             return [];
         }
     }

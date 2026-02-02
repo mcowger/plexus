@@ -38,3 +38,11 @@ for (const path of loggerPaths) {
         StreamTransport: class {}
     }));
 }
+
+// Initialize database for tests
+import { initializeDatabase } from "../src/db/client";
+import { runMigrations } from "../src/db/migrate";
+
+// Use in-memory database for tests
+initializeDatabase(":memory:");
+await runMigrations();

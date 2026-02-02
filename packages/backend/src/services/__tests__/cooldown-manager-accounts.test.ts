@@ -1,51 +1,48 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { CooldownManager } from "../cooldown-manager";
-import { UsageStorageService } from "../usage-storage";
+import { getDatabase } from "../../db/client";
+import * as schema from "../../../drizzle/schema";
 
 describe("CooldownManager - Per-Account Cooldowns", () => {
     let cooldownManager: CooldownManager;
-    let mockStorage: UsageStorageService;
 
-    beforeEach(() => {
-        // Get singleton instance and clear state
+    beforeEach(async () => {
+        // Get singleton instance and clear in-memory state
         cooldownManager = CooldownManager.getInstance();
         cooldownManager['cooldowns'].clear();
 
-        // Create mock storage (in-memory, no actual DB operations)
-        mockStorage = {
-            saveCooldown: () => {},
-            getCooldowns: () => [],
-            clearCooldown: () => {},
-            clearAllCooldowns: () => {}
-        } as any;
-
-        cooldownManager.setStorage(mockStorage);
+        // Clear all cooldowns from the database
+        const db = getDatabase();
+        await db.delete(schema.providerCooldowns);
+        
+        // Reload cooldowns (will be empty now)
+        await cooldownManager.loadFromStorage();
     });
 
-    test("Tracks cooldowns separately for different accounts on same provider+model", () => {
+    test("Tracks cooldowns separately for different accounts on same provider+model", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
 
         // Mark two different accounts as failed
-        cooldownManager.markProviderFailure(provider, model, 'user1@company.com', 30000);
-        cooldownManager.markProviderFailure(provider, model, 'user2@company.com', 60000);
+        await cooldownManager.markProviderFailure(provider, model, 'user1@company.com', 30000);
+        await cooldownManager.markProviderFailure(provider, model, 'user2@company.com', 60000);
 
         // user1 should be unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(false);
 
         // user2 should also be unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(false);
 
         // user3 (never marked as failed) should be healthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user3@company.com')).toBe(true);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user3@company.com')).toBe(true);
     });
 
-    test("Composite key format is provider:model:accountId", () => {
+    test("Composite key format is provider:model:accountId", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
         const accountId = 'user1@company.com';
 
-        cooldownManager.markProviderFailure(provider, model, accountId, 30000);
+        await cooldownManager.markProviderFailure(provider, model, accountId, 30000);
 
         const cooldowns = cooldownManager.getCooldowns();
         expect(cooldowns.length).toBe(1);
@@ -54,75 +51,75 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
         expect(cooldowns[0]?.accountId).toBe(accountId);
     });
 
-    test("Provider+model-level cooldown (no accountId) is tracked independently", () => {
+    test("Provider+model-level cooldown (no accountId) is tracked independently", async () => {
         const provider = 'my-openai';
         const model = 'gpt-3.5-turbo';
 
         // Mark provider+model as failed without specific account (API key-based provider)
-        cooldownManager.markProviderFailure(provider, model, undefined, 30000);
+        await cooldownManager.markProviderFailure(provider, model, undefined, 30000);
 
         // Provider+model-level check should be unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, undefined)).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, undefined)).toBe(false);
 
         // Account-specific checks are independent (per-account OAuth would have separate cooldowns)
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(true);
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(true);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(true);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(true);
     });
 
-    test("Account-specific cooldown does not affect other accounts", () => {
+    test("Account-specific cooldown does not affect other accounts", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
 
-        cooldownManager.markProviderFailure(provider, model, 'user1@company.com', 30000);
+        await cooldownManager.markProviderFailure(provider, model, 'user1@company.com', 30000);
 
         // user1 is unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(false);
 
         // user2 remains healthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(true);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(true);
     });
 
-    test("Different models on same provider can have independent cooldowns", () => {
+    test("Different models on same provider can have independent cooldowns", async () => {
         const provider = 'my-openai';
 
         // Mark gpt-4 as failed
-        cooldownManager.markProviderFailure(provider, 'gpt-4', undefined, 30000);
+        await cooldownManager.markProviderFailure(provider, 'gpt-4', undefined, 30000);
 
         // gpt-4 should be unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, 'gpt-4', undefined)).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, 'gpt-4', undefined)).toBe(false);
 
         // gpt-3.5-turbo should still be healthy
-        expect(cooldownManager.isProviderHealthy(provider, 'gpt-3.5-turbo', undefined)).toBe(true);
+        expect(await cooldownManager.isProviderHealthy(provider, 'gpt-3.5-turbo', undefined)).toBe(true);
     });
 
-    test("Cooldown expires after specified duration", () => {
+    test("Cooldown expires after specified duration", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
         const accountId = 'user1@company.com';
         const shortDuration = 100; // 100ms
 
-        cooldownManager.markProviderFailure(provider, model, accountId, shortDuration);
+        await cooldownManager.markProviderFailure(provider, model, accountId, shortDuration);
 
         // Immediately unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, accountId)).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, accountId)).toBe(false);
 
         // Wait for cooldown to expire
         return new Promise<void>((resolve) => {
-            setTimeout(() => {
+            setTimeout(async () => {
                 // Should be healthy again
-                expect(cooldownManager.isProviderHealthy(provider, model, accountId)).toBe(true);
+                expect(await cooldownManager.isProviderHealthy(provider, model, accountId)).toBe(true);
                 resolve();
             }, shortDuration + 50); // Add buffer
         });
     });
 
-    test("Custom cooldown duration is used when provided", () => {
+    test("Custom cooldown duration is used when provided", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
         const accountId = 'user1@company.com';
         const customDuration = 45000; // 45 seconds
 
-        cooldownManager.markProviderFailure(provider, model, accountId, customDuration);
+        await cooldownManager.markProviderFailure(provider, model, accountId, customDuration);
 
         const cooldowns = cooldownManager.getCooldowns();
         expect(cooldowns.length).toBe(1);
@@ -133,13 +130,13 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
         expect(timeRemaining).toBeLessThanOrEqual(customDuration);
     });
 
-    test("Default cooldown duration is used when not provided", () => {
+    test("Default cooldown duration is used when not provided", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
         const accountId = 'user1@company.com';
         const defaultDuration = 10 * 60 * 1000; // 10 minutes
 
-        cooldownManager.markProviderFailure(provider, model, accountId); // No duration specified
+        await cooldownManager.markProviderFailure(provider, model, accountId); // No duration specified
 
         const cooldowns = cooldownManager.getCooldowns();
         expect(cooldowns.length).toBe(1);
@@ -150,10 +147,10 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
         expect(timeRemaining).toBeLessThanOrEqual(defaultDuration);
     });
 
-    test("getCooldowns returns all cooldowns with model and account info", () => {
-        cooldownManager.markProviderFailure('provider1', 'model1', 'user1@example.com', 30000);
-        cooldownManager.markProviderFailure('provider1', 'model2', 'user2@example.com', 45000);
-        cooldownManager.markProviderFailure('provider2', 'model1', 'user3@example.com', 60000);
+    test("getCooldowns returns all cooldowns with model and account info", async () => {
+        await cooldownManager.markProviderFailure('provider1', 'model1', 'user1@example.com', 30000);
+        await cooldownManager.markProviderFailure('provider1', 'model2', 'user2@example.com', 45000);
+        await cooldownManager.markProviderFailure('provider2', 'model1', 'user3@example.com', 60000);
 
         const cooldowns = cooldownManager.getCooldowns();
         expect(cooldowns.length).toBe(3);
@@ -172,47 +169,47 @@ describe("CooldownManager - Per-Account Cooldowns", () => {
         expect(accountIds).toContain('user3@example.com');
     });
 
-    test("Clearing cooldown for specific account+model does not affect others", () => {
+    test("Clearing cooldown for specific account+model does not affect others", async () => {
         const provider = 'my-antigravity';
         const model = 'gpt-4';
 
-        cooldownManager.markProviderFailure(provider, model, 'user1@company.com', 60000);
-        cooldownManager.markProviderFailure(provider, model, 'user2@company.com', 60000);
+        await cooldownManager.markProviderFailure(provider, model, 'user1@company.com', 60000);
+        await cooldownManager.markProviderFailure(provider, model, 'user2@company.com', 60000);
 
         // Both unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(false);
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(false);
 
         // Clear cooldown for user1
-        cooldownManager.clearCooldown(provider, model, 'user1@company.com');
+        await cooldownManager.clearCooldown(provider, model, 'user1@company.com');
 
         // user1 now healthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(true);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user1@company.com')).toBe(true);
 
         // user2 still unhealthy
-        expect(cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(false);
+        expect(await cooldownManager.isProviderHealthy(provider, model, 'user2@company.com')).toBe(false);
     });
 
-    test("Multiple providers can have same model+account identifiers independently", () => {
+    test("Multiple providers can have same model+account identifiers independently", async () => {
         const model = 'gpt-4';
         const accountId = 'user@example.com';
 
-        cooldownManager.markProviderFailure('provider-a', model, accountId, 30000);
-        cooldownManager.markProviderFailure('provider-b', model, accountId, 60000);
+        await cooldownManager.markProviderFailure('provider-a', model, accountId, 30000);
+        await cooldownManager.markProviderFailure('provider-b', model, accountId, 60000);
 
         // Same model+account on provider-a is unhealthy
-        expect(cooldownManager.isProviderHealthy('provider-a', model, accountId)).toBe(false);
+        expect(await cooldownManager.isProviderHealthy('provider-a', model, accountId)).toBe(false);
 
         // Same model+account on provider-b is also unhealthy
-        expect(cooldownManager.isProviderHealthy('provider-b', model, accountId)).toBe(false);
+        expect(await cooldownManager.isProviderHealthy('provider-b', model, accountId)).toBe(false);
 
         // Clear cooldown only for provider-a+model+account
-        cooldownManager.clearCooldown('provider-a', model, accountId);
+        await cooldownManager.clearCooldown('provider-a', model, accountId);
 
         // provider-a:model:account is now healthy
-        expect(cooldownManager.isProviderHealthy('provider-a', model, accountId)).toBe(true);
+        expect(await cooldownManager.isProviderHealthy('provider-a', model, accountId)).toBe(true);
 
         // provider-b:model:account still unhealthy
-        expect(cooldownManager.isProviderHealthy('provider-b', model, accountId)).toBe(false);
+        expect(await cooldownManager.isProviderHealthy('provider-b', model, accountId)).toBe(false);
     });
 });

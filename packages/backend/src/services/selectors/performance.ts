@@ -11,7 +11,7 @@ export class PerformanceSelector extends Selector {
     this.storage = storage;
   }
 
-  select(targets: ModelTarget[]): ModelTarget | null {
+  async select(targets: ModelTarget[]): Promise<ModelTarget | null> {
     if (!targets || targets.length === 0) {
       return null;
     }
@@ -32,7 +32,7 @@ export class PerformanceSelector extends Selector {
     const candidates: { target: ModelTarget; tps: number }[] = [];
 
     for (const target of targets) {
-      const stats = this.storage.getProviderPerformance(target.provider, target.model);
+      const stats = await this.storage.getProviderPerformance(target.provider, target.model);
       
       let avgTps = 0;
       if (stats && stats.length > 0) {

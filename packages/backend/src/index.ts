@@ -13,6 +13,8 @@ import { SelectorFactory } from './services/selectors/factory';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
+import { initializeDatabase } from './db/client';
+import { runMigrations } from './db/migrate';
 
 /**
  * Plexus Backend Server
@@ -36,6 +38,17 @@ fastify.register(cors, {
     exposedHeaders: ['Content-Type']
 });
 
+// --- Database Initialization ---
+// Initialize database first before any services that depend on it
+try {
+  initializeDatabase();
+  await runMigrations();
+  await CooldownManager.getInstance().loadFromStorage();
+} catch (e) {
+  logger.error('Failed to initialize database or run migrations', e);
+  process.exit(1);
+}
+
 // --- Service Initialization ---
 
 const dispatcher = new Dispatcher();
@@ -43,7 +56,6 @@ const usageStorage = new UsageStorageService();
 
 // Initialize singletons with storage dependencies
 dispatcher.setUsageStorage(usageStorage);
-CooldownManager.getInstance().setStorage(usageStorage);
 DebugManager.getInstance().setStorage(usageStorage);
 SelectorFactory.setUsageStorage(usageStorage);
 

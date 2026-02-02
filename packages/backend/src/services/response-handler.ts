@@ -183,13 +183,13 @@ export async function handleResponse(
  * Helper to capture token usage, calculate costs, and persist usage records
  * specifically for non-streaming (unary) responses.
  */
-function finalizeUsage(
-  usageRecord: Partial<UsageRecord>,
-  unifiedResponse: UnifiedChatResponse,
-  usageStorage: UsageStorageService,
-  startTime: number,
-  pricing: any,
-  providerDiscount: any
+async function finalizeUsage(
+    usageRecord: Partial<UsageRecord>,
+    unifiedResponse: UnifiedChatResponse,
+    usageStorage: UsageStorageService,
+    startTime: number,
+    pricing: any,
+    providerDiscount: any
 ) {
   // Capture token usage if available in the response
   if (unifiedResponse.usage) {
@@ -212,11 +212,11 @@ function finalizeUsage(
   }
 
   // Persist usage record to database
-  usageStorage.saveRequest(usageRecord as UsageRecord);
+  await usageStorage.saveRequest(usageRecord as UsageRecord);
 
   // Update the performance sliding window for future routing decisions
   if (usageRecord.provider && usageRecord.selectedModelName) {
-    usageStorage.updatePerformanceMetrics(
+    await usageStorage.updatePerformanceMetrics(
       usageRecord.provider,
       usageRecord.selectedModelName,
       usageRecord.durationMs,

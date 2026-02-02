@@ -3,7 +3,7 @@ import { encode } from 'eventsource-encoder';
 import { UsageStorageService } from '../../services/usage-storage';
 
 export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService) {
-    fastify.get('/v0/management/usage', (request, reply) => {
+    fastify.get('/v0/management/usage', async (request, reply) => {
         const query = request.query as any;
         const limit = parseInt(query.limit || '50');
         const offset = parseInt(query.offset || '0');
@@ -23,14 +23,14 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
         if (query.maxDurationMs) filters.maxDurationMs = parseInt(query.maxDurationMs);
 
         try {
-            const result = usageStorage.getUsage(filters, { limit, offset });
+            const result = await usageStorage.getUsage(filters, { limit, offset });
             return reply.send(result);
         } catch (e: any) {
             return reply.code(500).send({ error: e.message });
         }
     });
 
-    fastify.delete('/v0/management/usage', (request, reply) => {
+    fastify.delete('/v0/management/usage', async (request, reply) => {
         const query = request.query as any;
         const olderThanDays = query.olderThanDays;
         let beforeDate: Date | undefined;
@@ -43,15 +43,15 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
             }
         }
 
-        const success = usageStorage.deleteAllUsageLogs(beforeDate);
+        const success = await usageStorage.deleteAllUsageLogs(beforeDate);
         if (!success) return reply.code(500).send({ error: "Failed to delete usage logs" });
         return reply.send({ success: true });
     });
 
-    fastify.delete('/v0/management/usage/:requestId', (request, reply) => {
+    fastify.delete('/v0/management/usage/:requestId', async (request, reply) => {
         const params = request.params as any;
         const requestId = params.requestId;
-        const success = usageStorage.deleteUsageLog(requestId);
+        const success = await usageStorage.deleteUsageLog(requestId);
         if (!success) return reply.code(404).send({ error: "Usage log not found or could not be deleted" });
         return reply.send({ success: true });
     });

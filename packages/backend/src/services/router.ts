@@ -13,7 +13,7 @@ export interface RouteResult {
 }
 
 export class Router {
-    static resolve(modelName: string, incomingApiType?: string): RouteResult {
+    static async resolve(modelName: string, incomingApiType?: string): Promise<RouteResult> {
         const config = getConfig();
 
         // 0. Check for direct provider/model syntax (e.g., "direct/stima/gemini-2.5-flash")
@@ -93,7 +93,7 @@ export class Router {
                     throw new Error(`All targets for model alias '${modelName}' are disabled.`);
                 }
 
-                let healthyTargets = CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
+                let healthyTargets = await CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
 
                 if (healthyTargets.length < enabledTargets.length) {
                     const filteredCount = enabledTargets.length - healthyTargets.length;
@@ -145,7 +145,7 @@ export class Router {
 
                 const selectorStrategy = alias.selector || 'random'; // Default to random
                 const selector = SelectorFactory.getSelector(selectorStrategy);
-                const target = selector.select(enrichedTargets);
+                const target = await selector.select(enrichedTargets);
                 
                 if (!target) {
                     throw new Error(`No target selected for alias '${modelName}'`);
