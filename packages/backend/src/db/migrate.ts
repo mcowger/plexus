@@ -14,13 +14,15 @@ export async function runMigrations() {
     const migrationsBase = path.resolve(__dirname, '../../drizzle');
 
     if (dialect === 'sqlite') {
-      const migrationsPath = path.join(migrationsBase, 'migrations');
+      const migrationsPath = process.env.DRIZZLE_MIGRATIONS_PATH 
+        ? process.env.DRIZZLE_MIGRATIONS_PATH.replace('/migrations_pg', '/migrations')
+        : path.join(migrationsBase, 'migrations');
       logger.info(`SQLite migrations path: ${migrationsPath}`);
       await migrateSqlite(db as any, {
         migrationsFolder: migrationsPath
       });
     } else {
-      const migrationsPath = path.join(migrationsBase, 'migrations_pg');
+      const migrationsPath = process.env.DRIZZLE_MIGRATIONS_PATH || path.join(migrationsBase, 'migrations_pg');
       logger.info(`PostgreSQL migrations path: ${migrationsPath}`);
       await migratePg(db as any, {
         migrationsFolder: migrationsPath
