@@ -465,44 +465,52 @@ export const Logs = () => {
                                             </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle">
-                                            <div className="flex gap-1.5 justify-center items-center">
-                                                {/* Tools defined in request */}
-                                                {log.toolsDefined !== undefined && log.toolsDefined > 0 && (
-                                                    <div title={`${log.toolsDefined} tool${log.toolsDefined > 1 ? 's' : ''} defined`} className="flex items-center gap-0.5 text-orange-400">
-                                                        <Wrench size={14} />
-                                                        <span className="text-[10px]">{log.toolsDefined}</span>
-                                                    </div>
-                                                )}
-                                                {/* Message count */}
-                                                {log.messageCount !== undefined && log.messageCount > 0 && (
-                                                    <div title={`${log.messageCount} message${log.messageCount > 1 ? 's' : ''} in context`} className="flex items-center gap-0.5 text-blue-400">
-                                                        <MessagesSquare size={14} />
-                                                        <span className="text-[10px]">{log.messageCount}</span>
-                                                    </div>
-                                                )}
-                                                {/* Parallel tool calls enabled */}
-                                                {log.parallelToolCallsEnabled === true && (
-                                                    <div title="Parallel tool calling enabled" className="text-purple-400">
-                                                        <GitFork size={14} />
-                                                    </div>
-                                                )}
-                                                {/* Tool calls in response */}
-                                                {log.toolCallsCount !== undefined && log.toolCallsCount > 0 && (
-                                                    <div title={`${log.toolCallsCount} tool call${log.toolCallsCount > 1 ? 's' : ''} in response`} className="flex items-center gap-0.5 text-green-400">
-                                                        <CheckCircle2 size={14} />
-                                                        <span className="text-[10px]">{log.toolCallsCount}</span>
-                                                    </div>
-                                                )}
-                                                {/* Finish reason - treat 'end_turn' same as 'stop' */}
-                                                {log.finishReason && (
-                                                    <div title={`Finish reason: ${log.finishReason}`} className="text-yellow-400">
-                                                        {log.finishReason === 'stop' || log.finishReason === 'end_turn' ? <CheckCircle2 size={14} /> :
-                                                         log.finishReason === 'tool_calls' ? <Wrench size={14} /> :
-                                                         log.finishReason === 'length' || log.finishReason === 'max_tokens' ? <AlertTriangle size={14} /> :
-                                                         <ChevronDown size={14} />}
-                                                    </div>
-                                                )}
+                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center' }}>
+                                                {/* Left column: Tools and Messages */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                    {/* Tools defined in request */}
+                                                    {log.toolsDefined !== undefined && log.toolsDefined > 0 && (
+                                                        <div title={`${log.toolsDefined} tool${log.toolsDefined > 1 ? 's' : ''} defined`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-orange-400">
+                                                            <Wrench size={12} />
+                                                            <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{log.toolsDefined}</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Message count */}
+                                                    {log.messageCount !== undefined && log.messageCount > 0 && (
+                                                        <div title={`${log.messageCount} message${log.messageCount > 1 ? 's' : ''} in context`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-blue-400">
+                                                            <MessagesSquare size={12} />
+                                                            <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{log.messageCount}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* Right column: Tool calls and Finish reason */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                    {/* Tool calls in response */}
+                                                    {log.toolCallsCount !== undefined && log.toolCallsCount > 0 && (
+                                                        <div title={`${log.toolCallsCount} tool call${log.toolCallsCount > 1 ? 's' : ''} in response`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-green-400">
+                                                            <CheckCircle2 size={12} />
+                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{log.toolCallsCount}</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Finish reason - treat 'end_turn' same as 'stop' */}
+                                                    {log.finishReason && (
+                                                        <div title={`Finish reason: ${log.finishReason}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-yellow-400">
+                                                            {log.finishReason === 'stop' || log.finishReason === 'end_turn' ? <CheckCircle2 size={12} /> :
+                                                             log.finishReason === 'tool_calls' ? <Wrench size={12} /> :
+                                                             log.finishReason === 'length' || log.finishReason === 'max_tokens' ? <AlertTriangle size={12} /> :
+                                                             <ChevronDown size={12} />}
+                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{log.finishReason}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
+                                            {/* Parallel tool calls enabled - shown below if active */}
+                                            {log.parallelToolCallsEnabled === true && (
+                                                <div title="Parallel tool calling enabled" style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center', marginTop: '2px' }} className="text-purple-400">
+                                                    <GitFork size={10} />
+                                                    <span style={{ fontSize: '0.75em' }}>parallel</span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td
                                             className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
