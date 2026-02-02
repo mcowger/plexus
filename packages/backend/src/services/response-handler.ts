@@ -63,28 +63,22 @@ export async function handleResponse(
     let finalClientStream: ReadableStream;
     let rawStream = unifiedResponse.stream;
 
-    // TAP THE RAW STREAM for debugging
-    // We want to capture the stream BEFORE any transformation to log the true "Raw Response".
-    const shouldDebug = debugManager.isEnabled() || shouldEstimateTokens;
-    const rawLogInspector = shouldDebug 
-        ? new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType)
-        : null;
+    // TAP THE RAW STREAM for debugging/usage extraction
+    // We always capture the stream BEFORE any transformation to enable usage extraction,
+    // even with pass-through optimization. Debug mode only controls DB persistence.
+    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType);
     
-    if (rawLogInspector) {
-        const tapStream = new TransformStream({
-          transform(chunk, controller) {
-            // Feed the inspector (Node PassThrough)
-            rawLogInspector.write(chunk);
-            controller.enqueue(chunk);
-          },
-          flush() {
-            rawLogInspector.end();
-          }
-        });
-        
-        // Replace the original stream with the tapped stream
-        rawStream = rawStream.pipeThrough(tapStream);
-    }
+    const tapStream = new TransformStream({
+      transform(chunk, controller) {
+        rawLogInspector.write(chunk);
+        controller.enqueue(chunk);
+      },
+      flush() {
+        rawLogInspector.end();
+      }
+    });
+    
+    rawStream = rawStream.pipeThrough(tapStream);
 
     if (unifiedResponse.bypassTransformation) {
       // Direct pass-through: No changes to the provider's raw bytes
@@ -135,11 +129,6 @@ export async function handleResponse(
     /**
      * Build the linear stream pipeline.
      */
-    
-    // Determine the format of the stream flowing through the inspectors
-    // If bypassTransformation is true, it's the provider's format.
-    // Otherwise, it's the client's requested format.
-    const streamApiType = unifiedResponse.bypassTransformation ? providerApiType : apiType;
 
     const usageInspector = new UsageInspector(
       usageRecord.requestId!,
@@ -149,9 +138,9 @@ export async function handleResponse(
       providerDiscount,
       startTime,
       shouldEstimateTokens,
-      streamApiType,
+      providerApiType,
       originalRequest
-    ).createInspector(streamApiType);
+    );
 
     // Convert Web Stream to Node Stream for piping
     const nodeStream = Readable.fromWeb(finalClientStream as any);

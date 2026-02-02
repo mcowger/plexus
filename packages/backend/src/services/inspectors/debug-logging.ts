@@ -17,10 +17,6 @@ export class DebugLoggingInspector extends BaseInspector {
   createInspector(providerApiType: string): PassThrough {
     const inspector = new PassThrough();
 
-    if (!this.debugManager.isEnabled()) {
-      return inspector;
-    }
-
     const bodyChunks: string[] = [];
     let totalSize = 0;
     let truncated = false;
@@ -61,7 +57,7 @@ export class DebugLoggingInspector extends BaseInspector {
 
     inspector.on("end", () => {
       const rawBody = bodyChunks.join('');
-      logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} raw body collected, length: ${rawBody.length}:\n${rawBody}`);
+      logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} stream ended, captured ${bodyChunks.length} chunks, total size: ${rawBody.length} bytes`);
       try {
         let reconstructed: any = null;
         switch (providerApiType) {
@@ -77,12 +73,20 @@ export class DebugLoggingInspector extends BaseInspector {
           default:
             logger.warn(`[Inspector] Unknown providerApiType: ${providerApiType}`);
         }
-        logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} reconstructed: ${JSON.stringify(reconstructed, null, 2)}`);
+        logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} reconstructed response: ${JSON.stringify(reconstructed, null, 2)}`);
+
+        // Always save to memory for usage extraction/estimation
         this.saveReconstructedResponse(reconstructed);
-        this.saveRawResponse(rawBody);
+        
+        // Only persist raw data to DB if debug mode is enabled
+        if (this.debugManager.isEnabled()) {
+          this.saveRawResponse(rawBody);
+        }
       } catch (err) {
         logger.error(`[Inspector:${this.mode}] Reconstruction failed: ${err}`);
-        this.saveRawResponse(rawBody);
+        if (this.debugManager.isEnabled()) {
+          this.saveRawResponse(rawBody);
+        }
       }
     });
 

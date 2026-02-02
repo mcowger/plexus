@@ -62,44 +62,73 @@ export class DebugManager {
 
     addTransformedRequest(requestId: string, payload: any) {
         if (!this.enabled) return;
-        const log = this.pendingLogs.get(requestId);
-        if (log) {
-            log.transformedRequest = payload;
+        let log = this.pendingLogs.get(requestId);
+        if (!log) {
+            // Create log entry if it doesn't exist (for ephemeral token estimation)
+            log = {
+                requestId,
+                createdAt: Date.now()
+            };
+            this.pendingLogs.set(requestId, log);
         }
+        log.transformedRequest = payload;
     }
 
     addRawResponse(requestId: string, payload: any) {
         if (!this.enabled) return;
-        const log = this.pendingLogs.get(requestId);
-        if (log) {
-            log.rawResponse = payload;
+        let log = this.pendingLogs.get(requestId);
+        if (!log) {
+            // Create log entry if it doesn't exist (for ephemeral token estimation)
+            log = {
+                requestId,
+                createdAt: Date.now()
+            };
+            this.pendingLogs.set(requestId, log);
         }
+        log.rawResponse = payload;
     }
 
     addReconstructedRawResponse(requestId: string, payload: any) {
         if (!this.enabled) return;
-        const log = this.pendingLogs.get(requestId);
-        if (log) {
-            log.rawResponseSnapshot = payload;
+        let log = this.pendingLogs.get(requestId);
+        if (!log) {
+            // Create log entry if it doesn't exist (for ephemeral token estimation)
+            log = {
+                requestId,
+                createdAt: Date.now()
+            };
+            this.pendingLogs.set(requestId, log);
         }
+        log.rawResponseSnapshot = payload;
     }
 
     addTransformedResponse(requestId: string, payload: any) {
         if (!this.enabled) return;
-        const log = this.pendingLogs.get(requestId);
-        if (log) {
-            log.transformedResponse = payload;
+        let log = this.pendingLogs.get(requestId);
+        if (!log) {
+            // Create log entry if it doesn't exist (for ephemeral token estimation)
+            log = {
+                requestId,
+                createdAt: Date.now()
+            };
+            this.pendingLogs.set(requestId, log);
         }
+        log.transformedResponse = payload;
     }
 
     addTransformedResponseSnapshot(requestId: string, payload: any) {
         if (!this.enabled) return;
-        const log = this.pendingLogs.get(requestId);
-        if (log) {
-            log.transformedResponseSnapshot = payload;
+        let log = this.pendingLogs.get(requestId);
+        if (!log) {
+            // Create log entry if it doesn't exist (for ephemeral token estimation)
+            log = {
+                requestId,
+                createdAt: Date.now()
+            };
+            this.pendingLogs.set(requestId, log);
         }
+        log.transformedResponseSnapshot = payload;
     }
-    
 
     flush(requestId: string) {
         // Skip flushing ephemeral requests
@@ -107,7 +136,7 @@ export class DebugManager {
             logger.debug(`[DebugManager] Skipping flush for ephemeral request ${requestId}`);
             return;
         }
-        
+
         if (!this.storage) return;
         const log = this.pendingLogs.get(requestId);
         if (log) {
