@@ -5,6 +5,7 @@ import { CostSelector } from '../cost';
 import { PerformanceSelector } from '../performance';
 import { LatencySelector } from '../latency';
 import { InOrderSelector } from '../in-order';
+import { UsageSelector } from '../usage';
 import { UsageStorageService } from '../../usage-storage';
 
 describe('SelectorFactory', () => {
@@ -55,7 +56,8 @@ describe('SelectorFactory', () => {
     expect(() => SelectorFactory.getSelector('unknown')).toThrow("Unknown selector type: unknown");
   });
 
-  it('should throw for unimplemented selectors', () => {
-     expect(() => SelectorFactory.getSelector('usage')).toThrow("Selector 'usage' not implemented yet");
+  it('should return UsageSelector for "usage"', () => {
+    const selector = SelectorFactory.getSelector('usage');
+    expect(selector).toBeInstanceOf(UsageSelector);
   });
 });

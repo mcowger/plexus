@@ -4,6 +4,7 @@ import { CostSelector } from './cost';
 import { PerformanceSelector } from './performance';
 import { LatencySelector } from './latency';
 import { InOrderSelector } from './in-order';
+import { UsageSelector } from './usage';
 import { UsageStorageService } from '../usage-storage';
 
 export class SelectorFactory {
@@ -34,8 +35,10 @@ export class SelectorFactory {
         }
         return new LatencySelector(this.usageStorage);
       case 'usage':
-        // Placeholder for future implementation
-        throw new Error("Selector 'usage' not implemented yet");
+        if (!this.usageStorage) {
+            throw new Error("UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.");
+        }
+        return new UsageSelector(this.usageStorage);
       default:
         throw new Error(`Unknown selector type: ${type}`);
     }
