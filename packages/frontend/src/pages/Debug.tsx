@@ -181,7 +181,7 @@ export const Debug: React.FC = () => {
                                         </button>
                                     </div>
                                     <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1">
-                                        {log.requestId.substring(0, 8)}...
+                                        {log.requestId?.substring(0, 8) ?? '-'}...
                                     </div>
                                 </div>
                             </div>

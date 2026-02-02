@@ -183,7 +183,7 @@ export const Errors: React.FC = () => {
                                         </button>
                                     </div>
                                     <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1 font-mono text-xs text-[var(--color-text-muted)]">
-                                        {err.request_id.substring(0, 8)}...
+                                        {err.request_id?.substring(0, 8) ?? '-'}...
                                     </div>
                                     <div className="mt-1 text-sm text-red-400 truncate" title={err.error_message}>
                                         {err.error_message}
