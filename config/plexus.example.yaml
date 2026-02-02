@@ -11,7 +11,7 @@
 #
 #   display_name: A friendly name for logging and metadata.
 #   api_base_url: The root endpoint for the provider's API.
-#                 Plexus automatically infers the API type (chat/messages/gemini) from this URL:
+#                 Plexus automatically infers the API type (chat/messages/gemini/embeddings) from this URL:
 #                 - URLs containing 'anthropic.com' are treated as 'messages' (Anthropic format)
 #                 - URLs containing 'generativelanguage.googleapis.com' are treated as 'gemini'
 #                 - All other URLs default to 'chat' (OpenAI-compatible format)
@@ -20,16 +20,20 @@
 #                 api_base_url:
 #                   chat: https://api.example.com/v1
 #                   messages: https://api.example.com/anthropic/v1
+#                   embeddings: https://api.example.com/v1
 #
 #   api_key:      Your authentication token for the provider (required).
 #   models:       A list of raw model identifiers supported by this provider.
-#                 OR a map of model names to configuration (e.g. pricing).
+#                 OR a map of model names to configuration (e.g. pricing, type).
+#                 For embeddings models, specify type: embeddings in the model config.
 #   headers:      (Optional) Custom HTTP headers to include in every request.
 #
 # 2. MODELS SECTION (ALIASES)
 # ---------------------------
 # Define friendly "Model Aliases" that your clients will use.
 #
+#   type:         (Optional) 'chat' (default) or 'embeddings'. Determines which
+#                 API endpoints can access this model.
 #   selector:     (Optional) The strategy to select a target.
 #                 Options: 'random' (default), 'cost', 'performance', 'latency', 'in_order'.
 #                 If multiple targets are available, Plexus will prioritize
@@ -63,6 +67,7 @@ providers:
       - gpt-4o
       - gpt-4o-mini
       - o1-preview
+      - text-embedding-3-small  # Embeddings model
 
   # Standard Anthropic Configuration
   # API type is automatically inferred as 'messages' from the URL
@@ -136,6 +141,20 @@ providers:
       - deepseek-chat
       - deepseek-reasoner
 
+  # Example embeddings provider
+  # Supports OpenAI-compatible embeddings endpoint
+  voyage:
+    display_name: Voyage AI
+    api_base_url: https://api.voyageai.com/v1
+    api_key: "your-voyage-api-key-here"
+    models:
+      voyage-3:
+        type: embeddings
+        pricing:
+          source: simple
+          input: 0.00006
+          output: 0
+
   # Example of a multi-protocol provider
   # This provider supports both OpenAI (chat) and Anthropic (messages) formats
   # Use a map to specify different URLs for each format
@@ -174,6 +193,9 @@ providers:
           discount: 0.1
     headers:
       "HTTP-Referer": "https://your-app.com"
+
+models:
+  # Basic alias routing to Anthropic
   smart-model:
     targets:
       - provider: anthropic
@@ -214,12 +236,21 @@ providers:
       - provider: anthropic
         model: claude-3-5-sonnet-latest
 
+  # Example using Cost Selector (Cheapest Provider)
+  cheapest-model:
+    selector: cost
+    targets:
+      - provider: openai_cost_tracked
+        model: gpt-4o-mini
+      - provider: deepseek
+        model: deepseek-chat
+
   # Example using Performance Selector (Fastest TPS)
   fastest-throughput-model:
     selector: performance
     targets:
-      - provider: groq
-        model: llama-3.1-70b
+      - provider: openai
+        model: gpt-4o
       - provider: openai
         model: gpt-4o-mini
 
@@ -233,76 +264,41 @@ providers:
         model: gpt-4o-mini
 
   # Example using InOrder Selector (Defined Order with Fallback)
-  # Requests route to 'kilo' first, then 'naga', then 'synthetic' if earlier ones are unavailable
-  # Individual targets can be disabled without removing them from the config
+  # Requests route to first provider, then second if first is unhealthy
   minimax-m2.1:
     selector: in_order
     targets:
-      - provider: kilo
-        model: minimax/minimax-m2.1
-      - provider: naga
-        model: minimax-m2.1
       - provider: synthetic
         model: "hf:MiniMaxAI/MiniMax-M2.1"
+      - provider: openai
+        model: gpt-4o-mini
 
   # Example with disabled target
   # The first target is disabled, so routing will skip it
   example-with-disabled-target:
     selector: cost
     targets:
-      - provider: kilo
-        model: minimax/minimax-m2.1
-        enabled: false  # This target is temporarily disabled
-      - provider: naga
-        model: minimax-m2.1
-        enabled: true   # Optional: true is the default
       - provider: synthetic
         model: "hf:MiniMaxAI/MiniMax-M2.1"
-        # enabled field omitted - defaults to true
-
-  # OAuth Provider Routing Example
-  # Route requests to OAuth-authenticated Antigravity accounts
-  gemini-thinking:
-    targets:
-      - provider: my-antigravity
-        model: gemini-2.0-flash-thinking-exp
-
-  # Multi-Target with OAuth Provider
-  # Load balances between OAuth-enabled Antigravity and API-key OpenAI
-  hybrid-smart-model:
-    selector: random
-    targets:
-      - provider: my-antigravity
-        model: gemini-2.0-flash-thinking-exp
+        enabled: false  # This target is temporarily disabled
       - provider: openai
         model: gpt-4o
-
-  # Claude Code OAuth Routing Example
-  # Route requests to OAuth-authenticated Claude Code accounts
-  claude-sonnet:
-    targets:
-      - provider: my-claude-code
-        model: claude-sonnet-4-5
-
-  # Claude Code with Cost-Based Selection
-  # Automatically selects cheapest available Claude model
-  claude-smart:
-    selector: cost
-    targets:
-      - provider: my-claude-code
-        model: claude-3-5-sonnet-latest
-      - provider: my-claude-code
-        model: claude-sonnet-4-5
-
-  # Hybrid Multi-Provider with Claude Code OAuth
-  # Load balances between OAuth Claude Code and standard Anthropic API key
-  claude-hybrid:
-    selector: random
-    targets:
-      - provider: my-claude-code
-        model: claude-sonnet-4-5
+        enabled: true   # Optional: true is the default
       - provider: anthropic
         model: claude-3-5-sonnet-latest
+        # enabled field omitted - defaults to true
+
+  # Embeddings model alias example
+  # Type is set to 'embeddings' so it's only accessible via /v1/embeddings
+  # Uses cost selector to choose cheapest embeddings provider
+  embeddings-model:
+    type: embeddings
+    selector: cost
+    targets:
+      - provider: openai
+        model: text-embedding-3-small
+      - provider: voyage
+        model: voyage-3
 
 keys:
   # Example API Key for accessing Plexus
