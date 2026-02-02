@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy, Variable, AudioLines, Volume2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, GitFork, CheckCircle2, ChevronDown } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -273,6 +273,7 @@ export const Logs = () => {
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Tokens (I/O/R/C)</th>
                                 <th className="px-2 py-1.5 border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider text-right whitespace-nowrap" style={{ minWidth: '102px' }}>Cost</th>
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Performance</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Meta</th>
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Mode</th>
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ maxWidth: '60px' }}>Status</th>
                                 <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-10"></th>
@@ -282,11 +283,11 @@ export const Logs = () => {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={16} className="p-5 text-center">Loading...</td>
+                                    <td colSpan={14} className="p-5 text-center">Loading...</td>
                                 </tr>
                             ) : logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={16} className="p-5 text-center">No logs found</td>
+                                    <td colSpan={14} className="p-5 text-center">No logs found</td>
                                 </tr>
                             ) : (
                                 logs.map((log) => (
@@ -461,6 +462,46 @@ export const Logs = () => {
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
                                                     {log.tokensPerSec && log.tokensPerSec > 0 ? `TPS: ${formatTPS(log.tokensPerSec)}` : ''}
                                                 </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle">
+                                            <div className="flex gap-1.5 justify-center items-center">
+                                                {/* Tools defined in request */}
+                                                {log.toolsDefined !== undefined && log.toolsDefined > 0 && (
+                                                    <div title={`${log.toolsDefined} tool${log.toolsDefined > 1 ? 's' : ''} defined`} className="flex items-center gap-0.5 text-orange-400">
+                                                        <Wrench size={14} />
+                                                        <span className="text-[10px]">{log.toolsDefined}</span>
+                                                    </div>
+                                                )}
+                                                {/* Message count */}
+                                                {log.messageCount !== undefined && log.messageCount > 0 && (
+                                                    <div title={`${log.messageCount} message${log.messageCount > 1 ? 's' : ''} in context`} className="flex items-center gap-0.5 text-blue-400">
+                                                        <MessagesSquare size={14} />
+                                                        <span className="text-[10px]">{log.messageCount}</span>
+                                                    </div>
+                                                )}
+                                                {/* Parallel tool calls enabled */}
+                                                {log.parallelToolCallsEnabled === true && (
+                                                    <div title="Parallel tool calling enabled" className="text-purple-400">
+                                                        <GitFork size={14} />
+                                                    </div>
+                                                )}
+                                                {/* Tool calls in response */}
+                                                {log.toolCallsCount !== undefined && log.toolCallsCount > 0 && (
+                                                    <div title={`${log.toolCallsCount} tool call${log.toolCallsCount > 1 ? 's' : ''} in response`} className="flex items-center gap-0.5 text-green-400">
+                                                        <CheckCircle2 size={14} />
+                                                        <span className="text-[10px]">{log.toolCallsCount}</span>
+                                                    </div>
+                                                )}
+                                                {/* Finish reason - treat 'end_turn' same as 'stop' */}
+                                                {log.finishReason && (
+                                                    <div title={`Finish reason: ${log.finishReason}`} className="text-yellow-400">
+                                                        {log.finishReason === 'stop' || log.finishReason === 'end_turn' ? <CheckCircle2 size={14} /> :
+                                                         log.finishReason === 'tool_calls' ? <Wrench size={14} /> :
+                                                         log.finishReason === 'length' || log.finishReason === 'max_tokens' ? <AlertTriangle size={14} /> :
+                                                         <ChevronDown size={14} />}
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                         <td

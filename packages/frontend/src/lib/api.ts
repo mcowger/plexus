@@ -180,6 +180,13 @@ export interface UsageRecord {
     hasDebug?: boolean;
     hasError?: boolean;
     isPassthrough?: boolean;
+    // Request metadata
+    toolsDefined?: number;
+    messageCount?: number;
+    parallelToolCallsEnabled?: boolean;
+    // Response metadata
+    toolCallsCount?: number;
+    finishReason?: string;
 }
 
 interface BackendResponse<T> {

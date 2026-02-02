@@ -31,4 +31,11 @@ export interface UsageRecord {
     isPassthrough?: boolean;
     tokensEstimated?: number; // 0 = actual usage from provider, 1 = estimated
     createdAt?: number;
+    // Request metadata
+    toolsDefined?: number | null;
+    messageCount?: number | null;
+    parallelToolCallsEnabled?: boolean | null;
+    // Response metadata
+    toolCallsCount?: number | null;
+    finishReason?: string | null;
 }

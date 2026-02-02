@@ -15,6 +15,13 @@
       "when": 1770053380708,
       "tag": "0001_chilly_jean_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770070671106,
+      "tag": "0002_handy_paibok",
+      "breakpoints": true
     }
   ]
 }

@@ -220,6 +220,10 @@ async function finalizeUsage(
     usageRecord.tokensReasoning = unifiedResponse.usage.reasoning_tokens;
   }
 
+  // Capture response metadata
+  usageRecord.toolCallsCount = unifiedResponse.tool_calls?.length ?? null;
+  usageRecord.finishReason = unifiedResponse.finishReason ?? null;
+
   // Finalize costs and duration
   calculateCosts(usageRecord, pricing, providerDiscount);
   usageRecord.responseStatus = "success";

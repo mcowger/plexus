@@ -280,6 +280,11 @@ export class UsageStorageService extends EventEmitter {
                     isStreamed: this.schema.requestUsage.isStreamed,
                     isPassthrough: this.schema.requestUsage.isPassthrough,
                     responseStatus: this.schema.requestUsage.responseStatus,
+                    toolsDefined: this.schema.requestUsage.toolsDefined,
+                    messageCount: this.schema.requestUsage.messageCount,
+                    parallelToolCallsEnabled: this.schema.requestUsage.parallelToolCallsEnabled,
+                    toolCallsCount: this.schema.requestUsage.toolCallsCount,
+                    finishReason: this.schema.requestUsage.finishReason,
                     hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.debugLogs} WHERE ${this.schema.debugLogs.requestId} = ${this.schema.requestUsage.requestId})`,
                     hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.inferenceErrors} WHERE ${this.schema.inferenceErrors.requestId} = ${this.schema.requestUsage.requestId})`,
                 })
@@ -320,7 +325,12 @@ export class UsageStorageService extends EventEmitter {
                 tokensPerSec: row.tokensPerSec,
                 hasDebug: row.hasDebug,
                 hasError: row.hasError,
-                isPassthrough: !!row.isPassthrough
+                isPassthrough: !!row.isPassthrough,
+                toolsDefined: row.toolsDefined,
+                messageCount: row.messageCount,
+                parallelToolCallsEnabled: !!row.parallelToolCallsEnabled,
+                toolCallsCount: row.toolCallsCount,
+                finishReason: row.finishReason
             }));
 
             const countResults = await this.ensureDb()

@@ -146,6 +146,7 @@ export interface UnifiedChatResponse {
   bypassTransformation?: boolean;
   rawResponse?: any;
   rawStream?: ReadableStream;
+  finishReason?: string | null;
 }
 
 export interface UnifiedChatStreamChunk {
