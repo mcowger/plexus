@@ -58,6 +58,12 @@ export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: 
             // Determine if token estimation is needed
             const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
             
+            // Capture request metadata
+            usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
+            usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
+            // Gemini doesn't have a direct parallel tool calls setting like OpenAI
+            usageRecord.parallelToolCallsEnabled = null;
+            
             return await handleResponse(
                 request,
                 reply,

@@ -48,6 +48,12 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
             // Determine if token estimation is needed
             const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
             
+            // Capture request metadata
+            usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
+            usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
+            // Anthropic doesn't have parallel_tool_calls like OpenAI, but can check for multi-tool preference
+            usageRecord.parallelToolCallsEnabled = null;
+            
             return await handleResponse(
                 request,
                 reply,

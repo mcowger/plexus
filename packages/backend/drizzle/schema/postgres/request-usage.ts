@@ -32,6 +32,13 @@ export const requestUsage = pgTable('request_usage', {
   responseStatus: text('response_status'),
   tokensEstimated: integer('tokens_estimated').notNull().default(0),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  // Request metadata
+  toolsDefined: integer('tools_defined'),
+  messageCount: integer('message_count'),
+  parallelToolCallsEnabled: integer('parallel_tool_calls_enabled'),
+  // Response metadata
+  toolCallsCount: integer('tool_calls_count'),
+  finishReason: text('finish_reason'),
 }, (table) => ({
   dateIdx: index('idx_request_usage_date').on(table.date),
   providerIdx: index('idx_request_usage_provider').on(table.provider),

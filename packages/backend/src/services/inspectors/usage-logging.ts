@@ -60,14 +60,21 @@ export class UsageInspector extends PassThrough {
             const debugManager = DebugManager.getInstance();
             const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
 
-            if (reconstructed) {
+                if (reconstructed) {
                 const usage = this.extractUsageFromReconstructed(reconstructed, this.apiType);
                 if (usage) {
                     stats.inputTokens = usage.inputTokens || 0;
                     stats.outputTokens = usage.outputTokens || 0;
                     stats.cachedTokens = usage.cachedTokens || 0;
                     stats.reasoningTokens = usage.reasoningTokens || 0;
-                } else if (this.shouldEstimateTokens) {
+                }
+
+                // Extract response metadata (tool calls count and finish reason)
+                const responseMetadata = this.extractResponseMetadataFromReconstructed(reconstructed, this.apiType);
+                this.usageRecord.toolCallsCount = responseMetadata.toolCallsCount;
+                this.usageRecord.finishReason = responseMetadata.finishReason;
+
+                if (this.shouldEstimateTokens) {
                     logger.info(`[Inspector:Usage] No usage data found for ${this.usageRecord.requestId}, attempting estimation`);
                     const estimated = estimateTokensFromReconstructed(reconstructed, this.apiType);
                     stats.outputTokens = estimated.output;
@@ -146,6 +153,44 @@ export class UsageInspector extends PassThrough {
                 } : null;
             default:
                 return null;
+        }
+    }
+
+    private extractResponseMetadataFromReconstructed(reconstructed: any, apiType: string): { toolCallsCount: number | null; finishReason: string | null } {
+        if (!reconstructed) {
+            return { toolCallsCount: null, finishReason: null };
+        }
+
+        switch (apiType) {
+            case "chat": {
+                // OpenAI format: tool_calls are in choices[0].delta.tool_calls
+                const choice = reconstructed.choices?.[0];
+                const toolCalls = choice?.delta?.tool_calls;
+                const finishReason = choice?.finish_reason ?? null;
+                const toolCallsCount = toolCalls?.length ?? 0;
+                return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
+            }
+            case "messages": {
+                // Anthropic format: tool_use blocks in content array
+                let toolCallsCount = 0;
+                if (reconstructed.content && Array.isArray(reconstructed.content)) {
+                    toolCallsCount = reconstructed.content.filter((block: any) => block.type === 'tool_use').length;
+                }
+                const finishReason = reconstructed.stop_reason ?? null;
+                return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
+            }
+            case "gemini": {
+                // Gemini format: functionCall parts in candidates[0].content.parts
+                let toolCallsCount = 0;
+                const candidate = reconstructed.candidates?.[0];
+                if (candidate?.content?.parts && Array.isArray(candidate.content.parts)) {
+                    toolCallsCount = candidate.content.parts.filter((part: any) => part.functionCall).length;
+                }
+                const finishReason = candidate?.finishReason ?? null;
+                return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
+            }
+            default:
+                return { toolCallsCount: null, finishReason: null };
         }
     }
 }

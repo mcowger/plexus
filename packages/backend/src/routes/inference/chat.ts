@@ -50,6 +50,11 @@ export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Di
             // Determine if token estimation is needed
             const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
             
+            // Capture request metadata
+            usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
+            usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
+            usageRecord.parallelToolCallsEnabled = body.parallel_tool_calls ?? null;
+            
             return await handleResponse(
                 request,
                 reply,
