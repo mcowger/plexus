@@ -368,7 +368,7 @@ export const Logs = () => {
                                         </td>
                                         <td
                                             className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                                            title={`Input: ${formatLargeNumber(log.tokensInput || 0)} • Output: ${formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${formatLargeNumber(log.tokensCached || 0)}`}
+                                            title={`Input: ${formatLargeNumber(log.tokensInput || 0)} • Output: ${formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${formatLargeNumber(log.tokensCached || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
                                             style={{ cursor: 'help' }}
                                         >
                                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -376,22 +376,34 @@ export const Logs = () => {
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <CloudUpload size={12} className="text-blue-400" />
-                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{formatLargeNumber(log.tokensInput || 0)}</span>
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>
+                                                            {formatLargeNumber(log.tokensInput || 0)}
+                                                            {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
+                                                        </span>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <CloudDownload size={12} className="text-green-400" />
-                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{formatLargeNumber(log.tokensOutput || 0)}</span>
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>
+                                                            {formatLargeNumber(log.tokensOutput || 0)}
+                                                            {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
+                                                        </span>
                                                     </div>
                                                 </div>
                                                 {/* Right side: Reasoning/Cache */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <BrainCog size={12} className="text-purple-400" />
-                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{formatLargeNumber(log.tokensReasoning || 0)}</span>
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                                                            {formatLargeNumber(log.tokensReasoning || 0)}
+                                                            {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
+                                                        </span>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <PackageOpen size={12} className="text-orange-400" />
-                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{formatLargeNumber(log.tokensCached || 0)}</span>
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                                                            {formatLargeNumber(log.tokensCached || 0)}
+                                                            {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>

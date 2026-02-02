@@ -162,6 +162,7 @@ export interface UsageRecord {
     tokensOutput?: number;
     tokensReasoning?: number;
     tokensCached?: number;
+    tokensEstimated?: number;
     costInput?: number;
     costOutput?: number;
     costCached?: number;
