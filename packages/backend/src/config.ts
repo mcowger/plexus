@@ -87,7 +87,14 @@ const KeyConfigSchema = z.object({
   comment: z.string().optional(),
 });
 
+const DatabaseConfigSchema = z.object({
+  connection_string: z.string()
+    .regex(/^(sqlite|postgres)(s)?:\/\//, "Must start with sqlite:// or postgres://")
+    .describe("Database connection URI (sqlite:// for SQLite, postgres:// for PostgreSQL)"),
+});
+
 const PlexusConfigSchema = z.object({
+  database: DatabaseConfigSchema,
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
   keys: z.record(z.string(), KeyConfigSchema),
@@ -95,6 +102,7 @@ const PlexusConfigSchema = z.object({
 });
 
 export type PlexusConfig = z.infer<typeof PlexusConfigSchema>;
+export type DatabaseConfig = z.infer<typeof DatabaseConfigSchema>;
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
@@ -259,4 +267,9 @@ export function getConfigPath(): string | null {
 
 export function setConfigForTesting(config: PlexusConfig) {
     currentConfig = config;
+}
+
+export function getDatabaseConfig(): DatabaseConfig {
+    const config = getConfig();
+    return config.database;
 }

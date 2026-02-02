@@ -40,9 +40,25 @@ for (const path of loggerPaths) {
 }
 
 // Initialize database for tests
+import { loadConfig } from "../src/config";
 import { initializeDatabase } from "../src/db/client";
 import { runMigrations } from "../src/db/migrate";
 
-// Use in-memory database for tests
-initializeDatabase(":memory:");
+// Load minimal test config with database section before initializing database
+const testDbUrl = process.env.PLEXUS_TEST_DB_URL || "sqlite://:memory:";
+const testConfig = `
+database:
+  connection_string: "${testDbUrl}"
+adminKey: test-key
+providers: {}
+models: {}
+keys: {}
+`;
+
+// Set the test config
+const { setConfigForTesting, validateConfig } = await import("../src/config");
+setConfigForTesting(validateConfig(testConfig));
+
+// Initialize database with the test config
+initializeDatabase();
 await runMigrations();

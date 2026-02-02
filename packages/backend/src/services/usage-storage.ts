@@ -1,7 +1,6 @@
 import { logger } from '../utils/logger';
 import { UsageRecord } from '../types/usage';
-import { getDatabase } from '../db/client';
-import * as schema from '../../drizzle/schema';
+import { getDatabase, getSchema } from '../db/client';
 import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
 import { eq, and, gte, lte, like, desc, sql } from 'drizzle-orm';
@@ -27,15 +26,23 @@ export interface PaginationOptions {
 }
 
 export class UsageStorageService extends EventEmitter {
-    private db;
+    private db: ReturnType<typeof getDatabase> | null = null;
+    private schema: any = null;
 
     constructor(connectionString?: string) {
         super();
-        this.db = getDatabase();
+    }
+
+    private ensureDb() {
+        if (!this.db) {
+            this.db = getDatabase();
+            this.schema = getSchema();
+        }
+        return this.db;
     }
 
     getDb() {
-        return this.db;
+        return this.ensureDb();
     }
 
     async saveRequest(record: NewRequestUsage | UsageRecord) {
@@ -43,7 +50,7 @@ export class UsageStorageService extends EventEmitter {
             const isStreamedValue = typeof record.isStreamed === 'boolean' ? (record.isStreamed ? 1 : 0) : record.isStreamed;
             const isPassthroughValue = typeof record.isPassthrough === 'boolean' ? (record.isPassthrough ? 1 : 0) : record.isPassthrough;
 
-            await this.db.insert(schema.requestUsage).values({
+            await this.ensureDb().insert(this.schema.requestUsage).values({
                 ...record,
                 isStreamed: isStreamedValue,
                 isPassthrough: isPassthroughValue,
@@ -59,7 +66,7 @@ export class UsageStorageService extends EventEmitter {
 
     async saveDebugLog(record: DebugLogRecord) {
         try {
-            await this.db.insert(schema.debugLogs).values({
+            await this.ensureDb().insert(this.schema.debugLogs).values({
                 requestId: record.requestId,
                 rawRequest: record.rawRequest ? (typeof record.rawRequest === 'string' ? record.rawRequest : JSON.stringify(record.rawRequest)) : null,
                 transformedRequest: record.transformedRequest ? (typeof record.transformedRequest === 'string' ? record.transformedRequest : JSON.stringify(record.transformedRequest)) : null,
@@ -78,7 +85,7 @@ export class UsageStorageService extends EventEmitter {
 
     async saveError(requestId: string, error: any, details?: any) {
         try {
-            await this.db.insert(schema.inferenceErrors).values({
+            await this.ensureDb().insert(this.schema.inferenceErrors).values({
                 requestId,
                 date: new Date().toISOString(),
                 errorMessage: error.message || String(error),
@@ -95,10 +102,10 @@ export class UsageStorageService extends EventEmitter {
 
     async getErrors(limit: number = 50, offset: number = 0): Promise<any[]> {
         try {
-            const results = await this.db
+            const results = await this.ensureDb()
                 .select()
-                .from(schema.inferenceErrors)
-                .orderBy(desc(schema.inferenceErrors.createdAt))
+                .from(this.schema.inferenceErrors)
+                .orderBy(desc(this.schema.inferenceErrors.createdAt))
                 .limit(limit)
                 .offset(offset);
             
@@ -111,9 +118,9 @@ export class UsageStorageService extends EventEmitter {
 
     async deleteError(requestId: string): Promise<boolean> {
         try {
-            await this.db
-                .delete(schema.inferenceErrors)
-                .where(eq(schema.inferenceErrors.requestId, requestId));
+            await this.ensureDb()
+                .delete(this.schema.inferenceErrors)
+                .where(eq(this.schema.inferenceErrors.requestId, requestId));
             return true;
         } catch (error) {
             logger.error(`Failed to delete error log for ${requestId}`, error);
@@ -123,7 +130,7 @@ export class UsageStorageService extends EventEmitter {
 
     async deleteAllErrors(): Promise<boolean> {
         try {
-            await this.db.delete(schema.inferenceErrors);
+            await this.ensureDb().delete(this.schema.inferenceErrors);
             logger.info('Deleted all error logs');
             return true;
         } catch (error) {
@@ -134,13 +141,13 @@ export class UsageStorageService extends EventEmitter {
 
     async getDebugLogs(limit: number = 50, offset: number = 0): Promise<{ requestId: string, createdAt: number }[]> {
         try {
-            const results = await this.db
+            const results = await this.ensureDb()
                 .select({
-                    requestId: schema.debugLogs.requestId,
-                    createdAt: schema.debugLogs.createdAt
+                    requestId: this.schema.debugLogs.requestId,
+                    createdAt: this.schema.debugLogs.createdAt
                 })
-                .from(schema.debugLogs)
-                .orderBy(desc(schema.debugLogs.createdAt))
+                .from(this.schema.debugLogs)
+                .orderBy(desc(this.schema.debugLogs.createdAt))
                 .limit(limit)
                 .offset(offset);
 
@@ -156,10 +163,10 @@ export class UsageStorageService extends EventEmitter {
 
     async getDebugLog(requestId: string): Promise<DebugLogRecord | null> {
         try {
-            const results = await this.db
+            const results = await this.ensureDb()
                 .select()
-                .from(schema.debugLogs)
-                .where(eq(schema.debugLogs.requestId, requestId));
+                .from(this.schema.debugLogs)
+                .where(eq(this.schema.debugLogs.requestId, requestId));
 
             if (!results || results.length === 0) return null;
 
@@ -184,9 +191,9 @@ export class UsageStorageService extends EventEmitter {
 
     async deleteDebugLog(requestId: string): Promise<boolean> {
         try {
-            await this.db
-                .delete(schema.debugLogs)
-                .where(eq(schema.debugLogs.requestId, requestId));
+            await this.ensureDb()
+                .delete(this.schema.debugLogs)
+                .where(eq(this.schema.debugLogs.requestId, requestId));
             return true;
         } catch (error) {
             logger.error(`Failed to delete debug log for ${requestId}`, error);
@@ -196,7 +203,7 @@ export class UsageStorageService extends EventEmitter {
 
     async deleteAllDebugLogs(): Promise<boolean> {
         try {
-            await this.db.delete(schema.debugLogs);
+            await this.ensureDb().delete(this.schema.debugLogs);
             logger.info('Deleted all debug logs');
             return true;
         } catch (error) {
@@ -209,75 +216,75 @@ export class UsageStorageService extends EventEmitter {
         const conditions = [];
 
         if (filters.startDate) {
-            conditions.push(gte(schema.requestUsage.date, filters.startDate));
+            conditions.push(gte(this.schema.requestUsage.date, filters.startDate));
         }
         if (filters.endDate) {
-            conditions.push(lte(schema.requestUsage.date, filters.endDate));
+            conditions.push(lte(this.schema.requestUsage.date, filters.endDate));
         }
         if (filters.incomingApiType) {
-            conditions.push(eq(schema.requestUsage.incomingApiType, filters.incomingApiType));
+            conditions.push(eq(this.schema.requestUsage.incomingApiType, filters.incomingApiType));
         }
         if (filters.provider) {
-            conditions.push(like(schema.requestUsage.provider, `%${filters.provider}%`));
+            conditions.push(like(this.schema.requestUsage.provider, `%${filters.provider}%`));
         }
         if (filters.incomingModelAlias) {
-            conditions.push(like(schema.requestUsage.incomingModelAlias, `%${filters.incomingModelAlias}%`));
+            conditions.push(like(this.schema.requestUsage.incomingModelAlias, `%${filters.incomingModelAlias}%`));
         }
         if (filters.selectedModelName) {
-            conditions.push(like(schema.requestUsage.selectedModelName, `%${filters.selectedModelName}%`));
+            conditions.push(like(this.schema.requestUsage.selectedModelName, `%${filters.selectedModelName}%`));
         }
         if (filters.outgoingApiType) {
-            conditions.push(eq(schema.requestUsage.outgoingApiType, filters.outgoingApiType));
+            conditions.push(eq(this.schema.requestUsage.outgoingApiType, filters.outgoingApiType));
         }
         if (filters.minDurationMs !== undefined) {
-            conditions.push(gte(schema.requestUsage.durationMs, filters.minDurationMs));
+            conditions.push(gte(this.schema.requestUsage.durationMs, filters.minDurationMs));
         }
         if (filters.maxDurationMs !== undefined) {
-            conditions.push(lte(schema.requestUsage.durationMs, filters.maxDurationMs));
+            conditions.push(lte(this.schema.requestUsage.durationMs, filters.maxDurationMs));
         }
         if (filters.responseStatus) {
-            conditions.push(eq(schema.requestUsage.responseStatus, filters.responseStatus));
+            conditions.push(eq(this.schema.requestUsage.responseStatus, filters.responseStatus));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         try {
-            const data = await this.db
+            const data = await this.ensureDb()
                 .select({
-                    requestId: schema.requestUsage.requestId,
-                    date: schema.requestUsage.date,
-                    sourceIp: schema.requestUsage.sourceIp,
-                    apiKey: schema.requestUsage.apiKey,
-                    attribution: schema.requestUsage.attribution,
-                    incomingApiType: schema.requestUsage.incomingApiType,
-                    provider: schema.requestUsage.provider,
-                    incomingModelAlias: schema.requestUsage.incomingModelAlias,
-                    canonicalModelName: schema.requestUsage.canonicalModelName,
-                    selectedModelName: schema.requestUsage.selectedModelName,
-                    outgoingApiType: schema.requestUsage.outgoingApiType,
-                    tokensInput: schema.requestUsage.tokensInput,
-                    tokensOutput: schema.requestUsage.tokensOutput,
-                    tokensReasoning: schema.requestUsage.tokensReasoning,
-                    tokensCached: schema.requestUsage.tokensCached,
-                    costInput: schema.requestUsage.costInput,
-                    costOutput: schema.requestUsage.costOutput,
-                    costCached: schema.requestUsage.costCached,
-                    costTotal: schema.requestUsage.costTotal,
-                    costSource: schema.requestUsage.costSource,
-                    costMetadata: schema.requestUsage.costMetadata,
-                    startTime: schema.requestUsage.startTime,
-                    durationMs: schema.requestUsage.durationMs,
-                    ttftMs: schema.requestUsage.ttftMs,
-                    tokensPerSec: schema.requestUsage.tokensPerSec,
-                    isStreamed: schema.requestUsage.isStreamed,
-                    isPassthrough: schema.requestUsage.isPassthrough,
-                    responseStatus: schema.requestUsage.responseStatus,
-                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.debugLogs} WHERE ${schema.debugLogs.requestId} = ${schema.requestUsage.requestId})`,
-                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.inferenceErrors} WHERE ${schema.inferenceErrors.requestId} = ${schema.requestUsage.requestId})`,
+                    requestId: this.schema.requestUsage.requestId,
+                    date: this.schema.requestUsage.date,
+                    sourceIp: this.schema.requestUsage.sourceIp,
+                    apiKey: this.schema.requestUsage.apiKey,
+                    attribution: this.schema.requestUsage.attribution,
+                    incomingApiType: this.schema.requestUsage.incomingApiType,
+                    provider: this.schema.requestUsage.provider,
+                    incomingModelAlias: this.schema.requestUsage.incomingModelAlias,
+                    canonicalModelName: this.schema.requestUsage.canonicalModelName,
+                    selectedModelName: this.schema.requestUsage.selectedModelName,
+                    outgoingApiType: this.schema.requestUsage.outgoingApiType,
+                    tokensInput: this.schema.requestUsage.tokensInput,
+                    tokensOutput: this.schema.requestUsage.tokensOutput,
+                    tokensReasoning: this.schema.requestUsage.tokensReasoning,
+                    tokensCached: this.schema.requestUsage.tokensCached,
+                    costInput: this.schema.requestUsage.costInput,
+                    costOutput: this.schema.requestUsage.costOutput,
+                    costCached: this.schema.requestUsage.costCached,
+                    costTotal: this.schema.requestUsage.costTotal,
+                    costSource: this.schema.requestUsage.costSource,
+                    costMetadata: this.schema.requestUsage.costMetadata,
+                    startTime: this.schema.requestUsage.startTime,
+                    durationMs: this.schema.requestUsage.durationMs,
+                    ttftMs: this.schema.requestUsage.ttftMs,
+                    tokensPerSec: this.schema.requestUsage.tokensPerSec,
+                    isStreamed: this.schema.requestUsage.isStreamed,
+                    isPassthrough: this.schema.requestUsage.isPassthrough,
+                    responseStatus: this.schema.requestUsage.responseStatus,
+                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.debugLogs} WHERE ${this.schema.debugLogs.requestId} = ${this.schema.requestUsage.requestId})`,
+                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.inferenceErrors} WHERE ${this.schema.inferenceErrors.requestId} = ${this.schema.requestUsage.requestId})`,
                 })
-                .from(schema.requestUsage)
+                .from(this.schema.requestUsage)
                 .where(whereClause)
-                .orderBy(desc(schema.requestUsage.date))
+                .orderBy(desc(this.schema.requestUsage.date))
                 .limit(pagination.limit)
                 .offset(pagination.offset);
 
@@ -314,9 +321,9 @@ export class UsageStorageService extends EventEmitter {
                 isPassthrough: !!row.isPassthrough
             }));
 
-            const countResults = await this.db
+            const countResults = await this.ensureDb()
                 .select({ count: sql<number>`count(*)` })
-                .from(schema.requestUsage)
+                .from(this.schema.requestUsage)
                 .where(whereClause);
 
             const total = countResults[0]?.count ?? 0;
@@ -333,9 +340,9 @@ export class UsageStorageService extends EventEmitter {
 
     async deleteUsageLog(requestId: string): Promise<boolean> {
         try {
-            await this.db
-                .delete(schema.requestUsage)
-                .where(eq(schema.requestUsage.requestId, requestId));
+            await this.ensureDb()
+                .delete(this.schema.requestUsage)
+                .where(eq(this.schema.requestUsage.requestId, requestId));
             return true;
         } catch (error) {
             logger.error(`Failed to delete usage log for ${requestId}`, error);
@@ -346,12 +353,12 @@ export class UsageStorageService extends EventEmitter {
     async deleteAllUsageLogs(beforeDate?: Date): Promise<boolean> {
         try {
             if (beforeDate) {
-                await this.db
-                    .delete(schema.requestUsage)
-                    .where(lte(schema.requestUsage.date, beforeDate.toISOString()));
+                await this.ensureDb()
+                    .delete(this.schema.requestUsage)
+                    .where(lte(this.schema.requestUsage.date, beforeDate.toISOString()));
                 logger.info(`Deleted usage logs older than ${beforeDate.toISOString()}`);
             } else {
-                await this.db.delete(schema.requestUsage);
+                await this.ensureDb().delete(this.schema.requestUsage);
                 logger.info('Deleted all usage logs');
             }
             return true;
@@ -375,7 +382,7 @@ export class UsageStorageService extends EventEmitter {
                 tokensPerSec = (outputTokens / durationMs) * 1000;
             }
 
-            await this.db.insert(schema.providerPerformance).values({
+            await this.ensureDb().insert(this.schema.providerPerformance).values({
                 provider,
                 model,
                 requestId,
@@ -386,20 +393,20 @@ export class UsageStorageService extends EventEmitter {
                 createdAt: Date.now()
             });
 
-            const subquery = this.db
-                .select({ id: schema.providerPerformance.id })
-                .from(schema.providerPerformance)
+            const subquery = this.ensureDb()
+                .select({ id: this.schema.providerPerformance.id })
+                .from(this.schema.providerPerformance)
                 .where(and(
-                    sql`${schema.providerPerformance.provider} = ${provider}`,
-                    sql`${schema.providerPerformance.model} = ${model}`
+                    sql`${this.schema.providerPerformance.provider} = ${provider}`,
+                    sql`${this.schema.providerPerformance.model} = ${model}`
                 ))
-                .orderBy(desc(schema.providerPerformance.createdAt))
+                .orderBy(desc(this.schema.providerPerformance.createdAt))
                 .limit(10)
                 .as('sub');
 
-            await this.db
-                .delete(schema.providerPerformance)
-                .where(sql`${schema.providerPerformance.id} NOT IN (SELECT id FROM ${subquery})`);
+            await this.ensureDb()
+                .delete(this.schema.providerPerformance)
+                .where(sql`${this.schema.providerPerformance.id} NOT IN (SELECT id FROM ${subquery})`);
 
             logger.debug(`Performance metrics updated for ${provider}:${model}`);
         } catch (error) {
@@ -412,28 +419,28 @@ export class UsageStorageService extends EventEmitter {
             const conditions = [];
             
             if (provider) {
-                conditions.push(eq(schema.providerPerformance.provider, provider));
+                conditions.push(eq(this.schema.providerPerformance.provider, provider));
             }
             if (model) {
-                conditions.push(eq(schema.providerPerformance.model, model));
+                conditions.push(eq(this.schema.providerPerformance.model, model));
             }
 
             const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-            const results = await this.db
+            const results = await this.ensureDb()
                 .select({
-                    provider: schema.providerPerformance.provider,
-                    model: schema.providerPerformance.model,
-                    avgTtftMs: sql<number>`AVG(${schema.providerPerformance.timeToFirstTokenMs})`,
-                    minTtftMs: sql<number>`MIN(${schema.providerPerformance.timeToFirstTokenMs})`,
-                    maxTtftMs: sql<number>`MAX(${schema.providerPerformance.timeToFirstTokenMs})`,
-                    avgTokensPerSec: sql<number>`AVG(${schema.providerPerformance.tokensPerSec})`,
-                    minTokensPerSec: sql<number>`MIN(${schema.providerPerformance.tokensPerSec})`,
-                    maxTokensPerSec: sql<number>`MAX(${schema.providerPerformance.tokensPerSec})`,
+                    provider: this.schema.providerPerformance.provider,
+                    model: this.schema.providerPerformance.model,
+                    avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                    minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                    maxTtftMs: sql<number>`MAX(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                    avgTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.tokensPerSec})`,
+                    minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
+                    maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
                     sampleCount: sql<number>`COUNT(*)`,
-                    lastUpdated: sql<number>`MAX(${schema.providerPerformance.createdAt})`
+                    lastUpdated: sql<number>`MAX(${this.schema.providerPerformance.createdAt})`
                 })
-                .from(schema.providerPerformance)
+                .from(this.schema.providerPerformance)
                 .where(whereClause);
                 
             const groupedResults = new Map<string, any>();

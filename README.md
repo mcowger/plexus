@@ -15,6 +15,40 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 - **Per-Model Cooldowns**: Configure cooldown periods per target within model aliases
 - **InOrder Selector**: Prioritized fallback logic with automatic health recovery
 
+### Database & ORM
+
+Plexus uses **Drizzle ORM** with **SQLite** for data persistence:
+
+- **Schema Management**: Type-safe database schemas in `packages/backend/drizzle/schema/`
+- **Automatic Migrations**: Migrations run automatically on startup
+- **Tables**: Usage tracking, provider cooldowns, debug logs, inference errors, performance metrics
+
+#### Managing Database Schema
+
+**Generate a migration after schema changes:**
+```bash
+cd packages/backend
+bunx drizzle-kit generate
+```
+
+**Apply migrations manually (optional):**
+```bash
+bunx drizzle-kit migrate
+```
+
+**Creating a new table:**
+```typescript
+// In drizzle/schema/new-table.ts
+import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+
+export const newTable = sqliteTable('new_table', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+});
+```
+
+Then run `bunx drizzle-kit generate` to create the migration.
+
 ## Quick Start
 
 ```bash
