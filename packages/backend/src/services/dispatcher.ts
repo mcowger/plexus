@@ -558,6 +558,10 @@ export class Dispatcher {
 
     logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
     logger.silly("Embeddings Request Payload", payload);
+    
+    if (request.requestId) {
+      DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+    }
 
     // 5. Execute request
     const response = await this.executeProviderRequest(url, headers, payload);
@@ -570,6 +574,10 @@ export class Dispatcher {
     // 6. Parse and enrich response
     const responseBody = await response.json();
     logger.silly("Embeddings Response Payload", responseBody);
+    
+    if (request.requestId) {
+      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+    }
 
     const enrichedResponse: any = {
       ...responseBody,
