@@ -8,6 +8,7 @@ import { registerChatRoute } from './chat';
 import { registerMessagesRoute } from './messages';
 import { registerGeminiRoute } from './gemini';
 import { registerResponsesRoute } from './responses';
+import { registerEmbeddingsRoute } from './embeddings';
 
 export async function registerInferenceRoutes(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService) {
     // Public Routes (Excluded from Auth)
@@ -75,5 +76,6 @@ export async function registerInferenceRoutes(fastify: FastifyInstance, dispatch
         await registerMessagesRoute(protectedRoutes, dispatcher, usageStorage);
         await registerGeminiRoute(protectedRoutes, dispatcher, usageStorage);
         await registerResponsesRoute(protectedRoutes);
+        await registerEmbeddingsRoute(protectedRoutes, dispatcher, usageStorage);
     });
 }

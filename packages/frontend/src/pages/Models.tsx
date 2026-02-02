@@ -329,6 +329,7 @@ export const Models = () => {
                 <thead>
                     <tr>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>Alias</th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Type</th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Aliases</th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Selector</th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px'}}>Targets</th>
@@ -342,6 +343,16 @@ export const Models = () => {
                                     <Edit2 size={12} style={{opacity: 0.5}} />
                                     {alias.id}
                                 </div>
+                            </td>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border border-border-glass" style={{
+                                    fontSize: '10px',
+                                    backgroundColor: alias.type === 'embeddings' ? '#10b981' : '#ebebeb',
+                                    color: alias.type === 'embeddings' ? 'white' : '#333',
+                                    border: 'none'
+                                }}>
+                                    {alias.type || 'chat'}
+                                </span>
                             </td>
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                 {alias.aliases && alias.aliases.length > 0 ? (
@@ -471,7 +482,7 @@ export const Models = () => {
                     ))}
                     {filteredAliases.length === 0 && (
                         <tr>
-                            <td colSpan={4} className="text-center text-text-muted p-12">No aliases found</td>
+                            <td colSpan={5} className="text-center text-text-muted p-12">No aliases found</td>
                         </tr>
                     )}
                 </tbody>
@@ -492,7 +503,7 @@ export const Models = () => {
         }
       >
           <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px'}}>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                   <div className="flex flex-col gap-1">
                       <label className="font-body text-[13px] font-medium text-text-secondary">Primary Name (ID)</label>
                       <input
@@ -501,6 +512,18 @@ export const Models = () => {
                         onChange={(e) => setEditingAlias({...editingAlias, id: e.target.value})}
                         placeholder="e.g. gpt-4-turbo"
                       />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">Model Type</label>
+                      <select
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        value={editingAlias.type || 'chat'}
+                        onChange={(e) => setEditingAlias({...editingAlias, type: e.target.value as 'chat' | 'embeddings'})}
+                      >
+                          <option value="chat">Chat</option>
+                          <option value="embeddings">Embeddings</option>
+                      </select>
                   </div>
 
                   <div className="flex flex-col gap-1">

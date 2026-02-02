@@ -516,4 +516,74 @@ export class Dispatcher {
 
     return unifiedResponse;
   }
+
+  /**
+   * Dispatch embeddings request to provider
+   * Simplified version of dispatch() since embeddings:
+   * - Don't support streaming
+   * - Use universal API format (no transformation needed)
+   * - Always use /embeddings endpoint
+   */
+  async dispatchEmbeddings(request: any): Promise<any> {
+    // 1. Route using existing Router with 'embeddings' as the API type
+    const route = await Router.resolve(request.model, 'embeddings');
+
+    // 2. Build URL (embeddings always use /embeddings endpoint)
+    const baseUrl = this.resolveBaseUrl(route, 'embeddings');
+    const url = `${baseUrl}/embeddings`;
+
+    // 3. Setup headers (Bearer auth, no streaming)
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+
+    if (route.config.api_key) {
+      headers["Authorization"] = `Bearer ${route.config.api_key}`;
+    }
+
+    if (route.config.headers) {
+      Object.assign(headers, route.config.headers);
+    }
+
+    // 4. Transform request (just model substitution)
+    const payload = {
+      ...request.originalBody,
+      model: route.model
+    };
+
+    if (route.config.extraBody) {
+      Object.assign(payload, route.config.extraBody);
+    }
+
+    logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
+    logger.silly("Embeddings Request Payload", payload);
+
+    // 5. Execute request
+    const response = await this.executeProviderRequest(url, headers, payload);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      await this.handleProviderError(response, route, errorText, url, headers, 'embeddings');
+    }
+
+    // 6. Parse and enrich response
+    const responseBody = await response.json();
+    logger.silly("Embeddings Response Payload", responseBody);
+
+    const enrichedResponse: any = {
+      ...responseBody,
+      plexus: {
+        provider: route.provider,
+        model: route.model,
+        apiType: 'embeddings',
+        pricing: route.modelConfig?.pricing,
+        providerDiscount: route.config.discount,
+        canonicalModel: route.canonicalModel,
+        config: route.config,
+      }
+    };
+
+    return enrichedResponse;
+  }
 }
