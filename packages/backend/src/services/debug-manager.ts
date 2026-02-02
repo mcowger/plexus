@@ -133,6 +133,14 @@ export class DebugManager {
         // Skip flushing ephemeral requests
         if (this.ephemeralRequests.has(requestId)) {
             logger.debug(`[DebugManager] Skipping flush for ephemeral request ${requestId}`);
+            this.pendingLogs.delete(requestId);
+            return;
+        }
+
+        // Only persist to database if debug mode is enabled
+        if (!this.enabled) {
+            logger.debug(`[DebugManager] Skipping flush for ${requestId} - debug mode disabled`);
+            this.pendingLogs.delete(requestId);
             return;
         }
 
