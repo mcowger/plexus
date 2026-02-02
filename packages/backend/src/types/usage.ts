@@ -29,4 +29,5 @@ export interface UsageRecord {
     hasDebug?: boolean;
     hasError?: boolean;
     isPassthrough?: boolean;
+    createdAt?: number;
 }

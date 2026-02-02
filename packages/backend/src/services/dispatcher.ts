@@ -17,7 +17,7 @@ export class Dispatcher {
   }
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
     // 1. Route
-    const route = Router.resolve(request.model, request.incomingApiType);
+    const route = await Router.resolve(request.model, request.incomingApiType);
 
     // Determine Target API Type
     const { targetApiType, selectionReason } = this.selectTargetApiType(

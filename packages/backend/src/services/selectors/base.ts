@@ -16,5 +16,5 @@ export abstract class Selector {
    * @param targets The list of model targets to choose from.
    * @returns The selected target, or null if no target could be selected.
    */
-  abstract select(targets: ModelTarget[]): ModelTarget | null;
+  abstract select(targets: ModelTarget[]): ModelTarget | null | Promise<ModelTarget | null>;
 }

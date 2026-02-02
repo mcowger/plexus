@@ -11,7 +11,7 @@ export class LatencySelector extends Selector {
     this.storage = storage;
   }
 
-  select(targets: ModelTarget[]): ModelTarget | null {
+  async select(targets: ModelTarget[]): Promise<ModelTarget | null> {
     if (!targets || targets.length === 0) {
       return null;
     }
@@ -26,7 +26,7 @@ export class LatencySelector extends Selector {
     const candidates: { target: ModelTarget; avgTtft: number }[] = [];
 
     for (const target of targets) {
-      const stats = this.storage.getProviderPerformance(target.provider, target.model);
+      const stats = await this.storage.getProviderPerformance(target.provider, target.model);
       
       let avgTtft = Infinity; // Default to worst possible latency if no data
       

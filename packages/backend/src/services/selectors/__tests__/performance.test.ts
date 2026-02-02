@@ -6,28 +6,28 @@ import { ModelTarget } from '../../../config';
 describe('PerformanceSelector', () => {
   // Mock usage storage
   // Explicitly type the mock return to allow any array of objects
-  const mockGetProviderPerformance = mock((provider?: string, model?: string): any[] => []);
+  const mockGetProviderPerformance = mock((provider?: string, model?: string): Promise<any[]> => Promise.resolve([]));
   const mockStorage = {
     getProviderPerformance: mockGetProviderPerformance
   } as unknown as UsageStorageService;
 
   const selector = new PerformanceSelector(mockStorage);
 
-  it('should return null for empty targets', () => {
-    expect(selector.select([])).toBeNull();
+  it('should return null for empty targets', async () => {
+    expect(await selector.select([])).toBeNull();
   });
 
-  it('should return the single target if only one exists', () => {
+  it('should return the single target if only one exists', async () => {
     const targets: ModelTarget[] = [{ provider: 'p1', model: 'm1' }];
-    expect(selector.select(targets)).toEqual(targets[0] || null);
+    expect(await selector.select(targets)).toEqual(targets[0] || null);
   });
 
-  it('should select the fastest target based on avg_tokens_per_sec', () => {
+  it('should select the fastest target based on avg_tokens_per_sec', async () => {
     mockGetProviderPerformance.mockImplementation((provider, model) => {
-      if (provider === 'p1') return [{ avg_tokens_per_sec: 10 }];
-      if (provider === 'p2') return [{ avg_tokens_per_sec: 50 }]; // Fastest
-      if (provider === 'p3') return [{ avg_tokens_per_sec: 20 }];
-      return [];
+      if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 10 }]);
+      if (provider === 'p2') return Promise.resolve([{ avg_tokens_per_sec: 50 }]); // Fastest
+      if (provider === 'p3') return Promise.resolve([{ avg_tokens_per_sec: 20 }]);
+      return Promise.resolve([]);
     });
 
     const targets: ModelTarget[] = [
@@ -36,15 +36,15 @@ describe('PerformanceSelector', () => {
       { provider: 'p3', model: 'm3' }
     ];
 
-    const selected = selector.select(targets);
+    const selected = await selector.select(targets);
     expect(selected).toEqual(targets[1]!); // p2 is fastest
   });
 
-  it('should handle targets with no performance data (0 tps)', () => {
+  it('should handle targets with no performance data (0 tps)', async () => {
     mockGetProviderPerformance.mockImplementation((provider, model) => {
-      if (provider === 'p1') return [{ avg_tokens_per_sec: 10 }];
-      if (provider === 'p2') return []; // No data -> 0
-      return [];
+      if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 10 }]);
+      if (provider === 'p2') return Promise.resolve([]); // No data -> 0
+      return Promise.resolve([]);
     });
 
     const targets: ModelTarget[] = [
@@ -52,19 +52,19 @@ describe('PerformanceSelector', () => {
       { provider: 'p2', model: 'm2' }
     ];
 
-    const selected = selector.select(targets);
+    const selected = await selector.select(targets);
     expect(selected).toEqual(targets[0]!); // p1 has data
   });
   
-  it('should handle all targets having no data (first one wins)', () => {
-      mockGetProviderPerformance.mockImplementation(() => []);
+  it('should handle all targets having no data (first one wins)', async () => {
+      mockGetProviderPerformance.mockImplementation(() => Promise.resolve([]));
       
       const targets: ModelTarget[] = [
         { provider: 'p1', model: 'm1' },
         { provider: 'p2', model: 'm2' }
       ];
   
-      const selected = selector.select(targets);
+      const selected = await selector.select(targets);
       expect(selected).toEqual(targets[0]!);
   });
 });

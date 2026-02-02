@@ -29,32 +29,32 @@ describe("Router Aliases", () => {
         setConfigForTesting(mockConfig as any);
     });
 
-    test("resolves canonical alias", () => {
-        const result = Router.resolve("canonical-model");
+    test("resolves canonical alias", async () => {
+        const result = await Router.resolve("canonical-model");
         expect(result.provider).toBe("test-provider");
         expect(result.model).toBe("target-model");
         expect(result.incomingModelAlias).toBe("canonical-model");
         expect(result.canonicalModel).toBe("canonical-model");
     });
 
-    test("resolves additional alias 1", () => {
-        const result = Router.resolve("alias-1");
+    test("resolves additional alias 1", async () => {
+        const result = await Router.resolve("alias-1");
         expect(result.provider).toBe("test-provider");
         expect(result.model).toBe("target-model");
         expect(result.incomingModelAlias).toBe("alias-1");
         expect(result.canonicalModel).toBe("canonical-model");
     });
 
-    test("resolves additional alias 2", () => {
-        const result = Router.resolve("alias-2");
+    test("resolves additional alias 2", async () => {
+        const result = await Router.resolve("alias-2");
         expect(result.provider).toBe("test-provider");
         expect(result.model).toBe("target-model");
         expect(result.incomingModelAlias).toBe("alias-2");
         expect(result.canonicalModel).toBe("canonical-model");
     });
 
-    test("throws on unknown model", () => {
-        expect(() => Router.resolve("unknown-model")).toThrow();
+    test("throws on unknown model", async () => {
+        await expect(Router.resolve("unknown-model")).rejects.toThrow();
     });
 });
 
@@ -95,8 +95,8 @@ describe("Router Direct Provider/Model Routing", () => {
         setConfigForTesting(mockConfig as any);
     });
 
-    test("resolves direct provider/model syntax", () => {
-        const result = Router.resolve("direct/stima/gemini-2.5-flash");
+    test("resolves direct provider/model syntax", async () => {
+        const result = await Router.resolve("direct/stima/gemini-2.5-flash");
         expect(result.provider).toBe("stima");
         expect(result.model).toBe("gemini-2.5-flash");
         expect(result.incomingModelAlias).toBe("direct/stima/gemini-2.5-flash");
@@ -106,52 +106,52 @@ describe("Router Direct Provider/Model Routing", () => {
         expect(result.modelConfig.pricing.input).toBe(0.5);
     });
 
-    test("resolves direct routing without model config", () => {
-        const result = Router.resolve("direct/stima/unlisted-model");
+    test("resolves direct routing without model config", async () => {
+        const result = await Router.resolve("direct/stima/unlisted-model");
         expect(result.provider).toBe("stima");
         expect(result.model).toBe("unlisted-model");
         expect(result.modelConfig).toBeUndefined();
     });
 
-    test("throws on direct routing with unknown provider", () => {
-      expect(() => Router.resolve("direct/unknown-provider/some-model")).toThrow(
+    test("throws on direct routing with unknown provider", async () => {
+      await expect(Router.resolve("direct/unknown-provider/some-model")).rejects.toThrow(
             "Direct routing failed: Provider 'unknown-provider' not found in configuration"
         );
     });
 
-    test("throws on direct routing with disabled provider", () => {
-        expect(() => Router.resolve("direct/disabled-provider/some-model")).toThrow(
+    test("throws on direct routing with disabled provider", async () => {
+        await expect(Router.resolve("direct/disabled-provider/some-model")).rejects.toThrow(
         "Direct routing failed: Provider 'disabled-provider' is disabled"
         );
     });
 
-    test("throws on direct routing with invalid format (missing model)", () => {
-        expect(() => Router.resolve("direct/stima")).toThrow(
+    test("throws on direct routing with invalid format (missing model)", async () => {
+        await expect(Router.resolve("direct/stima")).rejects.toThrow(
             "Direct routing failed: Invalid format 'direct/stima'. Expected 'direct/provider/model'"
         );
     });
 
-    test("direct routing bypasses alias system", () => {
+    test("direct routing bypasses alias system", async () => {
         // Even though "stima/claude-3-opus" matches a target in "smart-model" alias,
         // direct routing should bypass the alias system entirely
-        const result = Router.resolve("direct/stima/claude-3-opus");
+        const result = await Router.resolve("direct/stima/claude-3-opus");
         expect(result.provider).toBe("stima");
         expect(result.model).toBe("claude-3-opus");
         expect(result.incomingModelAlias).toBe("direct/stima/claude-3-opus");
         expect(result.canonicalModel).toBe("direct/stima/claude-3-opus");
     });
 
-    test("handles model names with multiple slashes", () => {
+    test("handles model names with multiple slashes", async () => {
         // Split on first slash after "direct/" prefix, rest goes to model name
-        const result = Router.resolve("direct/stima/namespace/model-name");
+        const result = await Router.resolve("direct/stima/namespace/model-name");
         expect(result.provider).toBe("stima");
         expect(result.model).toBe("namespace/model-name");
     });
 
-    test("model names with slashes are NOT treated as direct routing", () => {
+    test("model names with slashes are NOT treated as direct routing", async () => {
         // Model names containing "/" should NOT trigger direct routing without "direct/" prefix
         // This ensures models like "meta-llama/Llama-3-70b" work correctly through aliases
-        expect(() => Router.resolve("stima/gemini-2.5-flash")).toThrow(
+        await expect(Router.resolve("stima/gemini-2.5-flash")).rejects.toThrow(
             "Model 'stima/gemini-2.5-flash' not found in configuration"
         );
     });

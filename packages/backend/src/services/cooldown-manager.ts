@@ -1,5 +1,7 @@
 import { logger } from '../utils/logger';
-import { UsageStorageService } from './usage-storage';
+import { getDatabase } from '../db/client';
+import * as schema from '../../drizzle/schema';
+import { lt, eq, sql, and, desc } from 'drizzle-orm';
 
 interface Target {
     provider: string;
@@ -10,9 +12,11 @@ export class CooldownManager {
     private static instance: CooldownManager;
     private cooldowns: Map<string, number> = new Map();
     private readonly defaultCooldownMinutes = 10;
-    private storage: UsageStorageService | null = null;
+    private db;
 
-    private constructor() {}
+    private constructor() {
+        this.db = getDatabase();
+    }
 
     public static getInstance(): CooldownManager {
         if (!CooldownManager.instance) {
@@ -21,33 +25,27 @@ export class CooldownManager {
         return CooldownManager.instance;
     }
 
-    public async setStorage(storage: UsageStorageService) {
-        this.storage = storage;
-        await this.loadFromStorage();
-    }
-
-    private async loadFromStorage() {
-        if (!this.storage) return;
+    public async loadFromStorage() {
         try {
-            const db = this.storage.getDb();
             const now = Date.now();
 
-            // Clean up expired first
-            db.run("DELETE FROM provider_cooldowns WHERE expiry < ?", [now]);
+            await this.db
+                .delete(schema.providerCooldowns)
+                .where(lt(schema.providerCooldowns.expiry, now));
 
-            const rows = db.query("SELECT provider, model, account_id, expiry FROM provider_cooldowns").all() as
-                { provider: string, model: string, account_id: string | null, expiry: number }[];
+            const rows = await this.db
+                .select()
+                .from(schema.providerCooldowns)
+                .where(sql`${schema.providerCooldowns.expiry} >= ${now}`);
 
             this.cooldowns.clear();
             for (const row of rows) {
-                if (row.expiry > now) {
-                    const key = CooldownManager.makeCooldownKey(row.provider, row.model || '', row.account_id || undefined);
-                    this.cooldowns.set(key, row.expiry);
-                }
+                const key = CooldownManager.makeCooldownKey(row.provider, row.model || '', row.accountId || undefined);
+                this.cooldowns.set(key, row.expiry);
             }
             logger.info(`Loaded ${this.cooldowns.size} active cooldowns from storage`);
         } catch (e) {
-            logger.error("Failed to load cooldowns from storage", e);
+            logger.error('Failed to load cooldowns from storage', e);
         }
     }
 
@@ -65,7 +63,7 @@ export class CooldownManager {
         return (isNaN(minutes) ? this.defaultCooldownMinutes : minutes) * 60 * 1000;
     }
 
-    public markProviderFailure(provider: string, model: string, accountId?: string, durationMs?: number): void {
+    public async markProviderFailure(provider: string, model: string, accountId?: string, durationMs?: number): Promise<void> {
         const duration = durationMs || this.getCooldownDuration();
         const expiry = Date.now() + duration;
         const key = CooldownManager.makeCooldownKey(provider, model, accountId);
@@ -74,19 +72,27 @@ export class CooldownManager {
         const accountInfo = accountId ? ` (account: ${accountId})` : '';
         logger.warn(`Provider '${provider}' model '${model}'${accountInfo} placed on cooldown for ${duration / 1000}s until ${new Date(expiry).toISOString()}`);
 
-        if (this.storage) {
-            try {
-                this.storage.getDb().run(
-                    "INSERT OR REPLACE INTO provider_cooldowns (provider, model, account_id, expiry, created_at) VALUES (?, ?, ?, ?, ?)",
-                    [provider, model, accountId || '', expiry, Date.now()]
-                );
-            } catch (e) {
-                logger.error(`Failed to persist cooldown for ${provider}:${model}${accountInfo}`, e);
-            }
+        try {
+            await this.db.insert(schema.providerCooldowns).values({
+                provider,
+                model,
+                accountId: accountId || '',
+                expiry,
+                createdAt: Date.now(),
+            }).onConflictDoUpdate({
+                target: [
+                    schema.providerCooldowns.provider,
+                    schema.providerCooldowns.model,
+                    schema.providerCooldowns.accountId,
+                ],
+                set: { expiry },
+            });
+        } catch (e) {
+            logger.error(`Failed to persist cooldown for ${provider}:${model}${accountInfo}`, e);
         }
     }
 
-    public isProviderHealthy(provider: string, model: string, accountId?: string): boolean {
+    public async isProviderHealthy(provider: string, model: string, accountId?: string): Promise<boolean> {
         const key = CooldownManager.makeCooldownKey(provider, model, accountId);
         const expiry = this.cooldowns.get(key);
         if (!expiry) return true;
@@ -94,16 +100,17 @@ export class CooldownManager {
         if (Date.now() > expiry) {
             this.cooldowns.delete(key);
 
-            if (this.storage) {
-                try {
-                    this.storage.getDb().run(
-                        "DELETE FROM provider_cooldowns WHERE provider = ? AND model = ? AND (account_id = ? OR (account_id = '' AND ? = ''))",
-                        [provider, model, accountId || '', accountId || '']
-                    );
-                } catch (e) {
-                    const accountInfo = accountId ? ` (account: ${accountId})` : '';
-                    logger.error(`Failed to remove expired cooldown for ${provider}:${model}${accountInfo}`, e);
-                }
+            try {
+                await this.db
+                    .delete(schema.providerCooldowns)
+                    .where(and(
+                        eq(schema.providerCooldowns.provider, provider),
+                        eq(schema.providerCooldowns.model, model),
+                        sql`(${schema.providerCooldowns.accountId} = ${accountId || ''} OR (${schema.providerCooldowns.accountId} = '' AND ${accountId || ''} = ''))`
+                    ));
+            } catch (e) {
+                const accountInfo = accountId ? ` (account: ${accountId})` : '';
+                logger.error(`Failed to remove expired cooldown for ${provider}:${model}${accountInfo}`, e);
             }
 
             const accountInfo = accountId ? ` (account: ${accountId})` : '';
@@ -114,19 +121,25 @@ export class CooldownManager {
         return false;
     }
 
-    public filterHealthyTargets(targets: Target[], getAccountId?: (provider: string) => string | undefined): Target[] {
-        return targets.filter(target => {
+    public async filterHealthyTargets(targets: Target[], getAccountId?: (provider: string) => string | undefined): Promise<Target[]> {
+        const healthyTargets: Target[] = [];
+        
+        for (const target of targets) {
             const accountId = getAccountId ? getAccountId(target.provider) : undefined;
-            return this.isProviderHealthy(target.provider, target.model, accountId);
-        });
+            const isHealthy = await this.isProviderHealthy(target.provider, target.model, accountId);
+            if (isHealthy) {
+                healthyTargets.push(target);
+            }
+        }
+        
+        return healthyTargets;
     }
     
-    // Helper specifically for the requested signature, though filterHealthyTargets is more versatile
-    public removeCooldowns(targets: Target[]): Target[] {
+    public async removeCooldowns(targets: Target[]): Promise<Target[]> {
         return this.filterHealthyTargets(targets);
     }
 
-    public getCooldowns(): { provider: string, model: string, accountId?: string, expiry: number, timeRemainingMs: number }[] {
+    public getCooldowns(): { provider: string, model: string, accountId: string | undefined, expiry: number, timeRemainingMs: number }[] {
         const now = Date.now();
         const results = [];
         for (const [key, expiry] of this.cooldowns.entries()) {
@@ -134,75 +147,73 @@ export class CooldownManager {
                 const parts = key.split(':');
                 const provider = parts[0];
                 const model = parts[1] || '';
-                const accountId = parts[2] || undefined;
+                const accountId = parts[2];
                 results.push({
-                    provider,
+                    provider: provider || '',
                     model,
                     accountId,
                     expiry,
                     timeRemainingMs: expiry - now
                 });
             } else {
-                // Should be cleaned up on next check, but for reporting we ignore it
+                
             }
         }
         return results;
     }
 
-    public clearCooldown(provider?: string, model?: string, accountId?: string): void {
+    public async clearCooldown(provider?: string, model?: string, accountId?: string): Promise<void> {
         if (provider && model && accountId) {
-            // Clear specific provider+model+account cooldown
             const key = CooldownManager.makeCooldownKey(provider, model, accountId);
             this.cooldowns.delete(key);
             logger.info(`Manually cleared cooldown for provider '${provider}' model '${model}' account '${accountId}'`);
-            if (this.storage) {
-                try {
-                    this.storage.getDb().run(
-                        "DELETE FROM provider_cooldowns WHERE provider = ? AND model = ? AND account_id = ?",
-                        [provider, model, accountId]
-                    );
-                } catch (e) {
-                    logger.error(`Failed to delete cooldown for ${provider}:${model}:${accountId}`, e);
-                }
+            try {
+                await this.db
+                    .delete(schema.providerCooldowns)
+                    .where(and(
+                        eq(schema.providerCooldowns.provider, provider),
+                        eq(schema.providerCooldowns.model, model),
+                        eq(schema.providerCooldowns.accountId, accountId)
+                    ));
+            } catch (e) {
+                logger.error(`Failed to delete cooldown for ${provider}:${model}:${accountId}`, e);
             }
         } else if (provider && model) {
-            // Clear all cooldowns for this provider+model combination (all accounts)
             const keysToDelete = Array.from(this.cooldowns.keys()).filter(key =>
                 key.startsWith(`${provider}:${model}`)
             );
             keysToDelete.forEach(key => this.cooldowns.delete(key));
             logger.info(`Manually cleared all cooldowns for provider '${provider}' model '${model}' (${keysToDelete.length} total)`);
-            if (this.storage) {
-                try {
-                    this.storage.getDb().run("DELETE FROM provider_cooldowns WHERE provider = ? AND model = ?", [provider, model]);
-                } catch (e) {
-                    logger.error(`Failed to delete cooldowns for ${provider}:${model}`, e);
-                }
+            try {
+                await this.db
+                    .delete(schema.providerCooldowns)
+                    .where(and(
+                        eq(schema.providerCooldowns.provider, provider),
+                        eq(schema.providerCooldowns.model, model)
+                    ));
+            } catch (e) {
+                logger.error(`Failed to delete cooldowns for ${provider}:${model}`, e);
             }
         } else if (provider) {
-            // Clear all cooldowns for this provider (all models and accounts)
             const keysToDelete = Array.from(this.cooldowns.keys()).filter(key =>
                 key.startsWith(`${provider}:`)
             );
             keysToDelete.forEach(key => this.cooldowns.delete(key));
             logger.info(`Manually cleared all cooldowns for provider '${provider}' (${keysToDelete.length} total)`);
-            if (this.storage) {
-                try {
-                    this.storage.getDb().run("DELETE FROM provider_cooldowns WHERE provider = ?", [provider]);
-                } catch (e) {
-                    logger.error(`Failed to delete cooldowns for ${provider}`, e);
-                }
+            try {
+                await this.db
+                    .delete(schema.providerCooldowns)
+                    .where(eq(schema.providerCooldowns.provider, provider));
+            } catch (e) {
+                logger.error(`Failed to delete cooldowns for ${provider}`, e);
             }
         } else {
-            // Clear all cooldowns
             this.cooldowns.clear();
-            logger.info("Manually cleared all cooldowns");
-            if (this.storage) {
-                try {
-                    this.storage.getDb().run("DELETE FROM provider_cooldowns");
-                } catch (e) {
-                    logger.error("Failed to delete all cooldowns", e);
-                }
+            logger.info('Manually cleared all cooldowns');
+            try {
+                await this.db.delete(schema.providerCooldowns);
+            } catch (e) {
+                logger.error('Failed to delete all cooldowns', e);
             }
         }
     }
