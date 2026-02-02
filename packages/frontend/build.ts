@@ -104,16 +104,17 @@ await runBuild();
 // Watch Mode
 if (process.argv.includes("--watch")) {
     console.log("Watching for changes in ./src ...");
-    
+
     let debounceTimer: Timer | null = null;
     let isBuilding = false;
 
     watch("./src", { recursive: true }, async (event, filename) => {
-        if (filename && filename.includes("assets") && event === "rename") {
-             // specific suppression for potential noise if needed, but debounce should handle it
-        }
-
         if (isBuilding) return;
+        if (!filename) return;
+
+        if (filename.includes("assets/")) {
+            return;
+        }
 
         if (debounceTimer) {
             clearTimeout(debounceTimer);
