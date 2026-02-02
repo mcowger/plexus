@@ -73,8 +73,6 @@ export class DebugLoggingInspector extends BaseInspector {
           default:
             logger.warn(`[Inspector] Unknown providerApiType: ${providerApiType}`);
         }
-        logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} reconstructed response: ${JSON.stringify(reconstructed, null, 2)}`);
-
         // Always save to memory for usage extraction/estimation
         this.saveReconstructedResponse(reconstructed);
         

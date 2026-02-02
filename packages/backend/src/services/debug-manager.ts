@@ -89,10 +89,10 @@ export class DebugManager {
     }
 
     addReconstructedRawResponse(requestId: string, payload: any) {
-        if (!this.enabled) return;
+        // ALWAYS save to memory for usage extraction/estimation, regardless of debug mode
+        // The 'enabled' flag only controls DB persistence via flush()
         let log = this.pendingLogs.get(requestId);
         if (!log) {
-            // Create log entry if it doesn't exist (for ephemeral token estimation)
             log = {
                 requestId,
                 createdAt: Date.now()
@@ -103,10 +103,10 @@ export class DebugManager {
     }
 
     addTransformedResponse(requestId: string, payload: any) {
+        // Only save full response bodies if debug mode is enabled (for DB persistence)
         if (!this.enabled) return;
         let log = this.pendingLogs.get(requestId);
         if (!log) {
-            // Create log entry if it doesn't exist (for ephemeral token estimation)
             log = {
                 requestId,
                 createdAt: Date.now()
@@ -117,10 +117,9 @@ export class DebugManager {
     }
 
     addTransformedResponseSnapshot(requestId: string, payload: any) {
-        if (!this.enabled) return;
+        // ALWAYS save to memory for usage extraction/estimation
         let log = this.pendingLogs.get(requestId);
         if (!log) {
-            // Create log entry if it doesn't exist (for ephemeral token estimation)
             log = {
                 requestId,
                 createdAt: Date.now()
