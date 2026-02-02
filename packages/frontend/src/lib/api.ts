@@ -821,7 +821,8 @@ export const api = {
           ...(alias.type && { type: alias.type }),
           targets: alias.targets.map(t => ({
               provider: t.provider,
-              model: t.model
+              model: t.model,
+              ...(t.enabled === false && { enabled: false })
           }))
       };
 
@@ -876,7 +877,7 @@ export const api = {
 
         if (config.models) {
             Object.entries(config.models).forEach(([key, val]) => {
-                const targets = (val.targets || []).map((t: { provider: string; model: string }) => {
+                const targets = (val.targets || []).map((t: { provider: string; model: string; enabled?: boolean }) => {
                     const providerConfig = providers[t.provider];
 
                     // Infer type from api_base_url if not explicitly provided
@@ -895,7 +896,8 @@ export const api = {
                     return {
                         provider: t.provider,
                         model: t.model,
-                        apiType: Array.isArray(apiType) ? apiType : [apiType]
+                        apiType: Array.isArray(apiType) ? apiType : [apiType],
+                        enabled: t.enabled !== false // Default to true if not specified
                     };
                 });
 
