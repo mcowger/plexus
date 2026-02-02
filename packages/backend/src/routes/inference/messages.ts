@@ -45,6 +45,9 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
             
             const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
             
+            // Determine if token estimation is needed
+            const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
+            
             return await handleResponse(
                 request,
                 reply,
@@ -53,7 +56,9 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
                 usageRecord,
                 usageStorage,
                 startTime,
-                'messages'
+                'messages',
+                shouldEstimateTokens,
+                body
             );
         } catch (e: any) {
             usageRecord.responseStatus = 'error';

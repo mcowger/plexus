@@ -51,18 +51,13 @@ export function initializeDatabase(connectionString?: string) {
   let effectiveUri = connectionString;
   
   if (!effectiveUri) {
-    try {
-      const dbConfig = getDatabaseConfig();
-      effectiveUri = dbConfig?.connection_string;
-      logger.debug(`Config loaded URI: ${effectiveUri?.substring(0, 30)}...`);
-    } catch (e) {
-      logger.debug('Config not loaded, will use default');
+    effectiveUri = process.env.DATABASE_URL;
+    
+    if (!effectiveUri) {
+      throw new Error('DATABASE_URL environment variable is required for database connection');
     }
-  }
-
-  if (!effectiveUri) {
-    effectiveUri = "sqlite://:memory:";
-    logger.debug('Using default SQLite in-memory');
+    
+    logger.debug(`Using DATABASE_URL: ${effectiveUri.substring(0, 30)}...`);
   }
 
   const { dialect, connectionString: connStr } = parseConnectionString(effectiveUri);

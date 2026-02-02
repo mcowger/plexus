@@ -19,6 +19,7 @@ export class DebugManager {
     private storage: UsageStorageService | null = null;
     private enabled: boolean = false;
     private pendingLogs: Map<string, DebugLogRecord> = new Map();
+    private ephemeralRequests: Set<string> = new Set();
 
     private constructor() {}
 
@@ -101,12 +102,52 @@ export class DebugManager {
     
 
     flush(requestId: string) {
+        // Skip flushing ephemeral requests
+        if (this.ephemeralRequests.has(requestId)) {
+            logger.debug(`[DebugManager] Skipping flush for ephemeral request ${requestId}`);
+            return;
+        }
+        
         if (!this.storage) return;
         const log = this.pendingLogs.get(requestId);
         if (log) {
             logger.debug(`[DebugManager] Flushing debug log for ${requestId}`);
             this.storage.saveDebugLog(log);
             this.pendingLogs.delete(requestId);
+        }
+    }
+
+    /**
+     * Mark a request as ephemeral (debug data won't be persisted)
+     */
+    markEphemeral(requestId: string): void {
+        this.ephemeralRequests.add(requestId);
+        logger.debug(`[DebugManager] Marked ${requestId} as ephemeral`);
+    }
+
+    /**
+     * Check if a request is ephemeral
+     */
+    isEphemeral(requestId: string): boolean {
+        return this.ephemeralRequests.has(requestId);
+    }
+
+    /**
+     * Get reconstructed raw response for token estimation
+     */
+    getReconstructedRawResponse(requestId: string): any | null {
+        const log = this.pendingLogs.get(requestId);
+        return log?.rawResponseSnapshot || null;
+    }
+
+    /**
+     * Discard ephemeral debug data without saving to database
+     */
+    discardEphemeral(requestId: string): void {
+        if (this.ephemeralRequests.has(requestId)) {
+            this.pendingLogs.delete(requestId);
+            this.ephemeralRequests.delete(requestId);
+            logger.debug(`[DebugManager] Discarded ephemeral data for ${requestId}`);
         }
     }
 }

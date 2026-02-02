@@ -57,6 +57,7 @@ const EMPTY_PROVIDER: Provider = {
     type: [],
     apiKey: '',
     enabled: true,
+    estimateTokens: false,
     apiBaseUrl: {},
     headers: {},
     extraBody: {},
@@ -527,6 +528,17 @@ export const Providers = () => {
                                 value={editingProvider.discount || ''}
                                 onChange={(e) => setEditingProvider({...editingProvider, discount: parseFloat(e.target.value)})}
                             />
+                          </div>
+
+                          <div className="flex items-center gap-2 py-2">
+                              <Switch
+                                checked={editingProvider.estimateTokens || false}
+                                onChange={(checked) => setEditingProvider({...editingProvider, estimateTokens: checked})}
+                              />
+                              <div className="flex flex-col">
+                                  <label className="font-body text-[13px] font-medium text-text">Estimate Tokens</label>
+                                  <span className="font-body text-[11px] text-text-secondary">Enable token estimation for providers that don't return usage data</span>
+                              </div>
                           </div>
 
                           <div>

@@ -30,6 +30,7 @@ export const requestUsage = pgTable('request_usage', {
   isStreamed: integer('is_streamed').notNull().default(0),
   isPassthrough: integer('is_passthrough').notNull().default(0),
   responseStatus: text('response_status'),
+  tokensEstimated: integer('tokens_estimated').notNull().default(0),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 }, (table) => ({
   dateIdx: index('idx_request_usage_date').on(table.date),

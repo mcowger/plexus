@@ -47,6 +47,9 @@ export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Di
             
             const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
             
+            // Determine if token estimation is needed
+            const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
+            
             return await handleResponse(
                 request,
                 reply,
@@ -55,7 +58,9 @@ export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Di
                 usageRecord,
                 usageStorage,
                 startTime,
-                'chat'
+                'chat',
+                shouldEstimateTokens,
+                body
             );
         } catch (e: any) {
             usageRecord.responseStatus = 'error';

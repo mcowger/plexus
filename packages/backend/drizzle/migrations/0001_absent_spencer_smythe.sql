@@ -1,0 +1,1 @@
+ALTER TABLE `request_usage` ADD `tokens_estimated` integer DEFAULT 0 NOT NULL;

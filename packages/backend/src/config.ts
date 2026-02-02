@@ -64,6 +64,7 @@ const ProviderConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
   extraBody: z.record(z.any()).optional(),
   force_transformer: z.string().optional(),
+  estimateTokens: z.boolean().optional().default(false),
 }).refine(
   (data) => !!data.api_key,
   { message: "'api_key' must be specified for provider" }
@@ -87,14 +88,7 @@ const KeyConfigSchema = z.object({
   comment: z.string().optional(),
 });
 
-const DatabaseConfigSchema = z.object({
-  connection_string: z.string()
-    .regex(/^(sqlite|postgres)(s)?:\/\//, "Must start with sqlite:// or postgres://")
-    .describe("Database connection URI (sqlite:// for SQLite, postgres:// for PostgreSQL)"),
-});
-
 const PlexusConfigSchema = z.object({
-  database: DatabaseConfigSchema,
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
   keys: z.record(z.string(), KeyConfigSchema),
@@ -102,7 +96,9 @@ const PlexusConfigSchema = z.object({
 });
 
 export type PlexusConfig = z.infer<typeof PlexusConfigSchema>;
-export type DatabaseConfig = z.infer<typeof DatabaseConfigSchema>;
+export type DatabaseConfig = {
+  connectionString: string;
+};
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
@@ -269,7 +265,10 @@ export function setConfigForTesting(config: PlexusConfig) {
     currentConfig = config;
 }
 
-export function getDatabaseConfig(): DatabaseConfig {
-    const config = getConfig();
-    return config.database;
+export function getDatabaseConfig(): DatabaseConfig | null {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+        return null;
+    }
+    return { connectionString: databaseUrl };
 }

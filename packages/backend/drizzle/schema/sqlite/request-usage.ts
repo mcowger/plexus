@@ -31,6 +31,7 @@ export const requestUsage = sqliteTable('request_usage', {
   isStreamed: integer('is_streamed').notNull().default(0),
   isPassthrough: integer('is_passthrough').notNull().default(0),
   responseStatus: text('response_status'),
+  tokensEstimated: integer('tokens_estimated').notNull().default(0),
   createdAt: integer('created_at').notNull(),
 }, (table) => ({
   dateIdx: index('idx_request_usage_date').on(table.date),
