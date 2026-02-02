@@ -218,7 +218,7 @@ export const Models = () => {
   };
 
   const handleToggleModelSelection = (modelId: string, providerId: string) => {
-      const key = `${providerId}:${modelId}`;
+      const key = `${providerId}|${modelId}`;
       const newSelection = new Set(selectedModels);
       if (newSelection.has(key)) {
           newSelection.delete(key);
@@ -232,7 +232,9 @@ export const Models = () => {
       const newTargets = [...editingAlias.targets];
 
       selectedModels.forEach(key => {
-          const [providerId, modelId] = key.split(':');
+          const separatorIndex = key.indexOf('|');
+          const providerId = key.substring(0, separatorIndex);
+          const modelId = key.substring(separatorIndex + 1);
           const provider = providers.find(p => p.id === providerId);
           const model = availableModels.find(m => m.id === modelId && m.providerId === providerId);
 
@@ -347,8 +349,8 @@ export const Models = () => {
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                 <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border border-border-glass" style={{
                                     fontSize: '10px',
-                                    backgroundColor: alias.type === 'embeddings' ? '#10b981' : alias.type === 'transcriptions' ? '#a855f7' : '#ebebeb',
-                                    color: alias.type === 'embeddings' || alias.type === 'transcriptions' ? 'white' : '#333',
+                                    backgroundColor: alias.type === 'embeddings' ? '#10b981' : alias.type === 'transcriptions' ? '#a855f7' : alias.type === 'speech' ? '#f97316' : '#ebebeb',
+                                    color: alias.type === 'embeddings' || alias.type === 'transcriptions' || alias.type === 'speech' ? 'white' : '#333',
                                     border: 'none'
                                 }}>
                                     {alias.type || 'chat'}
@@ -519,11 +521,12 @@ export const Models = () => {
                       <select
                         className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                         value={editingAlias.type || 'chat'}
-                        onChange={(e) => setEditingAlias({...editingAlias, type: e.target.value as 'chat' | 'embeddings' | 'transcriptions'})}
+                        onChange={(e) => setEditingAlias({...editingAlias, type: e.target.value as 'chat' | 'embeddings' | 'transcriptions' | 'speech'})}
                       >
                           <option value="chat">Chat</option>
                           <option value="embeddings">Embeddings</option>
                           <option value="transcriptions">Transcriptions</option>
+                          <option value="speech">Speech</option>
                       </select>
                   </div>
 
@@ -721,40 +724,40 @@ export const Models = () => {
                       <table className="w-full border-collapse font-body text-[13px]">
                           <thead style={{position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-hover)', zIndex: 10}}>
                               <tr>
-                                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{width: '40px'}}>
-                                      <input
-                                        type="checkbox"
-                                        checked={filteredModels.length > 0 && filteredModels.every(m =>
-                                            selectedModels.has(`${m.provider.id}:${m.model.id}`) ||
-                                            editingAlias.targets.some(t => t.provider === m.provider.id && t.model === m.model.id)
-                                        )}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                const newSelection = new Set(selectedModels);
-                                                filteredModels.forEach(m => {
-                                                    const key = `${m.provider.id}:${m.model.id}`;
-                                                    if (!editingAlias.targets.some(t => t.provider === m.provider.id && t.model === m.model.id)) {
-                                                        newSelection.add(key);
-                                                    }
-                                                });
-                                                setSelectedModels(newSelection);
-                                            } else {
-                                                const newSelection = new Set(selectedModels);
-                                                filteredModels.forEach(m => {
-                                                    newSelection.delete(`${m.provider.id}:${m.model.id}`);
-                                                });
-                                                setSelectedModels(newSelection);
-                                            }
-                                        }}
-                                      />
-                                  </th>
+                                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{width: '40px'}}>
+                                       <input
+                                         type="checkbox"
+                                         checked={filteredModels.length > 0 && filteredModels.every(m =>
+                                             selectedModels.has(`${m.provider.id}|${m.model.id}`) ||
+                                             editingAlias.targets.some(t => t.provider === m.provider.id && t.model === m.model.id)
+                                         )}
+                                         onChange={(e) => {
+                                             if (e.target.checked) {
+                                                 const newSelection = new Set(selectedModels);
+                                                 filteredModels.forEach(m => {
+                                                     const key = `${m.provider.id}|${m.model.id}`;
+                                                     if (!editingAlias.targets.some(t => t.provider === m.provider.id && t.model === m.model.id)) {
+                                                         newSelection.add(key);
+                                                     }
+                                                 });
+                                                 setSelectedModels(newSelection);
+                                             } else {
+                                                 const newSelection = new Set(selectedModels);
+                                                 filteredModels.forEach(m => {
+                                                     newSelection.delete(`${m.provider.id}|${m.model.id}`);
+                                                 });
+                                                 setSelectedModels(newSelection);
+                                             }
+                                         }}
+                                       />
+                                   </th>
                                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Provider</th>
                                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Model</th>
                               </tr>
                           </thead>
                           <tbody>
                               {filteredModels.map(({ model, provider }) => {
-                                  const key = `${provider.id}:${model.id}`;
+                                  const key = `${provider.id}|${model.id}`;
                                   const alreadyExists = editingAlias.targets.some(t => t.provider === provider.id && t.model === model.id);
                                   const isSelected = selectedModels.has(key);
                                   const isDisabled = alreadyExists;

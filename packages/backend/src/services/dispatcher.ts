@@ -1,4 +1,4 @@
-import { UnifiedChatRequest, UnifiedChatResponse, UnifiedTranscriptionRequest, UnifiedTranscriptionResponse } from "../types/unified";
+import { UnifiedChatRequest, UnifiedChatResponse, UnifiedTranscriptionRequest, UnifiedTranscriptionResponse, UnifiedSpeechRequest, UnifiedSpeechResponse } from "../types/unified";
 import { Router } from "./router";
 import { TransformerFactory } from "./transformer-factory";
 import { logger } from "../utils/logger";
@@ -674,6 +674,95 @@ export class Dispatcher {
       provider: route.provider,
       model: route.model,
       apiType: 'transcriptions',
+      pricing: route.modelConfig?.pricing,
+      providerDiscount: route.config.discount,
+      canonicalModel: route.canonicalModel,
+      config: route.config,
+    };
+
+    return unifiedResponse;
+  }
+
+  /**
+   * Dispatches text-to-speech requests
+   * Handles JSON body requests to OpenAI-compatible speech endpoints
+   * Supports both binary audio responses and SSE streaming
+   */
+  async dispatchSpeech(request: UnifiedSpeechRequest): Promise<UnifiedSpeechResponse> {
+    // 1. Route using existing Router with 'speech' as the API type
+    const route = await Router.resolve(request.model, 'speech');
+
+    // 2. Build URL (speech uses /audio/speech endpoint)
+    const baseUrl = this.resolveBaseUrl(route, 'speech');
+    const url = `${baseUrl}/audio/speech`;
+
+    // 3. Setup headers
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (route.config.api_key) {
+      headers["Authorization"] = `Bearer ${route.config.api_key}`;
+    }
+
+    if (route.config.headers) {
+      Object.assign(headers, route.config.headers);
+    }
+
+    // 4. Transform request (model substitution and optional params)
+    const { SpeechTransformer } = await import('../transformers/speech');
+    const transformer = new SpeechTransformer();
+    const payload = await transformer.transformRequest({
+      ...request,
+      model: route.model,
+    });
+
+    if (route.config.extraBody) {
+      Object.assign(payload, route.config.extraBody);
+    }
+
+    logger.info(`Dispatching speech ${request.model} to ${route.provider}:${route.model}`);
+    logger.silly("Speech Request Payload", payload);
+
+    if (request.requestId) {
+      DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+    }
+
+    // 5. Execute request
+    const isStreamed = request.stream_format === 'sse';
+    const acceptHeader = isStreamed ? 'text/event-stream' : 'audio/*';
+    headers["Accept"] = acceptHeader;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      await this.handleProviderError(response, route, errorText, url, headers, 'speech');
+    }
+
+    // 6. Handle response (binary or streaming)
+    const responseBuffer = Buffer.from(await response.arrayBuffer());
+    logger.silly("Speech Response", { size: responseBuffer.length, isStreamed });
+
+    if (request.requestId) {
+      DebugManager.getInstance().addRawResponse(request.requestId, { size: responseBuffer.length, isStreamed });
+    }
+
+    // 7. Transform response
+    const unifiedResponse = await transformer.transformResponse(responseBuffer, {
+      stream_format: request.stream_format,
+      response_format: request.response_format,
+    });
+
+    // 8. Add plexus metadata
+    unifiedResponse.plexus = {
+      provider: route.provider,
+      model: route.model,
+      apiType: 'speech',
       pricing: route.modelConfig?.pricing,
       providerDiscount: route.config.discount,
       canonicalModel: route.canonicalModel,

@@ -109,6 +109,7 @@ export interface Model {
   name: string;
   providerId: string;
   pricingSource?: string;
+  type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech';
 }
 
 export interface Alias {
@@ -116,7 +117,7 @@ export interface Alias {
     aliases?: string[];
     selector?: string;
     priority?: 'selector' | 'api_match';
-    type?: 'chat' | 'embeddings' | 'transcriptions';
+    type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech';
     targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
 }
 
@@ -854,7 +855,8 @@ export const api = {
                                 id: mKey,
                                 name: mKey,
                                 providerId: pKey,
-                                pricingSource: mVal.pricing?.source
+                                pricingSource: mVal.pricing?.source,
+                                type: mVal.type
                             });
                         });
                     }

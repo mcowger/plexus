@@ -71,6 +71,13 @@ models:
     targets:
       - provider: openai_direct
         model: whisper-1
+
+  # Text-to-speech model
+  speech-model:
+    type: speech
+    targets:
+      - provider: openai_direct
+        model: tts-1-hd
 ```
 
 ## Direct Model Routing

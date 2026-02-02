@@ -34,6 +34,25 @@ Plexus 2 provides compatibility layers for major AI provider formats.
 - **Streaming:** Not supported in v1 (coming in future versions).
 - **Pass-through:** Transcription requests are always pass-through (no protocol transformation needed).
 
+### Audio Speech Compatible (OpenAI)
+- **Endpoint:** `POST /v1/audio/speech`
+- **Description:** Compatible with the OpenAI Audio Speech API. Generates audio from text using text-to-speech models.
+- **Documentation:** See [OpenAI Audio Speech API Reference](https://platform.openai.com/docs/api-reference/audio/createSpeech) for request and response formats.
+- **Model Type:** Models must be configured with `type: speech` to be accessible via this endpoint.
+- **Supported Models:** `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, and compatible TTS models.
+- **Request Body (JSON):**
+  - `model` (required): TTS model identifier
+  - `input` (required): Text to convert to speech (max 4096 characters)
+  - `voice` (required): Voice to use (alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse, marin, cedar)
+  - `instructions` (optional): Voice style control (not supported on tts-1 or tts-1-hd)
+  - `response_format` (optional): Output format (mp3, opus, aac, flac, wav, pcm). Default: mp3
+  - `speed` (optional): Speed multiplier (0.25-4.0). Default: 1.0
+  - `stream_format` (optional): Streaming format (sse, audio). Default: audio. Not supported on tts-1 or tts-1-hd.
+- **Response:**
+  - Binary audio file (default) with appropriate Content-Type header
+  - SSE stream when `stream_format: "sse"` with `speech.audio.delta` and `speech.audio.done` events
+- **Pass-through:** Speech requests are always pass-through (no protocol transformation needed).
+
 ### Gemini Compatible (Google)
 - **Endpoint:** `POST /v1beta/models/{model}:{action}`
 - **Description:** Compatible with the Google Generative Language API (Gemini).

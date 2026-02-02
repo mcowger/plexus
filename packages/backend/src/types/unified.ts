@@ -234,14 +234,14 @@ export interface UnifiedTranscriptionRequest {
 // Unified Transcription Response
 export interface UnifiedTranscriptionResponse {
   text: string;
-  
+
   // Optional usage field (present in JSON response)
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
     total_tokens?: number;
   };
-  
+
   // Plexus metadata
   plexus?: {
     provider?: string;
@@ -252,6 +252,43 @@ export interface UnifiedTranscriptionResponse {
     canonicalModel?: string;
     config?: any;
   };
-  
+
   rawResponse?: any;
+}
+
+// Unified Speech Request
+export interface UnifiedSpeechRequest {
+  requestId?: string;
+  model: string;
+  input: string;
+  voice: string;
+  instructions?: string;
+  response_format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
+  speed?: number;
+  stream_format?: 'sse' | 'audio';
+  incomingApiType?: string;
+  originalBody?: any;
+  metadata?: Record<string, any>;
+}
+
+// Unified Speech Response
+export interface UnifiedSpeechResponse {
+  audio?: Buffer;
+  stream?: ReadableStream;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+  plexus?: {
+    provider?: string;
+    model?: string;
+    apiType?: string;
+    pricing?: any;
+    providerDiscount?: number;
+    canonicalModel?: string;
+    config?: any;
+  };
+  rawResponse?: any;
+  isStreamed?: boolean;
 }

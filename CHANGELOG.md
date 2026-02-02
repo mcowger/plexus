@@ -1,6 +1,67 @@
 # Changelog
 
-## v0.10.0 - 2026-02-02
+## v0.11.0 - 2026-02-02
+
+### v0.11.0: OpenAI-Compatible Audio Speech Support
+
+### Main Features
+
+- **Audio Speech API**: Added OpenAI-compatible `/v1/audio/speech` endpoint support
+  - Text-to-speech generation with support for multiple TTS models
+  - Compatible with OpenAI TTS-1, TTS-1-HD, and GPT-4o-mini-tts models
+  - Supports multiple voices: alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse, marin, cedar
+  - Output formats: mp3, opus, aac, flac, wav, pcm (default: mp3)
+  - Speed control (0.25x to 4.0x)
+  - Voice instructions for style control (on supported models)
+  - Streaming support via SSE format (`stream_format: "sse"`)
+  - Full usage tracking with token counts, costs, and duration metrics
+  - Pass-through optimization (no protocol transformation needed)
+
+- **Model Type System Extension**: Extended type field to support speech models
+  - Models can now be configured as `type: chat`, `type: embeddings`, `type: transcriptions`, or `type: speech`
+  - Provider models support speech type specification
+  - Router automatically filters by model type when routing speech requests
+  - Ensures speech models are only accessible via speech API
+
+- **UI Enhancements for Speech**:
+  - Added speech to known API types with orange badge (#f97316) in Providers page
+  - Speech type support in Models page Type column
+  - Model Type dropdown includes speech option in edit modals
+  - Volume2 icon for speech in Logs page (orange color)
+  - Consistent badge styling across all pages
+
+### Backend Implementation
+
+- Created `SpeechTransformer` for request/response handling
+- Added `dispatchSpeech()` method to Dispatcher service
+- Implemented speech route handler with comprehensive validation
+  - Input text validation (max 4096 characters)
+  - Voice validation
+  - Response format validation
+  - Speed validation (0.25-4.0)
+  - Streaming format validation
+- Updated configuration schema to support `'speech'` model type
+
+### Frontend Updates
+
+- Updated `packages/frontend/src/pages/Providers.tsx` with speech badge
+- Updated `packages/frontend/src/pages/Models.tsx` with type support
+- Updated `packages/frontend/src/pages/Logs.tsx` with Volume2 icon
+- Updated API types in `packages/frontend/src/lib/api.ts`
+
+### Documentation
+
+- Added `/v1/audio/speech` endpoint documentation to API.md
+- Added speech model configuration examples to CONFIGURATION.md
+- Updated README.md with speech endpoint listing
+
+### Tests
+
+- Added 15 comprehensive tests for SpeechTransformer
+- Added 10 route handler tests for speech endpoint
+- All tests passing
+
+All existing backend tests continue to pass. Frontend builds successfully.
 
 ### v0.10.0: OpenAI-Compatible Audio Transcriptions Support
 
