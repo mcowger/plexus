@@ -52,6 +52,7 @@ Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
 - **Web Framework:** Fastify
 - **Configuration:** YAML (via `yaml` package)
 - **Validation:** [Zod](https://zod.dev/)
+- **ORM:** [Drizzle ORM](https://orm.drizzle.team/) with SQLite
 - **Libraries:** Where possible, use native Bun libraries
 
 ### 4.2 System Components
@@ -68,11 +69,146 @@ Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
   - `transformers/`: Protocol translation logic.
   - `types/`: Unified types for requests, responses, and streaming chunks.
   - `utils/`: Shared utilities (Logger).
+  - `db/`: Database client and types.
+  - `drizzle/schema/`: Drizzle ORM table definitions.
+  - `drizzle/migrations/`: Auto-generated migration files.
 
-## 6. Development & Testing
+# Database Migrations - CRITICAL RULE
+
+## NEVER Edit Existing Migrations
+
+**Modifying existing migration files is NEVER acceptable.** Migration files represent the historical change sequence of your database schema. Editing them can:
+
+- Break production databases with out-of-sync migration history
+- Cause data loss or corruption
+- Create inconsistencies between development and production environments
+
+## Always Create NEW Migrations
+
+When schema changes are needed:
+
+1. **Edit the schema files** in `packages/backend/drizzle/schema/`
+2. **Generate a new migration**:
+   ```bash
+   bunx drizzle-kit generate
+   ```
+3. **Review the new migration** in `drizzle/migrations/` or `drizzle/migrations_pg/`
+4. **Deploy the new migration** - migrations auto-apply on startup
+
+## Live Database Safety
+
+- It is NEVER acceptable to attempt to modify a live database directly
+- Always use migrations for schema changes
+- Test migrations in development/staging before production
+
+## 6. Database & ORM
+
+Plexus uses **Drizzle ORM** with **SQLite** for data persistence.
+
+**For PostgreSQL deployments**, migrations are stored in `drizzle/migrations_pg/` and schema definitions are in `drizzle/schema/postgres/`.
+
+### 6.1 Database Schema
+
+All database tables are defined in `packages/backend/drizzle/schema/`:
+- **`request_usage`** - Tracks API usage, costs, and timing
+- **`provider_cooldowns`** - Provider failure tracking with per-account support
+- **`debug_logs`** - Request/response debugging
+- **`inference_errors`** - Error logging
+- **`provider_performance`** - Performance metrics (last 10 requests per provider/model)
+
+### 6.2 Type-Safe Queries
+
+Drizzle provides full TypeScript type safety:
+
+```typescript
+import { eq, and, desc, sql } from 'drizzle-orm';
+import * as schema from '../../drizzle/schema';
+import { getDatabase } from '../db/client';
+
+const db = getDatabase();
+
+// Insert with type checking
+await db.insert(schema.requestUsage).values({
+  requestId: 'uuid-123',
+  date: new Date().toISOString(),
+  provider: 'openai',
+  // ... all fields are type-checked
+});
+
+// Select with filters
+const results = await db
+  .select()
+  .from(schema.requestUsage)
+  .where(and(
+    eq(schema.requestUsage.provider, 'openai'),
+    sql`${schema.requestUsage.createdAt} > ${Date.now() - 86400000}`
+  ))
+  .orderBy(desc(schema.requestUsage.createdAt));
+
+// Update with conflict handling
+await db.insert(schema.providerCooldowns)
+  .values({ provider, model, accountId, expiry })
+  .onConflictDoUpdate({
+    target: [schema.providerCooldowns.provider, schema.providerCooldowns.model, schema.providerCooldowns.accountId],
+    set: { expiry }
+  });
+```
+
+### 6.3 Running Migrations
+
+Migrations run automatically on application startup. To generate new migrations after schema changes:
+
+```bash
+# From packages/backend directory
+cd packages/backend
+
+# Generate migration (creates SQL file in drizzle/migrations/)
+bunx drizzle-kit generate
+
+# Review the generated SQL file
+cat drizzle/migrations/XXXX_description.sql
+
+# Apply migrations manually (optional, usually auto-applied)
+bunx drizzle-kit migrate
+```
+
+### 6.4 Adding New Tables or Columns
+
+To add a new table or modify existing schema:
+
+1. **Edit the schema file** (e.g., `drizzle/schema/request-usage.ts`):
+   ```typescript
+   export const requestUsage = sqliteTable('request_usage', {
+     // ... existing columns
+     newColumn: text('new_column'),  // Add new column
+   });
+   ```
+
+2. **Generate migration**:
+   ```bash
+   bunx drizzle-kit generate
+   ```
+
+3. **Review the generated SQL** in `drizzle/migrations/XXXX_description.sql`
+
+4. **Restart the application** - migrations auto-apply on startup
+
+### 6.5 Type Definitions
+
+Inferred types are available in `packages/backend/src/db/types.ts`:
+
+```typescript
+import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
+
+// Automatically inferred from schema
+export type RequestUsage = InferSelectModel<typeof schema.requestUsage>;
+export type NewRequestUsage = InferInsertModel<typeof schema.requestUsage>;
+```
+
+## 7. Development & Testing
 - **Full Stack Dev:** Run `bun run dev` from the root to start both the Backend (port 4000, watch mode) and Frontend Builder (watch mode).
 
-### 6.1 Testing Guidelines
+### 7.1 Testing Guidelines
 When writing tests for the backend, especially those involving configuration (`packages/backend/src/config.ts`), strict adherence to isolation principles is required to prevent "mock pollution" across tests.
 
 **Do NOT use `mock.module` to mock the configuration module globally.** 
@@ -85,7 +221,7 @@ To ensure test isolation and prevent "mock pollution" in Bun's shared-worker env
 
 ### `bunfig.toml` and `test/setup.ts`
 
-The root `bunfig.toml` is configured to preload `packages/backend/test/setup.ts` before any tests run. This script establishes "Gold Standard" mocks for global dependencies like the **Logger**.
+The root `bunfig.toml` is configured to preload `packages/backend/test/setup.ts` before any tests run. This script establishes "Gold Standard" mocks for global dependencies like the **Logger** and initializes an in-memory database with migrations.
 
 ### Mocking Pattern: Shared Dependencies
 
@@ -108,9 +244,9 @@ test("my test", () => {
 });
 ```
 
-## 7. Frontend Styling & Tailwind CSS
+## 8. Frontend Styling & Tailwind CSS
 
-### 7.1 Tailwind CSS Build Process
+### 8.1 Tailwind CSS Build Process
 The frontend uses Tailwind CSS v4. To ensure utility classes are correctly scanned and generated, the following configurations are CRITICAL:
 
 - **No CSS-in-JS Imports:** **NEVER** import `globals.css` (or any CSS file containing Tailwind v4 directives) directly into `.ts` or `.tsx` files. Bun's internal CSS loader does not support Tailwind v4 `@theme` or `@source` directives and will overwrite the valid CSS generated by the CLI with a broken version. The build script (`build.ts`) handles linking the generated `main.css` in the final `index.html`.
@@ -119,7 +255,7 @@ The frontend uses Tailwind CSS v4. To ensure utility classes are correctly scann
 
 Failure to follow these settings will result in a `main.css` file that contains only base styles and no generated utility classes, causing the UI to appear unstyled.
 
-### 7.2 Static Assets Location
+### 8.2 Static Assets Location
 All static assets (images, logos, icons, etc.) must be placed in `packages/frontend/src/assets/`.
 
 - **Import Assets in Components:** Import assets using ES6 import statements (e.g., `import logo from '../assets/logo.svg'`) rather than using direct paths.
@@ -128,7 +264,7 @@ All static assets (images, logos, icons, etc.) must be placed in `packages/front
 
 This ensures assets are properly bundled by the build system and served correctly in both development and production environments.
 
-### 7.3 Number and Time Formatting - **PREFERRED APPROACH**
+### 8.3 Number and Time Formatting - **PREFERRED APPROACH**
 
 The project uses centralized formatting utilities in `packages/frontend/src/lib/format.ts` powered by the [human-format](https://www.npmjs.com/package/human-format) library.
 

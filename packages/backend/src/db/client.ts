@@ -1,69 +1,131 @@
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import * as schema from '../../drizzle/schema';
+import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { getDatabaseConfig } from '../config';
 import { logger } from '../utils/logger';
-import fs from 'node:fs';
 import path from 'node:path';
+import fs from 'node:fs';
 
-let dbInstance: ReturnType<typeof drizzle> | null = null;
+type SupportedDialect = 'sqlite' | 'postgres';
+
+let dbInstance: ReturnType<typeof drizzle> | ReturnType<typeof drizzlePg> | null = null;
+let sqlClient: postgres.Sql | null = null;
+let currentDialect: SupportedDialect | null = null;
+let currentSchema: any = null;
+
+function parseConnectionString(uri: string): { dialect: SupportedDialect; connectionString: string } {
+  if (uri.startsWith('sqlite://')) {
+    return { dialect: 'sqlite', connectionString: uri.replace('sqlite://', '') };
+  } else if (uri.startsWith('postgres://') || uri.startsWith('postgresql://')) {
+    return { dialect: 'postgres', connectionString: uri };
+  }
+  throw new Error(`Invalid database URI: must start with sqlite:// or postgres://. Got: ${uri}`);
+}
+
+function resolvePath(relPath: string): string {
+  if (relPath.startsWith('/')) return relPath;
+  if (relPath.startsWith('./')) {
+    return path.resolve(process.cwd(), relPath);
+  }
+  const projectRoot = path.resolve(process.cwd(), '../../');
+  return path.join(projectRoot, relPath);
+}
 
 export function initializeDatabase(connectionString?: string) {
-  const effectiveConnectionString = connectionString || process.env.PLEXUS_DB_URL;
-  
-  let dbPath: string;
-  
-  if (effectiveConnectionString) {
-    dbPath = effectiveConnectionString;
-  } else {
-    let dbDir = process.env.DATA_DIR;
-    if (!dbDir) {
-      const possibleRoot = path.resolve(process.cwd(), '../../');
-      const localConfig = path.resolve(process.cwd(), 'config');
-      
-      if (fs.existsSync(path.join(possibleRoot, 'config', 'plexus.yaml'))) {
-        dbDir = path.join(possibleRoot, 'config');
-      } else if (fs.existsSync(path.join(localConfig, 'plexus.yaml'))) {
-        dbDir = localConfig;
-      } else {
-        dbDir = path.resolve(process.cwd(), 'data');
-      }
-    }
-    
-    if (!fs.existsSync(dbDir)) {
-      try {
-        fs.mkdirSync(dbDir, { recursive: true });
-      } catch (e) {
-        logger.error(`Failed to create data directory at ${dbDir}`, e);
-        dbDir = path.resolve(process.cwd(), 'data');
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-    }
-    dbPath = path.join(dbDir, 'usage.sqlite');
+  if (dbInstance) {
+    logger.debug('Database already initialized, skipping');
+    return dbInstance;
   }
+
+  let effectiveUri = connectionString;
   
-  logger.info(`Initializing database at ${dbPath}`);
+  if (!effectiveUri) {
+    try {
+      const dbConfig = getDatabaseConfig();
+      effectiveUri = dbConfig?.connection_string;
+      logger.debug(`Config loaded URI: ${effectiveUri?.substring(0, 30)}...`);
+    } catch (e) {
+      logger.debug('Config not loaded, will use default');
+    }
+  }
 
-  try {
+  if (!effectiveUri) {
+    effectiveUri = "sqlite://:memory:";
+    logger.debug('Using default SQLite in-memory');
+  }
+
+  const { dialect, connectionString: connStr } = parseConnectionString(effectiveUri);
+  currentDialect = dialect;
+
+  logger.info(`Initializing ${dialect} database...`);
+  
+  if (dialect === 'sqlite') {
+    const dbPath = connStr === ':memory:' ? ':memory:' : resolvePath(connStr);
+
+    if (dbPath !== ':memory:') {
+      const dir = path.dirname(dbPath);
+      if (dir !== '.' && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+
     const sqlite = new Database(dbPath);
-
     sqlite.exec('PRAGMA journal_mode = WAL');
     sqlite.exec('PRAGMA foreign_keys = ON');
 
+    const sqliteSchema = require('../../drizzle/schema/sqlite/index');
+    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } = sqliteSchema;
+
+    currentSchema = sqliteSchema;
     dbInstance = drizzle(sqlite, {
-      schema,
+      schema: { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance },
       logger: process.env.LOG_LEVEL === 'debug',
     });
+  } else {
+    sqlClient = postgres(connStr, {
+      ssl: false,
+      max: 10,
+    });
 
-    return dbInstance;
-  } catch (error) {
-    logger.error(`Failed to initialize database at ${dbPath}`, error);
-    throw error;
+    const pgSchema = require('../../drizzle/schema/postgres/index');
+    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } = pgSchema;
+
+    currentSchema = pgSchema;
+    dbInstance = drizzlePg(sqlClient, {
+      schema: { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance },
+      logger: process.env.LOG_LEVEL === 'debug',
+    });
   }
+  
+  return dbInstance;
 }
 
 export function getDatabase() {
   if (!dbInstance) {
-    throw new Error('Database not initialized. Call initializeDatabase() first.');
+    initializeDatabase();
   }
-  return dbInstance;
+  return dbInstance as ReturnType<typeof drizzle>;
+}
+
+export function getSchema() {
+  if (!currentSchema) {
+    initializeDatabase();
+  }
+  return currentSchema;
+}
+
+export function getCurrentDialect(): SupportedDialect {
+  if (!currentDialect) {
+    throw new Error('Database not initialized');
+  }
+  return currentDialect;
+}
+
+export async function closeDatabase() {
+  if (sqlClient) {
+    await sqlClient.end();
+    sqlClient = null;
+  }
+  dbInstance = null;
 }

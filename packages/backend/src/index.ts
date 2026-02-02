@@ -38,17 +38,6 @@ fastify.register(cors, {
     exposedHeaders: ['Content-Type']
 });
 
-// --- Database Initialization ---
-// Initialize database first before any services that depend on it
-try {
-  initializeDatabase();
-  await runMigrations();
-  await CooldownManager.getInstance().loadFromStorage();
-} catch (e) {
-  logger.error('Failed to initialize database or run migrations', e);
-  process.exit(1);
-}
-
 // --- Service Initialization ---
 
 const dispatcher = new Dispatcher();
@@ -72,6 +61,17 @@ try {
 } catch (e) {
     logger.error('Failed to load config or pricing', e);
     process.exit(1);
+}
+
+// --- Database Initialization ---
+// Initialize database after config is loaded
+try {
+  initializeDatabase();
+  await runMigrations();
+  await CooldownManager.getInstance().loadFromStorage();
+} catch (e) {
+  logger.error('Failed to initialize database or run migrations', e);
+  process.exit(1);
 }
 
 // --- Hooks & Global Logic ---
@@ -172,6 +172,18 @@ const start = async () => {
     try {
         await fastify.listen({ port, host });
         logger.info(`Server starting on port ${port}`);
+
+        const shutdown = async (signal: string) => {
+            logger.info(`Received ${signal}, shutting down gracefully...`);
+            await fastify.close();
+            const { closeDatabase } = await import('./db/client');
+            await closeDatabase();
+            logger.info('Shutdown complete');
+            process.exit(0);
+        };
+
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+        process.on('SIGINT', () => shutdown('SIGINT'));
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);

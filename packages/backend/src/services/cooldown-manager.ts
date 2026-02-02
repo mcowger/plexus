@@ -1,6 +1,5 @@
 import { logger } from '../utils/logger';
-import { getDatabase } from '../db/client';
-import * as schema from '../../drizzle/schema';
+import { getDatabase, getSchema } from '../db/client';
 import { lt, eq, sql, and, desc } from 'drizzle-orm';
 
 interface Target {
@@ -12,10 +11,10 @@ export class CooldownManager {
     private static instance: CooldownManager;
     private cooldowns: Map<string, number> = new Map();
     private readonly defaultCooldownMinutes = 10;
-    private db;
+    private db: ReturnType<typeof getDatabase> | null = null;
+    private schema: any = null;
 
     private constructor() {
-        this.db = getDatabase();
     }
 
     public static getInstance(): CooldownManager {
@@ -25,18 +24,27 @@ export class CooldownManager {
         return CooldownManager.instance;
     }
 
+    private ensureDb() {
+        if (!this.db) {
+            this.db = getDatabase();
+            this.schema = getSchema();
+        }
+        return this.db;
+    }
+
     public async loadFromStorage() {
         try {
+            const db = this.ensureDb();
             const now = Date.now();
 
-            await this.db
-                .delete(schema.providerCooldowns)
-                .where(lt(schema.providerCooldowns.expiry, now));
+            await db
+                .delete(this.schema.providerCooldowns)
+                .where(lt(this.schema.providerCooldowns.expiry, now));
 
-            const rows = await this.db
+            const rows = await db
                 .select()
-                .from(schema.providerCooldowns)
-                .where(sql`${schema.providerCooldowns.expiry} >= ${now}`);
+                .from(this.schema.providerCooldowns)
+                .where(sql`${this.schema.providerCooldowns.expiry} >= ${now}`);
 
             this.cooldowns.clear();
             for (const row of rows) {
@@ -73,7 +81,8 @@ export class CooldownManager {
         logger.warn(`Provider '${provider}' model '${model}'${accountInfo} placed on cooldown for ${duration / 1000}s until ${new Date(expiry).toISOString()}`);
 
         try {
-            await this.db.insert(schema.providerCooldowns).values({
+            const db = this.ensureDb();
+            await db.insert(this.schema.providerCooldowns).values({
                 provider,
                 model,
                 accountId: accountId || '',
@@ -81,9 +90,9 @@ export class CooldownManager {
                 createdAt: Date.now(),
             }).onConflictDoUpdate({
                 target: [
-                    schema.providerCooldowns.provider,
-                    schema.providerCooldowns.model,
-                    schema.providerCooldowns.accountId,
+                    this.schema.providerCooldowns.provider,
+                    this.schema.providerCooldowns.model,
+                    this.schema.providerCooldowns.accountId,
                 ],
                 set: { expiry },
             });
@@ -101,12 +110,13 @@ export class CooldownManager {
             this.cooldowns.delete(key);
 
             try {
-                await this.db
-                    .delete(schema.providerCooldowns)
+                const db = this.ensureDb();
+                await db
+                    .delete(this.schema.providerCooldowns)
                     .where(and(
-                        eq(schema.providerCooldowns.provider, provider),
-                        eq(schema.providerCooldowns.model, model),
-                        sql`(${schema.providerCooldowns.accountId} = ${accountId || ''} OR (${schema.providerCooldowns.accountId} = '' AND ${accountId || ''} = ''))`
+                        eq(this.schema.providerCooldowns.provider, provider),
+                        eq(this.schema.providerCooldowns.model, model),
+                        sql`(${this.schema.providerCooldowns.accountId} = ${accountId || ''} OR (${this.schema.providerCooldowns.accountId} = '' AND ${accountId || ''} = ''))`
                     ));
             } catch (e) {
                 const accountInfo = accountId ? ` (account: ${accountId})` : '';
@@ -168,12 +178,13 @@ export class CooldownManager {
             this.cooldowns.delete(key);
             logger.info(`Manually cleared cooldown for provider '${provider}' model '${model}' account '${accountId}'`);
             try {
-                await this.db
-                    .delete(schema.providerCooldowns)
+                const db = this.ensureDb();
+                await db
+                    .delete(this.schema.providerCooldowns)
                     .where(and(
-                        eq(schema.providerCooldowns.provider, provider),
-                        eq(schema.providerCooldowns.model, model),
-                        eq(schema.providerCooldowns.accountId, accountId)
+                        eq(this.schema.providerCooldowns.provider, provider),
+                        eq(this.schema.providerCooldowns.model, model),
+                        eq(this.schema.providerCooldowns.accountId, accountId)
                     ));
             } catch (e) {
                 logger.error(`Failed to delete cooldown for ${provider}:${model}:${accountId}`, e);
@@ -185,11 +196,12 @@ export class CooldownManager {
             keysToDelete.forEach(key => this.cooldowns.delete(key));
             logger.info(`Manually cleared all cooldowns for provider '${provider}' model '${model}' (${keysToDelete.length} total)`);
             try {
-                await this.db
-                    .delete(schema.providerCooldowns)
+                const db = this.ensureDb();
+                await db
+                    .delete(this.schema.providerCooldowns)
                     .where(and(
-                        eq(schema.providerCooldowns.provider, provider),
-                        eq(schema.providerCooldowns.model, model)
+                        eq(this.schema.providerCooldowns.provider, provider),
+                        eq(this.schema.providerCooldowns.model, model)
                     ));
             } catch (e) {
                 logger.error(`Failed to delete cooldowns for ${provider}:${model}`, e);
@@ -201,9 +213,10 @@ export class CooldownManager {
             keysToDelete.forEach(key => this.cooldowns.delete(key));
             logger.info(`Manually cleared all cooldowns for provider '${provider}' (${keysToDelete.length} total)`);
             try {
-                await this.db
-                    .delete(schema.providerCooldowns)
-                    .where(eq(schema.providerCooldowns.provider, provider));
+                const db = this.ensureDb();
+                await db
+                    .delete(this.schema.providerCooldowns)
+                    .where(eq(this.schema.providerCooldowns.provider, provider));
             } catch (e) {
                 logger.error(`Failed to delete cooldowns for ${provider}`, e);
             }
@@ -211,7 +224,8 @@ export class CooldownManager {
             this.cooldowns.clear();
             logger.info('Manually cleared all cooldowns');
             try {
-                await this.db.delete(schema.providerCooldowns);
+                const db = this.ensureDb();
+                await db.delete(this.schema.providerCooldowns);
             } catch (e) {
                 logger.error('Failed to delete all cooldowns', e);
             }
