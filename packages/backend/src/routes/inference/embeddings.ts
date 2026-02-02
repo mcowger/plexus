@@ -52,6 +52,7 @@ export async function registerEmbeddingsRoute(
       usageRecord.selectedModelName = unifiedResponse.plexus?.model;
       usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel;
       usageRecord.outgoingApiType = unifiedResponse.plexus?.apiType;
+      usageRecord.isPassthrough = true; // Embeddings are always pass-through (OpenAI format)
       usageRecord.tokensInput = unifiedResponse.usage.prompt_tokens;
       usageRecord.tokensOutput = 0; // Embeddings don't have output tokens
       usageRecord.durationMs = Date.now() - startTime;
