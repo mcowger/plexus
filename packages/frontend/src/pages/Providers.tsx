@@ -5,7 +5,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download, Info } from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
@@ -756,28 +756,28 @@ export const Providers = () => {
                                                   {mCfg.type === 'embeddings' && (
                                                       <div className="flex flex-col gap-1">
                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
-                                                              ℹ️ Embeddings models automatically use the 'embeddings' API only.
+                                                               <Info className="inline w-3 h-3 mb-0.5 mr-1" />Embeddings models automatically use the 'embeddings' API only.
                                                           </div>
                                                       </div>
                                                   )}
                                                   {mCfg.type === 'transcriptions' && (
                                                       <div className="flex flex-col gap-1">
                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
-                                                              ℹ️ Transcriptions models automatically use the 'transcriptions' API only.
+                                                               <Info className="inline w-3 h-3 mb-0.5 mr-1" />Transcriptions models automatically use the 'transcriptions' API only.
                                                           </div>
                                                       </div>
                                                   )}
                                                   {mCfg.type === 'speech' && (
                                                       <div className="flex flex-col gap-1">
                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
-                                                              ℹ️ Speech models automatically use the 'speech' API only.
+                                                               <Info className="inline w-3 h-3 mb-0.5 mr-1" />Speech models automatically use the 'speech' API only.
                                                           </div>
                                                       </div>
                                                   )}
                                                   {mCfg.type === 'image' && (
                                                       <div className="flex flex-col gap-1">
                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
-                                                              ℹ️ Image models automatically use the 'images' API only.
+                                                               <Info className="inline w-3 h-3 mb-0.5 mr-1" />Image models automatically use the 'images' API only.
                                                           </div>
                                                       </div>
                                                   )}
