@@ -1,0 +1,118 @@
+import React from 'react';
+import { clsx } from 'clsx';
+import { Cpu, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { QuotaProgressBar } from './QuotaProgressBar';
+import type { QuotaCheckResult } from '../../types/quota';
+import { formatDuration } from '../../lib/format';
+
+interface ClaudeCodeQuotaDisplayProps {
+  result: QuotaCheckResult;
+  isCollapsed: boolean;
+}
+
+export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
+  result,
+  isCollapsed,
+}) => {
+  if (!result.success) {
+    return (
+      <div className="px-2 py-2">
+        <div className={clsx(
+          "flex items-center gap-2 text-danger",
+          isCollapsed && "justify-center"
+        )}>
+          <AlertTriangle size={16} />
+          {!isCollapsed && <span className="text-xs">Error</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const windows = result.windows || [];
+  const fiveHourWindow = windows.find(w => w.windowType === 'five_hour');
+  const weeklyWindow = windows.find(w => w.windowType === 'weekly');
+
+  // Determine overall status
+  const overallStatus = fiveHourWindow?.status === 'exhausted' || fiveHourWindow?.status === 'critical' 
+    ? 'critical'
+    : weeklyWindow?.status === 'exhausted' || weeklyWindow?.status === 'critical'
+    ? 'critical'
+    : fiveHourWindow?.status === 'warning' || weeklyWindow?.status === 'warning'
+    ? 'warning'
+    : 'ok';
+
+  if (isCollapsed) {
+    return (
+      <div className="px-2 py-2 flex justify-center">
+        {overallStatus === 'ok' ? (
+          <CheckCircle2 size={18} className="text-success" />
+        ) : overallStatus === 'warning' ? (
+          <AlertTriangle size={18} className="text-warning" />
+        ) : (
+          <AlertTriangle size={18} className="text-danger" />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 py-2 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Cpu size={14} className="text-purple-400" />
+          <span className="text-xs font-semibold text-text">Claude Code</span>
+        </div>
+        <span className={clsx(
+          "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+          overallStatus === 'ok' ? 'bg-success/20 text-success' :
+          overallStatus === 'warning' ? 'bg-warning/20 text-warning' :
+          'bg-danger/20 text-danger'
+        )}>
+          {overallStatus === 'ok' ? 'Online' :
+           overallStatus === 'warning' ? 'Warning' : 'Critical'}
+        </span>
+      </div>
+
+      {/* 5-Hour Window */}
+      {fiveHourWindow && (
+        <QuotaProgressBar
+          label="5-Hour Window"
+          value={fiveHourWindow.utilizationPercent}
+          max={100}
+          displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
+          status={fiveHourWindow.status}
+          color="blue"
+          size="sm"
+        />
+      )}
+
+      {/* Weekly Window */}
+      {weeklyWindow && (
+        <QuotaProgressBar
+          label="Weekly Window"
+          value={weeklyWindow.utilizationPercent}
+          max={100}
+          displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}
+          status={weeklyWindow.status}
+          color="amber"
+          size="sm"
+        />
+      )}
+
+      {/* Reset info */}
+      {(fiveHourWindow?.resetInSeconds || weeklyWindow?.resetInSeconds) && (
+        <div className="flex items-center gap-1.5 text-text-muted text-[10px]">
+          <Clock size={10} />
+          <span>
+            Resets in {formatDuration(
+              (fiveHourWindow?.resetInSeconds && fiveHourWindow.resetInSeconds < (weeklyWindow?.resetInSeconds || Infinity))
+                ? fiveHourWindow.resetInSeconds
+                : (weeklyWindow?.resetInSeconds || 0)
+            )}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};

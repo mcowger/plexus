@@ -1,5 +1,6 @@
 import { parse, stringify } from 'yaml';
 import { formatNumber } from './format';
+import type { QuotaCheckerInfo, QuotaSnapshot, QuotaCheckResult } from '../types/quota';
 
 const API_BASE = ''; // Proxied via server.ts
 
@@ -1076,6 +1077,55 @@ export const api = {
       } catch (e) {
           console.error("API Error testModel", e);
           throw e;
+      }
+  },
+
+  getQuotas: async (): Promise<QuotaCheckerInfo[]> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas`);
+          if (!res.ok) throw new Error('Failed to fetch quotas');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getQuotas", e);
+          return [];
+      }
+  },
+
+  getQuota: async (checkerId: string): Promise<QuotaCheckerInfo | null> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/${checkerId}`);
+          if (!res.ok) throw new Error('Failed to fetch quota');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getQuota", e);
+          return null;
+      }
+  },
+
+  getQuotaHistory: async (checkerId: string, windowType?: string, since?: string): Promise<{ checkerId: string; windowType?: string; since?: string; history: QuotaSnapshot[] } | null> => {
+      try {
+          const params = new URLSearchParams();
+          if (windowType) params.set('windowType', windowType);
+          if (since) params.set('since', since);
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/${checkerId}/history?${params}`);
+          if (!res.ok) throw new Error('Failed to fetch quota history');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getQuotaHistory", e);
+          return null;
+      }
+  },
+
+  triggerQuotaCheck: async (checkerId: string): Promise<QuotaCheckResult | null> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/${checkerId}/check`, {
+              method: 'POST'
+          });
+          if (!res.ok) throw new Error('Failed to trigger quota check');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error triggerQuotaCheck", e);
+          return null;
       }
   }
 };
