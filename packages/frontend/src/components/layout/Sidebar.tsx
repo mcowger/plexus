@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Bug, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,7 +24,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, isCollapsed })
     <NavLink
       to={to}
       className={({ isActive }) => clsx(
-        'flex items-center gap-3 py-3 px-2 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text',
+        'flex items-center gap-3 py-1.5 px-2 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover hover:text-text',
         isCollapsed && 'justify-center',
         isActive && 'bg-bg-glass text-primary border-border-glass shadow-sm backdrop-blur-md shadow-[0_2px_8px_rgba(245,158,11,0.15)]'
       )}
@@ -50,6 +50,10 @@ export const Sidebar: React.FC = () => {
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [mainExpanded, setMainExpanded] = useState(true);
+  const [quotasExpanded, setQuotasExpanded] = useState(true);
+  const [configExpanded, setConfigExpanded] = useState(true);
+  const [devToolsExpanded, setDevToolsExpanded] = useState(false);
   const { logout } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
 
@@ -59,7 +63,9 @@ export const Sidebar: React.FC = () => {
 
   useEffect(() => {
     const fetchQuotas = async () => {
+      console.log('[Sidebar] Fetching quotas...');
       const data = await api.getQuotas();
+      console.log('[Sidebar] Quotas data:', data);
       setQuotas(data);
     };
     fetchQuotas();
@@ -73,22 +79,34 @@ export const Sidebar: React.FC = () => {
     const checker = quotas.find(q => q.checkerId === checkerId);
     if (!checker || !checker.latest || checker.latest.length === 0) return undefined;
     
-    const snapshot = checker.latest[0];
+    // Get unique window types (in case of duplicates, take the most recent)
+    const windowsByType = new Map<string, typeof checker.latest[0]>();
+    for (const snapshot of checker.latest) {
+      const existing = windowsByType.get(snapshot.windowType);
+      if (!existing || snapshot.checkedAt > existing.checkedAt) {
+        windowsByType.set(snapshot.windowType, snapshot);
+      }
+    }
+    
+    const windows = Array.from(windowsByType.values()).map(snapshot => ({
+      windowType: snapshot.windowType as any,
+      windowLabel: snapshot.description || snapshot.windowType,
+      limit: snapshot.limit || undefined,
+      used: snapshot.used || undefined,
+      remaining: snapshot.remaining || undefined,
+      utilizationPercent: snapshot.utilizationPercent || 0,
+      unit: (snapshot.unit as any) || 'percentage',
+      resetsAt: snapshot.resetsAt ? new Date(snapshot.resetsAt).toISOString() : undefined,
+      status: (snapshot.status as any) || 'ok',
+    }));
+    
+    const firstSnapshot = checker.latest[0];
     return {
-      provider: snapshot.provider,
-      checkerId: snapshot.checkerId,
-      checkedAt: new Date(snapshot.checkedAt).toISOString(),
-      success: snapshot.success === 1,
-      windows: [{
-        windowType: snapshot.windowType as any,
-        limit: snapshot.limit || undefined,
-        used: snapshot.used || undefined,
-        remaining: snapshot.remaining || undefined,
-        utilizationPercent: snapshot.utilizationPercent || 0,
-        unit: (snapshot.unit as any) || 'percentage',
-        resetsAt: snapshot.resetsAt ? new Date(snapshot.resetsAt).toISOString() : undefined,
-        status: (snapshot.status as any) || 'ok',
-      }],
+      provider: firstSnapshot.provider,
+      checkerId: firstSnapshot.checkerId,
+      checkedAt: new Date(firstSnapshot.checkedAt).toISOString(),
+      success: firstSnapshot.success === 1,
+      windows,
     };
   };
 
@@ -117,13 +135,13 @@ export const Sidebar: React.FC = () => {
       "h-screen fixed left-0 top-0 bg-bg-surface flex flex-col overflow-y-auto overflow-x-hidden z-50 transition-all duration-300 border-r border-border",
       isCollapsed ? "w-[64px]" : "w-[200px]"
     )}>
-      <div className="px-5 py-6 border-b border-border flex items-center justify-between">
+      <div className="px-5 py-3 border-b border-border flex items-center justify-between">
         <div className={clsx(
-          "flex items-center gap-3 mb-1 transition-opacity duration-200",
+          "flex items-center gap-2 transition-opacity duration-200",
           isCollapsed && "opacity-0 w-0 overflow-hidden"
         )}>
-          <img src={logo} alt="Plexus" className="w-8 h-8" />
-          <h1 className="font-heading text-xl font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">Plexus</h1>
+          <img src={logo} alt="Plexus" className="w-6 h-6" />
+          <h1 className="font-heading text-lg font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">Plexus</h1>
         </div>
 
         <button
@@ -135,111 +153,178 @@ export const Sidebar: React.FC = () => {
         </button>
       </div>
 
-      <p className={clsx(
-        "text-xs text-text-muted mt-1 px-5 transition-opacity duration-200",
-        isCollapsed && "opacity-0 h-0 overflow-hidden"
-      )}>
-        AI Infrastructure Management
-      </p>
-
-      <nav className="flex-1 py-4 px-2 flex flex-col gap-1">
+      <nav className="flex-1 py-2 px-2 flex flex-col gap-1">
         <div className="px-2">
-            <h3 className={clsx(
-              "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2 transition-opacity duration-200",
-              isCollapsed && "opacity-0 h-0 overflow-hidden"
-            )}>Main</h3>
-            <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
-            <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
-            <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
-        </div>
-
-        <div className="mt-6 px-2">
-            <h3 className={clsx(
-              "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2 transition-opacity duration-200",
-              isCollapsed && "opacity-0 h-0 overflow-hidden"
-            )}>Configuration</h3>
-            <NavItem to="/providers" icon={Server} label="Providers" isCollapsed={isCollapsed} />
-            <NavItem to="/models" icon={Box} label="Models" isCollapsed={isCollapsed} />
-            <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
-            <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
-            <NavItem to="/system-logs" icon={FileText} label="System Logs" isCollapsed={isCollapsed} />
+            <button
+              onClick={() => setMainExpanded(!mainExpanded)}
+              className="w-full flex items-center justify-between mb-1 group"
+            >
+              <h3 className={clsx(
+                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200",
+                isCollapsed && "opacity-0 h-0 overflow-hidden"
+              )}>Main</h3>
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
+                  className={clsx(
+                    "text-text-muted transition-transform duration-200 group-hover:text-text",
+                    mainExpanded && "rotate-90"
+                  )}
+                />
+              )}
+            </button>
+            {(mainExpanded || isCollapsed) && (
+              <>
+                <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
+                <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
+                <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
+              </>
+            )}
         </div>
 
         {/* Quotas Section */}
-        {quotas.length > 0 && (
-          <div className="mt-6 px-2">
+        <div className="mt-4 px-2">
+            <button
+              onClick={() => setQuotasExpanded(!quotasExpanded)}
+              className="w-full flex items-center justify-between mb-1 group"
+            >
               <h3 className={clsx(
-                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2 transition-opacity duration-200",
+                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200",
                 isCollapsed && "opacity-0 h-0 overflow-hidden"
               )}>Quotas</h3>
-              <div className="space-y-2">
-                {quotas.map((quota) => {
-                  const result = getQuotaResult(quota.checkerId);
-                  if (!result) return null;
-                  
-                  if (quota.checkerId.includes('synthetic')) {
-                    return (
-                      <SyntheticQuotaDisplay
-                        key={quota.checkerId}
-                        result={result}
-                        isCollapsed={isCollapsed}
-                      />
-                    );
-                  } else if (quota.checkerId.includes('claude')) {
-                    return (
-                      <ClaudeCodeQuotaDisplay
-                        key={quota.checkerId}
-                        result={result}
-                        isCollapsed={isCollapsed}
-                      />
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-          </div>
-        )}
-
-        <div className="mt-6 px-2 mt-auto">
-            <h3 className={clsx(
-              "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2 transition-opacity duration-200",
-              isCollapsed && "opacity-0 h-0 overflow-hidden"
-            )}>System</h3>
-            {(() => {
-              const debugButton = (
-                <button
-                  onClick={handleToggleClick}
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
                   className={clsx(
-                    "flex items-center gap-3 py-3 px-2 rounded-md font-body text-sm font-medium no-underline cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover w-full bg-transparent",
-                    isCollapsed && "justify-center",
-                    debugMode ? "text-danger border-danger/30 shadow-sm bg-[rgba(239,68,68,0.1)] shadow-[0_2px_8px_rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.15)]" : "text-text-secondary hover:text-text"
+                    "text-text-muted transition-transform duration-200 group-hover:text-text",
+                    quotasExpanded && "rotate-90"
                   )}
-                  style={{ marginBottom: '8px' }}
-                >
-                  <Bug size={20} />
-                  <span className={clsx(
-                    "transition-opacity duration-200",
-                    isCollapsed && "opacity-0 w-0 overflow-hidden"
-                  )}>
-                    {debugMode ? 'Debug Mode: On' : 'Debug Mode: Off'}
-                  </span>
-                </button>
-              );
+                />
+              )}
+            </button>
+            {(quotasExpanded || isCollapsed) && (
+              <>
+                {quotas.length === 0 ? (
+                  !isCollapsed && (
+                    <p className="text-xs text-text-muted px-2">No quota checkers configured</p>
+                  )
+                ) : (
+                  <div className="space-y-1">
+                    {quotas.map((quota) => {
+                      const result = getQuotaResult(quota.checkerId);
+                      if (!result) {
+                        console.warn(`No result for quota checker: ${quota.checkerId}`);
+                        return null;
+                      }
+                      
+                      // Use Synthetic display for synthetic checkers
+                      if (quota.checkerId.includes('synthetic')) {
+                        return (
+                          <SyntheticQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+                      
+                      // Use Claude Code display for claude checkers
+                      if (quota.checkerId.includes('claude')) {
+                        return (
+                          <ClaudeCodeQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+                      
+                      // Fallback: show checker ID for unknown types
+                      console.warn(`Unknown quota checker type: ${quota.checkerId}`);
+                      return null;
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+        </div>
 
-              return isCollapsed ? (
-                <Tooltip content={debugMode ? "Debug Mode: On" : "Debug Mode: Off"} position="right">
-                  {debugButton}
-                </Tooltip>
-              ) : debugButton;
-            })()}
-            <NavItem to="/debug" icon={Database} label="Debug Traces" isCollapsed={isCollapsed} />
-            <NavItem to="/errors" icon={AlertTriangle} label="Errors" isCollapsed={isCollapsed} />
+        <div className="mt-4 px-2">
+            <button
+              onClick={() => setConfigExpanded(!configExpanded)}
+              className="w-full flex items-center justify-between mb-1 group"
+            >
+              <h3 className={clsx(
+                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200",
+                isCollapsed && "opacity-0 h-0 overflow-hidden"
+              )}>Configuration</h3>
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
+                  className={clsx(
+                    "text-text-muted transition-transform duration-200 group-hover:text-text",
+                    configExpanded && "rotate-90"
+                  )}
+                />
+              )}
+            </button>
+            {(configExpanded || isCollapsed) && (
+              <>
+                <NavItem to="/providers" icon={Server} label="Providers" isCollapsed={isCollapsed} />
+                <NavItem to="/models" icon={Box} label="Models" isCollapsed={isCollapsed} />
+                <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
+                <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
+              </>
+            )}
+        </div>
+
+        <div className="mt-4 px-2 mt-auto">
+            <button
+              onClick={() => setDevToolsExpanded(!devToolsExpanded)}
+              className="w-full flex items-center justify-between mb-1 group"
+            >
+              <h3 className={clsx(
+                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200",
+                isCollapsed && "opacity-0 h-0 overflow-hidden"
+              )}>Dev Tools</h3>
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
+                  className={clsx(
+                    "text-text-muted transition-transform duration-200 group-hover:text-text",
+                    devToolsExpanded && "rotate-90"
+                  )}
+                />
+              )}
+            </button>
+            {(devToolsExpanded || isCollapsed) && (
+              <>
+                <div className="flex items-center justify-between">
+                  <NavItem to="/debug" icon={Database} label="Traces" isCollapsed={isCollapsed} />
+                  {!isCollapsed && (
+                    <button
+                      onClick={handleToggleClick}
+                      className={clsx(
+                        "ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all duration-200 flex-shrink-0",
+                        debugMode 
+                          ? "bg-danger text-white hover:bg-danger/80" 
+                          : "bg-text-muted/20 text-text-muted hover:bg-text-muted/30"
+                      )}
+                    >
+                      {debugMode ? 'ON' : 'OFF'}
+                    </button>
+                  )}
+                </div>
+                <NavItem to="/errors" icon={AlertTriangle} label="Errors" isCollapsed={isCollapsed} />
+                <NavItem to="/system-logs" icon={FileText} label="System Logs" isCollapsed={isCollapsed} />
+              </>
+            )}
             {(() => {
               const logoutButton = (
                 <button
                   onClick={handleLogout}
                   className={clsx(
-                    "flex items-center gap-3 py-3 px-2 rounded-md font-body text-sm font-medium text-danger no-underline cursor-pointer transition-all duration-200 border border-transparent w-full bg-transparent border-transparent hover:text-danger hover:border-danger/30 hover:bg-red-500/10 mt-4",
+                    "flex items-center gap-3 py-2 px-2 rounded-md font-body text-sm font-medium text-danger no-underline cursor-pointer transition-all duration-200 border border-transparent w-full bg-transparent border-transparent hover:text-danger hover:border-danger/30 hover:bg-red-500/10 mt-3",
                     isCollapsed && "justify-center"
                   )}
                 >

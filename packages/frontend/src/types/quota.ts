@@ -54,6 +54,7 @@ export interface QuotaSnapshot {
   checkerId: string;
   groupId: string | null;
   windowType: string;
+  description?: string;
   checkedAt: number;
   limit: number | null;
   used: number | null;
