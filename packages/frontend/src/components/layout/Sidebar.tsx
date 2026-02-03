@@ -8,6 +8,8 @@ import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
+import { SyntheticQuotaDisplay, ClaudeCodeQuotaDisplay } from '../quota';
+import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
 
 interface NavItemProps {
@@ -47,12 +49,48 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, isCollapsed })
 export const Sidebar: React.FC = () => {
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const { logout } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   useEffect(() => {
     api.getDebugMode().then(setDebugMode);
   }, []);
+
+  useEffect(() => {
+    const fetchQuotas = async () => {
+      const data = await api.getQuotas();
+      setQuotas(data);
+    };
+    fetchQuotas();
+    // Refresh quotas every 30 seconds
+    const interval = setInterval(fetchQuotas, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Convert QuotaSnapshot[] to QuotaCheckResult format for display
+  const getQuotaResult = (checkerId: string): QuotaCheckResult | undefined => {
+    const checker = quotas.find(q => q.checkerId === checkerId);
+    if (!checker || !checker.latest || checker.latest.length === 0) return undefined;
+    
+    const snapshot = checker.latest[0];
+    return {
+      provider: snapshot.provider,
+      checkerId: snapshot.checkerId,
+      checkedAt: new Date(snapshot.checkedAt).toISOString(),
+      success: snapshot.success === 1,
+      windows: [{
+        windowType: snapshot.windowType as any,
+        limit: snapshot.limit || undefined,
+        used: snapshot.used || undefined,
+        remaining: snapshot.remaining || undefined,
+        utilizationPercent: snapshot.utilizationPercent || 0,
+        unit: (snapshot.unit as any) || 'percentage',
+        resetsAt: snapshot.resetsAt ? new Date(snapshot.resetsAt).toISOString() : undefined,
+        status: (snapshot.status as any) || 'ok',
+      }],
+    };
+  };
 
   const handleToggleClick = () => {
       setShowConfirm(true);
@@ -126,6 +164,41 @@ export const Sidebar: React.FC = () => {
             <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
             <NavItem to="/system-logs" icon={FileText} label="System Logs" isCollapsed={isCollapsed} />
         </div>
+
+        {/* Quotas Section */}
+        {quotas.length > 0 && (
+          <div className="mt-6 px-2">
+              <h3 className={clsx(
+                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2 transition-opacity duration-200",
+                isCollapsed && "opacity-0 h-0 overflow-hidden"
+              )}>Quotas</h3>
+              <div className="space-y-2">
+                {quotas.map((quota) => {
+                  const result = getQuotaResult(quota.checkerId);
+                  if (!result) return null;
+                  
+                  if (quota.checkerId.includes('synthetic')) {
+                    return (
+                      <SyntheticQuotaDisplay
+                        key={quota.checkerId}
+                        result={result}
+                        isCollapsed={isCollapsed}
+                      />
+                    );
+                  } else if (quota.checkerId.includes('claude')) {
+                    return (
+                      <ClaudeCodeQuotaDisplay
+                        key={quota.checkerId}
+                        result={result}
+                        isCollapsed={isCollapsed}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+          </div>
+        )}
 
         <div className="mt-6 px-2 mt-auto">
             <h3 className={clsx(
