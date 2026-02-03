@@ -134,7 +134,7 @@ export class UsageInspector extends PassThrough {
                 return reconstructed.usage ? {
                     inputTokens: reconstructed.usage.prompt_tokens || 0,
                     outputTokens: reconstructed.usage.completion_tokens || 0,
-                    cachedTokens: reconstructed.usage.prompt_tokens_details?.cached_tokens || 0,
+                    cachedTokens: reconstructed.usage.prompt_tokens_details?.cached_tokens ?? reconstructed.usage.cached_tokens ?? 0,
                     reasoningTokens: reconstructed.usage.completion_tokens_details?.reasoning_tokens || 0
                 } : null;
             case "messages":
