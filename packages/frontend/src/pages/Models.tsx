@@ -303,29 +303,25 @@ export const Models = () => {
 
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
-      <div className="mb-8">
+      <div className="mb-6">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <div>
-                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Models</h1>
-                <p className="text-[15px] text-text-secondary m-0">Available AI models across providers.</p>
+            <h1 className="font-heading text-3xl font-bold text-text m-0">Models</h1>
+            <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                <div style={{position: 'relative', width: '280px'}}>
+                    <Search size={16} style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)'}} />
+                    <Input 
+                        placeholder="Search models..." 
+                        style={{paddingLeft: '36px'}}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+                <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Model</Button>
             </div>
-            <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Model</Button>
         </div>
       </div>
 
       <Card className="mb-6">
-           <div style={{position: 'relative'}}>
-              <Search size={16} style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)'}} />
-              <Input 
-                placeholder="Search models..." 
-                style={{paddingLeft: '36px'}}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-           </div>
-      </Card>
-
-      <Card title="Model Aliases" className="mb-6">
         <div className="overflow-x-auto -m-6">
             <table className="w-full border-collapse font-body text-[13px]">
                 <thead>
