@@ -1,13 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Globe, ChartCandlestick, CircleDollarSign, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, GitFork, CheckCircle2, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -263,31 +262,32 @@ export const Logs = () => {
                 <div className="overflow-x-auto -mx-3 px-3">
                     <table className="w-full border-collapse font-body text-[13px]">
                         <thead>
-                            <tr className="text-left border-b border-border">
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Date</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Key</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Source IP</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">API (In/Out)</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Model (In/Sel)</th>
+                            <tr className="text-center border-b border-border">
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Date</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Key</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">API</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Model</th>
                                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Tokens (I/O/R/C)</th>
-                                <th className="px-2 py-1.5 border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider text-right whitespace-nowrap" style={{ minWidth: '102px' }}>Cost</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Performance</th>
-                                <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Meta</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Mode</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ maxWidth: '60px' }}>Status</th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-10"></th>
-                                <th className="px-2 py-1.5 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap w-10"></th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Tokens</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '70px' }}>Cost</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Perf</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Meta</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Status</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                        <Trash2 size={12} />
+                                                    </div>
+                                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={14} className="p-5 text-center">Loading...</td>
+                                    <td colSpan={11} className="p-5 text-center">Loading...</td>
                                 </tr>
                             ) : logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={14} className="p-5 text-center">No logs found</td>
+                                    <td colSpan={11} className="p-5 text-center">No logs found</td>
                                 </tr>
                             ) : (
                                 logs.map((log) => (
@@ -299,7 +299,7 @@ export const Logs = () => {
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                 <span style={{ fontWeight: '500' }}>{new Date(log.date).toLocaleTimeString()}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                                                    {new Date(log.date).toISOString()}
+                                                    {new Date(log.date).toISOString().split('T')[0]}
                                                 </span>
                                             </div>
                                         </td>
@@ -313,45 +313,67 @@ export const Logs = () => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">{log.sourceIp || '-'}
-                                        </td>
                                         <td
                                             className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
-                                            title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'}`}
+                                            title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
                                             style={{ cursor: 'help' }}
                                         >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                {log.incomingApiType === 'embeddings' ? (
-                                                    <Variable size={16} className="text-green-500" />
-                                                ) : log.incomingApiType === 'transcriptions' ? (
-                                                    <AudioLines size={16} className="text-purple-500" />
-                                                ) : log.incomingApiType === 'speech' ? (
-                                                    <Volume2 size={16} className="text-orange-500" />
-                                                ) : log.incomingApiType === 'images' ? (
-                                                    <ImageIcon size={16} className="text-fuchsia-500" />
-                                                ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
-                                                    <img
-                                                        src={apiLogos[log.incomingApiType]}
-                                                        alt={log.incomingApiType}
-                                                        style={{ width: '16px', height: '16px' }}
-                                                    />
-                                                ) : '?'}
-                                                <span>→</span>
-                                                {log.outgoingApiType === 'embeddings' ? (
-                                                    <Variable size={16} className="text-green-500" />
-                                                ) : log.outgoingApiType === 'transcriptions' ? (
-                                                    <AudioLines size={16} className="text-purple-500" />
-                                                ) : log.outgoingApiType === 'speech' ? (
-                                                    <Volume2 size={16} className="text-orange-500" />
-                                                ) : log.outgoingApiType === 'images' ? (
-                                                    <ImageIcon size={16} className="text-fuchsia-500" />
-                                                ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
-                                                    <img
-                                                        src={apiLogos[log.outgoingApiType]}
-                                                        alt={log.outgoingApiType}
-                                                        style={{ width: '16px', height: '16px' }}
-                                                    />
-                                                ) : '?'}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                {/* API type icons */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                    <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                                                        {log.incomingApiType === 'embeddings' ? (
+                                                            <Variable size={16} className="text-green-500" />
+                                                        ) : log.incomingApiType === 'transcriptions' ? (
+                                                            <AudioLines size={16} className="text-purple-500" />
+                                                        ) : log.incomingApiType === 'speech' ? (
+                                                            <Volume2 size={16} className="text-orange-500" />
+                                                        ) : log.incomingApiType === 'images' ? (
+                                                            <ImageIcon size={16} className="text-fuchsia-500" />
+                                                        ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
+                                                            <img
+                                                                src={apiLogos[log.incomingApiType]}
+                                                                alt={log.incomingApiType}
+                                                                style={{ width: '16px', height: '16px' }}
+                                                            />
+                                                        ) : '?'}
+                                                    </div>
+                                                    <span style={{ width: '14px', textAlign: 'center' }}>→</span>
+                                                    <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                                                        {log.outgoingApiType === 'embeddings' ? (
+                                                            <Variable size={16} className="text-green-500" />
+                                                        ) : log.outgoingApiType === 'transcriptions' ? (
+                                                            <AudioLines size={16} className="text-purple-500" />
+                                                        ) : log.outgoingApiType === 'speech' ? (
+                                                            <Volume2 size={16} className="text-orange-500" />
+                                                        ) : log.outgoingApiType === 'images' ? (
+                                                            <ImageIcon size={16} className="text-fuchsia-500" />
+                                                        ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
+                                                            <img
+                                                                src={apiLogos[log.outgoingApiType]}
+                                                                alt={log.outgoingApiType}
+                                                                style={{ width: '16px', height: '16px' }}
+                                                            />
+                                                        ) : '?'}
+                                                    </div>
+                                                </div>
+                                                <div style={{ borderTop: '1px solid var(--color-border-glass)', margin: '1px 4px', width: '44px' }}></div>
+                                                {/* Streaming/Passthrough icons */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                    <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                                                        {log.isStreamed ?
+                                                            <Zap size={12} className="text-blue-400" /> :
+                                                            <ZapOff size={12} className="text-gray-400" />
+                                                        }
+                                                    </div>
+                                                    <span style={{ width: '14px' }}></span>
+                                                    <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                                                        {log.isPassthrough ?
+                                                            <MoveHorizontal size={12} className="text-yellow-500" /> :
+                                                            <Languages size={12} className="text-purple-400" />
+                                                        }
+                                                    </div>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
@@ -384,74 +406,84 @@ export const Logs = () => {
                                         </td>
                                         <td
                                             className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                                            title={`Input: ${formatLargeNumber(log.tokensInput || 0)} • Output: ${formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${formatLargeNumber(log.tokensCached || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
+                                            title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
                                             style={{ cursor: 'help' }}
                                         >
-                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                                {/* Left side: Input/Output */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                {/* Row 1: Input and Reasoning */}
+                                                <div style={{ display: 'flex', gap: '16px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <CloudUpload size={12} className="text-blue-400" />
-                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>
-                                                            {formatLargeNumber(log.tokensInput || 0)}
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}>
+                                                            {(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)}
                                                             {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
                                                         </span>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <CloudDownload size={12} className="text-green-400" />
-                                                        <span style={{ fontWeight: '500', fontSize: '0.9em' }}>
-                                                            {formatLargeNumber(log.tokensOutput || 0)}
+                                                        <BrainCog size={12} className="text-purple-400" />
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '30px' }}>
+                                                            {(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)}
                                                             {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                {/* Right side: Reasoning/Cache */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                {/* Row 2: Output and Cache */}
+                                                <div style={{ display: 'flex', gap: '16px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <BrainCog size={12} className="text-purple-400" />
-                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                            {formatLargeNumber(log.tokensReasoning || 0)}
+                                                        <CloudDownload size={12} className="text-green-400" />
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}>
+                                                            {(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)}
                                                             {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
                                                         </span>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <PackageOpen size={12} className="text-orange-400" />
-                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                                                            {formatLargeNumber(log.tokensCached || 0)}
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '30px' }}>
+                                                            {(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}
                                                             {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle text-right">
+                                        <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle">
                                             {log.costTotal !== undefined && log.costTotal !== null ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                    {/* Left side: Total cost */}
+                                                    <div style={{ minWidth: '50px' }}>
                                                         {log.costSource ? (
                                                             <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
-                                                                <span style={{ cursor: 'help', display: 'flex', alignItems: 'center' }}>
-                                                                    {log.costSource === 'simple' ? <CircleDollarSign size={14} className="text-green-400" /> :
-                                                                     log.costSource === 'defined' ? <ChartCandlestick size={14} className="text-blue-400" /> :
-                                                                     log.costSource === 'openrouter' ? <Globe size={14} className="text-purple-400" /> : '❔'}
+                                                                <span style={{ fontWeight: '500', cursor: 'help' }}>
+                                                                    {log.costTotal === 0 ? '$ -' : formatCost(log.costTotal)}
                                                                 </span>
                                                             </CostToolTip>
-                                                        ) : <span />}
-                                                        <span style={{ fontWeight: '500' }}>
-                                                            {formatCost(log.costTotal)}
-                                                        </span>
-                                                    </div>
-                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <CloudUpload size={10} className="text-blue-400" /> {formatCost(log.costInput || 0)}
-                                                    </span>
-                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <CloudDownload size={10} className="text-green-400" /> {formatCost(log.costOutput || 0)}
-                                                    </span>
-                                                    <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        {(log.costCached || 0) > 0 && (
-                                                            <><PackageOpen size={10} className="text-orange-400" /> {formatCost(log.costCached || 0)}</>
+                                                        ) : (
+                                                            <span style={{ fontWeight: '500' }}>
+                                                                {log.costTotal === 0 ? '$ -' : formatCost(log.costTotal)}
+                                                            </span>
                                                         )}
-                                                    </span>
+                                                    </div>
+                                                    {/* Right side: Breakdown */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <CloudUpload size={10} className="text-blue-400" />
+                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
+                                                                {log.costInput === 0 ? '$ -' : formatCost(log.costInput || 0)}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <CloudDownload size={10} className="text-green-400" />
+                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
+                                                                {log.costOutput === 0 ? '$ -' : formatCost(log.costOutput || 0)}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <PackageOpen size={10} className="text-orange-400" />
+                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
+                                                                {log.costCached === 0 ? '$ -' : formatCost(log.costCached || 0)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '1.2em' }}>∅</span>
@@ -459,7 +491,7 @@ export const Logs = () => {
                                         </td>
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: '500' }}>Duration: {formatMs(log.durationMs)}</span>
+                                                <span>Duration: {formatMs(log.durationMs)}</span>
                                                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', whiteSpace: 'nowrap' }}>
                                                     {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : ''}
                                                 </span>
@@ -469,93 +501,77 @@ export const Logs = () => {
                                             </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle">
-                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center' }}>
-                                                {/* Left column: Tools and Messages */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                    {/* Tools defined in request */}
-                                                    {log.toolsDefined !== undefined && log.toolsDefined > 0 && (
-                                                        <div title={`${log.toolsDefined} tool${log.toolsDefined > 1 ? 's' : ''} defined`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-orange-400">
-                                                            <Wrench size={12} />
-                                                            <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{log.toolsDefined}</span>
-                                                        </div>
-                                                    )}
-                                                    {/* Message count */}
-                                                    {log.messageCount !== undefined && log.messageCount > 0 && (
-                                                        <div title={`${log.messageCount} message${log.messageCount > 1 ? 's' : ''} in context`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-blue-400">
-                                                            <MessagesSquare size={12} />
-                                                            <span style={{ fontWeight: '500', fontSize: '0.9em' }}>{log.messageCount}</span>
-                                                        </div>
-                                                    )}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                {/* Row 1: Messages and Tool calls */}
+                                                <div style={{ display: 'flex', gap: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-blue-400">
+                                                        <MessagesSquare size={12} />
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
+                                                            {log.messageCount || 0}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-green-400">
+                                                        <PlugZap size={12} />
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '20px' }}>
+                                                            {log.toolCallsCount || 0}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                {/* Right column: Tool calls and Finish reason */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                    {/* Tool calls in response */}
-                                                    {log.toolCallsCount !== undefined && log.toolCallsCount > 0 && (
-                                                        <div title={`${log.toolCallsCount} tool call${log.toolCallsCount > 1 ? 's' : ''} in response`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-green-400">
-                                                            <CheckCircle2 size={12} />
-                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{log.toolCallsCount}</span>
-                                                        </div>
-                                                    )}
-                                                    {/* Finish reason - treat 'end_turn' same as 'stop' */}
-                                                    {log.finishReason && (
-                                                        <div title={`Finish reason: ${log.finishReason}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-yellow-400">
-                                                            {log.finishReason === 'stop' || log.finishReason === 'end_turn' ? <CheckCircle2 size={12} /> :
-                                                             log.finishReason === 'tool_calls' ? <Wrench size={12} /> :
-                                                             log.finishReason === 'length' || log.finishReason === 'max_tokens' ? <AlertTriangle size={12} /> :
-                                                             <ChevronDown size={12} />}
-                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>{log.finishReason}</span>
-                                                        </div>
-                                                    )}
+                                                {/* Row 2: Tools defined and Finish reason */}
+                                                <div style={{ display: 'flex', gap: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-orange-400">
+                                                        <Wrench size={12} />
+                                                        <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
+                                                            {log.toolsDefined || 0}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        {log.finishReason === 'end_turn' ? <CirclePause size={12} className="text-yellow-500" /> :
+                                                         log.finishReason === 'stop' ? <Octagon size={12} className="text-red-500" /> :
+                                                         log.finishReason === 'tool_calls' ? <Hammer size={12} className="text-purple-500" /> :
+                                                         log.finishReason === 'length' || log.finishReason === 'max_tokens' ? <RulerDimensionLine size={12} className="text-pink-400" /> :
+                                                         <ChevronDown size={12} className="text-gray-400" />}
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '20px' }}>
+                                                            {log.finishReason || '-'}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            {/* Parallel tool calls enabled - shown below if active */}
-                                            {log.parallelToolCallsEnabled === true && (
-                                                <div title="Parallel tool calling enabled" style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center', marginTop: '2px' }} className="text-purple-400">
-                                                    <GitFork size={10} />
-                                                    <span style={{ fontSize: '0.75em' }}>parallel</span>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td
-                                            className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                                            title={`${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
-                                            style={{ cursor: 'help' }}
-                                        >
-                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                                {log.isStreamed ?
-                                                    <Zap size={14} className="text-blue-400" /> :
-                                                    <ZapOff size={14} className="text-gray-400" />
-                                                }
-                                                {log.isPassthrough ?
-                                                    <MoveHorizontal size={14} className="text-yellow-500" /> :
-                                                    <Languages size={14} className="text-purple-400" />
-                                                }
                                             </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                                            <Badge status={log.responseStatus === 'success' ? 'connected' : 'error'}>
-                                                {log.responseStatus === 'success' ? '✓' : '✗'}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                                            <div className="flex gap-2">
-                                                {log.hasDebug && (
-                                                    <button
-                                                        onClick={() => navigate('/debug', { state: { requestId: log.requestId } })}
-                                                        className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger"
-                                                        title="View Debug Trace"
-                                                    >
-                                                        <Bug size={14} className="text-blue-400" />
-                                                    </button>
-                                                )}
+                                            <div className="flex gap-2 items-center">
                                                 {log.hasError && (
                                                     <button
                                                         onClick={() => navigate('/errors', { state: { requestId: log.requestId } })}
-                                                        className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger"
+                                                        className={clsx('inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border', 
+                                                            'text-danger border-danger/30 bg-red-500/15 hover:bg-red-500/25')}
+                                                        style={{ width: '52px' }}
                                                         title="View Error Details"
                                                     >
-                                                        <AlertTriangle size={14} className="text-red-500" />
+                                                        <AlertTriangle size={12} />
+                                                        <span style={{ fontWeight: 600 }}>✗</span>
                                                     </button>
+                                                )}
+                                                {log.hasDebug && (
+                                                    <button
+                                                        onClick={() => navigate('/debug', { state: { requestId: log.requestId } })}
+                                                        className={clsx('inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border', 
+                                                            'text-blue-400 border-blue-400/30 bg-blue-500/15 hover:bg-blue-500/25')}
+                                                        style={{ width: '52px' }}
+                                                        title="View Debug Trace"
+                                                    >
+                                                        <Bug size={12} />
+                                                        <span style={{ fontWeight: 600 }}>✓</span>
+                                                    </button>
+                                                )}
+                                                {!log.hasError && !log.hasDebug && (
+                                                    <div className={clsx('inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border', 
+                                                        log.responseStatus === 'success' 
+                                                            ? 'text-success border-success/30 bg-emerald-500/15' 
+                                                            : 'text-danger border-danger/30 bg-red-500/15')}
+                                                        style={{ width: '52px' }}>
+                                                        <span style={{ fontWeight: 600 }}>{log.responseStatus === 'success' ? '✓' : '✗'}</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         </td>
