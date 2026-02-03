@@ -3,7 +3,7 @@ import { UsageRecord } from '../types/usage';
 import { getDatabase, getSchema } from '../db/client';
 import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
-import { eq, and, gte, lte, like, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, like, desc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 
 
@@ -285,8 +285,8 @@ export class UsageStorageService extends EventEmitter {
                     parallelToolCallsEnabled: this.schema.requestUsage.parallelToolCallsEnabled,
                     toolCallsCount: this.schema.requestUsage.toolCallsCount,
                     finishReason: this.schema.requestUsage.finishReason,
-                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.debugLogs} WHERE ${this.schema.debugLogs.requestId} = ${this.schema.requestUsage.requestId})`,
-                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.inferenceErrors} WHERE ${this.schema.inferenceErrors.requestId} = ${this.schema.requestUsage.requestId})`,
+                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.debugLogs} dl WHERE dl.request_id = request_usage.request_id)`,
+                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.inferenceErrors} ie WHERE ie.request_id = request_usage.request_id)`,
                 })
                 .from(this.schema.requestUsage)
                 .where(whereClause)
