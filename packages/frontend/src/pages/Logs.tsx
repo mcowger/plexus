@@ -66,7 +66,7 @@ export const Logs = () => {
 
             const res = await api.getLogs(limit, offset, cleanFilters);
             setLogs(res.data);
-            setTotal(res.total);
+            setTotal(Number(res.total) || 0);
         } catch (e) {
             console.error(e);
         } finally {
@@ -191,7 +191,7 @@ export const Logs = () => {
                                         if (updated.length > limit) return updated.slice(0, limit);
                                         return updated;
                                     });
-                                    setTotal(prev => prev + 1);
+                                    setTotal(prev => Number(prev) + 1);
                                     setNewestLogId(newLog.requestId);
                                 }
                             } catch (e) {
