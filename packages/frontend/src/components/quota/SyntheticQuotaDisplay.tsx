@@ -1,9 +1,8 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { CircleDollarSign, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { DollarSign, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import type { QuotaCheckResult } from '../../types/quota';
-import { formatCost } from '../../lib/format';
 
 interface SyntheticQuotaDisplayProps {
   result: QuotaCheckResult;
@@ -29,10 +28,16 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
+  
+  // Find windows by type
   const subscriptionWindow = windows.find(w => w.windowType === 'subscription');
+  const dailyWindow = windows.find(w => w.windowType === 'daily');
+  const hourlyWindow = windows.find(w => w.windowType === 'hourly');
+
+  // Get overall status
+  const overallStatus = subscriptionWindow?.status || 'ok';
 
   if (isCollapsed) {
-    const overallStatus = subscriptionWindow?.status || 'ok';
     return (
       <div className="px-2 py-2 flex justify-center">
         {overallStatus === 'ok' ? (
@@ -47,56 +52,51 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
   }
 
   return (
-    <div className="px-2 py-2 space-y-3">
+    <div className="px-2 py-1 space-y-1">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CircleDollarSign size={14} className="text-info" />
-          <span className="text-xs font-semibold text-text">Synthetic</span>
-        </div>
-        {subscriptionWindow && (
-          <span className={clsx(
-            "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-            subscriptionWindow.status === 'ok' ? 'bg-success/20 text-success' :
-            subscriptionWindow.status === 'warning' ? 'bg-warning/20 text-warning' :
-            'bg-danger/20 text-danger'
-          )}>
-            {subscriptionWindow.status === 'ok' ? 'Healthy' :
-             subscriptionWindow.status === 'warning' ? 'Warning' :
-             subscriptionWindow.status === 'critical' ? 'Critical' : 'Exhausted'}
-          </span>
-        )}
+      <div className="flex items-center gap-2">
+        <DollarSign size={14} className="text-info" />
+        <span className="text-xs font-semibold text-text">Synthetic</span>
       </div>
 
-      {/* Subscription Budget */}
+      {/* Subscription - Requests per 5-hour window */}
       {subscriptionWindow && subscriptionWindow.limit && (
         <QuotaProgressBar
-          label="Monthly Budget"
+          label="5-Hour"
           value={subscriptionWindow.used || 0}
           max={subscriptionWindow.limit}
-          displayValue={`${formatCost(subscriptionWindow.used || 0)} / ${formatCost(subscriptionWindow.limit)}`}
+          displayValue={`${Math.round(subscriptionWindow.utilizationPercent)}%`}
           status={subscriptionWindow.status}
           color="green"
           size="sm"
         />
       )}
 
-      {/* Additional windows */}
-      {windows.filter(w => w.windowType !== 'subscription').map((window, idx) => (
+      {/* Daily Tool Calls */}
+      {dailyWindow && dailyWindow.limit && (
         <QuotaProgressBar
-          key={window.windowType}
-          label={window.windowLabel || window.windowType}
-          value={window.used || 0}
-          max={window.limit || 100}
-          displayValue={window.unit === 'dollars' 
-            ? `${formatCost(window.used || 0)} / ${formatCost(window.limit || 0)}`
-            : `${Math.round(window.utilizationPercent)}%`
-          }
-          status={window.status}
-          color={idx % 2 === 0 ? 'blue' : 'amber'}
+          label="Daily Tools"
+          value={dailyWindow.used || 0}
+          max={dailyWindow.limit}
+          displayValue={`${Math.round(dailyWindow.utilizationPercent)}%`}
+          status={dailyWindow.status}
+          color="amber"
           size="sm"
         />
-      ))}
+      )}
+
+      {/* Hourly Search */}
+      {hourlyWindow && hourlyWindow.limit && (
+        <QuotaProgressBar
+          label="Hourly Search"
+          value={hourlyWindow.used || 0}
+          max={hourlyWindow.limit}
+          displayValue={`${Math.round(hourlyWindow.utilizationPercent)}%`}
+          status={hourlyWindow.status}
+          color="blue"
+          size="sm"
+        />
+      )}
     </div>
   );
 };

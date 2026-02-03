@@ -56,28 +56,17 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
   }
 
   return (
-    <div className="px-2 py-2 space-y-3">
+    <div className="px-2 py-1 space-y-1">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Cpu size={14} className="text-purple-400" />
-          <span className="text-xs font-semibold text-text">Claude Code</span>
-        </div>
-        <span className={clsx(
-          "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-          overallStatus === 'ok' ? 'bg-success/20 text-success' :
-          overallStatus === 'warning' ? 'bg-warning/20 text-warning' :
-          'bg-danger/20 text-danger'
-        )}>
-          {overallStatus === 'ok' ? 'Online' :
-           overallStatus === 'warning' ? 'Warning' : 'Critical'}
-        </span>
+      <div className="flex items-center gap-2">
+        <Cpu size={14} className="text-purple-400" />
+        <span className="text-xs font-semibold text-text">Claude Code</span>
       </div>
 
       {/* 5-Hour Window */}
       {fiveHourWindow && (
         <QuotaProgressBar
-          label="5-Hour Window"
+          label="5-Hour"
           value={fiveHourWindow.utilizationPercent}
           max={100}
           displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
@@ -90,7 +79,7 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
       {/* Weekly Window */}
       {weeklyWindow && (
         <QuotaProgressBar
-          label="Weekly Window"
+          label="Weekly"
           value={weeklyWindow.utilizationPercent}
           max={100}
           displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}

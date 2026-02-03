@@ -3,7 +3,7 @@ import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 
 export async function registerQuotaRoutes(fastify: FastifyInstance, quotaScheduler: QuotaScheduler) {
-  fastify.get('/quotas', async (request, reply) => {
+  fastify.get('/v0/management/quotas', async (request, reply) => {
     const checkerIds = quotaScheduler.getCheckerIds();
     const results = [];
 
@@ -15,13 +15,13 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
     return results;
   });
 
-  fastify.get('/quotas/:checkerId', async (request, reply) => {
+  fastify.get('/v0/management/quotas/:checkerId', async (request, reply) => {
     const { checkerId } = request.params as { checkerId: string };
     const latest = await quotaScheduler.getLatestQuota(checkerId);
     return { checkerId, latest };
   });
 
-  fastify.get('/quotas/:checkerId/history', async (request, reply) => {
+  fastify.get('/v0/management/quotas/:checkerId/history', async (request, reply) => {
     const { checkerId } = request.params as { checkerId: string };
     const querystring = request.query as { windowType?: string; since?: string };
     let since: number | undefined;
@@ -39,7 +39,7 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
     return { checkerId, windowType: querystring.windowType, since: since ? new Date(since).toISOString() : undefined, history };
   });
 
-  fastify.post('/quotas/:checkerId/check', async (request, reply) => {
+  fastify.post('/v0/management/quotas/:checkerId/check', async (request, reply) => {
     const { checkerId } = request.params as { checkerId: string };
     const result = await quotaScheduler.runCheckNow(checkerId);
     if (!result) {
