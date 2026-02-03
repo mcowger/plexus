@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.10.2 - 2026-02-03
+
+### v0.10.2: Implementation of Quota Tracking System and Sidebar UI Redesign
+
+## v0.10.2 Release Notes
+
+### Main Features
+
+- **Backend Quota Tracking**: Introduced a robust quota tracking system featuring periodic backend checking to monitor resource usage automatically ([9ea0638](https://github.com/mcowger/plexus/commit/9ea0638)).
+- **Naga.ac Support**: Added specialized quota tracking and frontend display components specifically for Naga.ac integration ([385bff3](https://github.com/mcowger/plexus/commit/385bff3)).
+- **UI Redesign**: Implemented a new compact sidebar with collapsible sections, optimizing workspace layout while integrating real-time quota displays ([a90da6e](https://github.com/mcowger/plexus/commit/a90da6e), [23afa69](https://github.com/mcowger/plexus/commit/23afa69)).
+
+### Other Changes
+
+- **Models Page Layout**: Consolidated the header layout on the Models page for better visual consistency ([ba55504](https://github.com/mcowger/plexus/commit/ba55504)).
+- **Logs Table Optimization**: Enhanced the styling and layout of the Logs table to improve readability and data density ([be7c2b4](https://github.com/mcowger/plexus/commit/be7c2b4)).
+- **Backend Maintenance**: Removed legacy and unused quota checker logic to streamline the codebase ([32c0913](https://github.com/mcowger/plexus/commit/32c0913)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.10.1 - 2026-02-03
 
 ### v0.10.1: OpenAI-Compatible Image APIs, Usage-Based Load Balancing, and Enhanced Metadata Logging
