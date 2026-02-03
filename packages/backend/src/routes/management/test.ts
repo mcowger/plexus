@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../../services/dispatcher';
-import { OpenAITransformer, AnthropicTransformer, GeminiTransformer, ResponsesTransformer } from '../../transformers';
+import { OpenAITransformer, AnthropicTransformer, GeminiTransformer, ResponsesTransformer, EmbeddingsTransformer, ImageTransformer } from '../../transformers';
 
 /**
  * Test request templates for each API type
@@ -56,6 +56,18 @@ const TEST_TEMPLATES = {
         model: modelPath,
         input: 'Just respond with the word acknowledged',
         instructions: 'You are a helpful assistant.'
+    }),
+
+    embeddings: (modelPath: string) => ({
+        model: modelPath,
+        input: ['Hello world']
+    }),
+
+    images: (modelPath: string) => ({
+        model: modelPath,
+        prompt: 'A tiny 256x256 red square',
+        n: 1,
+        size: '256x256'
     })
 };
 
@@ -86,10 +98,10 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             logger.info(`Testing model: ${body.provider}/${body.model} via ${apiType} API`);
 
             // Validate API type
-            if (!['chat', 'messages', 'gemini', 'responses'].includes(apiType)) {
+            if (!['chat', 'messages', 'gemini', 'responses', 'embeddings', 'images'].includes(apiType)) {
                 return reply.code(400).send({
                     success: false,
-                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses`
+                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses, embeddings, images`
                 });
             }
 
@@ -101,43 +113,99 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             const testRequest = TEST_TEMPLATES[apiType as keyof typeof TEST_TEMPLATES](directModelPath);
 
             logger.info('Creating transformer...');
-            let transformer;
+            let dispatchMethod: 'dispatch' | 'dispatchEmbeddings' | 'dispatchImageGenerations' = 'dispatch';
+            let imageRequestData: { model: string; prompt: string; n?: number; size?: string; response_format?: 'url' | 'b64_json'; quality?: string; style?: string; user?: string } | null = null;
             switch (apiType) {
                 case 'chat':
-                    transformer = new OpenAITransformer();
-                    break;
                 case 'messages':
-                    transformer = new AnthropicTransformer();
-                    break;
                 case 'gemini':
-                    transformer = new GeminiTransformer();
-                    break;
                 case 'responses':
-                    transformer = new ResponsesTransformer();
+                    // These use the standard dispatch path
+                    break;
+                case 'embeddings':
+                    dispatchMethod = 'dispatchEmbeddings';
+                    break;
+                case 'images':
+                    dispatchMethod = 'dispatchImageGenerations';
+                    const imgReq = testRequest as { model: string; prompt: string; n?: number; size?: string; quality?: string; style?: string; user?: string };
+                    imageRequestData = {
+                        model: imgReq.model,
+                        prompt: imgReq.prompt,
+                        n: imgReq.n,
+                        size: imgReq.size,
+                        response_format: 'url' as const,
+                        quality: imgReq.quality,
+                        style: imgReq.style,
+                        user: imgReq.user
+                    };
                     break;
                 default:
-                    transformer = new OpenAITransformer();
+                    break;
             }
 
-            logger.info('Parsing request...');
-            const unifiedRequest = await transformer.parseRequest(testRequest);
-            unifiedRequest.incomingApiType = apiType;
-            unifiedRequest.originalBody = testRequest;
-            unifiedRequest.requestId = requestId;
-
             logger.info('Dispatching request...');
-            const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+            let response;
+
+            if (dispatchMethod === 'dispatchEmbeddings') {
+                response = await dispatcher.dispatchEmbeddings({
+                    originalBody: testRequest,
+                    requestId,
+                    incomingApiType: 'embeddings'
+                });
+            } else if (dispatchMethod === 'dispatchImageGenerations' && imageRequestData) {
+                response = await dispatcher.dispatchImageGenerations({
+                    ...imageRequestData,
+                    originalBody: testRequest,
+                    requestId,
+                    incomingApiType: 'images'
+                });
+            } else {
+                // chat, messages, gemini, responses all use transformers with parseRequest
+                let transformer;
+                switch (apiType) {
+                    case 'chat':
+                        transformer = new OpenAITransformer();
+                        break;
+                    case 'messages':
+                        transformer = new AnthropicTransformer();
+                        break;
+                    case 'gemini':
+                        transformer = new GeminiTransformer();
+                        break;
+                    case 'responses':
+                        transformer = new ResponsesTransformer();
+                        break;
+                    default:
+                        transformer = new OpenAITransformer();
+                }
+                const unifiedRequest = await transformer.parseRequest(testRequest);
+                unifiedRequest.incomingApiType = apiType;
+                unifiedRequest.originalBody = testRequest;
+                unifiedRequest.requestId = requestId;
+                response = await dispatcher.dispatch(unifiedRequest);
+            }
 
             const durationMs = Date.now() - startTime;
 
             logger.info(`Test completed in ${durationMs}ms`);
 
-            // Extract response text
-            const responseText = unifiedResponse.content
-                ? (typeof unifiedResponse.content === 'string'
-                    ? unifiedResponse.content.substring(0, 100)
-                    : 'Success')
-                : 'Success';
+            // Extract response text based on API type
+            let responseText: string;
+            if (apiType === 'images') {
+                responseText = response.data && Array.isArray(response.data)
+                    ? `Success (${response.data.length} image${response.data.length > 1 ? 's' : ''} created)`
+                    : 'Success';
+            } else if (apiType === 'embeddings') {
+                responseText = response.data && Array.isArray(response.data)
+                    ? `Success (${response.data.length} embedding${response.data.length > 1 ? 's' : ''})`
+                    : 'Success';
+            } else {
+                responseText = response.content
+                    ? (typeof response.content === 'string'
+                        ? response.content.substring(0, 100)
+                        : 'Success')
+                    : 'Success';
+            }
 
             return reply.code(200).send({
                 success: true,
