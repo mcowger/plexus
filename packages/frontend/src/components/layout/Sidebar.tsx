@@ -8,7 +8,7 @@ import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
-import { SyntheticQuotaDisplay, ClaudeCodeQuotaDisplay } from '../quota';
+import { SyntheticQuotaDisplay, ClaudeCodeQuotaDisplay, NagaQuotaDisplay } from '../quota';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
 
@@ -238,7 +238,18 @@ export const Sidebar: React.FC = () => {
                           />
                         );
                       }
-                      
+
+                      // Use Naga display for naga checkers
+                      if (quota.checkerId.includes('naga')) {
+                        return (
+                          <NagaQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+
                       // Fallback: show checker ID for unknown types
                       console.warn(`Unknown quota checker type: ${quota.checkerId}`);
                       return null;

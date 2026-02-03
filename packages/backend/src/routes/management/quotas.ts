@@ -1,10 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
+import { logger } from '../../utils/logger';
 
 export async function registerQuotaRoutes(fastify: FastifyInstance, quotaScheduler: QuotaScheduler) {
   fastify.get('/v0/management/quotas', async (request, reply) => {
     const checkerIds = quotaScheduler.getCheckerIds();
+    logger.debug(`[Quotas API] getCheckerIds returned: ${JSON.stringify(checkerIds)}`);
     const results = [];
 
     for (const checkerId of checkerIds) {
