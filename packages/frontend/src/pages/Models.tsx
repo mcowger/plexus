@@ -392,8 +392,8 @@ export const Models = () => {
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                 <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border border-border-glass" style={{
                                     fontSize: '10px',
-                                    backgroundColor: alias.type === 'embeddings' ? '#10b981' : alias.type === 'transcriptions' ? '#a855f7' : alias.type === 'speech' ? '#f97316' : alias.type === 'image' ? '#d946ef' : '#ebebeb',
-                                    color: alias.type === 'embeddings' || alias.type === 'transcriptions' || alias.type === 'speech' || alias.type === 'image' ? 'white' : '#333',
+                                    backgroundColor: alias.type === 'embeddings' ? '#10b981' : alias.type === 'transcriptions' ? '#a855f7' : alias.type === 'speech' ? '#f97316' : alias.type === 'image' ? '#d946ef' : alias.type === 'responses' ? '#06b6d4' : '#ebebeb',
+                                    color: alias.type === 'embeddings' || alias.type === 'transcriptions' || alias.type === 'speech' || alias.type === 'image' || alias.type === 'responses' ? 'white' : '#333',
                                     border: 'none'
                                 }}>
                                     {alias.type || 'chat'}
@@ -564,13 +564,14 @@ export const Models = () => {
                       <select
                         className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                         value={editingAlias.type || 'chat'}
-                        onChange={(e) => setEditingAlias({...editingAlias, type: e.target.value as 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image'})}
+                        onChange={(e) => setEditingAlias({...editingAlias, type: e.target.value as 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses'})}
                       >
                           <option value="chat">Chat</option>
                           <option value="embeddings">Embeddings</option>
                           <option value="transcriptions">Transcriptions</option>
                           <option value="speech">Speech</option>
                           <option value="image">Image</option>
+                          <option value="responses">Responses</option>
                       </select>
                   </div>
 

@@ -10,7 +10,7 @@ import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download, Info } fro
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 
-const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images'];
+const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
     switch (apiType.toLowerCase()) {
@@ -28,6 +28,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
             return { backgroundColor: '#f97316', color: 'white', border: 'none' };
         case 'images':
             return { backgroundColor: '#d946ef', color: 'white', border: 'none' };
+        case 'responses':
+            return { backgroundColor: '#06b6d4', color: 'white', border: 'none' };
         default:
             return {};
     }
@@ -652,7 +654,7 @@ export const Providers = () => {
                                                         className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                                                         value={mCfg.type || 'chat'}
                                                           onChange={(e) => {
-                                                          const newType = e.target.value as 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image';
+                                                          const newType = e.target.value as 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
                                                           // If switching to embeddings, clear non-embeddings APIs from access_via
                                                           if (newType === 'embeddings') {
                                                             const filteredAccessVia = (mCfg.access_via || []).filter((api: string) => api === 'embeddings');
@@ -666,6 +668,9 @@ export const Providers = () => {
                                                           } else if (newType === 'image') {
                                                             const filteredAccessVia = (mCfg.access_via || []).filter((api: string) => api === 'images');
                                                             updateModelConfig(mId, { type: newType, access_via: filteredAccessVia.length > 0 ? filteredAccessVia : ['images'] });
+                                                          } else if (newType === 'responses') {
+                                                            const filteredAccessVia = (mCfg.access_via || []).filter((api: string) => api === 'responses');
+                                                            updateModelConfig(mId, { type: newType, access_via: filteredAccessVia.length > 0 ? filteredAccessVia : ['responses'] });
                                                           } else {
                                                             updateModelConfig(mId, { type: newType });
                                                           }
@@ -676,6 +681,7 @@ export const Providers = () => {
                                                           <option value="transcriptions">Transcriptions</option>
                                                           <option value="speech">Speech</option>
                                                           <option value="image">Image</option>
+                                                          <option value="responses">Responses</option>
                                                       </select>
                                                   </div>
                                                   <div className="flex flex-col gap-1">
@@ -716,16 +722,17 @@ export const Providers = () => {
                                                           <option value="defined">Ranges (Complex)</option>
                                                       </select>
                                                   </div>
-                                                   {mCfg.type !== 'embeddings' && mCfg.type !== 'transcriptions' && mCfg.type !== 'speech' && mCfg.type !== 'image' && (
-                                                      <div className="flex flex-col gap-1">
-                                                          <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
-                                                          <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
-                                                              {KNOWN_APIS.map(apiType => {
-                                                                    const isEmbeddingsModel = mCfg.type === 'embeddings';
-                                                                    const isTranscriptionsModel = mCfg.type === 'transcriptions';
-                                                                    const isSpeechModel = mCfg.type === 'speech';
-                                                                    const isImageModel = mCfg.type === 'image';
-                                                                    const isDisabled = (isEmbeddingsModel && apiType !== 'embeddings') || (isTranscriptionsModel && apiType !== 'transcriptions') || (isSpeechModel && apiType !== 'speech') || (isImageModel && apiType !== 'images');
+                                                   {mCfg.type !== 'embeddings' && mCfg.type !== 'transcriptions' && mCfg.type !== 'speech' && mCfg.type !== 'image' && mCfg.type !== 'responses' && (
+                                                       <div className="flex flex-col gap-1">
+                                                           <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
+                                                           <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
+                                                               {KNOWN_APIS.map(apiType => {
+                                                                     const isEmbeddingsModel = mCfg.type === 'embeddings';
+                                                                     const isTranscriptionsModel = mCfg.type === 'transcriptions';
+                                                                     const isSpeechModel = mCfg.type === 'speech';
+                                                                     const isImageModel = mCfg.type === 'image';
+                                                                     const isResponsesModel = mCfg.type === 'responses';
+                                                                     const isDisabled = (isEmbeddingsModel && apiType !== 'embeddings') || (isTranscriptionsModel && apiType !== 'transcriptions') || (isSpeechModel && apiType !== 'speech') || (isImageModel && apiType !== 'images') || (isResponsesModel && apiType !== 'responses');
                                                                   
                                                                   return (
                                                                       <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}>
@@ -774,13 +781,20 @@ export const Providers = () => {
                                                           </div>
                                                       </div>
                                                   )}
-                                                  {mCfg.type === 'image' && (
-                                                      <div className="flex flex-col gap-1">
-                                                          <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
-                                                               <Info className="inline w-3 h-3 mb-0.5 mr-1" />Image models automatically use the 'images' API only.
-                                                          </div>
-                                                      </div>
-                                                  )}
+                                                   {mCfg.type === 'image' && (
+                                                       <div className="flex flex-col gap-1">
+                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
+                                                                <Info className="inline w-3 h-3 mb-0.5 mr-1" />Image models automatically use the 'images' API only.
+                                                           </div>
+                                                       </div>
+                                                   )}
+                                                   {mCfg.type === 'responses' && (
+                                                       <div className="flex flex-col gap-1">
+                                                           <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic', padding: '8px', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-sm)'}}>
+                                                                <Info className="inline w-3 h-3 mb-0.5 mr-1" />Responses models automatically use the 'responses' API only.
+                                                           </div>
+                                                       </div>
+                                                   )}
                                               </div>
 
                                               {mCfg.pricing?.source === 'simple' && (

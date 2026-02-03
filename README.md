@@ -17,6 +17,8 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 - **Token Estimation**: Automatic token counting for providers that don't return usage data
 - **Bulk Model Import**: Import models directly in provider configuration
 - **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format
+- **Responses API Support**: Full OpenAI `/v1/responses` endpoint with multi-turn conversation support
+- **Automatic Response Cleanup**: Responses are retained for 7 days with hourly cleanup jobs to prevent database bloat
 
 ### Database & ORM
 
@@ -62,6 +64,37 @@ docker run -p 4000:4000 \
 ```
 
 See [Installation Guide](docs/INSTALLATION.md) for other options.
+
+## OpenAI Responses API
+
+Plexus supports the OpenAI `/v1/responses` endpoint with full multi-turn conversation support:
+
+```bash
+curl -X POST http://localhost:4000/v1/responses \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "What is 2+2?",
+    "previous_response_id": "resp_abc123"
+  }'
+```
+
+### previous_response_id Handling
+
+Unlike many LLM gateways that lack multi-turn state management, Plexus correctly handles `previous_response_id`:
+
+- **Stateful Conversations**: Send just the new input and previous_response_id - no need to resend conversation history
+- **Automatic Context Loading**: Previous response output items are merged into the current request automatically
+- **Storage & Linking**: Responses are stored with TTL cleanup (7 days), linked via previous_response_id references
+
+### Response Storage & TTL
+
+Responses are stored for multi-turn conversation support:
+
+- **Retention**: 7-day TTL (configurable)
+- **Automatic Cleanup**: Hourly job removes expired responses and orphaned conversations
+- **Management API**: Retrieve, list, or delete stored responses via `/v1/responses/:response_id`
 
 ## License
 

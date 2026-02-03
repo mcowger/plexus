@@ -12,6 +12,7 @@ import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
 import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
+import { ResponsesStorageService } from './services/responses-storage';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
@@ -134,6 +135,11 @@ fastify.setErrorHandler((error, request, reply) => {
 
 // --- Routes: v1 (Inference API) ---
 await registerInferenceRoutes(fastify, dispatcher, usageStorage);
+
+// --- Response Storage Cleanup ---
+// Start cleanup job (runs every hour, deletes responses older than 7 days)
+const responsesStorage = new ResponsesStorageService();
+responsesStorage.startCleanupJob(1, 7);
 
 // --- Management API (v0) ---
 await registerManagementRoutes(fastify, usageStorage, dispatcher, quotaScheduler);

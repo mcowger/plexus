@@ -36,6 +36,13 @@
       "when": 1770090032869,
       "tag": "0004_fixed_iron_fist",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770155146322,
+      "tag": "0005_military_inertia",
+      "breakpoints": true
     }
   ]
 }

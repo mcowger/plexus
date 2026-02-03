@@ -137,6 +137,13 @@ export class UsageInspector extends PassThrough {
                     cachedTokens: reconstructed.usage.prompt_tokens_details?.cached_tokens ?? reconstructed.usage.cached_tokens ?? 0,
                     reasoningTokens: reconstructed.usage.completion_tokens_details?.reasoning_tokens || 0
                 } : null;
+            case "responses":
+                return reconstructed.usage ? {
+                    inputTokens: reconstructed.usage.input_tokens || 0,
+                    outputTokens: reconstructed.usage.output_tokens || 0,
+                    cachedTokens: reconstructed.usage.input_tokens_details?.cached_tokens || 0,
+                    reasoningTokens: reconstructed.usage.output_tokens_details?.reasoning_tokens || 0
+                } : null;
             case "messages":
                 return reconstructed.usage ? {
                     inputTokens: reconstructed.usage.input_tokens || 0,
@@ -168,6 +175,16 @@ export class UsageInspector extends PassThrough {
                 const toolCalls = choice?.delta?.tool_calls;
                 const finishReason = choice?.finish_reason ?? null;
                 const toolCallsCount = toolCalls?.length ?? 0;
+                return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
+            }
+            case "responses": {
+                // Responses API format: function_call items in output array
+                let toolCallsCount = 0;
+                if (reconstructed.output && Array.isArray(reconstructed.output)) {
+                    toolCallsCount = reconstructed.output.filter((item: any) => item.type === 'function_call').length;
+                }
+                // Responses API doesn't have a direct finish_reason, use status instead
+                const finishReason = reconstructed.status === 'completed' ? 'stop' : reconstructed.status;
                 return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
             }
             case "messages": {

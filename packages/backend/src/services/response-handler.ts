@@ -26,7 +26,7 @@ export async function handleResponse(
   usageRecord: Partial<UsageRecord>,
   usageStorage: UsageStorageService,
   startTime: number,
-  apiType: "chat" | "messages" | "gemini",
+  apiType: "chat" | "messages" | "gemini" | "responses",
   shouldEstimateTokens: boolean = false,
   originalRequest?: any
 ) {

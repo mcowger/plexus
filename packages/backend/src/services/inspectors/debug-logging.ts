@@ -64,6 +64,9 @@ export class DebugLoggingInspector extends BaseInspector {
           case "chat":
             reconstructed = this.reconstructChatCompletions(rawBody);
             break;
+          case "responses":
+            reconstructed = this.reconstructResponses(rawBody);
+            break;
           case "messages":
             reconstructed = this.reconstructMessages(rawBody);
             break;
@@ -119,6 +122,25 @@ export class DebugLoggingInspector extends BaseInspector {
       try {
         const chunk = JSON.parse(jsonStr);
         snapshot = this.updateChatCompletionsSnapshot(snapshot, chunk);
+      } catch (e) {
+        // Skip malformed/non-JSON lines
+      }
+    }
+    return snapshot;
+  }
+
+  private reconstructResponses(fullBody: string): any {
+    const lines = fullBody.split(/\r?\n/);
+    let snapshot: any = null;
+
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const jsonStr = line.replace(/^data:\s*/, "").trim();
+      if (!jsonStr || jsonStr === "[DONE]") continue;
+
+      try {
+        const event = JSON.parse(jsonStr);
+        snapshot = this.updateResponsesSnapshot(snapshot, event);
       } catch (e) {
         // Skip malformed/non-JSON lines
       }
@@ -378,5 +400,77 @@ export class DebugLoggingInspector extends BaseInspector {
     }
 
     return result;
+  }
+
+  /**
+   * Applies a Responses API streaming event to the existing snapshot.
+   */
+  private updateResponsesSnapshot(acc: any, event: any): any {
+    // Initialize snapshot from response.created event
+    if (!acc && event.type === "response.created") {
+      acc = { ...event.response };
+      if (!acc.output) acc.output = [];
+      return acc;
+    }
+
+    if (!acc) {
+      acc = { output: [] };
+    }
+
+    switch (event.type) {
+      case "response.created":
+      case "response.in_progress":
+        // Update top-level response fields
+        if (event.response) {
+          Object.assign(acc, event.response);
+        }
+        break;
+
+      case "response.output_item.added":
+        // Add new output item
+        const outputIndex = event.output_index ?? acc.output.length;
+        if (event.item) {
+          acc.output[outputIndex] = { ...event.item };
+        }
+        break;
+
+      case "response.output_text.delta":
+        // Accumulate text deltas
+        const textItem = acc.output[event.output_index];
+        if (textItem && textItem.content && textItem.content[event.content_index]) {
+          if (!textItem.content[event.content_index].text) {
+            textItem.content[event.content_index].text = "";
+          }
+          textItem.content[event.content_index].text += event.delta;
+        }
+        break;
+
+      case "response.function_call_arguments.delta":
+        // Accumulate function call arguments
+        const fcItem = acc.output[event.output_index];
+        if (fcItem && fcItem.type === "function_call") {
+          if (!fcItem.arguments) {
+            fcItem.arguments = "";
+          }
+          fcItem.arguments += event.delta;
+        }
+        break;
+
+      case "response.output_item.done":
+        // Finalize output item
+        if (event.item && event.output_index !== undefined) {
+          acc.output[event.output_index] = { ...event.item };
+        }
+        break;
+
+      case "response.completed":
+        // Final response state
+        if (event.response) {
+          Object.assign(acc, event.response);
+        }
+        break;
+    }
+
+    return acc;
   }
 }

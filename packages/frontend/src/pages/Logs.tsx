@@ -328,8 +328,10 @@ export const Logs = () => {
                                                             <AudioLines size={16} className="text-purple-500" />
                                                         ) : log.incomingApiType === 'speech' ? (
                                                             <Volume2 size={16} className="text-orange-500" />
-                                                        ) : log.incomingApiType === 'images' ? (
+                                                         ) : log.incomingApiType === 'images' ? (
                                                             <ImageIcon size={16} className="text-fuchsia-500" />
+                                                        ) : log.incomingApiType === 'responses' ? (
+                                                            <MessagesSquare size={16} className="text-cyan-500" />
                                                         ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
                                                             <img
                                                                 src={apiLogos[log.incomingApiType]}
@@ -346,8 +348,10 @@ export const Logs = () => {
                                                             <AudioLines size={16} className="text-purple-500" />
                                                         ) : log.outgoingApiType === 'speech' ? (
                                                             <Volume2 size={16} className="text-orange-500" />
-                                                        ) : log.outgoingApiType === 'images' ? (
+                                                         ) : log.outgoingApiType === 'images' ? (
                                                             <ImageIcon size={16} className="text-fuchsia-500" />
+                                                        ) : log.outgoingApiType === 'responses' ? (
+                                                            <MessagesSquare size={16} className="text-cyan-500" />
                                                         ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
                                                             <img
                                                                 src={apiLogos[log.outgoingApiType]}
