@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../../services/dispatcher';
-import { OpenAITransformer, AnthropicTransformer, GeminiTransformer } from '../../transformers';
+import { OpenAITransformer, AnthropicTransformer, GeminiTransformer, ResponsesTransformer } from '../../transformers';
 
 /**
  * Test request templates for each API type
@@ -50,6 +50,12 @@ const TEST_TEMPLATES = {
         generationConfig: {
             maxOutputTokens: 100
         }
+    }),
+
+    responses: (modelPath: string) => ({
+        model: modelPath,
+        input: 'Just respond with the word acknowledged',
+        instructions: 'You are a helpful assistant.'
     })
 };
 
@@ -80,10 +86,10 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             logger.info(`Testing model: ${body.provider}/${body.model} via ${apiType} API`);
 
             // Validate API type
-            if (!['chat', 'messages', 'gemini'].includes(apiType)) {
+            if (!['chat', 'messages', 'gemini', 'responses'].includes(apiType)) {
                 return reply.code(400).send({
                     success: false,
-                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini`
+                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses`
                 });
             }
 
@@ -105,6 +111,9 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
                     break;
                 case 'gemini':
                     transformer = new GeminiTransformer();
+                    break;
+                case 'responses':
+                    transformer = new ResponsesTransformer();
                     break;
                 default:
                     transformer = new OpenAITransformer();
