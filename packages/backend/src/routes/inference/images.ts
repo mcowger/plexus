@@ -88,6 +88,11 @@ export async function registerImagesRoute(
       });
       DebugManager.getInstance().flush(requestId);
 
+      // Remove internal plexus metadata before sending to client
+      if (unifiedResponse.plexus) {
+        delete (unifiedResponse as any).plexus;
+      }
+
       return reply.send(unifiedResponse);
 
     } catch (e: any) {
@@ -228,6 +233,11 @@ export async function registerImagesRoute(
         imageCount: unifiedResponse.data?.length || 0,
       });
       DebugManager.getInstance().flush(requestId);
+
+      // Remove internal plexus metadata before sending to client
+      if (unifiedResponse.plexus) {
+        delete (unifiedResponse as any).plexus;
+      }
 
       return reply.send(unifiedResponse);
 
