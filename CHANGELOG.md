@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.3 - 2026-02-03
+
+### v0.10.3: UI Enhancements for Model Alias Management
+
+### New Features
+
+- **Model Alias Removal**: Added a new interactive button within the user interface to facilitate the removal of model aliases. ([1be57fe](https://github.com/mcowger/plexus/commit/1be57fe))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.10.2 - 2026-02-03
 
 ### v0.10.2: Implementation of Quota Tracking System and Sidebar UI Redesign
