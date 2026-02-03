@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.10.1 - 2026-02-03
+
+### v0.10.1: OpenAI-Compatible Image APIs, Usage-Based Load Balancing, and Enhanced Metadata Logging
+
+## New Features
+
+- **OpenAI-Compatible Image APIs**: Added support for image generation and editing endpoints ([6b3ed1f](https://github.com/mcowger/plexus/commit/6b3ed1f)).
+- **Usage-Based Load Balancing**: Implemented a new `UsageSelector` strategy to improve load balancing logic ([48902f4](https://github.com/mcowger/plexus/commit/48902f4)).
+- **Request/Response Metadata Logging**: Enhanced usage logs to capture and display detailed request and response metadata ([5d57657](https://github.com/mcowger/plexus/commit/5d57657)).
+
+## Bug Fixes and Improvements
+
+- **Backend Updates**:
+  - Fixed correlated `EXISTS` subqueries and handled SQLite boolean coercion for `hasDebug` and `hasError` flags ([5a66237](https://github.com/mcowger/plexus/commit/5a66237), [90c650e](https://github.com/mcowger/plexus/commit/90c650e)).
+  - Improved `UsageInspector` to correctly extract `cached_tokens` from OpenAI responses ([3c67f20](https://github.com/mcowger/plexus/commit/3c67f20), [955ae06](https://github.com/mcowger/plexus/commit/955ae06)).
+  - Ensured `message_delta` payloads always include the required usage field ([bdb71bb](https://github.com/mcowger/plexus/commit/bdb71bb)).
+  - Aligned `InferenceError` interface with current API response formats ([39f3838](https://github.com/mcowger/plexus/commit/39f4e38)).
+- **Frontend & UI**:
+  - Restructured the logs table `meta` column into a stacked 2x2 grid layout ([1437797](https://github.com/mcowger/plexus/commit/1437797)).
+  - Fixed a pagination bug where string concatenation occurred instead of numeric addition ([91241d4](https://github.com/mcowger/plexus/commit/91241d4)).
+  - Removed emojis from the interface ([1b07f6c](https://github.com/mcowger/plexus/commit/1b07f6c)).
+  - Excluded assets from the build watch loop to improve performance ([12f065a](https://github.com/mcowger/plexus/commit/12f065a)).
+- **Cleanup**:
+  - Removed the unimplemented `/v1/responses` endpoint ([c79ef52](https://github.com/mcowger/plexus/commit/c79ef52)).
+  - Stripped internal metadata from image generation responses ([e845a94](https://github.com/mcowger/plexus/commit/e845a94)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.12.0 - 2026-02-02
 
 ### v0.12.0: OpenAI-Compatible Image Generation and Editing APIs
