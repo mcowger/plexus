@@ -22,6 +22,20 @@
       "when": 1770070671106,
       "tag": "0002_handy_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770081025012,
+      "tag": "0003_nice_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770090032869,
+      "tag": "0004_fixed_iron_fist",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `quota_snapshots` ADD `description` text;

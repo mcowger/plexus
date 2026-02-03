@@ -208,3 +208,107 @@ The Management APIs provide endpoints for inspecting the system configuration an
     }
   ]
   ```
+
+---
+
+## Quota Management (`/v0/quotas`)
+
+The Quota Management APIs provide endpoints for monitoring provider rate limits and quotas.
+
+### List All Quota Checkers
+
+- **Endpoint:** `GET /v0/quotas`
+- **Description:** Returns a list of all configured quota checkers with their latest status.
+- **Response Format:**
+  ```json
+  [
+    {
+      "checkerId": "synthetic-main",
+      "latest": [
+        {
+          "provider": "synthetic",
+          "checkerId": "synthetic-main",
+          "windowType": "subscription",
+          "limit": 1000.0,
+          "used": 381.5,
+          "remaining": 618.5,
+          "utilizationPercent": 38.15,
+          "unit": "dollars",
+          "status": "ok"
+        }
+      ]
+    }
+  ]
+  ```
+
+### Get Latest Quota
+
+- **Endpoint:** `GET /v0/quotas/:checkerId`
+- **Description:** Returns the latest quota status for a specific checker.
+- **Response Format:** Same as list all checkers but for a single checker.
+
+### Get Quota History
+
+- **Endpoint:** `GET /v0/quotas/:checkerId/history`
+- **Query Parameters:**
+  - `windowType` (optional): Filter by window type (e.g., `subscription`, `five_hour`, `weekly`)
+  - `since` (optional): Start date. Can be ISO timestamp or relative format like `7d`, `30d`
+
+- **Response Format:**
+  ```json
+  {
+    "checkerId": "anthropic-pro",
+    "windowType": "five_hour",
+    "since": "2026-01-26T00:00:00.000Z",
+    "history": [
+      {
+        "id": 123,
+        "provider": "anthropic",
+        "checkerId": "anthropic-pro",
+        "groupId": null,
+        "windowType": "five_hour",
+        "checkedAt": 1735689599000,
+        "limit": 100,
+        "used": 45,
+        "remaining": 55,
+        "utilizationPercent": 45.0,
+        "unit": "percentage",
+        "resetsAt": 1735704000000,
+        "status": "ok",
+        "success": 1,
+        "errorMessage": null
+      }
+    ]
+  }
+  ```
+
+### Trigger Immediate Check
+
+- **Endpoint:** `POST /v0/quotas/:checkerId/check`
+- **Description:** Triggers an immediate quota check for the specified checker.
+- **Response Format:** Returns the `QuotaCheckResult` immediately.
+
+---
+
+## Quota Window Types
+
+Quota windows represent different time-based rate limit periods:
+
+| Window Type | Description |
+|------------|-------------|
+| `subscription` | Monthly/billing cycle based quota |
+| `hourly` | Hourly rolling window |
+| `five_hour` | 5-hour rolling window (Anthropic) |
+| `daily` | Daily reset quota |
+| `weekly` | 7-day rolling window (Anthropic) |
+| `monthly` | Calendar month quota |
+| `custom` | Provider-specific window |
+
+## Quota Status Levels
+
+| Status | Utilization | Description |
+|--------|-------------|-------------|
+| `ok` | 0-75% | Healthy, plenty of quota remaining |
+| `warning` | 75-90% | Approaching exhaustion, plan accordingly |
+| `critical` | 90-100% | Near exhaustion, take action soon |
+| `exhausted` | 100% | Quota fully consumed, requests will fail |

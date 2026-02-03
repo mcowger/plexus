@@ -493,6 +493,109 @@ The `adminKey` acts as a shared secret for administrative access:
 2.  **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.
 3.  **Startup Requirement**: The Plexus server will fail to start if this key is missing from the configuration.
 
+### `quotas` (Optional)
+
+This section configures quota checkers that monitor provider rate limits and quotas. Plexus periodically checks each configured quota source and stores the results for monitoring and alerting.
+
+**Purpose:**
+- Monitor provider rate limits (e.g., Anthropic's 5-hour and 7-day windows)
+- Track subscription quotas (e.g., monthly dollar limits)
+- Detect when quotas are approaching exhaustion
+- Provide historical quota utilization data
+
+**Structure:**
+
+```yaml
+quotas:
+  - id: checker-name                    # Unique identifier
+    type: synthetic | anthropic | antigravity  # Checker type
+    provider: provider-key               # Provider name to associate with
+    enabled: true                       # Enable/disable this checker
+    intervalMinutes: 30                 # Check frequency in minutes
+    options: {}                        # Provider-specific options
+```
+
+**Checker Types:**
+
+#### `synthetic`
+
+Queries the Synthetic API for quota information.
+
+**Required Options:**
+- `apiKey`: Synthetic API key
+
+**Optional Options:**
+- `endpoint`: Override the default API endpoint
+
+**Example:**
+```yaml
+quotas:
+  - id: synthetic-main
+    type: synthetic
+    provider: synthetic
+    enabled: true
+    intervalMinutes: 30
+    options:
+      apiKey: syn_your_api_key
+      # endpoint: https://api.synthetic.new/v2/quotas
+```
+
+#### `anthropic`
+
+Makes a minimal inference request to Anthropic and reads rate limit headers.
+
+**Required Options:**
+- `apiKey`: Anthropic API key
+
+**Optional Options:**
+- `model`: Model to use for the probe request (default: `claude-haiku-4-5`)
+
+**Example:**
+```yaml
+quotas:
+  - id: anthropic-pro
+    type: anthropic
+    provider: anthropic
+    enabled: true
+    intervalMinutes: 15
+    options:
+      apiKey: sk-ant-your_api_key
+      # model: claude-haiku-4-5
+```
+
+#### `antigravity`
+
+Uses Google Cloud credentials to fetch available models and quota information.
+
+**Required Options:**
+- `credentialsPath`: Path to Google service account JSON credentials file
+
+**Optional Options:**
+- `projectId`: GCP project ID (default: `bamboo-precept-lgxtn`)
+
+**Example:**
+```yaml
+quotas:
+  - id: antigravity-main
+    type: antigravity
+    provider: cpa
+    enabled: true
+    intervalMinutes: 20
+    options:
+      credentialsPath: /path/to/google-credentials.json
+      # projectId: my-gcp-project
+```
+
+**Quota Monitoring API:**
+
+Once configured, quota data is available via the Management API:
+- `GET /v0/quotas` - List all quota checkers and their latest status
+- `GET /v0/quotas/:checkerId` - Get latest quota for a specific checker
+- `GET /v0/quotas/:checkerId/history` - Get historical quota data
+- `POST /v0/quotas/:checkerId/check` - Trigger an immediate quota check
+
+See the [API Documentation](./API.md#quota-management) for response formats.
+
 ## Token Estimation
 
 Some AI providers (particularly free-tier models on OpenRouter and similar platforms) don't return usage data in their responses. This makes it difficult to track token consumption and calculate costs accurately.
