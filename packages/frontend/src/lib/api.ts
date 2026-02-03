@@ -1127,5 +1127,26 @@ export const api = {
           console.error("API Error triggerQuotaCheck", e);
           return null;
       }
+  },
+
+  deleteAlias: async (aliasId: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          throw new Error('Failed to parse config');
+      }
+
+      if (!config) config = {};
+      if (!config.models) config.models = {};
+
+      // Delete the alias from the config
+      if (config.models[aliasId]) {
+          delete config.models[aliasId];
+      }
+
+      const newYaml = stringify(config);
+      await api.saveConfig(newYaml);
   }
 };

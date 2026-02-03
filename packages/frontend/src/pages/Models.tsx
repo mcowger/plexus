@@ -28,6 +28,11 @@ export const Models = () => {
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Delete Confirmation State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [aliasToDelete, setAliasToDelete] = useState<Alias | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Auto Add Modal State
   const [isAutoAddModalOpen, setIsAutoAddModalOpen] = useState(false);
   const [substring, setSubstring] = useState('');
@@ -86,6 +91,28 @@ export const Models = () => {
           alert("Failed to save alias");
       } finally {
           setIsSaving(false);
+      }
+  };
+
+  const handleDeleteClick = (alias: Alias) => {
+      setAliasToDelete(alias);
+      setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+      if (!aliasToDelete) return;
+
+      setIsDeleting(true);
+      try {
+          await api.deleteAlias(aliasToDelete.id);
+          await loadData();
+          setIsDeleteModalOpen(false);
+          setAliasToDelete(null);
+      } catch (e) {
+          console.error("Failed to delete alias", e);
+          alert("Failed to delete alias");
+      } finally {
+          setIsDeleting(false);
       }
   };
 
@@ -337,9 +364,29 @@ export const Models = () => {
                     {filteredAliases.map(alias => (
                         <tr key={alias.id} className="hover:bg-bg-hover">
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{fontWeight: 600, paddingLeft: '24px'}}>
-                                <div onClick={() => handleEdit(alias)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
-                                    <Edit2 size={12} style={{opacity: 0.5}} />
-                                    {alias.id}
+                                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px'}}>
+                                    <div onClick={() => handleEdit(alias)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1}}>
+                                        <Edit2 size={12} style={{opacity: 0.5}} />
+                                        {alias.id}
+                                    </div>
+                                    <button
+                                        onClick={() => handleDeleteClick(alias)}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            borderRadius: '4px',
+                                            color: 'var(--color-danger)',
+                                            opacity: 0.6,
+                                            transition: 'opacity 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                                        title="Delete alias"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             </td>
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
@@ -794,8 +841,43 @@ export const Models = () => {
               ) : (
                   <div className="text-text-muted italic text-center text-sm py-8">Enter a search term to find models</div>
               )}
+           </div>
+       </Modal>
+
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Delete Model Alias"
+        size="sm"
+        footer={
+            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
+                <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>Cancel</Button>
+                <Button onClick={handleConfirmDelete} isLoading={isDeleting} variant="danger">Delete</Button>
+            </div>
+        }
+      >
+          <div style={{display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center', padding: '16px 0'}}>
+              <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+              }}>
+                  <Trash2 size={24} style={{color: 'var(--color-danger)'}} />
+              </div>
+              <div>
+                  <p className="text-text" style={{marginBottom: '8px', fontWeight: 500}}>
+                      Are you sure you want to delete this alias?
+                  </p>
+                  <p className="text-text-secondary" style={{fontSize: '14px'}}>
+                      <strong>{aliasToDelete?.id}</strong> will be permanently removed from the configuration.
+                  </p>
+              </div>
           </div>
       </Modal>
-    </div>
-  );
-};
+     </div>
+   );
+ };
