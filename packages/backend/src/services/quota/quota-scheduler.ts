@@ -1,0 +1,187 @@
+import { logger } from '../../utils/logger';
+import { getDatabase, getSchema } from '../../db/client';
+import { QuotaCheckerFactory } from './quota-checker-factory';
+import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
+import { and, eq, gte, desc } from 'drizzle-orm';
+
+export class QuotaScheduler {
+  private static instance: QuotaScheduler;
+  private checkers: Map<string, QuotaChecker> = new Map();
+  private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private db: ReturnType<typeof getDatabase> | null = null;
+  private schema: ReturnType<typeof getSchema> | null = null;
+
+  private constructor() {}
+
+  static getInstance(): QuotaScheduler {
+    if (!QuotaScheduler.instance) {
+      QuotaScheduler.instance = new QuotaScheduler();
+    }
+    return QuotaScheduler.instance;
+  }
+
+  private ensureDb() {
+    if (!this.db) {
+      this.db = getDatabase();
+      this.schema = getSchema();
+    }
+    return { db: this.db, schema: this.schema };
+  }
+
+  async initialize(quotaConfigs: QuotaCheckerConfig[]): Promise<void> {
+    for (const config of quotaConfigs) {
+      if (!config.enabled) {
+        logger.info(`Quota checker '${config.id}' is disabled, skipping`);
+        continue;
+      }
+
+      try {
+        const checker = QuotaCheckerFactory.createChecker(config.type, config);
+        this.checkers.set(config.id, checker);
+        logger.info(`Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`);
+      } catch (error) {
+        logger.error(`Failed to register quota checker '${config.id}': ${error}`);
+      }
+    }
+
+    for (const [id, checker] of this.checkers) {
+      try {
+        await this.runCheckNow(id);
+        const intervalMs = checker.config.intervalMinutes * 60 * 1000;
+        const intervalId = setInterval(() => this.runCheckNow(id), intervalMs);
+        this.intervals.set(id, intervalId);
+        logger.info(`Scheduled quota checker '${id}' to run every ${checker.config.intervalMinutes} minutes`);
+      } catch (error) {
+        logger.error(`Failed to schedule quota checker '${id}': ${error}`);
+      }
+    }
+  }
+
+  async runCheckNow(checkerId: string): Promise<QuotaCheckResult | null> {
+    const checker = this.checkers.get(checkerId);
+    if (!checker) {
+      logger.warn(`Quota checker '${checkerId}' not found`);
+      return null;
+    }
+
+    logger.debug(`Running quota check for '${checkerId}'`);
+    const result = await checker.checkQuota();
+
+    await this.persistResult(result);
+
+    return result;
+  }
+
+  private async persistResult(result: QuotaCheckResult): Promise<void> {
+    if (!result.success) {
+      return;
+    }
+
+    const { db, schema } = this.ensureDb();
+    const checkedAt = result.checkedAt.getTime();
+    const now = Date.now();
+
+    if (result.windows) {
+      for (const window of result.windows) {
+        try {
+            await db.insert(schema.quotaSnapshots).values({
+              provider: result.provider,
+              checkerId: result.checkerId,
+              groupId: null,
+              windowType: window.windowType,
+              checkedAt,
+              limit: window.limit,
+              used: window.used,
+              remaining: window.remaining,
+              utilizationPercent: window.utilizationPercent,
+              unit: window.unit,
+              resetsAt: window.resetsAt?.getTime() ?? null,
+              status: window.status ?? null,
+              description: window.description ?? null,
+              success: 1,
+              errorMessage: null,
+              createdAt: now,
+            });
+        } catch (error) {
+          logger.error(`Failed to persist quota window for '${result.checkerId}': ${error}`);
+        }
+      }
+    }
+
+    if (result.groups) {
+      for (const group of result.groups) {
+        for (const window of group.windows) {
+          try {
+            await db.insert(schema.quotaSnapshots).values({
+              provider: result.provider,
+              checkerId: result.checkerId,
+              groupId: group.groupId,
+              windowType: window.windowType,
+              checkedAt,
+              limit: window.limit,
+              used: window.used,
+              remaining: window.remaining,
+              utilizationPercent: window.utilizationPercent,
+              unit: window.unit,
+              resetsAt: window.resetsAt?.getTime() ?? null,
+              status: window.status ?? null,
+              description: window.description ?? null,
+              success: 1,
+              errorMessage: null,
+              createdAt: now,
+            });
+          } catch (error) {
+            logger.error(`Failed to persist quota group '${group.groupId}' for '${result.checkerId}': ${error}`);
+          }
+        }
+      }
+    }
+  }
+
+  getCheckerIds(): string[] {
+    return Array.from(this.checkers.keys());
+  }
+
+  async getLatestQuota(checkerId: string) {
+    const { db, schema } = this.ensureDb();
+    const results = await db
+      .select()
+      .from(schema.quotaSnapshots)
+      .where(eq(schema.quotaSnapshots.checkerId, checkerId))
+      .orderBy(desc(schema.quotaSnapshots.checkedAt))
+      .limit(100);
+
+    return results;
+  }
+
+  async getQuotaHistory(checkerId: string, windowType?: string, since?: number) {
+    const { db, schema } = this.ensureDb();
+    let conditions = [eq(schema.quotaSnapshots.checkerId, checkerId)];
+
+    if (windowType) {
+      conditions.push(eq(schema.quotaSnapshots.windowType, windowType));
+    }
+
+    if (since) {
+      conditions.push(gte(schema.quotaSnapshots.checkedAt, since));
+    }
+
+    const results = await db
+      .select()
+      .from(schema.quotaSnapshots)
+      .where(and(...conditions))
+      .orderBy(desc(schema.quotaSnapshots.checkedAt))
+      .limit(1000);
+
+    return results;
+  }
+
+  stop(): void {
+    for (const [id, intervalId] of this.intervals) {
+      clearInterval(intervalId);
+      logger.info(`Stopped quota checker '${id}'`);
+    }
+    this.intervals.clear();
+    this.checkers.clear();
+  }
+}

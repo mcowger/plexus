@@ -10,6 +10,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates (v0.10.0)
 
+- **Quota Tracking System**: Monitor provider rate limits and quotas with configurable checkers
 - **Audio Transcriptions API**: Full OpenAI-compatible `/v1/audio/transcriptions` endpoint support with multipart file uploads
 - **Embeddings API**: Full OpenAI-compatible `/v1/embeddings` endpoint support
 - **Model Type System**: Distinguish between chat, embeddings, and transcriptions models with automatic API filtering
@@ -23,7 +24,7 @@ Plexus uses **Drizzle ORM** with **SQLite** for data persistence:
 
 - **Schema Management**: Type-safe database schemas in `packages/backend/drizzle/schema/`
 - **Automatic Migrations**: Migrations run automatically on startup
-- **Tables**: Usage tracking, provider cooldowns, debug logs, inference errors, performance metrics
+- **Tables**: Usage tracking, provider cooldowns, debug logs, inference errors, performance metrics, quota snapshots
 
 #### Managing Database Schema
 

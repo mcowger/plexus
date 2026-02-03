@@ -46,7 +46,8 @@ describe("Auth Middleware", () => {
             keys: {
                 "test-key-1": { secret: "sk-valid-key", comment: "Test Key" }
             },
-            adminKey: "admin-secret"
+            adminKey: "admin-secret",
+            quotas: []
         });
 
         await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
@@ -215,7 +216,8 @@ describe("Key Attribution", () => {
             keys: {
                 "test-key-1": { secret: "sk-valid-key", comment: "Test Key" }
             },
-            adminKey: "admin-secret"
+            adminKey: "admin-secret",
+            quotas: []
         });
 
         await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);

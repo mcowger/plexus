@@ -6,12 +6,14 @@ export type ProviderCooldown = InferSelectModel<typeof schema.providerCooldowns>
 export type DebugLog = InferSelectModel<typeof schema.debugLogs>;
 export type InferenceError = InferSelectModel<typeof schema.inferenceErrors>;
 export type ProviderPerformance = InferSelectModel<typeof schema.providerPerformance>;
+export type QuotaSnapshot = InferSelectModel<typeof schema.quotaSnapshots>;
 
 export type NewRequestUsage = InferInsertModel<typeof schema.requestUsage>;
 export type NewProviderCooldown = InferInsertModel<typeof schema.providerCooldowns>;
 export type NewDebugLog = InferInsertModel<typeof schema.debugLogs>;
 export type NewInferenceError = InferInsertModel<typeof schema.inferenceErrors>;
 export type NewProviderPerformance = InferInsertModel<typeof schema.providerPerformance>;
+export type NewQuotaSnapshot = InferInsertModel<typeof schema.quotaSnapshots>;
 
 export type UsageRecord = Omit<RequestUsage, 'isStreamed' | 'isPassthrough'> & {
   isStreamed: boolean;

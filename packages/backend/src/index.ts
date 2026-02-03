@@ -11,6 +11,7 @@ import { CooldownManager } from './services/cooldown-manager';
 import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
 import { SelectorFactory } from './services/selectors/factory';
+import { QuotaScheduler } from './services/quota/quota-scheduler';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
@@ -52,6 +53,7 @@ fastify.register(multipart, {
 
 const dispatcher = new Dispatcher();
 const usageStorage = new UsageStorageService();
+const quotaScheduler = QuotaScheduler.getInstance();
 
 // Initialize singletons with storage dependencies
 dispatcher.setUsageStorage(usageStorage);
@@ -74,7 +76,7 @@ try {
 }
 
 // --- Database Initialization ---
-// Initialize database after config is loaded
+// Initialize database before quota checkers (which need DB access)
 try {
   initializeDatabase();
   await runMigrations();
@@ -82,6 +84,16 @@ try {
 } catch (e) {
   logger.error('Failed to initialize database or run migrations', e);
   process.exit(1);
+}
+
+// Initialize quota checkers (requires DB to be ready)
+try {
+    const config = getConfig();
+    if (config.quotas && config.quotas.length > 0) {
+        await quotaScheduler.initialize(config.quotas);
+    }
+} catch (e) {
+    logger.error('Failed to initialize quota checkers', e);
 }
 
 // --- Hooks & Global Logic ---
@@ -124,7 +136,7 @@ fastify.setErrorHandler((error, request, reply) => {
 await registerInferenceRoutes(fastify, dispatcher, usageStorage);
 
 // --- Management API (v0) ---
-await registerManagementRoutes(fastify, usageStorage, dispatcher);
+await registerManagementRoutes(fastify, usageStorage, dispatcher, quotaScheduler);
 
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));
@@ -185,6 +197,7 @@ const start = async () => {
 
         const shutdown = async (signal: string) => {
             logger.info(`Received ${signal}, shutting down gracefully...`);
+            quotaScheduler.stop();
             await fastify.close();
             const { closeDatabase } = await import('./db/client');
             await closeDatabase();

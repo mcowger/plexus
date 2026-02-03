@@ -90,11 +90,21 @@ const KeyConfigSchema = z.object({
   comment: z.string().optional(),
 });
 
+const QuotaConfigSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  provider: z.string(),
+  enabled: z.boolean().default(true),
+  intervalMinutes: z.number().min(1).default(30),
+  options: z.record(z.any()).default({}),
+});
+
 const PlexusConfigSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
   keys: z.record(z.string(), KeyConfigSchema),
   adminKey: z.string(),
+  quotas: z.array(QuotaConfigSchema).optional().default([]),
 });
 
 export type PlexusConfig = z.infer<typeof PlexusConfigSchema>;
@@ -105,6 +115,7 @@ export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
+export type QuotaConfig = z.infer<typeof QuotaConfigSchema>;
 
 /**
  * Extract supported API types from the provider configuration.
@@ -172,6 +183,14 @@ function logConfigStats(config: PlexusConfig) {
       logger.info(`Loaded ${keyCount} API Keys:`);
       Object.keys(config.keys).forEach((keyName) => {
         logger.info(`  - ${keyName}`);
+      });
+    }
+
+    if (config.quotas) {
+      const quotaCount = config.quotas.length;
+      logger.info(`Loaded ${quotaCount} Quota Checkers:`);
+      config.quotas.forEach((quota) => {
+        logger.info(`  - ${quota.id}: ${quota.type} (${quota.provider}) every ${quota.intervalMinutes}m`);
       });
     }
 }

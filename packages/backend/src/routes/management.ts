@@ -8,9 +8,11 @@ import { registerDebugRoutes } from './management/debug';
 import { registerErrorRoutes } from './management/errors';
 import { registerSystemLogRoutes } from './management/system-logs';
 import { registerTestRoutes } from './management/test';
+import { registerQuotaRoutes } from './management/quotas';
 import { Dispatcher } from '../services/dispatcher';
+import { QuotaScheduler } from '../services/quota/quota-scheduler';
 
-export async function registerManagementRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService, dispatcher: Dispatcher) {
+export async function registerManagementRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService, dispatcher: Dispatcher, quotaScheduler?: QuotaScheduler) {
     await registerConfigRoutes(fastify);
     await registerUsageRoutes(fastify, usageStorage);
     await registerCooldownRoutes(fastify);
@@ -19,4 +21,7 @@ export async function registerManagementRoutes(fastify: FastifyInstance, usageSt
     await registerErrorRoutes(fastify, usageStorage);
     await registerSystemLogRoutes(fastify);
     await registerTestRoutes(fastify, dispatcher);
+    if (quotaScheduler) {
+      await registerQuotaRoutes(fastify, quotaScheduler);
+    }
 }
