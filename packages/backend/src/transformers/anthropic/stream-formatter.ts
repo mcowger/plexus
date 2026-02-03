@@ -219,17 +219,12 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
         sendEvent("message_delta", {
           type: "message_delta",
           delta: {
-         stop_reason: pendingFinishReason || "end_turn",
+            stop_reason: pendingFinishReason || "end_turn",
             stop_sequence: null,
           },
-          usage: lastUsage
-            ? {
-      input_tokens: lastUsage.input_tokens,
-             output_tokens: lastUsage.output_tokens,
-           thinkingTokens: lastUsage.reasoning_tokens,
-                cache_read_input_tokens: lastUsage.cached_tokens,
-            }
-         : undefined,
+          usage: {
+            output_tokens: lastUsage?.output_tokens ?? 0,
+          },
         });
 
         sendEvent("message_stop", { type: "message_stop" });
