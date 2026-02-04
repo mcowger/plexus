@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.0 - 2026-02-04
+
+### v0.11.0: OpenAI-Compatible Responses API and Enhanced Model Test Suite
+
+### Main Features
+
+- **OpenAI-Compatible Responses API**: Added core support for OpenAI-compatible responses API ([565890f](https://github.com/mcowger/plexus/commit/565890f)).
+
+### Minor Changes and Improvements
+
+- **Model Testing & Filtering**: Improved model testing procedures and added API filtering logic ([f5418ba](https://github.com/mcowger/plexus/commit/f5418ba)).
+- **Embeddings and Images**: Added test support for embeddings and image-based data types ([f12da0f](https://github.com/mcowger/plexus/commit/f12da0f)).
+- **Responses API Testing**: Implemented unit and integration test support for the newly added responses API ([040f32d](https://github.com/mcowger/plexus/commit/040f32d)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.10.3 - 2026-02-03
 
 ### v0.10.3: UI Enhancements for Model Alias Management
