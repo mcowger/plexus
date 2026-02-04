@@ -268,7 +268,7 @@ export const Logs = () => {
                                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">API</th>
                                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Model</th>
                                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Tokens</th>
+                                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ width: '125px' }}>Tokens</th>
                                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '70px' }}>Cost</th>
                                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Perf</th>
                                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Meta</th>
@@ -458,33 +458,33 @@ export const Logs = () => {
                                                         {log.costSource ? (
                                                             <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
                                                                 <span style={{ fontWeight: '500', cursor: 'help' }}>
-                                                                    {log.costTotal === 0 ? '$ -' : formatCost(log.costTotal)}
+                                                                    {log.costTotal === 0 ? '∅' : formatCost(log.costTotal)}
                                                                 </span>
                                                             </CostToolTip>
                                                         ) : (
                                                             <span style={{ fontWeight: '500' }}>
-                                                                {log.costTotal === 0 ? '$ -' : formatCost(log.costTotal)}
+                                                                {log.costTotal === 0 ? '∅' : formatCost(log.costTotal)}
                                                             </span>
                                                         )}
                                                     </div>
                                                     {/* Right side: Breakdown */}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                             <CloudUpload size={10} className="text-blue-400" />
                                                             <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
-                                                                {log.costInput === 0 ? '$ -' : formatCost(log.costInput || 0)}
+                                                                {log.costInput === 0 ? '∅' : formatCost(log.costInput || 0)}
                                                             </span>
                                                         </div>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                             <CloudDownload size={10} className="text-green-400" />
                                                             <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
-                                                                {log.costOutput === 0 ? '$ -' : formatCost(log.costOutput || 0)}
+                                                                {log.costOutput === 0 ? '∅' : formatCost(log.costOutput || 0)}
                                                             </span>
                                                         </div>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                             <PackageOpen size={10} className="text-orange-400" />
                                                             <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
-                                                                {log.costCached === 0 ? '$ -' : formatCost(log.costCached || 0)}
+                                                                {log.costCached === 0 ? '∅' : formatCost(log.costCached || 0)}
                                                             </span>
                                                         </div>
                                                     </div>
