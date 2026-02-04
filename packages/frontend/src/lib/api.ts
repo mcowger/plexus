@@ -20,6 +20,10 @@ function inferProviderTypes(apiBaseUrl?: string | Record<string, string>): strin
     // Single URL - infer type from URL pattern
     const url = apiBaseUrl.toLowerCase();
 
+    if (url.startsWith('oauth://')) {
+      return ['oauth'];
+    }
+
     // Check for known patterns
     if (url.includes('anthropic.com')) {
       return ['messages'];
@@ -97,6 +101,7 @@ export interface Provider {
   type: string | string[];
   apiBaseUrl?: string | Record<string, string>;
   apiKey: string;
+  oauthProvider?: string;
   enabled: boolean;
   estimateTokens?: boolean;
   discount?: number;
@@ -200,6 +205,7 @@ interface PlexusConfig {
     providers: Record<string, {
         type?: string | string[]; // Optional for backward compatibility, but will be inferred from api_base_url
         api_key?: string;
+        oauth_provider?: string;
         api_base_url?: string | Record<string, string>;
         display_name?: string;
         models?: string[] | Record<string, any>;
@@ -708,6 +714,7 @@ export const api = {
                 type: inferredTypes,
                 apiBaseUrl: val.api_base_url,
                 apiKey: val.api_key || '',
+                oauthProvider: val.oauth_provider,
                 enabled: val.enabled !== false, // Default to true if not present
                 estimateTokens: val.estimateTokens || false,
                 discount: val.discount,
@@ -749,6 +756,7 @@ export const api = {
               ...existing, // Keep existing fields like models list if any
               type: p.type,
               api_key: p.apiKey,
+              ...(p.oauthProvider && { oauth_provider: p.oauthProvider }),
               api_base_url: p.apiBaseUrl,
               display_name: p.name,
               discount: p.discount,
@@ -792,6 +800,7 @@ export const api = {
       config.providers[provider.id] = {
           ...(shouldIncludeType && { type: provider.type }),
           api_key: provider.apiKey,
+          ...(provider.oauthProvider && { oauth_provider: provider.oauthProvider }),
           api_base_url: provider.apiBaseUrl,
           display_name: provider.name,
           estimateTokens: provider.estimateTokens,
