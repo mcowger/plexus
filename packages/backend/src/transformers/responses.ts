@@ -54,6 +54,10 @@ export class ResponsesTransformer implements Transformer {
       tools: tools.length > 0 ? tools : undefined,
       tool_choice: this.convertToolChoiceForChatCompletions(input.tool_choice),
       reasoning: input.reasoning,
+      include: input.include,
+      prompt_cache_key: input.prompt_cache_key,
+      text: input.text,
+      parallel_tool_calls: input.parallel_tool_calls,
       response_format: input.text?.format ? {
         type: input.text.format.type,
         json_schema: input.text.format.schema
@@ -162,6 +166,28 @@ export class ResponsesTransformer implements Transformer {
     }
     if (request.tool_choice) {
       payload.tool_choice = request.tool_choice;
+    }
+    if (request.reasoning) {
+      payload.reasoning = request.reasoning;
+    }
+    if (request.include && request.include.length > 0) {
+      payload.include = request.include;
+    }
+    if (request.prompt_cache_key) {
+      payload.prompt_cache_key = request.prompt_cache_key;
+    }
+    if (request.parallel_tool_calls !== undefined) {
+      payload.parallel_tool_calls = request.parallel_tool_calls;
+    }
+    if (request.text) {
+      payload.text = request.text;
+    } else if (request.response_format) {
+      payload.text = {
+        format: {
+          type: request.response_format.type,
+          schema: request.response_format.json_schema
+        }
+      };
     }
 
     return payload;

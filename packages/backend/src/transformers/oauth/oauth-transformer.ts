@@ -101,14 +101,44 @@ export class OAuthTransformer implements Transformer {
 
   async transformRequest(request: UnifiedChatRequest): Promise<any> {
     const context = unifiedToContext(request);
+    const options: Record<string, any> = {};
+
+    if (request.reasoning?.effort) {
+      options.reasoningEffort = request.reasoning.effort;
+    }
+    if (request.reasoning?.summary) {
+      options.reasoningSummary = request.reasoning.summary;
+    }
+    if (request.text?.verbosity) {
+      options.textVerbosity = request.text.verbosity;
+    }
+    if (request.prompt_cache_key) {
+      options.sessionId = request.prompt_cache_key;
+    }
+    if (Array.isArray(request.include) && request.include.length > 0) {
+      options.include = request.include;
+    }
+    if (request.max_tokens !== undefined) {
+      options.maxOutputTokens = request.max_tokens;
+    }
+    if (request.temperature !== undefined) {
+      options.temperature = request.temperature;
+    }
+    if (request.tool_choice !== undefined) {
+      options.toolChoice = request.tool_choice;
+    }
+    if (request.parallel_tool_calls !== undefined) {
+      options.parallelToolCalls = request.parallel_tool_calls;
+    }
 
     logger.debug(`${this.name}: Converted UnifiedChatRequest to pi-ai Context`, {
       messageCount: context.messages.length,
       hasSystemPrompt: !!context.systemPrompt,
-      toolCount: context.tools?.length || 0
+      toolCount: context.tools?.length || 0,
+      optionKeys: Object.keys(options)
     });
 
-    return context;
+    return { context, options };
   }
 
   async transformResponse(response: any): Promise<UnifiedChatResponse> {
@@ -189,11 +219,13 @@ export class OAuthTransformer implements Transformer {
     context: any,
     provider: OAuthProvider,
     modelId: string,
-    streaming: boolean
+    streaming: boolean,
+    options?: Record<string, any>
   ): Promise<any> {
     const authManager = OAuthAuthManager.getInstance();
     const apiKey = await authManager.getApiKey(provider);
     const model = this.getPiAiModel(provider, modelId);
+    const requestOptions = { apiKey, ...(options || {}) };
 
     logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request`, {
       model: model.id,
@@ -202,7 +234,7 @@ export class OAuthTransformer implements Transformer {
 
     if (streaming) {
       try {
-        const result = await stream(model, context, { apiKey });
+        const result = await stream(model, context, requestOptions);
         logger.debug(`${this.name}: OAuth stream result type`, describeStreamResult(result));
         return result;
       } catch (error) {
@@ -211,6 +243,6 @@ export class OAuthTransformer implements Transformer {
       }
     }
 
-    return await complete(model, context, { apiKey });
+    return await complete(model, context, requestOptions);
   }
 }
