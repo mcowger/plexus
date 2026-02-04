@@ -461,7 +461,23 @@ export const Models = () => {
                                                     e.stopPropagation();
                                                     e.preventDefault();
                                                     if (!isDisabled) {
-                                                        handleTestTarget(alias.id, i, t.provider, t.model, t.apiType || ['chat']);
+                                                        let testApiTypes: string[] = ['chat'];
+                                                        if (alias.type === 'embeddings') {
+                                                            testApiTypes = ['embeddings'];
+                                                        } else if (alias.type === 'transcriptions') {
+                                                            alert('Cannot test transcriptions API via test button - requires file upload. Use actual /v1/audio/transcriptions endpoint.');
+                                                            return;
+                                                        } else if (alias.type === 'speech') {
+                                                            alert('Cannot test speech API via test button - requires file upload. Use actual /v1/audio/speech endpoint.');
+                                                            return;
+                                                        } else if (alias.type === 'image') {
+                                                            testApiTypes = ['images'];
+                                                        } else if (alias.type === 'responses') {
+                                                            testApiTypes = ['responses'];
+                                                        } else if (t.apiType && t.apiType.length > 0) {
+                                                            testApiTypes = t.apiType;
+                                                        }
+                                                        handleTestTarget(alias.id, i, t.provider, t.model, testApiTypes);
                                                     }
                                                 }} style={{
                                                     display: 'flex',
@@ -501,7 +517,22 @@ export const Models = () => {
                                                             color: 'var(--color-text-secondary)',
                                                             opacity: 0.7
                                                         }}>
-                                                            [{t.apiType.join(', ')}]
+                                                            [{(() => {
+                                                                const chatApis = ['chat', 'messages', 'gemini', 'responses'];
+                                                                if (alias.type === 'embeddings') {
+                                                                    return 'embeddings';
+                                                                } else if (alias.type === 'transcriptions') {
+                                                                    return 'transcriptions';
+                                                                } else if (alias.type === 'speech') {
+                                                                    return 'speech';
+                                                                } else if (alias.type === 'image') {
+                                                                    return 'images';
+                                                                } else if (alias.type === 'responses') {
+                                                                    return 'responses';
+                                                                } else {
+                                                                    return t.apiType.filter((a: string) => chatApis.includes(a)).join(', ');
+                                                                }
+                                                            })()}]
                                                         </span>
                                                     )}
                                                     {isProviderDisabled && <span style={{textDecoration: 'none', display: 'inline-block', marginLeft: '4px', fontStyle: 'italic'}}>(provider disabled)</span>}

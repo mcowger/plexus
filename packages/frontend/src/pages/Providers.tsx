@@ -725,34 +725,39 @@ export const Providers = () => {
                                                    {mCfg.type !== 'embeddings' && mCfg.type !== 'transcriptions' && mCfg.type !== 'speech' && mCfg.type !== 'image' && mCfg.type !== 'responses' && (
                                                        <div className="flex flex-col gap-1">
                                                            <label className="font-body text-[13px] font-medium text-text-secondary">Access Via (APIs)</label>
-                                                           <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
-                                                               {KNOWN_APIS.map(apiType => {
-                                                                     const isEmbeddingsModel = mCfg.type === 'embeddings';
-                                                                     const isTranscriptionsModel = mCfg.type === 'transcriptions';
-                                                                     const isSpeechModel = mCfg.type === 'speech';
-                                                                     const isImageModel = mCfg.type === 'image';
-                                                                     const isResponsesModel = mCfg.type === 'responses';
-                                                                     const isDisabled = (isEmbeddingsModel && apiType !== 'embeddings') || (isTranscriptionsModel && apiType !== 'transcriptions') || (isSpeechModel && apiType !== 'speech') || (isImageModel && apiType !== 'images') || (isResponsesModel && apiType !== 'responses');
-                                                                  
-                                                                  return (
-                                                                      <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}>
-                                                                          <input 
-                                                                            type="checkbox" 
-                                                                            checked={(mCfg.access_via || []).includes(apiType)}
-                                                                            disabled={isDisabled}
-                                                                            onChange={() => {
-                                                                                const current = mCfg.access_via || [];
-                                                                                const next = current.includes(apiType) ? current.filter((a: string) => a !== apiType) : [...current, apiType];
-                                                                                updateModelConfig(mId, { access_via: next });
-                                                                            }}
-                                                                          />
-                                                                          <span className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium" style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 6px', opacity: (mCfg.access_via || []).includes(apiType) ? 1 : 0.5 }}>
-                                                                            {apiType}
-                                                                          </span>
-                                                                      </label>
-                                                                  );
-                                                              })}
-                                                          </div>
+                                                            <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px'}}>
+                                                                {KNOWN_APIS.filter(apiType => {
+                                                                    if (mCfg.type === 'chat') {
+                                                                        return ['messages', 'chat', 'gemini', 'responses'].includes(apiType);
+                                                                    }
+                                                                    return true;
+                                                                }).map(apiType => {
+                                                                      const isEmbeddingsModel = mCfg.type === 'embeddings';
+                                                                      const isTranscriptionsModel = mCfg.type === 'transcriptions';
+                                                                      const isSpeechModel = mCfg.type === 'speech';
+                                                                      const isImageModel = mCfg.type === 'image';
+                                                                      const isResponsesModel = mCfg.type === 'responses';
+                                                                      const isDisabled = (isEmbeddingsModel && apiType !== 'embeddings') || (isTranscriptionsModel && apiType !== 'transcriptions') || (isSpeechModel && apiType !== 'speech') || (isImageModel && apiType !== 'images') || (isResponsesModel && apiType !== 'responses');
+                                                                   
+                                                                   return (
+                                                                       <label key={apiType} style={{display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}>
+                                                                           <input 
+                                                                             type="checkbox" 
+                                                                             checked={(mCfg.access_via || []).includes(apiType)}
+                                                                             disabled={isDisabled}
+                                                                             onChange={() => {
+                                                                                 const current = mCfg.access_via || [];
+                                                                                 const next = current.includes(apiType) ? current.filter((a: string) => a !== apiType) : [...current, apiType];
+                                                                                 updateModelConfig(mId, { access_via: next });
+                                                                             }}
+                                                                           />
+                                                                           <span className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium" style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 6px', opacity: (mCfg.access_via || []).includes(apiType) ? 1 : 0.5 }}>
+                                                                             {apiType}
+                                                                           </span>
+                                                                       </label>
+                                                                   );
+                                                               })}
+                                                            </div>
                                                           {(!mCfg.access_via || mCfg.access_via.length === 0) && (
                                                               <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic'}}>
                                                                   No APIs selected. Defaults to ALL supported APIs.

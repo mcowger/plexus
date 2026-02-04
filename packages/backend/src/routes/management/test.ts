@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../../services/dispatcher';
-import { OpenAITransformer, AnthropicTransformer, GeminiTransformer, ResponsesTransformer, EmbeddingsTransformer, ImageTransformer } from '../../transformers';
+import { OpenAITransformer, AnthropicTransformer, GeminiTransformer, ResponsesTransformer, EmbeddingsTransformer, ImageTransformer, SpeechTransformer } from '../../transformers';
 
 /**
  * Test request templates for each API type
@@ -68,6 +68,11 @@ const TEST_TEMPLATES = {
         prompt: 'A tiny 256x256 red square',
         n: 1,
         size: '256x256'
+    }),
+
+    speech: (modelPath: string) => ({
+        model: modelPath,
+        input: 'Hello world'
     })
 };
 
@@ -98,10 +103,10 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             logger.info(`Testing model: ${body.provider}/${body.model} via ${apiType} API`);
 
             // Validate API type
-            if (!['chat', 'messages', 'gemini', 'responses', 'embeddings', 'images'].includes(apiType)) {
+            if (!['chat', 'messages', 'gemini', 'responses', 'embeddings', 'images', 'transcriptions', 'speech'].includes(apiType)) {
                 return reply.code(400).send({
                     success: false,
-                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses, embeddings, images`
+                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses, embeddings, images, transcriptions, speech`
                 });
             }
 
@@ -120,7 +125,8 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
                 case 'messages':
                 case 'gemini':
                 case 'responses':
-                    // These use the standard dispatch path
+                case 'speech':
+                    // These use the standard dispatch path with transformers
                     break;
                 case 'embeddings':
                     dispatchMethod = 'dispatchEmbeddings';
@@ -146,8 +152,16 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             logger.info('Dispatching request...');
             let response;
 
+            if (apiType === 'transcriptions') {
+                return reply.code(400).send({
+                    success: false,
+                    error: 'Cannot test transcriptions API via test endpoint - requires file upload. Use the actual /v1/audio/transcriptions endpoint to test.'
+                });
+            }
+
             if (dispatchMethod === 'dispatchEmbeddings') {
                 response = await dispatcher.dispatchEmbeddings({
+                    model: directModelPath,
                     originalBody: testRequest,
                     requestId,
                     incomingApiType: 'embeddings'
@@ -159,6 +173,14 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
                     requestId,
                     incomingApiType: 'images'
                 });
+            } else if (apiType === 'speech') {
+                const { SpeechTransformer } = await import('../../transformers/speech');
+                const transformer = new SpeechTransformer();
+                const unifiedRequest = await transformer.parseRequest(testRequest);
+                unifiedRequest.incomingApiType = 'speech';
+                unifiedRequest.originalBody = testRequest;
+                unifiedRequest.requestId = requestId;
+                response = await dispatcher.dispatchSpeech(unifiedRequest);
             } else {
                 // chat, messages, gemini, responses all use transformers with parseRequest
                 let transformer;
