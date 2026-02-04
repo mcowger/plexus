@@ -632,8 +632,16 @@ export class ResponsesTransformer implements Transformer {
     let messageItemId = '';
     let messageText = '';
     let messagePartAdded = false;
+    let messageOutputIndex: number | null = null;
+    let reasoningItemSent = false;
+    let reasoningItemId = '';
+    let reasoningText = '';
+    let reasoningOutputIndex: number | null = null;
     let lastUsage: any = null;
     let sequenceNumber = 0;
+    let nextOutputIndex = 0;
+    const usedOutputIndices = new Set<number>();
+    const outputItemsByIndex = new Map<number, any>();
     const toolOutputIndexMap = new Map<number, number>();
     const toolCallIdMap = new Map<number, string>();
     const toolItemIdMap = new Map<number, string>();
@@ -673,6 +681,16 @@ export class ResponsesTransformer implements Transformer {
       hasSentCreated = true;
     };
 
+    const reserveOutputIndex = (): number => {
+      while (usedOutputIndices.has(nextOutputIndex)) {
+        nextOutputIndex += 1;
+      }
+      const index = nextOutputIndex;
+      usedOutputIndices.add(index);
+      nextOutputIndex += 1;
+      return index;
+    };
+
     const ensureInProgress = (controller: ReadableStreamDefaultController) => {
       if (hasSentInProgress) return;
       sendEvent(controller, {
@@ -691,10 +709,14 @@ export class ResponsesTransformer implements Transformer {
 
     const ensureMessageItem = (controller: ReadableStreamDefaultController) => {
       if (messageItemSent) return;
+      if (messageOutputIndex === null) {
+        messageOutputIndex = reserveOutputIndex();
+      }
+      const currentMessageOutputIndex = messageOutputIndex as number;
       messageItemId = this.generateItemId('msg');
       sendEvent(controller, {
         type: 'response.output_item.added',
-        output_index: 0,
+        output_index: currentMessageOutputIndex,
         item: {
           id: messageItemId,
           type: 'message',
@@ -706,7 +728,7 @@ export class ResponsesTransformer implements Transformer {
       if (!messagePartAdded) {
         sendEvent(controller, {
           type: 'response.content_part.added',
-          output_index: 0,
+          output_index: currentMessageOutputIndex,
           item_id: messageItemId,
           content_index: 0,
           part: {
@@ -721,13 +743,30 @@ export class ResponsesTransformer implements Transformer {
       messageItemSent = true;
     };
 
+    const ensureReasoningItem = (controller: ReadableStreamDefaultController) => {
+      if (reasoningItemSent) return;
+      reasoningOutputIndex = reserveOutputIndex();
+      reasoningItemId = this.generateItemId('rs');
+      sendEvent(controller, {
+        type: 'response.output_item.added',
+        output_index: reasoningOutputIndex,
+        item: {
+          id: reasoningItemId,
+          type: 'reasoning',
+          status: 'in_progress',
+          summary: []
+        }
+      });
+      reasoningItemSent = true;
+    };
+
     const ensureToolItem = (
       controller: ReadableStreamDefaultController,
       toolIndex: number,
       toolCall: any
     ) => {
       if (toolOutputIndexMap.has(toolIndex)) return;
-      const outputIndex = toolIndex + 1;
+      const outputIndex = reserveOutputIndex();
       const callId = toolCall?.id || this.generateItemId('call');
       const itemId = this.generateItemId('fc');
       toolOutputIndexMap.set(toolIndex, outputIndex);
@@ -790,12 +829,24 @@ export class ResponsesTransformer implements Transformer {
             }
 
             const delta = unifiedChunk.delta || {};
+            const reasoningDelta =
+              typeof delta.reasoning_content === 'string'
+                ? delta.reasoning_content
+                : typeof delta.thinking?.content === 'string'
+                  ? delta.thinking.content
+                  : null;
+
+            if (reasoningDelta && reasoningDelta.length > 0) {
+              ensureReasoningItem(controller);
+              reasoningText += reasoningDelta;
+            }
+
             if (typeof delta.content === 'string' && delta.content.length > 0) {
               ensureMessageItem(controller);
               messageText += delta.content;
               sendEvent(controller, {
                 type: 'response.output_text.delta',
-                output_index: 0,
+                output_index: messageOutputIndex as number,
                 item_id: messageItemId,
                 content_index: 0,
                 delta: delta.content,
@@ -823,69 +874,28 @@ export class ResponsesTransformer implements Transformer {
             }
 
             if (unifiedChunk.finish_reason && !unifiedChunk.delta) {
-              if (messageItemSent) {
-                sendEvent(controller, {
-                  type: 'response.output_text.done',
-                  output_index: 0,
-                  item_id: messageItemId,
-                  content_index: 0,
-                  logprobs: [],
-                  text: messageText
-                });
-                sendEvent(controller, {
-                  type: 'response.content_part.done',
-                  output_index: 0,
-                  item_id: messageItemId,
-                  content_index: 0,
-                  part: {
-                    type: 'output_text',
-                    annotations: [],
-                    logprobs: [],
-                    text: messageText
-                  }
-                });
+              if (reasoningItemSent && reasoningOutputIndex !== null) {
+                const reasoningItem = {
+                  id: reasoningItemId,
+                  type: 'reasoning',
+                  status: 'completed',
+                  summary: [
+                    {
+                      type: 'summary_text',
+                      text: reasoningText
+                    }
+                  ]
+                };
                 sendEvent(controller, {
                   type: 'response.output_item.done',
-                  output_index: 0,
-                  item: {
-                    id: messageItemId,
-                    type: 'message',
-                    status: 'completed',
-                    role: 'assistant',
-                    content: [
-                      {
-                        type: 'output_text',
-                        annotations: [],
-                        logprobs: [],
-                        text: messageText
-                      }
-                    ]
-                  }
+                  output_index: reasoningOutputIndex,
+                  item: reasoningItem
                 });
+                outputItemsByIndex.set(reasoningOutputIndex, reasoningItem);
               }
 
-              for (const [toolIndex, outputIndex] of toolOutputIndexMap.entries()) {
-                const itemId = toolItemIdMap.get(toolIndex);
-                const callId = toolCallIdMap.get(toolIndex);
-                const args = toolArgsMap.get(toolIndex) || '';
-                const name = toolNameMap.get(toolIndex) || '';
-                sendEvent(controller, {
-                  type: 'response.output_item.done',
-                  output_index: outputIndex,
-                  item: {
-                    id: itemId,
-                    type: 'function_call',
-                    status: 'completed',
-                    call_id: callId,
-                    name,
-                    arguments: args
-                  }
-                });
-              }
-
-              const outputItems: any[] = [];
               if (messageItemSent) {
-                outputItems.push({
+                const messageItem = {
                   id: messageItemId,
                   type: 'message',
                   status: 'completed',
@@ -898,22 +908,59 @@ export class ResponsesTransformer implements Transformer {
                       text: messageText
                     }
                   ]
+                };
+                sendEvent(controller, {
+                  type: 'response.output_text.done',
+                  output_index: messageOutputIndex as number,
+                  item_id: messageItemId,
+                  content_index: 0,
+                  logprobs: [],
+                  text: messageText
                 });
+                sendEvent(controller, {
+                  type: 'response.content_part.done',
+                  output_index: messageOutputIndex as number,
+                  item_id: messageItemId,
+                  content_index: 0,
+                  part: {
+                    type: 'output_text',
+                    annotations: [],
+                    logprobs: [],
+                    text: messageText
+                  }
+                });
+                sendEvent(controller, {
+                  type: 'response.output_item.done',
+                  output_index: messageOutputIndex as number,
+                  item: messageItem
+                });
+                outputItemsByIndex.set(messageOutputIndex as number, messageItem);
               }
+
               for (const [toolIndex, outputIndex] of toolOutputIndexMap.entries()) {
                 const itemId = toolItemIdMap.get(toolIndex);
                 const callId = toolCallIdMap.get(toolIndex);
                 const args = toolArgsMap.get(toolIndex) || '';
                 const name = toolNameMap.get(toolIndex) || '';
-                outputItems.push({
+                const toolItem = {
                   id: itemId,
                   type: 'function_call',
                   status: 'completed',
                   call_id: callId,
                   name,
                   arguments: args
+                };
+                sendEvent(controller, {
+                  type: 'response.output_item.done',
+                  output_index: outputIndex,
+                  item: toolItem
                 });
+                outputItemsByIndex.set(outputIndex, toolItem);
               }
+
+              const outputItems = Array.from(outputItemsByIndex.entries())
+                .sort(([a], [b]) => a - b)
+                .map(([, item]) => item);
 
               sendEvent(controller, {
                 type: 'response.completed',
