@@ -60,5 +60,5 @@ const { setConfigForTesting, validateConfig } = await import("../src/config");
 setConfigForTesting(validateConfig(testConfig));
 
 // Initialize database with the test config
-initializeDatabase();
+initializeDatabase(testDbUrl);
 await runMigrations();
