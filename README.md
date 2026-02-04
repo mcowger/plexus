@@ -8,7 +8,7 @@
 
 Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemini, etc.) under a single API. Switch models and providers without rewriting client code.
 
-### Recent Updates (v0.10.0)
+### Recent Updates
 
 - **Quota Tracking System**: Monitor provider rate limits and quotas with configurable checkers
 - **Audio Transcriptions API**: Full OpenAI-compatible `/v1/audio/transcriptions` endpoint support with multipart file uploads
@@ -17,42 +17,17 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 - **Token Estimation**: Automatic token counting for providers that don't return usage data
 - **Bulk Model Import**: Import models directly in provider configuration
 - **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format
-- **Responses API Support**: Full OpenAI `/v1/responses` endpoint with multi-turn conversation support
+- **Responses API Support**: Full OpenAI `/v1/responses` endpoint with multi-turn conversation support.  Inckudes support for previous_response_id tracking and injection, something many proxy tools lack.    
 - **Automatic Response Cleanup**: Responses are retained for 7 days with hourly cleanup jobs to prevent database bloat
 
 ### Database & ORM
 
-Plexus uses **Drizzle ORM** with **SQLite** for data persistence:
+Plexus uses **Drizzle ORM** with **SQLite** or **Postgres** for data persistence:
 
 - **Schema Management**: Type-safe database schemas in `packages/backend/drizzle/schema/`
 - **Automatic Migrations**: Migrations run automatically on startup
 - **Tables**: Usage tracking, provider cooldowns, debug logs, inference errors, performance metrics, quota snapshots
 
-#### Managing Database Schema
-
-**Generate a migration after schema changes:**
-```bash
-cd packages/backend
-bunx drizzle-kit generate
-```
-
-**Apply migrations manually (optional):**
-```bash
-bunx drizzle-kit migrate
-```
-
-**Creating a new table:**
-```typescript
-// In drizzle/schema/new-table.ts
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
-
-export const newTable = sqliteTable('new_table', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-});
-```
-
-Then run `bunx drizzle-kit generate` to create the migration.
 
 ## Quick Start
 
