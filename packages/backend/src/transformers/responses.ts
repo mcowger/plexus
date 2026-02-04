@@ -1,5 +1,5 @@
 import { Transformer } from "../types/transformer";
-import { UnifiedResponsesRequest, UnifiedResponsesResponse, ResponsesStreamEvent, ResponsesInputItem, ResponsesMessageItem, ResponsesFunctionCallItem, ResponsesFunctionCallOutputItem, ResponsesOutputItem } from "../types/responses";
+import { UnifiedResponsesRequest, UnifiedResponsesResponse, ResponsesStreamEvent, ResponsesInputItem, ResponsesMessageItem, ResponsesFunctionCallItem, ResponsesFunctionCallOutputItem, ResponsesOutputItem, ResponsesReasoningTextPart, ResponsesSummaryTextPart } from "../types/responses";
 import { UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage } from "../types/unified";
 import { createParser } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
@@ -225,7 +225,10 @@ export class ResponsesTransformer implements Transformer {
 
       // Find reasoning output item
       const reasoningItem = response.output?.find((item: any) => item.type === 'reasoning');
-      const reasoning_content = reasoningItem?.summary
+      const reasoningParts = reasoningItem?.content?.length
+        ? reasoningItem.content
+        : reasoningItem?.summary;
+      const reasoning_content = reasoningParts
         ?.map((part: any) => part.text)
         .join('\n') || null;
 
@@ -482,15 +485,21 @@ export class ResponsesTransformer implements Transformer {
     const items: ResponsesOutputItem[] = [];
 
     // Add reasoning if present
-    if (response.reasoning_content) {
+    if (response.reasoning_content || response.thinking?.content) {
+      const reasoningText = response.reasoning_content || '';
+      const reasoningSummary = response.thinking?.content || '';
+      const contentParts: ResponsesReasoningTextPart[] = reasoningText
+        ? [{ type: 'reasoning_text', text: reasoningText }]
+        : [];
+      const summaryParts: ResponsesSummaryTextPart[] = reasoningSummary
+        ? [{ type: 'summary_text', text: reasoningSummary }]
+        : [];
       items.push({
         type: 'reasoning',
         id: this.generateItemId('reason'),
         status: 'completed',
-        summary: [{
-          type: 'summary_text',
-          text: response.reasoning_content
-        }]
+        content: contentParts,
+        summary: summaryParts
       });
     }
 
@@ -663,6 +672,10 @@ export class ResponsesTransformer implements Transformer {
     let reasoningItemId = '';
     let reasoningText = '';
     let reasoningOutputIndex: number | null = null;
+    let reasoningSummaryText = '';
+    let reasoningContentIndex = 0;
+    let reasoningSummaryIndex = 0;
+    let reasoningSummaryPartAdded = false;
     let lastUsage: any = null;
     let sequenceNumber = 0;
     let nextOutputIndex = 0;
@@ -794,6 +807,7 @@ export class ResponsesTransformer implements Transformer {
           id: reasoningItemId,
           type: 'reasoning',
           status: 'in_progress',
+          content: [],
           summary: []
         }
       });
@@ -834,13 +848,53 @@ export class ResponsesTransformer implements Transformer {
           id: reasoningItemId,
           type: 'reasoning',
           status: 'completed',
-          summary: [
-            {
-              type: 'summary_text',
-              text: reasoningText
-            }
-          ]
+          content: reasoningText
+            ? [
+                {
+                  type: 'reasoning_text',
+                  text: reasoningText
+                }
+              ]
+            : [],
+          summary: reasoningSummaryText
+            ? [
+                {
+                  type: 'summary_text',
+                  text: reasoningSummaryText
+                }
+              ]
+            : []
         };
+        if (reasoningText) {
+          sendEvent(controller, {
+            type: 'response.reasoning_text.done',
+            output_index: reasoningOutputIndex,
+            item_id: reasoningItemId,
+            content_index: reasoningContentIndex,
+            text: reasoningText
+          });
+        }
+        if (reasoningSummaryText) {
+          sendEvent(controller, {
+            type: 'response.reasoning_summary_text.done',
+            output_index: reasoningOutputIndex,
+            item_id: reasoningItemId,
+            summary_index: reasoningSummaryIndex,
+            text: reasoningSummaryText
+          });
+          if (reasoningSummaryPartAdded) {
+            sendEvent(controller, {
+              type: 'response.reasoning_summary_part.done',
+              output_index: reasoningOutputIndex,
+              item_id: reasoningItemId,
+              summary_index: reasoningSummaryIndex,
+              part: {
+                type: 'summary_text',
+                text: reasoningSummaryText
+              }
+            });
+          }
+        }
         sendEvent(controller, {
           type: 'response.output_item.done',
           output_index: reasoningOutputIndex,
@@ -964,13 +1018,47 @@ export class ResponsesTransformer implements Transformer {
             const reasoningDelta =
               typeof delta.reasoning_content === 'string'
                 ? delta.reasoning_content
-                : typeof delta.thinking?.content === 'string'
-                  ? delta.thinking.content
-                  : null;
+                : null;
+            const reasoningSummaryDelta =
+              typeof delta.thinking?.content === 'string'
+                ? delta.thinking.content
+                : null;
 
             if (reasoningDelta && reasoningDelta.length > 0) {
               ensureReasoningItem(controller);
               reasoningText += reasoningDelta;
+              sendEvent(controller, {
+                type: 'response.reasoning_text.delta',
+                output_index: reasoningOutputIndex as number,
+                item_id: reasoningItemId,
+                content_index: reasoningContentIndex,
+                delta: reasoningDelta
+              });
+            }
+
+            if (reasoningSummaryDelta && reasoningSummaryDelta.length > 0) {
+              ensureReasoningItem(controller);
+              if (!reasoningSummaryPartAdded) {
+                sendEvent(controller, {
+                  type: 'response.reasoning_summary_part.added',
+                  output_index: reasoningOutputIndex as number,
+                  item_id: reasoningItemId,
+                  summary_index: reasoningSummaryIndex,
+                  part: {
+                    type: 'summary_text',
+                    text: ''
+                  }
+                });
+                reasoningSummaryPartAdded = true;
+              }
+              reasoningSummaryText += reasoningSummaryDelta;
+              sendEvent(controller, {
+                type: 'response.reasoning_summary_text.delta',
+                output_index: reasoningOutputIndex as number,
+                item_id: reasoningItemId,
+                summary_index: reasoningSummaryIndex,
+                delta: reasoningSummaryDelta
+              });
             }
 
             if (typeof delta.content === 'string' && delta.content.length > 0) {
