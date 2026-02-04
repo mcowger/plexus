@@ -15,7 +15,9 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   createInspector(providerApiType: string): PassThrough {
-    const inspector = new PassThrough();
+    const inspector = providerApiType === 'oauth'
+      ? new PassThrough({ objectMode: true })
+      : new PassThrough();
 
     const bodyChunks: string[] = [];
     let totalSize = 0;
@@ -33,6 +35,8 @@ export class DebugLoggingInspector extends BaseInspector {
         chunkStr = chunk.toString('utf8');
       } else if (chunk instanceof Uint8Array) {
         chunkStr = new TextDecoder().decode(chunk);
+      } else if (chunk && typeof chunk === 'object') {
+        chunkStr = `${JSON.stringify(chunk)}\n`;
       } else {
         try {
           chunkStr = String(chunk);
@@ -72,6 +76,9 @@ export class DebugLoggingInspector extends BaseInspector {
             break;
           case "gemini":
             reconstructed = this.reconstructGemini(rawBody);
+            break;
+          case "oauth":
+            reconstructed = this.reconstructOAuth(rawBody);
             break;
           default:
             logger.warn(`[Inspector] Unknown providerApiType: ${providerApiType}`);
@@ -184,6 +191,97 @@ export class DebugLoggingInspector extends BaseInspector {
       }
     }
     return snapshot;
+  }
+
+  private reconstructOAuth(fullBody: string): any {
+    const lines = fullBody.split(/\r?\n/);
+    const snapshot: any = {
+      content: '',
+      reasoning_content: '',
+      tool_calls: [],
+      usage: undefined,
+      finishReason: null
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      try {
+        const event = JSON.parse(trimmed);
+        switch (event.type) {
+          case 'text_delta':
+            snapshot.content += event.delta || '';
+            break;
+          case 'thinking_delta':
+            snapshot.reasoning_content += event.delta || '';
+            break;
+          case 'toolcall_start': {
+            const index = event.contentIndex ?? 0;
+            snapshot.tool_calls[index] = snapshot.tool_calls[index] || {
+              id: '',
+              type: 'function',
+              function: { name: '', arguments: '' }
+            };
+            break;
+          }
+          case 'toolcall_delta': {
+            const index = event.contentIndex ?? 0;
+            const toolCall = event.partial?.content?.[index];
+            snapshot.tool_calls[index] = snapshot.tool_calls[index] || {
+              id: '',
+              type: 'function',
+              function: { name: '', arguments: '' }
+            };
+            if (toolCall?.id) snapshot.tool_calls[index].id = toolCall.id;
+            if (toolCall?.name) snapshot.tool_calls[index].function.name = toolCall.name;
+            if (typeof event.delta === 'string') {
+              snapshot.tool_calls[index].function.arguments += event.delta;
+            }
+            break;
+          }
+          case 'toolcall_end': {
+            const index = event.contentIndex ?? 0;
+            snapshot.tool_calls[index] = snapshot.tool_calls[index] || {
+              id: '',
+              type: 'function',
+              function: { name: '', arguments: '' }
+            };
+            snapshot.tool_calls[index].id = event.toolCall?.id || snapshot.tool_calls[index].id;
+            snapshot.tool_calls[index].function.name =
+              event.toolCall?.name || snapshot.tool_calls[index].function.name;
+            if (event.toolCall?.arguments) {
+              snapshot.tool_calls[index].function.arguments = JSON.stringify(event.toolCall.arguments);
+            }
+            break;
+          }
+          case 'done':
+            snapshot.usage = this.mapOAuthUsage(event.message?.usage);
+            snapshot.finishReason = event.reason || null;
+            break;
+          case 'error':
+            snapshot.usage = this.mapOAuthUsage(event.error?.usage);
+            snapshot.finishReason = event.reason || 'error';
+            break;
+        }
+      } catch (e) {
+        // Skip malformed lines
+      }
+    }
+
+    return snapshot;
+  }
+
+  private mapOAuthUsage(usage: any): any {
+    if (!usage) return undefined;
+    return {
+      input_tokens: usage.input || 0,
+      output_tokens: usage.output || 0,
+      total_tokens: usage.totalTokens || 0,
+      reasoning_tokens: 0,
+      cached_tokens: usage.cacheRead || 0,
+      cache_creation_tokens: usage.cacheWrite || 0
+    };
   }
 
   /**

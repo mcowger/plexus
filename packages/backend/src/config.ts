@@ -52,10 +52,24 @@ const ModelProviderConfigSchema = z.object({
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
 });
 
+const OAuthProviderSchema = z.enum([
+  'anthropic',
+  'openai-codex',
+  'github-copilot',
+  'google-gemini-cli',
+  'google-antigravity'
+]);
+
 const ProviderConfigSchema = z.object({
   display_name: z.string().optional(),
-  api_base_url: z.union([z.string().url(), z.record(z.string())]),
+  api_base_url: z.union([
+    z.string().refine((value) => isValidUrlOrOAuth(value), {
+      message: "api_base_url must be a valid URL or oauth://"
+    }),
+    z.record(z.string())
+  ]),
   api_key: z.string().optional(),
+  oauth_provider: OAuthProviderSchema.optional(),
   enabled: z.boolean().default(true).optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
@@ -65,10 +79,15 @@ const ProviderConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
   extraBody: z.record(z.any()).optional(),
   estimateTokens: z.boolean().optional().default(false),
-}).refine(
-  (data) => !!data.api_key,
-  { message: "'api_key' must be specified for provider" }
-);
+})
+  .refine(
+    (data) => !!data.api_key || isOAuthProviderConfig(data),
+    { message: "'api_key' must be specified for provider" }
+  )
+  .refine(
+    (data) => !isOAuthProviderConfig(data) || !!data.oauth_provider,
+    { message: "'oauth_provider' must be specified when using oauth://" }
+  );
 
 const ModelTargetSchema = z.object({
   provider: z.string(),
@@ -128,6 +147,10 @@ export function getProviderTypes(provider: ProviderConfig): string[] {
     // Single URL - infer type from URL pattern
     const url = provider.api_base_url.toLowerCase();
 
+    if (url.startsWith('oauth://')) {
+      return ['oauth'];
+    }
+
     // Check for known patterns
     if (url.includes('anthropic.com')) {
       return ['messages'];
@@ -145,6 +168,27 @@ export function getProviderTypes(provider: ProviderConfig): string[] {
       return typeof value === 'string' && value.length > 0;
     });
   }
+}
+
+export function getAuthJsonPath(): string {
+  return process.env.AUTH_JSON || './auth.json';
+}
+
+function isValidUrlOrOAuth(value: string): boolean {
+  if (value.startsWith('oauth://')) return true;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isOAuthProviderConfig(provider: { api_base_url: string | Record<string, string> }): boolean {
+  if (typeof provider.api_base_url === 'string') {
+    return provider.api_base_url.startsWith('oauth://');
+  }
+  return Object.values(provider.api_base_url).some((value) => value.startsWith('oauth://'));
 }
 
 // --- Loader ---
