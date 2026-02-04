@@ -73,7 +73,7 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
           parseFloat(fiveHourUtil) * 100,
           undefined,
           'percentage',
-          new Date(parseInt(fiveHourReset)),
+          new Date(parseInt(fiveHourReset) * 1000),
           '5-hour request quota'
         ));
       }
@@ -86,7 +86,7 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
           parseFloat(sevenDayUtil) * 100,
           undefined,
           'percentage',
-          new Date(parseInt(sevenDayReset)),
+          new Date(parseInt(sevenDayReset) * 1000),
           'Weekly request quota'
         ));
       }

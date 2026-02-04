@@ -63,7 +63,7 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
       {/* Subscription - Requests per 5-hour window */}
       {subscriptionWindow && subscriptionWindow.limit && (
         <QuotaProgressBar
-          label={`5h: ${subscriptionWindow.resetInSeconds !== undefined ? formatDuration(subscriptionWindow.resetInSeconds) : '?'}`}
+          label={`5h: ${subscriptionWindow.resetInSeconds !== undefined && subscriptionWindow.resetInSeconds !== null ? formatDuration(subscriptionWindow.resetInSeconds) : '?'}`}
           value={subscriptionWindow.used || 0}
           max={subscriptionWindow.limit}
           displayValue={`${Math.round(subscriptionWindow.utilizationPercent)}%`}

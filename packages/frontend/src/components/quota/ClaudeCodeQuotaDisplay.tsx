@@ -66,7 +66,7 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
       {/* 5-Hour Window */}
       {fiveHourWindow && (
         <QuotaProgressBar
-          label={`5h: ${fiveHourWindow.resetInSeconds !== undefined ? formatDuration(fiveHourWindow.resetInSeconds) : '?'}`}
+          label={`5h: ${fiveHourWindow.resetInSeconds !== undefined && fiveHourWindow.resetInSeconds !== null ? formatDuration(fiveHourWindow.resetInSeconds) : '?'}`}
           value={fiveHourWindow.utilizationPercent}
           max={100}
           displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
@@ -79,7 +79,7 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
       {/* Weekly Window */}
       {weeklyWindow && (
         <QuotaProgressBar
-          label={`1w: ${weeklyWindow.resetInSeconds !== undefined ? formatDuration(weeklyWindow.resetInSeconds) : '?'}`}
+          label={`1w: ${weeklyWindow.resetInSeconds !== undefined && weeklyWindow.resetInSeconds !== null ? formatDuration(weeklyWindow.resetInSeconds) : '?'}`}
           value={weeklyWindow.utilizationPercent}
           max={100}
           displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}

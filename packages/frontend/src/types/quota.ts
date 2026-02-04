@@ -62,6 +62,7 @@ export interface QuotaSnapshot {
   utilizationPercent: number | null;
   unit: string | null;
   resetsAt: number | null;
+  resetInSeconds?: number | null;
   status: string | null;
   success: number;
   errorMessage: string | null;

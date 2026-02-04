@@ -213,84 +213,86 @@ export class UsageStorageService extends EventEmitter {
     }
 
     async getUsage(filters: UsageFilters, pagination: PaginationOptions): Promise<{ data: UsageRecord[], total: number }> {
+        const db = this.ensureDb();
+        const schema = this.schema!;
         const conditions = [];
 
         if (filters.startDate) {
-            conditions.push(gte(this.schema.requestUsage.date, filters.startDate));
+            conditions.push(gte(schema.requestUsage.date, filters.startDate));
         }
         if (filters.endDate) {
-            conditions.push(lte(this.schema.requestUsage.date, filters.endDate));
+            conditions.push(lte(schema.requestUsage.date, filters.endDate));
         }
         if (filters.incomingApiType) {
-            conditions.push(eq(this.schema.requestUsage.incomingApiType, filters.incomingApiType));
+            conditions.push(eq(schema.requestUsage.incomingApiType, filters.incomingApiType));
         }
         if (filters.provider) {
-            conditions.push(like(this.schema.requestUsage.provider, `%${filters.provider}%`));
+            conditions.push(like(schema.requestUsage.provider, `%${filters.provider}%`));
         }
         if (filters.incomingModelAlias) {
-            conditions.push(like(this.schema.requestUsage.incomingModelAlias, `%${filters.incomingModelAlias}%`));
+            conditions.push(like(schema.requestUsage.incomingModelAlias, `%${filters.incomingModelAlias}%`));
         }
         if (filters.selectedModelName) {
-            conditions.push(like(this.schema.requestUsage.selectedModelName, `%${filters.selectedModelName}%`));
+            conditions.push(like(schema.requestUsage.selectedModelName, `%${filters.selectedModelName}%`));
         }
         if (filters.outgoingApiType) {
-            conditions.push(eq(this.schema.requestUsage.outgoingApiType, filters.outgoingApiType));
+            conditions.push(eq(schema.requestUsage.outgoingApiType, filters.outgoingApiType));
         }
         if (filters.minDurationMs !== undefined) {
-            conditions.push(gte(this.schema.requestUsage.durationMs, filters.minDurationMs));
+            conditions.push(gte(schema.requestUsage.durationMs, filters.minDurationMs));
         }
         if (filters.maxDurationMs !== undefined) {
-            conditions.push(lte(this.schema.requestUsage.durationMs, filters.maxDurationMs));
+            conditions.push(lte(schema.requestUsage.durationMs, filters.maxDurationMs));
         }
         if (filters.responseStatus) {
-            conditions.push(eq(this.schema.requestUsage.responseStatus, filters.responseStatus));
+            conditions.push(eq(schema.requestUsage.responseStatus, filters.responseStatus));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         try {
-            const data = await this.ensureDb()
+            const data = await db
                 .select({
-                    requestId: this.schema.requestUsage.requestId,
-                    date: this.schema.requestUsage.date,
-                    sourceIp: this.schema.requestUsage.sourceIp,
-                    apiKey: this.schema.requestUsage.apiKey,
-                    attribution: this.schema.requestUsage.attribution,
-                    incomingApiType: this.schema.requestUsage.incomingApiType,
-                    provider: this.schema.requestUsage.provider,
-                    incomingModelAlias: this.schema.requestUsage.incomingModelAlias,
-                    canonicalModelName: this.schema.requestUsage.canonicalModelName,
-                    selectedModelName: this.schema.requestUsage.selectedModelName,
-                    outgoingApiType: this.schema.requestUsage.outgoingApiType,
-                    tokensInput: this.schema.requestUsage.tokensInput,
-                    tokensOutput: this.schema.requestUsage.tokensOutput,
-                    tokensReasoning: this.schema.requestUsage.tokensReasoning,
-                    tokensCached: this.schema.requestUsage.tokensCached,
-                    tokensEstimated: this.schema.requestUsage.tokensEstimated,
-                    costInput: this.schema.requestUsage.costInput,
-                    costOutput: this.schema.requestUsage.costOutput,
-                    costCached: this.schema.requestUsage.costCached,
-                    costTotal: this.schema.requestUsage.costTotal,
-                    costSource: this.schema.requestUsage.costSource,
-                    costMetadata: this.schema.requestUsage.costMetadata,
-                    startTime: this.schema.requestUsage.startTime,
-                    durationMs: this.schema.requestUsage.durationMs,
-                    ttftMs: this.schema.requestUsage.ttftMs,
-                    tokensPerSec: this.schema.requestUsage.tokensPerSec,
-                    isStreamed: this.schema.requestUsage.isStreamed,
-                    isPassthrough: this.schema.requestUsage.isPassthrough,
-                    responseStatus: this.schema.requestUsage.responseStatus,
-                    toolsDefined: this.schema.requestUsage.toolsDefined,
-                    messageCount: this.schema.requestUsage.messageCount,
-                    parallelToolCallsEnabled: this.schema.requestUsage.parallelToolCallsEnabled,
-                    toolCallsCount: this.schema.requestUsage.toolCallsCount,
-                    finishReason: this.schema.requestUsage.finishReason,
-                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.debugLogs} dl WHERE dl.request_id = request_usage.request_id)`,
-                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${this.schema.inferenceErrors} ie WHERE ie.request_id = request_usage.request_id)`,
+                    requestId: schema.requestUsage.requestId,
+                    date: schema.requestUsage.date,
+                    sourceIp: schema.requestUsage.sourceIp,
+                    apiKey: schema.requestUsage.apiKey,
+                    attribution: schema.requestUsage.attribution,
+                    incomingApiType: schema.requestUsage.incomingApiType,
+                    provider: schema.requestUsage.provider,
+                    incomingModelAlias: schema.requestUsage.incomingModelAlias,
+                    canonicalModelName: schema.requestUsage.canonicalModelName,
+                    selectedModelName: schema.requestUsage.selectedModelName,
+                    outgoingApiType: schema.requestUsage.outgoingApiType,
+                    tokensInput: schema.requestUsage.tokensInput,
+                    tokensOutput: schema.requestUsage.tokensOutput,
+                    tokensReasoning: schema.requestUsage.tokensReasoning,
+                    tokensCached: schema.requestUsage.tokensCached,
+                    tokensEstimated: schema.requestUsage.tokensEstimated,
+                    costInput: schema.requestUsage.costInput,
+                    costOutput: schema.requestUsage.costOutput,
+                    costCached: schema.requestUsage.costCached,
+                    costTotal: schema.requestUsage.costTotal,
+                    costSource: schema.requestUsage.costSource,
+                    costMetadata: schema.requestUsage.costMetadata,
+                    startTime: schema.requestUsage.startTime,
+                    durationMs: schema.requestUsage.durationMs,
+                    ttftMs: schema.requestUsage.ttftMs,
+                    tokensPerSec: schema.requestUsage.tokensPerSec,
+                    isStreamed: schema.requestUsage.isStreamed,
+                    isPassthrough: schema.requestUsage.isPassthrough,
+                    responseStatus: schema.requestUsage.responseStatus,
+                    toolsDefined: schema.requestUsage.toolsDefined,
+                    messageCount: schema.requestUsage.messageCount,
+                    parallelToolCallsEnabled: schema.requestUsage.parallelToolCallsEnabled,
+                    toolCallsCount: schema.requestUsage.toolCallsCount,
+                    finishReason: schema.requestUsage.finishReason,
+                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.debugLogs} dl WHERE dl.request_id = request_usage.request_id)`,
+                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.inferenceErrors} ie WHERE ie.request_id = request_usage.request_id)`,
                 })
-                .from(this.schema.requestUsage)
+                .from(schema.requestUsage)
                 .where(whereClause)
-                .orderBy(desc(this.schema.requestUsage.date))
+                .orderBy(desc(schema.requestUsage.date))
                 .limit(pagination.limit)
                 .offset(pagination.offset);
 
@@ -333,9 +335,9 @@ export class UsageStorageService extends EventEmitter {
                 finishReason: row.finishReason
             }));
 
-            const countResults = await this.ensureDb()
+            const countResults = await db
                 .select({ count: sql<number>`count(*)` })
-                .from(this.schema.requestUsage)
+                .from(schema.requestUsage)
                 .where(whereClause);
 
             const total = countResults[0]?.count ?? 0;

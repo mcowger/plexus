@@ -58,7 +58,7 @@ export class SyntheticQuotaChecker extends QuotaChecker {
           data.subscription.requests,
           data.subscription.remaining,
           'dollars',
-          undefined,
+          data.subscription.renewsAt ? new Date(data.subscription.renewsAt) : undefined,
           'Monthly subscription quota'
         ));
       }
@@ -70,7 +70,7 @@ export class SyntheticQuotaChecker extends QuotaChecker {
           data.search.hourly.requests,
           data.search.hourly.remaining,
           'requests',
-          undefined,
+          data.search.hourly.renewsAt ? new Date(data.search.hourly.renewsAt) : undefined,
           'Hourly search request quota'
         ));
       }
@@ -82,7 +82,7 @@ export class SyntheticQuotaChecker extends QuotaChecker {
           data.toolCallDiscounts.requests,
           data.toolCallDiscounts.remaining,
           'requests',
-          undefined,
+          data.toolCallDiscounts.renewsAt ? new Date(data.toolCallDiscounts.renewsAt) : undefined,
           'Daily tool call discount quota'
         ));
       }
