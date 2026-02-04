@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.11.1 - 2026-02-04
+
+### v0.11.1: Implementation of Server-Side Quota Forecasting and Database Resiliency Fixes
+
+### Main New Features
+
+* **Quota Exceedance Estimation**: Introduced server-side logic to estimate quota exhaustion using historical data analysis ([d22a73d](https://github.com/mcowger/plexus/commit/d22a73d)).
+
+### Technical Changes and Fixes
+
+* **Database Reliability**: Implemented comprehensive error handling for database timeout issues and corrected Drizzle ORM API usage during response cleanup ([aff2e30](https://github.com/mcowger/plexus/commit/aff2e30), [36d9910](https://github.com/mcowger/plexus/commit/36d9910)).
+* **Quota Logic Improvements**: Resolved issues with quota snapshot deduplication, `resetInSeconds` calculation, and schema initialization ([c297f84](https://github.com/mcowger/plexus/commit/c297f84), [0d469b5](https://github.com/mcowger/plexus/commit/0d469b5)).
+* **UI Enhancements**: Refactored quota reset displays into integrated labels and updated the 'Tokens' column with fixed widths and null-set symbols for zero-cost entries ([7973c41](https://github.com/mcowger/plexus/commit/7973c41), [4db76e2](https://github.com/mcowger/plexus/commit/4db76e2)).
+* **Cleanup**: Removed unnecessary code artifacts ([41a3a24](https://github.com/mcowger/plexus/commit/41a3a24)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.11.0 - 2026-02-04
 
 ### v0.11.0: OpenAI-Compatible Responses API and Enhanced Model Test Suite
