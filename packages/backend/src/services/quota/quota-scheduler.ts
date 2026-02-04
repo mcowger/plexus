@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger';
 import { getDatabase, getSchema } from '../../db/client';
 import { QuotaCheckerFactory } from './quota-checker-factory';
+import { QuotaEstimator } from './quota-estimator';
 import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
 import { and, eq, gte, desc } from 'drizzle-orm';
 
@@ -169,12 +170,27 @@ export class QuotaScheduler {
         }
       }
       
-      // Add resetInSeconds calculation
+      // Add resetInSeconds calculation and quota estimation
       const now = Date.now();
-      return Array.from(latestByWindowType.values()).map(snapshot => ({
-        ...snapshot,
-        resetInSeconds: snapshot.resetsAt ? Math.max(0, Math.floor((snapshot.resetsAt - now) / 1000)) : null
-      }));
+      return Array.from(latestByWindowType.values()).map(snapshot => {
+        const resetInSeconds = snapshot.resetsAt ? Math.max(0, Math.floor((snapshot.resetsAt - now) / 1000)) : null;
+        
+        // Calculate estimation for this window type
+        const estimation = QuotaEstimator.estimateUsageAtReset(
+          checkerId,
+          snapshot.windowType,
+          snapshot.used,
+          snapshot.limit,
+          snapshot.resetsAt,
+          results // Pass all historical data
+        );
+        
+        return {
+          ...snapshot,
+          resetInSeconds,
+          estimation,
+        };
+      });
     } catch (error) {
       logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
       throw error;
