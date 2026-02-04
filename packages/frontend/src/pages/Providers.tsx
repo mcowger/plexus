@@ -12,6 +12,14 @@ import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
+const OAUTH_PROVIDERS = [
+  { value: 'openai-codex', label: 'OpenAI Codex' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'github-copilot', label: 'GitHub Copilot' },
+  { value: 'google-gemini-cli', label: 'Google Gemini CLI' },
+  { value: 'google-antigravity', label: 'Google Antigravity' }
+];
+
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
     switch (apiType.toLowerCase()) {
         case 'messages':
@@ -30,6 +38,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
             return { backgroundColor: '#d946ef', color: 'white', border: 'none' };
         case 'responses':
             return { backgroundColor: '#06b6d4', color: 'white', border: 'none' };
+        case 'oauth':
+            return { backgroundColor: '#111827', color: 'white', border: 'none' };
         default:
             return {};
     }
@@ -46,6 +56,9 @@ const inferProviderTypes = (apiBaseUrl?: string | Record<string, string>): strin
 
   if (typeof apiBaseUrl === 'string') {
     const url = apiBaseUrl.toLowerCase();
+    if (url.startsWith('oauth://')) {
+      return ['oauth'];
+    }
     if (url.includes('anthropic.com')) {
       return ['messages'];
     } else if (url.includes('generativelanguage.googleapis.com')) {
@@ -66,6 +79,7 @@ const EMPTY_PROVIDER: Provider = {
     name: '',
     type: [],
     apiKey: '',
+    oauthProvider: '',
     enabled: true,
     estimateTokens: false,
     apiBaseUrl: {},
@@ -94,6 +108,10 @@ export const Providers = () => {
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const isOAuthMode =
+    typeof editingProvider.apiBaseUrl === 'string' &&
+    editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
 
   // Accordion state for Modal
   const [isModelsOpen, setIsModelsOpen] = useState(false);
@@ -153,7 +171,11 @@ export const Providers = () => {
     }
     setIsSaving(true);
     try {
-        await api.saveProvider(editingProvider, originalId || undefined);
+        let providerToSave = editingProvider;
+        if (isOAuthMode && !providerToSave.oauthProvider) {
+          providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0].value };
+        }
+        await api.saveProvider(providerToSave, originalId || undefined);
         await loadData();
         setIsModalOpen(false);
     } catch (e) {
@@ -179,6 +201,7 @@ export const Providers = () => {
   };
 
   const updateApiUrl = (apiType: string, url: string) => {
+      if (isOAuthMode) return;
       let newBaseUrl: any = editingProvider.apiBaseUrl;
 
       if (typeof newBaseUrl !== 'object' || newBaseUrl === null) {
@@ -277,6 +300,7 @@ export const Providers = () => {
 
   // Generate default models URL from chat URL
   const generateModelsUrl = (): string => {
+    if (isOAuthMode) return '';
     const chatUrl = getApiUrlValue('chat');
     if (!chatUrl) return '';
     
@@ -287,6 +311,7 @@ export const Providers = () => {
 
   // Open fetch models modal
   const handleOpenFetchModels = () => {
+    if (isOAuthMode) return;
     const defaultUrl = generateModelsUrl();
     setModelsUrl(defaultUrl);
     setFetchedModels([]);
@@ -486,43 +511,105 @@ export const Providers = () => {
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
                   {/* Left: APIs & Base URLs */}
                   <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
+                        <label className="font-body text-[13px] font-medium text-text-secondary">Connection Type</label>
+                        <select
+                          className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                          value={isOAuthMode ? 'oauth' : 'url'}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === 'oauth') {
+                              setEditingProvider({
+                                ...editingProvider,
+                                apiBaseUrl: 'oauth://',
+                                apiKey: 'oauth',
+                                oauthProvider: editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value,
+                                type: ['oauth']
+                              });
+                            } else {
+                              setEditingProvider({
+                                ...editingProvider,
+                                apiBaseUrl: {},
+                                apiKey: '',
+                                oauthProvider: '',
+                                type: []
+                              });
+                            }
+                          }}
+                        >
+                          <option value="url">Custom API URL</option>
+                          <option value="oauth">OAuth (pi-ai)</option>
+                        </select>
+                      </div>
                       <label className="font-body text-[13px] font-medium text-text-secondary">Supported APIs & Base URLs</label>
                       <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontStyle: 'italic'}}>
                           API types are automatically inferred from the URLs you provide.
                       </div>
-                      <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
-                          {KNOWN_APIS.map(apiType => {
-                              const inferredTypes = inferProviderTypes(editingProvider.apiBaseUrl);
-                              const isInferred = inferredTypes.includes(apiType);
+                      {isOAuthMode ? (
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
+                          <Input
+                            label="OAuth Base URL"
+                            value="oauth://"
+                            disabled
+                          />
+                          <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic'}}>
+                            OAuth providers always use the fixed oauth:// base URL.
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
+                            {KNOWN_APIS.map(apiType => {
+                                const inferredTypes = inferProviderTypes(editingProvider.apiBaseUrl);
+                                const isInferred = inferredTypes.includes(apiType);
 
-                              return (
-                                  <div key={apiType} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                      <div style={{display: 'flex', alignItems: 'center', gap: '6px', width: '100px', flexShrink: 0}}>
-                                          <Badge
-                                            status={isInferred ? "connected" : "disconnected"}
-                                            style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 8px', opacity: isInferred ? 1 : 0.5 }}
-                                            className="[&_.connection-dot]:hidden"
-                                          >
-                                              {apiType}
-                                          </Badge>
-                                      </div>
-                                      <div style={{flex: 1}}>
-                                        <Input
-                                            placeholder={`${apiType} URL`}
-                                            value={getApiUrlValue(apiType)}
-                                            onChange={(e) => updateApiUrl(apiType, e.target.value)}
-                                        />
-                                      </div>
-                                  </div>
-                              );
-                          })}
-                      </div>
+                                return (
+                                    <div key={apiType} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                        <div style={{display: 'flex', alignItems: 'center', gap: '6px', width: '100px', flexShrink: 0}}>
+                                            <Badge
+                                              status={isInferred ? "connected" : "disconnected"}
+                                              style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 8px', opacity: isInferred ? 1 : 0.5 }}
+                                              className="[&_.connection-dot]:hidden"
+                                            >
+                                                {apiType}
+                                            </Badge>
+                                        </div>
+                                        <div style={{flex: 1}}>
+                                          <Input
+                                              placeholder={`${apiType} URL`}
+                                              value={getApiUrlValue(apiType)}
+                                              onChange={(e) => updateApiUrl(apiType, e.target.value)}
+                                          />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                      )}
                   </div>
 
                   {/* Right: Advanced Configuration */}
                   <div className="flex flex-col gap-1">
                       <label className="font-body text-[13px] font-medium text-text-secondary">Advanced Configuration</label>
                       <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                          {isOAuthMode && (
+                            <div className="flex flex-col gap-1">
+                              <label className="font-body text-[13px] font-medium text-text-secondary">OAuth Provider</label>
+                              <select
+                                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+                                onChange={(e) => setEditingProvider({
+                                  ...editingProvider,
+                                  oauthProvider: e.target.value
+                                })}
+                              >
+                                {OAUTH_PROVIDERS.map((provider) => (
+                                  <option key={provider.value} value={provider.value}>
+                                    {provider.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                           <div style={{width: '200px'}}>
                             <Input
                                 label="Discount (0.0 - 1.0)"
@@ -605,6 +692,7 @@ export const Providers = () => {
                 value={editingProvider.apiKey}
                 onChange={(e) => setEditingProvider({...editingProvider, apiKey: e.target.value})}
                 placeholder="sk-..."
+                disabled={isOAuthMode}
               />
 
               {/* Models Accordion */}
@@ -620,6 +708,7 @@ export const Providers = () => {
                         size="sm" 
                         variant="secondary" 
                         onClick={(e) => { e.stopPropagation(); handleOpenFetchModels(); }}
+                        disabled={isOAuthMode}
                         leftIcon={<Download size={14}/>}
                         style={{marginLeft: '8px'}}
                       >
