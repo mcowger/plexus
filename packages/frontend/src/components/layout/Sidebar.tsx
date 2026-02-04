@@ -97,6 +97,7 @@ export const Sidebar: React.FC = () => {
       utilizationPercent: snapshot.utilizationPercent || 0,
       unit: (snapshot.unit as any) || 'percentage',
       resetsAt: snapshot.resetsAt ? new Date(snapshot.resetsAt).toISOString() : undefined,
+      resetInSeconds: (snapshot as any).resetInSeconds ?? undefined,
       status: (snapshot.status as any) || 'ok',
     }));
     

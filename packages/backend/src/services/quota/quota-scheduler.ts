@@ -158,8 +158,23 @@ export class QuotaScheduler {
         .orderBy(desc(schema.quotaSnapshots.checkedAt))
         .limit(100);
       
-      const results = await Promise.race([queryPromise, timeoutPromise]);
-      return results as any[];
+      const results = await Promise.race([queryPromise, timeoutPromise]) as any[];
+      
+      // Get only the most recent snapshot per window type
+      const latestByWindowType = new Map<string, any>();
+      for (const snapshot of results) {
+        const existing = latestByWindowType.get(snapshot.windowType);
+        if (!existing || snapshot.checkedAt > existing.checkedAt) {
+          latestByWindowType.set(snapshot.windowType, snapshot);
+        }
+      }
+      
+      // Add resetInSeconds calculation
+      const now = Date.now();
+      return Array.from(latestByWindowType.values()).map(snapshot => ({
+        ...snapshot,
+        resetInSeconds: snapshot.resetsAt ? Math.max(0, Math.floor((snapshot.resetsAt - now) / 1000)) : null
+      }));
     } catch (error) {
       logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
       throw error;
