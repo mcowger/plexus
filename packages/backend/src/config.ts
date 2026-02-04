@@ -64,7 +64,6 @@ const ProviderConfigSchema = z.object({
   ]).optional(),
   headers: z.record(z.string()).optional(),
   extraBody: z.record(z.any()).optional(),
-  force_transformer: z.string().optional(),
   estimateTokens: z.boolean().optional().default(false),
 }).refine(
   (data) => !!data.api_key,
