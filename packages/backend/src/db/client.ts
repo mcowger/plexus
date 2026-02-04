@@ -91,7 +91,14 @@ export function initializeDatabase(connectionString?: string) {
     sqlClient = postgres(connStr, {
       ssl: false,
       max: 10,
+      idle_timeout: 20,
+      connect_timeout: 10,
       onnotice: () => {},
+    });
+    
+    // Set statement timeout to prevent long-running queries from blocking
+    sqlClient`SET statement_timeout = '30s'`.catch((err) => {
+      logger.warn(`Failed to set statement_timeout: ${err}`);
     });
 
     const pgSchema = require('../../drizzle/schema/postgres/index');
