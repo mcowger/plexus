@@ -47,3 +47,4 @@ plexus-linux
 plexus-macos
 plexus.exe
 sampledata/*.db
+auth.json
