@@ -30,7 +30,7 @@ export class Dispatcher {
     );
 
     // 2. Get Transformer
-    const transformerType = this.resolveTransformerType(route, targetApiType);
+    const transformerType = targetApiType;
     const transformer = TransformerFactory.getTransformer(transformerType);
 
     // 3. Transform Request
@@ -180,19 +180,6 @@ export class Dispatcher {
   }
 
   /**
-   * Determines which transformer to use, respecting force_transformer override
-   */
-  private resolveTransformerType(route: RouteResult, targetApiType: string): string {
-    const transformerType = route.config.force_transformer || targetApiType;
-    if (route.config.force_transformer) {
-      logger.info(
-        `Dispatcher: Using forced transformer '${transformerType}' instead of '${targetApiType}' for provider '${route.provider}'`
-      );
-    }
-    return transformerType;
-  }
-
-  /**
    * Resolves the provider base URL from configuration, handling both string and record formats
    * @returns Normalized base URL without trailing slash
    */
@@ -256,7 +243,7 @@ export class Dispatcher {
       !!request.incomingApiType?.toLowerCase() &&
       request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase();
 
-    return isCompatible && !!request.originalBody && !route.config.force_transformer;
+    return isCompatible && !!request.originalBody;
   }
 
   /**
@@ -289,11 +276,6 @@ export class Dispatcher {
 
       bypassTransformation = true;
     } else {
-      if (route.config.force_transformer) {
-        logger.info(
-          `Pass-through optimization bypassed due to force_transformer: ${route.config.force_transformer}`
-        );
-      }
       providerPayload = await transformer.transformRequest(request);
     }
 
