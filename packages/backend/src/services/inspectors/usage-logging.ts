@@ -158,6 +158,13 @@ export class UsageInspector extends PassThrough {
                     cachedTokens: reconstructed.usageMetadata.cachedContentTokenCount || 0,
                     reasoningTokens: 0
                 } : null;
+            case "oauth":
+                return reconstructed.usage ? {
+                    inputTokens: reconstructed.usage.input_tokens || 0,
+                    outputTokens: reconstructed.usage.output_tokens || 0,
+                    cachedTokens: reconstructed.usage.cached_tokens || 0,
+                    reasoningTokens: reconstructed.usage.reasoning_tokens || 0
+                } : null;
             default:
                 return null;
         }
@@ -204,6 +211,11 @@ export class UsageInspector extends PassThrough {
                     toolCallsCount = candidate.content.parts.filter((part: any) => part.functionCall).length;
                 }
                 const finishReason = candidate?.finishReason ?? null;
+                return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
+            }
+            case "oauth": {
+                const toolCallsCount = reconstructed.tool_calls?.length ?? 0;
+                const finishReason = reconstructed.finishReason ?? null;
                 return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
             }
             default:
