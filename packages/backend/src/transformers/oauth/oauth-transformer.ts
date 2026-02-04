@@ -11,6 +11,7 @@ import {
   type OAuthProvider,
   type Model as PiAiModel
 } from '@mariozechner/pi-ai';
+import { filterPiAiRequestOptions } from '../../filters/pi-ai-request-filters';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 import { unifiedToContext, piAiMessageToUnified, piAiEventToChunk } from './type-mappers';
 import { logger } from '../../utils/logger';
@@ -225,7 +226,16 @@ export class OAuthTransformer implements Transformer {
     const authManager = OAuthAuthManager.getInstance();
     const apiKey = await authManager.getApiKey(provider);
     const model = this.getPiAiModel(provider, modelId);
-    const requestOptions = { apiKey, ...(options || {}) };
+    const { filteredOptions, strippedParameters } = filterPiAiRequestOptions(options ?? {}, model);
+    const requestOptions = { apiKey, ...filteredOptions };
+
+    if (strippedParameters.length > 0) {
+      logger.debug(`${this.name}: Stripped pi-ai request options`, {
+        model: model.id,
+        provider,
+        strippedParameters
+      });
+    }
 
     logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request`, {
       model: model.id,
