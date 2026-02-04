@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { DollarSign, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { DollarSign, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import { formatDuration } from '../../lib/format';
 import type { QuotaCheckResult } from '../../types/quota';
@@ -62,41 +62,80 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
 
       {/* Subscription - Requests per 5-hour window */}
       {subscriptionWindow && subscriptionWindow.limit && (
-        <QuotaProgressBar
-          label={`5h: ${subscriptionWindow.resetInSeconds !== undefined && subscriptionWindow.resetInSeconds !== null ? formatDuration(subscriptionWindow.resetInSeconds) : '?'}`}
-          value={subscriptionWindow.used || 0}
-          max={subscriptionWindow.limit}
-          displayValue={`${Math.round(subscriptionWindow.utilizationPercent)}%`}
-          status={subscriptionWindow.status}
-          color="green"
-          size="sm"
-        />
+        <>
+          <QuotaProgressBar
+            label={`5h: ${subscriptionWindow.resetInSeconds !== undefined && subscriptionWindow.resetInSeconds !== null ? formatDuration(subscriptionWindow.resetInSeconds) : '?'}`}
+            value={subscriptionWindow.used || 0}
+            max={subscriptionWindow.limit}
+            displayValue={`${Math.round(subscriptionWindow.utilizationPercent)}%`}
+            status={subscriptionWindow.status}
+            color="green"
+            size="sm"
+          />
+          {subscriptionWindow.estimation?.willExceed && (
+            <div className="flex items-center gap-1 text-xs text-warning pl-1">
+              <TrendingUp size={12} />
+              <span>
+                Proj. {Math.round(subscriptionWindow.estimation.projectedUtilizationPercent)}% at reset
+                {subscriptionWindow.estimation.exceedanceTimestamp && (
+                  <span className="text-danger font-semibold"> (will exceed)</span>
+                )}
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Daily Tool Calls */}
       {dailyWindow && dailyWindow.limit && (
-        <QuotaProgressBar
-          label="Daily Tools"
-          value={dailyWindow.used || 0}
-          max={dailyWindow.limit}
-          displayValue={`${Math.round(dailyWindow.utilizationPercent)}%`}
-          status={dailyWindow.status}
-          color="amber"
-          size="sm"
-        />
+        <>
+          <QuotaProgressBar
+            label="Daily Tools"
+            value={dailyWindow.used || 0}
+            max={dailyWindow.limit}
+            displayValue={`${Math.round(dailyWindow.utilizationPercent)}%`}
+            status={dailyWindow.status}
+            color="amber"
+            size="sm"
+          />
+          {dailyWindow.estimation?.willExceed && (
+            <div className="flex items-center gap-1 text-xs text-warning pl-1">
+              <TrendingUp size={12} />
+              <span>
+                Proj. {Math.round(dailyWindow.estimation.projectedUtilizationPercent)}% at reset
+                {dailyWindow.estimation.exceedanceTimestamp && (
+                  <span className="text-danger font-semibold"> (will exceed)</span>
+                )}
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Hourly Search */}
       {hourlyWindow && hourlyWindow.limit && (
-        <QuotaProgressBar
-          label="Hourly Search"
-          value={hourlyWindow.used || 0}
-          max={hourlyWindow.limit}
-          displayValue={`${Math.round(hourlyWindow.utilizationPercent)}%`}
-          status={hourlyWindow.status}
-          color="blue"
-          size="sm"
-        />
+        <>
+          <QuotaProgressBar
+            label="Hourly Search"
+            value={hourlyWindow.used || 0}
+            max={hourlyWindow.limit}
+            displayValue={`${Math.round(hourlyWindow.utilizationPercent)}%`}
+            status={hourlyWindow.status}
+            color="blue"
+            size="sm"
+          />
+          {hourlyWindow.estimation?.willExceed && (
+            <div className="flex items-center gap-1 text-xs text-warning pl-1">
+              <TrendingUp size={12} />
+              <span>
+                Proj. {Math.round(hourlyWindow.estimation.projectedUtilizationPercent)}% at reset
+                {hourlyWindow.estimation.exceedanceTimestamp && (
+                  <span className="text-danger font-semibold"> (will exceed)</span>
+                )}
+              </span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

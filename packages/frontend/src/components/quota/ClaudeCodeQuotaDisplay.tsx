@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Cpu, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import type { QuotaCheckResult } from '../../types/quota';
 import { formatDuration } from '../../lib/format';
@@ -65,28 +65,54 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
 
       {/* 5-Hour Window */}
       {fiveHourWindow && (
-        <QuotaProgressBar
-          label={`5h: ${fiveHourWindow.resetInSeconds !== undefined && fiveHourWindow.resetInSeconds !== null ? formatDuration(fiveHourWindow.resetInSeconds) : '?'}`}
-          value={fiveHourWindow.utilizationPercent}
-          max={100}
-          displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
-          status={fiveHourWindow.status}
-          color="blue"
-          size="sm"
-        />
+        <>
+          <QuotaProgressBar
+            label={`5h: ${fiveHourWindow.resetInSeconds !== undefined && fiveHourWindow.resetInSeconds !== null ? formatDuration(fiveHourWindow.resetInSeconds) : '?'}`}
+            value={fiveHourWindow.utilizationPercent}
+            max={100}
+            displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
+            status={fiveHourWindow.status}
+            color="blue"
+            size="sm"
+          />
+          {fiveHourWindow.estimation?.willExceed && (
+            <div className="flex items-center gap-1 text-xs text-warning pl-1">
+              <TrendingUp size={12} />
+              <span>
+                Proj. {Math.round(fiveHourWindow.estimation.projectedUtilizationPercent)}% at reset
+                {fiveHourWindow.estimation.exceedanceTimestamp && (
+                  <span className="text-danger font-semibold"> (will exceed)</span>
+                )}
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Weekly Window */}
       {weeklyWindow && (
-        <QuotaProgressBar
-          label={`1w: ${weeklyWindow.resetInSeconds !== undefined && weeklyWindow.resetInSeconds !== null ? formatDuration(weeklyWindow.resetInSeconds) : '?'}`}
-          value={weeklyWindow.utilizationPercent}
-          max={100}
-          displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}
-          status={weeklyWindow.status}
-          color="amber"
-          size="sm"
-        />
+        <>
+          <QuotaProgressBar
+            label={`1w: ${weeklyWindow.resetInSeconds !== undefined && weeklyWindow.resetInSeconds !== null ? formatDuration(weeklyWindow.resetInSeconds) : '?'}`}
+            value={weeklyWindow.utilizationPercent}
+            max={100}
+            displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}
+            status={weeklyWindow.status}
+            color="amber"
+            size="sm"
+          />
+          {weeklyWindow.estimation?.willExceed && (
+            <div className="flex items-center gap-1 text-xs text-warning pl-1">
+              <TrendingUp size={12} />
+              <span>
+                Proj. {Math.round(weeklyWindow.estimation.projectedUtilizationPercent)}% at reset
+                {weeklyWindow.estimation.exceedanceTimestamp && (
+                  <span className="text-danger font-semibold"> (will exceed)</span>
+                )}
+              </span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

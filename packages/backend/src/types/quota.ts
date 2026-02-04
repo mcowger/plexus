@@ -23,6 +23,13 @@ export interface QuotaWindow {
   resetsAt?: Date;
   resetInSeconds?: number;
   status?: QuotaStatus;
+  estimation?: {
+    projectedUsedAtReset: number;
+    projectedUtilizationPercent: number;
+    willExceed: boolean;
+    exceedanceTimestamp?: number; // When quota is projected to be exceeded
+    projectionBasedOnMinutes: number; // How many minutes of historical data was used
+  };
 }
 
 export interface QuotaGroup {
