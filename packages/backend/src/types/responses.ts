@@ -24,7 +24,8 @@ export type ResponsesContentPart =
   | ResponsesInputImagePart 
   | ResponsesInputAudioPart
   | ResponsesOutputTextPart
-  | ResponsesSummaryTextPart;
+  | ResponsesSummaryTextPart
+  | ResponsesReasoningTextPart;
 
 export interface ResponsesInputTextPart {
   type: 'input_text';
@@ -55,6 +56,11 @@ export interface ResponsesSummaryTextPart {
   text: string;
 }
 
+export interface ResponsesReasoningTextPart {
+  type: 'reasoning_text';
+  text: string;
+}
+
 export interface ResponsesFunctionCallItem extends ResponsesInputItem {
   type: 'function_call';
   call_id: string;
@@ -72,6 +78,7 @@ export interface ResponsesFunctionCallOutputItem extends ResponsesInputItem {
 
 export interface ResponsesReasoningItem extends ResponsesInputItem {
   type: 'reasoning';
+  content?: ResponsesReasoningTextPart[];
   summary: ResponsesSummaryTextPart[];
   reasoning_content?: ResponsesContentPart[];
   encrypted_content?: string;
