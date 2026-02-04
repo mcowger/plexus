@@ -143,37 +143,60 @@ export class QuotaScheduler {
   }
 
   async getLatestQuota(checkerId: string) {
-    const { db, schema } = this.ensureDb();
-    const results = await db
-      .select()
-      .from(schema.quotaSnapshots)
-      .where(eq(schema.quotaSnapshots.checkerId, checkerId))
-      .orderBy(desc(schema.quotaSnapshots.checkedAt))
-      .limit(100);
-
-    return results;
+    try {
+      const { db, schema } = this.ensureDb();
+      
+      // Create a timeout promise to prevent indefinite hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Database query timeout')), 15000);
+      });
+      
+      const queryPromise = db
+        .select()
+        .from(schema.quotaSnapshots)
+        .where(eq(schema.quotaSnapshots.checkerId, checkerId))
+        .orderBy(desc(schema.quotaSnapshots.checkedAt))
+        .limit(100);
+      
+      const results = await Promise.race([queryPromise, timeoutPromise]);
+      return results as any[];
+    } catch (error) {
+      logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
+      throw error;
+    }
   }
 
   async getQuotaHistory(checkerId: string, windowType?: string, since?: number) {
-    const { db, schema } = this.ensureDb();
-    let conditions = [eq(schema.quotaSnapshots.checkerId, checkerId)];
+    try {
+      const { db, schema } = this.ensureDb();
+      let conditions = [eq(schema.quotaSnapshots.checkerId, checkerId)];
 
-    if (windowType) {
-      conditions.push(eq(schema.quotaSnapshots.windowType, windowType));
+      if (windowType) {
+        conditions.push(eq(schema.quotaSnapshots.windowType, windowType));
+      }
+
+      if (since) {
+        conditions.push(gte(schema.quotaSnapshots.checkedAt, since));
+      }
+
+      // Create a timeout promise to prevent indefinite hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Database query timeout')), 15000);
+      });
+
+      const queryPromise = db
+        .select()
+        .from(schema.quotaSnapshots)
+        .where(and(...conditions))
+        .orderBy(desc(schema.quotaSnapshots.checkedAt))
+        .limit(1000);
+
+      const results = await Promise.race([queryPromise, timeoutPromise]);
+      return results as any[];
+    } catch (error) {
+      logger.error(`Failed to get quota history for '${checkerId}': ${error}`);
+      throw error;
     }
-
-    if (since) {
-      conditions.push(gte(schema.quotaSnapshots.checkedAt, since));
-    }
-
-    const results = await db
-      .select()
-      .from(schema.quotaSnapshots)
-      .where(and(...conditions))
-      .orderBy(desc(schema.quotaSnapshots.checkedAt))
-      .limit(1000);
-
-    return results;
   }
 
   stop(): void {
