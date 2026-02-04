@@ -316,14 +316,18 @@ export class Dispatcher {
 
     try {
       const oauthProvider = route.config.oauth_provider || route.provider;
-      if (!context.systemPrompt) {
-        context.systemPrompt = this.resolveOAuthInstructions(request, oauthProvider) || context.systemPrompt;
+      const oauthContext = context?.context ? context.context : context;
+      const oauthOptions = context?.options;
+
+      if (!oauthContext.systemPrompt) {
+        oauthContext.systemPrompt = this.resolveOAuthInstructions(request, oauthProvider) || oauthContext.systemPrompt;
       }
       const result = await transformer.executeRequest(
-        context,
+        oauthContext,
         oauthProvider,
         route.model,
-        !!request.stream
+        !!request.stream,
+        oauthOptions
       );
 
       if (request.stream) {

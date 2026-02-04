@@ -57,7 +57,7 @@ export interface UnifiedTool {
   };
 }
 
-export type ThinkLevel = "none" | "low" | "medium" | "high";
+export type ThinkLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 // Unified Request
 
@@ -79,7 +79,18 @@ export interface UnifiedChatRequest {
     effort?: ThinkLevel;
     max_tokens?: number;
     enabled?: boolean;
+    summary?: string;
   };
+  include?: string[];
+  prompt_cache_key?: string;
+  text?: {
+    verbosity?: string;
+    format?: {
+      type: string;
+      schema?: any;
+    };
+  };
+  parallel_tool_calls?: boolean;
   response_format?: {
     type: "text" | "json_object" | "json_schema";
     json_schema?: any;
