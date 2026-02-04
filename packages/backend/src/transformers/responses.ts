@@ -463,9 +463,7 @@ export class ResponsesTransformer implements Transformer {
     return items;
   }
 
-  /**
-   * Transforms streaming response from Chat Completions to Responses API SSE
-   */
+
   transformStream(stream: ReadableStream): ReadableStream {
     // Converts Responses API SSE stream to Unified chunks
     // Following the same pattern as OpenAI and Anthropic transformers
@@ -577,6 +575,180 @@ export class ResponsesTransformer implements Transformer {
             const { done, value } = await reader.read();
             if (done) break;
             parser.feed(decoder.decode(value, { stream: true }));
+          }
+        } finally {
+          reader.releaseLock();
+          controller.close();
+        }
+      }
+    });
+  }
+
+  formatStream(stream: ReadableStream): ReadableStream {
+    const encoder = new TextEncoder();
+    const reader = stream.getReader();
+
+    let hasSentCreated = false;
+    let responseId = '';
+    let responseModel = '';
+    let responseCreatedAt = 0;
+    let messageItemSent = false;
+    let lastUsage: any = null;
+    const toolOutputIndexMap = new Map<number, number>();
+    const toolCallIdMap = new Map<number, string>();
+
+    const sendEvent = (controller: ReadableStreamDefaultController, data: any) => {
+      controller.enqueue(encoder.encode(encode({ data: JSON.stringify(data) })));
+    };
+
+    const ensureCreated = (controller: ReadableStreamDefaultController, chunk: any) => {
+      if (hasSentCreated) return;
+      responseId = chunk.id || this.generateResponseId();
+      responseModel = chunk.model || responseModel;
+      responseCreatedAt = chunk.created || Math.floor(Date.now() / 1000);
+      sendEvent(controller, {
+        type: 'response.created',
+        response: {
+          id: responseId,
+          object: 'response',
+          created_at: responseCreatedAt,
+          status: 'in_progress',
+          model: responseModel,
+          output: []
+        }
+      });
+      hasSentCreated = true;
+    };
+
+    const ensureMessageItem = (controller: ReadableStreamDefaultController) => {
+      if (messageItemSent) return;
+      sendEvent(controller, {
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: {
+          id: this.generateItemId('msg'),
+          type: 'message',
+          status: 'in_progress',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: '' }]
+        }
+      });
+      messageItemSent = true;
+    };
+
+    const ensureToolItem = (
+      controller: ReadableStreamDefaultController,
+      toolIndex: number,
+      toolCall: any
+    ) => {
+      if (toolOutputIndexMap.has(toolIndex)) return;
+      const outputIndex = toolIndex + 1;
+      const callId = toolCall?.id || this.generateItemId('call');
+      toolOutputIndexMap.set(toolIndex, outputIndex);
+      toolCallIdMap.set(toolIndex, callId);
+      sendEvent(controller, {
+        type: 'response.output_item.added',
+        output_index: outputIndex,
+        item: {
+          id: this.generateItemId('fc'),
+          type: 'function_call',
+          status: 'in_progress',
+          call_id: callId,
+          name: toolCall?.function?.name || toolCall?.name || '',
+          arguments: ''
+        }
+      });
+    };
+
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          while (true) {
+            const { done, value: unifiedChunk } = await reader.read();
+            if (done) {
+              if (!hasSentCreated) {
+                ensureCreated(controller, { model: responseModel, created: responseCreatedAt });
+              }
+              sendEvent(controller, {
+                type: 'response.completed',
+                response: {
+                  id: responseId || undefined,
+                  object: 'response',
+                  created_at: responseCreatedAt || Math.floor(Date.now() / 1000),
+                  status: 'completed',
+                  model: responseModel,
+                  usage: lastUsage ? {
+                    input_tokens: lastUsage.input_tokens,
+                    output_tokens: lastUsage.output_tokens,
+                    total_tokens: lastUsage.total_tokens,
+                    input_tokens_details: {
+                      cached_tokens: lastUsage.cached_tokens || 0
+                    },
+                    output_tokens_details: {
+                      reasoning_tokens: lastUsage.reasoning_tokens || 0
+                    }
+                  } : undefined
+                }
+              });
+              break;
+            }
+
+            ensureCreated(controller, unifiedChunk);
+
+            if (unifiedChunk.usage) {
+              lastUsage = unifiedChunk.usage;
+            }
+
+            const delta = unifiedChunk.delta || {};
+            if (typeof delta.content === 'string' && delta.content.length > 0) {
+              ensureMessageItem(controller);
+              sendEvent(controller, {
+                type: 'response.output_text.delta',
+                output_index: 0,
+                content_index: 0,
+                delta: delta.content
+              });
+            }
+
+            if (Array.isArray(delta.tool_calls)) {
+              for (const toolCall of delta.tool_calls) {
+                const toolIndex = toolCall.index ?? 0;
+                ensureToolItem(controller, toolIndex, toolCall);
+                if (typeof toolCall.function?.arguments === 'string') {
+                  const outputIndex = toolOutputIndexMap.get(toolIndex) ?? toolIndex + 1;
+                  sendEvent(controller, {
+                    type: 'response.function_call_arguments.delta',
+                    output_index: outputIndex,
+                    delta: toolCall.function.arguments
+                  });
+                }
+              }
+            }
+
+            if (unifiedChunk.finish_reason && !unifiedChunk.delta) {
+              sendEvent(controller, {
+                type: 'response.completed',
+                response: {
+                  id: responseId || undefined,
+                  object: 'response',
+                  created_at: responseCreatedAt || Math.floor(Date.now() / 1000),
+                  status: 'completed',
+                  model: responseModel,
+                  usage: lastUsage ? {
+                    input_tokens: lastUsage.input_tokens,
+                    output_tokens: lastUsage.output_tokens,
+                    total_tokens: lastUsage.total_tokens,
+                    input_tokens_details: {
+                      cached_tokens: lastUsage.cached_tokens || 0
+                    },
+                    output_tokens_details: {
+                      reasoning_tokens: lastUsage.reasoning_tokens || 0
+                    }
+                  } : undefined
+                }
+              });
+              break;
+            }
           }
         } finally {
           reader.releaseLock();

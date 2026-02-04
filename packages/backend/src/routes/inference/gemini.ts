@@ -90,7 +90,10 @@ export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: 
             usageStorage.saveError(requestId, e, errorDetails);
 
             logger.error('Error processing Gemini request', e);
-            return reply.code(500).send({ error: { message: e.message, code: 500, status: "INTERNAL" } });
+            const statusCode = e.routingContext?.statusCode || 500;
+            return reply
+                .code(statusCode)
+                .send({ error: { message: e.message, code: statusCode, status: statusCode === 401 ? "UNAUTHENTICATED" : "INTERNAL" } });
         }
     });
 }

@@ -80,7 +80,9 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
             usageStorage.saveError(requestId, e, errorDetails);
 
             logger.error('Error processing Anthropic request', e);
-            return reply.code(500).send({ type: 'error', error: { type: 'api_error', message: e.message } });
+            const statusCode = e.routingContext?.statusCode || 500;
+            const errorType = statusCode === 401 ? 'authentication_error' : 'api_error';
+            return reply.code(statusCode).send({ type: 'error', error: { type: errorType, message: e.message } });
         }
     });
 }

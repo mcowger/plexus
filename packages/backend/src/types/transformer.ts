@@ -24,7 +24,7 @@ export interface Transformer {
 
   // Convert Provider Stream to Unified Stream
   // Takes a raw stream from provider, returns a stream of UnifiedChatStreamChunk
-  transformStream?(stream: ReadableStream): ReadableStream;
+  transformStream?(stream: ReadableStream | AsyncIterable<any>): ReadableStream;
 
   // Convert Unified Stream to Client Stream
   // Takes a stream of UnifiedChatStreamChunk, returns a raw stream for the client

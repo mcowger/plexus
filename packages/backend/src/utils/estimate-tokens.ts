@@ -206,6 +206,31 @@ function extractGeminiContent(reconstructed: any): { output: string; reasoning: 
   return { output, reasoning };
 }
 
+function extractOAuthContent(reconstructed: any): { output: string; reasoning: string } {
+  let output = '';
+  let reasoning = '';
+
+  if (!reconstructed) return { output, reasoning };
+
+  if (typeof reconstructed.content === 'string') {
+    output += reconstructed.content;
+  }
+
+  if (typeof reconstructed.reasoning_content === 'string') {
+    reasoning += reconstructed.reasoning_content;
+  }
+
+  if (reconstructed.tool_calls && Array.isArray(reconstructed.tool_calls)) {
+    for (const toolCall of reconstructed.tool_calls) {
+      if (toolCall?.function?.arguments) {
+        output += toolCall.function.arguments;
+      }
+    }
+  }
+
+  return { output, reasoning };
+}
+
 /**
  * Estimates tokens from a reconstructed response based on API type
  * 
@@ -242,6 +267,11 @@ export function estimateTokensFromReconstructed(
         const geminiContent = extractGeminiContent(reconstructed);
         outputText = geminiContent.output;
         reasoningText = geminiContent.reasoning;
+        break;
+      case 'oauth':
+        const oauthContent = extractOAuthContent(reconstructed);
+        outputText = oauthContent.output;
+        reasoningText = oauthContent.reasoning;
         break;
         
       default:

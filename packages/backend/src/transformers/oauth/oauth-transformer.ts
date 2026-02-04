@@ -1,0 +1,216 @@
+import { Transformer } from '../../types/transformer';
+import type {
+  UnifiedChatRequest,
+  UnifiedChatResponse,
+  UnifiedChatStreamChunk
+} from '../../types/unified';
+import {
+  getModel,
+  stream,
+  complete,
+  type OAuthProvider,
+  type Model as PiAiModel
+} from '@mariozechner/pi-ai';
+import { OAuthAuthManager } from '../../services/oauth-auth-manager';
+import { unifiedToContext, piAiMessageToUnified, piAiEventToChunk } from './type-mappers';
+import { logger } from '../../utils/logger';
+
+function streamFromAsyncIterable<T>(iterable: AsyncIterable<T>): ReadableStream<T> {
+  const iterator = iterable[Symbol.asyncIterator]();
+  let closed = false;
+  let reading = false;
+
+  return new ReadableStream<T>({
+    async pull(controller) {
+      if (closed || reading) return;
+      reading = true;
+      try {
+        const { value, done } = await iterator.next();
+        if (done) {
+          closed = true;
+          controller.close();
+        } else if (!closed) {
+          controller.enqueue(value);
+        }
+      } catch (error) {
+        if (!closed) {
+          logger.error('OAuth: Stream pull failed', error as Error);
+          closed = true;
+          controller.error(error);
+        }
+      } finally {
+        reading = false;
+      }
+    },
+    async cancel(reason) {
+      closed = true;
+      await iterator.return?.(reason);
+    }
+  });
+}
+
+async function* readableStreamToAsyncIterable<T>(stream: ReadableStream<T>): AsyncIterable<T> {
+  const reader = stream.getReader();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value !== undefined) {
+        yield value;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function isAsyncIterable<T>(input: any): input is AsyncIterable<T> {
+  return input && typeof input[Symbol.asyncIterator] === 'function';
+}
+
+function isReadableStream<T>(input: any): input is ReadableStream<T> {
+  return !!input && typeof input.getReader === 'function';
+}
+
+function describeStreamResult(result: any): Record<string, any> {
+  return {
+    isPromise: !!result && typeof result.then === 'function',
+    isAsyncIterable: isAsyncIterable(result),
+    isReadableStream: isReadableStream(result),
+    hasIterator: !!result && typeof result[Symbol.asyncIterator] === 'function',
+    hasGetReader: !!result && typeof result.getReader === 'function',
+    constructorName: result?.constructor?.name || typeof result
+  };
+}
+
+export class OAuthTransformer implements Transformer {
+  readonly name = 'oauth';
+  readonly defaultEndpoint = '/v1/chat/completions';
+  readonly defaultModel = 'gpt-5-mini';
+
+  protected getPiAiModel(provider: OAuthProvider, modelId: string): PiAiModel<any> {
+    return getModel(provider as any, modelId);
+  }
+
+  async parseRequest(_input: any): Promise<UnifiedChatRequest> {
+    throw new Error(
+      `${this.name}: OAuth transformer cannot parse direct client requests. ` +
+        `Use OpenAI or Anthropic transformers as entry points.`
+    );
+  }
+
+  async transformRequest(request: UnifiedChatRequest): Promise<any> {
+    const context = unifiedToContext(request);
+
+    logger.debug(`${this.name}: Converted UnifiedChatRequest to pi-ai Context`, {
+      messageCount: context.messages.length,
+      hasSystemPrompt: !!context.systemPrompt,
+      toolCount: context.tools?.length || 0
+    });
+
+    return context;
+  }
+
+  async transformResponse(response: any): Promise<UnifiedChatResponse> {
+    logger.silly(`${this.name}: Raw pi-ai response`, response);
+    if (response?.stopReason === 'error') {
+      const message = response.errorMessage || 'OAuth provider error';
+      throw new Error(message);
+    }
+    const unified = piAiMessageToUnified(response, response.provider, response.model);
+
+    logger.debug(`${this.name}: Converted pi-ai response to unified`, {
+      hasContent: !!unified.content,
+      hasToolCalls: !!unified.tool_calls,
+      usageTokens: unified.usage?.total_tokens
+    });
+
+    return unified;
+  }
+
+  async formatResponse(): Promise<any> {
+    throw new Error(
+      `${this.name}: OAuth transformer cannot format responses. ` +
+        `Use the original entry transformer for formatting.`
+    );
+  }
+
+  transformStream(streamInput: ReadableStream | AsyncIterable<any>): ReadableStream {
+    const mapped = (async function* () {
+      const source = isAsyncIterable<any>(streamInput)
+        ? streamInput
+        : readableStreamToAsyncIterable(streamInput as ReadableStream<any>);
+
+      for await (const event of source) {
+        const chunk = piAiEventToChunk(event, event.partial?.model || 'unknown');
+        if (chunk) {
+          yield chunk;
+        }
+      }
+    })();
+
+    return streamFromAsyncIterable(mapped) as ReadableStream<UnifiedChatStreamChunk>;
+  }
+
+  formatStream(): ReadableStream {
+    throw new Error(
+      `${this.name}: OAuth transformer cannot format streams. ` +
+        `Use the original entry transformer for formatting.`
+    );
+  }
+
+  extractUsage(eventData: string):
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        cached_tokens?: number;
+        reasoning_tokens?: number;
+      }
+    | undefined {
+    try {
+      const event = JSON.parse(eventData);
+
+      if (event.type === 'done' && event.message?.usage) {
+        return {
+          input_tokens: event.message.usage.input,
+          output_tokens: event.message.usage.output,
+          cached_tokens: event.message.usage.cacheRead,
+          reasoning_tokens: 0
+        };
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    return undefined;
+  }
+
+  async executeRequest(
+    context: any,
+    provider: OAuthProvider,
+    modelId: string,
+    streaming: boolean
+  ): Promise<any> {
+    const authManager = OAuthAuthManager.getInstance();
+    const apiKey = await authManager.getApiKey(provider);
+    const model = this.getPiAiModel(provider, modelId);
+
+    logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request`, {
+      model: model.id,
+      provider
+    });
+
+    if (streaming) {
+      try {
+        const result = await stream(model, context, { apiKey });
+        logger.debug(`${this.name}: OAuth stream result type`, describeStreamResult(result));
+        return result;
+      } catch (error) {
+        logger.error(`${this.name}: OAuth stream request failed`, error);
+        throw error;
+      }
+    }
+
+    return await complete(model, context, { apiKey });
+  }
+}

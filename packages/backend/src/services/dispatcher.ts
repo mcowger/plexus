@@ -49,6 +49,16 @@ export class Dispatcher {
       DebugManager.getInstance().addTransformedRequest(request.requestId, providerPayload);
     }
 
+    if (this.isOAuthRoute(route, targetApiType)) {
+      return await this.dispatchOAuthRequest(
+        providerPayload,
+        request,
+        route,
+        targetApiType,
+        transformer
+      );
+    }
+
     // 4. Execute Request
     const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
 
@@ -229,6 +239,168 @@ export class Dispatcher {
 
     // Ensure api_base_url doesn't end with slash
     return rawBaseUrl.replace(/\/$/, "");
+  }
+
+  private isOAuthRoute(route: RouteResult, targetApiType: string): boolean {
+    if (targetApiType.toLowerCase() === 'oauth') return true;
+    if (typeof route.config.api_base_url === 'string') {
+      return route.config.api_base_url.startsWith('oauth://');
+    }
+    const urlMap = route.config.api_base_url as Record<string, string>;
+    return Object.values(urlMap).some((value) => value.startsWith('oauth://'));
+  }
+
+  private isAsyncIterable<T>(input: any): input is AsyncIterable<T> {
+    return input && typeof input[Symbol.asyncIterator] === 'function';
+  }
+
+  private isReadableStream<T>(input: any): input is ReadableStream<T> {
+    return !!input && typeof input.getReader === 'function';
+  }
+
+  private describeStreamResult(result: any): Record<string, any> {
+    return {
+      isPromise: !!result && typeof result.then === 'function',
+      isAsyncIterable: this.isAsyncIterable(result),
+      isReadableStream: this.isReadableStream(result),
+      hasIterator: !!result && typeof result[Symbol.asyncIterator] === 'function',
+      hasGetReader: !!result && typeof result.getReader === 'function',
+      constructorName: result?.constructor?.name || typeof result
+    };
+  }
+
+  private streamFromAsyncIterable<T>(iterable: AsyncIterable<T>): ReadableStream<T> {
+    const iterator = iterable[Symbol.asyncIterator]();
+    let closed = false;
+    let reading = false;
+
+    return new ReadableStream<T>({
+      async pull(controller) {
+        if (closed || reading) return;
+        reading = true;
+        try {
+          const { value, done } = await iterator.next();
+          if (done) {
+            closed = true;
+            controller.close();
+          } else if (!closed) {
+            controller.enqueue(value);
+          }
+        } catch (error) {
+          if (!closed) {
+            logger.error('OAuth: Stream pull failed', error as Error);
+            closed = true;
+            controller.error(error);
+          }
+        } finally {
+          reading = false;
+        }
+      },
+      async cancel(reason) {
+        closed = true;
+        await iterator.return?.(reason);
+      }
+    });
+  }
+
+  private async dispatchOAuthRequest(
+    context: any,
+    request: UnifiedChatRequest,
+    route: RouteResult,
+    targetApiType: string,
+    transformer: any
+  ): Promise<UnifiedChatResponse> {
+    if (!transformer.executeRequest) {
+      throw new Error('OAuth transformer missing executeRequest()');
+    }
+
+    try {
+      const oauthProvider = route.config.oauth_provider || route.provider;
+      if (!context.systemPrompt) {
+        context.systemPrompt = this.resolveOAuthInstructions(request, oauthProvider) || context.systemPrompt;
+      }
+      const result = await transformer.executeRequest(
+        context,
+        oauthProvider,
+        route.model,
+        !!request.stream
+      );
+
+      if (request.stream) {
+        let rawStream: ReadableStream<any>;
+
+        if (this.isReadableStream(result)) {
+          rawStream = result;
+        } else if (this.isAsyncIterable(result)) {
+          rawStream = this.streamFromAsyncIterable(result);
+        } else {
+          throw new Error('OAuth provider returned an unsupported stream type');
+        }
+        logger.debug('OAuth: Normalized stream result', this.describeStreamResult(result));
+        const streamResponse: UnifiedChatResponse = {
+          id: 'stream-' + Date.now(),
+          model: request.model,
+          content: null,
+          stream: rawStream,
+          bypassTransformation: false
+        };
+
+        this.enrichResponseWithMetadata(streamResponse, route, targetApiType);
+        return streamResponse;
+      }
+
+      const unified = await transformer.transformResponse(result);
+      this.enrichResponseWithMetadata(unified, route, targetApiType);
+      return unified;
+    } catch (error: any) {
+      throw this.wrapOAuthError(error, route, targetApiType);
+    }
+  }
+
+  private wrapOAuthError(error: Error, route: RouteResult, targetApiType: string): Error {
+    const message = error?.message || 'OAuth provider error';
+    let statusCode = 500;
+
+    if (message.includes('Not authenticated') || message.includes('re-authenticate') || message.includes('expired')) {
+      statusCode = 401;
+    } else if (message.toLowerCase().includes('model') && message.toLowerCase().includes('not')) {
+      statusCode = 400;
+    }
+
+    const enriched = new Error(message) as any;
+    enriched.routingContext = {
+      provider: route.provider,
+      targetModel: route.model,
+      targetApiType,
+      statusCode
+    };
+
+    return enriched;
+  }
+
+  private resolveOAuthInstructions(
+    request: UnifiedChatRequest,
+    oauthProvider: string
+  ): string | undefined {
+    const requestInstructions = request.originalBody?.instructions;
+    if (typeof requestInstructions === 'string' && requestInstructions.trim()) {
+      return requestInstructions;
+    }
+
+    const systemMessage = request.messages.find((msg) => msg.role === 'system');
+    const developerMessage = (request.messages as any[]).find((msg) => msg.role === 'developer');
+    const instructionSource = systemMessage || developerMessage;
+    const instructionContent = instructionSource?.content;
+    if (typeof instructionContent === 'string' && instructionContent.trim()) {
+      return instructionContent;
+    }
+
+    if (oauthProvider === 'openai-codex') {
+      logger.info("OAuth: Inserted default instructions for openai-codex");
+      return 'You are a helpful coding assistant.';
+    }
+
+    return undefined;
   }
 
   /**
