@@ -209,8 +209,9 @@ export function piAiMessageToUnified(
       } else if (block.type === 'thinking') {
         thinkingContent = (thinkingContent || '') + block.thinking;
       } else if (block.type === 'toolCall') {
+        const { callId } = parseToolCallIds((block as any).id);
         toolCalls.push({
-          id: block.id,
+          id: callId || block.id,
           type: 'function',
           function: {
             name: block.name,
@@ -274,29 +275,37 @@ export function piAiEventToChunk(
         }
       };
     case 'toolcall_start':
-      return {
-        ...baseChunk,
-        delta: {
-          tool_calls: [
-            {
-              index: event.contentIndex,
-              id: '',
-              type: 'function',
-              function: { name: '', arguments: '' }
-            }
-          ]
-        }
-      };
-    case 'toolcall_delta': {
-      const toolCall = event.partial?.content?.[event.contentIndex];
-      if (toolCall && toolCall.type === 'toolCall') {
+      {
+        const toolCall = event.partial?.content?.[event.contentIndex];
+        const { callId } = parseToolCallIds((toolCall as any)?.id);
         return {
           ...baseChunk,
           delta: {
             tool_calls: [
               {
                 index: event.contentIndex,
-                id: (toolCall as any).id,
+                id: callId || '',
+                type: 'function',
+                function: {
+                  name: (toolCall as any)?.name || '',
+                  arguments: ''
+                }
+              }
+            ]
+          }
+        };
+      }
+    case 'toolcall_delta': {
+      const toolCall = event.partial?.content?.[event.contentIndex];
+      if (toolCall && toolCall.type === 'toolCall') {
+        const { callId } = parseToolCallIds((toolCall as any).id);
+        return {
+          ...baseChunk,
+          delta: {
+            tool_calls: [
+              {
+                index: event.contentIndex,
+                id: callId || (toolCall as any).id,
                 type: 'function',
                 function: {
                   name: (toolCall as any).name,
@@ -310,22 +319,25 @@ export function piAiEventToChunk(
       return null;
     }
     case 'toolcall_end':
-      return {
-        ...baseChunk,
-        delta: {
-          tool_calls: [
-            {
-              index: event.contentIndex,
-              id: event.toolCall.id,
-              type: 'function',
-              function: {
-                name: event.toolCall.name,
-                arguments: JSON.stringify(event.toolCall.arguments)
+      {
+        const { callId } = parseToolCallIds(event.toolCall.id);
+        return {
+          ...baseChunk,
+          delta: {
+            tool_calls: [
+              {
+                index: event.contentIndex,
+                id: callId || event.toolCall.id,
+                type: 'function',
+                function: {
+                  name: event.toolCall.name,
+                  arguments: JSON.stringify(event.toolCall.arguments)
+                }
               }
-            }
-          ]
-        }
-      };
+            ]
+          }
+        };
+      }
     case 'done':
       return {
         ...baseChunk,
@@ -374,6 +386,15 @@ function mapStopReason(reason: string): string {
     default:
       return 'stop';
   }
+}
+
+function parseToolCallIds(rawId?: string): { callId?: string; functionCallId?: string } {
+  if (!rawId) return {};
+  const [callId, functionCallId] = rawId.split('|');
+  if (!functionCallId) {
+    return { callId };
+  }
+  return { callId, functionCallId };
 }
 
 function extractTextContent(content: string | null | MessageContent[]): string | null {
