@@ -2,6 +2,7 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { DollarSign, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { QuotaProgressBar } from './QuotaProgressBar';
+import { formatDuration } from '../../lib/format';
 import type { QuotaCheckResult } from '../../types/quota';
 
 interface SyntheticQuotaDisplayProps {
@@ -62,7 +63,7 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
       {/* Subscription - Requests per 5-hour window */}
       {subscriptionWindow && subscriptionWindow.limit && (
         <QuotaProgressBar
-          label="5-Hour"
+          label={`5h: ${subscriptionWindow.resetInSeconds !== undefined ? formatDuration(subscriptionWindow.resetInSeconds) : '?'}`}
           value={subscriptionWindow.used || 0}
           max={subscriptionWindow.limit}
           displayValue={`${Math.round(subscriptionWindow.utilizationPercent)}%`}

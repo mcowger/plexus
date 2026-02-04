@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { Cpu, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import type { QuotaCheckResult } from '../../types/quota';
 import { formatDuration } from '../../lib/format';
@@ -66,7 +66,7 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
       {/* 5-Hour Window */}
       {fiveHourWindow && (
         <QuotaProgressBar
-          label="5-Hour"
+          label={`5h: ${fiveHourWindow.resetInSeconds !== undefined ? formatDuration(fiveHourWindow.resetInSeconds) : '?'}`}
           value={fiveHourWindow.utilizationPercent}
           max={100}
           displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
@@ -79,7 +79,7 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
       {/* Weekly Window */}
       {weeklyWindow && (
         <QuotaProgressBar
-          label="Weekly"
+          label={`1w: ${weeklyWindow.resetInSeconds !== undefined ? formatDuration(weeklyWindow.resetInSeconds) : '?'}`}
           value={weeklyWindow.utilizationPercent}
           max={100}
           displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}
@@ -87,20 +87,6 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
           color="amber"
           size="sm"
         />
-      )}
-
-      {/* Reset info */}
-      {(fiveHourWindow?.resetInSeconds || weeklyWindow?.resetInSeconds) && (
-        <div className="flex items-center gap-1.5 text-text-muted text-[10px]">
-          <Clock size={10} />
-          <span>
-            Resets in {formatDuration(
-              (fiveHourWindow?.resetInSeconds && fiveHourWindow.resetInSeconds < (weeklyWindow?.resetInSeconds || Infinity))
-                ? fiveHourWindow.resetInSeconds
-                : (weeklyWindow?.resetInSeconds || 0)
-            )}
-          </span>
-        </div>
       )}
     </div>
   );
