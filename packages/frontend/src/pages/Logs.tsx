@@ -6,7 +6,7 @@ import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon, ShieldCheck } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -332,6 +332,8 @@ export const Logs = () => {
                                                             <ImageIcon size={16} className="text-fuchsia-500" />
                                                         ) : log.incomingApiType === 'responses' ? (
                                                             <MessagesSquare size={16} className="text-cyan-500" />
+                                                        ) : log.incomingApiType === 'oauth' ? (
+                                                            <ShieldCheck size={16} className="text-emerald-500" />
                                                         ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
                                                             <img
                                                                 src={apiLogos[log.incomingApiType]}
@@ -352,6 +354,8 @@ export const Logs = () => {
                                                             <ImageIcon size={16} className="text-fuchsia-500" />
                                                         ) : log.outgoingApiType === 'responses' ? (
                                                             <MessagesSquare size={16} className="text-cyan-500" />
+                                                        ) : log.outgoingApiType === 'oauth' ? (
+                                                            <ShieldCheck size={16} className="text-emerald-500" />
                                                         ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
                                                             <img
                                                                 src={apiLogos[log.outgoingApiType]}
