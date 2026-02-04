@@ -99,6 +99,17 @@ try {
 
 // --- Hooks & Global Logic ---
 
+// Global Unhandled Rejection Handler
+// Prevents application crashes from unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Promise Rejection', { reason, promise });
+});
+
+// Global Uncaught Exception Handler
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception', error);
+});
+
 // Global Request Logger: Runs on every incoming request
 fastify.addHook('onRequest', requestLogger);
 
