@@ -648,6 +648,20 @@ export class ResponsesTransformer implements Transformer {
     const toolArgsMap = new Map<number, string>();
     const toolNameMap = new Map<number, string>();
 
+    const normalizeToolArgs = (previous: string, delta: string): string => {
+      if (!delta) return previous;
+      const trimmed = delta.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          JSON.parse(trimmed);
+          return trimmed;
+        } catch {
+          return previous + delta;
+        }
+      }
+      return previous + delta;
+    };
+
     const sendEvent = (controller: ReadableStreamDefaultController, data: any) => {
       controller.enqueue(
         encoder.encode(
@@ -788,6 +802,96 @@ export class ResponsesTransformer implements Transformer {
       });
     };
 
+    const finalizeOutputItems = (controller: ReadableStreamDefaultController): any[] => {
+      if (reasoningItemSent && reasoningOutputIndex !== null) {
+        const reasoningItem = {
+          id: reasoningItemId,
+          type: 'reasoning',
+          status: 'completed',
+          summary: [
+            {
+              type: 'summary_text',
+              text: reasoningText
+            }
+          ]
+        };
+        sendEvent(controller, {
+          type: 'response.output_item.done',
+          output_index: reasoningOutputIndex,
+          item: reasoningItem
+        });
+        outputItemsByIndex.set(reasoningOutputIndex, reasoningItem);
+      }
+
+      if (messageItemSent) {
+        const messageItem = {
+          id: messageItemId,
+          type: 'message',
+          status: 'completed',
+          role: 'assistant',
+          content: [
+            {
+              type: 'output_text',
+              annotations: [],
+              logprobs: [],
+              text: messageText
+            }
+          ]
+        };
+        sendEvent(controller, {
+          type: 'response.output_text.done',
+          output_index: messageOutputIndex as number,
+          item_id: messageItemId,
+          content_index: 0,
+          logprobs: [],
+          text: messageText
+        });
+        sendEvent(controller, {
+          type: 'response.content_part.done',
+          output_index: messageOutputIndex as number,
+          item_id: messageItemId,
+          content_index: 0,
+          part: {
+            type: 'output_text',
+            annotations: [],
+            logprobs: [],
+            text: messageText
+          }
+        });
+        sendEvent(controller, {
+          type: 'response.output_item.done',
+          output_index: messageOutputIndex as number,
+          item: messageItem
+        });
+        outputItemsByIndex.set(messageOutputIndex as number, messageItem);
+      }
+
+      for (const [toolIndex, outputIndex] of toolOutputIndexMap.entries()) {
+        const itemId = toolItemIdMap.get(toolIndex);
+        const callId = toolCallIdMap.get(toolIndex);
+        const args = toolArgsMap.get(toolIndex) || '';
+        const name = toolNameMap.get(toolIndex) || '';
+        const toolItem = {
+          id: itemId,
+          type: 'function_call',
+          status: 'completed',
+          call_id: callId,
+          name,
+          arguments: args
+        };
+        sendEvent(controller, {
+          type: 'response.output_item.done',
+          output_index: outputIndex,
+          item: toolItem
+        });
+        outputItemsByIndex.set(outputIndex, toolItem);
+      }
+
+      return Array.from(outputItemsByIndex.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([, item]) => item);
+    };
+
     return new ReadableStream({
       async start(controller) {
         try {
@@ -797,6 +901,7 @@ export class ResponsesTransformer implements Transformer {
               if (!hasSentCreated) {
                 ensureCreated(controller, { model: responseModel, created: responseCreatedAt });
               }
+              const outputItems = finalizeOutputItems(controller);
               sendEvent(controller, {
                 type: 'response.completed',
                 response: {
@@ -805,6 +910,7 @@ export class ResponsesTransformer implements Transformer {
                   created_at: responseCreatedAt || Math.floor(Date.now() / 1000),
                   status: 'completed',
                   model: responseModel,
+                  output: outputItems,
                   usage: lastUsage ? {
                     input_tokens: lastUsage.input_tokens,
                     output_tokens: lastUsage.output_tokens,
@@ -862,7 +968,10 @@ export class ResponsesTransformer implements Transformer {
                   const outputIndex = toolOutputIndexMap.get(toolIndex) ?? toolIndex + 1;
                   const itemId = toolItemIdMap.get(toolIndex);
                   const prevArgs = toolArgsMap.get(toolIndex) || '';
-                  toolArgsMap.set(toolIndex, prevArgs + toolCall.function.arguments);
+                  toolArgsMap.set(
+                    toolIndex,
+                    normalizeToolArgs(prevArgs, toolCall.function.arguments)
+                  );
                   sendEvent(controller, {
                     type: 'response.function_call_arguments.delta',
                     output_index: outputIndex,
@@ -874,93 +983,7 @@ export class ResponsesTransformer implements Transformer {
             }
 
             if (unifiedChunk.finish_reason && !unifiedChunk.delta) {
-              if (reasoningItemSent && reasoningOutputIndex !== null) {
-                const reasoningItem = {
-                  id: reasoningItemId,
-                  type: 'reasoning',
-                  status: 'completed',
-                  summary: [
-                    {
-                      type: 'summary_text',
-                      text: reasoningText
-                    }
-                  ]
-                };
-                sendEvent(controller, {
-                  type: 'response.output_item.done',
-                  output_index: reasoningOutputIndex,
-                  item: reasoningItem
-                });
-                outputItemsByIndex.set(reasoningOutputIndex, reasoningItem);
-              }
-
-              if (messageItemSent) {
-                const messageItem = {
-                  id: messageItemId,
-                  type: 'message',
-                  status: 'completed',
-                  role: 'assistant',
-                  content: [
-                    {
-                      type: 'output_text',
-                      annotations: [],
-                      logprobs: [],
-                      text: messageText
-                    }
-                  ]
-                };
-                sendEvent(controller, {
-                  type: 'response.output_text.done',
-                  output_index: messageOutputIndex as number,
-                  item_id: messageItemId,
-                  content_index: 0,
-                  logprobs: [],
-                  text: messageText
-                });
-                sendEvent(controller, {
-                  type: 'response.content_part.done',
-                  output_index: messageOutputIndex as number,
-                  item_id: messageItemId,
-                  content_index: 0,
-                  part: {
-                    type: 'output_text',
-                    annotations: [],
-                    logprobs: [],
-                    text: messageText
-                  }
-                });
-                sendEvent(controller, {
-                  type: 'response.output_item.done',
-                  output_index: messageOutputIndex as number,
-                  item: messageItem
-                });
-                outputItemsByIndex.set(messageOutputIndex as number, messageItem);
-              }
-
-              for (const [toolIndex, outputIndex] of toolOutputIndexMap.entries()) {
-                const itemId = toolItemIdMap.get(toolIndex);
-                const callId = toolCallIdMap.get(toolIndex);
-                const args = toolArgsMap.get(toolIndex) || '';
-                const name = toolNameMap.get(toolIndex) || '';
-                const toolItem = {
-                  id: itemId,
-                  type: 'function_call',
-                  status: 'completed',
-                  call_id: callId,
-                  name,
-                  arguments: args
-                };
-                sendEvent(controller, {
-                  type: 'response.output_item.done',
-                  output_index: outputIndex,
-                  item: toolItem
-                });
-                outputItemsByIndex.set(outputIndex, toolItem);
-              }
-
-              const outputItems = Array.from(outputItemsByIndex.entries())
-                .sort(([a], [b]) => a - b)
-                .map(([, item]) => item);
+              const outputItems = finalizeOutputItems(controller);
 
               sendEvent(controller, {
                 type: 'response.completed',
