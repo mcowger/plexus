@@ -1,5 +1,5 @@
 import { getDatabase, getSchema } from '../db/client';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, lt, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { UnifiedResponsesResponse } from '../types/responses';
 
@@ -272,13 +272,14 @@ export class ResponsesStorageService {
   async cleanupOldResponses(ttlDays: number = 7): Promise<{ deletedResponses: number; deletedItems: number; deletedConversations: number }> {
     try {
       const db = this.ensureDb();
-      const cutoffTime = Date.now() - (ttlDays * 24 * 60 * 60 * 1000);
+      // Convert to Unix timestamp in seconds (createdAt is stored as integer/bigint in seconds)
+      const cutoffTime = Math.floor(Date.now() / 1000) - (ttlDays * 24 * 60 * 60);
 
       // Find old response IDs
       const oldResponses = await db
         .select({ id: this.schema.responses.id })
         .from(this.schema.responses)
-        .where(this.schema.responses.createdAt.lt(cutoffTime));
+        .where(lt(this.schema.responses.createdAt, cutoffTime));
 
       const responseIds = oldResponses.map(r => r.id);
 
@@ -289,12 +290,12 @@ export class ResponsesStorageService {
       // Delete response items
       await db
         .delete(this.schema.responseItems)
-        .where(this.schema.responseItems.responseId.in(responseIds));
+        .where(inArray(this.schema.responseItems.responseId, responseIds));
 
       // Delete responses
       await db
         .delete(this.schema.responses)
-        .where(this.schema.responses.id.in(responseIds));
+        .where(inArray(this.schema.responses.id, responseIds));
 
       // Find and delete orphaned conversations (no responses referencing them)
       const conversationIdsToDelete = await db
@@ -308,7 +309,7 @@ export class ResponsesStorageService {
       if (orphanedIds.length > 0) {
         await db
           .delete(this.schema.conversations)
-          .where(this.schema.conversations.id.in(orphanedIds));
+          .where(inArray(this.schema.conversations.id, orphanedIds));
         deletedConversations = orphanedIds.length;
       }
 
