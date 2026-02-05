@@ -10,6 +10,8 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates
 
+- **OAuth Providers (pi-ai)**: Authenticate to Anthropic, GitHub Copilot, Gemini CLI, Antigravity, and OpenAI Codex via the Admin UI and route them with `oauth://` providers
+- **OAuth Management APIs**: Start, poll, prompt, and cancel OAuth login sessions via `/v0/management/oauth/*`
 - **Quota Tracking System**: Monitor provider rate limits and quotas with configurable checkers
 - **Audio Transcriptions API**: Full OpenAI-compatible `/v1/audio/transcriptions` endpoint support with multipart file uploads
 - **Embeddings API**: Full OpenAI-compatible `/v1/embeddings` endpoint support
@@ -34,9 +36,13 @@ Plexus uses **Drizzle ORM** with **SQLite** or **Postgres** for data persistence
 ```bash
 docker run -p 4000:4000 \
   -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
+  -e AUTH_JSON=/app/auth.json \
+  -v $(pwd)/auth.json:/app/auth.json \
   -v plexus-data:/app/data \
   ghcr.io/mcowger/plexus:latest
 ```
+
+`AUTH_JSON` points Plexus at the OAuth credentials file (default: `./auth.json`).
 
 See [Installation Guide](docs/INSTALLATION.md) for other options.
 
