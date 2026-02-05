@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.12.1 - 2026-02-05
+
+### v0.12.1: Reduce Query Weight for Homepage.
+
+### New Features
+
+- **Usage Summary Endpoint**: Added a new endpoint to provide usage statistics for dashboard integration. ([36f129e](https://github.com/mcowger/plexus/commit/36f129e))
+
+### Bug Fixes
+
+- **PostgreSQL Type Mismatch**: Resolved a database schema issue where the `parallelToolCallsEnabled` field had an incorrect type mapping in PostgreSQL. ([97a014d](https://github.com/mcowger/plexus/commit/97a014d))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.12.0 - 2026-02-05
 
 ### v0.12.0: Support Oauth/Subscription Providers:  Codex, Claude Pro, Antigravity, GeminiCLI, Github Copilot
