@@ -374,14 +374,21 @@ export class Dispatcher {
 
   private assertOAuthModelSupported(oauthProvider: string, modelId: string) {
     const supportedModels = getModels(oauthProvider as any);
+    const extraModels: Record<string, string[]> = {
+      'openai-codex': ['gpt-5.3-codex']
+    };
+    const mergedModels = [
+      ...(supportedModels ?? []),
+      ...(extraModels[oauthProvider] || []).map((id) => ({ id }))
+    ];
 
-    if (!supportedModels || supportedModels.length === 0) {
+    if (!mergedModels || mergedModels.length === 0) {
       throw new Error(`OAuth provider '${oauthProvider}' has no known models.`);
     }
 
-    const isSupported = supportedModels.some((model) => model.id === modelId);
+    const isSupported = mergedModels.some((model) => model.id === modelId);
     if (!isSupported) {
-      const modelList = supportedModels.map((model) => model.id).sort().join(", ");
+      const modelList = mergedModels.map((model) => model.id).sort().join(", ");
       throw new Error(
         `OAuth model '${modelId}' is not supported for provider '${oauthProvider}'. ` +
           `Supported models: ${modelList}`
