@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.12.2 - 2026-02-05
+
+### v0.12.2: GPT 5.3 Codex Support and Dependency Updates
+
+## New Features
+
+- **GPT 5.3 Codex Integration**: Support has been added for the GPT 5.3 Codex model. [[9727869](https://github.com/mcowger/plexus/commit/9727869)]
+
+## Minor Changes
+
+- **Dependency Updates**: Updated project dependencies to their latest versions. [[f9d93ae](https://github.com/mcowger/plexus/commit/f9d93ae)]
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.12.1 - 2026-02-05
 
 ### v0.12.1: Reduce Query Weight for Homepage.
