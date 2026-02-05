@@ -172,6 +172,7 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`api_base_url`**: The base URL for the provider's API. **The API type is automatically inferred from this field:**
   - Single URL string: Plexus infers the type from the URL pattern:
+    - URLs starting with `oauth://` → `oauth` format (pi-ai)
     - URLs containing `anthropic.com` → `messages` format
     - URLs containing `generativelanguage.googleapis.com` → `gemini` format
     - All other URLs → `chat` format (OpenAI-compatible)
@@ -182,6 +183,8 @@ This section defines the upstream AI providers that Plexus will route requests t
       messages: https://api.example.com/anthropic/v1
     ```
     The keys (`chat`, `messages`) define the supported API types.
+
+  - **OAuth providers**: Set `api_base_url` to `oauth://` to route via the pi-ai OAuth bridge. Use `oauth_provider` when the provider key doesn't match the pi-ai provider ID.
 
 - **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
 
@@ -214,6 +217,56 @@ This section defines the upstream AI providers that Plexus will route requests t
 - **`discount`**: (Optional) A percentage discount (0.0-1.0) to apply to all pricing for this provider. Often used if you want to base your pricing on public numbers but apply a global discount.
 
 - **`estimateTokens`**: (Optional, default: `false`) Enable automatic token estimation for providers that don't return usage data in their responses. When enabled, Plexus will reconstruct the response content and estimate token counts using a character-based heuristic algorithm. See [Token Estimation](#token-estimation) for details.
+
+### OAuth Providers (pi-ai)
+
+Plexus supports OAuth-backed providers (Anthropic, GitHub Copilot, Gemini CLI, Antigravity, OpenAI Codex) through the [pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai) library.
+
+**Requirements:**
+- OAuth credentials stored in `auth.json` (see below)
+- Provider `api_base_url` set to `oauth://`
+- `oauth_provider` set when the provider key differs from the pi-ai provider ID
+
+**Example:**
+
+```yaml
+providers:
+  codex:
+    display_name: OpenAI Codex
+    api_base_url: oauth://
+    api_key: oauth
+    oauth_provider: openai-codex
+    models:
+      - gpt-5-mini
+      - gpt-5
+
+  github-copilot:
+    display_name: GitHub Copilot
+    api_base_url: oauth://
+    api_key: oauth
+    # oauth_provider can be omitted when provider key matches pi-ai provider id
+    models:
+      - gpt-4o
+      - claude-3-5-sonnet-20241022
+```
+
+### OAuth Credentials (`auth.json`)
+
+OAuth providers read credentials from `auth.json` (default path: `./auth.json`).
+
+- **Override path** with `AUTH_JSON` environment variable (absolute or relative to the server working directory).
+- An example file is provided at `auth.json.example`.
+- Credentials can be created via the Admin UI OAuth flow or via `npx @mariozechner/pi-ai login <provider>`.
+
+#### `AUTH_JSON` Environment Variable
+
+Set `AUTH_JSON` to point Plexus at a custom credentials file:
+
+```bash
+export AUTH_JSON=/absolute/path/to/auth.json
+```
+
+Relative paths are resolved from the server working directory (typically the repo root or container workdir).
 
 **Multi-Protocol Provider Configuration:**
 
@@ -739,4 +792,3 @@ When estimation occurs, Plexus logs at `info` level:
 ```
 
 This helps you monitor which requests are using estimation and verify the feature is working correctly.
-
