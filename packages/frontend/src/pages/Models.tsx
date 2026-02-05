@@ -529,9 +529,19 @@ export const Models = () => {
                                                                     return 'images';
                                                                 } else if (alias.type === 'responses') {
                                                                     return 'responses';
-                                                                } else {
-                                                                    return t.apiType.filter((a: string) => chatApis.includes(a)).join(', ');
                                                                 }
+
+                                                                const apiTypes = t.apiType || [];
+                                                                if (apiTypes.includes('oauth')) {
+                                                                    const oauthLabel = provider?.oauthProvider
+                                                                        ? `oauth:${provider.oauthProvider}`
+                                                                        : 'oauth';
+                                                                    const filtered = apiTypes.filter((a: string) => a !== 'oauth' && chatApis.includes(a));
+                                                                    return [oauthLabel, ...filtered].join(', ');
+                                                                }
+
+                                                                const filtered = apiTypes.filter((a: string) => chatApis.includes(a));
+                                                                return (filtered.length ? filtered : apiTypes).join(', ');
                                                             })()}]
                                                         </span>
                                                     )}

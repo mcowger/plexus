@@ -6,6 +6,9 @@ import { OpenAITransformer, AnthropicTransformer, GeminiTransformer, ResponsesTr
 /**
  * Test request templates for each API type
  */
+const TEST_SYSTEM_PROMPT = 'You are a helpful assistant.';
+const TEST_USER_PROMPT = 'Just respond with the word acknowledged';
+
 const TEST_TEMPLATES = {
     chat: (modelPath: string) => ({
         model: modelPath,
@@ -13,11 +16,11 @@ const TEST_TEMPLATES = {
         messages: [
             {
                 role: 'system',
-                content: 'You are a helpful assistant.'
+                content: TEST_SYSTEM_PROMPT
             },
             {
                 role: 'user',
-                content: 'Just respond with the word acknowledged'
+                content: TEST_USER_PROMPT
             }
         ]
     }),
@@ -26,9 +29,9 @@ const TEST_TEMPLATES = {
         model: modelPath,
         stream: false,
         max_tokens: 100,
-        system: 'You are a helpful assistant.',
+        system: TEST_SYSTEM_PROMPT,
         messages: [
-            { role: 'user', content: 'Just respond with the word acknowledged' }
+            { role: 'user', content: TEST_USER_PROMPT }
         ]
     }),
 
@@ -38,13 +41,13 @@ const TEST_TEMPLATES = {
             {
                 role: 'user',
                 parts: [
-                    { text: 'Just respond with the word acknowledged' }
+                    { text: TEST_USER_PROMPT }
                 ]
             }
         ],
         system_instruction: {
             parts: [
-                { text: 'You are a helpful assistant.' }
+                { text: TEST_SYSTEM_PROMPT }
             ]
         },
         generationConfig: {
@@ -54,8 +57,8 @@ const TEST_TEMPLATES = {
 
     responses: (modelPath: string) => ({
         model: modelPath,
-        input: 'Just respond with the word acknowledged',
-        instructions: 'You are a helpful assistant.'
+        input: TEST_USER_PROMPT,
+        instructions: TEST_SYSTEM_PROMPT
     }),
 
     embeddings: (modelPath: string) => ({
@@ -73,6 +76,22 @@ const TEST_TEMPLATES = {
     speech: (modelPath: string) => ({
         model: modelPath,
         input: 'Hello world'
+    }),
+
+    oauth: (_modelPath: string) => ({
+        context: {
+            systemPrompt: TEST_SYSTEM_PROMPT,
+            messages: [
+                {
+                    role: 'user',
+                    content: TEST_USER_PROMPT,
+                    timestamp: Date.now()
+                }
+            ]
+        },
+        options: {
+            maxTokens: 100
+        }
     })
 };
 
@@ -103,10 +122,10 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
             logger.info(`Testing model: ${body.provider}/${body.model} via ${apiType} API`);
 
             // Validate API type
-            if (!['chat', 'messages', 'gemini', 'responses', 'embeddings', 'images', 'transcriptions', 'speech'].includes(apiType)) {
+            if (!['chat', 'messages', 'gemini', 'responses', 'embeddings', 'images', 'transcriptions', 'speech', 'oauth'].includes(apiType)) {
                 return reply.code(400).send({
                     success: false,
-                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses, embeddings, images, transcriptions, speech`
+                    error: `Invalid API type: ${apiType}. Must be one of: chat, messages, gemini, responses, embeddings, images, transcriptions, speech, oauth`
                 });
             }
 
@@ -159,7 +178,29 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
                 });
             }
 
-            if (dispatchMethod === 'dispatchEmbeddings') {
+            if (apiType === 'oauth') {
+                const { context, options } = testRequest as {
+                    context: { systemPrompt?: string; messages: Array<{ role: string; content: any }> };
+                    options?: Record<string, any>;
+                };
+
+                const unifiedRequest = {
+                    model: directModelPath,
+                    messages: [
+                        ...(context.systemPrompt
+                            ? [{ role: 'system', content: context.systemPrompt }]
+                            : []),
+                        ...context.messages.map((message) => ({
+                            role: message.role as any,
+                            content: message.content
+                        }))
+                    ],
+                    incomingApiType: 'oauth',
+                    originalBody: { context, options }
+                };
+
+                response = await dispatcher.dispatch(unifiedRequest);
+            } else if (dispatchMethod === 'dispatchEmbeddings') {
                 response = await dispatcher.dispatchEmbeddings({
                     model: directModelPath,
                     originalBody: testRequest,
