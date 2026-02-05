@@ -100,9 +100,6 @@ export function filterPiAiRequestOptions(
   options: Record<string, unknown>,
   model: PiAiModel<any>
 ): { filteredOptions: Record<string, unknown>; strippedParameters: string[] } {
-  if (!model?.provider) {
-    return { filteredOptions: options, strippedParameters: [] };
-  }
   const matches = PI_AI_REQUEST_FILTERS.filter(
     (rule: PiAiRequestFilterRule) => rule.provider === model.provider && rule.model === model.id
   );

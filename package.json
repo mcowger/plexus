@@ -26,8 +26,5 @@
   "type": "module",
   "workspaces": [
     "packages/*"
-  ],
-  "dependencies": {
-    "@mariozechner/pi-ai": "^0.51.6"
-  }
+  ]
 }
