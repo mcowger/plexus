@@ -49,11 +49,13 @@ export class UsageStorageService extends EventEmitter {
         try {
             const isStreamedValue = typeof record.isStreamed === 'boolean' ? (record.isStreamed ? 1 : 0) : record.isStreamed;
             const isPassthroughValue = typeof record.isPassthrough === 'boolean' ? (record.isPassthrough ? 1 : 0) : record.isPassthrough;
+            const parallelToolCallsValue = typeof record.parallelToolCallsEnabled === 'boolean' ? (record.parallelToolCallsEnabled ? 1 : 0) : record.parallelToolCallsEnabled;
 
             await this.ensureDb().insert(this.schema.requestUsage).values({
                 ...record,
                 isStreamed: isStreamedValue,
                 isPassthrough: isPassthroughValue,
+                parallelToolCallsEnabled: parallelToolCallsValue,
                 createdAt: record.createdAt || Date.now(),
             });
 
