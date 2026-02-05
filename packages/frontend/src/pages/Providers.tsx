@@ -131,7 +131,8 @@ const OAUTH_PROVIDER_MODELS: Record<string, FetchedModel[]> = {
     { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
     { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
     { id: 'gpt-5.2', name: 'GPT-5.2' },
-    { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' }
+    { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' },
+    { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex' }
   ],
   'github-copilot': [
     { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5' },
