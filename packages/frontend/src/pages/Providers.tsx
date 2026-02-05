@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Provider } from '../lib/api';
+import { api, Provider, OAuthSession } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -13,11 +13,11 @@ import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
 const OAUTH_PROVIDERS = [
-  { value: 'openai-codex', label: 'OpenAI Codex' },
-  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'anthropic', label: 'Anthropic (Claude Code Pro/Max)' },
   { value: 'github-copilot', label: 'GitHub Copilot' },
-  { value: 'google-gemini-cli', label: 'Google Gemini CLI' },
-  { value: 'google-antigravity', label: 'Google Antigravity' }
+  { value: 'google-gemini-cli', label: 'Google Cloud Code Assist (Gemini CLI)' },
+  { value: 'google-antigravity', label: 'Antigravity (Gemini 3, Claude, GPT-OSS)' },
+  { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
@@ -178,9 +178,30 @@ export const Providers = () => {
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [oauthSessionId, setOauthSessionId] = useState<string | null>(null);
+  const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
+  const [oauthPromptValue, setOauthPromptValue] = useState('');
+  const [oauthManualCode, setOauthManualCode] = useState('');
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [oauthBusy, setOauthBusy] = useState(false);
+
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
     editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
+
+  const oauthStatus = oauthSession?.status;
+  const oauthIsTerminal = oauthStatus ? ['success', 'error', 'cancelled'].includes(oauthStatus) : false;
+  const oauthStatusLabel = oauthStatus
+    ? {
+        in_progress: 'Starting',
+        awaiting_auth: 'Awaiting browser',
+        awaiting_prompt: 'Awaiting input',
+        awaiting_manual_code: 'Awaiting redirect',
+        success: 'Authenticated',
+        error: 'Error',
+        cancelled: 'Cancelled'
+      }[oauthStatus] || oauthStatus
+    : 'Not started';
 
   // Accordion state for Modal
   const [isModelsOpen, setIsModelsOpen] = useState(false);
@@ -252,6 +273,122 @@ export const Providers = () => {
         alert("Failed to save provider: " + e);
     } finally {
         setIsSaving(false);
+    }
+  };
+
+  const resetOAuthState = () => {
+    setOauthSessionId(null);
+    setOauthSession(null);
+    setOauthPromptValue('');
+    setOauthManualCode('');
+    setOauthError(null);
+    setOauthBusy(false);
+  };
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      resetOAuthState();
+      return;
+    }
+  }, [isModalOpen]);
+
+  useEffect(() => {
+    if (!isOAuthMode) return;
+    resetOAuthState();
+  }, [editingProvider.oauthProvider, isOAuthMode]);
+
+  useEffect(() => {
+    if (!oauthSessionId) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const session = await api.getOAuthSession(oauthSessionId);
+        if (cancelled) return;
+        setOauthSession(session);
+        if (['awaiting_prompt', 'awaiting_manual_code', 'awaiting_auth'].includes(session.status)) {
+          setOauthBusy(false);
+        }
+        if (['success', 'error', 'cancelled'].includes(session.status)) {
+          setOauthBusy(false);
+          return;
+        }
+        setTimeout(poll, 1000);
+      } catch (error) {
+        if (!cancelled) {
+          setOauthError(error instanceof Error ? error.message : 'Failed to load OAuth session');
+          setOauthBusy(false);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [oauthSessionId]);
+
+  const handleStartOAuth = async () => {
+    const providerId = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+    setOauthBusy(true);
+    setOauthError(null);
+    setOauthSession(null);
+    setOauthSessionId(null);
+    try {
+      const session = await api.startOAuthSession(providerId);
+      setOauthSessionId(session.id);
+      setOauthSession(session);
+      if (['awaiting_prompt', 'awaiting_manual_code', 'awaiting_auth'].includes(session.status)) {
+        setOauthBusy(false);
+      }
+    } catch (error) {
+      setOauthError(error instanceof Error ? error.message : 'Failed to start OAuth');
+      setOauthBusy(false);
+    }
+  };
+
+  const handleSubmitPrompt = async () => {
+    if (!oauthSessionId) return;
+    setOauthBusy(true);
+    setOauthError(null);
+    try {
+      const session = await api.submitOAuthPrompt(oauthSessionId, oauthPromptValue);
+      setOauthSession(session);
+      setOauthPromptValue('');
+    } catch (error) {
+      setOauthError(error instanceof Error ? error.message : 'Failed to submit prompt');
+    } finally {
+      setOauthBusy(false);
+    }
+  };
+
+  const handleSubmitManualCode = async () => {
+    if (!oauthSessionId) return;
+    setOauthBusy(true);
+    setOauthError(null);
+    try {
+      const session = await api.submitOAuthManualCode(oauthSessionId, oauthManualCode);
+      setOauthSession(session);
+      setOauthManualCode('');
+    } catch (error) {
+      setOauthError(error instanceof Error ? error.message : 'Failed to submit code');
+    } finally {
+      setOauthBusy(false);
+    }
+  };
+
+  const handleCancelOAuth = async () => {
+    if (!oauthSessionId) return;
+    setOauthBusy(true);
+    setOauthError(null);
+    try {
+      const session = await api.cancelOAuthSession(oauthSessionId);
+      setOauthSession(session);
+    } catch (error) {
+      setOauthError(error instanceof Error ? error.message : 'Failed to cancel session');
+    } finally {
+      setOauthBusy(false);
     }
   };
 
@@ -780,6 +917,124 @@ export const Providers = () => {
                 placeholder="sk-..."
                 disabled={isOAuthMode}
               />
+
+              {isOAuthMode && (
+                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px'}}>
+                    <div>
+                      <div className="font-body text-[13px] font-medium text-text">OAuth Authentication</div>
+                      <div className="text-[11px] text-text-secondary">Tokens are saved to auth.json after login.</div>
+                    </div>
+                    <Badge
+                      status={
+                        oauthStatus === 'success'
+                          ? 'connected'
+                          : oauthStatus === 'error' || oauthStatus === 'cancelled'
+                          ? 'error'
+                          : oauthSessionId
+                          ? 'warning'
+                          : 'neutral'
+                      }
+                      style={{fontSize: '10px', padding: '2px 8px'}}
+                      className="[&_.connection-dot]:hidden"
+                    >
+                      {oauthStatusLabel}
+                    </Badge>
+                  </div>
+
+                  {oauthError && (
+                    <div className="text-[11px] text-danger" style={{marginBottom: '8px'}}>
+                      {oauthError}
+                    </div>
+                  )}
+
+                  {oauthSession?.authInfo && (
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px'}}>
+                      <Input
+                        label="Authorization URL"
+                        value={oauthSession.authInfo.url}
+                        readOnly
+                      />
+                      {oauthSession.authInfo.instructions && (
+                        <div className="text-[11px] text-text-secondary flex items-center gap-1">
+                          <Info size={12} />
+                          <span>{oauthSession.authInfo.instructions}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {oauthSession?.prompt && (
+                    <div style={{display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px'}}>
+                      <div style={{flex: 1}}>
+                        <Input
+                          label={oauthSession.prompt.message}
+                          placeholder={oauthSession.prompt.placeholder}
+                          value={oauthPromptValue}
+                          onChange={(e) => setOauthPromptValue(e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={handleSubmitPrompt}
+                        disabled={oauthBusy || (!oauthSession.prompt.allowEmpty && !oauthPromptValue)}
+                      >
+                        Submit
+                      </Button>
+                    </div>
+                  )}
+
+                  {oauthSession?.status === 'awaiting_manual_code' && (
+                    <div style={{display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px'}}>
+                      <div style={{flex: 1}}>
+                        <Input
+                          label="Paste redirect URL or code"
+                          value={oauthManualCode}
+                          onChange={(e) => setOauthManualCode(e.target.value)}
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <Button size="sm" onClick={handleSubmitManualCode} disabled={oauthBusy || !oauthManualCode}>
+                        Submit
+                      </Button>
+                    </div>
+                  )}
+
+                  {oauthSession?.progress && oauthSession.progress.length > 0 && (
+                    <div style={{marginBottom: '8px'}}>
+                      <div className="text-[11px] text-text-secondary">Progress</div>
+                      <div className="text-[11px] text-text" style={{marginTop: '4px'}}>
+                        {(oauthSession?.progress ?? []).slice(-3).map((message, idx) => (
+                          <div key={`${message}-${idx}`}>{message}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {oauthStatus === 'success' && (
+                    <div className="text-[11px] text-success" style={{marginBottom: '8px'}}>
+                      Authentication complete. Tokens saved to auth.json.
+                    </div>
+                  )}
+
+                  <div style={{display: 'flex', gap: '8px'}}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleStartOAuth}
+                      isLoading={oauthBusy && !oauthSessionId}
+                      disabled={oauthBusy || (!!oauthSessionId && !oauthIsTerminal)}
+                    >
+                      {oauthSessionId && !oauthIsTerminal ? 'OAuth in progress' : 'Start OAuth'}
+                    </Button>
+                    {oauthSessionId && !oauthIsTerminal && (
+                      <Button size="sm" variant="ghost" onClick={handleCancelOAuth} disabled={oauthBusy}>
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Models Accordion */}
               <div className="border border-border-glass rounded-md">

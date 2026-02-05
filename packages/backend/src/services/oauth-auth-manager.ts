@@ -26,6 +26,10 @@ export class OAuthAuthManager {
     return this.instance;
   }
 
+  static resetForTesting(): void {
+    this.instance = undefined as unknown as OAuthAuthManager;
+  }
+
   private loadAuthFile(): void {
     try {
       if (fs.existsSync(this.authFilePath)) {
@@ -54,6 +58,11 @@ export class OAuthAuthManager {
     } catch (error) {
       logger.error(`OAuth: Failed to save ${this.authFilePath}:`, error);
     }
+  }
+
+  setCredentials(provider: OAuthProvider, credentials: OAuthCredentials): void {
+    this.authData[provider] = { type: 'oauth', ...credentials } as OAuthCredentials;
+    this.saveAuthFile();
   }
 
   async getApiKey(provider: OAuthProvider): Promise<string> {

@@ -225,6 +225,35 @@ export interface KeyConfig {
     comment?: string;
 }
 
+export interface OAuthProviderInfo {
+    id: string;
+    name: string;
+    usesCallbackServer: boolean;
+}
+
+export interface OAuthAuthInfo {
+    url: string;
+    instructions?: string;
+}
+
+export interface OAuthPrompt {
+    message: string;
+    placeholder?: string;
+    allowEmpty?: boolean;
+}
+
+export interface OAuthSession {
+    id: string;
+    providerId: string;
+    status: string;
+    authInfo?: OAuthAuthInfo;
+    prompt?: OAuthPrompt;
+    progress: string[];
+    error?: string;
+    createdAt: number;
+    updatedAt: number;
+}
+
 export const formatLargeNumber = formatNumber;
 
 export const STAT_LABELS = {
@@ -1157,5 +1186,76 @@ export const api = {
 
       const newYaml = stringify(config);
       await api.saveConfig(newYaml);
+  },
+
+  getOAuthProviders: async (): Promise<OAuthProviderInfo[]> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/providers`);
+      if (!res.ok) throw new Error('Failed to fetch OAuth providers');
+      const json = await res.json() as BackendResponse<OAuthProviderInfo[]>;
+      return json.data || [];
+  },
+
+  startOAuthSession: async (providerId: string): Promise<OAuthSession> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerId })
+      });
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to start OAuth session');
+      }
+      const json = await res.json() as { data: OAuthSession };
+      return json.data;
+  },
+
+  getOAuthSession: async (sessionId: string): Promise<OAuthSession> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions/${sessionId}`);
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to fetch OAuth session');
+      }
+      const json = await res.json() as { data: OAuthSession };
+      return json.data;
+  },
+
+  submitOAuthPrompt: async (sessionId: string, value: string): Promise<OAuthSession> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions/${sessionId}/prompt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value })
+      });
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to submit OAuth prompt');
+      }
+      const json = await res.json() as { data: OAuthSession };
+      return json.data;
+  },
+
+  submitOAuthManualCode: async (sessionId: string, value: string): Promise<OAuthSession> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions/${sessionId}/manual-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value })
+      });
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to submit OAuth code');
+      }
+      const json = await res.json() as { data: OAuthSession };
+      return json.data;
+  },
+
+  cancelOAuthSession: async (sessionId: string): Promise<OAuthSession> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions/${sessionId}/cancel`, {
+          method: 'POST'
+      });
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to cancel OAuth session');
+      }
+      const json = await res.json() as { data: OAuthSession };
+      return json.data;
   }
 };
