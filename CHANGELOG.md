@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.12.0 - 2026-02-05
+
+### v0.12.0: Support Oauth/Subscription Providers:  Codex, Claude Pro, Antigravity, GeminiCLI, Github Copilot
+
+## Main Features
+
+- **OAuth Authentication Integration**: Implemented a full OAuth login flow, including backend services and frontend UI components. This release introduces support for OAuth providers and a specialized OAuth transformer designed for streaming support.
+  - Backend/Frontend integration: [11c8917](https://github.com/mcowger/plexus/commit/11c8917), [7034b59](https://github.com/mcowger/plexus/commit/7034b59)
+  - OAuth transformer with streaming: [22ea201](https://github.com/mcowger/plexus/commit/22ea201)
+
+## Smaller Changes and Fixes
+
+- **Stream Event Refinement**: Improved the streaming response logic to align with API specifications and provide richer data during inference.
+  - Align responses stream events with API: [6f6aa00](https://github.com/mcowger/plexus/commit/6f6aa00)
+  - Emit reasoning summary and output items in stream: [c2f41da](https://github.com/mcowger/plexus/commit/c2f41da), [20784d9](https://github.com/mcowger/plexus/commit/20784d9)
+  - Finalize tool calls within the responses stream: [a08fe9d](https://github.com/mcowger/plexus/commit/a08fe9d)
+- **Validation & Schemas**: Integrated TypeBox for robust schema validation and added validation for OAuth models.
+  - Document auth JSON and add TypeBox: [f858cf5](https://github.com/mcowger/plexus/commit/f858cf5)
+  - Validate OAuth models and known lists: [3854e26](https://github.com/mcowger/plexus/commit/3854e26)
+- **UI and UX Fixes**:
+  - Display OAuth provider icons in logs: [38897da](https://github.com/mcowger/plexus/commit/38897da)
+  - Pass response options to OAuth flow: [c35af6b](https://github.com/mcowger/plexus/commit/c35af6b)
+  - Filter pi-ai request options: [3f76d19](https://github.com/mcowger/plexus/commit/3f76d19)
+- **Maintenance & Tooling**:
+  - Added OAuth test payloads and labels: [651b24e](https://github.com/mcowger/plexus/commit/651b24e)
+  - Updated README and test configurations: [26e31b6](https://github.com/mcowger/plexus/commit/26e31b6), [51fb3a7](https://github.com/mcowger/plexus/commit/51fb3a7)
+  - Ignore local auth artifacts and remove runtime data: [2a4b83e](https://github.com/mcowger/plexus/commit/2a4b83e)
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.11.1 - 2026-02-04
 
 ### v0.11.1: Implementation of Server-Side Quota Forecasting and Database Resiliency Fixes
