@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.12.3 - 2026-02-05
+
+### v0.12.3: OAuth model validation update for gpt-5.3-codex
+
+### Bug Fixes
+
+- **OAuth**: Added support for `gpt-5.3-codex` in model validation checks within the OAuth flow. ([6721502](https://github.com/mcowger/plexus/commit6721502))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.12.2 - 2026-02-05
 
 ### v0.12.2: GPT 5.3 Codex Support and Dependency Updates
