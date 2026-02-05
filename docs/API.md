@@ -126,6 +126,93 @@ The Management APIs provide endpoints for inspecting the system configuration an
     - `400 Bad Request`: Validation failed. Response JSON includes error details.
     - `500 Internal Server Error`: File write failed or path not resolved.
 
+### OAuth Providers
+
+Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, GitHub Copilot, Gemini CLI, Antigravity, OpenAI Codex).
+
+#### List OAuth Providers
+- **Endpoint:** `GET /v0/management/oauth/providers`
+- **Description:** Returns the OAuth providers available on this server.
+- **Response Format:**
+  ```json
+  {
+    "data": [
+      {
+        "id": "openai-codex",
+        "name": "OpenAI Codex",
+        "usesCallbackServer": false
+      }
+    ],
+    "total": 1
+  }
+  ```
+
+#### Start OAuth Session
+- **Endpoint:** `POST /v0/management/oauth/sessions`
+- **Description:** Starts an OAuth login session for a provider.
+- **Request Body:**
+  ```json
+  { "providerId": "openai-codex" }
+  ```
+- **Response Format:**
+  ```json
+  {
+    "data": {
+      "id": "session_123",
+      "providerId": "openai-codex",
+      "status": "waiting",
+      "authInfo": { "url": "https://...", "instructions": "..." },
+      "prompt": null,
+      "progress": [],
+      "createdAt": 1735689599000,
+      "updatedAt": 1735689599000
+    }
+  }
+  ```
+
+#### Get OAuth Session
+- **Endpoint:** `GET /v0/management/oauth/sessions/:id`
+- **Description:** Fetches the latest session status for polling.
+
+#### Submit OAuth Prompt
+- **Endpoint:** `POST /v0/management/oauth/sessions/:id/prompt`
+- **Description:** Sends a prompt response back to the OAuth session (e.g., confirmation codes).
+- **Request Body:**
+  ```json
+  { "value": "yes" }
+  ```
+
+#### Submit OAuth Manual Code
+- **Endpoint:** `POST /v0/management/oauth/sessions/:id/manual-code`
+- **Description:** Submits a manual redirect code when the provider requires it.
+- **Request Body:**
+  ```json
+  { "value": "4/0Ad..." }
+  ```
+
+#### Cancel OAuth Session
+- **Endpoint:** `POST /v0/management/oauth/sessions/:id/cancel`
+- **Description:** Cancels an active OAuth session.
+
+### Provider Test
+
+Run a lightweight test request for a provider/model pair. Supports `chat`, `messages`, `gemini`, `responses`, `embeddings`, `images`, `speech`, and `oauth`.
+
+- **Endpoint:** `POST /v0/management/test`
+- **Request Body:**
+  ```json
+  { "provider": "openai", "model": "gpt-4o", "apiType": "chat" }
+  ```
+- **Response Format:**
+  ```json
+  {
+    "success": true,
+    "durationMs": 420,
+    "apiType": "chat",
+    "response": "acknowledged"
+  }
+  ```
+
 ### Usage Records
 - **Endpoint:** `GET /v0/management/usage`
 - **Description:** Returns a paginated list of usage records with support for extensive filtering.
