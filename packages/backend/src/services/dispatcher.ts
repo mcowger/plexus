@@ -319,6 +319,15 @@ export class Dispatcher {
       const oauthContext = context?.context ? context.context : context;
       const oauthOptions = context?.options;
 
+      logger.debug('OAuth: Dispatching request', {
+        routeProvider: route.provider,
+        oauthProvider,
+        model: route.model,
+        targetApiType,
+        streaming: !!request.stream,
+        hasOptions: !!oauthOptions
+      });
+
       if (!oauthContext.systemPrompt) {
         oauthContext.systemPrompt = this.resolveOAuthInstructions(request, oauthProvider) || oauthContext.systemPrompt;
       }

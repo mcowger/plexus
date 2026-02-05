@@ -11,7 +11,11 @@ import {
   type OAuthProvider,
   type Model as PiAiModel
 } from '@mariozechner/pi-ai';
-import { filterPiAiRequestOptions } from '../../filters/pi-ai-request-filters';
+import {
+  applyClaudeCodeToolProxy,
+  filterPiAiRequestOptions,
+  proxyClaudeCodeToolName
+} from '../../filters/pi-ai-request-filters';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 import { unifiedToContext, piAiMessageToUnified, piAiEventToChunk } from './type-mappers';
 import { logger } from '../../utils/logger';
@@ -120,7 +124,7 @@ export class OAuthTransformer implements Transformer {
       options.include = request.include;
     }
     if (request.max_tokens !== undefined) {
-      options.maxOutputTokens = request.max_tokens;
+      options.maxTokens = request.max_tokens;
     }
     if (request.temperature !== undefined) {
       options.temperature = request.temperature;
@@ -173,7 +177,8 @@ export class OAuthTransformer implements Transformer {
         : readableStreamToAsyncIterable(streamInput as ReadableStream<any>);
 
       for await (const event of source) {
-        const chunk = piAiEventToChunk(event, event.partial?.model || 'unknown');
+        const provider = event.partial?.provider || event.message?.provider || event.error?.provider;
+        const chunk = piAiEventToChunk(event, event.partial?.model || 'unknown', provider);
         if (chunk) {
           yield chunk;
         }
@@ -227,7 +232,54 @@ export class OAuthTransformer implements Transformer {
     const apiKey = await authManager.getApiKey(provider);
     const model = this.getPiAiModel(provider, modelId);
     const { filteredOptions, strippedParameters } = filterPiAiRequestOptions(options ?? {}, model);
-    const requestOptions = { apiKey, ...filteredOptions };
+    const isClaudeCodeToken = apiKey.includes('sk-ant-oat');
+    const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
+
+    if (provider === 'anthropic' && isClaudeCodeToken) {
+      applyClaudeCodeToolProxy(context);
+
+      if (requestOptions.toolChoice) {
+        if (typeof requestOptions.toolChoice === 'string') {
+          requestOptions.toolChoice = proxyClaudeCodeToolName(requestOptions.toolChoice);
+        } else if (typeof requestOptions.toolChoice === 'object') {
+          if (typeof requestOptions.toolChoice.name === 'string') {
+            requestOptions.toolChoice.name = proxyClaudeCodeToolName(requestOptions.toolChoice.name);
+          }
+          if (requestOptions.toolChoice.function?.name) {
+            requestOptions.toolChoice.function.name = proxyClaudeCodeToolName(
+              requestOptions.toolChoice.function.name
+            );
+          }
+        }
+      }
+
+      const claudeCodeHeaders = {
+        accept: 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'anthropic-beta':
+          'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14',
+        'user-agent': 'claude-cli/2.1.2 (external, cli)',
+        'x-app': 'cli'
+      };
+
+      requestOptions.headers = {
+        ...claudeCodeHeaders,
+        ...(filteredOptions as any).headers
+      };
+    }
+
+    const apiKeyPreview = apiKey ? `${apiKey.slice(0, 12)}...` : 'none';
+
+    logger.debug(`${this.name}: OAuth credentials resolved`, {
+      provider,
+      model: model.id,
+      streaming,
+      apiKeyPreview,
+      isClaudeCodeToken,
+      optionKeys: Object.keys(filteredOptions),
+      hasInjectedClaudeCodeHeaders: !!requestOptions.headers
+    });
 
     if (strippedParameters.length > 0) {
       logger.debug(`${this.name}: Stripped pi-ai request options`, {

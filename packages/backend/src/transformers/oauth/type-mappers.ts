@@ -196,6 +196,11 @@ export function piAiMessageToUnified(
   provider: string,
   model: string
 ): UnifiedChatResponse {
+  const stripProxyPrefix = (name?: string) => {
+    if (!name || provider !== 'anthropic') return name;
+    return name.startsWith('proxy_') ? name.slice('proxy_'.length) : name;
+  };
+
   let textContent: string | null = null;
   let thinkingContent: string | null = null;
   const toolCalls: any[] = [];
@@ -214,7 +219,7 @@ export function piAiMessageToUnified(
           id: callId || block.id,
           type: 'function',
           function: {
-            name: block.name,
+            name: stripProxyPrefix(block.name) || block.name,
             arguments: JSON.stringify(block.arguments)
           }
         });
@@ -244,8 +249,14 @@ export function piAiMessageToUnified(
 
 export function piAiEventToChunk(
   event: AssistantMessageEvent,
-  model: string
+  model: string,
+  provider?: string
 ): UnifiedChatStreamChunk | null {
+  const stripProxyPrefix = (name?: string) => {
+    if (!name || provider !== 'anthropic') return name;
+    return name.startsWith('proxy_') ? name.slice('proxy_'.length) : name;
+  };
+
   const baseChunk = {
     id: `oauth-${Date.now()}`,
     model,
@@ -287,7 +298,7 @@ export function piAiEventToChunk(
                 id: callId || '',
                 type: 'function',
                 function: {
-                  name: (toolCall as any)?.name || '',
+                  name: stripProxyPrefix((toolCall as any)?.name) || '',
                   arguments: ''
                 }
               }
@@ -308,7 +319,7 @@ export function piAiEventToChunk(
                 id: callId || (toolCall as any).id,
                 type: 'function',
                 function: {
-                  name: (toolCall as any).name,
+                  name: stripProxyPrefix((toolCall as any).name),
                   arguments: event.delta
                 }
               }
@@ -330,7 +341,7 @@ export function piAiEventToChunk(
                 id: callId || event.toolCall.id,
                 type: 'function',
                 function: {
-                  name: event.toolCall.name,
+                  name: stripProxyPrefix(event.toolCall.name),
                   arguments: JSON.stringify(event.toolCall.arguments)
                 }
               }
