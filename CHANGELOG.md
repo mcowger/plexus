@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.12.4 - 2026-02-05
+
+### FInalized support for GPT 5.3 Codex
+
+## Changes
+
+### Bug Fixes
+- **OAuth:** Guarded OAuth model metadata to ensure stability ([8d05db2](https://github.com/mcowger/plexus/commit/8d05db2))
+
+### Maintenance and Chores
+- Updated the `bun` lockfile to current versions ([e67300b](https://github.com/mcowger/plexus/commit/e67300b))
+- Synchronized `pi-ai` dependency with upstream ([f3c2cb8](https://github.com/mcowger/plexus/commit/f3c2cb8))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.12.3 - 2026-02-05
 
 ### v0.12.3: OAuth model validation update for gpt-5.3-codex
