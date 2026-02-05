@@ -374,12 +374,12 @@ export class Dispatcher {
 
   private assertOAuthModelSupported(oauthProvider: string, modelId: string) {
     const supportedModels = getModels(oauthProvider as any);
-    const extraModels: Record<string, string[]> = {
-      'openai-codex': ['gpt-5.3-codex']
+    const extraModels: Record<string, Array<{ id: string; provider: string }>> = {
+      'openai-codex': [{ id: 'gpt-5.3-codex', provider: 'openai-codex' }]
     };
     const mergedModels = [
       ...(supportedModels ?? []),
-      ...(extraModels[oauthProvider] || []).map((id) => ({ id }))
+      ...(extraModels[oauthProvider] || [])
     ];
 
     if (!mergedModels || mergedModels.length === 0) {
