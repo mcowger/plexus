@@ -1,12 +1,58 @@
 import { FastifyInstance } from 'fastify';
 import { encode } from 'eventsource-encoder';
+import { and, gte, lte, sql } from 'drizzle-orm';
+import { getCurrentDialect, getSchema } from '../../db/client';
 import { UsageStorageService } from '../../services/usage-storage';
+
+const USAGE_FIELDS = new Set([
+    'requestId',
+    'date',
+    'sourceIp',
+    'apiKey',
+    'attribution',
+    'incomingApiType',
+    'provider',
+    'incomingModelAlias',
+    'canonicalModelName',
+    'selectedModelName',
+    'outgoingApiType',
+    'tokensInput',
+    'tokensOutput',
+    'tokensReasoning',
+    'tokensCached',
+    'tokensEstimated',
+    'costInput',
+    'costOutput',
+    'costCached',
+    'costTotal',
+    'costSource',
+    'costMetadata',
+    'startTime',
+    'durationMs',
+    'ttftMs',
+    'tokensPerSec',
+    'isStreamed',
+    'isPassthrough',
+    'responseStatus',
+    'toolsDefined',
+    'messageCount',
+    'parallelToolCallsEnabled',
+    'toolCallsCount',
+    'finishReason',
+    'hasDebug',
+    'hasError'
+]);
 
 export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService) {
     fastify.get('/v0/management/usage', async (request, reply) => {
         const query = request.query as any;
         const limit = parseInt(query.limit || '50');
         const offset = parseInt(query.offset || '0');
+        const rawFields = typeof query.fields === 'string' ? query.fields : '';
+        const requestedFields = rawFields
+            .split(',')
+            .map((field: string) => field.trim())
+            .filter((field: string) => USAGE_FIELDS.has(field));
 
         const filters: any = {
             startDate: query.startDate,
@@ -24,7 +70,163 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
 
         try {
             const result = await usageStorage.getUsage(filters, { limit, offset });
-            return reply.send(result);
+            if (requestedFields.length === 0) {
+                return reply.send(result);
+            }
+
+            const filteredData = result.data.map((record: any) => {
+                const filtered: Record<string, unknown> = {};
+                for (const field of requestedFields) {
+                    filtered[field] = record[field];
+                }
+                return filtered;
+            });
+
+            return reply.send({
+                data: filteredData,
+                total: result.total
+            });
+        } catch (e: any) {
+            return reply.code(500).send({ error: e.message });
+        }
+    });
+
+    fastify.get('/v0/management/usage/summary', async (request, reply) => {
+        const query = request.query as any;
+        const range = query.range || 'day';
+        if (!['hour', 'day', 'week', 'month'].includes(range)) {
+            return reply.code(400).send({ error: 'Invalid range' });
+        }
+
+        const now = new Date();
+        now.setSeconds(0, 0);
+        const rangeStart = new Date(now);
+        const statsStart = new Date(now);
+        statsStart.setDate(statsStart.getDate() - 7);
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+
+        let stepSeconds = 60;
+        switch (range) {
+            case 'hour':
+                rangeStart.setHours(rangeStart.getHours() - 1);
+                stepSeconds = 60;
+                break;
+            case 'day':
+                rangeStart.setHours(rangeStart.getHours() - 24);
+                stepSeconds = 60 * 60;
+                break;
+            case 'week':
+                rangeStart.setDate(rangeStart.getDate() - 7);
+                stepSeconds = 60 * 60 * 24;
+                break;
+            case 'month':
+                rangeStart.setDate(rangeStart.getDate() - 30);
+                stepSeconds = 60 * 60 * 24;
+                break;
+        }
+
+        const db = usageStorage.getDb();
+        const schema = getSchema();
+        const dialect = getCurrentDialect();
+        const stepMs = stepSeconds * 1000;
+        const nowMs = now.getTime();
+        const rangeStartMs = rangeStart.getTime();
+        const statsStartMs = statsStart.getTime();
+        const todayStartMs = todayStart.getTime();
+
+        const stepMsLiteral = sql.raw(String(stepMs));
+        const bucketStartMs = dialect === 'sqlite'
+            ? sql<number>`CAST((CAST(${schema.requestUsage.startTime} AS INTEGER) / ${stepMsLiteral}) * ${stepMsLiteral} AS INTEGER)`
+            : sql<number>`FLOOR(${schema.requestUsage.startTime}::double precision / ${stepMsLiteral}) * ${stepMsLiteral}`;
+
+        const toNumber = (value: unknown) => (value === null || value === undefined ? 0 : Number(value));
+
+        try {
+            const seriesRows = await db
+                .select({
+                    bucketStartMs,
+                    requests: sql<number>`COUNT(*)`,
+                    inputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
+                    outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
+                    cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`
+                })
+                .from(schema.requestUsage)
+                .where(and(
+                    gte(schema.requestUsage.startTime, rangeStartMs),
+                    lte(schema.requestUsage.startTime, nowMs)
+                ))
+                .groupBy(bucketStartMs)
+                .orderBy(bucketStartMs);
+
+            const statsRows = await db
+                .select({
+                    requests: sql<number>`COUNT(*)`,
+                    inputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
+                    outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
+                    avgDurationMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`
+                })
+                .from(schema.requestUsage)
+                .where(and(
+                    gte(schema.requestUsage.startTime, statsStartMs),
+                    lte(schema.requestUsage.startTime, nowMs)
+                ));
+
+            const todayRows = await db
+                .select({
+                    requests: sql<number>`COUNT(*)`,
+                    inputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
+                    outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
+                    reasoningTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensReasoning}), 0)`,
+                    cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
+                    totalCost: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`
+                })
+                .from(schema.requestUsage)
+                .where(and(
+                    gte(schema.requestUsage.startTime, todayStartMs),
+                    lte(schema.requestUsage.startTime, nowMs)
+                ));
+
+            const statsRow = statsRows[0] || {
+                requests: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                avgDurationMs: 0
+            };
+
+            const todayRow = todayRows[0] || {
+                requests: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                reasoningTokens: 0,
+                cachedTokens: 0,
+                totalCost: 0
+            };
+
+            return reply.send({
+                range,
+                series: seriesRows.map(row => ({
+                    bucketStartMs: toNumber(row.bucketStartMs),
+                    requests: toNumber(row.requests),
+                    inputTokens: toNumber(row.inputTokens),
+                    outputTokens: toNumber(row.outputTokens),
+                    cachedTokens: toNumber(row.cachedTokens),
+                    tokens: toNumber(row.inputTokens) + toNumber(row.outputTokens)
+                })),
+                stats: {
+                    totalRequests: toNumber(statsRow.requests),
+                    totalTokens: toNumber(statsRow.inputTokens) + toNumber(statsRow.outputTokens),
+                    avgDurationMs: toNumber(statsRow.avgDurationMs)
+                },
+                today: {
+                    requests: toNumber(todayRow.requests),
+                    inputTokens: toNumber(todayRow.inputTokens),
+                    outputTokens: toNumber(todayRow.outputTokens),
+                    reasoningTokens: toNumber(todayRow.reasoningTokens),
+                    cachedTokens: toNumber(todayRow.cachedTokens),
+                    totalCost: toNumber(todayRow.totalCost)
+                }
+            });
         } catch (e: any) {
             return reply.code(500).send({ error: e.message });
         }

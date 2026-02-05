@@ -88,6 +88,13 @@ export interface TodayMetrics {
   totalCost: number;
 }
 
+export interface DashboardData {
+    stats: Stat[];
+    usageData: UsageData[];
+    cooldowns: Cooldown[];
+    todayMetrics: TodayMetrics;
+}
+
 export interface PieChartDataPoint {
   name: string;
   requests: number;
@@ -201,6 +208,308 @@ interface BackendResponse<T> {
     error?: string;
 }
 
+interface UsageSummarySeriesPoint {
+    bucketStartMs: number;
+    requests: number;
+    inputTokens: number;
+    outputTokens: number;
+    cachedTokens: number;
+    tokens: number;
+}
+
+interface UsageSummaryResponse {
+    range: 'hour' | 'day' | 'week' | 'month';
+    series: UsageSummarySeriesPoint[];
+    stats: {
+        totalRequests: number;
+        totalTokens: number;
+        avgDurationMs: number;
+    };
+    today: TodayMetrics;
+}
+
+type UsageRecordField = keyof UsageRecord;
+
+interface UsageQueryParams<T extends UsageRecordField> {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+    incomingApiType?: string;
+    provider?: string;
+    incomingModelAlias?: string;
+    selectedModelName?: string;
+    outgoingApiType?: string;
+    responseStatus?: string;
+    minDurationMs?: number;
+    maxDurationMs?: number;
+    fields?: T[];
+    cache?: boolean;
+}
+
+const USAGE_CACHE_TTL_MS = 20000;
+const usageRequestCache = new Map<string, { expiresAt: number; promise: Promise<BackendResponse<any>> }>();
+const summaryRequestCache = new Map<string, { expiresAt: number; promise: Promise<UsageSummaryResponse> }>();
+
+const CONFIG_CACHE_TTL_MS = 20000;
+const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<PlexusConfig | null> }>();
+
+const USAGE_PAGE_FIELDS: UsageRecordField[] = [
+    'date',
+    'tokensInput',
+    'tokensOutput',
+    'tokensCached',
+    'incomingModelAlias',
+    'provider',
+    'apiKey'
+];
+
+
+const normalizeNow = (): Date => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    return now;
+};
+
+const getUsageRangeConfig = (range: 'hour' | 'day' | 'week' | 'month', now: Date) => {
+    const startDate = new Date(now);
+    let bucketFormat: (d: Date) => string;
+    let buckets = 0;
+    let step = 0;
+
+    switch (range) {
+        case 'hour':
+            startDate.setHours(startDate.getHours() - 1);
+            bucketFormat = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            buckets = 60;
+            step = 60 * 1000;
+            break;
+        case 'day':
+            startDate.setHours(startDate.getHours() - 24);
+            bucketFormat = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            buckets = 24;
+            step = 60 * 60 * 1000;
+            break;
+        case 'month':
+            startDate.setDate(startDate.getDate() - 30);
+            bucketFormat = (d) => d.toLocaleDateString();
+            buckets = 30;
+            step = 24 * 60 * 60 * 1000;
+            break;
+        case 'week':
+        default:
+            startDate.setDate(startDate.getDate() - 7);
+            bucketFormat = (d) => d.toLocaleDateString();
+            buckets = 7;
+            step = 24 * 60 * 60 * 1000;
+            break;
+    }
+
+    return { startDate, bucketFormat, buckets, step };
+};
+
+const buildUsageSeries = (
+    records: Array<Partial<UsageRecord>>,
+    range: 'hour' | 'day' | 'week' | 'month',
+    now: Date
+): UsageData[] => {
+    const { startDate, bucketFormat, buckets, step } = getUsageRangeConfig(range, now);
+    const grouped: Record<string, UsageData> = {};
+    const nowMs = now.getTime();
+
+    for (let i = buckets; i >= 0; i--) {
+        const t = new Date(nowMs - (i * step));
+        if (range === 'day') t.setMinutes(0, 0, 0);
+        if (range === 'week' || range === 'month') t.setHours(0, 0, 0, 0);
+
+        const key = bucketFormat(t);
+        if (!grouped[key]) {
+            grouped[key] = {
+                timestamp: key,
+                requests: 0,
+                tokens: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                cachedTokens: 0
+            };
+        }
+    }
+
+    records.forEach((record) => {
+        if (!record.date) return;
+        const d = new Date(record.date);
+        if (d < startDate) return;
+
+        if (range === 'day') d.setMinutes(0, 0, 0);
+        if (range === 'week' || range === 'month') d.setHours(0, 0, 0, 0);
+
+        const key = bucketFormat(d);
+        if (!grouped[key]) {
+            grouped[key] = {
+                timestamp: key,
+                requests: 0,
+                tokens: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                cachedTokens: 0
+            };
+        }
+
+        const inputTokens = record.tokensInput || 0;
+        const outputTokens = record.tokensOutput || 0;
+        const cachedTokens = record.tokensCached || 0;
+
+        grouped[key].requests++;
+        grouped[key].tokens += inputTokens + outputTokens;
+        grouped[key].inputTokens += inputTokens;
+        grouped[key].outputTokens += outputTokens;
+        grouped[key].cachedTokens += cachedTokens;
+    });
+
+    return Object.values(grouped);
+};
+
+const formatBucketLabel = (range: 'hour' | 'day' | 'week' | 'month', date: Date) => {
+    if (range === 'hour' || range === 'day') {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString();
+};
+
+const buildSummarySeries = (
+    summary: UsageSummaryResponse,
+    now: Date
+): UsageData[] => {
+    const { buckets, step } = getUsageRangeConfig(summary.range, now);
+    const grouped: Record<string, UsageData> = {};
+    const stepMs = step;
+    const alignedNowMs = Math.floor(now.getTime() / stepMs) * stepMs;
+    const startMs = alignedNowMs - (buckets * stepMs);
+    const byBucket = new Map(summary.series.map(point => [point.bucketStartMs, point]));
+
+    for (let i = 0; i <= buckets; i++) {
+        const bucketStartMs = startMs + (i * stepMs);
+        const bucketDate = new Date(bucketStartMs);
+        const label = formatBucketLabel(summary.range, bucketDate);
+        const point = byBucket.get(bucketStartMs);
+        const inputTokens = point?.inputTokens || 0;
+        const outputTokens = point?.outputTokens || 0;
+        const cachedTokens = point?.cachedTokens || 0;
+
+        grouped[label] = {
+            timestamp: label,
+            requests: point?.requests || 0,
+            tokens: point?.tokens || inputTokens + outputTokens,
+            inputTokens,
+            outputTokens,
+            cachedTokens
+        };
+    }
+
+    return Object.values(grouped);
+};
+
+const buildUsageQuery = <T extends UsageRecordField>(params: UsageQueryParams<T>) => {
+    const searchParams = new URLSearchParams();
+
+    if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params.startDate) searchParams.set('startDate', params.startDate);
+    if (params.endDate) searchParams.set('endDate', params.endDate);
+    if (params.incomingApiType) searchParams.set('incomingApiType', params.incomingApiType);
+    if (params.provider) searchParams.set('provider', params.provider);
+    if (params.incomingModelAlias) searchParams.set('incomingModelAlias', params.incomingModelAlias);
+    if (params.selectedModelName) searchParams.set('selectedModelName', params.selectedModelName);
+    if (params.outgoingApiType) searchParams.set('outgoingApiType', params.outgoingApiType);
+    if (params.responseStatus) searchParams.set('responseStatus', params.responseStatus);
+    if (params.minDurationMs !== undefined) searchParams.set('minDurationMs', String(params.minDurationMs));
+    if (params.maxDurationMs !== undefined) searchParams.set('maxDurationMs', String(params.maxDurationMs));
+
+    if (params.fields && params.fields.length > 0) {
+        const fieldsValue = [...params.fields].sort().join(',');
+        searchParams.set('fields', fieldsValue);
+    }
+
+    return searchParams;
+};
+
+const fetchUsageRecords = async <T extends UsageRecordField>(
+    params: UsageQueryParams<T>
+): Promise<BackendResponse<Pick<UsageRecord, T>[]>> => {
+    const searchParams = buildUsageQuery(params);
+    const queryString = searchParams.toString();
+    const url = queryString ? `${API_BASE}/v0/management/usage?${queryString}` : `${API_BASE}/v0/management/usage`;
+
+    if (params.cache) {
+        const cached = usageRequestCache.get(queryString);
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.promise as Promise<BackendResponse<Pick<UsageRecord, T>[]>>;
+        }
+
+        const promise = (async () => {
+            const res = await fetchWithAuth(url);
+            if (!res.ok) throw new Error('Failed to fetch usage');
+            return await res.json() as BackendResponse<Pick<UsageRecord, T>[]>;
+        })();
+
+        usageRequestCache.set(queryString, { expiresAt: Date.now() + USAGE_CACHE_TTL_MS, promise });
+        promise.catch(() => usageRequestCache.delete(queryString));
+        return promise;
+    }
+
+    const res = await fetchWithAuth(url);
+    if (!res.ok) throw new Error('Failed to fetch usage');
+    return await res.json() as BackendResponse<Pick<UsageRecord, T>[]>;
+};
+
+const fetchUsageSummary = async (range: 'hour' | 'day' | 'week' | 'month', cache = true) => {
+    const queryString = `range=${range}`;
+    const url = `${API_BASE}/v0/management/usage/summary?${queryString}`;
+
+    if (cache) {
+        const cached = summaryRequestCache.get(queryString);
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.promise;
+        }
+
+        const promise = (async () => {
+            const res = await fetchWithAuth(url);
+            if (!res.ok) throw new Error('Failed to fetch usage summary');
+            return await res.json() as UsageSummaryResponse;
+        })();
+
+        summaryRequestCache.set(queryString, { expiresAt: Date.now() + USAGE_CACHE_TTL_MS, promise });
+        promise.catch(() => summaryRequestCache.delete(queryString));
+        return promise;
+    }
+
+    const res = await fetchWithAuth(url);
+    if (!res.ok) throw new Error('Failed to fetch usage summary');
+    return await res.json() as UsageSummaryResponse;
+};
+
+const fetchConfigCached = async (): Promise<PlexusConfig | null> => {
+    const cached = configRequestCache.get('config');
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.promise;
+    }
+
+    const promise = (async () => {
+        const res = await fetchWithAuth(`${API_BASE}/v0/management/config`);
+        if (!res.ok) throw new Error('Failed to fetch config');
+        const configText = await res.text();
+        try {
+            return parse(configText) as PlexusConfig;
+        } catch {
+            return null;
+        }
+    })();
+
+    configRequestCache.set('config', { expiresAt: Date.now() + CONFIG_CACHE_TTL_MS, promise });
+    promise.catch(() => configRequestCache.delete('config'));
+    return promise;
+};
+
 interface PlexusConfig {
     providers: Record<string, {
         type?: string | string[]; // Optional for backward compatibility, but will be inferred from api_base_url
@@ -292,32 +601,28 @@ export const api = {
 
   getStats: async (): Promise<Stat[]> => {
     try {
-        const startDate = new Date();
+        const now = normalizeNow();
+        const startDate = new Date(now);
         startDate.setDate(startDate.getDate() - 7);
-        
-        // Fetch last 1000 requests for stats calculation (approximation)
-        const params = new URLSearchParams({
-            limit: '1000',
-            startDate: startDate.toISOString()
+        const usageResponse = await fetchUsageRecords({
+            limit: 1000,
+            startDate: startDate.toISOString(),
+            fields: ['tokensInput', 'tokensOutput', 'durationMs'],
+            cache: true
         });
-        
-        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch usage');
-        const json = await res.json() as BackendResponse<UsageRecord[]>;
-        
-        const records = json.data || [];
-        const totalRequests = json.total;
-        
+
+        const config = await fetchConfigCached();
+        const activeProviders = config ? Object.keys(config.providers || {}).length : '-';
+
+        const records = usageResponse.data || [];
+        const totalRequests = usageResponse.total;
         const totalTokens = records.reduce((acc, r) => acc + (r.tokensInput || 0) + (r.tokensOutput || 0), 0);
-        const avgLatency = records.length ? Math.round(records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / records.length) : 0;
-        
-        // Get active providers count
-        const configStr = await api.getConfig();
-        const config = parse(configStr) as PlexusConfig;
-        const activeProviders = Object.keys(config.providers || {}).length;
+        const avgLatency = records.length
+            ? Math.round(records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / records.length)
+            : 0;
 
         return [
-            { label: STAT_LABELS.REQUESTS, value: totalRequests.toLocaleString() }, // Change calculation requires historical comparison
+            { label: STAT_LABELS.REQUESTS, value: formatNumber(totalRequests, 0) },
             { label: STAT_LABELS.PROVIDERS, value: activeProviders },
             { label: STAT_LABELS.TOKENS, value: formatLargeNumber(totalTokens) },
             { label: STAT_LABELS.DURATION, value: avgLatency + 'ms' },
@@ -333,108 +638,69 @@ export const api = {
     }
   },
 
+  getDashboardData: async (range: 'hour' | 'day' | 'week' | 'month' = 'day'): Promise<DashboardData> => {
+    try {
+        const now = normalizeNow();
+        const [summary, cooldowns, config] = await Promise.all([
+            fetchUsageSummary(range, true),
+            api.getCooldowns(),
+            fetchConfigCached()
+        ]);
+
+        const usageData = buildSummarySeries(summary, now);
+        const totalRequests = summary.stats.totalRequests || 0;
+        const totalTokens = summary.stats.totalTokens || 0;
+        const avgLatency = Math.round(summary.stats.avgDurationMs || 0);
+        const activeProviders = config ? Object.keys(config.providers || {}).length : '-';
+
+        const stats: Stat[] = [
+            { label: STAT_LABELS.REQUESTS, value: formatNumber(totalRequests, 0) },
+            { label: STAT_LABELS.PROVIDERS, value: activeProviders },
+            { label: STAT_LABELS.TOKENS, value: formatLargeNumber(totalTokens) },
+            { label: STAT_LABELS.DURATION, value: avgLatency + 'ms' },
+        ];
+
+        return {
+            stats,
+            usageData,
+            cooldowns,
+            todayMetrics: summary.today
+        };
+    } catch (e) {
+        console.error('API Error getDashboardData', e);
+        return {
+            stats: [
+                { label: STAT_LABELS.REQUESTS, value: '-' },
+                { label: STAT_LABELS.PROVIDERS, value: '-' },
+                { label: STAT_LABELS.TOKENS, value: '-' },
+                { label: STAT_LABELS.DURATION, value: '-' },
+            ],
+            usageData: [],
+            cooldowns: [],
+            todayMetrics: {
+                requests: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                reasoningTokens: 0,
+                cachedTokens: 0,
+                totalCost: 0
+            }
+        };
+    }
+  },
+
   getUsageData: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<UsageData[]> => {
     try {
-        const startDate = new Date();
-        let bucketFormat: (d: Date) => string;
-        let buckets = 0;
-        let step = 0; // ms
-
-        switch (range) {
-            case 'hour':
-                startDate.setHours(startDate.getHours() - 1);
-                bucketFormat = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                buckets = 60;
-                step = 60 * 1000; // 1 min
-                break;
-            case 'day':
-                startDate.setHours(startDate.getHours() - 24);
-                bucketFormat = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // Hour resolution
-                buckets = 24;
-                step = 60 * 60 * 1000; // 1 hour
-                break;
-            case 'week':
-            default:
-                startDate.setDate(startDate.getDate() - 7);
-                bucketFormat = (d) => d.toLocaleDateString();
-                buckets = 7;
-                step = 24 * 60 * 60 * 1000; // 1 day
-                break;
-            case 'month':
-                startDate.setDate(startDate.getDate() - 30);
-                bucketFormat = (d) => d.toLocaleDateString();
-                buckets = 30;
-                step = 24 * 60 * 60 * 1000; // 1 day
-                break;
-        }
-
-        const params = new URLSearchParams({
-            limit: '5000',
-            startDate: startDate.toISOString()
+        const now = normalizeNow();
+        const { startDate } = getUsageRangeConfig(range, now);
+        const usageResponse = await fetchUsageRecords({
+            limit: 5000,
+            startDate: startDate.toISOString(),
+            fields: USAGE_PAGE_FIELDS,
+            cache: true
         });
 
-        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch usage');
-        const json = await res.json() as BackendResponse<UsageRecord[]>;
-        const records = json.data || [];
-
-        // Grouping
-        const grouped: Record<string, UsageData> = {};
-
-        // Initialize buckets
-        const now = Date.now();
-        for (let i = buckets; i >= 0; i--) {
-            const t = new Date(now - (i * step));
-            // Snap to bucket start
-            if (range === 'day') t.setMinutes(0, 0, 0);
-            if (range === 'week' || range === 'month') t.setHours(0, 0, 0, 0);
-
-            const key = bucketFormat(t);
-            if (!grouped[key]) {
-                grouped[key] = {
-                    timestamp: key,
-                    requests: 0,
-                    tokens: 0,
-                    inputTokens: 0,
-                    outputTokens: 0,
-                    cachedTokens: 0
-                };
-            }
-        }
-
-        records.forEach(r => {
-            const d = new Date(r.date);
-            if (d < startDate) return;
-
-            let key = bucketFormat(d);
-            // Fix key generation for aggregation to match initialized buckets if needed,
-            // but simplified formatting usually aligns enough for visual graph
-
-            // For 'day' (24h), we want to group by hour. bucketFormat returns HH:MM.
-            // If we initialized buckets as HH:00, we need to snap record time to HH:00
-            if (range === 'day') d.setMinutes(0, 0, 0);
-            if (range === 'week' || range === 'month') d.setHours(0, 0, 0, 0);
-
-            key = bucketFormat(d);
-
-            if (!grouped[key]) {
-                grouped[key] = {
-                    timestamp: key,
-                    requests: 0,
-                    tokens: 0,
-                    inputTokens: 0,
-                    outputTokens: 0,
-                    cachedTokens: 0
-                };
-            }
-            grouped[key].requests++;
-            grouped[key].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
-            grouped[key].inputTokens += (r.tokensInput || 0);
-            grouped[key].outputTokens += (r.tokensOutput || 0);
-            grouped[key].cachedTokens += (r.tokensCached || 0);
-        });
-
-        return Object.values(grouped);
+        return buildUsageSeries(usageResponse.data || [], range, now);
     } catch (e) {
         console.error("API Error getUsageData", e);
         return [];
@@ -443,21 +709,17 @@ export const api = {
 
   getTodayMetrics: async (): Promise<TodayMetrics> => {
     try {
-        // Get records from midnight today to now
-        const startDate = new Date();
+        const now = normalizeNow();
+        const startDate = new Date(now);
         startDate.setHours(0, 0, 0, 0);
 
-        const params = new URLSearchParams({
-            limit: '10000',
-            startDate: startDate.toISOString()
+        const usageResponse = await fetchUsageRecords({
+            limit: 5000,
+            startDate: startDate.toISOString(),
+            fields: ['date', 'tokensInput', 'tokensOutput', 'tokensReasoning', 'tokensCached', 'costTotal'],
+            cache: true
         });
 
-        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch usage');
-        const json = await res.json() as BackendResponse<UsageRecord[]>;
-        const records = json.data || [];
-
-        // Aggregate all records from today
         const metrics: TodayMetrics = {
             requests: 0,
             inputTokens: 0,
@@ -467,7 +729,7 @@ export const api = {
             totalCost: 0
         };
 
-        records.forEach(r => {
+        (usageResponse.data || []).forEach(r => {
             metrics.requests++;
             metrics.inputTokens += r.tokensInput || 0;
             metrics.outputTokens += r.tokensOutput || 0;
@@ -492,31 +754,16 @@ export const api = {
 
   getUsageByModel: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<PieChartDataPoint[]> => {
     try {
-        const startDate = new Date();
-        switch (range) {
-            case 'hour':
-                startDate.setHours(startDate.getHours() - 1);
-                break;
-            case 'day':
-                startDate.setHours(startDate.getHours() - 24);
-                break;
-            case 'week':
-                startDate.setDate(startDate.getDate() - 7);
-                break;
-            case 'month':
-                startDate.setDate(startDate.getDate() - 30);
-                break;
-        }
-
-        const params = new URLSearchParams({
-            limit: '5000',
-            startDate: startDate.toISOString()
+        const now = normalizeNow();
+        const { startDate } = getUsageRangeConfig(range, now);
+        const usageResponse = await fetchUsageRecords({
+            limit: 5000,
+            startDate: startDate.toISOString(),
+            fields: USAGE_PAGE_FIELDS,
+            cache: true
         });
 
-        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch usage');
-        const json = await res.json() as BackendResponse<UsageRecord[]>;
-        const records = json.data || [];
+        const records = usageResponse.data || [];
 
         const aggregated: Record<string, PieChartDataPoint> = {};
 
@@ -538,31 +785,16 @@ export const api = {
 
   getUsageByProvider: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<PieChartDataPoint[]> => {
     try {
-        const startDate = new Date();
-        switch (range) {
-            case 'hour':
-                startDate.setHours(startDate.getHours() - 1);
-                break;
-            case 'day':
-                startDate.setHours(startDate.getHours() - 24);
-                break;
-            case 'week':
-                startDate.setDate(startDate.getDate() - 7);
-                break;
-            case 'month':
-                startDate.setDate(startDate.getDate() - 30);
-                break;
-        }
-
-        const params = new URLSearchParams({
-            limit: '5000',
-            startDate: startDate.toISOString()
+        const now = normalizeNow();
+        const { startDate } = getUsageRangeConfig(range, now);
+        const usageResponse = await fetchUsageRecords({
+            limit: 5000,
+            startDate: startDate.toISOString(),
+            fields: USAGE_PAGE_FIELDS,
+            cache: true
         });
 
-        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch usage');
-        const json = await res.json() as BackendResponse<UsageRecord[]>;
-        const records = json.data || [];
+        const records = usageResponse.data || [];
 
         const aggregated: Record<string, PieChartDataPoint> = {};
 
@@ -584,31 +816,16 @@ export const api = {
 
   getUsageByKey: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<PieChartDataPoint[]> => {
     try {
-        const startDate = new Date();
-        switch (range) {
-            case 'hour':
-                startDate.setHours(startDate.getHours() - 1);
-                break;
-            case 'day':
-                startDate.setHours(startDate.getHours() - 24);
-                break;
-            case 'week':
-                startDate.setDate(startDate.getDate() - 7);
-                break;
-            case 'month':
-                startDate.setDate(startDate.getDate() - 30);
-                break;
-        }
-
-        const params = new URLSearchParams({
-            limit: '5000',
-            startDate: startDate.toISOString()
+        const now = normalizeNow();
+        const { startDate } = getUsageRangeConfig(range, now);
+        const usageResponse = await fetchUsageRecords({
+            limit: 5000,
+            startDate: startDate.toISOString(),
+            fields: USAGE_PAGE_FIELDS,
+            cache: true
         });
 
-        const res = await fetchWithAuth(`${API_BASE}/v0/management/usage?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch usage');
-        const json = await res.json() as BackendResponse<UsageRecord[]>;
-        const records = json.data || [];
+        const records = usageResponse.data || [];
 
         const aggregated: Record<string, PieChartDataPoint> = {};
 
