@@ -102,6 +102,75 @@ interface FetchedModel {
   };
 }
 
+const OAUTH_PROVIDER_MODELS: Record<string, FetchedModel[]> = {
+  anthropic: [
+    { id: 'claude-3-5-haiku-20241022', name: 'Claude Haiku 3.5' },
+    { id: 'claude-3-5-haiku-latest', name: 'Claude Haiku 3.5 (latest)' },
+    { id: 'claude-3-5-sonnet-20240620', name: 'Claude Sonnet 3.5' },
+    { id: 'claude-3-5-sonnet-20241022', name: 'Claude Sonnet 3.5 v2' },
+    { id: 'claude-3-7-sonnet-20250219', name: 'Claude Sonnet 3.7' },
+    { id: 'claude-3-7-sonnet-latest', name: 'Claude Sonnet 3.7 (latest)' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude Haiku 3' },
+    { id: 'claude-3-opus-20240229', name: 'Claude Opus 3' },
+    { id: 'claude-3-sonnet-20240229', name: 'Claude Sonnet 3' },
+    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (latest)' },
+    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+    { id: 'claude-opus-4-0', name: 'Claude Opus 4 (latest)' },
+    { id: 'claude-opus-4-1', name: 'Claude Opus 4.1 (latest)' },
+    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1' },
+    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4' },
+    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5 (latest)' },
+    { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
+    { id: 'claude-sonnet-4-0', name: 'Claude Sonnet 4 (latest)' },
+    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
+    { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (latest)' },
+    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' }
+  ],
+  'openai-codex': [
+    { id: 'gpt-5.1', name: 'GPT-5.1' },
+    { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
+    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
+    { id: 'gpt-5.2', name: 'GPT-5.2' },
+    { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' }
+  ],
+  'github-copilot': [
+    { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5' },
+    { id: 'claude-opus-4.5', name: 'Claude Opus 4.5' },
+    { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
+    { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
+    { id: 'gpt-4.1', name: 'GPT-4.1' },
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-5', name: 'GPT-5' },
+    { id: 'gpt-5-mini', name: 'GPT-5-mini' },
+    { id: 'gpt-5.1', name: 'GPT-5.1' },
+    { id: 'gpt-5.1-codex', name: 'GPT-5.1-Codex' },
+    { id: 'gpt-5.1-codex-max', name: 'GPT-5.1-Codex-max' },
+    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1-Codex-mini' },
+    { id: 'gpt-5.2', name: 'GPT-5.2' },
+    { id: 'gpt-5.2-codex', name: 'GPT-5.2-Codex' },
+    { id: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
+  ],
+  'google-gemini-cli': [
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Cloud Code Assist)' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Cloud Code Assist)' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Cloud Code Assist)' },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview (Cloud Code Assist)' },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview (Cloud Code Assist)' }
+  ],
+  'google-antigravity': [
+    { id: 'claude-opus-4-5-thinking', name: 'Claude Opus 4.5 Thinking (Antigravity)' },
+    { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (Antigravity)' },
+    { id: 'claude-sonnet-4-5-thinking', name: 'Claude Sonnet 4.5 Thinking (Antigravity)' },
+    { id: 'gemini-3-flash', name: 'Gemini 3 Flash (Antigravity)' },
+    { id: 'gemini-3-pro-high', name: 'Gemini 3 Pro High (Antigravity)' },
+    { id: 'gemini-3-pro-low', name: 'Gemini 3 Pro Low (Antigravity)' },
+    { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B Medium (Antigravity)' }
+  ]
+};
+
 export const Providers = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -311,7 +380,6 @@ export const Providers = () => {
 
   // Open fetch models modal
   const handleOpenFetchModels = () => {
-    if (isOAuthMode) return;
     const defaultUrl = generateModelsUrl();
     setModelsUrl(defaultUrl);
     setFetchedModels([]);
@@ -322,6 +390,24 @@ export const Providers = () => {
 
   // Fetch models from URL
   const handleFetchModels = async () => {
+    if (isOAuthMode) {
+      const oauthProvider = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+      const oauthModels = OAUTH_PROVIDER_MODELS[oauthProvider] || [];
+      const sortedModels = [...oauthModels].sort((a, b) => a.id.localeCompare(b.id));
+
+      if (sortedModels.length === 0) {
+        setFetchError(`No known models found for OAuth provider '${oauthProvider}'.`);
+        setFetchedModels([]);
+        setSelectedModelIds(new Set());
+        return;
+      }
+
+      setFetchedModels(sortedModels);
+      setSelectedModelIds(new Set());
+      setFetchError(null);
+      return;
+    }
+
     if (!modelsUrl) {
       setFetchError('Please enter a URL');
       return;
@@ -704,16 +790,15 @@ export const Providers = () => {
                       {isModelsOpen ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                       <span style={{fontWeight: 600, fontSize: '13px', flex: 1}}>Provider Models</span>
                       <Badge status="connected">{Object.keys(editingProvider.models || {}).length} Models</Badge>
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        onClick={(e) => { e.stopPropagation(); handleOpenFetchModels(); }}
-                        disabled={isOAuthMode}
-                        leftIcon={<Download size={14}/>}
-                        style={{marginLeft: '8px'}}
-                      >
-                        Fetch Models
-                      </Button>
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          onClick={(e) => { e.stopPropagation(); handleOpenFetchModels(); }}
+                          leftIcon={<Download size={14}/>}
+                          style={{marginLeft: '8px'}}
+                        >
+                          Fetch Models
+                        </Button>
                   </div>
                   {isModelsOpen && (
                       <div style={{padding: '8px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-deep)'}}>
@@ -1063,7 +1148,12 @@ export const Providers = () => {
                 label="Models Endpoint URL"
                 value={modelsUrl}
                 onChange={(e) => setModelsUrl(e.target.value)}
-                placeholder="https://api.example.com/v1/models"
+                placeholder={
+                  isOAuthMode
+                    ? 'OAuth providers use built-in model lists'
+                    : 'https://api.example.com/v1/models'
+                }
+                disabled={isOAuthMode}
               />
             </div>
             <Button 
@@ -1185,7 +1275,9 @@ export const Providers = () => {
               fontSize: '13px',
               fontStyle: 'italic'
             }}>
-              Enter a URL and click Fetch to load available models
+              {isOAuthMode
+                ? 'Click Fetch to load known OAuth models'
+                : 'Enter a URL and click Fetch to load available models'}
             </div>
           )}
         </div>

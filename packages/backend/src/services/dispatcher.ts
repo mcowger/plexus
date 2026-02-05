@@ -8,6 +8,7 @@ import { DebugManager } from "./debug-manager";
 import { UsageStorageService } from "./usage-storage";
 import { CooldownParserRegistry } from "./cooldown-parsers";
 import { getProviderTypes } from "../config";
+import { getModels } from "@mariozechner/pi-ai";
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
@@ -316,6 +317,7 @@ export class Dispatcher {
 
     try {
       const oauthProvider = route.config.oauth_provider || route.provider;
+      this.assertOAuthModelSupported(oauthProvider, route.model);
       const oauthContext = context?.context ? context.context : context;
       const oauthOptions = context?.options;
 
@@ -367,6 +369,23 @@ export class Dispatcher {
       return unified;
     } catch (error: any) {
       throw this.wrapOAuthError(error, route, targetApiType);
+    }
+  }
+
+  private assertOAuthModelSupported(oauthProvider: string, modelId: string) {
+    const supportedModels = getModels(oauthProvider as any);
+
+    if (!supportedModels || supportedModels.length === 0) {
+      throw new Error(`OAuth provider '${oauthProvider}' has no known models.`);
+    }
+
+    const isSupported = supportedModels.some((model) => model.id === modelId);
+    if (!isSupported) {
+      const modelList = supportedModels.map((model) => model.id).sort().join(", ");
+      throw new Error(
+        `OAuth model '${modelId}' is not supported for provider '${oauthProvider}'. ` +
+          `Supported models: ${modelList}`
+      );
     }
   }
 
