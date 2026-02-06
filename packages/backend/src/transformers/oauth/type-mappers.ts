@@ -173,10 +173,33 @@ function unifiedToolToPiAi(tool: UnifiedTool): PiAiTool {
   const parameters = Type.Object(
     Object.fromEntries(
       Object.entries(tool.function.parameters.properties || {}).map(
-        ([key, value]: [string, any]) => [
-          key,
-          Type.Any({ description: value.description })
-        ]
+        ([key, value]: [string, any]) => {
+          const description = value?.description ? { description: value.description } : undefined;
+          let mapped: any = Type.Any(description);
+
+          switch (value?.type) {
+            case 'boolean':
+              mapped = Type.Boolean(description);
+              break;
+            case 'string':
+              mapped = Type.String(description);
+              break;
+            case 'number':
+              mapped = Type.Number(description);
+              break;
+            case 'integer':
+              mapped = Type.Integer(description);
+              break;
+            case 'array':
+              mapped = Type.Array(Type.Any(), description);
+              break;
+            default:
+              mapped = Type.Any(description);
+              break;
+          }
+
+          return [key, mapped];
+        }
       )
     ),
     {
