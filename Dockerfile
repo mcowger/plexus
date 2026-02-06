@@ -3,6 +3,9 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 # Copy root package files
 COPY package.json bun.lock ./
 

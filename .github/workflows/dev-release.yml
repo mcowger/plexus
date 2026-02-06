@@ -50,6 +50,8 @@ jobs:
         # compiling each platform separately
         # Note: Each compile script in package.json runs build:frontend. 
         # This is acceptable for correctness to ensure each binary is built with the latest assets.
+        env:
+          APP_VERSION: dev-${{ github.sha }}
         run: |
           bun run compile:linux
           bun run compile:macos
@@ -77,6 +79,8 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository }}:dev
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=dev-${{ github.sha }}
 
       - name: Create dev pre-release
         uses: softprops/action-gh-release@v1

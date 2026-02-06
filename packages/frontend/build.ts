@@ -58,6 +58,7 @@ const runBuild = async () => {
       minify: process.env.NODE_ENV === "production",
       define: {
         "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+        "process.env.APP_VERSION": JSON.stringify(process.env.APP_VERSION || "dev"),
       },
     });
 
@@ -133,4 +134,3 @@ if (process.argv.includes("--watch")) {
         }, 300);
     });
 }
-

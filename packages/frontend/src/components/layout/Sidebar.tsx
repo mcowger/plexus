@@ -47,9 +47,11 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, isCollapsed })
 };
 
 export const Sidebar: React.FC = () => {
+  const appVersion = process.env.APP_VERSION || 'dev';
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [mainExpanded, setMainExpanded] = useState(true);
   const [quotasExpanded, setQuotasExpanded] = useState(true);
   const [configExpanded, setConfigExpanded] = useState(true);
@@ -73,6 +75,65 @@ export const Sidebar: React.FC = () => {
     const interval = setInterval(fetchQuotas, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const parseSemverTag = (tag: string): [number, number, number] | null => {
+    const match = tag.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    if (!match) return null;
+    return [parseInt(match[1]!, 10), parseInt(match[2]!, 10), parseInt(match[3]!, 10)];
+  };
+
+  const compareSemverTags = (a: string, b: string): number => {
+    const parsedA = parseSemverTag(a);
+    const parsedB = parseSemverTag(b);
+    if (!parsedA || !parsedB) return 0;
+
+    for (let i = 0; i < 3; i++) {
+      if (parsedA[i]! !== parsedB[i]!) {
+        return parsedA[i]! - parsedB[i]!;
+      }
+    }
+    return 0;
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchLatestVersion = async () => {
+      try {
+        const response = await fetch('https://api.github.com/repos/mcowger/plexus/releases/latest', {
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/vnd.github+json',
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const latestRelease = await response.json() as { tag_name?: string };
+        if (latestRelease.tag_name && parseSemverTag(latestRelease.tag_name)) {
+          setLatestVersion(latestRelease.tag_name);
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.warn('Failed to fetch latest Plex release tag', error);
+        }
+      }
+    };
+
+    fetchLatestVersion();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  const isOutdated = Boolean(
+    latestVersion &&
+    parseSemverTag(appVersion) &&
+    compareSemverTags(appVersion, latestVersion) < 0
+  );
 
   // Convert QuotaSnapshot[] to QuotaCheckResult format for display
   const getQuotaResult = (checkerId: string): QuotaCheckResult | undefined => {
@@ -142,7 +203,19 @@ export const Sidebar: React.FC = () => {
           isCollapsed && "opacity-0 w-0 overflow-hidden"
         )}>
           <img src={logo} alt="Plexus" className="w-6 h-6" />
-          <h1 className="font-heading text-lg font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">Plexus</h1>
+          <div className="flex flex-col">
+            <h1 className="font-heading text-lg font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">Plexus</h1>
+            <div className="flex items-center gap-1 text-[10px] leading-none text-text-muted">
+              <span>{appVersion}</span>
+              {isOutdated && (
+                <Tooltip content={`Update available: ${latestVersion}`} position="bottom">
+                  <span className="inline-flex text-primary" aria-label={`Outdated version. Latest is ${latestVersion}`}>
+                    <AlertTriangle size={11} />
+                  </span>
+                </Tooltip>
+              )}
+            </div>
+          </div>
         </div>
 
         <button

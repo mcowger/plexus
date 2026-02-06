@@ -29,6 +29,8 @@ jobs:
         # compiling each platform separately
         # Note: Each compile script in package.json runs build:frontend. 
         # This is acceptable for correctness to ensure each binary is built with the latest assets.
+        env:
+          APP_VERSION: ${{ github.ref_name }}
         run: |
           bun run compile:linux
           bun run compile:macos
@@ -54,6 +56,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
 
       - name: Extract Release Notes
         run: |
