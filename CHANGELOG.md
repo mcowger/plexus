@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.12.5 - 2026-02-06
+
+### v0.12.5: Sidebar UI Enhancements and Tool Proxy Adjustments
+
+### New Features
+* Surface app version and update status in sidebar ([f5fe214](https://github.com/mcowger/plexus/commit/f5fe214))
+
+### Fixes & Improvements
+* Preserve basic tool param types for oauth ([965d8b6](https://github.com/mcowger/plexus/commit/965d8b6))
+* Adjust proxy renaming to only whitelist tools when requestor is claude code ([977dbfd](https://github.com/mcowger/plexus/commit/977dbfd))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.12.4 - 2026-02-05
 
 ### FInalized support for GPT 5.3 Codex
