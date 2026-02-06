@@ -107,6 +107,10 @@ export class OAuthTransformer implements Transformer {
   async transformRequest(request: UnifiedChatRequest): Promise<any> {
     const context = unifiedToContext(request);
     const options: Record<string, any> = {};
+    const clientHeaders = request.metadata?.clientHeaders;
+    if (clientHeaders && typeof clientHeaders === 'object') {
+      options.clientHeaders = clientHeaders;
+    }
 
     if (request.reasoning?.effort) {
       options.reasoningEffort = request.reasoning.effort;
@@ -231,24 +235,32 @@ export class OAuthTransformer implements Transformer {
     const authManager = OAuthAuthManager.getInstance();
     const apiKey = await authManager.getApiKey(provider);
     const model = this.getPiAiModel(provider, modelId);
-    const { filteredOptions, strippedParameters } = filterPiAiRequestOptions(options ?? {}, model);
+    const rawOptions = { ...(options ?? {}) };
+    const clientHeaders = rawOptions.clientHeaders as Record<string, unknown> | undefined;
+    delete rawOptions.clientHeaders;
+    const { filteredOptions, strippedParameters } = filterPiAiRequestOptions(rawOptions, model);
     const isClaudeCodeToken = apiKey.includes('sk-ant-oat');
     const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
+    const isClaudeCodeAgent =
+      typeof clientHeaders?.['x-app'] === 'string' &&
+      clientHeaders['x-app'].toLowerCase() === 'cli';
 
     if (provider === 'anthropic' && isClaudeCodeToken) {
-      applyClaudeCodeToolProxy(context);
+      if (!isClaudeCodeAgent) {
+        applyClaudeCodeToolProxy(context);
 
-      if (requestOptions.toolChoice) {
-        if (typeof requestOptions.toolChoice === 'string') {
-          requestOptions.toolChoice = proxyClaudeCodeToolName(requestOptions.toolChoice);
-        } else if (typeof requestOptions.toolChoice === 'object') {
-          if (typeof requestOptions.toolChoice.name === 'string') {
-            requestOptions.toolChoice.name = proxyClaudeCodeToolName(requestOptions.toolChoice.name);
-          }
-          if (requestOptions.toolChoice.function?.name) {
-            requestOptions.toolChoice.function.name = proxyClaudeCodeToolName(
-              requestOptions.toolChoice.function.name
-            );
+        if (requestOptions.toolChoice) {
+          if (typeof requestOptions.toolChoice === 'string') {
+            requestOptions.toolChoice = proxyClaudeCodeToolName(requestOptions.toolChoice);
+          } else if (typeof requestOptions.toolChoice === 'object') {
+            if (typeof requestOptions.toolChoice.name === 'string') {
+              requestOptions.toolChoice.name = proxyClaudeCodeToolName(requestOptions.toolChoice.name);
+            }
+            if (requestOptions.toolChoice.function?.name) {
+              requestOptions.toolChoice.function.name = proxyClaudeCodeToolName(
+                requestOptions.toolChoice.function.name
+              );
+            }
           }
         }
       }
@@ -277,6 +289,7 @@ export class OAuthTransformer implements Transformer {
       streaming,
       apiKeyPreview,
       isClaudeCodeToken,
+      isClaudeCodeAgent,
       optionKeys: Object.keys(filteredOptions),
       hasInjectedClaudeCodeHeaders: !!requestOptions.headers
     });

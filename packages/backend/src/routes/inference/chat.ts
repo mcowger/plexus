@@ -42,6 +42,17 @@ export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Di
             unifiedRequest.incomingApiType = 'chat';
             unifiedRequest.originalBody = body;
             unifiedRequest.requestId = requestId;
+            const xAppHeader = Array.isArray(request.headers['x-app'])
+                ? request.headers['x-app'][0]
+                : request.headers['x-app'];
+            if (typeof xAppHeader === 'string' && xAppHeader.trim()) {
+                unifiedRequest.metadata = {
+                    ...(unifiedRequest.metadata || {}),
+                    clientHeaders: {
+                        'x-app': xAppHeader
+                    }
+                };
+            }
 
             DebugManager.getInstance().startLog(requestId, body);
             
