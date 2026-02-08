@@ -13,6 +13,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 - **OAuth Providers (pi-ai)**: Authenticate to Anthropic, GitHub Copilot, Gemini CLI, Antigravity, and OpenAI Codex via the Admin UI and route them with `oauth://` providers
 - **OAuth Management APIs**: Start, poll, prompt, and cancel OAuth login sessions via `/v0/management/oauth/*`
 - **Quota Tracking System**: Monitor provider rate limits and quotas with configurable checkers
+- **OAuth-backed Quota Checkers**: `claude-code` and `openai-codex` quota checkers read tokens from `auth.json` by default (no hardcoded quota API key required)
 - **Audio Transcriptions API**: Full OpenAI-compatible `/v1/audio/transcriptions` endpoint support with multipart file uploads
 - **Embeddings API**: Full OpenAI-compatible `/v1/embeddings` endpoint support
 - **Model Type System**: Distinguish between chat, embeddings, and transcriptions models with automatic API filtering
@@ -43,6 +44,8 @@ docker run -p 4000:4000 \
 ```
 
 `AUTH_JSON` points Plexus at the OAuth credentials file (default: `./auth.json`).
+
+For OAuth-backed quota checkers (`claude-code`, `openai-codex`), Plexus also uses this file automatically unless an explicit `options.apiKey` override is provided.
 
 See [Installation Guide](docs/INSTALLATION.md) for other options.
 
