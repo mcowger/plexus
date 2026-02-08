@@ -1,9 +1,17 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { OAuthLoginSessionManager } from '../../services/oauth-login-session';
+import { OAuthAuthManager } from '../../services/oauth-auth-manager';
+import type { OAuthProvider, OAuthProviderId } from '@mariozechner/pi-ai';
 
 const startSessionSchema = z.object({
-  providerId: z.string().min(1)
+  providerId: z.string().min(1),
+  accountId: z.string().min(1)
+});
+
+const deleteCredentialsSchema = z.object({
+  providerId: z.string().min(1),
+  accountId: z.string().min(1)
 });
 
 const inputSchema = z.object({
@@ -32,11 +40,33 @@ export async function registerOAuthRoutes(
     }
 
     try {
-      const session = await sessionManager.createSession(parsed.data.providerId);
+      const session = await sessionManager.createSession(
+        parsed.data.providerId as OAuthProviderId,
+        parsed.data.accountId
+      );
       return reply.send({ data: session });
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
     }
+  });
+
+  fastify.delete('/v0/management/oauth/credentials', async (request, reply) => {
+    const parsed = deleteCredentialsSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+    }
+
+    const authManager = OAuthAuthManager.getInstance();
+    const deleted = authManager.deleteCredentials(
+      parsed.data.providerId as OAuthProvider,
+      parsed.data.accountId
+    );
+
+    if (!deleted) {
+      return reply.code(404).send({ error: 'OAuth credentials not found' });
+    }
+
+    return reply.send({ data: { deleted: true } });
   });
 
   fastify.get('/v0/management/oauth/sessions/:id', async (request, reply) => {
