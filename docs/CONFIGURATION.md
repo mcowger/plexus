@@ -184,7 +184,7 @@ This section defines the upstream AI providers that Plexus will route requests t
     ```
     The keys (`chat`, `messages`) define the supported API types.
 
-  - **OAuth providers**: Set `api_base_url` to `oauth://` to route via the pi-ai OAuth bridge. Use `oauth_provider` when the provider key doesn't match the pi-ai provider ID.
+  - **OAuth providers**: Set `api_base_url` to `oauth://` to route via the pi-ai OAuth bridge. Set `oauth_account` to the account ID to use for this provider entry. Use `oauth_provider` when the provider key doesn't match the pi-ai provider ID.
 
 - **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
 
@@ -225,26 +225,40 @@ Plexus supports OAuth-backed providers (Anthropic, GitHub Copilot, Gemini CLI, A
 **Requirements:**
 - OAuth credentials stored in `auth.json` (see below)
 - Provider `api_base_url` set to `oauth://`
+- Provider `oauth_account` set to a specific account ID
 - `oauth_provider` set when the provider key differs from the pi-ai provider ID
+- No fallback/default account behavior: if `oauth_account` is missing or credentials for that account do not exist, requests fail
 
 **Example:**
 
 ```yaml
 providers:
-  codex:
-    display_name: OpenAI Codex
+  codex-work:
+    display_name: OpenAI Codex (Work)
     api_base_url: oauth://
     api_key: oauth
     oauth_provider: openai-codex
+    oauth_account: work
     models:
       - gpt-5-mini
       - gpt-5
 
-  github-copilot:
-    display_name: GitHub Copilot
+  codex-personal:
+    display_name: OpenAI Codex (Personal)
     api_base_url: oauth://
     api_key: oauth
-    # oauth_provider can be omitted when provider key matches pi-ai provider id
+    oauth_provider: openai-codex
+    oauth_account: personal
+    models:
+      - gpt-5-mini
+      - gpt-5
+
+  github-copilot-main:
+    display_name: GitHub Copilot (Main)
+    api_base_url: oauth://
+    api_key: oauth
+    oauth_provider: github-copilot
+    oauth_account: main
     models:
       - gpt-4o
       - claude-3-5-sonnet-20241022
@@ -256,7 +270,20 @@ OAuth providers read credentials from `auth.json` (default path: `./auth.json`).
 
 - **Override path** with `AUTH_JSON` environment variable (absolute or relative to the server working directory).
 - An example file is provided at `auth.json.example`.
-- Credentials can be created via the Admin UI OAuth flow or via `npx @mariozechner/pi-ai login <provider>`.
+- Credentials are keyed by provider and account ID:
+
+```json
+{
+  "openai-codex": {
+    "accounts": {
+      "work": { "type": "oauth", "accessToken": "...", "refreshToken": "...", "expiresAt": 1738627200000 },
+      "personal": { "type": "oauth", "accessToken": "...", "refreshToken": "...", "expiresAt": 1738627200000 }
+    }
+  }
+}
+```
+
+- Credentials can be created via the Admin UI OAuth flow. OAuth login session creation requires both `providerId` and `accountId`.
 
 #### `AUTH_JSON` Environment Variable
 

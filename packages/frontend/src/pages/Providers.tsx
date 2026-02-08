@@ -80,6 +80,7 @@ const EMPTY_PROVIDER: Provider = {
     type: [],
     apiKey: '',
     oauthProvider: '',
+    oauthAccount: '',
     enabled: true,
     estimateTokens: false,
     apiBaseUrl: {},
@@ -266,6 +267,10 @@ export const Providers = () => {
         if (isOAuthMode && !providerToSave.oauthProvider) {
           providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0].value };
         }
+        if (isOAuthMode && !providerToSave.oauthAccount?.trim()) {
+          alert('OAuth account is required');
+          return;
+        }
         await api.saveProvider(providerToSave, originalId || undefined);
         await loadData();
         setIsModalOpen(false);
@@ -332,12 +337,17 @@ export const Providers = () => {
 
   const handleStartOAuth = async () => {
     const providerId = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+    const accountId = editingProvider.oauthAccount?.trim();
+    if (!accountId) {
+      setOauthError('OAuth account is required before starting login');
+      return;
+    }
     setOauthBusy(true);
     setOauthError(null);
     setOauthSession(null);
     setOauthSessionId(null);
     try {
-      const session = await api.startOAuthSession(providerId);
+      const session = await api.startOAuthSession(providerId, accountId);
       setOauthSessionId(session.id);
       setOauthSession(session);
       if (['awaiting_prompt', 'awaiting_manual_code', 'awaiting_auth'].includes(session.status)) {
@@ -748,6 +758,7 @@ export const Providers = () => {
                                 apiBaseUrl: 'oauth://',
                                 apiKey: 'oauth',
                                 oauthProvider: editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value,
+                                oauthAccount: editingProvider.oauthAccount || '',
                                 type: ['oauth']
                               });
                             } else {
@@ -756,6 +767,7 @@ export const Providers = () => {
                                 apiBaseUrl: {},
                                 apiKey: '',
                                 oauthProvider: '',
+                                oauthAccount: '',
                                 type: []
                               });
                             }
@@ -816,22 +828,33 @@ export const Providers = () => {
                       <label className="font-body text-[13px] font-medium text-text-secondary">Advanced Configuration</label>
                       <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                           {isOAuthMode && (
-                            <div className="flex flex-col gap-1">
-                              <label className="font-body text-[13px] font-medium text-text-secondary">OAuth Provider</label>
-                              <select
-                                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                                value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+                            <div className="flex flex-col gap-2">
+                              <div className="flex flex-col gap-1">
+                                <label className="font-body text-[13px] font-medium text-text-secondary">OAuth Provider</label>
+                                <select
+                                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                  value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+                                  onChange={(e) => setEditingProvider({
+                                    ...editingProvider,
+                                    oauthProvider: e.target.value
+                                  })}
+                                >
+                                  {OAUTH_PROVIDERS.map((provider) => (
+                                    <option key={provider.value} value={provider.value}>
+                                      {provider.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <Input
+                                label="OAuth Account"
+                                value={editingProvider.oauthAccount || ''}
                                 onChange={(e) => setEditingProvider({
                                   ...editingProvider,
-                                  oauthProvider: e.target.value
+                                  oauthAccount: e.target.value
                                 })}
-                              >
-                                {OAUTH_PROVIDERS.map((provider) => (
-                                  <option key={provider.value} value={provider.value}>
-                                    {provider.label}
-                                  </option>
-                                ))}
-                              </select>
+                                placeholder="e.g. work, personal, team-a"
+                              />
                             </div>
                           )}
                           <div style={{width: '200px'}}>

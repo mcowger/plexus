@@ -317,6 +317,14 @@ export class Dispatcher {
 
     try {
       const oauthProvider = route.config.oauth_provider || route.provider;
+      const oauthAccount = route.config.oauth_account?.trim();
+      if (!oauthAccount) {
+        throw new Error(
+          `OAuth account is not configured for provider '${route.provider}'. ` +
+            `Set providers.${route.provider}.oauth_account in plexus config.`
+        );
+      }
+
       this.assertOAuthModelSupported(oauthProvider, route.model);
       const oauthContext = context?.context ? context.context : context;
       const oauthOptions = context?.options;
@@ -324,6 +332,7 @@ export class Dispatcher {
       logger.debug('OAuth: Dispatching request', {
         routeProvider: route.provider,
         oauthProvider,
+        oauthAccount,
         model: route.model,
         targetApiType,
         streaming: !!request.stream,
@@ -336,6 +345,7 @@ export class Dispatcher {
       const result = await transformer.executeRequest(
         oauthContext,
         oauthProvider,
+        oauthAccount,
         route.model,
         !!request.stream,
         oauthOptions
@@ -401,6 +411,8 @@ export class Dispatcher {
     const enriched = new Error(message) as any;
     enriched.routingContext = {
       provider: route.provider,
+      oauthProvider: route.config.oauth_provider || route.provider,
+      oauthAccount: route.config.oauth_account,
       targetModel: route.model,
       targetApiType,
       statusCode

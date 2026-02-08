@@ -13,6 +13,7 @@ import { PricingManager } from './services/pricing-manager';
 import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
 import { ResponsesStorageService } from './services/responses-storage';
+import { OAuthAuthManager } from './services/oauth-auth-manager';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
@@ -70,6 +71,9 @@ if (process.env.DEBUG === 'true') {
 // Bootstrap configuration and pricing data
 try {
     await loadConfig();
+    // Eagerly initialize OAuth auth manager so auth.json schema migration
+    // runs during startup (instead of waiting for first OAuth request).
+    OAuthAuthManager.getInstance();
     await PricingManager.getInstance().loadPricing();
 } catch (e) {
     logger.error('Failed to load config or pricing', e);

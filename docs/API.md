@@ -149,10 +149,10 @@ Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, Git
 
 #### Start OAuth Session
 - **Endpoint:** `POST /v0/management/oauth/sessions`
-- **Description:** Starts an OAuth login session for a provider.
+- **Description:** Starts an OAuth login session for a provider/account pair.
 - **Request Body:**
   ```json
-  { "providerId": "openai-codex" }
+  { "providerId": "openai-codex", "accountId": "work" }
   ```
 - **Response Format:**
   ```json
@@ -160,6 +160,7 @@ Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, Git
     "data": {
       "id": "session_123",
       "providerId": "openai-codex",
+      "accountId": "work",
       "status": "waiting",
       "authInfo": { "url": "https://...", "instructions": "..." },
       "prompt": null,
@@ -193,6 +194,18 @@ Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, Git
 #### Cancel OAuth Session
 - **Endpoint:** `POST /v0/management/oauth/sessions/:id/cancel`
 - **Description:** Cancels an active OAuth session.
+
+#### Delete OAuth Credentials
+- **Endpoint:** `DELETE /v0/management/oauth/credentials`
+- **Description:** Deletes stored OAuth credentials for a provider/account pair.
+- **Request Body:**
+  ```json
+  { "providerId": "openai-codex", "accountId": "work" }
+  ```
+- **Response Format:**
+  ```json
+  { "data": { "deleted": true } }
+  ```
 
 ### Provider Test
 
