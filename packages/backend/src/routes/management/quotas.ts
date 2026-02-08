@@ -4,6 +4,25 @@ import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
 
 export async function registerQuotaRoutes(fastify: FastifyInstance, quotaScheduler: QuotaScheduler) {
+  const config = getConfig();
+  const quotaConfigs = config.quotas ?? [];
+  const quotaConfigById = new Map(quotaConfigs.map((quotaConfig) => [quotaConfig.id, quotaConfig]));
+
+  const getOAuthMetadata = (checkerId: string) => {
+    const quotaConfig = quotaConfigById.get(checkerId);
+    if (!quotaConfig) {
+      return {} as { oauthAccountId?: string; oauthProvider?: string };
+    }
+
+    const oauthAccountId = (quotaConfig.options?.oauthAccountId as string | undefined)?.trim();
+    const oauthProvider = (quotaConfig.options?.oauthProvider as string | undefined)?.trim();
+
+    return {
+      oauthAccountId: oauthAccountId && oauthAccountId.length > 0 ? oauthAccountId : undefined,
+      oauthProvider: oauthProvider && oauthProvider.length > 0 ? oauthProvider : undefined,
+    };
+  };
+
   fastify.get('/v0/management/quotas', async (request, reply) => {
     try {
       const checkerIds = quotaScheduler.getCheckerIds();
@@ -13,10 +32,15 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
       for (const checkerId of checkerIds) {
         try {
           const latest = await quotaScheduler.getLatestQuota(checkerId);
-          results.push({ checkerId, latest });
+          results.push({ checkerId, latest, ...getOAuthMetadata(checkerId) });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
-          results.push({ checkerId, latest: [], error: error instanceof Error ? error.message : 'Unknown error' });
+          results.push({
+            checkerId,
+            latest: [],
+            error: error instanceof Error ? error.message : 'Unknown error',
+            ...getOAuthMetadata(checkerId),
+          });
         }
       }
 
@@ -31,7 +55,7 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
     try {
       const { checkerId } = request.params as { checkerId: string };
       const latest = await quotaScheduler.getLatestQuota(checkerId);
-      return { checkerId, latest };
+      return { checkerId, latest, ...getOAuthMetadata(checkerId) };
     } catch (error) {
       logger.error(`Failed to get quota for '${(request.params as any).checkerId}': ${error}`);
       return reply.status(500).send({ error: 'Failed to retrieve quota data' });

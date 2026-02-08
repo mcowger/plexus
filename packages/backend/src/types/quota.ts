@@ -45,6 +45,8 @@ export interface QuotaCheckResult {
   checkedAt: Date;
   success: boolean;
   error?: string;
+  oauthAccountId?: string;
+  oauthProvider?: string;
   windows?: QuotaWindow[];
   groups?: QuotaGroup[];
   rawResponse?: unknown;

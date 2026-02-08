@@ -62,6 +62,9 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
         <Cpu size={14} className="text-purple-400" />
         <span className="text-xs font-semibold text-text">Claude Code</span>
       </div>
+      {result.oauthAccountId && (
+        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
+      )}
 
       {/* 5-Hour Window */}
       {fiveHourWindow && (

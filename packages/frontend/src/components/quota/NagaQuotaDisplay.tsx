@@ -56,6 +56,9 @@ export const NagaQuotaDisplay: React.FC<NagaQuotaDisplayProps> = ({
         <Wallet size={14} className="text-info" />
         <span className="text-xs font-semibold text-text">Naga</span>
       </div>
+      {result.oauthAccountId && (
+        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
+      )}
 
       {/* Account Balance */}
       {subscriptionWindow && subscriptionWindow.limit && (

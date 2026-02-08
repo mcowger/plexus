@@ -33,6 +33,16 @@ export abstract class QuotaChecker {
 
   abstract checkQuota(): Promise<QuotaCheckResult>;
 
+  protected getOAuthMetadata(): { oauthAccountId?: string; oauthProvider?: string } {
+    const oauthAccountId = (this.config.options.oauthAccountId as string | undefined)?.trim();
+    const oauthProvider = (this.config.options.oauthProvider as string | undefined)?.trim();
+
+    return {
+      oauthAccountId: oauthAccountId && oauthAccountId.length > 0 ? oauthAccountId : undefined,
+      oauthProvider: oauthProvider && oauthProvider.length > 0 ? oauthProvider : undefined,
+    };
+  }
+
   protected getOption<T>(key: string, defaultValue: T): T {
     return (this.config.options[key] as T) ?? defaultValue;
   }
@@ -81,11 +91,13 @@ export abstract class QuotaChecker {
     windows?: QuotaWindow[],
     groups?: QuotaGroup[]
   ): QuotaCheckResult {
+    const oauthMetadata = this.getOAuthMetadata();
     return {
       provider: this.config.provider,
       checkerId: this.config.id,
       checkedAt: new Date(),
       success: true,
+      ...oauthMetadata,
       windows,
       groups,
     };
@@ -93,12 +105,14 @@ export abstract class QuotaChecker {
 
   protected errorResult(error: string | Error): QuotaCheckResult {
     const errorMessage = error instanceof Error ? error.message : error;
+    const oauthMetadata = this.getOAuthMetadata();
     return {
       provider: this.config.provider,
       checkerId: this.config.id,
       checkedAt: new Date(),
       success: false,
       error: errorMessage,
+      ...oauthMetadata,
     };
   }
 
