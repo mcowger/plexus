@@ -1,6 +1,8 @@
 import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
+import { OAuthAuthManager } from '../../oauth-auth-manager';
+import type { OAuthProvider } from '@mariozechner/pi-ai';
 
 export class ClaudeCodeQuotaChecker extends QuotaChecker {
   private endpoint: string;
@@ -13,9 +15,8 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
-
     try {
+      const apiKey = await this.resolveApiKey();
       logger.debug(`[claude-code-checker] Making inference request to ${this.endpoint}?beta=true`);
 
       const response = await fetch(`${this.endpoint}?beta=true`, {
@@ -95,6 +96,24 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
       return this.successResult(windows);
     } catch (error) {
       return this.errorResult(error as Error);
+    }
+  }
+
+  private async resolveApiKey(): Promise<string> {
+    const configuredApiKey = this.getOption<string>('apiKey', '').trim();
+    if (configuredApiKey) {
+      return configuredApiKey;
+    }
+
+    const provider = this.getOption<string>('oauthProvider', 'anthropic').trim() || 'anthropic';
+    const authManager = OAuthAuthManager.getInstance();
+
+    try {
+      return await authManager.getApiKey(provider as OAuthProvider);
+    } catch {
+      authManager.reload();
+      logger.info(`[claude-code-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`);
+      return await authManager.getApiKey(provider as OAuthProvider);
     }
   }
 }
