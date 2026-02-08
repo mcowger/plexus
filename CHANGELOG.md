@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.13.0 - 2026-02-08
+
+### v0.13.0: Multi-account OAuth quota management and Codex/Claude quota checker enhancements
+
+## Main features
+
+- Added **OpenAI Codex quota checker and UI integration** ([`9f4062b`](https://github.com/mcowger/plexus/commit/9f4062b)).
+- Added **support for multiple puath accounts** to enable multi-account workflows ([`1ffb089`](https://github.com/mcowger/plexus/commit/1ffb089)); merged via multiaccount branch integration ([`6feceaa`](https://github.com/mcowger/plexus/commit/6feceaa)).
+- Implemented **Multiquota** support for handling quota logic across multiple account contexts ([`6055a61`](https://github.com/mcowger/plexus/commit/6055a61)).
+- Updated Claude code checker to use the **OAuth auth manager** ([`2f4a83d`](https://github.com/mcowger/plexus/commit/2f4a83d)).
+- Made **OAuth quotas implicit**, simplifying quota configuration behavior ([`20bed5f`](https://github.com/mcowger/plexus/commit/20bed5f)).
+
+## Compatibility and fixes
+
+- Fixed support for **Codex 5.3** compatibility ([`c2b5c4b`](https://github.com/mcowger/plexus/commit/c2b5c4b)).
+- Updated **Codex headers** handling ([`d3af5a8`](https://github.com/mcowger/plexus/commit/d3af5a8)).
+
+## Quota layout updates
+
+- Refreshed **Claude quota layout** ([`bc6ecd1`](https://github.com/mcowger/plexus/commit/bc6ecd1)).
+- Refined **Synthetic quota layout** ([`ce3e58d`](https://github.com/mcowger/plexus/commit/ce3e58d)).
+- Updated **Codex quota layout** ([`62a81f4`](https://github.com/mcowger/plexus/commit/62a81f4)).
+
+## Documentation
+
+- Documented **quota account mapping** ([`8cd0344`](https://github.com/mcowger/plexus/commit/8cd0344)).
+- Updated docs for **quota checker OAuth configuration guidance** ([`3b742c3`](https://github.com/mcowger/plexus/commit/3b742c3)).
+- General documentation updates ([`5a450d9`](https://github.com/mcowger/plexus/commit/5a450d9)).
+
+Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.12.5 - 2026-02-06
 
 ### v0.12.5: Sidebar UI Enhancements and Tool Proxy Adjustments
