@@ -57,27 +57,16 @@
 adminKey: "change-me-to-a-secure-admin-password"
 
 # [OPTIONAL] Quota checker configuration
-# OAuth-backed quota checkers (`claude-code`, `openai-codex`) load tokens from AUTH_JSON/auth.json
-# by default and do not require hardcoded API keys.
+# OAuth-backed quota checkers (Codex + Claude Code) are implicit for providers
+# with oauth_provider set to openai-codex or anthropic.
 quotas:
-  - id: claude-code-main
-    type: claude-code
-    provider: claude-code
+  - id: synthetic-main
+    type: synthetic
+    provider: synthetic
     enabled: true
-    intervalMinutes: 10
+    intervalMinutes: 30
     options:
-      endpoint: https://api.anthropic.com/v1/messages
-      model: claude-haiku-4-5-20251001
-      # oauthProvider: anthropic
-
-  - id: codex-main
-    type: openai-codex
-    provider: openai
-    enabled: true
-    intervalMinutes: 5
-    options:
-      endpoint: https://chatgpt.com/backend-api/wham/usage
-      # oauthProvider: openai-codex
+      apiKey: syn_your_api_key
 
 providers:
   # Standard OpenAI Configuration
@@ -130,6 +119,8 @@ providers:
     display_name: OpenAI Codex
     api_base_url: oauth://
     api_key: oauth
+    oauth_provider: openai-codex
+    oauth_account: work
     models:
       - gpt-5-mini
       - gpt-5

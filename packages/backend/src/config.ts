@@ -140,6 +140,13 @@ export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
 export type QuotaConfig = z.infer<typeof QuotaConfigSchema>;
 
+const CODEX_QUOTA_TYPE = 'openai-codex';
+const CODEX_OAUTH_PROVIDER = 'openai-codex';
+const CODEX_DEFAULT_INTERVAL_MINUTES = 10;
+const CLAUDE_CODE_QUOTA_TYPE = 'claude-code';
+const CLAUDE_OAUTH_PROVIDER = 'anthropic';
+const CLAUDE_DEFAULT_INTERVAL_MINUTES = 10;
+
 /**
  * Extract supported API types from the provider configuration.
  * Infers types from api_base_url field: if it's a record/map, the keys are the supported types.
@@ -246,7 +253,8 @@ function logConfigStats(config: PlexusConfig) {
 export function validateConfig(yamlContent: string): PlexusConfig {
   const parsed = yaml.parse(yamlContent);
   const { parsed: migrated } = migrateOAuthAccounts(parsed);
-  return PlexusConfigSchema.parse(migrated);
+  const config = PlexusConfigSchema.parse(migrated);
+  return applyImplicitQuotaDefaults(config);
 }
 
 function migrateOAuthAccounts(parsed: unknown): {
@@ -301,6 +309,88 @@ function migrateOAuthAccounts(parsed: unknown): {
   };
 }
 
+function applyImplicitQuotaDefaults(config: PlexusConfig): PlexusConfig {
+  const explicitCodexQuotas = config.quotas.filter((quota) => quota.type === CODEX_QUOTA_TYPE);
+  const explicitClaudeQuotas = config.quotas.filter(
+    (quota) => quota.type === CLAUDE_CODE_QUOTA_TYPE
+  );
+
+  if (explicitCodexQuotas.length > 0) {
+    const ids = explicitCodexQuotas.map((quota) => quota.id).join(', ');
+    logger.error(
+      `Explicit Codex quota entries are no longer supported and will be ignored: ${ids}`
+    );
+  }
+
+  if (explicitClaudeQuotas.length > 0) {
+    const ids = explicitClaudeQuotas.map((quota) => quota.id).join(', ');
+    logger.error(
+      `Explicit Claude Code quota entries are no longer supported and will be ignored: ${ids}`
+    );
+  }
+
+  const retainedQuotas = config.quotas.filter(
+    (quota) => quota.type !== CODEX_QUOTA_TYPE && quota.type !== CLAUDE_CODE_QUOTA_TYPE
+  );
+  const existingQuotaIds = new Set(retainedQuotas.map((quota) => quota.id));
+  const implicitQuotas: QuotaConfig[] = [];
+
+  for (const [providerId, providerConfig] of Object.entries(config.providers)) {
+    if (providerConfig.enabled === false) {
+      continue;
+    }
+
+    if (providerConfig.oauth_provider === CODEX_OAUTH_PROVIDER) {
+      const implicitId = `codex-${providerId}`;
+      if (existingQuotaIds.has(implicitId)) {
+        logger.error(
+          `Skipping implicit Codex quota for provider '${providerId}' because quota id '${implicitId}' is already in use.`
+        );
+      } else {
+        implicitQuotas.push({
+          id: implicitId,
+          provider: providerId,
+          type: CODEX_QUOTA_TYPE,
+          enabled: true,
+          intervalMinutes: CODEX_DEFAULT_INTERVAL_MINUTES,
+          options: {
+            oauthProvider: CODEX_OAUTH_PROVIDER,
+            oauthAccountId: providerConfig.oauth_account
+          }
+        });
+        existingQuotaIds.add(implicitId);
+      }
+    }
+
+    if (providerConfig.oauth_provider === CLAUDE_OAUTH_PROVIDER) {
+      const implicitId = `claude-code-${providerId}`;
+      if (existingQuotaIds.has(implicitId)) {
+        logger.error(
+          `Skipping implicit Claude Code quota for provider '${providerId}' because quota id '${implicitId}' is already in use.`
+        );
+      } else {
+        implicitQuotas.push({
+          id: implicitId,
+          provider: providerId,
+          type: CLAUDE_CODE_QUOTA_TYPE,
+          enabled: true,
+          intervalMinutes: CLAUDE_DEFAULT_INTERVAL_MINUTES,
+          options: {
+            oauthProvider: CLAUDE_OAUTH_PROVIDER,
+            oauthAccountId: providerConfig.oauth_account
+          }
+        });
+        existingQuotaIds.add(implicitId);
+      }
+    }
+  }
+
+  return {
+    ...config,
+    quotas: [...retainedQuotas, ...implicitQuotas]
+  };
+}
+
 async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
   const file = Bun.file(filePath);
   const fileContents = await file.text();
@@ -316,8 +406,9 @@ async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
   }
 
   const config = PlexusConfigSchema.parse(migratedParsed);
-  logConfigStats(config);
-  return config;
+  const finalConfig = applyImplicitQuotaDefaults(config);
+  logConfigStats(finalConfig);
+  return finalConfig;
 }
 
 function setupWatcher(filePath: string) {

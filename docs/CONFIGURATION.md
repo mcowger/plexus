@@ -583,12 +583,22 @@ This section configures quota checkers that monitor provider rate limits and quo
 - Detect when quotas are approaching exhaustion
 - Provide historical quota utilization data
 
+**Codex note:**
+- OpenAI Codex quota tracking is created automatically for any provider configured with `oauth_provider: openai-codex`.
+- Explicit `openai-codex` entries in `quotas` are ignored.
+- The implicit checker runs every 10 minutes and uses the provider's `oauth_account` for quota grouping.
+
+**Claude Code note:**
+- Claude Code quota tracking is created automatically for any provider configured with `oauth_provider: anthropic`.
+- Explicit `claude-code` entries in `quotas` are ignored.
+- The implicit checker runs every 10 minutes and uses the provider's `oauth_account` for quota grouping.
+
 **Structure:**
 
 ```yaml
 quotas:
   - id: checker-name                    # Unique identifier
-    type: synthetic | claude-code | openai-codex | naga  # Checker type
+    type: synthetic | naga  # Checker type
     provider: provider-key               # Provider name to associate with
     enabled: true                       # Enable/disable this checker
     intervalMinutes: 30                 # Check frequency in minutes
@@ -634,50 +644,13 @@ Makes a minimal inference request to Anthropic and reads rate limit headers.
 - `oauthProvider`: OAuth provider key to read from auth.json (default: `anthropic`)
 - `apiKey`: Optional explicit bearer token override
 
-**Example:**
-```yaml
-quotas:
-  - id: claude-code-main
-    type: claude-code
-    provider: claude-code
-    enabled: true
-    intervalMinutes: 15
-    options:
-      # oauthProvider defaults to anthropic
-      endpoint: https://api.anthropic.com/v1/messages
-      model: claude-haiku-4-5-20251001
-```
+**Configuration:**
+- Claude Code checkers are created implicitly when a provider is configured with `oauth_provider: anthropic`.
+- Explicit `claude-code` entries are ignored.
 
 **Quota tracking note:**
 - Quota results are keyed by `oauthAccountId`.
 - Ensure the provider's `oauth_account` value in `providers` matches the OAuth account ID used for the checker.
-
-#### `openai-codex`
-
-Fetches Codex usage and maps rate-limit windows to Plexus quota windows.
-
-**Token Source:**
-- By default, this checker loads OAuth credentials from `auth.json` via `oauthProvider: openai-codex`.
-- `apiKey` is optional and only needed as an explicit override.
-
-**Optional Options:**
-- `endpoint`: Override usage endpoint (default: `https://chatgpt.com/backend-api/wham/usage`)
-- `userAgent`: Override request user agent
-- `oauthProvider`: OAuth provider key to read from auth.json (default: `openai-codex`)
-- `apiKey`: Optional explicit bearer token override
-
-**Example:**
-```yaml
-quotas:
-  - id: codex-main
-    type: openai-codex
-    provider: openai
-    enabled: true
-    intervalMinutes: 1
-    options:
-      # oauthProvider defaults to openai-codex
-      endpoint: https://chatgpt.com/backend-api/wham/usage
-```
 
 #### `naga`
 
