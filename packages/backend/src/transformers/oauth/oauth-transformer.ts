@@ -242,6 +242,11 @@ export class OAuthTransformer implements Transformer {
     const { filteredOptions, strippedParameters } = filterPiAiRequestOptions(rawOptions, model);
     const isClaudeCodeToken = apiKey.includes('sk-ant-oat');
     const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
+    const baseHeaders = {
+      ...(filteredOptions as any).headers,
+      Version: '0.98.0'
+    };
+    requestOptions.headers = baseHeaders;
     const isClaudeCodeAgent =
       typeof clientHeaders?.['x-app'] === 'string' &&
       clientHeaders['x-app'].toLowerCase() === 'cli';
@@ -278,7 +283,7 @@ export class OAuthTransformer implements Transformer {
 
       requestOptions.headers = {
         ...claudeCodeHeaders,
-        ...(filteredOptions as any).headers
+        ...baseHeaders
       };
     }
 
