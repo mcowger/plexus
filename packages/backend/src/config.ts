@@ -70,6 +70,7 @@ const ProviderConfigSchema = z.object({
   ]),
   api_key: z.string().optional(),
   oauth_provider: OAuthProviderSchema.optional(),
+  oauth_account: z.string().min(1).optional(),
   enabled: z.boolean().default(true).optional(),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
@@ -87,6 +88,10 @@ const ProviderConfigSchema = z.object({
   .refine(
     (data) => !isOAuthProviderConfig(data) || !!data.oauth_provider,
     { message: "'oauth_provider' must be specified when using oauth://" }
+  )
+  .refine(
+    (data) => !isOAuthProviderConfig(data) || !!data.oauth_account,
+    { message: "'oauth_account' must be specified when using oauth://" }
   );
 
 const ModelTargetSchema = z.object({
@@ -240,13 +245,77 @@ function logConfigStats(config: PlexusConfig) {
 
 export function validateConfig(yamlContent: string): PlexusConfig {
   const parsed = yaml.parse(yamlContent);
-  return PlexusConfigSchema.parse(parsed);
+  const { parsed: migrated } = migrateOAuthAccounts(parsed);
+  return PlexusConfigSchema.parse(migrated);
+}
+
+function migrateOAuthAccounts(parsed: unknown): {
+  parsed: unknown;
+  migrated: boolean;
+  migratedProviders: string[];
+} {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { parsed, migrated: false, migratedProviders: [] };
+  }
+
+  const root = parsed as Record<string, unknown>;
+  const providersValue = root.providers;
+  if (!providersValue || typeof providersValue !== 'object' || Array.isArray(providersValue)) {
+    return { parsed, migrated: false, migratedProviders: [] };
+  }
+
+  const providers = providersValue as Record<string, unknown>;
+  const migratedProviders: string[] = [];
+
+  for (const [providerId, providerValue] of Object.entries(providers)) {
+    if (!providerValue || typeof providerValue !== 'object' || Array.isArray(providerValue)) {
+      continue;
+    }
+
+    const providerConfig = providerValue as Record<string, unknown>;
+    const baseUrl = providerConfig.api_base_url;
+    const isOAuth =
+      (typeof baseUrl === 'string' && baseUrl.startsWith('oauth://')) ||
+      (typeof baseUrl === 'object' &&
+        baseUrl !== null &&
+        !Array.isArray(baseUrl) &&
+        Object.values(baseUrl as Record<string, unknown>).some(
+          (value) => typeof value === 'string' && value.startsWith('oauth://')
+        ));
+
+    if (!isOAuth) {
+      continue;
+    }
+
+    const oauthAccount = providerConfig.oauth_account;
+    if (typeof oauthAccount !== 'string' || oauthAccount.trim().length === 0) {
+      providerConfig.oauth_account = 'legacy';
+      migratedProviders.push(providerId);
+    }
+  }
+
+  return {
+    parsed,
+    migrated: migratedProviders.length > 0,
+    migratedProviders
+  };
 }
 
 async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
   const file = Bun.file(filePath);
   const fileContents = await file.text();
-  const config = validateConfig(fileContents);
+  const parsed = yaml.parse(fileContents);
+  const { parsed: migratedParsed, migrated, migratedProviders } = migrateOAuthAccounts(parsed);
+
+  if (migrated) {
+    const migratedYaml = yaml.stringify(migratedParsed);
+    await Bun.write(filePath, migratedYaml);
+    logger.warn(
+      `Auto-migrated OAuth provider config with oauth_account='legacy' for: ${migratedProviders.join(', ')}`
+    );
+  }
+
+  const config = PlexusConfigSchema.parse(migratedParsed);
   logConfigStats(config);
   return config;
 }
