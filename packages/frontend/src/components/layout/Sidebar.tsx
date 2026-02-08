@@ -166,6 +166,8 @@ export const Sidebar: React.FC = () => {
     return {
       provider: firstSnapshot.provider,
       checkerId: firstSnapshot.checkerId,
+      oauthAccountId: checker.oauthAccountId,
+      oauthProvider: checker.oauthProvider,
       checkedAt: new Date(firstSnapshot.checkedAt).toISOString(),
       success: firstSnapshot.success === 1,
       windows,
@@ -288,6 +290,8 @@ export const Sidebar: React.FC = () => {
                       const result = getQuotaResult(quota.checkerId) ?? {
                         provider: 'unknown',
                         checkerId: quota.checkerId,
+                        oauthAccountId: quota.oauthAccountId,
+                        oauthProvider: quota.oauthProvider,
                         checkedAt: new Date().toISOString(),
                         success: false,
                         error: 'No quota data available yet',

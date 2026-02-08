@@ -70,6 +70,9 @@ export const OpenAICodexQuotaDisplay: React.FC<OpenAICodexQuotaDisplayProps> = (
         <Bot size={14} className="text-emerald-400" />
         <span className="text-xs font-semibold text-text">OpenAI Codex</span>
       </div>
+      {result.oauthAccountId && (
+        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
+      )}
 
       {orderedWindows.map((window, index) => {
         const labelBase = window.windowType === 'five_hour'

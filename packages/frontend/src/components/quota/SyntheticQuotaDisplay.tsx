@@ -59,6 +59,9 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
         <DollarSign size={14} className="text-info" />
         <span className="text-xs font-semibold text-text">Synthetic</span>
       </div>
+      {result.oauthAccountId && (
+        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
+      )}
 
       {/* Subscription - Requests per 5-hour window */}
       {subscriptionWindow && subscriptionWindow.limit && (

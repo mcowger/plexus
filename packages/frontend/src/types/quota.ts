@@ -45,6 +45,8 @@ export interface QuotaCheckResult {
   checkedAt: string;
   success: boolean;
   error?: string;
+  oauthAccountId?: string;
+  oauthProvider?: string;
   windows?: QuotaWindow[];
   groups?: QuotaGroup[];
   rawResponse?: unknown;
@@ -52,6 +54,8 @@ export interface QuotaCheckResult {
 
 export interface QuotaCheckerInfo {
   checkerId: string;
+  oauthAccountId?: string;
+  oauthProvider?: string;
   latest: QuotaSnapshot[];
 }
 
