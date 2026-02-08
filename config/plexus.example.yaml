@@ -56,6 +56,29 @@
 # [REQUIRED] Admin Key for Dashboard and Management API Access
 adminKey: "change-me-to-a-secure-admin-password"
 
+# [OPTIONAL] Quota checker configuration
+# OAuth-backed quota checkers (`claude-code`, `openai-codex`) load tokens from AUTH_JSON/auth.json
+# by default and do not require hardcoded API keys.
+quotas:
+  - id: claude-code-main
+    type: claude-code
+    provider: claude-code
+    enabled: true
+    intervalMinutes: 10
+    options:
+      endpoint: https://api.anthropic.com/v1/messages
+      model: claude-haiku-4-5-20251001
+      # oauthProvider: anthropic
+
+  - id: codex-main
+    type: openai-codex
+    provider: openai
+    enabled: true
+    intervalMinutes: 5
+    options:
+      endpoint: https://chatgpt.com/backend-api/wham/usage
+      # oauthProvider: openai-codex
+
 providers:
   # Standard OpenAI Configuration
   # API type is automatically inferred as 'chat' from the URL

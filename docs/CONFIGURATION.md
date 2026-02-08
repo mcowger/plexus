@@ -561,7 +561,7 @@ This section configures quota checkers that monitor provider rate limits and quo
 ```yaml
 quotas:
   - id: checker-name                    # Unique identifier
-    type: synthetic | anthropic | antigravity  # Checker type
+    type: synthetic | claude-code | openai-codex | naga  # Checker type
     provider: provider-key               # Provider name to associate with
     enabled: true                       # Enable/disable this checker
     intervalMinutes: 30                 # Check frequency in minutes
@@ -593,59 +593,76 @@ quotas:
       # endpoint: https://api.synthetic.new/v2/quotas
 ```
 
-#### `anthropic`
+#### `claude-code`
 
 Makes a minimal inference request to Anthropic and reads rate limit headers.
 
-**Required Options:**
-- `apiKey`: Anthropic API key
+**Token Source:**
+- By default, this checker loads OAuth credentials from `auth.json` via `oauthProvider: anthropic`.
+- You can still provide `apiKey` explicitly as an override, but it is optional.
 
 **Optional Options:**
 - `model`: Model to use for the probe request (default: `claude-haiku-4-5`)
+- `endpoint`: Override the default API endpoint
+- `oauthProvider`: OAuth provider key to read from auth.json (default: `anthropic`)
+- `apiKey`: Optional explicit bearer token override
 
 **Example:**
 ```yaml
 quotas:
-  - id: anthropic-pro
-    type: anthropic
-    provider: anthropic
+  - id: claude-code-main
+    type: claude-code
+    provider: claude-code
     enabled: true
     intervalMinutes: 15
     options:
-      apiKey: sk-ant-your_api_key
-      # model: claude-haiku-4-5
+      # oauthProvider defaults to anthropic
+      endpoint: https://api.anthropic.com/v1/messages
+      model: claude-haiku-4-5-20251001
 ```
 
-#### `antigravity`
+#### `openai-codex`
 
-Uses Google Cloud credentials to fetch available models and quota information.
+Fetches Codex usage and maps rate-limit windows to Plexus quota windows.
 
-**Required Options:**
-- `credentialsPath`: Path to Google service account JSON credentials file
+**Token Source:**
+- By default, this checker loads OAuth credentials from `auth.json` via `oauthProvider: openai-codex`.
+- `apiKey` is optional and only needed as an explicit override.
 
 **Optional Options:**
-- `projectId`: GCP project ID (default: `bamboo-precept-lgxtn`)
+- `endpoint`: Override usage endpoint (default: `https://chatgpt.com/backend-api/wham/usage`)
+- `userAgent`: Override request user agent
+- `oauthProvider`: OAuth provider key to read from auth.json (default: `openai-codex`)
+- `apiKey`: Optional explicit bearer token override
 
 **Example:**
 ```yaml
 quotas:
-  - id: antigravity-main
-    type: antigravity
-    provider: cpa
+  - id: codex-main
+    type: openai-codex
+    provider: openai
     enabled: true
-    intervalMinutes: 20
+    intervalMinutes: 1
     options:
-      credentialsPath: /path/to/google-credentials.json
-      # projectId: my-gcp-project
+      # oauthProvider defaults to openai-codex
+      endpoint: https://chatgpt.com/backend-api/wham/usage
 ```
+
+#### `naga`
+
+Checks Naga account balance and maps it to a subscription-style quota window.
+
+**Required Options:**
+- `apiKey`: Naga API key
+- `max`: Maximum account balance for utilization calculation
 
 **Quota Monitoring API:**
 
 Once configured, quota data is available via the Management API:
-- `GET /v0/quotas` - List all quota checkers and their latest status
-- `GET /v0/quotas/:checkerId` - Get latest quota for a specific checker
-- `GET /v0/quotas/:checkerId/history` - Get historical quota data
-- `POST /v0/quotas/:checkerId/check` - Trigger an immediate quota check
+- `GET /v0/management/quotas` - List all quota checkers and their latest status
+- `GET /v0/management/quotas/:checkerId` - Get latest quota for a specific checker
+- `GET /v0/management/quotas/:checkerId/history` - Get historical quota data
+- `POST /v0/management/quotas/:checkerId/check` - Trigger an immediate quota check
 
 See the [API Documentation](./API.md#quota-management) for response formats.
 
