@@ -109,6 +109,7 @@ export interface Provider {
   apiBaseUrl?: string | Record<string, string>;
   apiKey: string;
   oauthProvider?: string;
+  oauthAccount?: string;
   enabled: boolean;
   estimateTokens?: boolean;
   discount?: number;
@@ -515,6 +516,7 @@ interface PlexusConfig {
         type?: string | string[]; // Optional for backward compatibility, but will be inferred from api_base_url
         api_key?: string;
         oauth_provider?: string;
+        oauth_account?: string;
         api_base_url?: string | Record<string, string>;
         display_name?: string;
         models?: string[] | Record<string, any>;
@@ -554,6 +556,7 @@ export interface OAuthPrompt {
 export interface OAuthSession {
     id: string;
     providerId: string;
+    accountId: string;
     status: string;
     authInfo?: OAuthAuthInfo;
     prompt?: OAuthPrompt;
@@ -961,6 +964,7 @@ export const api = {
                 apiBaseUrl: val.api_base_url,
                 apiKey: val.api_key || '',
                 oauthProvider: val.oauth_provider,
+                oauthAccount: val.oauth_account,
                 enabled: val.enabled !== false, // Default to true if not present
                 estimateTokens: val.estimateTokens || false,
                 discount: val.discount,
@@ -1003,6 +1007,7 @@ export const api = {
               type: p.type,
               api_key: p.apiKey,
               ...(p.oauthProvider && { oauth_provider: p.oauthProvider }),
+              ...(p.oauthAccount && { oauth_account: p.oauthAccount }),
               api_base_url: p.apiBaseUrl,
               display_name: p.name,
               discount: p.discount,
@@ -1047,6 +1052,7 @@ export const api = {
           ...(shouldIncludeType && { type: provider.type }),
           api_key: provider.apiKey,
           ...(provider.oauthProvider && { oauth_provider: provider.oauthProvider }),
+          ...(provider.oauthAccount && { oauth_account: provider.oauthAccount }),
           api_base_url: provider.apiBaseUrl,
           display_name: provider.name,
           estimateTokens: provider.estimateTokens,
@@ -1412,11 +1418,11 @@ export const api = {
       return json.data || [];
   },
 
-  startOAuthSession: async (providerId: string): Promise<OAuthSession> => {
+  startOAuthSession: async (providerId: string, accountId: string): Promise<OAuthSession> => {
       const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providerId })
+          body: JSON.stringify({ providerId, accountId })
       });
       if (!res.ok) {
           const err = await res.json();
@@ -1424,6 +1430,18 @@ export const api = {
       }
       const json = await res.json() as { data: OAuthSession };
       return json.data;
+  },
+
+  deleteOAuthCredentials: async (providerId: string, accountId: string): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/credentials`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerId, accountId })
+      });
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to delete OAuth credentials');
+      }
   },
 
   getOAuthSession: async (sessionId: string): Promise<OAuthSession> => {

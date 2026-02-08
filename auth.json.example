@@ -1,34 +1,60 @@
 {
   "anthropic": {
-    "type": "oauth",
-    "accessToken": "ey...",
-    "refreshToken": "ey...",
-    "expiresAt": 1738627200000
+    "accounts": {
+      "work": {
+        "type": "oauth",
+        "accessToken": "ey...",
+        "refreshToken": "ey...",
+        "expiresAt": 1738627200000
+      }
+    }
   },
   "openai-codex": {
-    "type": "oauth",
-    "accessToken": "ey...",
-    "refreshToken": "ey...",
-    "expiresAt": 1738627200000
+    "accounts": {
+      "personal": {
+        "type": "oauth",
+        "accessToken": "ey...",
+        "refreshToken": "ey...",
+        "expiresAt": 1738627200000
+      },
+      "work": {
+        "type": "oauth",
+        "accessToken": "ey...",
+        "refreshToken": "ey...",
+        "expiresAt": 1738627200000
+      }
+    }
   },
   "google-antigravity": {
-    "type": "oauth",
-    "accessToken": "ya29...",
-    "refreshToken": "1//...",
-    "expiresAt": 1738627200000,
-    "projectId": "your-project-id"
+    "accounts": {
+      "team-a": {
+        "type": "oauth",
+        "accessToken": "ya29...",
+        "refreshToken": "1//...",
+        "expiresAt": 1738627200000,
+        "projectId": "your-project-id"
+      }
+    }
   },
   "github-copilot": {
-    "type": "oauth",
-    "accessToken": "ghu_...",
-    "refreshToken": "ghr_...",
-    "expiresAt": 1738627200000
+    "accounts": {
+      "main": {
+        "type": "oauth",
+        "accessToken": "ghu_...",
+        "refreshToken": "ghr_...",
+        "expiresAt": 1738627200000
+      }
+    }
   },
   "google-gemini-cli": {
-    "type": "oauth",
-    "accessToken": "ya29...",
-    "refreshToken": "1//...",
-    "expiresAt": 1738627200000,
-    "projectId": "your-project-id"
+    "accounts": {
+      "main": {
+        "type": "oauth",
+        "accessToken": "ya29...",
+        "refreshToken": "1//...",
+        "expiresAt": 1738627200000,
+        "projectId": "your-project-id"
+      }
+    }
   }
 }

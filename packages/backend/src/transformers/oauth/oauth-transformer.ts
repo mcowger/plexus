@@ -228,12 +228,13 @@ export class OAuthTransformer implements Transformer {
   async executeRequest(
     context: any,
     provider: OAuthProvider,
+    accountId: string,
     modelId: string,
     streaming: boolean,
     options?: Record<string, any>
   ): Promise<any> {
     const authManager = OAuthAuthManager.getInstance();
-    const apiKey = await authManager.getApiKey(provider);
+    const apiKey = await authManager.getApiKey(provider, accountId);
     const model = this.getPiAiModel(provider, modelId);
     const rawOptions = { ...(options ?? {}) };
     const clientHeaders = rawOptions.clientHeaders as Record<string, unknown> | undefined;
@@ -285,6 +286,7 @@ export class OAuthTransformer implements Transformer {
 
     logger.debug(`${this.name}: OAuth credentials resolved`, {
       provider,
+      accountId,
       model: model.id,
       streaming,
       apiKeyPreview,
@@ -298,13 +300,15 @@ export class OAuthTransformer implements Transformer {
       logger.debug(`${this.name}: Stripped pi-ai request options`, {
         model: model.id,
         provider,
+        accountId,
         strippedParameters
       });
     }
 
     logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request`, {
       model: model.id,
-      provider
+      provider,
+      accountId
     });
 
     if (streaming) {

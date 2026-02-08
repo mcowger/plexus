@@ -109,18 +109,25 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
     }
 
     const provider = this.getOption<string>('oauthProvider', 'openai-codex').trim() || 'openai-codex';
+    const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
 
     let oauthApiKey: string;
     try {
-      oauthApiKey = await authManager.getApiKey(provider as OAuthProvider);
+      oauthApiKey = oauthAccountId
+        ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
+        : await authManager.getApiKey(provider as OAuthProvider);
     } catch (error) {
       authManager.reload();
-      oauthApiKey = await authManager.getApiKey(provider as OAuthProvider);
+      oauthApiKey = oauthAccountId
+        ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
+        : await authManager.getApiKey(provider as OAuthProvider);
       logger.info(`[openai-codex-checker] Reloaded OAuth auth file and retrieved token for provider '${provider}'.`);
     }
 
-    const credentials = authManager.getCredentials(provider as OAuthProvider) as Record<string, unknown> | null;
+    const credentials = (oauthAccountId
+      ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
+      : authManager.getCredentials(provider as OAuthProvider)) as Record<string, unknown> | null;
     const accountId = typeof credentials?.accountId === 'string'
       ? credentials.accountId.trim()
       : (typeof credentials?.chatgpt_account_id === 'string' ? credentials.chatgpt_account_id.trim() : '');

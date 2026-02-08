@@ -31,7 +31,7 @@ describe("OAuthTransformer", () => {
       messages: []
     };
 
-    await transformer.executeRequest(context, "anthropic" as any, "claude-test", false, {
+    await transformer.executeRequest(context, "anthropic" as any, "test-account", "claude-test", false, {
       clientHeaders: { "x-app": "cli" }
     });
 
@@ -48,7 +48,7 @@ describe("OAuthTransformer", () => {
       messages: []
     };
 
-    await transformer.executeRequest(context, "anthropic" as any, "claude-test", false, {});
+    await transformer.executeRequest(context, "anthropic" as any, "test-account", "claude-test", false, {});
 
     expect(context.tools[0]?.name).toBe("proxy_MyTool");
   });

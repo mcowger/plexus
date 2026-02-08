@@ -14,6 +14,7 @@ export type OAuthSessionStatus =
 export type OAuthSession = {
   id: string;
   providerId: OAuthProviderId;
+  accountId: string;
   status: OAuthSessionStatus;
   authInfo?: OAuthAuthInfo;
   prompt?: OAuthPrompt;
@@ -91,8 +92,12 @@ export class OAuthLoginSessionManager {
     return session ? this.stripInternal(session) : undefined;
   }
 
-  async createSession(providerId: OAuthProviderId): Promise<OAuthSession> {
+  async createSession(providerId: OAuthProviderId, accountId: string): Promise<OAuthSession> {
     this.cleanupExpired();
+    if (!accountId?.trim()) {
+      throw new Error('accountId is required');
+    }
+
     const provider = this.providerResolver(providerId);
     if (!provider) {
       throw new Error(`Unknown OAuth provider: ${providerId}`);
@@ -105,6 +110,7 @@ export class OAuthLoginSessionManager {
     const session: SessionInternal = {
       id: sessionId,
       providerId,
+      accountId,
       status: 'in_progress',
       progress: [],
       createdAt: now,
@@ -181,6 +187,7 @@ export class OAuthLoginSessionManager {
     return {
       id: session.id,
       providerId: session.providerId,
+      accountId: session.accountId,
       status: session.status,
       authInfo: session.authInfo,
       prompt: session.prompt,
@@ -233,7 +240,7 @@ export class OAuthLoginSessionManager {
 
     try {
       const credentials: OAuthCredentials = await provider.login(callbacks);
-      authManager.setCredentials(provider.id, credentials);
+      authManager.setCredentials(provider.id, session.accountId, credentials);
       session.status = 'success';
       session.error = undefined;
       session.prompt = undefined;
