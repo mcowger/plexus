@@ -1,9 +1,8 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { DollarSign, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react';
-import { QuotaProgressBar } from './QuotaProgressBar';
+import { DollarSign, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatDuration } from '../../lib/format';
-import type { QuotaCheckResult } from '../../types/quota';
+import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
 
 interface SyntheticQuotaDisplayProps {
   result: QuotaCheckResult;
@@ -38,6 +37,16 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
   // Get overall status
   const overallStatus = subscriptionWindow?.status || 'ok';
 
+  const statusColors: Record<QuotaStatus, string> = {
+    ok: 'bg-success',
+    warning: 'bg-warning',
+    critical: 'bg-danger',
+    exhausted: 'bg-danger',
+  };
+
+  const barColorForStatus = (status?: QuotaStatus, fallback = 'bg-emerald-400') =>
+    status ? statusColors[status] : fallback;
+
   if (isCollapsed) {
     return (
       <div className="px-2 py-2 flex justify-center">
@@ -55,90 +64,75 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
   return (
     <div className="px-2 py-1 space-y-1">
       {/* Header */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <DollarSign size={14} className="text-info" />
-        <span className="text-xs font-semibold text-text">Synthetic</span>
+        <span className="text-xs font-semibold text-text whitespace-nowrap">Synthetic</span>
+        {result.oauthAccountId && (
+          <span className="text-[10px] text-text-muted truncate">({result.oauthAccountId})</span>
+        )}
       </div>
-      {result.oauthAccountId && (
-        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
-      )}
 
       {/* Subscription - Requests per 5-hour window */}
       {subscriptionWindow && subscriptionWindow.limit && (
-        <>
-          <QuotaProgressBar
-            label={`5h: ${subscriptionWindow.resetInSeconds !== undefined && subscriptionWindow.resetInSeconds !== null ? formatDuration(subscriptionWindow.resetInSeconds) : '?'}`}
-            value={subscriptionWindow.used || 0}
-            max={subscriptionWindow.limit}
-            displayValue={`${Math.round(subscriptionWindow.utilizationPercent)}%`}
-            status={subscriptionWindow.status}
-            color="green"
-            size="sm"
-          />
-          {subscriptionWindow.estimation?.willExceed && (
-            <div className="flex items-center gap-1 text-xs text-warning pl-1">
-              <TrendingUp size={12} />
-              <span>
-                Proj. {Math.round(subscriptionWindow.estimation.projectedUtilizationPercent)}% at reset
-                {subscriptionWindow.estimation.exceedanceTimestamp && (
-                  <span className="text-danger font-semibold"> (will exceed)</span>
+        <div className="space-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold text-text-secondary">5h:</span>
+            <span className="text-[10px] text-text-muted">
+              {subscriptionWindow.resetInSeconds !== undefined && subscriptionWindow.resetInSeconds !== null
+                ? formatDuration(subscriptionWindow.resetInSeconds)
+                : '?'}
+            </span>
+          </div>
+          <div className="relative h-2">
+            <div className="h-2 rounded-md bg-bg-hover overflow-hidden mr-7">
+              <div
+                className={clsx(
+                  'h-full rounded-md transition-all duration-500 ease-out',
+                  barColorForStatus(subscriptionWindow.status, 'bg-emerald-400')
                 )}
-              </span>
+                style={{ width: `${Math.min(100, Math.max(0, subscriptionWindow.utilizationPercent))}%` }}
+              />
             </div>
-          )}
-        </>
+            <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-emerald-400">
+              {Math.round(subscriptionWindow.utilizationPercent)}%
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Daily Tool Calls */}
-      {dailyWindow && dailyWindow.limit && (
-        <>
-          <QuotaProgressBar
-            label="Daily Tools"
-            value={dailyWindow.used || 0}
-            max={dailyWindow.limit}
-            displayValue={`${Math.round(dailyWindow.utilizationPercent)}%`}
-            status={dailyWindow.status}
-            color="amber"
-            size="sm"
-          />
-          {dailyWindow.estimation?.willExceed && (
-            <div className="flex items-center gap-1 text-xs text-warning pl-1">
-              <TrendingUp size={12} />
-              <span>
-                Proj. {Math.round(dailyWindow.estimation.projectedUtilizationPercent)}% at reset
-                {dailyWindow.estimation.exceedanceTimestamp && (
-                  <span className="text-danger font-semibold"> (will exceed)</span>
-                )}
-              </span>
+      {(dailyWindow || hourlyWindow) && (
+        <div className="flex items-center gap-3 text-[10px] text-text-secondary">
+          {dailyWindow && dailyWindow.limit && (
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-text-secondary">Tools</span>
+              <div className="relative flex-1 h-1.5 rounded-full bg-bg-hover overflow-hidden">
+                <div
+                  className={clsx(
+                    'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
+                    barColorForStatus(dailyWindow.status, 'bg-emerald-400')
+                  )}
+                  style={{ width: `${Math.min(100, Math.max(0, dailyWindow.utilizationPercent))}%` }}
+                />
+              </div>
+              <span className="text-text">{Math.round(dailyWindow.utilizationPercent)}%</span>
             </div>
           )}
-        </>
-      )}
-
-      {/* Hourly Search */}
-      {hourlyWindow && hourlyWindow.limit && (
-        <>
-          <QuotaProgressBar
-            label="Hourly Search"
-            value={hourlyWindow.used || 0}
-            max={hourlyWindow.limit}
-            displayValue={`${Math.round(hourlyWindow.utilizationPercent)}%`}
-            status={hourlyWindow.status}
-            color="blue"
-            size="sm"
-          />
-          {hourlyWindow.estimation?.willExceed && (
-            <div className="flex items-center gap-1 text-xs text-warning pl-1">
-              <TrendingUp size={12} />
-              <span>
-                Proj. {Math.round(hourlyWindow.estimation.projectedUtilizationPercent)}% at reset
-                {hourlyWindow.estimation.exceedanceTimestamp && (
-                  <span className="text-danger font-semibold"> (will exceed)</span>
-                )}
-              </span>
+          {hourlyWindow && hourlyWindow.limit && (
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-text-secondary">Search</span>
+              <div className="relative flex-1 h-1.5 rounded-full bg-bg-hover overflow-hidden">
+                <div
+                  className={clsx(
+                    'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
+                    barColorForStatus(hourlyWindow.status, 'bg-info')
+                  )}
+                  style={{ width: `${Math.min(100, Math.max(0, hourlyWindow.utilizationPercent))}%` }}
+                />
+              </div>
+              <span className="text-text">{Math.round(hourlyWindow.utilizationPercent)}%</span>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
