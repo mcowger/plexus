@@ -66,7 +66,26 @@ export class QuotaScheduler {
     }
 
     logger.debug(`Running quota check for '${checkerId}'`);
-    const result = await checker.checkQuota();
+    let result: QuotaCheckResult;
+
+    try {
+      result = await checker.checkQuota();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`Quota checker '${checkerId}' threw an exception: ${message}`);
+
+      result = {
+        provider: checker.config.provider,
+        checkerId,
+        checkedAt: new Date(),
+        success: false,
+        error: message,
+      };
+    }
+
+    if (!result.success) {
+      logger.warn(`Quota check failed for '${checkerId}': ${result.error ?? 'unknown error'}`);
+    }
 
     await this.persistResult(result);
 
@@ -74,13 +93,35 @@ export class QuotaScheduler {
   }
 
   private async persistResult(result: QuotaCheckResult): Promise<void> {
-    if (!result.success) {
-      return;
-    }
-
     const { db, schema } = this.ensureDb();
     const checkedAt = result.checkedAt.getTime();
     const now = Date.now();
+
+    if (!result.success) {
+      try {
+        await db.insert(schema.quotaSnapshots).values({
+          provider: result.provider,
+          checkerId: result.checkerId,
+          groupId: null,
+          windowType: 'custom',
+          checkedAt,
+          limit: null,
+          used: null,
+          remaining: null,
+          utilizationPercent: null,
+          unit: null,
+          resetsAt: null,
+          status: null,
+          description: 'Quota check failed',
+          success: 0,
+          errorMessage: result.error ?? 'Unknown quota check error',
+          createdAt: now,
+        });
+      } catch (error) {
+        logger.error(`Failed to persist quota error for '${result.checkerId}': ${error}`);
+      }
+      return;
+    }
 
     if (result.windows) {
       for (const window of result.windows) {

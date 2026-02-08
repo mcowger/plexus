@@ -8,7 +8,7 @@ import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
-import { SyntheticQuotaDisplay, ClaudeCodeQuotaDisplay, NagaQuotaDisplay } from '../quota';
+import { SyntheticQuotaDisplay, ClaudeCodeQuotaDisplay, NagaQuotaDisplay, OpenAICodexQuotaDisplay } from '../quota';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
 
@@ -285,11 +285,14 @@ export const Sidebar: React.FC = () => {
                 ) : (
                   <div className="space-y-1">
                     {quotas.map((quota) => {
-                      const result = getQuotaResult(quota.checkerId);
-                      if (!result) {
-                        console.warn(`No result for quota checker: ${quota.checkerId}`);
-                        return null;
-                      }
+                      const result = getQuotaResult(quota.checkerId) ?? {
+                        provider: 'unknown',
+                        checkerId: quota.checkerId,
+                        checkedAt: new Date().toISOString(),
+                        success: false,
+                        error: 'No quota data available yet',
+                        windows: [],
+                      };
                       
                       // Use Synthetic display for synthetic checkers
                       if (quota.checkerId.includes('synthetic')) {
@@ -317,6 +320,17 @@ export const Sidebar: React.FC = () => {
                       if (quota.checkerId.includes('naga')) {
                         return (
                           <NagaQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+
+                      // Use OpenAI Codex display for codex checkers
+                      if (quota.checkerId.includes('openai-codex') || quota.checkerId.includes('codex')) {
+                        return (
+                          <OpenAICodexQuotaDisplay
                             key={quota.checkerId}
                             result={result}
                             isCollapsed={isCollapsed}

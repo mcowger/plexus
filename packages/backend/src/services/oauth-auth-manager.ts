@@ -83,6 +83,10 @@ export class OAuthAuthManager {
     return result.apiKey;
   }
 
+  getCredentials(provider: OAuthProvider): OAuthCredentials | null {
+    return this.authData[provider] ?? null;
+  }
+
   hasProvider(provider: OAuthProvider): boolean {
     return !!this.authData[provider];
   }

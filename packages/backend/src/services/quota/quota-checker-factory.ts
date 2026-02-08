@@ -2,11 +2,13 @@ import type { QuotaCheckerConfig, QuotaChecker } from '../../types/quota';
 import { SyntheticQuotaChecker } from './checkers/synthetic-checker';
 import { ClaudeCodeQuotaChecker } from './checkers/claude-code-checker';
 import { NagaQuotaChecker } from './checkers/naga-checker';
+import { OpenAICodexQuotaChecker } from './checkers/openai-codex-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
   'claude-code': ClaudeCodeQuotaChecker,
   'naga': NagaQuotaChecker,
+  'openai-codex': OpenAICodexQuotaChecker,
 };
 
 export class QuotaCheckerFactory {
