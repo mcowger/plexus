@@ -648,6 +648,10 @@ quotas:
       model: claude-haiku-4-5-20251001
 ```
 
+**Quota tracking note:**
+- Quota results are keyed by `oauthAccountId`.
+- Ensure the provider's `oauth_account` value in `providers` matches the OAuth account ID used for the checker.
+
 #### `openai-codex`
 
 Fetches Codex usage and maps rate-limit windows to Plexus quota windows.
