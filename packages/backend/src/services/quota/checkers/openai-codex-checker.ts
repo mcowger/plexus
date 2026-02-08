@@ -36,7 +36,7 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
   constructor(config: QuotaCheckerConfig) {
     super(config);
     this.endpoint = this.getOption<string>('endpoint', 'https://chatgpt.com/backend-api/wham/usage');
-    this.userAgent = this.getOption<string>('userAgent', 'codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal');
+    this.userAgent = this.getOption<string>('userAgent', 'codex_cli_rs/0.98.0 (Debian 13.0.0; x86_64) WindowsTerminal');
     this.timeoutMs = this.getOption<number>('timeoutMs', 15000);
   }
 
