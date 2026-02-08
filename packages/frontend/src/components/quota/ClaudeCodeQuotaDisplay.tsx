@@ -1,8 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { Cpu, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react';
-import { QuotaProgressBar } from './QuotaProgressBar';
-import type { QuotaCheckResult } from '../../types/quota';
+import { Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
 import { formatDuration } from '../../lib/format';
 
 interface ClaudeCodeQuotaDisplayProps {
@@ -41,6 +40,16 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
     ? 'warning'
     : 'ok';
 
+  const statusColors: Record<QuotaStatus, string> = {
+    ok: 'bg-success',
+    warning: 'bg-warning',
+    critical: 'bg-danger',
+    exhausted: 'bg-danger',
+  };
+
+  const barColorForStatus = (status?: QuotaStatus, fallback = 'bg-info') =>
+    status ? statusColors[status] : fallback;
+
   if (isCollapsed) {
     return (
       <div className="px-2 py-2 flex justify-center">
@@ -58,64 +67,64 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
   return (
     <div className="px-2 py-1 space-y-1">
       {/* Header */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <Cpu size={14} className="text-purple-400" />
-        <span className="text-xs font-semibold text-text">Claude Code</span>
+        <span className="text-xs font-semibold text-text whitespace-nowrap">Claude</span>
+        {result.oauthAccountId && (
+          <span className="text-[10px] text-text-muted truncate">({result.oauthAccountId})</span>
+        )}
       </div>
-      {result.oauthAccountId && (
-        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
-      )}
 
       {/* 5-Hour Window */}
       {fiveHourWindow && (
-        <>
-          <QuotaProgressBar
-            label={`5h: ${fiveHourWindow.resetInSeconds !== undefined && fiveHourWindow.resetInSeconds !== null ? formatDuration(fiveHourWindow.resetInSeconds) : '?'}`}
-            value={fiveHourWindow.utilizationPercent}
-            max={100}
-            displayValue={`${Math.round(fiveHourWindow.utilizationPercent)}%`}
-            status={fiveHourWindow.status}
-            color="blue"
-            size="sm"
-          />
-          {fiveHourWindow.estimation?.willExceed && (
-            <div className="flex items-center gap-1 text-xs text-warning pl-1">
-              <TrendingUp size={12} />
-              <span>
-                Proj. {Math.round(fiveHourWindow.estimation.projectedUtilizationPercent)}% at reset
-                {fiveHourWindow.estimation.exceedanceTimestamp && (
-                  <span className="text-danger font-semibold"> (will exceed)</span>
+        <div className="space-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold text-text-secondary">5h:</span>
+            <span className="text-[10px] text-text-muted">
+              {fiveHourWindow.resetInSeconds !== undefined && fiveHourWindow.resetInSeconds !== null
+                ? formatDuration(fiveHourWindow.resetInSeconds)
+                : '?'}
+            </span>
+          </div>
+          <div className="relative h-2">
+            <div className="h-2 rounded-md bg-bg-hover overflow-hidden mr-7">
+              <div
+                className={clsx(
+                  'h-full rounded-md transition-all duration-500 ease-out',
+                  barColorForStatus(fiveHourWindow.status, 'bg-info')
                 )}
-              </span>
+                style={{ width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%` }}
+              />
             </div>
-          )}
-        </>
+            <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-info">
+              {Math.round(fiveHourWindow.utilizationPercent)}%
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Weekly Window */}
       {weeklyWindow && (
-        <>
-          <QuotaProgressBar
-            label={`1w: ${weeklyWindow.resetInSeconds !== undefined && weeklyWindow.resetInSeconds !== null ? formatDuration(weeklyWindow.resetInSeconds) : '?'}`}
-            value={weeklyWindow.utilizationPercent}
-            max={100}
-            displayValue={`${Math.round(weeklyWindow.utilizationPercent)}%`}
-            status={weeklyWindow.status}
-            color="amber"
-            size="sm"
-          />
-          {weeklyWindow.estimation?.willExceed && (
-            <div className="flex items-center gap-1 text-xs text-warning pl-1">
-              <TrendingUp size={12} />
-              <span>
-                Proj. {Math.round(weeklyWindow.estimation.projectedUtilizationPercent)}% at reset
-                {weeklyWindow.estimation.exceedanceTimestamp && (
-                  <span className="text-danger font-semibold"> (will exceed)</span>
+        <div className="flex items-center gap-3 text-[10px] text-text-secondary">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-text-secondary">1w:</span>
+            <span className="text-text-muted">
+              {weeklyWindow.resetInSeconds !== undefined && weeklyWindow.resetInSeconds !== null
+                ? formatDuration(weeklyWindow.resetInSeconds)
+                : '?'}
+            </span>
+            <div className="relative flex-1 h-1.5 rounded-full bg-bg-hover overflow-hidden">
+              <div
+                className={clsx(
+                  'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
+                  barColorForStatus(weeklyWindow.status, 'bg-purple-400')
                 )}
-              </span>
+                style={{ width: `${Math.min(100, Math.max(0, weeklyWindow.utilizationPercent))}%` }}
+              />
             </div>
-          )}
-        </>
+          </div>
+          <span className="text-text">{Math.round(weeklyWindow.utilizationPercent)}%</span>
+        </div>
       )}
     </div>
   );
