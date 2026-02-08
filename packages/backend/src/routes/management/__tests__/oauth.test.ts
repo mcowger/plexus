@@ -75,10 +75,11 @@ describe('OAuth management routes', () => {
   });
 
   it('persists credentials after prompt flow', async () => {
+    const accountId = 'work';
     const response = await fastify.inject({
       method: 'POST',
       url: '/v0/management/oauth/sessions',
-      payload: { providerId: 'test-provider' }
+      payload: { providerId: 'test-provider', accountId }
     });
     const session = response.json() as { data: { id: string } };
 
@@ -96,16 +97,30 @@ describe('OAuth management routes', () => {
     const authJson = JSON.parse(authContents) as Record<string, any>;
 
     expect(authJson['test-provider']).toBeDefined();
-    expect(authJson['test-provider'].type).toBe('oauth');
-    expect(authJson['test-provider'].access).toBe('access-token');
-    expect(authJson['test-provider'].refresh).toBe('refresh-token');
+    expect(authJson['test-provider'].accounts).toBeDefined();
+    expect(authJson['test-provider'].accounts[accountId].type).toBe('oauth');
+    expect(authJson['test-provider'].accounts[accountId].access).toBe('access-token');
+    expect(authJson['test-provider'].accounts[accountId].refresh).toBe('refresh-token');
 
     const authManager = OAuthAuthManager.getInstance();
     authManager.reload();
-    expect(authManager.hasProvider('test-provider')).toBe(true);
+    expect(authManager.hasProvider('test-provider' as any, accountId)).toBe(true);
+
+    const deleteResponse = await fastify.inject({
+      method: 'DELETE',
+      url: '/v0/management/oauth/credentials',
+      payload: { providerId: 'test-provider', accountId }
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const afterDelete = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as Record<string, any>;
+    expect(afterDelete['test-provider']).toBeUndefined();
+    authManager.reload();
+    expect(authManager.hasProvider('test-provider' as any, accountId)).toBe(false);
   });
 
   it('accepts manual code input for callback flows', async () => {
+    const accountId = 'personal';
     const manualProvider: OAuthProviderInterface = {
       id: 'manual-provider',
       name: 'Manual Provider',
@@ -138,7 +153,7 @@ describe('OAuth management routes', () => {
     const response = await fastify.inject({
       method: 'POST',
       url: '/v0/management/oauth/sessions',
-      payload: { providerId: 'manual-provider' }
+      payload: { providerId: 'manual-provider', accountId }
     });
     const session = response.json() as { data: { id: string } };
 
@@ -156,6 +171,6 @@ describe('OAuth management routes', () => {
     const authJson = JSON.parse(authContents) as Record<string, any>;
 
     expect(authJson['manual-provider']).toBeDefined();
-    expect(authJson['manual-provider'].access).toBe('manual-access');
+    expect(authJson['manual-provider'].accounts[accountId].access).toBe('manual-access');
   });
 });

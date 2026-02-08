@@ -106,14 +106,19 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
     }
 
     const provider = this.getOption<string>('oauthProvider', 'anthropic').trim() || 'anthropic';
+    const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
 
     try {
-      return await authManager.getApiKey(provider as OAuthProvider);
+      return oauthAccountId
+        ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
+        : await authManager.getApiKey(provider as OAuthProvider);
     } catch {
       authManager.reload();
       logger.info(`[claude-code-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`);
-      return await authManager.getApiKey(provider as OAuthProvider);
+      return oauthAccountId
+        ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
+        : await authManager.getApiKey(provider as OAuthProvider);
     }
   }
 }
