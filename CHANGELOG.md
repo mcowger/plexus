@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.1 - 2026-02-09
+
+### Per-model metrics for provider performance
+
+**Added a canonical performance dashboard**
+
 ## v0.13.0 - 2026-02-08
 
 ### v0.13.0: Multi-account OAuth quota management and Codex/Claude quota checker enhancements
