@@ -1,5 +1,5 @@
 import { logger } from '../../utils/logger';
-import { getDatabase, getSchema } from '../../db/client';
+import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
 import { QuotaCheckerFactory } from './quota-checker-factory';
 import { QuotaEstimator } from './quota-estimator';
 import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
@@ -94,8 +94,17 @@ export class QuotaScheduler {
 
   private async persistResult(result: QuotaCheckResult): Promise<void> {
     const { db, schema } = this.ensureDb();
-    const checkedAt = result.checkedAt.getTime();
+    const isSqlite = getCurrentDialect() === 'sqlite';
+    const toDbTimestamp = (value: Date | number | null | undefined) => {
+      if (value == null) return null;
+
+      const timestamp = value instanceof Date ? value.getTime() : value;
+      return isSqlite ? new Date(timestamp) : timestamp;
+    };
+
+    const checkedAt = toDbTimestamp(result.checkedAt);
     const now = Date.now();
+    const createdAt = toDbTimestamp(now);
 
     if (!result.success) {
       try {
@@ -115,7 +124,7 @@ export class QuotaScheduler {
           description: 'Quota check failed',
           success: 0,
           errorMessage: result.error ?? 'Unknown quota check error',
-          createdAt: now,
+          createdAt,
         });
       } catch (error) {
         logger.error(`Failed to persist quota error for '${result.checkerId}': ${error}`);
@@ -137,12 +146,12 @@ export class QuotaScheduler {
               remaining: window.remaining,
               utilizationPercent: window.utilizationPercent,
               unit: window.unit,
-              resetsAt: window.resetsAt?.getTime() ?? null,
+              resetsAt: toDbTimestamp(window.resetsAt),
               status: window.status ?? null,
               description: window.description ?? null,
               success: 1,
               errorMessage: null,
-              createdAt: now,
+              createdAt,
             });
         } catch (error) {
           logger.error(`Failed to persist quota window for '${result.checkerId}': ${error}`);
@@ -165,12 +174,12 @@ export class QuotaScheduler {
               remaining: window.remaining,
               utilizationPercent: window.utilizationPercent,
               unit: window.unit,
-              resetsAt: window.resetsAt?.getTime() ?? null,
+              resetsAt: toDbTimestamp(window.resetsAt),
               status: window.status ?? null,
               description: window.description ?? null,
               success: 1,
               errorMessage: null,
-              createdAt: now,
+              createdAt,
             });
           } catch (error) {
             logger.error(`Failed to persist quota group '${group.groupId}' for '${result.checkerId}': ${error}`);
