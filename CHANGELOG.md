@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.13.2 - 2026-02-09
+
+### Add exploration mechanism to selectors
+
+## New Features
+- Added exploration mechanism to performance and latency selectors ([cdd748d](https://github.com/mcowger/plexus/commit/cdd748d))
+
+This release introduces an exploration mechanism to the performance and latency selectors, allowing for more adaptive selection behavior.
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.13.1 - 2026-02-09
 
 ### Per-model metrics for provider performance
