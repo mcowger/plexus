@@ -66,16 +66,16 @@ export interface QuotaSnapshot {
   groupId: string | null;
   windowType: string;
   description?: string;
-  checkedAt: number;
+  checkedAt: string | number;
   limit: number | null;
   used: number | null;
   remaining: number | null;
   utilizationPercent: number | null;
   unit: string | null;
-  resetsAt: number | null;
+  resetsAt: string | number | null;
   resetInSeconds?: number | null;
   status: string | null;
-  success: number;
+  success: boolean | number;
   errorMessage: string | null;
-  createdAt: number;
+  createdAt: string | number;
 }
