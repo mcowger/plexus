@@ -126,6 +126,32 @@ The Management APIs provide endpoints for inspecting the system configuration an
     - `400 Bad Request`: Validation failed. Response JSON includes error details.
     - `500 Internal Server Error`: File write failed or path not resolved.
 
+### Model Alias Management
+
+#### Delete Model Alias
+- **Endpoint:** `DELETE /v0/management/models/:aliasId`
+- **Description:** Deletes a single model alias from the `models` section of the loaded configuration.
+- **Path Parameters:**
+  - `aliasId`: Model alias ID to delete.
+- **Responses:**
+  - `200 OK`: Alias deleted successfully.
+    ```json
+    { "success": true }
+    ```
+  - `404 Not Found`: Configuration file missing or alias does not exist.
+  - `500 Internal Server Error`: Failed to update configuration.
+
+#### Delete All Model Aliases
+- **Endpoint:** `DELETE /v0/management/models`
+- **Description:** Deletes all configured model aliases by clearing the `models` map in config.
+- **Responses:**
+  - `200 OK`: All aliases deleted successfully.
+    ```json
+    { "success": true, "deletedCount": 18 }
+    ```
+  - `404 Not Found`: Configuration file missing.
+  - `500 Internal Server Error`: Failed to update configuration.
+
 ### OAuth Providers
 
 Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, GitHub Copilot, Gemini CLI, Antigravity, OpenAI Codex).

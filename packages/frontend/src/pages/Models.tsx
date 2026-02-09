@@ -32,6 +32,8 @@ export const Models = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [aliasToDelete, setAliasToDelete] = useState<Alias | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   // Auto Add Modal State
   const [isAutoAddModalOpen, setIsAutoAddModalOpen] = useState(false);
@@ -113,6 +115,20 @@ export const Models = () => {
           alert("Failed to delete alias");
       } finally {
           setIsDeleting(false);
+      }
+  };
+
+  const handleConfirmDeleteAll = async () => {
+      setIsDeletingAll(true);
+      try {
+          await api.deleteAllAliases();
+          await loadData();
+          setIsDeleteAllModalOpen(false);
+      } catch (e) {
+          console.error("Failed to delete all aliases", e);
+          alert("Failed to delete all aliases");
+      } finally {
+          setIsDeletingAll(false);
       }
   };
 
@@ -342,7 +358,15 @@ export const Models = () => {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
-                </div>
+                 </div>
+                <Button
+                    variant="danger"
+                    leftIcon={<Trash2 size={16}/>}
+                    onClick={() => setIsDeleteAllModalOpen(true)}
+                    disabled={aliases.length === 0}
+                >
+                    Delete All Models
+                </Button>
                 <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Model</Button>
             </div>
         </div>
@@ -885,6 +909,41 @@ export const Models = () => {
               )}
            </div>
        </Modal>
+
+      <Modal
+        isOpen={isDeleteAllModalOpen}
+        onClose={() => setIsDeleteAllModalOpen(false)}
+        title="Delete All Models"
+        size="sm"
+        footer={
+            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
+                <Button variant="ghost" onClick={() => setIsDeleteAllModalOpen(false)} disabled={isDeletingAll}>Cancel</Button>
+                <Button onClick={handleConfirmDeleteAll} isLoading={isDeletingAll} variant="danger">Delete All</Button>
+            </div>
+        }
+      >
+          <div style={{display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center', padding: '16px 0'}}>
+              <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+              }}>
+                  <Trash2 size={24} style={{color: 'var(--color-danger)'}} />
+              </div>
+              <div>
+                  <p className="text-text" style={{marginBottom: '8px', fontWeight: 500}}>
+                      Are you sure you want to delete all configured models?
+                  </p>
+                  <p className="text-text-secondary" style={{fontSize: '14px'}}>
+                      This will permanently remove <strong>{aliases.length}</strong> model alias{aliases.length !== 1 ? 'es' : ''} from the configuration.
+                  </p>
+              </div>
+          </div>
+      </Modal>
 
       <Modal
         isOpen={isDeleteModalOpen}

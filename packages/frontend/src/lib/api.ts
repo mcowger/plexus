@@ -1478,24 +1478,25 @@ export const api = {
   },
 
   deleteAlias: async (aliasId: string): Promise<void> => {
-      const yamlStr = await api.getConfig();
-      let config: any;
-      try {
-          config = parse(yamlStr);
-      } catch (e) {
-          throw new Error('Failed to parse config');
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/models/${encodeURIComponent(aliasId)}`, {
+          method: 'DELETE'
+      });
+
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to delete alias');
       }
+  },
 
-      if (!config) config = {};
-      if (!config.models) config.models = {};
+  deleteAllAliases: async (): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/models`, {
+          method: 'DELETE'
+      });
 
-      // Delete the alias from the config
-      if (config.models[aliasId]) {
-          delete config.models[aliasId];
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to delete all aliases');
       }
-
-      const newYaml = stringify(config);
-      await api.saveConfig(newYaml);
   },
 
   getOAuthProviders: async (): Promise<OAuthProviderInfo[]> => {
