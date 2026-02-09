@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Usage } from './pages/Usage';
+import { Performance } from './pages/Performance';
 import { Logs } from './pages/Logs';
 import { Providers } from './pages/Providers';
 import { Models } from './pages/Models';
@@ -57,6 +58,7 @@ const AppRoutes = () => {
                         <Routes>
                             <Route path="/" element={<Dashboard />} />
                             <Route path="/usage" element={<Usage />} />
+                            <Route path="/performance" element={<Performance />} />
                             <Route path="/logs" element={<Logs />} />
                             <Route path="/providers" element={<Providers />} />
                             <Route path="/models" element={<Models />} />

@@ -42,6 +42,15 @@ export const Login: React.FC = () => {
         
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              defaultValue="admin"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+            />
             <div>
               <label htmlFor="adminKey" className="block text-sm font-medium text-text-muted mb-1">
                 Admin Key
@@ -49,6 +58,7 @@ export const Login: React.FC = () => {
               <Input
                 id="adminKey"
                 type="password"
+                autoComplete="current-password"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="sk-admin-..."

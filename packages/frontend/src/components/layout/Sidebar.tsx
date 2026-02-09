@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -65,9 +65,7 @@ export const Sidebar: React.FC = () => {
 
   useEffect(() => {
     const fetchQuotas = async () => {
-      console.log('[Sidebar] Fetching quotas...');
       const data = await api.getQuotas();
-      console.log('[Sidebar] Quotas data:', data);
       setQuotas(data);
     };
     fetchQuotas();
@@ -253,6 +251,7 @@ export const Sidebar: React.FC = () => {
               <>
                 <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
                 <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
+                <NavItem to="/performance" icon={Gauge} label="Performance" isCollapsed={isCollapsed} />
                 <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
               </>
             )}
