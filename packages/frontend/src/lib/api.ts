@@ -102,6 +102,19 @@ export interface PieChartDataPoint {
   [key: string]: string | number; // Index signature for recharts compatibility
 }
 
+export interface ProviderPerformanceData {
+  provider: string;
+  model: string;
+  avg_ttft_ms: number;
+  min_ttft_ms: number;
+  max_ttft_ms: number;
+  avg_tokens_per_sec: number;
+  min_tokens_per_sec: number;
+  max_tokens_per_sec: number;
+  sample_count: number;
+  last_updated: number;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -845,6 +858,43 @@ export const api = {
     } catch (e) {
         console.error("API Error getUsageByKey", e);
         return [];
+    }
+  },
+
+  getProviderPerformance: async (model?: string, provider?: string): Promise<ProviderPerformanceData[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (model) params.set('model', model);
+      if (provider) params.set('provider', provider);
+
+      const query = params.toString();
+      const url = `${API_BASE}/v0/management/performance${query ? `?${query}` : ''}`;
+
+      const res = await fetchWithAuth(url);
+      if (!res.ok) throw new Error('Failed to fetch provider performance');
+
+      const rawRows = await res.json() as Array<Record<string, unknown>>;
+
+      const toNumber = (value: unknown): number => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      return rawRows.map((row) => ({
+        provider: String(row.provider ?? ''),
+        model: String(row.model ?? ''),
+        avg_ttft_ms: toNumber(row.avg_ttft_ms),
+        min_ttft_ms: toNumber(row.min_ttft_ms),
+        max_ttft_ms: toNumber(row.max_ttft_ms),
+        avg_tokens_per_sec: toNumber(row.avg_tokens_per_sec),
+        min_tokens_per_sec: toNumber(row.min_tokens_per_sec),
+        max_tokens_per_sec: toNumber(row.max_tokens_per_sec),
+        sample_count: toNumber(row.sample_count),
+        last_updated: toNumber(row.last_updated)
+      }));
+    } catch (e) {
+      console.error('API Error getProviderPerformance', e);
+      return [];
     }
   },
 
