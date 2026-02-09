@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
+import { toBoolean, toIsoString } from '../../lib/normalize';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
@@ -150,12 +151,12 @@ export const Sidebar: React.FC = () => {
     const windows = Array.from(windowsByType.values()).map(snapshot => ({
       windowType: snapshot.windowType as any,
       windowLabel: snapshot.description || snapshot.windowType,
-      limit: snapshot.limit || undefined,
-      used: snapshot.used || undefined,
-      remaining: snapshot.remaining || undefined,
-      utilizationPercent: snapshot.utilizationPercent || 0,
+      limit: snapshot.limit ?? undefined,
+      used: snapshot.used ?? undefined,
+      remaining: snapshot.remaining ?? undefined,
+      utilizationPercent: snapshot.utilizationPercent ?? 0,
       unit: (snapshot.unit as any) || 'percentage',
-      resetsAt: snapshot.resetsAt ? new Date(snapshot.resetsAt).toISOString() : undefined,
+      resetsAt: toIsoString(snapshot.resetsAt) ?? undefined,
       resetInSeconds: snapshot.resetInSeconds !== null && snapshot.resetInSeconds !== undefined ? snapshot.resetInSeconds : undefined,
       status: (snapshot.status as any) || 'ok',
     }));
@@ -166,8 +167,8 @@ export const Sidebar: React.FC = () => {
       checkerId: firstSnapshot.checkerId,
       oauthAccountId: checker.oauthAccountId,
       oauthProvider: checker.oauthProvider,
-      checkedAt: new Date(firstSnapshot.checkedAt).toISOString(),
-      success: firstSnapshot.success === 1,
+      checkedAt: toIsoString(firstSnapshot.checkedAt) ?? new Date(0).toISOString(),
+      success: toBoolean(firstSnapshot.success),
       windows,
     };
   };

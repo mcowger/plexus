@@ -2,6 +2,17 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
+import { toBoolean, toIsoString } from '../../utils/normalize';
+
+function normalizeQuotaSnapshot(snapshot: any) {
+  return {
+    ...snapshot,
+    checkedAt: toIsoString(snapshot.checkedAt),
+    resetsAt: toIsoString(snapshot.resetsAt),
+    createdAt: toIsoString(snapshot.createdAt),
+    success: toBoolean(snapshot.success),
+  };
+}
 
 export async function registerQuotaRoutes(fastify: FastifyInstance, quotaScheduler: QuotaScheduler) {
   const config = getConfig();
@@ -44,7 +55,10 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
         }
       }
 
-      return results;
+      return results.map((result) => ({
+        ...result,
+        latest: Array.isArray(result.latest) ? result.latest.map(normalizeQuotaSnapshot) : [],
+      }));
     } catch (error) {
       logger.error(`Failed to get quotas: ${error}`);
       return reply.status(500).send({ error: 'Failed to retrieve quotas' });
@@ -55,7 +69,11 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
     try {
       const { checkerId } = request.params as { checkerId: string };
       const latest = await quotaScheduler.getLatestQuota(checkerId);
-      return { checkerId, latest, ...getOAuthMetadata(checkerId) };
+      return {
+        checkerId,
+        latest: latest.map(normalizeQuotaSnapshot),
+        ...getOAuthMetadata(checkerId),
+      };
     } catch (error) {
       logger.error(`Failed to get quota for '${(request.params as any).checkerId}': ${error}`);
       return reply.status(500).send({ error: 'Failed to retrieve quota data' });
@@ -78,7 +96,12 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
       }
 
       const history = await quotaScheduler.getQuotaHistory(checkerId, querystring.windowType, since);
-      return { checkerId, windowType: querystring.windowType, since: since ? new Date(since).toISOString() : undefined, history };
+      return {
+        checkerId,
+        windowType: querystring.windowType,
+        since: since ? new Date(since).toISOString() : undefined,
+        history: history.map(normalizeQuotaSnapshot),
+      };
     } catch (error) {
       logger.error(`Failed to get quota history for '${(request.params as any).checkerId}': ${error}`);
       return reply.status(500).send({ error: 'Failed to retrieve quota history' });

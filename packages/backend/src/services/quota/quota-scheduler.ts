@@ -2,6 +2,7 @@ import { logger } from '../../utils/logger';
 import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
 import { QuotaCheckerFactory } from './quota-checker-factory';
 import { QuotaEstimator } from './quota-estimator';
+import { toDbBoolean, toEpochMs } from '../../utils/normalize';
 import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
 import { and, eq, gte, desc } from 'drizzle-orm';
 
@@ -95,10 +96,9 @@ export class QuotaScheduler {
   private async persistResult(result: QuotaCheckResult): Promise<void> {
     const { db, schema } = this.ensureDb();
     const isSqlite = getCurrentDialect() === 'sqlite';
-    const toDbTimestamp = (value: Date | number | null | undefined) => {
-      if (value == null) return null;
-
-      const timestamp = value instanceof Date ? value.getTime() : value;
+    const toDbTimestamp = (value: Date | number | string | null | undefined) => {
+      const timestamp = toEpochMs(value);
+      if (timestamp == null) return null;
       return isSqlite ? new Date(timestamp) : timestamp;
     };
 
@@ -122,7 +122,7 @@ export class QuotaScheduler {
           resetsAt: null,
           status: null,
           description: 'Quota check failed',
-          success: 0,
+          success: toDbBoolean(false),
           errorMessage: result.error ?? 'Unknown quota check error',
           createdAt,
         });
@@ -149,7 +149,7 @@ export class QuotaScheduler {
               resetsAt: toDbTimestamp(window.resetsAt),
               status: window.status ?? null,
               description: window.description ?? null,
-              success: 1,
+              success: toDbBoolean(true),
               errorMessage: null,
               createdAt,
             });
@@ -177,7 +177,7 @@ export class QuotaScheduler {
               resetsAt: toDbTimestamp(window.resetsAt),
               status: window.status ?? null,
               description: window.description ?? null,
-              success: 1,
+               success: toDbBoolean(true),
               errorMessage: null,
               createdAt,
             });
@@ -223,7 +223,8 @@ export class QuotaScheduler {
       // Add resetInSeconds calculation and quota estimation
       const now = Date.now();
       return Array.from(latestByWindowType.values()).map(snapshot => {
-        const resetInSeconds = snapshot.resetsAt ? Math.max(0, Math.floor((snapshot.resetsAt - now) / 1000)) : null;
+        const resetsAtMs = toEpochMs(snapshot.resetsAt);
+        const resetInSeconds = resetsAtMs != null ? Math.max(0, Math.floor((resetsAtMs - now) / 1000)) : null;
         
         // Calculate estimation for this window type
         const estimation = QuotaEstimator.estimateUsageAtReset(
@@ -231,7 +232,7 @@ export class QuotaScheduler {
           snapshot.windowType,
           snapshot.used,
           snapshot.limit,
-          snapshot.resetsAt,
+            resetsAtMs,
           results // Pass all historical data
         );
         

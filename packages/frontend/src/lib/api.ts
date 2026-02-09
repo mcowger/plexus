@@ -1,5 +1,6 @@
 import { parse, stringify } from 'yaml';
 import { formatNumber } from './format';
+import { toBoolean, toIsoString } from './normalize';
 import type { QuotaCheckerInfo, QuotaSnapshot, QuotaCheckResult } from '../types/quota';
 
 const API_BASE = ''; // Proxied via server.ts
@@ -62,6 +63,35 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   }
   return res;
 };
+
+function normalizeQuotaSnapshot(snapshot: QuotaSnapshot): QuotaSnapshot {
+  return {
+    ...snapshot,
+    checkedAt: toIsoString(snapshot.checkedAt) ?? new Date(0).toISOString(),
+    resetsAt: toIsoString(snapshot.resetsAt),
+    createdAt: toIsoString(snapshot.createdAt) ?? new Date(0).toISOString(),
+    success: toBoolean(snapshot.success),
+  };
+}
+
+function normalizeQuotaCheckerInfo(checker: QuotaCheckerInfo): QuotaCheckerInfo {
+  return {
+    ...checker,
+    latest: Array.isArray(checker.latest) ? checker.latest.map(normalizeQuotaSnapshot) : [],
+  };
+}
+
+function normalizeQuotaCheckResult(result: QuotaCheckResult): QuotaCheckResult {
+  return {
+    ...result,
+    checkedAt: toIsoString(result.checkedAt) ?? new Date(0).toISOString(),
+    success: toBoolean(result.success),
+    windows: result.windows?.map((window) => ({
+      ...window,
+      resetsAt: window.resetsAt ? (toIsoString(window.resetsAt) ?? undefined) : undefined,
+    })),
+  };
+}
 
 export interface Stat {
   label: string;
@@ -1395,7 +1425,8 @@ export const api = {
       try {
           const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas`);
           if (!res.ok) throw new Error('Failed to fetch quotas');
-          return await res.json();
+          const json = await res.json() as QuotaCheckerInfo[];
+          return Array.isArray(json) ? json.map(normalizeQuotaCheckerInfo) : [];
       } catch (e) {
           console.error("API Error getQuotas", e);
           return [];
@@ -1406,7 +1437,8 @@ export const api = {
       try {
           const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/${checkerId}`);
           if (!res.ok) throw new Error('Failed to fetch quota');
-          return await res.json();
+          const json = await res.json() as QuotaCheckerInfo;
+          return normalizeQuotaCheckerInfo(json);
       } catch (e) {
           console.error("API Error getQuota", e);
           return null;
@@ -1420,7 +1452,11 @@ export const api = {
           if (since) params.set('since', since);
           const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/${checkerId}/history?${params}`);
           if (!res.ok) throw new Error('Failed to fetch quota history');
-          return await res.json();
+          const json = await res.json() as { checkerId: string; windowType?: string; since?: string; history: QuotaSnapshot[] };
+          return {
+            ...json,
+            history: Array.isArray(json.history) ? json.history.map(normalizeQuotaSnapshot) : [],
+          };
       } catch (e) {
           console.error("API Error getQuotaHistory", e);
           return null;
@@ -1433,7 +1469,8 @@ export const api = {
               method: 'POST'
           });
           if (!res.ok) throw new Error('Failed to trigger quota check');
-          return await res.json();
+          const json = await res.json() as QuotaCheckResult;
+          return normalizeQuotaCheckResult(json);
       } catch (e) {
           console.error("API Error triggerQuotaCheck", e);
           return null;
