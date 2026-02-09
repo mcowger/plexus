@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.13.3 - 2026-02-09
+
+### Normalize quota snapshot types across dialects
+
+## Changes
+
+- **Improvements**
+  - Normalize quota snapshot booleans and timestamps across dialects ([819d46f](https://github.com/mcowger/plexus/commit/819d46f))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.13.2 - 2026-02-09
 
 ### Add exploration mechanism to selectors
