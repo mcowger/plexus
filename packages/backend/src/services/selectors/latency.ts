@@ -2,6 +2,7 @@ import { Selector } from './base';
 import { ModelTarget } from '../../config';
 import { UsageStorageService } from '../usage-storage';
 import { logger } from '../../utils/logger';
+import { getConfig } from '../../config';
 
 export class LatencySelector extends Selector {
   private storage: UsageStorageService;
@@ -47,6 +48,19 @@ export class LatencySelector extends Selector {
     // If we have valid candidates, sort by TTFT ascending (lowest is best)
     if (validCandidates.length > 0) {
         validCandidates.sort((a, b) => a.avgTtft - b.avgTtft);
+
+        const config = getConfig();
+        const explorationRate = config.latencyExplorationRate ?? config.performanceExplorationRate ?? 0;
+
+        // If exploration rate is set and we have multiple candidates, occasionally explore
+        if (explorationRate > 0 && validCandidates.length > 1 && Math.random() < explorationRate) {
+            const explored = validCandidates[Math.floor(Math.random() * validCandidates.length)];
+            if (explored) {
+                logger.debug(`LatencySelector: Exploring alternative provider ${explored.target.provider}/${explored.target.model} with ${explored.avgTtft.toFixed(2)}ms TTFT (rate: ${(explorationRate * 100).toFixed(1)}%)`);
+                return explored.target;
+            }
+        }
+
         const best = validCandidates[0];
         if (best) {
             logger.debug(`LatencySelector: Selected ${best.target.provider}/${best.target.model} with ${best.avgTtft.toFixed(2)}ms TTFT`);

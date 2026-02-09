@@ -456,7 +456,41 @@ This is particularly useful when you have:
 
 - **`performance`**: Routes to the provider with the highest average throughput (tokens per second). Uses historical performance data collected from actual requests. Falls back to the first target if no performance data exists yet.
 
+  **Performance Exploration:** To prevent the performance selector from permanently favoring a single provider that happens to be faster, Plexus includes an exploration mechanism. With a configurable probability (`performanceExplorationRate`), the selector will randomly choose a different provider instead of the fastest one. This ensures all providers get a chance to demonstrate their performance over time, preventing the system from getting "stuck" on the initially fastest provider.
+
+  The exploration rate is configured globally in the `plexus.yaml` file:
+
+  ```yaml
+  performanceExplorationRate: 0.05  # 5% chance to explore
+  ```
+
+  - **Default**: `0.05` (5%)
+  - **Range**: `0.0` to `1.0` (0% to 100%)
+  - **Effect**: Higher values = more exploration (less likely to stick with fastest provider)
+  - **Use cases**:
+    - `0.0`: Always use fastest provider (no exploration)
+    - `0.05`: Default - explore occasionally to ensure fair testing
+    - `0.2`: More aggressive exploration for performance testing
+    - `0.5`: Randomly explore 50% of the time
+
 - **`latency`**: Routes to the provider with the lowest average time-to-first-token (TTFT). Uses historical latency data from actual requests. Defaults to the first target if all targets have no data.
+
+  **Latency Exploration:** Similar to the performance selector, the latency selector includes an exploration mechanism to prevent it from permanently favoring a single provider with the lowest TTFT. With a configurable probability (`latencyExplorationRate`), the selector will randomly choose a different provider instead of the one with lowest latency. This ensures all providers get a chance to demonstrate their latency characteristics over time.
+
+  The exploration rate is configured globally in the `plexus.yaml` file:
+
+  ```yaml
+  latencyExplorationRate: 0.05  # 5% chance to explore
+  ```
+
+  - **Default**: Falls back to `performanceExplorationRate` (which defaults to `0.05` or 5%)
+  - **Range**: `0.0` to `1.0` (0% to 100%)
+  - **Effect**: Higher values = more exploration (less likely to stick with lowest-latency provider)
+  - **Use cases**:
+    - `0.0`: Always use lowest-latency provider (no exploration)
+    - `0.05`: Default - explore occasionally to ensure fair testing
+    - `0.2`: More aggressive exploration for latency testing
+    - `0.5`: Randomly explore 50% of the time
 
 ### `keys`
 
