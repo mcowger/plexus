@@ -33,7 +33,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 config/plexus.yaml
-config/usage.sqlite
+config/*.db
+config/*.sqlite
+config/*.db*
 
 CLIProxyApi/
 llms/
