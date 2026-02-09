@@ -128,6 +128,8 @@ const PlexusConfigSchema = z.object({
   keys: z.record(z.string(), KeyConfigSchema),
   adminKey: z.string(),
   quotas: z.array(QuotaConfigSchema).optional().default([]),
+  performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
+  latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
 });
 
 export type PlexusConfig = z.infer<typeof PlexusConfigSchema>;

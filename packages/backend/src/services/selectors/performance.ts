@@ -1,5 +1,5 @@
 import { Selector } from './base';
-import { ModelTarget } from '../../config';
+import { ModelTarget, getConfig } from '../../config';
 import { UsageStorageService } from '../usage-storage';
 import { logger } from '../../utils/logger';
 
@@ -19,6 +19,10 @@ export class PerformanceSelector extends Selector {
     if (targets.length === 1) {
       return targets[0] ?? null;
     }
+
+    // Get exploration rate from config (default 5%)
+    const config = getConfig();
+    const explorationRate = config.performanceExplorationRate ?? 0.05;
 
     // If no performance data exists, we might want to fall back to random or first.
     // For now, let's assume we want to pick the one with highest known performance.
@@ -52,6 +56,17 @@ export class PerformanceSelector extends Selector {
             // If the best has 0 TPS (no data), and others also have 0, 
             // strictly speaking they are equal. The sort is stable or undefined for equals.
             // We pick the top one.
+
+            // Check if we should explore a different provider (randomly choose from non-best targets)
+            if (explorationRate > 0 && Math.random() < explorationRate && candidates.length > 1) {
+                const nonBestCandidates = candidates.slice(1);
+                const randomChoice = nonBestCandidates[Math.floor(Math.random() * nonBestCandidates.length)];
+                if (randomChoice) {
+                    logger.debug(`PerformanceSelector: Exploring - selected ${randomChoice.target.provider}/${randomChoice.target.model} with ${randomChoice.tps.toFixed(2)} TPS (instead of ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS)`);
+                    return randomChoice.target;
+                }
+            }
+
             logger.debug(`PerformanceSelector: Selected ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS`);
             return best.target;
         }
