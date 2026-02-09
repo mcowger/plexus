@@ -3,6 +3,7 @@ import { clsx } from 'clsx';
 import { Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
 import { formatDuration } from '../../lib/format';
+import { Tooltip } from '../ui/Tooltip';
 
 interface ClaudeCodeQuotaDisplayProps {
   result: QuotaCheckResult;
@@ -13,16 +14,39 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
   result,
   isCollapsed,
 }) => {
+  const getErrorTooltipContent = () => {
+    const fallback = result.oauthProvider
+      ? `Claude quota check failed. Re-authenticate the '${result.oauthProvider}' OAuth provider and retry.`
+      : 'Claude quota check failed. Retry the check or verify your provider authentication.';
+
+    const message = result.error?.trim() || fallback;
+    const isOAuthError = /oauth|not authenticated|login/i.test(message);
+
+    return (
+      <div className="max-w-[320px] whitespace-normal leading-snug">
+        <div className="font-semibold text-text">Quota check failed</div>
+        <div className="mt-1 text-text-muted">{message}</div>
+        {isOAuthError && result.oauthProvider && (
+          <div className="mt-1 text-text-secondary">
+            Next step: run OAuth login for provider '{result.oauthProvider}'.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!result.success) {
     return (
       <div className="px-2 py-2">
-        <div className={clsx(
-          "flex items-center gap-2 text-danger",
-          isCollapsed && "justify-center"
-        )}>
-          <AlertTriangle size={16} />
-          {!isCollapsed && <span className="text-xs">Error</span>}
-        </div>
+        <Tooltip content={getErrorTooltipContent()} position="right">
+          <div className={clsx(
+            "flex items-center gap-2 text-danger cursor-help",
+            isCollapsed && "justify-center"
+          )}>
+            <AlertTriangle size={16} />
+            {!isCollapsed && <span className="text-xs">Error</span>}
+          </div>
+        </Tooltip>
       </div>
     );
   }

@@ -162,6 +162,7 @@ export const Sidebar: React.FC = () => {
     }));
     
     const firstSnapshot = checker.latest[0];
+    const errorFromSnapshots = checker.latest.find((snapshot) => snapshot.errorMessage)?.errorMessage || undefined;
     return {
       provider: firstSnapshot.provider,
       checkerId: firstSnapshot.checkerId,
@@ -169,6 +170,7 @@ export const Sidebar: React.FC = () => {
       oauthProvider: checker.oauthProvider,
       checkedAt: toIsoString(firstSnapshot.checkedAt) ?? new Date(0).toISOString(),
       success: toBoolean(firstSnapshot.success),
+      error: errorFromSnapshots,
       windows,
     };
   };
