@@ -68,6 +68,15 @@ quotas:
     options:
       apiKey: syn_your_api_key
 
+  - id: nanogpt-main
+    type: nanogpt
+    provider: nanogpt
+    enabled: true
+    intervalMinutes: 30
+    options:
+      apiKey: nanogpt_your_api_key
+      # endpoint: https://nano-gpt.com/api/subscription/v1/usage
+
 providers:
   # Standard OpenAI Configuration
   # API type is automatically inferred as 'chat' from the URL

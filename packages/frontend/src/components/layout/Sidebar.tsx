@@ -9,7 +9,13 @@ import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
-import { SyntheticQuotaDisplay, ClaudeCodeQuotaDisplay, NagaQuotaDisplay, OpenAICodexQuotaDisplay } from '../quota';
+import {
+  SyntheticQuotaDisplay,
+  ClaudeCodeQuotaDisplay,
+  NagaQuotaDisplay,
+  OpenAICodexQuotaDisplay,
+  NanoGPTQuotaDisplay,
+} from '../quota';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
 
@@ -326,6 +332,17 @@ export const Sidebar: React.FC = () => {
                       if (quota.checkerId.includes('naga')) {
                         return (
                           <NagaQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+
+                      // Use NanoGPT display for nanogpt checkers
+                      if (quota.checkerId.includes('nanogpt')) {
+                        return (
+                          <NanoGPTQuotaDisplay
                             key={quota.checkerId}
                             result={result}
                             isCollapsed={isCollapsed}
