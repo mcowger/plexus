@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.13.4 - 2026-02-11
+
+### v0.13.4: Quotas UI integration, implicit OAuth quota visibility, and model alias deletion APIs
+
+## Main features
+
+- Added a new **Quotas UI on the Providers page** to configure **Synthetic** and **Naga** quota checkers ([9936c44](https://github.com/mcowger/plexus/commit/9936c44)).
+- Implemented **management APIs for model alias deletion**, expanding alias lifecycle administration capabilities ([65fa9e9](https://github.com/mcowger/plexus/commit/65fa9e9)).
+
+## Smaller improvements and fixes
+
+- Quotas UI now shows **implicit OAuth quota checkers as read-only rows**, improving visibility while preserving constraints for non-editable quota sources ([a7ef05e](https://github.com/mcowger/plexus/commit/a7ef05e)).
+- Improved **Claude quota error feedback** with a more actionable tooltip to help users resolve quota issues faster ([200dfc7](https://github.com/mcowger/plexus/commit/200dfc7)).
+- Updated `.gitignore` housekeeping ([027b3e7](https://github.com/mcowger/plexus/commit/027b3e7)).
+
+Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.13.3 - 2026-02-09
 
 ### Normalize quota snapshot types across dialects
