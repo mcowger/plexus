@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.13.5 - 2026-02-11
+
+### v0.13.5: Performance page multi-target bar rendering fix
+
+### Main change
+- Fixed performance visualization for providers with multiple targets so each target now renders as a separate bar ([db98e18](https://github.com/mcowger/plexus/commit/db98e18)).
+
+### Smaller changes
+- No additional commits in this release.
+
+Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.13.4 - 2026-02-11
 
 ### v0.13.4: Quotas UI integration, implicit OAuth quota visibility, and model alias deletion APIs
