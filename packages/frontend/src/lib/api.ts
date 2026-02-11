@@ -583,7 +583,7 @@ export interface KeyConfig {
 
 export interface QuotaConfig {
     id: string;
-    type: 'synthetic' | 'naga' | 'codex' | 'claude-code';
+    type: 'synthetic' | 'naga' | 'nanogpt' | 'codex' | 'claude-code';
     provider: string;
     enabled: boolean;
     intervalMinutes: number;

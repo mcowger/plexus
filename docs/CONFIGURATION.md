@@ -632,7 +632,7 @@ This section configures quota checkers that monitor provider rate limits and quo
 ```yaml
 quotas:
   - id: checker-name                    # Unique identifier
-    type: synthetic | naga  # Checker type
+    type: synthetic | naga | nanogpt    # Checker type
     provider: provider-key               # Provider name to associate with
     enabled: true                       # Enable/disable this checker
     intervalMinutes: 30                 # Check frequency in minutes
@@ -693,6 +693,29 @@ Checks Naga account balance and maps it to a subscription-style quota window.
 **Required Options:**
 - `apiKey`: Naga API key
 - `max`: Maximum account balance for utilization calculation
+
+#### `nanogpt`
+
+Checks NanoGPT subscription usage for daily and monthly usage windows.
+
+**Required Options:**
+- `apiKey`: NanoGPT API key
+
+**Optional Options:**
+- `endpoint`: Override the default API endpoint (default: `https://nano-gpt.com/api/subscription/v1/usage`)
+
+**Example:**
+```yaml
+quotas:
+  - id: nanogpt-main
+    type: nanogpt
+    provider: nanogpt
+    enabled: true
+    intervalMinutes: 30
+    options:
+      apiKey: ngpt_your_api_key
+      # endpoint: https://nano-gpt.com/api/subscription/v1/usage
+```
 
 **Quota Monitoring API:**
 

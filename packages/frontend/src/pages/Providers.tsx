@@ -244,7 +244,12 @@ export const Providers = () => {
           .filter(checker => !explicitIds.has(checker.checkerId) && (checker.oauthProvider || checker.oauthAccountId))
           .map(checker => ({
             id: checker.checkerId,
-            type: checker.checkerId.startsWith('codex-') ? 'codex' as const : 'claude-code' as const,
+            type:
+              checker.checkerId.includes('codex')
+                ? 'codex' as const
+                : checker.checkerId.includes('nanogpt')
+                ? 'nanogpt' as const
+                : 'claude-code' as const,
             provider: checker.checkerId,
             enabled: true,
             intervalMinutes: 30,
@@ -831,7 +836,15 @@ export const Providers = () => {
                                   <Badge
                                     status="connected"
                                     style={{
-                                      backgroundColor: q.type === 'naga' ? '#8b5cf6' : q.type === 'codex' ? '#10b981' : q.type === 'claude-code' ? '#D97757' : '#06b6d4',
+                                      backgroundColor: q.type === 'naga'
+                                        ? '#8b5cf6'
+                                        : q.type === 'codex'
+                                        ? '#10b981'
+                                        : q.type === 'claude-code'
+                                        ? '#D97757'
+                                        : q.type === 'nanogpt'
+                                        ? '#06b6d4'
+                                        : '#06b6d4',
                                       color: 'white',
                                       border: 'none',
                                       fontSize: '10px',
@@ -1761,22 +1774,31 @@ export const Providers = () => {
       >
         <div style={{display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '-8px'}}>
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end'}}>
-            <Input
-              label="Unique ID"
-              value={editingQuota?.id || ''}
-              onChange={(e) => setEditingQuota({ ...editingQuota!, id: e.target.value })}
-              placeholder="e.g. synthetic-main"
-              disabled={!!originalQuotaId}
-            />
+              <Input
+                label="Unique ID"
+                value={editingQuota?.id || ''}
+                onChange={(e) => setEditingQuota({ ...editingQuota!, id: e.target.value })}
+                placeholder={editingQuota?.type === 'naga'
+                  ? 'e.g. naga-main'
+                  : editingQuota?.type === 'nanogpt'
+                  ? 'e.g. nanogpt-main'
+                  : 'e.g. synthetic-main'}
+                disabled={!!originalQuotaId}
+              />
             <div className="flex flex-col gap-1">
               <label className="font-body text-[13px] font-medium text-text-secondary">Type</label>
               <select
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                 value={editingQuota?.type || 'synthetic'}
-                onChange={(e) => setEditingQuota({ ...editingQuota!, type: e.target.value as 'synthetic' | 'naga' })}
+                onChange={(e) => setEditingQuota({
+                  ...editingQuota!,
+                  type: e.target.value as QuotaConfig['type'],
+                  provider: editingQuota?.provider || (e.target.value as QuotaConfig['type'])
+                })}
               >
                 <option value="synthetic">Synthetic</option>
                 <option value="naga">Naga</option>
+                <option value="nanogpt">NanoGPT</option>
               </select>
             </div>
             <div className="flex flex-col gap-2">
@@ -1795,7 +1817,11 @@ export const Providers = () => {
               label="Provider ID"
               value={editingQuota?.provider || ''}
               onChange={(e) => setEditingQuota({ ...editingQuota!, provider: e.target.value })}
-              placeholder="e.g. synthetic"
+              placeholder={editingQuota?.type === 'naga'
+                ? 'e.g. naga'
+                : editingQuota?.type === 'nanogpt'
+                ? 'e.g. nanogpt'
+                : 'e.g. synthetic'}
             />
             <Input
               label="Check Interval (minutes)"
@@ -1819,7 +1845,9 @@ export const Providers = () => {
                 ...editingQuota!,
                 options: { ...editingQuota?.options, apiKey: e.target.value }
               })}
-              placeholder="Bearer token for API authentication"
+              placeholder={editingQuota?.type === 'nanogpt'
+                ? 'NanoGPT API key'
+                : 'Bearer token for API authentication'}
             />
 
             {editingQuota?.type === 'naga' && (
@@ -1843,14 +1871,18 @@ export const Providers = () => {
                 ...editingQuota!,
                 options: { ...editingQuota?.options, endpoint: e.target.value || undefined }
               })}
-              placeholder={editingQuota?.type === 'naga' 
-                ? "Default: https://api.naga.ac/v1/account/balance"
-                : "Default: https://api.synthetic.new/v2/quotas"}
+              placeholder={editingQuota?.type === 'naga'
+                ? 'Default: https://api.naga.ac/v1/account/balance'
+                : editingQuota?.type === 'nanogpt'
+                ? 'Default: https://nano-gpt.com/api/subscription/v1/usage'
+                : 'Default: https://api.synthetic.new/v2/quotas'}
             />
 
             <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', marginTop: '4px'}}>
-              {editingQuota?.type === 'naga' 
+              {editingQuota?.type === 'naga'
                 ? <><Info size={12} className="inline mb-0.5 mr-1" />Naga checks account balance against the max limit.</>
+                : editingQuota?.type === 'nanogpt'
+                ? <><Info size={12} className="inline mb-0.5 mr-1" />NanoGPT checks subscription usage windows for daily and monthly request quotas.</>
                 : <><Info size={12} className="inline mb-0.5 mr-1" />Synthetic checks subscription dollars, hourly and daily request quotas.</>}
             </div>
           </div>

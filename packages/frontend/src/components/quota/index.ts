@@ -3,3 +3,4 @@ export { SyntheticQuotaDisplay } from './SyntheticQuotaDisplay';
 export { ClaudeCodeQuotaDisplay } from './ClaudeCodeQuotaDisplay';
 export { NagaQuotaDisplay } from './NagaQuotaDisplay';
 export { OpenAICodexQuotaDisplay } from './OpenAICodexQuotaDisplay';
+export { NanoGPTQuotaDisplay } from './NanoGPTQuotaDisplay';
