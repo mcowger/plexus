@@ -582,7 +582,7 @@ export interface KeyConfig {
 
 export interface QuotaConfig {
     id: string;
-    type: 'synthetic' | 'naga';
+    type: 'synthetic' | 'naga' | 'codex' | 'claude-code';
     provider: string;
     enabled: boolean;
     intervalMinutes: number;
@@ -590,7 +590,10 @@ export interface QuotaConfig {
         apiKey?: string;
         endpoint?: string;
         max?: number;
+        oauthProvider?: string;
+        oauthAccountId?: string;
     };
+    implicit?: boolean;
 }
 
 export interface OAuthProviderInfo {

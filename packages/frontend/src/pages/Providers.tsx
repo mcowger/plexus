@@ -231,12 +231,31 @@ export const Providers = () => {
 
   const loadData = async () => {
     try {
-        const [p, q] = await Promise.all([
+        const [p, configQuotas, allQuotaCheckers] = await Promise.all([
           api.getProviders(),
-          api.getConfigQuotas()
+          api.getConfigQuotas(),
+          api.getQuotas()
         ]);
         setProviders(p);
-        setQuotas(q);
+        
+        // Merge explicit config quotas with implicit OAuth quotas
+        const explicitIds = new Set(configQuotas.map(q => q.id));
+        const implicitQuotas: QuotaConfig[] = allQuotaCheckers
+          .filter(checker => !explicitIds.has(checker.checkerId) && (checker.oauthProvider || checker.oauthAccountId))
+          .map(checker => ({
+            id: checker.checkerId,
+            type: checker.checkerId.startsWith('codex-') ? 'codex' as const : 'claude-code' as const,
+            provider: checker.checkerId,
+            enabled: true,
+            intervalMinutes: 30,
+            options: {
+              oauthProvider: checker.oauthProvider,
+              oauthAccountId: checker.oauthAccountId
+            },
+            implicit: true
+          }));
+        
+        setQuotas([...configQuotas, ...implicitQuotas]);
     } catch (e) {
         console.error("Failed to load data", e);
     }
@@ -786,18 +805,33 @@ export const Providers = () => {
                   </thead>
                   <tbody>
                       {quotas.map(q => (
-                          <tr key={q.id} onClick={() => handleEditQuota(q)} style={{cursor: 'pointer'}} className="hover:bg-bg-hover">
+                          <tr key={q.id} onClick={q.implicit ? undefined : () => handleEditQuota(q)} style={{cursor: q.implicit ? 'default' : 'pointer', opacity: q.implicit ? 0.7 : 1}} className={q.implicit ? '' : 'hover:bg-bg-hover'}>
                               <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingLeft: '24px'}}>
                                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                      <Edit2 size={12} style={{opacity: 0.5}} />
+                                      {!q.implicit && <Edit2 size={12} style={{opacity: 0.5}} />}
                                       <div style={{fontWeight: 600}}>{q.id}</div>
+                                      {q.implicit && (
+                                        <Badge
+                                          status="neutral"
+                                          style={{
+                                            backgroundColor: '#6b7280',
+                                            color: 'white',
+                                            border: 'none',
+                                            fontSize: '9px',
+                                            padding: '1px 6px'
+                                          }}
+                                          className="[&_.connection-dot]:hidden"
+                                        >
+                                          auto
+                                        </Badge>
+                                      )}
                                   </div>
                               </td>
                               <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                                   <Badge
                                     status="connected"
                                     style={{
-                                      backgroundColor: q.type === 'naga' ? '#8b5cf6' : '#06b6d4',
+                                      backgroundColor: q.type === 'naga' ? '#8b5cf6' : q.type === 'codex' ? '#10b981' : q.type === 'claude-code' ? '#D97757' : '#06b6d4',
                                       color: 'white',
                                       border: 'none',
                                       fontSize: '10px',
@@ -815,22 +849,28 @@ export const Providers = () => {
                                   {q.intervalMinutes}m
                               </td>
                               <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                                  <div onClick={(e) => e.stopPropagation()}>
-                                      <Switch
-                                        checked={q.enabled !== false}
-                                        onChange={(val) => {
-                                          const updated = quotas.map(x => x.id === q.id ? { ...x, enabled: val } : x);
-                                          setQuotas(updated);
-                                          api.saveConfigQuota({ ...q, enabled: val }, q.id);
-                                        }}
-                                        size="sm"
-                                      />
-                                  </div>
+                                  {q.implicit ? (
+                                    <span className="text-text-secondary text-[11px]">Always enabled</span>
+                                  ) : (
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <Switch
+                                          checked={q.enabled !== false}
+                                          onChange={(val) => {
+                                            const updated = quotas.map(x => x.id === q.id ? { ...x, enabled: val } : x);
+                                            setQuotas(updated);
+                                            api.saveConfigQuota({ ...q, enabled: val }, q.id);
+                                          }}
+                                          size="sm"
+                                        />
+                                    </div>
+                                  )}
                               </td>
                               <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
-                                  <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
-                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteQuota(q.id); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
-                                  </div>
+                                  {!q.implicit && (
+                                    <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteQuota(q.id); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
+                                    </div>
+                                  )}
                               </td>
                           </tr>
                       ))}
