@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Provider, OAuthSession } from '../lib/api';
+import { api, Provider, OAuthSession, QuotaConfig } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -217,6 +217,12 @@ export const Providers = () => {
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const [quotas, setQuotas] = useState<QuotaConfig[]>([]);
+  const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
+  const [editingQuota, setEditingQuota] = useState<QuotaConfig | null>(null);
+  const [originalQuotaId, setOriginalQuotaId] = useState<string | null>(null);
+  const [isSavingQuota, setIsSavingQuota] = useState(false);
+
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 10000);
@@ -225,8 +231,12 @@ export const Providers = () => {
 
   const loadData = async () => {
     try {
-        const p = await api.getProviders();
+        const [p, q] = await Promise.all([
+          api.getProviders(),
+          api.getConfigQuotas()
+        ]);
         setProviders(p);
+        setQuotas(q);
     } catch (e) {
         console.error("Failed to load data", e);
     }
@@ -415,6 +425,69 @@ export const Providers = () => {
           alert("Failed to update provider status: " + e);
           loadData();
       }
+  };
+
+  const EMPTY_QUOTA: QuotaConfig = {
+    id: '',
+    type: 'synthetic',
+    provider: '',
+    enabled: true,
+    intervalMinutes: 30,
+    options: {}
+  };
+
+  const handleAddQuota = () => {
+    setOriginalQuotaId(null);
+    setEditingQuota({ ...EMPTY_QUOTA });
+    setIsQuotaModalOpen(true);
+  };
+
+  const handleEditQuota = (quota: QuotaConfig) => {
+    setOriginalQuotaId(quota.id);
+    setEditingQuota({ ...quota, options: { ...quota.options } });
+    setIsQuotaModalOpen(true);
+  };
+
+  const handleDeleteQuota = async (id: string) => {
+    if (confirm(`Are you sure you want to delete quota "${id}"?`)) {
+      try {
+        await api.deleteConfigQuota(id);
+        await loadData();
+      } catch (e) {
+        alert("Failed to delete quota: " + e);
+      }
+    }
+  };
+
+  const handleSaveQuota = async () => {
+    if (!editingQuota?.id) {
+      alert("Quota ID is required");
+      return;
+    }
+    if (!editingQuota.provider) {
+      alert("Provider is required");
+      return;
+    }
+    if (!editingQuota.options?.apiKey) {
+      alert("API Key is required");
+      return;
+    }
+    if (editingQuota.type === 'naga' && !editingQuota.options?.max) {
+      alert("Max balance is required for Naga quotas");
+      return;
+    }
+
+    setIsSavingQuota(true);
+    try {
+      await api.saveConfigQuota(editingQuota, originalQuotaId || undefined);
+      await loadData();
+      setIsQuotaModalOpen(false);
+    } catch (e) {
+      console.error("Save quota error", e);
+      alert("Failed to save quota: " + e);
+    } finally {
+      setIsSavingQuota(false);
+    }
   };
 
   const updateApiUrl = (apiType: string, url: string) => {
@@ -635,17 +708,10 @@ export const Providers = () => {
 
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
-      <div className="mb-8">
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <div>
-                <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Providers</h1>
-                <p className="text-[15px] text-text-secondary m-0">Manage AI provider integrations.</p>
-            </div>
-            <Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Provider</Button>
-        </div>
-      </div>
-
-      <Card title="Active Providers">
+      <Card 
+        title="Configured Providers"
+        extra={<Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add Provider</Button>}
+      >
           <div className="overflow-x-auto -m-6">
               <table className="w-full border-collapse font-body text-[13px]">
                   <thead>
@@ -700,6 +766,85 @@ export const Providers = () => {
               </table>
           </div>
       </Card>
+
+      <Card 
+        title="Quotas" 
+        className="mt-6"
+        extra={<Button leftIcon={<Plus size={16}/>} onClick={handleAddQuota}>Add Quota</Button>}
+      >
+           <div className="overflow-x-auto -m-6">
+               <table className="w-full border-collapse font-body text-[13px]">
+                  <thead>
+                      <tr>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>ID</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Type</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Provider</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Interval</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {quotas.map(q => (
+                          <tr key={q.id} onClick={() => handleEditQuota(q)} style={{cursor: 'pointer'}} className="hover:bg-bg-hover">
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingLeft: '24px'}}>
+                                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                      <Edit2 size={12} style={{opacity: 0.5}} />
+                                      <div style={{fontWeight: 600}}>{q.id}</div>
+                                  </div>
+                              </td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                  <Badge
+                                    status="connected"
+                                    style={{
+                                      backgroundColor: q.type === 'naga' ? '#8b5cf6' : '#06b6d4',
+                                      color: 'white',
+                                      border: 'none',
+                                      fontSize: '10px',
+                                      padding: '2px 8px'
+                                    }}
+                                    className="[&_.connection-dot]:hidden"
+                                  >
+                                    {q.type}
+                                  </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                  {q.provider}
+                              </td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                  {q.intervalMinutes}m
+                              </td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                      <Switch
+                                        checked={q.enabled !== false}
+                                        onChange={(val) => {
+                                          const updated = quotas.map(x => x.id === q.id ? { ...x, enabled: val } : x);
+                                          setQuotas(updated);
+                                          api.saveConfigQuota({ ...q, enabled: val }, q.id);
+                                        }}
+                                        size="sm"
+                                      />
+                                  </div>
+                              </td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
+                                  <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteQuota(q.id); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
+                                  </div>
+                              </td>
+                          </tr>
+                      ))}
+                      {quotas.length === 0 && (
+                          <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-text-secondary text-[13px]">
+                                  No quota checkers configured. Click "Add Quota" to add one.
+                              </td>
+                          </tr>
+                      )}
+                   </tbody>
+               </table>
+           </div>
+       </Card>
 
       <Modal
         isOpen={isModalOpen}
@@ -1559,6 +1704,116 @@ export const Providers = () => {
                 : 'Enter a URL and click Fetch to load available models'}
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isQuotaModalOpen}
+        onClose={() => setIsQuotaModalOpen(false)}
+        title={originalQuotaId ? `Edit Quota: ${originalQuotaId}` : "Add Quota"}
+        size="md"
+        footer={
+          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
+            <Button variant="ghost" onClick={() => setIsQuotaModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveQuota} isLoading={isSavingQuota}>Save Quota</Button>
+          </div>
+        }
+      >
+        <div style={{display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '-8px'}}>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end'}}>
+            <Input
+              label="Unique ID"
+              value={editingQuota?.id || ''}
+              onChange={(e) => setEditingQuota({ ...editingQuota!, id: e.target.value })}
+              placeholder="e.g. synthetic-main"
+              disabled={!!originalQuotaId}
+            />
+            <div className="flex flex-col gap-1">
+              <label className="font-body text-[13px] font-medium text-text-secondary">Type</label>
+              <select
+                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                value={editingQuota?.type || 'synthetic'}
+                onChange={(e) => setEditingQuota({ ...editingQuota!, type: e.target.value as 'synthetic' | 'naga' })}
+              >
+                <option value="synthetic">Synthetic</option>
+                <option value="naga">Naga</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-body text-[13px] font-medium text-text-secondary">Enabled</label>
+              <div style={{height: '38px', display: 'flex', alignItems: 'center'}}>
+                <Switch
+                  checked={editingQuota?.enabled !== false}
+                  onChange={(checked) => setEditingQuota({ ...editingQuota!, enabled: checked })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
+            <Input
+              label="Provider ID"
+              value={editingQuota?.provider || ''}
+              onChange={(e) => setEditingQuota({ ...editingQuota!, provider: e.target.value })}
+              placeholder="e.g. synthetic"
+            />
+            <Input
+              label="Check Interval (minutes)"
+              type="number"
+              min={1}
+              value={editingQuota?.intervalMinutes || 30}
+              onChange={(e) => setEditingQuota({ ...editingQuota!, intervalMinutes: parseInt(e.target.value) || 30 })}
+            />
+          </div>
+
+          <div style={{height: '1px', background: 'var(--color-border-glass)', margin: '4px 0'}} />
+
+          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+            <label className="font-body text-[13px] font-medium text-text">Options</label>
+            
+            <Input
+              label="API Key"
+              type="password"
+              value={editingQuota?.options?.apiKey || ''}
+              onChange={(e) => setEditingQuota({
+                ...editingQuota!,
+                options: { ...editingQuota?.options, apiKey: e.target.value }
+              })}
+              placeholder="Bearer token for API authentication"
+            />
+
+            {editingQuota?.type === 'naga' && (
+              <Input
+                label="Max Balance"
+                type="number"
+                min={1}
+                value={editingQuota?.options?.max || ''}
+                onChange={(e) => setEditingQuota({
+                  ...editingQuota!,
+                  options: { ...editingQuota?.options, max: parseInt(e.target.value) || undefined }
+                })}
+                placeholder="Maximum balance limit"
+              />
+            )}
+
+            <Input
+              label="Custom Endpoint (optional)"
+              value={editingQuota?.options?.endpoint || ''}
+              onChange={(e) => setEditingQuota({
+                ...editingQuota!,
+                options: { ...editingQuota?.options, endpoint: e.target.value || undefined }
+              })}
+              placeholder={editingQuota?.type === 'naga' 
+                ? "Default: https://api.naga.ac/v1/account/balance"
+                : "Default: https://api.synthetic.new/v2/quotas"}
+            />
+
+            <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', marginTop: '4px'}}>
+              {editingQuota?.type === 'naga' 
+                ? <><Info size={12} className="inline mb-0.5 mr-1" />Naga checks account balance against the max limit.</>
+                : <><Info size={12} className="inline mb-0.5 mr-1" />Synthetic checks subscription dollars, hourly and daily request quotas.</>}
+            </div>
+          </div>
         </div>
       </Modal>
     </div>
