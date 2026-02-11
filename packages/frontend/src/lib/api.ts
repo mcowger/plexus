@@ -571,12 +571,26 @@ interface PlexusConfig {
     }>;
     models?: Record<string, any>;
     keys?: Record<string, KeyConfig>;
+    quotas?: QuotaConfig[];
 }
 
 export interface KeyConfig {
     key: string; // The user-facing alias/name for the key (e.g. 'my-app')
     secret: string; // The actual sk-uuid
     comment?: string;
+}
+
+export interface QuotaConfig {
+    id: string;
+    type: 'synthetic' | 'naga';
+    provider: string;
+    enabled: boolean;
+    intervalMinutes: number;
+    options: {
+        apiKey?: string;
+        endpoint?: string;
+        max?: number;
+    };
 }
 
 export interface OAuthProviderInfo {
@@ -1580,5 +1594,59 @@ export const api = {
       }
       const json = await res.json() as { data: OAuthSession };
       return json.data;
+  },
+
+  getConfigQuotas: async (): Promise<QuotaConfig[]> => {
+      try {
+          const yamlStr = await api.getConfig();
+          const config = parse(yamlStr) as PlexusConfig;
+          return config.quotas || [];
+      } catch (e) {
+          console.error("API Error getConfigQuotas", e);
+          return [];
+      }
+  },
+
+  saveConfigQuota: async (quota: QuotaConfig, oldId?: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          config = { providers: {}, models: {} };
+      }
+
+      if (!config) config = {};
+      if (!config.quotas) config.quotas = [];
+
+      if (oldId && oldId !== quota.id) {
+          config.quotas = config.quotas.filter((q: QuotaConfig) => q.id !== oldId);
+      }
+
+      const existingIdx = config.quotas.findIndex((q: QuotaConfig) => q.id === quota.id);
+      if (existingIdx >= 0) {
+          config.quotas[existingIdx] = quota;
+      } else {
+          config.quotas.push(quota);
+      }
+
+      const newYaml = stringify(config);
+      await api.saveConfig(newYaml);
+  },
+
+  deleteConfigQuota: async (quotaId: string): Promise<void> => {
+      const yamlStr = await api.getConfig();
+      let config: any;
+      try {
+          config = parse(yamlStr);
+      } catch (e) {
+          return;
+      }
+
+      if (config && config.quotas) {
+          config.quotas = config.quotas.filter((q: QuotaConfig) => q.id !== quotaId);
+          const newYaml = stringify(config);
+          await api.saveConfig(newYaml);
+      }
   }
 };
