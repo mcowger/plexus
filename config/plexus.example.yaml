@@ -56,27 +56,6 @@
 # [REQUIRED] Admin Key for Dashboard and Management API Access
 adminKey: "change-me-to-a-secure-admin-password"
 
-# [OPTIONAL] Quota checker configuration
-# OAuth-backed quota checkers (Codex + Claude Code) are implicit for providers
-# with oauth_provider set to openai-codex or anthropic.
-quotas:
-  - id: synthetic-main
-    type: synthetic
-    provider: synthetic
-    enabled: true
-    intervalMinutes: 30
-    options:
-      apiKey: syn_your_api_key
-
-  - id: nanogpt-main
-    type: nanogpt
-    provider: nanogpt
-    enabled: true
-    intervalMinutes: 30
-    options:
-      apiKey: nanogpt_your_api_key
-      # endpoint: https://nano-gpt.com/api/subscription/v1/usage
-
 providers:
   # Standard OpenAI Configuration
   # API type is automatically inferred as 'chat' from the URL
@@ -118,6 +97,12 @@ providers:
     display_name: Anthropic Claude (OAuth)
     api_base_url: oauth://
     api_key: oauth
+    oauth_provider: anthropic
+    oauth_account: work
+    quota_checker:
+      type: claude-code
+      enabled: true
+      intervalMinutes: 10
     models:
       - claude-3-5-sonnet-20241022
       - claude-3-5-haiku-20241022
@@ -130,6 +115,10 @@ providers:
     api_key: oauth
     oauth_provider: openai-codex
     oauth_account: work
+    quota_checker:
+      type: openai-codex
+      enabled: true
+      intervalMinutes: 10
     models:
       - gpt-5-mini
       - gpt-5
@@ -237,6 +226,10 @@ providers:
       chat: https://api.synthetic.new/openai/v1
       messages: https://api.synthetic.new/messages/v1
     api_key: "your-synthetic-key"
+    quota_checker:
+      type: synthetic
+      enabled: true
+      intervalMinutes: 30
     models:
       # This model can be accessed via both formats
       "hf:MiniMaxAI/MiniMax-M2.1":

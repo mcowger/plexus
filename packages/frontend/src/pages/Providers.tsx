@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Provider, OAuthSession, QuotaConfig } from '../lib/api';
+import { api, Provider, OAuthSession } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -19,6 +19,16 @@ const OAUTH_PROVIDERS = [
   { value: 'google-antigravity', label: 'Antigravity (Gemini 3, Claude, GPT-OSS)' },
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
+
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code'] as const;
+const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
+
+const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
+  if (!oauthProvider) return null;
+  if (oauthProvider === 'openai-codex') return 'openai-codex';
+  if (oauthProvider === 'anthropic' || oauthProvider === 'claude-code') return 'claude-code';
+  return null;
+};
 
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
     switch (apiType.toLowerCase()) {
@@ -190,6 +200,19 @@ export const Providers = () => {
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
     editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
+  const forcedOAuthQuotaCheckerType = isOAuthMode
+    ? getForcedOAuthQuotaCheckerType(editingProvider.oauthProvider)
+    : null;
+  const selectableQuotaCheckerTypes = forcedOAuthQuotaCheckerType
+    ? [forcedOAuthQuotaCheckerType]
+    : isOAuthMode
+      ? QUOTA_CHECKER_TYPES.filter((type) => type !== 'openai-codex' && type !== 'claude-code')
+      : QUOTA_CHECKER_TYPES.filter((type) => type !== 'openai-codex' && type !== 'claude-code');
+  const selectedQuotaCheckerType = forcedOAuthQuotaCheckerType
+    ? forcedOAuthQuotaCheckerType
+    : (editingProvider.quotaChecker?.type && selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type)
+      ? editingProvider.quotaChecker.type
+      : '');
 
   const oauthStatus = oauthSession?.status;
   const oauthIsTerminal = oauthStatus ? ['success', 'error', 'cancelled'].includes(oauthStatus) : false;
@@ -217,12 +240,6 @@ export const Providers = () => {
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [quotas, setQuotas] = useState<QuotaConfig[]>([]);
-  const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
-  const [editingQuota, setEditingQuota] = useState<QuotaConfig | null>(null);
-  const [originalQuotaId, setOriginalQuotaId] = useState<string | null>(null);
-  const [isSavingQuota, setIsSavingQuota] = useState(false);
-
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 10000);
@@ -231,36 +248,8 @@ export const Providers = () => {
 
   const loadData = async () => {
     try {
-        const [p, configQuotas, allQuotaCheckers] = await Promise.all([
-          api.getProviders(),
-          api.getConfigQuotas(),
-          api.getQuotas()
-        ]);
+        const p = await api.getProviders();
         setProviders(p);
-        
-        // Merge explicit config quotas with implicit OAuth quotas
-        const explicitIds = new Set(configQuotas.map(q => q.id));
-        const implicitQuotas: QuotaConfig[] = allQuotaCheckers
-          .filter(checker => !explicitIds.has(checker.checkerId) && (checker.oauthProvider || checker.oauthAccountId))
-          .map(checker => ({
-            id: checker.checkerId,
-            type:
-              checker.checkerId.includes('codex')
-                ? 'codex' as const
-                : checker.checkerId.includes('nanogpt')
-                ? 'nanogpt' as const
-                : 'claude-code' as const,
-            provider: checker.checkerId,
-            enabled: true,
-            intervalMinutes: 30,
-            options: {
-              oauthProvider: checker.oauthProvider,
-              oauthAccountId: checker.oauthAccountId
-            },
-            implicit: true
-          }));
-        
-        setQuotas([...configQuotas, ...implicitQuotas]);
     } catch (e) {
         console.error("Failed to load data", e);
     }
@@ -305,6 +294,38 @@ export const Providers = () => {
           alert('OAuth account is required');
           return;
         }
+        if (providerToSave.quotaChecker) {
+          const quotaType = providerToSave.quotaChecker.type?.trim();
+          if (!quotaType) {
+            providerToSave = {
+              ...providerToSave,
+              quotaChecker: undefined
+            };
+          } else {
+            const isValidQuotaType = VALID_QUOTA_CHECKER_TYPES.has(quotaType);
+            providerToSave = {
+              ...providerToSave,
+              quotaChecker: {
+                type: quotaType,
+                intervalMinutes: Math.max(1, providerToSave.quotaChecker.intervalMinutes || 30),
+                enabled: isValidQuotaType ? providerToSave.quotaChecker.enabled !== false : false
+              }
+            };
+          }
+        }
+        if (isOAuthMode && providerToSave.oauthProvider) {
+          const forcedType = getForcedOAuthQuotaCheckerType(providerToSave.oauthProvider);
+          if (forcedType) {
+            providerToSave = {
+              ...providerToSave,
+              quotaChecker: {
+                type: forcedType,
+                enabled: true,
+                intervalMinutes: Math.max(1, providerToSave.quotaChecker?.intervalMinutes || 30)
+              }
+            };
+          }
+        }
         await api.saveProvider(providerToSave, originalId || undefined);
         await loadData();
         setIsModalOpen(false);
@@ -336,6 +357,29 @@ export const Providers = () => {
     if (!isOAuthMode) return;
     resetOAuthState();
   }, [editingProvider.oauthProvider, isOAuthMode]);
+
+  useEffect(() => {
+    if (!forcedOAuthQuotaCheckerType) return;
+    setEditingProvider((prev) => {
+      const intervalMinutes = Math.max(1, prev.quotaChecker?.intervalMinutes || 30);
+      if (
+        prev.quotaChecker?.type === forcedOAuthQuotaCheckerType &&
+        prev.quotaChecker?.enabled === true &&
+        prev.quotaChecker?.intervalMinutes === intervalMinutes
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        quotaChecker: {
+          type: forcedOAuthQuotaCheckerType,
+          enabled: true,
+          intervalMinutes
+        }
+      };
+    });
+  }, [forcedOAuthQuotaCheckerType]);
 
   useEffect(() => {
     if (!oauthSessionId) return;
@@ -451,68 +495,6 @@ export const Providers = () => {
       }
   };
 
-  const EMPTY_QUOTA: QuotaConfig = {
-    id: '',
-    type: 'synthetic',
-    provider: '',
-    enabled: true,
-    intervalMinutes: 30,
-    options: {}
-  };
-
-  const handleAddQuota = () => {
-    setOriginalQuotaId(null);
-    setEditingQuota({ ...EMPTY_QUOTA });
-    setIsQuotaModalOpen(true);
-  };
-
-  const handleEditQuota = (quota: QuotaConfig) => {
-    setOriginalQuotaId(quota.id);
-    setEditingQuota({ ...quota, options: { ...quota.options } });
-    setIsQuotaModalOpen(true);
-  };
-
-  const handleDeleteQuota = async (id: string) => {
-    if (confirm(`Are you sure you want to delete quota "${id}"?`)) {
-      try {
-        await api.deleteConfigQuota(id);
-        await loadData();
-      } catch (e) {
-        alert("Failed to delete quota: " + e);
-      }
-    }
-  };
-
-  const handleSaveQuota = async () => {
-    if (!editingQuota?.id) {
-      alert("Quota ID is required");
-      return;
-    }
-    if (!editingQuota.provider) {
-      alert("Provider is required");
-      return;
-    }
-    if (!editingQuota.options?.apiKey) {
-      alert("API Key is required");
-      return;
-    }
-    if (editingQuota.type === 'naga' && !editingQuota.options?.max) {
-      alert("Max balance is required for Naga quotas");
-      return;
-    }
-
-    setIsSavingQuota(true);
-    try {
-      await api.saveConfigQuota(editingQuota, originalQuotaId || undefined);
-      await loadData();
-      setIsQuotaModalOpen(false);
-    } catch (e) {
-      console.error("Save quota error", e);
-      alert("Failed to save quota: " + e);
-    } finally {
-      setIsSavingQuota(false);
-    }
-  };
 
   const updateApiUrl = (apiType: string, url: string) => {
       if (isOAuthMode) return;
@@ -791,114 +773,6 @@ export const Providers = () => {
           </div>
       </Card>
 
-      <Card 
-        title="Quotas" 
-        className="mt-6"
-        extra={<Button leftIcon={<Plus size={16}/>} onClick={handleAddQuota}>Add Quota</Button>}
-      >
-           <div className="overflow-x-auto -m-6">
-               <table className="w-full border-collapse font-body text-[13px]">
-                  <thead>
-                      <tr>
-                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>ID</th>
-                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Type</th>
-                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Provider</th>
-                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Interval</th>
-                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
-                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {quotas.map(q => (
-                          <tr key={q.id} onClick={q.implicit ? undefined : () => handleEditQuota(q)} style={{cursor: q.implicit ? 'default' : 'pointer', opacity: q.implicit ? 0.7 : 1}} className={q.implicit ? '' : 'hover:bg-bg-hover'}>
-                              <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingLeft: '24px'}}>
-                                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                      {!q.implicit && <Edit2 size={12} style={{opacity: 0.5}} />}
-                                      <div style={{fontWeight: 600}}>{q.id}</div>
-                                      {q.implicit && (
-                                        <Badge
-                                          status="neutral"
-                                          style={{
-                                            backgroundColor: '#6b7280',
-                                            color: 'white',
-                                            border: 'none',
-                                            fontSize: '9px',
-                                            padding: '1px 6px'
-                                          }}
-                                          className="[&_.connection-dot]:hidden"
-                                        >
-                                          auto
-                                        </Badge>
-                                      )}
-                                  </div>
-                              </td>
-                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                                  <Badge
-                                    status="connected"
-                                    style={{
-                                      backgroundColor: q.type === 'naga'
-                                        ? '#8b5cf6'
-                                        : q.type === 'codex'
-                                        ? '#10b981'
-                                        : q.type === 'claude-code'
-                                        ? '#D97757'
-                                        : q.type === 'nanogpt'
-                                        ? '#06b6d4'
-                                        : '#06b6d4',
-                                      color: 'white',
-                                      border: 'none',
-                                      fontSize: '10px',
-                                      padding: '2px 8px'
-                                    }}
-                                    className="[&_.connection-dot]:hidden"
-                                  >
-                                    {q.type}
-                                  </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                                  {q.provider}
-                              </td>
-                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                                  {q.intervalMinutes}m
-                              </td>
-                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                                  {q.implicit ? (
-                                    <span className="text-text-secondary text-[11px]">Always enabled</span>
-                                  ) : (
-                                    <div onClick={(e) => e.stopPropagation()}>
-                                        <Switch
-                                          checked={q.enabled !== false}
-                                          onChange={(val) => {
-                                            const updated = quotas.map(x => x.id === q.id ? { ...x, enabled: val } : x);
-                                            setQuotas(updated);
-                                            api.saveConfigQuota({ ...q, enabled: val }, q.id);
-                                          }}
-                                          size="sm"
-                                        />
-                                    </div>
-                                  )}
-                              </td>
-                              <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
-                                  {!q.implicit && (
-                                    <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
-                                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteQuota(q.id); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
-                                    </div>
-                                  )}
-                              </td>
-                          </tr>
-                      ))}
-                      {quotas.length === 0 && (
-                          <tr>
-                              <td colSpan={6} className="px-4 py-8 text-center text-text-secondary text-[13px]">
-                                  No quota checkers configured. Click "Add Quota" to add one.
-                              </td>
-                          </tr>
-                      )}
-                   </tbody>
-               </table>
-           </div>
-       </Card>
-
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -1126,6 +1000,68 @@ export const Providers = () => {
                                       </div>
                                   ))}
                               </div>
+                          </div>
+
+                          <div>
+                            <label className="font-body text-[13px] font-medium text-text-secondary">Quota Checker</label>
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 120px', gap: '8px', alignItems: 'end', marginTop: '4px'}}>
+                              <div className="flex flex-col gap-1">
+                                <label className="font-body text-[11px] font-medium text-text-secondary">Type</label>
+                                <select
+                                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                  value={selectedQuotaCheckerType}
+                                  disabled={!!forcedOAuthQuotaCheckerType}
+                                  onChange={(e) => {
+                                    const quotaType = e.target.value;
+                                    if (!quotaType) {
+                                      setEditingProvider({ ...editingProvider, quotaChecker: undefined });
+                                      return;
+                                    }
+                                    setEditingProvider({
+                                      ...editingProvider,
+                                      quotaChecker: {
+                                        type: quotaType,
+                                        enabled: true,
+                                        intervalMinutes: Math.max(1, editingProvider.quotaChecker?.intervalMinutes || 30)
+                                      }
+                                    });
+                                  }}
+                                >
+                                  {!forcedOAuthQuotaCheckerType && <option value="">&lt;none&gt;</option>}
+                                  {selectableQuotaCheckerTypes.map((type) => (
+                                    <option key={type} value={type}>{type}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <Input
+                                label="Interval"
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={editingProvider.quotaChecker?.intervalMinutes || 30}
+                                disabled={!selectedQuotaCheckerType}
+                                onChange={(e) => {
+                                  const intervalMinutes = Math.max(1, parseInt(e.target.value, 10) || 30);
+                                  setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      type: selectedQuotaCheckerType,
+                                      enabled: selectedQuotaCheckerType
+                                        ? VALID_QUOTA_CHECKER_TYPES.has(selectedQuotaCheckerType)
+                                          ? editingProvider.quotaChecker?.enabled !== false
+                                          : false
+                                        : false,
+                                      intervalMinutes
+                                    }
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic'}}>
+                              {forcedOAuthQuotaCheckerType
+                                ? `Quota checker type is fixed to '${forcedOAuthQuotaCheckerType}' for this OAuth provider.`
+                                : <>Select <span style={{fontWeight: 600}}>&lt;none&gt;</span> to disable provider quota checks.</>}
+                            </div>
                           </div>
                       </div>
                   </div>
@@ -1760,134 +1696,6 @@ export const Providers = () => {
         </div>
       </Modal>
 
-      <Modal
-        isOpen={isQuotaModalOpen}
-        onClose={() => setIsQuotaModalOpen(false)}
-        title={originalQuotaId ? `Edit Quota: ${originalQuotaId}` : "Add Quota"}
-        size="md"
-        footer={
-          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
-            <Button variant="ghost" onClick={() => setIsQuotaModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveQuota} isLoading={isSavingQuota}>Save Quota</Button>
-          </div>
-        }
-      >
-        <div style={{display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '-8px'}}>
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end'}}>
-              <Input
-                label="Unique ID"
-                value={editingQuota?.id || ''}
-                onChange={(e) => setEditingQuota({ ...editingQuota!, id: e.target.value })}
-                placeholder={editingQuota?.type === 'naga'
-                  ? 'e.g. naga-main'
-                  : editingQuota?.type === 'nanogpt'
-                  ? 'e.g. nanogpt-main'
-                  : 'e.g. synthetic-main'}
-                disabled={!!originalQuotaId}
-              />
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text-secondary">Type</label>
-              <select
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                value={editingQuota?.type || 'synthetic'}
-                onChange={(e) => setEditingQuota({
-                  ...editingQuota!,
-                  type: e.target.value as QuotaConfig['type'],
-                  provider: editingQuota?.provider || (e.target.value as QuotaConfig['type'])
-                })}
-              >
-                <option value="synthetic">Synthetic</option>
-                <option value="naga">Naga</option>
-                <option value="nanogpt">NanoGPT</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="font-body text-[13px] font-medium text-text-secondary">Enabled</label>
-              <div style={{height: '38px', display: 'flex', alignItems: 'center'}}>
-                <Switch
-                  checked={editingQuota?.enabled !== false}
-                  onChange={(checked) => setEditingQuota({ ...editingQuota!, enabled: checked })}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
-            <Input
-              label="Provider ID"
-              value={editingQuota?.provider || ''}
-              onChange={(e) => setEditingQuota({ ...editingQuota!, provider: e.target.value })}
-              placeholder={editingQuota?.type === 'naga'
-                ? 'e.g. naga'
-                : editingQuota?.type === 'nanogpt'
-                ? 'e.g. nanogpt'
-                : 'e.g. synthetic'}
-            />
-            <Input
-              label="Check Interval (minutes)"
-              type="number"
-              min={1}
-              value={editingQuota?.intervalMinutes || 30}
-              onChange={(e) => setEditingQuota({ ...editingQuota!, intervalMinutes: parseInt(e.target.value) || 30 })}
-            />
-          </div>
-
-          <div style={{height: '1px', background: 'var(--color-border-glass)', margin: '4px 0'}} />
-
-          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-            <label className="font-body text-[13px] font-medium text-text">Options</label>
-            
-            <Input
-              label="API Key"
-              type="password"
-              value={editingQuota?.options?.apiKey || ''}
-              onChange={(e) => setEditingQuota({
-                ...editingQuota!,
-                options: { ...editingQuota?.options, apiKey: e.target.value }
-              })}
-              placeholder={editingQuota?.type === 'nanogpt'
-                ? 'NanoGPT API key'
-                : 'Bearer token for API authentication'}
-            />
-
-            {editingQuota?.type === 'naga' && (
-              <Input
-                label="Max Balance"
-                type="number"
-                min={1}
-                value={editingQuota?.options?.max || ''}
-                onChange={(e) => setEditingQuota({
-                  ...editingQuota!,
-                  options: { ...editingQuota?.options, max: parseInt(e.target.value) || undefined }
-                })}
-                placeholder="Maximum balance limit"
-              />
-            )}
-
-            <Input
-              label="Custom Endpoint (optional)"
-              value={editingQuota?.options?.endpoint || ''}
-              onChange={(e) => setEditingQuota({
-                ...editingQuota!,
-                options: { ...editingQuota?.options, endpoint: e.target.value || undefined }
-              })}
-              placeholder={editingQuota?.type === 'naga'
-                ? 'Default: https://api.naga.ac/v1/account/balance'
-                : editingQuota?.type === 'nanogpt'
-                ? 'Default: https://nano-gpt.com/api/subscription/v1/usage'
-                : 'Default: https://api.synthetic.new/v2/quotas'}
-            />
-
-            <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic', marginTop: '4px'}}>
-              {editingQuota?.type === 'naga'
-                ? <><Info size={12} className="inline mb-0.5 mr-1" />Naga checks account balance against the max limit.</>
-                : editingQuota?.type === 'nanogpt'
-                ? <><Info size={12} className="inline mb-0.5 mr-1" />NanoGPT checks subscription usage windows for daily and monthly request quotas.</>
-                : <><Info size={12} className="inline mb-0.5 mr-1" />Synthetic checks subscription dollars, hourly and daily request quotas.</>}
-            </div>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

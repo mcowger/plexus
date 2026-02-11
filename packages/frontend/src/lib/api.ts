@@ -160,6 +160,11 @@ export interface Provider {
   headers?: Record<string, string>;
   extraBody?: Record<string, any>;
   models?: string[] | Record<string, any>;
+  quotaChecker?: {
+    type?: string;
+    enabled: boolean;
+    intervalMinutes: number;
+  };
 }
 
 export interface Model {
@@ -298,6 +303,24 @@ const summaryRequestCache = new Map<string, { expiresAt: number; promise: Promis
 
 const CONFIG_CACHE_TTL_MS = 20000;
 const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<PlexusConfig | null> }>();
+
+const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code']);
+
+const normalizeProviderQuotaChecker = (
+    checker?: { type?: string; enabled?: boolean; intervalMinutes?: number }
+): Provider['quotaChecker'] | undefined => {
+    if (!checker) return undefined;
+
+    const type = checker.type?.trim();
+    if (!type) return undefined;
+
+    const isValidType = VALID_QUOTA_CHECKER_TYPES.has(type);
+    return {
+        type,
+        enabled: isValidType ? checker.enabled !== false : false,
+        intervalMinutes: Math.max(1, Number(checker.intervalMinutes || 30))
+    };
+};
 
 const USAGE_PAGE_FIELDS: UsageRecordField[] = [
     'date',
@@ -569,6 +592,11 @@ interface PlexusConfig {
         discount?: number;
         headers?: Record<string, string>;
         extraBody?: Record<string, any>;
+        quota_checker?: {
+            type?: string;
+            enabled?: boolean;
+            intervalMinutes?: number;
+        };
     }>;
     models?: Record<string, any>;
     keys?: Record<string, KeyConfig>;
@@ -1069,7 +1097,8 @@ export const api = {
                 discount: val.discount,
                 headers: val.headers,
                 extraBody: val.extraBody,
-                models: normalizedModels
+                models: normalizedModels,
+                quotaChecker: normalizeProviderQuotaChecker(val.quota_checker)
             };
         });
     } catch (e) {
@@ -1112,7 +1141,14 @@ export const api = {
               discount: p.discount,
               headers: p.headers,
               extraBody: p.extraBody,
-              models: p.models
+               models: p.models,
+               quota_checker: p.quotaChecker?.type
+                 ? {
+                     type: p.quotaChecker.type,
+                     enabled: p.quotaChecker.enabled,
+                     intervalMinutes: Math.max(1, p.quotaChecker.intervalMinutes || 30)
+                   }
+                 : undefined
           };
       }
       
@@ -1159,7 +1195,14 @@ export const api = {
           headers: provider.headers,
           extraBody: provider.extraBody,
           models: provider.models,
-          enabled: provider.enabled
+          enabled: provider.enabled,
+          quota_checker: provider.quotaChecker?.type
+            ? {
+                type: provider.quotaChecker.type,
+                enabled: provider.quotaChecker.enabled,
+                intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30)
+              }
+            : undefined
       };
 
       const newYaml = stringify(config);

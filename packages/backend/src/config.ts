@@ -60,6 +60,14 @@ const OAuthProviderSchema = z.enum([
   'google-antigravity'
 ]);
 
+const ProviderQuotaCheckerSchema = z.object({
+  enabled: z.boolean().default(true),
+  intervalMinutes: z.number().min(1).default(30),
+  id: z.string().trim().min(1).optional(),
+  type: z.string().trim().min(1),
+  options: z.record(z.any()).default({}),
+});
+
 const ProviderConfigSchema = z.object({
   display_name: z.string().optional(),
   api_base_url: z.union([
@@ -80,6 +88,7 @@ const ProviderConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
   extraBody: z.record(z.any()).optional(),
   estimateTokens: z.boolean().optional().default(false),
+  quota_checker: ProviderQuotaCheckerSchema.optional(),
 })
   .refine(
     (data) => !!data.api_key || isOAuthProviderConfig(data),
@@ -122,17 +131,18 @@ const QuotaConfigSchema = z.object({
   options: z.record(z.any()).default({}),
 });
 
-const PlexusConfigSchema = z.object({
+const RawPlexusConfigSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
   keys: z.record(z.string(), KeyConfigSchema),
   adminKey: z.string(),
-  quotas: z.array(QuotaConfigSchema).optional().default([]),
   performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
 });
 
-export type PlexusConfig = z.infer<typeof PlexusConfigSchema>;
+export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
+  quotas: QuotaConfig[];
+};
 export type DatabaseConfig = {
   connectionString: string;
 };
@@ -141,13 +151,6 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
 export type QuotaConfig = z.infer<typeof QuotaConfigSchema>;
-
-const CODEX_QUOTA_TYPE = 'openai-codex';
-const CODEX_OAUTH_PROVIDER = 'openai-codex';
-const CODEX_DEFAULT_INTERVAL_MINUTES = 10;
-const CLAUDE_CODE_QUOTA_TYPE = 'claude-code';
-const CLAUDE_OAUTH_PROVIDER = 'anthropic';
-const CLAUDE_DEFAULT_INTERVAL_MINUTES = 10;
 
 /**
  * Extract supported API types from the provider configuration.
@@ -255,8 +258,15 @@ function logConfigStats(config: PlexusConfig) {
 export function validateConfig(yamlContent: string): PlexusConfig {
   const parsed = yaml.parse(yamlContent);
   const { parsed: migrated } = migrateOAuthAccounts(parsed);
-  const config = PlexusConfigSchema.parse(migrated);
-  return applyImplicitQuotaDefaults(config);
+  const rawConfig = RawPlexusConfigSchema.parse(migrated);
+  return hydrateConfig(rawConfig);
+}
+
+function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
+  return {
+    ...config,
+    quotas: buildProviderQuotaConfigs(config),
+  };
 }
 
 function migrateOAuthAccounts(parsed: unknown): {
@@ -311,86 +321,60 @@ function migrateOAuthAccounts(parsed: unknown): {
   };
 }
 
-function applyImplicitQuotaDefaults(config: PlexusConfig): PlexusConfig {
-  const explicitCodexQuotas = config.quotas.filter((quota) => quota.type === CODEX_QUOTA_TYPE);
-  const explicitClaudeQuotas = config.quotas.filter(
-    (quota) => quota.type === CLAUDE_CODE_QUOTA_TYPE
-  );
-
-  if (explicitCodexQuotas.length > 0) {
-    const ids = explicitCodexQuotas.map((quota) => quota.id).join(', ');
-    logger.error(
-      `Explicit Codex quota entries are no longer supported and will be ignored: ${ids}`
-    );
-  }
-
-  if (explicitClaudeQuotas.length > 0) {
-    const ids = explicitClaudeQuotas.map((quota) => quota.id).join(', ');
-    logger.error(
-      `Explicit Claude Code quota entries are no longer supported and will be ignored: ${ids}`
-    );
-  }
-
-  const retainedQuotas = config.quotas.filter(
-    (quota) => quota.type !== CODEX_QUOTA_TYPE && quota.type !== CLAUDE_CODE_QUOTA_TYPE
-  );
-  const existingQuotaIds = new Set(retainedQuotas.map((quota) => quota.id));
-  const implicitQuotas: QuotaConfig[] = [];
+function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>): QuotaConfig[] {
+  const quotas: QuotaConfig[] = [];
+  const seenIds = new Set<string>();
 
   for (const [providerId, providerConfig] of Object.entries(config.providers)) {
     if (providerConfig.enabled === false) {
       continue;
     }
 
-    if (providerConfig.oauth_provider === CODEX_OAUTH_PROVIDER) {
-      const implicitId = `codex-${providerId}`;
-      if (existingQuotaIds.has(implicitId)) {
-        logger.error(
-          `Skipping implicit Codex quota for provider '${providerId}' because quota id '${implicitId}' is already in use.`
-        );
-      } else {
-        implicitQuotas.push({
-          id: implicitId,
-          provider: providerId,
-          type: CODEX_QUOTA_TYPE,
-          enabled: true,
-          intervalMinutes: CODEX_DEFAULT_INTERVAL_MINUTES,
-          options: {
-            oauthProvider: CODEX_OAUTH_PROVIDER,
-            oauthAccountId: providerConfig.oauth_account
-          }
-        });
-        existingQuotaIds.add(implicitId);
-      }
+    const quotaChecker = providerConfig.quota_checker;
+    if (!quotaChecker || quotaChecker.enabled === false) {
+      continue;
     }
 
-    if (providerConfig.oauth_provider === CLAUDE_OAUTH_PROVIDER) {
-      const implicitId = `claude-code-${providerId}`;
-      if (existingQuotaIds.has(implicitId)) {
-        logger.error(
-          `Skipping implicit Claude Code quota for provider '${providerId}' because quota id '${implicitId}' is already in use.`
-        );
-      } else {
-        implicitQuotas.push({
-          id: implicitId,
-          provider: providerId,
-          type: CLAUDE_CODE_QUOTA_TYPE,
-          enabled: true,
-          intervalMinutes: CLAUDE_DEFAULT_INTERVAL_MINUTES,
-          options: {
-            oauthProvider: CLAUDE_OAUTH_PROVIDER,
-            oauthAccountId: providerConfig.oauth_account
-          }
-        });
-        existingQuotaIds.add(implicitId);
-      }
+    const checkerId = (quotaChecker.id ?? providerId).trim();
+    if (!checkerId) {
+      throw new Error(`Provider '${providerId}' has an invalid quota checker id`);
     }
+
+    if (seenIds.has(checkerId)) {
+      throw new Error(`Duplicate quota checker id '${checkerId}' found in provider '${providerId}'`);
+    }
+    seenIds.add(checkerId);
+
+    const checkerType = quotaChecker.type;
+
+    const options: Record<string, unknown> = {
+      ...(quotaChecker.options ?? {}),
+    };
+
+    const apiKey = providerConfig.api_key?.trim();
+    if (apiKey && apiKey.toLowerCase() !== 'oauth' && options.apiKey === undefined) {
+      options.apiKey = apiKey;
+    }
+
+    if (providerConfig.oauth_provider && options.oauthProvider === undefined) {
+      options.oauthProvider = providerConfig.oauth_provider;
+    }
+
+    if (providerConfig.oauth_account && options.oauthAccountId === undefined) {
+      options.oauthAccountId = providerConfig.oauth_account;
+    }
+
+    quotas.push({
+      id: checkerId,
+      provider: providerId,
+      type: checkerType,
+      enabled: true,
+      intervalMinutes: quotaChecker.intervalMinutes,
+      options,
+    });
   }
 
-  return {
-    ...config,
-    quotas: [...retainedQuotas, ...implicitQuotas]
-  };
+  return quotas;
 }
 
 async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
@@ -407,8 +391,8 @@ async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
     );
   }
 
-  const config = PlexusConfigSchema.parse(migratedParsed);
-  const finalConfig = applyImplicitQuotaDefaults(config);
+  const rawConfig = RawPlexusConfigSchema.parse(migratedParsed);
+  const finalConfig = hydrateConfig(rawConfig);
   logConfigStats(finalConfig);
   return finalConfig;
 }

@@ -607,114 +607,67 @@ The `adminKey` acts as a shared secret for administrative access:
 2.  **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.
 3.  **Startup Requirement**: The Plexus server will fail to start if this key is missing from the configuration.
 
-### `quotas` (Optional)
+### `providers.<provider>.quota_checker` (Optional)
 
-This section configures quota checkers that monitor provider rate limits and quotas. Plexus periodically checks each configured quota source and stores the results for monitoring and alerting.
-
-**Purpose:**
-- Monitor provider rate limits (e.g., Anthropic's 5-hour and 7-day windows)
-- Track subscription quotas (e.g., monthly dollar limits)
-- Detect when quotas are approaching exhaustion
-- Provide historical quota utilization data
-
-**Codex note:**
-- OpenAI Codex quota tracking is created automatically for any provider configured with `oauth_provider: openai-codex`.
-- Explicit `openai-codex` entries in `quotas` are ignored.
-- The implicit checker runs every 10 minutes and uses the provider's `oauth_account` for quota grouping.
-
-**Claude Code note:**
-- Claude Code quota tracking is created automatically for any provider configured with `oauth_provider: anthropic`.
-- Explicit `claude-code` entries in `quotas` are ignored.
-- The implicit checker runs every 10 minutes and uses the provider's `oauth_account` for quota grouping.
+Quota checkers are configured per provider (not in a top-level `quotas` section). Plexus periodically runs each enabled checker and stores results for monitoring and alerting.
 
 **Structure:**
 
 ```yaml
-quotas:
-  - id: checker-name                    # Unique identifier
-    type: synthetic | naga | nanogpt    # Checker type
-    provider: provider-key               # Provider name to associate with
-    enabled: true                       # Enable/disable this checker
-    intervalMinutes: 30                 # Check frequency in minutes
-    options: {}                        # Provider-specific options
+providers:
+  my-provider:
+    api_key: "..."
+    api_base_url: https://api.example.com/v1
+    quota_checker:
+      type: synthetic | naga | nanogpt | openai-codex | claude-code
+      enabled: true
+      intervalMinutes: 30
+      # optional
+      # id: custom-checker-id
+      # options: {}
 ```
 
-**Checker Types:**
+**Fields:**
+- `type` (**required**): checker implementation to use.
+- `enabled` (optional, default `true`): enable/disable checker.
+- `intervalMinutes` (optional, default `30`): polling interval, minimum `1`.
+- `id` (optional): explicit checker ID. Defaults to provider ID.
+- `options` (optional): checker-specific options map.
 
-#### `synthetic`
+**OAuth restrictions:**
+- Providers with `oauth_provider: openai-codex` must use `quota_checker.type: openai-codex`.
+- Providers with `oauth_provider: anthropic` must use `quota_checker.type: claude-code`.
 
-Queries the Synthetic API for quota information.
+**Checker notes:**
+- `synthetic`: Synthetic quota checker (`options.apiKey` is derived from provider `api_key` by default).
+- `naga`: Naga balance-based checker.
+- `nanogpt`: NanoGPT usage checker.
+- `openai-codex`: Codex OAuth-backed checker.
+- `claude-code`: Claude Code OAuth-backed checker.
 
-**Required Options:**
-- `apiKey`: Synthetic API key
+**Examples:**
 
-**Optional Options:**
-- `endpoint`: Override the default API endpoint
-
-**Example:**
 ```yaml
-quotas:
-  - id: synthetic-main
-    type: synthetic
-    provider: synthetic
-    enabled: true
-    intervalMinutes: 30
-    options:
-      apiKey: syn_your_api_key
-      # endpoint: https://api.synthetic.new/v2/quotas
-```
+providers:
+  synthetic:
+    api_base_url:
+      chat: https://api.synthetic.new/openai/v1
+      messages: https://api.synthetic.new/anthropic/v1
+    api_key: syn_your_api_key
+    quota_checker:
+      type: synthetic
+      enabled: true
+      intervalMinutes: 30
 
-#### `claude-code`
-
-Makes a minimal inference request to Anthropic and reads rate limit headers.
-
-**Token Source:**
-- By default, this checker loads OAuth credentials from `auth.json` via `oauthProvider: anthropic`.
-- You can still provide `apiKey` explicitly as an override, but it is optional.
-
-**Optional Options:**
-- `model`: Model to use for the probe request (default: `claude-haiku-4-5`)
-- `endpoint`: Override the default API endpoint
-- `oauthProvider`: OAuth provider key to read from auth.json (default: `anthropic`)
-- `apiKey`: Optional explicit bearer token override
-
-**Configuration:**
-- Claude Code checkers are created implicitly when a provider is configured with `oauth_provider: anthropic`.
-- Explicit `claude-code` entries are ignored.
-
-**Quota tracking note:**
-- Quota results are keyed by `oauthAccountId`.
-- Ensure the provider's `oauth_account` value in `providers` matches the OAuth account ID used for the checker.
-
-#### `naga`
-
-Checks Naga account balance and maps it to a subscription-style quota window.
-
-**Required Options:**
-- `apiKey`: Naga API key
-- `max`: Maximum account balance for utilization calculation
-
-#### `nanogpt`
-
-Checks NanoGPT subscription usage for daily and monthly usage windows.
-
-**Required Options:**
-- `apiKey`: NanoGPT API key
-
-**Optional Options:**
-- `endpoint`: Override the default API endpoint (default: `https://nano-gpt.com/api/subscription/v1/usage`)
-
-**Example:**
-```yaml
-quotas:
-  - id: nanogpt-main
-    type: nanogpt
-    provider: nanogpt
-    enabled: true
-    intervalMinutes: 30
-    options:
-      apiKey: ngpt_your_api_key
-      # endpoint: https://nano-gpt.com/api/subscription/v1/usage
+  codex:
+    api_base_url: oauth://
+    api_key: oauth
+    oauth_provider: openai-codex
+    oauth_account: work
+    quota_checker:
+      type: openai-codex
+      enabled: true
+      intervalMinutes: 10
 ```
 
 **Quota Monitoring API:**
