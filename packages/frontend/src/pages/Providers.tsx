@@ -231,6 +231,7 @@ export const Providers = () => {
   // Accordion state for Modal
   const [isModelsOpen, setIsModelsOpen] = useState(false);
   const [openModelIdx, setOpenModelIdx] = useState<string | null>(null);
+  const [isApiBaseUrlsOpen, setIsApiBaseUrlsOpen] = useState(true);
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
 
@@ -498,32 +499,64 @@ export const Providers = () => {
   };
 
 
-  const updateApiUrl = (apiType: string, url: string) => {
-      if (isOAuthMode) return;
-      let newBaseUrl: any = editingProvider.apiBaseUrl;
+  const getApiBaseUrlMap = (): Record<string, string> => {
+    if (typeof editingProvider.apiBaseUrl === 'object' && editingProvider.apiBaseUrl !== null && !Array.isArray(editingProvider.apiBaseUrl)) {
+      return { ...(editingProvider.apiBaseUrl as Record<string, string>) };
+    }
 
-      if (typeof newBaseUrl !== 'object' || newBaseUrl === null) {
-          const currentTypes = Array.isArray(editingProvider.type) ? editingProvider.type : (editingProvider.type ? [editingProvider.type] : []);
-          if (currentTypes.length === 1 && typeof newBaseUrl === 'string') {
-              newBaseUrl = { [currentTypes[0]]: newBaseUrl };
-          } else {
-              newBaseUrl = {};
-          }
-      } else {
-          newBaseUrl = { ...newBaseUrl };
-      }
+    if (typeof editingProvider.apiBaseUrl === 'string' && editingProvider.apiBaseUrl.trim()) {
+      const inferredTypes = inferProviderTypes(editingProvider.apiBaseUrl);
+      const fallbackType = inferredTypes[0] || 'chat';
+      return { [fallbackType]: editingProvider.apiBaseUrl };
+    }
 
-      // Update or remove the URL for this API type
-      if (url && url.trim()) {
-          newBaseUrl[apiType] = url;
-      } else {
-          delete newBaseUrl[apiType];
-      }
+    return {};
+  };
 
-      // Infer types from the updated api_base_url
-      const inferredTypes = inferProviderTypes(newBaseUrl);
+  const addApiBaseUrlEntry = () => {
+    if (isOAuthMode) return;
+    const currentMap = getApiBaseUrlMap();
+    const nextType = KNOWN_APIS.find((apiType) => !(apiType in currentMap));
+    if (!nextType) return;
 
-      setEditingProvider({ ...editingProvider, type: inferredTypes, apiBaseUrl: newBaseUrl });
+    const updated = { ...currentMap, [nextType]: '' };
+    setEditingProvider({
+      ...editingProvider,
+      apiBaseUrl: updated,
+      type: inferProviderTypes(updated)
+    });
+    setIsApiBaseUrlsOpen(true);
+  };
+
+  const updateApiBaseUrlEntry = (oldType: string, newType: string, url: string) => {
+    if (isOAuthMode) return;
+    const currentMap = getApiBaseUrlMap();
+    const updated: Record<string, string> = { ...currentMap };
+    delete updated[oldType];
+
+    const normalizedType = newType.trim();
+    if (normalizedType && url.trim()) {
+      updated[normalizedType] = url;
+    }
+
+    setEditingProvider({
+      ...editingProvider,
+      apiBaseUrl: updated,
+      type: inferProviderTypes(updated)
+    });
+  };
+
+  const removeApiBaseUrlEntry = (apiType: string) => {
+    if (isOAuthMode) return;
+    const currentMap = getApiBaseUrlMap();
+    const updated = { ...currentMap };
+    delete updated[apiType];
+
+    setEditingProvider({
+      ...editingProvider,
+      apiBaseUrl: updated,
+      type: inferProviderTypes(updated)
+    });
   };
 
   const getApiUrlValue = (apiType: string) => {
@@ -893,32 +926,58 @@ export const Providers = () => {
                           />
                         </div>
                       ) : (
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
-                            {KNOWN_APIS.map(apiType => {
-                                const inferredTypes = inferProviderTypes(editingProvider.apiBaseUrl);
-                                const isInferred = inferredTypes.includes(apiType);
-
-                                return (
-                                    <div key={apiType} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                        <div style={{display: 'flex', alignItems: 'center', gap: '6px', width: '100px', flexShrink: 0}}>
-                                            <Badge
-                                              status={isInferred ? "connected" : "disconnected"}
-                                              style={{ ...getApiBadgeStyle(apiType), fontSize: '10px', padding: '2px 8px', opacity: isInferred ? 1 : 0.5 }}
-                                              className="[&_.connection-dot]:hidden"
-                                            >
-                                                {apiType}
-                                            </Badge>
-                                        </div>
-                                        <div style={{flex: 1}}>
-                                          <Input
-                                              placeholder={`${apiType} URL`}
-                                              value={getApiUrlValue(apiType)}
-                                              onChange={(e) => updateApiUrl(apiType, e.target.value)}
-                                          />
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <div className="border border-border-glass rounded-md overflow-hidden">
+                          <div
+                            className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                            onClick={() => setIsApiBaseUrlsOpen(!isApiBaseUrlsOpen)}
+                          >
+                            {isApiBaseUrlsOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>} 
+                            <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0, flex: 1}}>Base URL Entries</label>
+                            <Badge status="neutral" style={{fontSize: '10px', padding: '2px 8px'}}>{Object.keys(getApiBaseUrlMap()).length}</Badge>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addApiBaseUrlEntry();
+                              }}
+                              disabled={Object.keys(getApiBaseUrlMap()).length >= KNOWN_APIS.length}
+                            >
+                              <Plus size={14}/>
+                            </Button>
+                          </div>
+                          {isApiBaseUrlsOpen && (
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-subtle)'}}>
+                              {Object.entries(getApiBaseUrlMap()).length === 0 && (
+                                <div className="font-body text-[11px] text-text-secondary italic">No base URLs configured yet.</div>
+                              )}
+                              {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => (
+                                <div key={apiType} style={{display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'start'}}>
+                                  <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                                    <select
+                                      className="w-full py-1.5 px-3 font-body text-xs border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                      style={{ ...getApiBadgeStyle(apiType), fontWeight: 600 }}
+                                      value={apiType}
+                                      onChange={(e) => updateApiBaseUrlEntry(apiType, e.target.value, typeof url === 'string' ? url : '')}
+                                    >
+                                      {KNOWN_APIS.map((knownType) => (
+                                        <option key={knownType} value={knownType}>{knownType}</option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                      placeholder="https://api.example.com/..."
+                                      value={typeof url === 'string' ? url : ''}
+                                      onChange={(e) => updateApiBaseUrlEntry(apiType, apiType, e.target.value)}
+                                    />
+                                  </div>
+                                  <Button variant="ghost" size="sm" onClick={() => removeApiBaseUrlEntry(apiType)} style={{padding: '4px', marginTop: '4px'}}>
+                                    <Trash2 size={14} style={{color: 'var(--color-danger)'}}/>
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                   </div>
