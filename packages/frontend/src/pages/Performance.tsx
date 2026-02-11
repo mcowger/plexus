@@ -22,7 +22,10 @@ const PerformanceBarChart = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
-  const chartData = reverse ? [...data].reverse() : data;
+  const chartData = (reverse ? [...data] : data).map(row => ({
+    ...row,
+    label: row.provider
+  }));
   const metricLabel = metric === 'avg_tokens_per_sec' ? 'Avg throughput' : 'Avg TTFT';
 
   useEffect(() => {
@@ -58,7 +61,7 @@ const PerformanceBarChart = ({
             stroke="var(--color-text-secondary)"
             tickFormatter={(value) => (metric === 'avg_tokens_per_sec' ? formatNumber(value as number) : formatMs(value as number))}
           />
-          <YAxis type="category" dataKey="provider" stroke="var(--color-text-secondary)" width={95} />
+          <YAxis type="category" dataKey="label" stroke="var(--color-text-secondary)" width={80} />
           <Tooltip
             contentStyle={{
               backgroundColor: 'rgba(8, 13, 28, 0.96)',
@@ -77,6 +80,13 @@ const PerformanceBarChart = ({
                   : formatMs(numericValue),
                 metricLabel
               ];
+            }}
+            labelFormatter={(label, payload) => {
+              const row = payload?.[0]?.payload;
+              if (row?.target_model) {
+                return row.target_model;
+              }
+              return label;
             }}
           />
           <Bar dataKey={metric} radius={[0, 6, 6, 0]}>
@@ -187,12 +197,15 @@ export const Performance = () => {
         >
           <div style={{ height: 280 }}><PerformanceBarChart data={fastestByTokens} metric="avg_tokens_per_sec" reverse /></div>
           <div className="mt-4 space-y-2">
-            {fastestByTokens.slice(0, 5).map((row, index) => (
-              <div key={`${row.provider}-${index}`} className="flex items-center justify-between text-sm">
-                <span className="text-text-secondary">{String(index + 1).padStart(2, '0')}. {row.provider}</span>
-                <span className="text-text font-medium">{formatNumber(row.avg_tokens_per_sec, 1)} tok/s</span>
-              </div>
-            ))}
+            {fastestByTokens.slice(0, 5).map((row, index) => {
+              const label = row.target_model ? `${row.provider}/${row.target_model}` : row.provider;
+              return (
+                <div key={label} className="flex items-center justify-between text-sm">
+                  <span className="text-text-secondary">{String(index + 1).padStart(2, '0')}. {label}</span>
+                  <span className="text-text font-medium">{formatNumber(row.avg_tokens_per_sec, 1)} tok/s</span>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
@@ -204,12 +217,15 @@ export const Performance = () => {
         >
           <div style={{ height: 280 }}><PerformanceBarChart data={fastestByTtft} metric="avg_ttft_ms" reverse /></div>
           <div className="mt-4 space-y-2">
-            {fastestByTtft.slice(0, 5).map((row, index) => (
-              <div key={`${row.provider}-${index}`} className="flex items-center justify-between text-sm">
-                <span className="text-text-secondary">{String(index + 1).padStart(2, '0')}. {row.provider}</span>
-                <span className="text-text font-medium">{formatMs(row.avg_ttft_ms)}</span>
-              </div>
-            ))}
+            {fastestByTtft.slice(0, 5).map((row, index) => {
+              const label = row.target_model ? `${row.provider}/${row.target_model}` : row.provider;
+              return (
+                <div key={label} className="flex items-center justify-between text-sm">
+                  <span className="text-text-secondary">{String(index + 1).padStart(2, '0')}. {label}</span>
+                  <span className="text-text font-medium">{formatMs(row.avg_ttft_ms)}</span>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
@@ -226,13 +242,13 @@ export const Performance = () => {
             <div className="pt-2 border-t border-border-glass text-text-secondary">Top throughput provider</div>
             <div className="text-text font-medium">
               {fastestByTokens[0]
-                ? `${fastestByTokens[0].provider} · ${formatNumber(fastestByTokens[0].avg_tokens_per_sec, 1)} tok/s`
+                ? `${fastestByTokens[0].target_model ? `${fastestByTokens[0].provider}/${fastestByTokens[0].target_model}` : fastestByTokens[0].provider} · ${formatNumber(fastestByTokens[0].avg_tokens_per_sec, 1)} tok/s`
                 : '—'}
             </div>
 
             <div className="pt-2 border-t border-border-glass text-text-secondary">Lowest TTFT provider</div>
             <div className="text-text font-medium">
-              {fastestByTtft[0] ? `${fastestByTtft[0].provider} · ${formatMs(fastestByTtft[0].avg_ttft_ms)}` : '—'}
+              {fastestByTtft[0] ? `${fastestByTtft[0].target_model ? `${fastestByTtft[0].provider}/${fastestByTtft[0].target_model}` : fastestByTtft[0].provider} · ${formatMs(fastestByTtft[0].avg_ttft_ms)}` : '—'}
             </div>
           </div>
         </Card>
