@@ -484,6 +484,7 @@ export class UsageStorageService extends EventEmitter {
                     .select({
                         provider: this.schema.requestUsage.provider,
                         model: modelNameExpr,
+                        targetModel: this.schema.requestUsage.selectedModelName,
                         avgTtftMs: sql<number>`AVG(${this.schema.requestUsage.ttftMs})`,
                         minTtftMs: sql<number>`MIN(${this.schema.requestUsage.ttftMs})`,
                         maxTtftMs: sql<number>`MAX(${this.schema.requestUsage.ttftMs})`,
@@ -497,6 +498,7 @@ export class UsageStorageService extends EventEmitter {
                     .where(whereClause)
                     .groupBy(
                         this.schema.requestUsage.provider,
+                        this.schema.requestUsage.selectedModelName,
                         modelNameExpr
                     )
                     .orderBy(desc(sql`AVG(${this.schema.requestUsage.tokensPerSec})`));
@@ -511,6 +513,7 @@ export class UsageStorageService extends EventEmitter {
                 return rows.map(row => ({
                     provider: row.provider,
                     model: row.model,
+                    target_model: row.targetModel,
                     avg_ttft_ms: row.avgTtftMs ?? 0,
                     min_ttft_ms: row.minTtftMs ?? 0,
                     max_ttft_ms: row.maxTtftMs ?? 0,
@@ -552,6 +555,7 @@ export class UsageStorageService extends EventEmitter {
             const selection = {
                 provider: this.schema.providerPerformance.provider,
                 model: modelNameExpr,
+                targetModel: this.schema.providerPerformance.model,
                 avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
                 minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
                 maxTtftMs: sql<number>`MAX(${this.schema.providerPerformance.timeToFirstTokenMs})`,
@@ -575,12 +579,14 @@ export class UsageStorageService extends EventEmitter {
                     .where(whereClause)
                     .groupBy(
                         this.schema.providerPerformance.provider,
+                        this.schema.providerPerformance.model,
                         modelNameExpr
                     )
                     .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`))
                 : await baseQuery
                     .groupBy(
                         this.schema.providerPerformance.provider,
+                        this.schema.providerPerformance.model,
                         modelNameExpr
                     )
                     .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
@@ -595,6 +601,7 @@ export class UsageStorageService extends EventEmitter {
             const mappedPrimaryRows = results.map(row => ({
                 provider: row.provider,
                 model: row.model,
+                target_model: row.targetModel,
                 avg_ttft_ms: row.avgTtftMs ?? 0,
                 min_ttft_ms: row.minTtftMs ?? 0,
                 max_ttft_ms: row.maxTtftMs ?? 0,
@@ -621,11 +628,11 @@ export class UsageStorageService extends EventEmitter {
             const mergedRows = new Map<string, any>();
 
             for (const row of mappedPrimaryRows) {
-                mergedRows.set(`${row.provider}:${row.model}`, row);
+                mergedRows.set(`${row.provider}:${row.target_model}:${row.model}`, row);
             }
 
             for (const row of fallbackRows) {
-                const key = `${row.provider}:${row.model}`;
+                const key = `${row.provider}:${row.target_model}:${row.model}`;
                 if (!mergedRows.has(key)) {
                     mergedRows.set(key, row);
                 }

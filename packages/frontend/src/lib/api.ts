@@ -135,6 +135,7 @@ export interface PieChartDataPoint {
 export interface ProviderPerformanceData {
   provider: string;
   model: string;
+  target_model?: string;
   avg_ttft_ms: number;
   min_ttft_ms: number;
   max_ttft_ms: number;
@@ -930,6 +931,7 @@ export const api = {
       return rawRows.map((row) => ({
         provider: String(row.provider ?? ''),
         model: String(row.model ?? ''),
+        target_model: row.target_model ? String(row.target_model) : undefined,
         avg_ttft_ms: toNumber(row.avg_ttft_ms),
         min_ttft_ms: toNumber(row.min_ttft_ms),
         max_ttft_ms: toNumber(row.max_ttft_ms),
