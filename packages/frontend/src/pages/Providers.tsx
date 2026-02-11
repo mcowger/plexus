@@ -231,6 +231,8 @@ export const Providers = () => {
   // Accordion state for Modal
   const [isModelsOpen, setIsModelsOpen] = useState(false);
   const [openModelIdx, setOpenModelIdx] = useState<string | null>(null);
+  const [isHeadersOpen, setIsHeadersOpen] = useState(false);
+  const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
 
   // Fetch Models Modal state
   const [isFetchModelsModalOpen, setIsFetchModelsModalOpen] = useState(false);
@@ -785,8 +787,8 @@ export const Providers = () => {
             </div>
         }
       >
-          <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px'}}>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '16px', alignItems: 'end'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '-8px'}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end'}}>
                   <Input
                     label="Unique ID"
                     value={editingProvider.id}
@@ -799,6 +801,14 @@ export const Providers = () => {
                     value={editingProvider.name}
                     onChange={(e) => setEditingProvider({...editingProvider, name: e.target.value})}
                     placeholder="e.g. OpenAI Production"
+                  />
+                  <Input
+                    label="API Key"
+                    type="password"
+                    value={editingProvider.apiKey}
+                    onChange={(e) => setEditingProvider({...editingProvider, apiKey: e.target.value})}
+                    placeholder="sk-..."
+                    disabled={isOAuthMode}
                   />
                   <div className="flex flex-col gap-2">
                       <label className="font-body text-[13px] font-medium text-text-secondary">Enabled</label>
@@ -814,9 +824,9 @@ export const Providers = () => {
               {/* Separator */}
               <div style={{height: '1px', background: 'var(--color-border-glass)', margin: '4px 0'}} />
 
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}}>
                   {/* Left: APIs & Base URLs */}
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
                       <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
                         <label className="font-body text-[13px] font-medium text-text-secondary">Connection Type</label>
                         <select
@@ -854,15 +864,33 @@ export const Providers = () => {
                           API types are automatically inferred from the URLs you provide.
                       </div>
                       {isOAuthMode ? (
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
-                          <Input
-                            label="OAuth Base URL"
-                            value="oauth://"
-                            disabled
-                          />
-                          <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic'}}>
-                            OAuth providers always use the fixed oauth:// base URL.
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
+                          <div className="flex flex-col gap-1">
+                            <label className="font-body text-[13px] font-medium text-text-secondary">OAuth Provider</label>
+                            <select
+                              className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                              value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+                              onChange={(e) => setEditingProvider({
+                                ...editingProvider,
+                                oauthProvider: e.target.value
+                              })}
+                            >
+                              {OAUTH_PROVIDERS.map((provider) => (
+                                <option key={provider.value} value={provider.value}>
+                                  {provider.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
+                          <Input
+                            label="OAuth Account"
+                            value={editingProvider.oauthAccount || ''}
+                            onChange={(e) => setEditingProvider({
+                              ...editingProvider,
+                              oauthAccount: e.target.value
+                            })}
+                            placeholder="e.g. work, personal, team-a"
+                          />
                         </div>
                       ) : (
                         <div style={{display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-bg-subtle)', padding: '8px', borderRadius: 'var(--radius-md)'}}>
@@ -896,110 +924,116 @@ export const Providers = () => {
                   </div>
 
                   {/* Right: Advanced Configuration */}
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
                       <label className="font-body text-[13px] font-medium text-text-secondary">Advanced Configuration</label>
                       <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                          {isOAuthMode && (
-                            <div className="flex flex-col gap-2">
-                              <div className="flex flex-col gap-1">
-                                <label className="font-body text-[13px] font-medium text-text-secondary">OAuth Provider</label>
-                                <select
-                                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                                  value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
-                                  onChange={(e) => setEditingProvider({
-                                    ...editingProvider,
-                                    oauthProvider: e.target.value
-                                  })}
+                          <div style={{display: 'grid', gridTemplateColumns: '140px', gap: '12px', alignItems: 'end'}}>
+                            <div className="flex flex-col gap-1">
+                              <label className="font-body text-[11px] font-medium text-text-secondary">Discount (%)</label>
+                              <div style={{position: 'relative'}}>
+                                <input
+                                  className="w-full py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  max="100"
+                                  value={Math.round((editingProvider.discount ?? 0) * 100)}
+                                  onChange={(e) => {
+                                    const percent = Number(e.target.value || '0');
+                                    const clamped = Math.min(100, Math.max(0, percent));
+                                    setEditingProvider({...editingProvider, discount: clamped / 100});
+                                  }}
+                                />
+                                <span
+                                  className="font-body text-[12px] text-text-secondary"
+                                  style={{position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none'}}
                                 >
-                                  {OAUTH_PROVIDERS.map((provider) => (
-                                    <option key={provider.value} value={provider.value}>
-                                      {provider.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                  %
+                                </span>
                               </div>
-                              <Input
-                                label="OAuth Account"
-                                value={editingProvider.oauthAccount || ''}
-                                onChange={(e) => setEditingProvider({
-                                  ...editingProvider,
-                                  oauthAccount: e.target.value
-                                })}
-                                placeholder="e.g. work, personal, team-a"
-                              />
                             </div>
-                          )}
-                          <div style={{width: '200px'}}>
-                            <Input
-                                label="Discount (0.0 - 1.0)"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max="1"
-                                value={editingProvider.discount || ''}
-                                onChange={(e) => setEditingProvider({...editingProvider, discount: parseFloat(e.target.value)})}
-                            />
                           </div>
 
-                          <div className="flex items-center gap-2 py-2">
-                              <Switch
-                                checked={editingProvider.estimateTokens || false}
-                                onChange={(checked) => setEditingProvider({...editingProvider, estimateTokens: checked})}
-                              />
-                              <div className="flex flex-col">
-                                  <label className="font-body text-[13px] font-medium text-text">Estimate Tokens</label>
-                                  <span className="font-body text-[11px] text-text-secondary">Enable token estimation for providers that don't return usage data</span>
+                          <div className="border border-border-glass rounded-md overflow-hidden">
+                              <div
+                                className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                                onClick={() => setIsHeadersOpen(!isHeadersOpen)}
+                              >
+                                  {isHeadersOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+                                  <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0, flex: 1}}>Custom Headers</label>
+                                  <Badge status="neutral" style={{fontSize: '10px', padding: '2px 8px'}}>{Object.keys(editingProvider.headers || {}).length}</Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => { e.stopPropagation(); addKV('headers'); setIsHeadersOpen(true); }}
+                                  >
+                                    <Plus size={14}/>
+                                  </Button>
                               </div>
+                              {isHeadersOpen && (
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-deep)'}}>
+                                    {Object.entries(editingProvider.headers || {}).length === 0 && (
+                                      <div className="font-body text-[11px] text-text-secondary italic">No custom headers configured.</div>
+                                    )}
+                                    {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
+                                        <div key={idx} style={{display: 'flex', gap: '6px'}}>
+                                            <Input placeholder="Header Name" value={key} onChange={(e) => updateKV('headers', key, e.target.value, val)} style={{flex: 1}}/>
+                                            <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
+                                                    const rawValue = e.target.value;
+                                                    let parsedValue;
+                                                    try {
+                                                        parsedValue = JSON.parse(rawValue);
+                                                    } catch {
+                                                        parsedValue = rawValue;
+                                                    }
+                                                    updateKV('headers', key, key, parsedValue);
+                                                }} style={{flex: 1}}/>
+                                            <Button variant="ghost" size="sm" onClick={() => removeKV('headers', key)} style={{padding: '4px'}}><Trash2 size={14} style={{color: 'var(--color-danger)'}}/></Button>
+                                        </div>
+                                    ))}
+                                </div>
+                              )}
                           </div>
 
-                          <div>
-                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
-                                  <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Custom Headers</label>
-                                  <Button size="sm" variant="secondary" onClick={() => addKV('headers')}><Plus size={14}/></Button>
+                          <div className="border border-border-glass rounded-md overflow-hidden">
+                              <div
+                                className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                                onClick={() => setIsExtraBodyOpen(!isExtraBodyOpen)}
+                              >
+                                  {isExtraBodyOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+                                  <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0, flex: 1}}>Extra Body Fields</label>
+                                  <Badge status="neutral" style={{fontSize: '10px', padding: '2px 8px'}}>{Object.keys(editingProvider.extraBody || {}).length}</Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => { e.stopPropagation(); addKV('extraBody'); setIsExtraBodyOpen(true); }}
+                                  >
+                                    <Plus size={14}/>
+                                  </Button>
                               </div>
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                  {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
-                                      <div key={idx} style={{display: 'flex', gap: '6px'}}>
-                                          <Input placeholder="Header Name" value={key} onChange={(e) => updateKV('headers', key, e.target.value, val)} style={{flex: 1}}/>
-                                          <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
-                                                  const rawValue = e.target.value;
-                                                  let parsedValue;
-                                                  try {
-                                                      parsedValue = JSON.parse(rawValue);
-                                                  } catch {
-                                                      parsedValue = rawValue;
-                                                  }
-                                                  updateKV('headers', key, key, parsedValue);
-                                              }} style={{flex: 1}}/>
-                                          <Button variant="ghost" size="sm" onClick={() => removeKV('headers', key)} style={{padding: '4px'}}><Trash2 size={14} style={{color: 'var(--color-danger)'}}/></Button>
-                                      </div>
-                                  ))}
-                              </div>
-                          </div>
-
-                          <div>
-                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
-                                  <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Extra Body Fields</label>
-                                  <Button size="sm" variant="secondary" onClick={() => addKV('extraBody')}><Plus size={14}/></Button>
-                              </div>
-                              <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                  {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
-                                      <div key={idx} style={{display: 'flex', gap: '6px'}}>
-                                          <Input placeholder="Field Name" value={key} onChange={(e) => updateKV('extraBody', key, e.target.value, val)} style={{flex: 1}}/>
-                                          <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
-                                                  const rawValue = e.target.value;
-                                                  let parsedValue;
-                                                  try {
-                                                      parsedValue = JSON.parse(rawValue);
-                                                  } catch {
-                                                      parsedValue = rawValue;
-                                                  }
-                                                  updateKV('extraBody', key, key, parsedValue);
-                                              }} style={{flex: 1}}/>
-                                          <Button variant="ghost" size="sm" onClick={() => removeKV('extraBody', key)} style={{padding: '4px'}}><Trash2 size={14} style={{color: 'var(--color-danger)'}}/></Button>
-                                      </div>
-                                  ))}
-                              </div>
+                              {isExtraBodyOpen && (
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', borderTop: '1px solid var(--color-border-glass)', background: 'var(--color-bg-deep)'}}>
+                                    {Object.entries(editingProvider.extraBody || {}).length === 0 && (
+                                      <div className="font-body text-[11px] text-text-secondary italic">No extra body fields configured.</div>
+                                    )}
+                                    {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
+                                        <div key={idx} style={{display: 'flex', gap: '6px'}}>
+                                            <Input placeholder="Field Name" value={key} onChange={(e) => updateKV('extraBody', key, e.target.value, val)} style={{flex: 1}}/>
+                                            <Input placeholder="Value" value={typeof val === 'object' ? JSON.stringify(val) : val} onChange={(e) => {
+                                                    const rawValue = e.target.value;
+                                                    let parsedValue;
+                                                    try {
+                                                        parsedValue = JSON.parse(rawValue);
+                                                    } catch {
+                                                        parsedValue = rawValue;
+                                                    }
+                                                    updateKV('extraBody', key, key, parsedValue);
+                                                }} style={{flex: 1}}/>
+                                            <Button variant="ghost" size="sm" onClick={() => removeKV('extraBody', key)} style={{padding: '4px'}}><Trash2 size={14} style={{color: 'var(--color-danger)'}}/></Button>
+                                        </div>
+                                    ))}
+                                </div>
+                              )}
                           </div>
 
                           <div>
@@ -1033,29 +1067,32 @@ export const Providers = () => {
                                   ))}
                                 </select>
                               </div>
-                              <Input
-                                label="Interval"
-                                type="number"
-                                min={1}
-                                step={1}
-                                value={editingProvider.quotaChecker?.intervalMinutes || 30}
-                                disabled={!selectedQuotaCheckerType}
-                                onChange={(e) => {
-                                  const intervalMinutes = Math.max(1, parseInt(e.target.value, 10) || 30);
-                                  setEditingProvider({
-                                    ...editingProvider,
-                                    quotaChecker: {
-                                      type: selectedQuotaCheckerType,
-                                      enabled: selectedQuotaCheckerType
-                                        ? VALID_QUOTA_CHECKER_TYPES.has(selectedQuotaCheckerType)
-                                          ? editingProvider.quotaChecker?.enabled !== false
-                                          : false
-                                        : false,
-                                      intervalMinutes
-                                    }
-                                  });
-                                }}
-                              />
+                              <div className="flex flex-col gap-1">
+                                <label className="font-body text-[11px] font-medium text-text-secondary">Interval (min)</label>
+                                <input
+                                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  value={editingProvider.quotaChecker?.intervalMinutes || 30}
+                                  disabled={!selectedQuotaCheckerType}
+                                  onChange={(e) => {
+                                    const intervalMinutes = Math.max(1, parseInt(e.target.value, 10) || 30);
+                                    setEditingProvider({
+                                      ...editingProvider,
+                                      quotaChecker: {
+                                        type: selectedQuotaCheckerType,
+                                        enabled: selectedQuotaCheckerType
+                                          ? VALID_QUOTA_CHECKER_TYPES.has(selectedQuotaCheckerType)
+                                            ? editingProvider.quotaChecker?.enabled !== false
+                                            : false
+                                          : false,
+                                        intervalMinutes
+                                      }
+                                    });
+                                  }}
+                                />
+                              </div>
                             </div>
                             <div style={{fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', fontStyle: 'italic'}}>
                               {forcedOAuthQuotaCheckerType
@@ -1063,18 +1100,23 @@ export const Providers = () => {
                                 : <>Select <span style={{fontWeight: 600}}>&lt;none&gt;</span> to disable provider quota checks.</>}
                             </div>
                           </div>
+
+                          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                            <div className="flex items-center gap-2" style={{minHeight: '38px'}}>
+                              <Switch
+                                checked={editingProvider.estimateTokens || false}
+                                onChange={(checked) => setEditingProvider({...editingProvider, estimateTokens: checked})}
+                              />
+                              <label className="font-body text-[13px] font-medium text-text" style={{marginBottom: 0}}>Estimate Tokens</label>
+                            </div>
+                            <div className="font-body text-[11px] text-text-secondary" style={{lineHeight: 1.35, marginTop: '4px'}}>
+                              Enable token estimation only when a provider does not return usage data.
+                              <span className="text-warning" style={{marginLeft: '6px'}}>Use sparingly—this is rarely needed.</span>
+                            </div>
+                          </div>
                       </div>
                   </div>
               </div>
-
-              <Input
-                label="API Key"
-                type="password"
-                value={editingProvider.apiKey}
-                onChange={(e) => setEditingProvider({...editingProvider, apiKey: e.target.value})}
-                placeholder="sk-..."
-                disabled={isOAuthMode}
-              />
 
               {isOAuthMode && (
                 <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
