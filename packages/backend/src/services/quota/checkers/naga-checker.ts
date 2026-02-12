@@ -37,7 +37,9 @@ export class NagaQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`Invalid balance value received: ${data.balance}`));
       }
 
-      const used = Math.max(0, maxBalance - currentBalance);
+      const used = currentBalance > maxBalance 
+        ? currentBalance 
+        : Math.max(0, maxBalance - currentBalance);
       const remaining = currentBalance;
 
       const window: QuotaWindow = this.createWindow(
