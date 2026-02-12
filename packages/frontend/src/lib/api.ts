@@ -655,6 +655,10 @@ export interface OAuthSession {
     updatedAt: number;
 }
 
+export interface OAuthCredentialStatus {
+    ready: boolean;
+}
+
 export const formatLargeNumber = formatNumber;
 
 export const STAT_LABELS = {
@@ -1592,6 +1596,17 @@ export const api = {
           const err = await res.json();
           throw new Error(err.error || 'Failed to delete OAuth credentials');
       }
+  },
+
+  getOAuthCredentialStatus: async (providerId: string, accountId: string): Promise<OAuthCredentialStatus> => {
+      const query = new URLSearchParams({ providerId, accountId }).toString();
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/credentials/status?${query}`);
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to fetch OAuth credential status');
+      }
+      const json = await res.json() as { data: OAuthCredentialStatus };
+      return json.data;
   },
 
   getOAuthSession: async (sessionId: string): Promise<OAuthSession> => {

@@ -18,6 +18,11 @@ const inputSchema = z.object({
   value: z.string()
 });
 
+const credentialStatusQuerySchema = z.object({
+  providerId: z.string().min(1),
+  accountId: z.string().min(1)
+});
+
 const toProviderResponse = (provider: { id: string; name: string; usesCallbackServer?: boolean }) => ({
   id: provider.id,
   name: provider.name,
@@ -67,6 +72,21 @@ export async function registerOAuthRoutes(
     }
 
     return reply.send({ data: { deleted: true } });
+  });
+
+  fastify.get('/v0/management/oauth/credentials/status', async (request, reply) => {
+    const parsed = credentialStatusQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid query parameters', details: parsed.error.errors });
+    }
+
+    const authManager = OAuthAuthManager.getInstance();
+    const ready = authManager.hasProvider(
+      parsed.data.providerId as OAuthProvider,
+      parsed.data.accountId
+    );
+
+    return reply.send({ data: { ready } });
   });
 
   fastify.get('/v0/management/oauth/sessions/:id', async (request, reply) => {

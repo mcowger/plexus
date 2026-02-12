@@ -196,6 +196,8 @@ export const Providers = () => {
   const [oauthManualCode, setOauthManualCode] = useState('');
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [oauthBusy, setOauthBusy] = useState(false);
+  const [oauthCredentialReady, setOauthCredentialReady] = useState(false);
+  const [oauthCredentialChecking, setOauthCredentialChecking] = useState(false);
 
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
@@ -226,7 +228,11 @@ export const Providers = () => {
         error: 'Error',
         cancelled: 'Cancelled'
       }[oauthStatus] || oauthStatus
-    : 'Not started';
+    : oauthCredentialChecking
+      ? 'Checking...'
+      : oauthCredentialReady
+        ? 'Ready'
+        : 'Not started';
 
   // Accordion state for Modal
   const [isModelsOpen, setIsModelsOpen] = useState(false);
@@ -352,9 +358,47 @@ export const Providers = () => {
   useEffect(() => {
     if (!isModalOpen) {
       resetOAuthState();
+      setOauthCredentialReady(false);
+      setOauthCredentialChecking(false);
       return;
     }
   }, [isModalOpen]);
+
+  useEffect(() => {
+    if (!isModalOpen || !isOAuthMode) {
+      setOauthCredentialReady(false);
+      setOauthCredentialChecking(false);
+      return;
+    }
+
+    const providerId = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+    const accountId = editingProvider.oauthAccount?.trim();
+    if (!accountId) {
+      setOauthCredentialReady(false);
+      setOauthCredentialChecking(false);
+      return;
+    }
+
+    let cancelled = false;
+    setOauthCredentialChecking(true);
+    api.getOAuthCredentialStatus(providerId, accountId)
+      .then((result) => {
+        if (cancelled) return;
+        setOauthCredentialReady(!!result.ready);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOauthCredentialReady(false);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setOauthCredentialChecking(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isModalOpen, isOAuthMode, editingProvider.oauthProvider, editingProvider.oauthAccount, oauthStatus]);
 
   useEffect(() => {
     if (!isOAuthMode) return;
@@ -924,6 +968,129 @@ export const Providers = () => {
                             })}
                             placeholder="e.g. work, personal, team-a"
                           />
+
+                          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle" style={{marginTop: '4px'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px'}}>
+                              <div>
+                                <div className="font-body text-[13px] font-medium text-text">OAuth Authentication</div>
+                                <div className="text-[11px] text-text-secondary">Tokens are saved to auth.json after login.</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '999px',
+                                    background: oauthStatus === 'success' || (!oauthStatus && oauthCredentialReady)
+                                      ? 'var(--color-success)'
+                                      : oauthStatus === 'error' || oauthStatus === 'cancelled'
+                                        ? 'var(--color-danger)'
+                                        : 'var(--color-text-secondary)',
+                                    opacity: oauthCredentialChecking ? 0.6 : 1
+                                  }}
+                                />
+                                <span className="text-[11px] font-medium text-text-secondary" style={{textTransform: 'lowercase'}}>
+                                  {oauthStatusLabel}
+                                </span>
+                              </div>
+                            </div>
+
+                            {oauthError && (
+                              <div className="text-[11px] text-danger" style={{marginBottom: '8px'}}>
+                                {oauthError}
+                              </div>
+                            )}
+
+                            {oauthSession?.authInfo && (
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px'}}>
+                                <Input
+                                  label="Authorization URL"
+                                  value={oauthSession.authInfo.url}
+                                  readOnly
+                                />
+                                {oauthSession.authInfo.instructions && (
+                                  <div className="text-[11px] text-text-secondary flex items-center gap-1">
+                                    <Info size={12} />
+                                    <span>{oauthSession.authInfo.instructions}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {oauthSession?.prompt && (
+                              <div style={{display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px'}}>
+                                <div style={{flex: 1}}>
+                                  <Input
+                                    label={oauthSession.prompt.message}
+                                    placeholder={oauthSession.prompt.placeholder}
+                                    value={oauthPromptValue}
+                                    onChange={(e) => setOauthPromptValue(e.target.value)}
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSubmitPrompt}
+                                  disabled={oauthBusy || (!oauthSession.prompt.allowEmpty && !oauthPromptValue)}
+                                >
+                                  Submit
+                                </Button>
+                              </div>
+                            )}
+
+                            {oauthSession?.status === 'awaiting_manual_code' && (
+                              <div style={{display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px'}}>
+                                <div style={{flex: 1}}>
+                                  <Input
+                                    label="Paste redirect URL or code"
+                                    value={oauthManualCode}
+                                    onChange={(e) => setOauthManualCode(e.target.value)}
+                                    placeholder="https://..."
+                                  />
+                                </div>
+                                <Button size="sm" onClick={handleSubmitManualCode} disabled={oauthBusy || !oauthManualCode}>
+                                  Submit
+                                </Button>
+                              </div>
+                            )}
+
+                            {oauthSession?.progress && oauthSession.progress.length > 0 && (
+                              <div style={{marginBottom: '8px'}}>
+                                <div className="text-[11px] text-text-secondary">Progress</div>
+                                <div className="text-[11px] text-text" style={{marginTop: '4px'}}>
+                                  {(oauthSession?.progress ?? []).slice(-3).map((message, idx) => (
+                                    <div key={`${message}-${idx}`}>{message}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {oauthStatus === 'success' && (
+                              <div className="text-[11px] text-success" style={{marginBottom: '8px'}}>
+                                Authentication complete. Tokens saved to auth.json.
+                              </div>
+                            )}
+
+                            <div style={{display: 'flex', gap: '8px'}}>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={handleStartOAuth}
+                                isLoading={oauthBusy && !oauthSessionId}
+                                disabled={oauthBusy || (!!oauthSessionId && !oauthIsTerminal)}
+                              >
+                                {oauthSessionId && !oauthIsTerminal
+                                  ? 'OAuth in progress'
+                                  : oauthCredentialReady
+                                    ? 'Restart OAuth'
+                                    : 'Start OAuth'}
+                              </Button>
+                              {oauthSessionId && !oauthIsTerminal && (
+                                <Button size="sm" variant="ghost" onClick={handleCancelOAuth} disabled={oauthBusy}>
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <div className="border border-border-glass rounded-md overflow-hidden">
@@ -1177,123 +1344,7 @@ export const Providers = () => {
                   </div>
               </div>
 
-              {isOAuthMode && (
-                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px'}}>
-                    <div>
-                      <div className="font-body text-[13px] font-medium text-text">OAuth Authentication</div>
-                      <div className="text-[11px] text-text-secondary">Tokens are saved to auth.json after login.</div>
-                    </div>
-                    <Badge
-                      status={
-                        oauthStatus === 'success'
-                          ? 'connected'
-                          : oauthStatus === 'error' || oauthStatus === 'cancelled'
-                          ? 'error'
-                          : oauthSessionId
-                          ? 'warning'
-                          : 'neutral'
-                      }
-                      style={{fontSize: '10px', padding: '2px 8px'}}
-                      className="[&_.connection-dot]:hidden"
-                    >
-                      {oauthStatusLabel}
-                    </Badge>
-                  </div>
 
-                  {oauthError && (
-                    <div className="text-[11px] text-danger" style={{marginBottom: '8px'}}>
-                      {oauthError}
-                    </div>
-                  )}
-
-                  {oauthSession?.authInfo && (
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px'}}>
-                      <Input
-                        label="Authorization URL"
-                        value={oauthSession.authInfo.url}
-                        readOnly
-                      />
-                      {oauthSession.authInfo.instructions && (
-                        <div className="text-[11px] text-text-secondary flex items-center gap-1">
-                          <Info size={12} />
-                          <span>{oauthSession.authInfo.instructions}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {oauthSession?.prompt && (
-                    <div style={{display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px'}}>
-                      <div style={{flex: 1}}>
-                        <Input
-                          label={oauthSession.prompt.message}
-                          placeholder={oauthSession.prompt.placeholder}
-                          value={oauthPromptValue}
-                          onChange={(e) => setOauthPromptValue(e.target.value)}
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={handleSubmitPrompt}
-                        disabled={oauthBusy || (!oauthSession.prompt.allowEmpty && !oauthPromptValue)}
-                      >
-                        Submit
-                      </Button>
-                    </div>
-                  )}
-
-                  {oauthSession?.status === 'awaiting_manual_code' && (
-                    <div style={{display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px'}}>
-                      <div style={{flex: 1}}>
-                        <Input
-                          label="Paste redirect URL or code"
-                          value={oauthManualCode}
-                          onChange={(e) => setOauthManualCode(e.target.value)}
-                          placeholder="https://..."
-                        />
-                      </div>
-                      <Button size="sm" onClick={handleSubmitManualCode} disabled={oauthBusy || !oauthManualCode}>
-                        Submit
-                      </Button>
-                    </div>
-                  )}
-
-                  {oauthSession?.progress && oauthSession.progress.length > 0 && (
-                    <div style={{marginBottom: '8px'}}>
-                      <div className="text-[11px] text-text-secondary">Progress</div>
-                      <div className="text-[11px] text-text" style={{marginTop: '4px'}}>
-                        {(oauthSession?.progress ?? []).slice(-3).map((message, idx) => (
-                          <div key={`${message}-${idx}`}>{message}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {oauthStatus === 'success' && (
-                    <div className="text-[11px] text-success" style={{marginBottom: '8px'}}>
-                      Authentication complete. Tokens saved to auth.json.
-                    </div>
-                  )}
-
-                  <div style={{display: 'flex', gap: '8px'}}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={handleStartOAuth}
-                      isLoading={oauthBusy && !oauthSessionId}
-                      disabled={oauthBusy || (!!oauthSessionId && !oauthIsTerminal)}
-                    >
-                      {oauthSessionId && !oauthIsTerminal ? 'OAuth in progress' : 'Start OAuth'}
-                    </Button>
-                    {oauthSessionId && !oauthIsTerminal && (
-                      <Button size="sm" variant="ghost" onClick={handleCancelOAuth} disabled={oauthBusy}>
-                        Cancel
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Models Accordion */}
               <div className="border border-border-glass rounded-md">
