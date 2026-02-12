@@ -226,9 +226,6 @@ export const Providers = () => {
     if (!quotaType) return null;
     
     if (quotaType === 'naga') {
-      if (!options.max || (options.max as number) <= 0) {
-        return 'Max Balance is required for Naga quota checker';
-      }
       if (!options.apiKey || !(options.apiKey as string).trim()) {
         return 'Provisioning API Key is required for Naga quota checker';
       }
