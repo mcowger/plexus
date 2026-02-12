@@ -20,7 +20,7 @@
     "compile:windows": "bun run build:frontend && bun build packages/backend/src/index.ts packages/frontend/dist/index.html packages/frontend/dist/main.js packages/frontend/dist/main.css --compile --target=bun-windows-x64 --outfile plexus.exe",
     "build:bin": "bun run build:frontend && bun build packages/backend/src/index.ts packages/frontend/dist/index.html packages/frontend/dist/main.js packages/frontend/dist/main.css --compile --outfile plexus",
     "install:all": "bun install && (cd packages/backend && bun install) && (cd packages/frontend && bun install)",
-    "check-types": "bun run --workspaces check-types",
+    "typecheck": "bun run --workspaces typecheck",
     "release": "bun run scripts/release.ts"
   },
   "type": "module",
