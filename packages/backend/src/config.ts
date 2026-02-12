@@ -355,6 +355,7 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
   const quotas: QuotaConfig[] = [];
   const seenIds = new Set<string>();
 
+  // First, process explicitly configured quota checkers
   for (const [providerId, providerConfig] of Object.entries(config.providers)) {
     if (providerConfig.enabled === false) {
       continue;
@@ -404,6 +405,54 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       intervalMinutes: quotaChecker.intervalMinutes,
       options,
     });
+  }
+
+  // Add implicit quota checkers for OAuth providers that don't have explicit quota checkers
+  // These are automatically added based on the oauth_provider type
+  const oauthQuotaCheckers: Record<string, { type: string; intervalMinutes: number }> = {
+    'openai-codex': { type: 'openai-codex', intervalMinutes: 5 },
+    'claude-code': { type: 'claude-code', intervalMinutes: 5 },
+  };
+
+  for (const [providerId, providerConfig] of Object.entries(config.providers)) {
+    if (providerConfig.enabled === false) {
+      continue;
+    }
+
+    // Skip if already has explicit quota checker
+    if (providerConfig.quota_checker && providerConfig.quota_checker.enabled !== false) {
+      continue;
+    }
+
+    // Check if this provider uses an OAuth provider that needs a quota checker
+    const oauthProvider = providerConfig.oauth_provider;
+    if (oauthProvider && oauthQuotaCheckers[oauthProvider]) {
+      const quotaInfo = oauthQuotaCheckers[oauthProvider];
+      const checkerId = `${providerId}-${oauthProvider}`;
+
+      if (!seenIds.has(checkerId)) {
+        seenIds.add(checkerId);
+
+        const options: Record<string, unknown> = {};
+        if (oauthProvider && options.oauthProvider === undefined) {
+          options.oauthProvider = oauthProvider;
+        }
+        if (providerConfig.oauth_account && options.oauthAccountId === undefined) {
+          options.oauthAccountId = providerConfig.oauth_account;
+        }
+
+        quotas.push({
+          id: checkerId,
+          provider: providerId,
+          type: quotaInfo.type,
+          enabled: true,
+          intervalMinutes: quotaInfo.intervalMinutes,
+          options,
+        });
+
+        logger.info(`Added implicit quota checker '${quotaInfo.type}' for provider '${providerId}'`);
+      }
+    }
   }
 
   return quotas;
