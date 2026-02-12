@@ -1213,6 +1213,50 @@ export const api = {
       await api.saveConfig(newYaml);
   },
 
+  deleteProvider: async (providerId: string, cascade?: boolean): Promise<{
+    success: boolean;
+    provider: string;
+    removedTargets?: number;
+    affectedAliases?: string[];
+  }> => {
+    try {
+      const url = `/v0/management/providers/${encodeURIComponent(providerId)}${cascade ? '?cascade=true' : ''}`;
+      
+      const response = await fetchWithAuth(url, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to delete provider' }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (e) {
+      console.error('API Error deleteProvider', e);
+      throw e;
+    }
+  },
+
+  getAffectedAliases: async (providerId: string): Promise<{ aliasId: string; targetsCount: number }[]> => {
+    try {
+      const aliases = await api.getAliases();
+      const affected: { aliasId: string; targetsCount: number }[] = [];
+      
+      for (const alias of aliases) {
+        const targetsCount = alias.targets.filter(t => t.provider === providerId).length;
+        if (targetsCount > 0) {
+          affected.push({ aliasId: alias.id, targetsCount });
+        }
+      }
+      
+      return affected;
+    } catch (e) {
+      console.error('API Error getAffectedAliases', e);
+      return [];
+    }
+  },
+
   saveAlias: async (alias: Alias, oldId?: string): Promise<void> => {
       const yamlStr = await api.getConfig();
       let config: any;
