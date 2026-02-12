@@ -289,4 +289,38 @@ export class QuotaScheduler {
     this.intervals.clear();
     this.checkers.clear();
   }
+
+  async reload(quotaConfigs: QuotaCheckerConfig[]): Promise<void> {
+    const existingIds = new Set(this.checkers.keys());
+    const newConfigs = quotaConfigs.filter(c => !existingIds.has(c.id) && c.enabled);
+
+    for (const config of newConfigs) {
+      try {
+        const checker = QuotaCheckerFactory.createChecker(config.type, config);
+        this.checkers.set(config.id, checker);
+        logger.info(`Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`);
+
+        await this.runCheckNow(config.id);
+        const intervalMs = checker.config.intervalMinutes * 60 * 1000;
+        const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
+        this.intervals.set(config.id, intervalId);
+        logger.info(`Scheduled quota checker '${config.id}' to run every ${checker.config.intervalMinutes} minutes`);
+      } catch (error) {
+        logger.error(`Failed to register quota checker '${config.id}' on reload: ${error}`);
+      }
+    }
+
+    const loadedIds = new Set(quotaConfigs.filter(c => c.enabled).map(c => c.id));
+    for (const id of existingIds) {
+      if (!loadedIds.has(id)) {
+        const intervalId = this.intervals.get(id);
+        if (intervalId) {
+          clearInterval(intervalId);
+          this.intervals.delete(id);
+        }
+        this.checkers.delete(id);
+        logger.info(`Removed quota checker '${id}' on reload`);
+      }
+    }
+  }
 }

@@ -3,6 +3,7 @@ import fs from 'fs';
 import yaml from 'yaml';
 import path from 'path';
 import { logger } from './utils/logger';
+import { QuotaScheduler } from './services/quota/quota-scheduler';
 
 // --- Zod Schemas ---
 
@@ -413,6 +414,7 @@ function setupWatcher(filePath: string) {
                     try {
                         const newConfig = await parseConfigFile(filePath);
                         currentConfig = newConfig;
+                        await QuotaScheduler.getInstance().reload(newConfig.quotas);
                         logger.info('Configuration reloaded successfully');
                     } catch (error) {
                         logger.error('Failed to reload configuration', { error });
