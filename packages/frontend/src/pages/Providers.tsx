@@ -804,6 +804,7 @@ export const Providers = () => {
                           <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>ID / Name</th>
                           <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">APIs</th>
+                          <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Models</th>
                           <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
                       </tr>
                   </thead>
@@ -839,6 +840,15 @@ export const Providers = () => {
                                           </Badge>
                                       ))}
                                   </div>
+                              </td>
+                              <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                                  {p.models 
+                                    ? (Array.isArray(p.models) 
+                                        ? p.models.length 
+                                        : typeof p.models === 'object' 
+                                          ? Object.keys(p.models).length 
+                                          : 0)
+                                    : 0}
                               </td>
                               <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
                                   <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
