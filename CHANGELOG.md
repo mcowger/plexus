@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.14.2 - 2026-02-12
+
+### v0.14.2: Quota checker UI and Naga quota fixes
+
+## New Features
+
+- **Quota Checker Configuration UI** - Added UI components for configuring quota checkers ([1fdd2c0](https://github.com/mcowger/plexus/commit/1fdd2c0))
+
+## Bug Fixes
+
+- **Naga Quota Display Styling** - Improved styling to match other quota displays ([a865758](https://github.com/mcowger/plexus/commit/a865758))
+- **Implicit OAuth Quota Checkers** - Added implicit quota checkers for openai-codex and claude-code OAuth providers ([093de5e](https://github.com/mcowger/plexus/commit/093de5e))
+- **Naga Quota Utilization Calculation** - Fixed calculation when balance exceeds max ([ffb0429](https://github.com/mcowger/plexus/commit/ffb0429))
+- **Deprecation Warning** - Only show warning if array has entries ([0c657b2](https://github.com/mcowger/plexus/commit/0c657b2))
+
+## Improvements
+
+- **Naga Quota Checker** - Removed max balance tracking, simplifying the implementation ([5bb11a9](https://github.com/mcowger/plexus/commit/5bb11a9))
+
+---
+
+Docker image updated and available at ghcr.io/mcowger/plexus:latest
+
 ## v0.14.1 - 2026-02-12
 
 ### v0.14.1: Option for Cascade Provider Deletions, and small bugs
