@@ -124,6 +124,75 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
         }
     });
 
+    fastify.delete('/v0/management/providers/:providerId', async (request, reply) => {
+        const configPath = getConfigPath();
+        if (!configPath) {
+            return reply.code(500).send({ error: 'Configuration path not determined' });
+        }
+
+        const params = request.params as { providerId: string };
+        const providerId = params.providerId;
+        const query = request.query as { cascade?: string };
+        const cascade = query.cascade === 'true';
+
+        try {
+            const file = Bun.file(configPath);
+            if (!(await file.exists())) {
+                return reply.code(404).send({ error: 'Configuration file not found' });
+            }
+
+            const configContent = await file.text();
+            const parsed = (yaml.parse(configContent) as any) || {};
+            const providers = parsed.providers || {};
+
+            if (!providers[providerId]) {
+                return reply.code(404).send({ error: `Provider '${providerId}' not found` });
+            }
+
+            delete providers[providerId];
+            parsed.providers = providers;
+
+            let removedTargets = 0;
+            const affectedAliases: string[] = [];
+
+            if (cascade) {
+                const models = parsed.models || {};
+                for (const [aliasId, alias] of Object.entries(models)) {
+                    const aliasObj = alias as any;
+                    if (aliasObj.targets && Array.isArray(aliasObj.targets)) {
+                        const originalLength = aliasObj.targets.length;
+                        aliasObj.targets = aliasObj.targets.filter(
+                            (target: any) => target.provider !== providerId
+                        );
+                        const targetsRemoved = originalLength - aliasObj.targets.length;
+                        if (targetsRemoved > 0) {
+                            removedTargets += targetsRemoved;
+                            affectedAliases.push(aliasId);
+                        }
+                    }
+                }
+                parsed.models = models;
+            }
+
+            const updatedConfig = yaml.stringify(parsed);
+            validateConfig(updatedConfig);
+
+            await Bun.write(configPath, updatedConfig);
+            logger.info(`Provider '${providerId}' deleted via API at ${configPath}${cascade ? ' (cascade)' : ''}`);
+            await loadConfig(configPath);
+
+            return reply.send({
+                success: true,
+                provider: providerId,
+                removedTargets: cascade ? removedTargets : undefined,
+                affectedAliases: cascade ? affectedAliases : undefined,
+            });
+        } catch (e: any) {
+            logger.error(`Failed to delete provider '${providerId}'`, e);
+            return reply.code(500).send({ error: e.message });
+        }
+    });
+
     // Support YAML and Plain Text payloads for management API
     fastify.addContentTypeParser(['text/plain', 'application/x-yaml', 'text/yaml'], { parseAs: 'string' }, (req, body, done) => {
         done(null, body);

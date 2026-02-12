@@ -249,6 +249,10 @@ export const Providers = () => {
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const [deleteModalProvider, setDeleteModalProvider] = useState<Provider | null>(null);
+  const [deleteModalLoading, setDeleteModalLoading] = useState(false);
+  const [affectedAliases, setAffectedAliases] = useState<{ aliasId: string; targetsCount: number }[]>([]);
+
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 10000);
@@ -276,15 +280,24 @@ export const Providers = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm(`Are you sure you want to delete provider "${id}"?`)) {
-        try {
-            const updated = providers.filter(p => p.id !== id);
-            await api.saveProviders(updated);
-            await loadData();
-        } catch (e) {
-            alert("Failed to delete provider: " + e);
-        }
+  const openDeleteModal = async (provider: Provider) => {
+    const affected = await api.getAffectedAliases(provider.id);
+    setAffectedAliases(affected);
+    setDeleteModalProvider(provider);
+  };
+
+  const handleDelete = async (cascade: boolean) => {
+    if (!deleteModalProvider) return;
+    
+    setDeleteModalLoading(true);
+    try {
+      await api.deleteProvider(deleteModalProvider.id, cascade);
+      await loadData();
+      setDeleteModalProvider(null);
+    } catch (e) {
+      alert("Failed to delete provider: " + e);
+    } finally {
+      setDeleteModalLoading(false);
     }
   };
 
@@ -852,7 +865,7 @@ export const Providers = () => {
                               </td>
                               <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
                                   <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
-                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openDeleteModal(p); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
                                   </div>
                               </td>
                           </tr>
@@ -1855,6 +1868,98 @@ export const Providers = () => {
                 : 'Enter a URL and click Fetch to load available models'}
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!deleteModalProvider}
+        onClose={() => setDeleteModalProvider(null)}
+        title={`Delete Provider: ${deleteModalProvider?.name || deleteModalProvider?.id || ''}`}
+        size="lg"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+            Choose how to delete this provider. The action cannot be undone.
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ 
+              border: '1px solid var(--color-border)', 
+              borderRadius: '8px', 
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-danger)' }}>
+                Delete Provider (Cascade)
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                Removes this provider AND deletes all model alias targets that reference it.
+              </div>
+              {affectedAliases.length > 0 ? (
+                <div style={{ fontSize: '13px' }}>
+                  <div style={{ fontWeight: 500, marginBottom: '4px' }}>
+                    This will affect {affectedAliases.length} model alias(es):
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                    {affectedAliases.map(a => (
+                      <li key={a.aliasId}>{a.aliasId} ({a.targetsCount} target(s))</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                  No model aliases reference this provider.
+                </div>
+              )}
+              <Button 
+                onClick={() => handleDelete(true)} 
+                isLoading={deleteModalLoading}
+                style={{ 
+                  backgroundColor: 'var(--color-danger)', 
+                  marginTop: 'auto'
+                }}
+              >
+                Delete (Cascade)
+              </Button>
+            </div>
+
+            <div style={{ 
+              border: '1px solid var(--color-border)', 
+              borderRadius: '8px', 
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-text)' }}>
+                Delete (Retain Targets)
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                Removes only the provider. Model alias targets that reference this provider will remain but may cause errors.
+              </div>
+              {affectedAliases.length > 0 && (
+                <div style={{ fontSize: '12px', color: 'var(--color-warning)', fontStyle: 'italic' }}>
+                  {affectedAliases.length} model alias(es) will have orphaned targets.
+                </div>
+              )}
+              <Button 
+                variant="secondary"
+                onClick={() => handleDelete(false)} 
+                isLoading={deleteModalLoading}
+                style={{ marginTop: 'auto' }}
+              >
+                Delete (Retain)
+              </Button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="ghost" onClick={() => setDeleteModalProvider(null)}>
+              Cancel
+            </Button>
+          </div>
         </div>
       </Modal>
 
