@@ -277,7 +277,7 @@ function logConfigStats(config: PlexusConfig) {
       });
     }
 
-    if (config.quotas) {
+    if (config.quotas && Array.isArray(config.quotas) && config.quotas.length > 0) {
       logger.warn(`DEPRECATED: Top-level 'quotas' array is no longer supported. Quota checkers should now be configured per-provider under providers.<name>.quota_checker. The top-level 'quotas' entries will be ignored.`);
       config.quotas.forEach((quota) => {
         logger.warn(`  - Ignoring: ${quota.id} (${quota.type})`);
