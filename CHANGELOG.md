@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.14.1 - 2026-02-12
+
+### v0.14.1: Option for Cascade Provider Deletions, and small bugs
+
+## Changes
+
+### New Features
+- **Cascade delete option for provider deletion** - Added ability to cascade delete resources when deleting a provider ([3b71f57](https://github.com/mcowger/plexus/commit/3b71f57))
+
+### Bug Fixes
+- **Fix TPS calculation for streaming requests** - TPS (Tokens Per Second) is now calculated excluding TTFT (Time To First Token) for streaming requests ([e89c660](https://github.com/mcowger/plexus/commit/e89c660))
+- **Fix API type testing** - Now only uses alias.type for testing API types instead of target.apiType ([b6207a5](https://github.com/mcowger/plexus/commit/b6207a5))
+
+---
+
+The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.14.0 - 2026-02-12
 
 ### v0.14.0 - NanoGPT quota checker, OAuth credential status, and provider UI enhancements
