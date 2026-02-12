@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.14.0 - 2026-02-12
+
+### v0.14.0 - NanoGPT quota checker, OAuth credential status, and provider UI enhancements
+
+## New Features
+
+- **NanoGPT Quota Checker Support** - Added new quota checker and provider configuration support for NanoGPT ([fe3c9c4](https://github.com/mcowger/plexus/commit/fe3c9c4))
+- **OAuth Integration** - Integrated OAuth auth panel into connection section and show credential readiness status ([7b53bd4](https://github.com/mcowger/plexus/commit/7b53bd4))
+- **Provider Models Column** - Added Models column to providers list for better visibility ([ce2bbd2](https://github.com/mcowger/plexus/commit/ce2bbd2))
+- **Quota Checker Configuration** - Moved quota checker config into providers with updated UI and documentation ([f4d942c](https://github.com/mcowger/plexus/commit/f4d942c))
+
+## Bug Fixes
+
+- **Dynamic Quota Checker Reload** - Fixed issue where quota checkers were not dynamically reloaded on config change ([4cf82b6](https://github.com/mcowger/plexus/commit/4cf82b6))
+
+## Improvements
+
+- **Base URL Editor Layout** - Improved base URL entry editor layout for better usability ([76cff1f](https://github.com/mcowger/plexus/commit/76cff1f))
+- **OAuth Provider Form Layout** - Refined OAuth provider form layout ([a704890](https://github.com/mcowger/plexus/commit/a704890))
+- **Build Script Renaming** - Renamed check-types to typecheck in package.json scripts ([33f19bd](https://github.com/mcowger/plexus/commit/33f19bd))
+
+---
+
+The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.13.5 - 2026-02-11
 
 ### v0.13.5: Performance page multi-target bar rendering fix
