@@ -498,8 +498,6 @@ export const Models = () => {
                                                             testApiTypes = ['images'];
                                                         } else if (alias.type === 'responses') {
                                                             testApiTypes = ['responses'];
-                                                        } else if (t.apiType && t.apiType.length > 0) {
-                                                            testApiTypes = t.apiType;
                                                         }
                                                         handleTestTarget(alias.id, i, t.provider, t.model, testApiTypes);
                                                     }
