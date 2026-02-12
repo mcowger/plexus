@@ -409,7 +409,8 @@ export class UsageStorageService extends EventEmitter {
 
             let tokensPerSec: number | null = null;
             if (outputTokens && durationMs > 0) {
-                tokensPerSec = (outputTokens / durationMs) * 1000;
+                const streamingTimeMs = timeToFirstTokenMs ? durationMs - timeToFirstTokenMs : durationMs;
+                tokensPerSec = streamingTimeMs > 0 ? (outputTokens / streamingTimeMs) * 1000 : null;
             }
 
             await this.ensureDb().insert(this.schema.providerPerformance).values({
