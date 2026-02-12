@@ -15,7 +15,6 @@ export class NagaQuotaChecker extends QuotaChecker {
 
   async checkQuota(): Promise<QuotaCheckResult> {
     const apiKey = this.requireOption<string>('apiKey');
-    const maxBalance = this.requireOption<number>('max');
 
     try {
       const response = await fetch(this.endpoint, {
@@ -37,16 +36,11 @@ export class NagaQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`Invalid balance value received: ${data.balance}`));
       }
 
-      const used = currentBalance > maxBalance 
-        ? currentBalance 
-        : Math.max(0, maxBalance - currentBalance);
-      const remaining = currentBalance;
-
       const window: QuotaWindow = this.createWindow(
         'subscription',
-        maxBalance,
-        used,
-        remaining,
+        undefined,
+        undefined,
+        currentBalance,
         'dollars',
         undefined,
         'Naga.ac account balance'

@@ -19,21 +19,6 @@ export const NagaQuotaConfig: React.FC<NagaQuotaConfigProps> = ({
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Max Balance ($) <span className="text-danger">*</span>
-        </label>
-        <Input
-          type="number"
-          value={(options.max as number) ?? ''}
-          onChange={(e) => handleChange('max', parseFloat(e.target.value) || 0)}
-          placeholder="e.g. 100"
-        />
-        <span className="text-[10px] text-text-muted">
-          Maximum account balance to track. Used to calculate utilization percentage.
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
           Provisioning API Key <span className="text-danger">*</span>
         </label>
         <Input
