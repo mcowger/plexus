@@ -61,13 +61,43 @@ const OAuthProviderSchema = z.enum([
   'google-antigravity'
 ]);
 
-const ProviderQuotaCheckerSchema = z.object({
-  enabled: z.boolean().default(true),
-  intervalMinutes: z.number().min(1).default(30),
-  id: z.string().trim().min(1).optional(),
-  type: z.string().trim().min(1),
-  options: z.record(z.any()).default({}),
+const NagaQuotaCheckerOptionsSchema = z.object({
+  apiKey: z.string().min(1, "Naga provisioning key is required"),
+  max: z.number().positive("Max balance must be a positive number"),
+  endpoint: z.string().url().optional(),
 });
+
+const SyntheticQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
+const NanoGPTQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
+const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('naga'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: NagaQuotaCheckerOptionsSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('synthetic'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: SyntheticQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('nanogpt'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: NanoGPTQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+]);
 
 const ProviderConfigSchema = z.object({
   display_name: z.string().optional(),
@@ -139,7 +169,7 @@ const RawPlexusConfigSchema = z.object({
   adminKey: z.string(),
   performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
-});
+}).passthrough();
 
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   quotas: QuotaConfig[];
@@ -248,10 +278,9 @@ function logConfigStats(config: PlexusConfig) {
     }
 
     if (config.quotas) {
-      const quotaCount = config.quotas.length;
-      logger.info(`Loaded ${quotaCount} Quota Checkers:`);
+      logger.warn(`DEPRECATED: Top-level 'quotas' array is no longer supported. Quota checkers should now be configured per-provider under providers.<name>.quota_checker. The top-level 'quotas' entries will be ignored.`);
       config.quotas.forEach((quota) => {
-        logger.info(`  - ${quota.id}: ${quota.type} (${quota.provider}) every ${quota.intervalMinutes}m`);
+        logger.warn(`  - Ignoring: ${quota.id} (${quota.type})`);
       });
     }
 }
@@ -352,6 +381,8 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       ...(quotaChecker.options ?? {}),
     };
 
+    // Inject the provider's API key for quota checkers that need it
+    // Each quota checker implementation decides whether to use it or use its own option
     const apiKey = providerConfig.api_key?.trim();
     if (apiKey && apiKey.toLowerCase() !== 'oauth' && options.apiKey === undefined) {
       options.apiKey = apiKey;

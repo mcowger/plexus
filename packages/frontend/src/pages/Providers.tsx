@@ -9,6 +9,9 @@ import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download, Info } fro
 
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
+import { NagaQuotaConfig } from '../components/quota/NagaQuotaConfig';
+import { SyntheticQuotaConfig } from '../components/quota/SyntheticQuotaConfig';
+import { NanoGPTQuotaConfig } from '../components/quota/NanoGPTQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -216,6 +219,28 @@ export const Providers = () => {
       ? editingProvider.quotaChecker.type
       : '');
 
+  const validateQuotaChecker = (): string | null => {
+    const quotaType = editingProvider.quotaChecker?.type;
+    const options = editingProvider.quotaChecker?.options || {};
+    
+    if (!quotaType) return null;
+    
+    if (quotaType === 'naga') {
+      if (!options.max || (options.max as number) <= 0) {
+        return 'Max Balance is required for Naga quota checker';
+      }
+      if (!options.apiKey || !(options.apiKey as string).trim()) {
+        return 'Provisioning API Key is required for Naga quota checker';
+      }
+    }
+    
+    // synthetic and nanogpt don't require options - they use the provider's api_key
+    
+    return null;
+  };
+
+  const quotaValidationError = validateQuotaChecker();
+
   const oauthStatus = oauthSession?.status;
   const oauthIsTerminal = oauthStatus ? ['success', 'error', 'cancelled'].includes(oauthStatus) : false;
   const oauthStatusLabel = oauthStatus
@@ -330,7 +355,8 @@ export const Providers = () => {
               quotaChecker: {
                 type: quotaType,
                 intervalMinutes: Math.max(1, providerToSave.quotaChecker.intervalMinutes || 30),
-                enabled: isValidQuotaType ? providerToSave.quotaChecker.enabled !== false : false
+                enabled: isValidQuotaType ? providerToSave.quotaChecker.enabled !== false : false,
+                options: providerToSave.quotaChecker.options
               }
             };
           }
@@ -343,7 +369,8 @@ export const Providers = () => {
               quotaChecker: {
                 type: forcedType,
                 enabled: true,
-                intervalMinutes: Math.max(1, providerToSave.quotaChecker?.intervalMinutes || 30)
+                intervalMinutes: Math.max(1, providerToSave.quotaChecker?.intervalMinutes || 30),
+                options: providerToSave.quotaChecker?.options
               }
             };
           }
@@ -883,7 +910,11 @@ export const Providers = () => {
         footer={
             <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
                 <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave} isLoading={isSaving}>Save Provider</Button>
+                <Button 
+                  onClick={handleSave} 
+                  isLoading={isSaving}
+                  disabled={!!quotaValidationError}
+                >Save Provider</Button>
             </div>
         }
       >
@@ -1348,6 +1379,57 @@ export const Providers = () => {
                                 ? `Quota checker type is fixed to '${forcedOAuthQuotaCheckerType}' for this OAuth provider.`
                                 : <>Select <span style={{fontWeight: 600}}>&lt;none&gt;</span> to disable provider quota checks.</>}
                             </div>
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'naga' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <NagaQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'synthetic' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <SyntheticQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'nanogpt' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <NanoGPTQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {quotaValidationError && (
+                              <div className="mt-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
+                                {quotaValidationError}
+                              </div>
+                            )}
                           </div>
 
                           <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">

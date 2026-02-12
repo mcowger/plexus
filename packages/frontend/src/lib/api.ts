@@ -164,6 +164,7 @@ export interface Provider {
     type?: string;
     enabled: boolean;
     intervalMinutes: number;
+    options?: Record<string, unknown>;
   };
 }
 
@@ -307,7 +308,7 @@ const configRequestCache = new Map<string, { expiresAt: number; promise: Promise
 const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code']);
 
 const normalizeProviderQuotaChecker = (
-    checker?: { type?: string; enabled?: boolean; intervalMinutes?: number }
+    checker?: { type?: string; enabled?: boolean; intervalMinutes?: number; options?: Record<string, unknown> }
 ): Provider['quotaChecker'] | undefined => {
     if (!checker) return undefined;
 
@@ -318,7 +319,8 @@ const normalizeProviderQuotaChecker = (
     return {
         type,
         enabled: isValidType ? checker.enabled !== false : false,
-        intervalMinutes: Math.max(1, Number(checker.intervalMinutes || 30))
+        intervalMinutes: Math.max(1, Number(checker.intervalMinutes || 30)),
+        options: checker.options
     };
 };
 
@@ -596,6 +598,7 @@ interface PlexusConfig {
             type?: string;
             enabled?: boolean;
             intervalMinutes?: number;
+            options?: Record<string, unknown>;
         };
     }>;
     models?: Record<string, any>;
@@ -1200,13 +1203,14 @@ export const api = {
           extraBody: provider.extraBody,
           models: provider.models,
           enabled: provider.enabled,
-          quota_checker: provider.quotaChecker?.type
-            ? {
-                type: provider.quotaChecker.type,
-                enabled: provider.quotaChecker.enabled,
-                intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30)
-              }
-            : undefined
+quota_checker: provider.quotaChecker?.type
+              ? {
+                  type: provider.quotaChecker.type,
+                  enabled: provider.quotaChecker.enabled,
+                  intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30),
+                  options: provider.quotaChecker.options
+                }
+              : undefined
       };
 
       const newYaml = stringify(config);
