@@ -73,12 +73,13 @@ const ConnectionIndicator = ({
         {config.text}
       </span>
       {(status === 'error' || status === 'disconnected') && (
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onReconnect}
-          className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
         >
           Reconnect
-        </button>
+        </Button>
       )}
     </div>
   );
