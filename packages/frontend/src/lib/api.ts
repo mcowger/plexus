@@ -127,6 +127,49 @@ export interface DashboardData {
     todayMetrics: TodayMetrics;
 }
 
+export interface LiveRequestSnapshot {
+    requestId: string;
+    date: string;
+    provider: string;
+    model: string;
+    responseStatus: string;
+    totalTokens: number;
+    costTotal: number;
+    durationMs: number;
+    ttftMs: number;
+    tokensPerSec: number;
+}
+
+export interface LiveProviderSnapshot {
+    provider: string;
+    requests: number;
+    successes: number;
+    errors: number;
+    successRate: number;
+    totalTokens: number;
+    totalCost: number;
+    avgDurationMs: number;
+    avgTtftMs: number;
+    avgTokensPerSec: number;
+}
+
+export interface LiveDashboardSnapshot {
+    windowMinutes: number;
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    successRate: number;
+    totalTokens: number;
+    totalCost: number;
+    tokensPerMinute: number;
+    costPerMinute: number;
+    avgDurationMs: number;
+    avgTtftMs: number;
+    avgTokensPerSec: number;
+    providers: LiveProviderSnapshot[];
+    recentRequests: LiveRequestSnapshot[];
+}
+
 export interface PieChartDataPoint {
   name: string;
   requests: number;
@@ -366,6 +409,23 @@ const USAGE_PAGE_FIELDS: UsageRecordField[] = [
     'incomingModelAlias',
     'provider',
     'apiKey'
+];
+
+const LIVE_DASHBOARD_FIELDS: UsageRecordField[] = [
+    'requestId',
+    'date',
+    'provider',
+    'incomingModelAlias',
+    'selectedModelName',
+    'responseStatus',
+    'tokensInput',
+    'tokensOutput',
+    'tokensReasoning',
+    'tokensCached',
+    'costTotal',
+    'durationMs',
+    'ttftMs',
+    'tokensPerSec'
 ];
 
 
@@ -838,6 +898,238 @@ export const api = {
             }
         };
     }
+  },
+
+  getLiveDashboardSnapshot: async (windowMinutes: number = 5, limit: number = 500): Promise<LiveDashboardSnapshot> => {
+    const safeWindowMinutes = Math.max(1, Math.floor(windowMinutes));
+    const safeLimit = Math.max(50, Math.min(5000, Math.floor(limit)));
+    const emptySnapshot: LiveDashboardSnapshot = {
+      windowMinutes: safeWindowMinutes,
+      requestCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      successRate: 1,
+      totalTokens: 0,
+      totalCost: 0,
+      tokensPerMinute: 0,
+      costPerMinute: 0,
+      avgDurationMs: 0,
+      avgTtftMs: 0,
+      avgTokensPerSec: 0,
+      providers: [],
+      recentRequests: []
+    };
+
+    try {
+      const windowStartMs = Date.now() - (safeWindowMinutes * 60 * 1000);
+      const startDate = new Date(windowStartMs).toISOString();
+      const usageResponse = await fetchUsageRecords({
+        limit: safeLimit,
+        startDate,
+        fields: LIVE_DASHBOARD_FIELDS,
+        cache: false
+      });
+
+      const toNumber = (value: unknown) => {
+        const parsed = Number(value ?? 0);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const records = (usageResponse.data || [])
+        .filter((record) => {
+          const timestamp = Date.parse(record.date || '');
+          return Number.isFinite(timestamp) && timestamp >= windowStartMs;
+        })
+        .sort((a, b) => Date.parse(b.date || '') - Date.parse(a.date || ''));
+
+      let requestCount = 0;
+      let successCount = 0;
+      let errorCount = 0;
+      let totalTokens = 0;
+      let totalCost = 0;
+      let durationSum = 0;
+      let durationSamples = 0;
+      let ttftSum = 0;
+      let ttftSamples = 0;
+      let tokensPerSecSum = 0;
+      let tokensPerSecSamples = 0;
+
+      const providerStats = new Map<string, {
+        requests: number;
+        successes: number;
+        errors: number;
+        totalTokens: number;
+        totalCost: number;
+        durationSum: number;
+        durationSamples: number;
+        ttftSum: number;
+        ttftSamples: number;
+        tokensPerSecSum: number;
+        tokensPerSecSamples: number;
+      }>();
+
+      for (const record of records) {
+        requestCount += 1;
+
+        const provider = record.provider?.trim() || 'unknown';
+        const status = (record.responseStatus || 'unknown').toLowerCase();
+        const isSuccess = status === 'success';
+
+        if (isSuccess) {
+          successCount += 1;
+        } else {
+          errorCount += 1;
+        }
+
+        const inputTokens = toNumber(record.tokensInput);
+        const outputTokens = toNumber(record.tokensOutput);
+        const reasoningTokens = toNumber(record.tokensReasoning);
+        const cachedTokens = toNumber(record.tokensCached);
+        const requestTokens = inputTokens + outputTokens + reasoningTokens + cachedTokens;
+        const requestCost = toNumber(record.costTotal);
+        const durationMs = toNumber(record.durationMs);
+        const ttftMs = toNumber(record.ttftMs);
+        const tokensPerSec = toNumber(record.tokensPerSec);
+
+        totalTokens += requestTokens;
+        totalCost += requestCost;
+
+        if (durationMs > 0) {
+          durationSum += durationMs;
+          durationSamples += 1;
+        }
+        if (ttftMs > 0) {
+          ttftSum += ttftMs;
+          ttftSamples += 1;
+        }
+        if (tokensPerSec > 0) {
+          tokensPerSecSum += tokensPerSec;
+          tokensPerSecSamples += 1;
+        }
+
+        const existingProvider = providerStats.get(provider) ?? {
+          requests: 0,
+          successes: 0,
+          errors: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          durationSum: 0,
+          durationSamples: 0,
+          ttftSum: 0,
+          ttftSamples: 0,
+          tokensPerSecSum: 0,
+          tokensPerSecSamples: 0
+        };
+
+        existingProvider.requests += 1;
+        existingProvider.successes += isSuccess ? 1 : 0;
+        existingProvider.errors += isSuccess ? 0 : 1;
+        existingProvider.totalTokens += requestTokens;
+        existingProvider.totalCost += requestCost;
+
+        if (durationMs > 0) {
+          existingProvider.durationSum += durationMs;
+          existingProvider.durationSamples += 1;
+        }
+        if (ttftMs > 0) {
+          existingProvider.ttftSum += ttftMs;
+          existingProvider.ttftSamples += 1;
+        }
+        if (tokensPerSec > 0) {
+          existingProvider.tokensPerSecSum += tokensPerSec;
+          existingProvider.tokensPerSecSamples += 1;
+        }
+
+        providerStats.set(provider, existingProvider);
+      }
+
+      const providers: LiveProviderSnapshot[] = Array.from(providerStats.entries())
+        .map(([provider, stats]) => ({
+          provider,
+          requests: stats.requests,
+          successes: stats.successes,
+          errors: stats.errors,
+          successRate: stats.requests > 0 ? stats.successes / stats.requests : 1,
+          totalTokens: stats.totalTokens,
+          totalCost: stats.totalCost,
+          avgDurationMs: stats.durationSamples > 0 ? stats.durationSum / stats.durationSamples : 0,
+          avgTtftMs: stats.ttftSamples > 0 ? stats.ttftSum / stats.ttftSamples : 0,
+          avgTokensPerSec: stats.tokensPerSecSamples > 0 ? stats.tokensPerSecSum / stats.tokensPerSecSamples : 0
+        }))
+        .sort((a, b) => b.requests - a.requests);
+
+      const recentRequests: LiveRequestSnapshot[] = records.slice(0, 20).map((record) => {
+        const inputTokens = toNumber(record.tokensInput);
+        const outputTokens = toNumber(record.tokensOutput);
+        const reasoningTokens = toNumber(record.tokensReasoning);
+        const cachedTokens = toNumber(record.tokensCached);
+
+        return {
+          requestId: String(record.requestId || ''),
+          date: String(record.date || new Date().toISOString()),
+          provider: String(record.provider || 'unknown'),
+          model: String(record.selectedModelName || record.incomingModelAlias || 'unknown'),
+          responseStatus: String(record.responseStatus || 'unknown'),
+          totalTokens: inputTokens + outputTokens + reasoningTokens + cachedTokens,
+          costTotal: toNumber(record.costTotal),
+          durationMs: toNumber(record.durationMs),
+          ttftMs: toNumber(record.ttftMs),
+          tokensPerSec: toNumber(record.tokensPerSec)
+        };
+      });
+
+      return {
+        windowMinutes: safeWindowMinutes,
+        requestCount,
+        successCount,
+        errorCount,
+        successRate: requestCount > 0 ? successCount / requestCount : 1,
+        totalTokens,
+        totalCost,
+        tokensPerMinute: totalTokens / safeWindowMinutes,
+        costPerMinute: totalCost / safeWindowMinutes,
+        avgDurationMs: durationSamples > 0 ? durationSum / durationSamples : 0,
+        avgTtftMs: ttftSamples > 0 ? ttftSum / ttftSamples : 0,
+        avgTokensPerSec: tokensPerSecSamples > 0 ? tokensPerSecSum / tokensPerSecSamples : 0,
+        providers,
+        recentRequests
+      };
+    } catch (e) {
+      console.error('API Error getLiveDashboardSnapshot', e);
+      return emptySnapshot;
+    }
+  },
+
+  subscribeToUsageEvents: (handlers: {
+    onLog: (record: UsageRecord) => void;
+    onError?: (event: Event) => void;
+  }): (() => void) => {
+    const streamUrl = `${API_BASE}/v0/management/events`;
+    const source = new EventSource(streamUrl);
+
+    const onLogEvent: EventListener = (event) => {
+      try {
+        const messageEvent = event as MessageEvent<string>;
+        if (!messageEvent.data) {
+          return;
+        }
+
+        const parsed = JSON.parse(messageEvent.data) as UsageRecord;
+        handlers.onLog(parsed);
+      } catch (error) {
+        console.error('Failed to parse usage stream event', error);
+      }
+    };
+
+    source.addEventListener('log', onLogEvent);
+    source.onerror = (event) => {
+      handlers.onError?.(event);
+    };
+
+    return () => {
+      source.removeEventListener('log', onLogEvent);
+      source.close();
+    };
   },
 
   getUsageData: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<UsageData[]> => {
