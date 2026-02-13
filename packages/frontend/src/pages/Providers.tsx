@@ -629,7 +629,9 @@ export const Providers = () => {
     delete updated[oldType];
 
     const normalizedType = newType.trim();
-    if (normalizedType && url.trim()) {
+    if (normalizedType) {
+      // Keep unfinished entries (empty URL) visible while editing.
+      // Types are still inferred only from non-empty URLs via inferProviderTypes().
       updated[normalizedType] = url;
     }
 
