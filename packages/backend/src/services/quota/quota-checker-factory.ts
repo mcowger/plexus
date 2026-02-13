@@ -5,6 +5,7 @@ import { NagaQuotaChecker } from './checkers/naga-checker';
 import { OpenAICodexQuotaChecker } from './checkers/openai-codex-checker';
 import { NanoGPTQuotaChecker } from './checkers/nanogpt-checker';
 import { ZAIQuotaChecker } from './checkers/zai-checker';
+import { MoonshotQuotaChecker } from './checkers/moonshot-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
@@ -13,6 +14,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   'openai-codex': OpenAICodexQuotaChecker,
   'nanogpt': NanoGPTQuotaChecker,
   zai: ZAIQuotaChecker,
+  moonshot: MoonshotQuotaChecker,
 };
 
 export class QuotaCheckerFactory {

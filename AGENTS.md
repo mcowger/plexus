@@ -343,3 +343,472 @@ import { formatNumber } from '../lib/format';
 // ⚠️ Legacy (still works but avoid in new code)
 import { formatLargeNumber } from '../lib/api';
 ```
+
+## 9. Implementing a New Quota Checker
+
+This section documents the pattern for adding a new quota checker (e.g., for a new AI provider). The implementation involves both backend and frontend changes.
+
+### 9.1 Backend - Schema & Configuration
+
+**Update `packages/backend/src/config.ts`:**
+
+1. Add a new Zod schema for checker options:
+```typescript
+const NewQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+  // Add other provider-specific options here
+});
+```
+
+2. Add a new discriminated union variant to `ProviderQuotaCheckerSchema`:
+```typescript
+z.object({
+  type: z.literal('new-checker-name'),
+  enabled: z.boolean().default(true),
+  intervalMinutes: z.number().min(1).default(30),
+  id: z.string().trim().min(1).optional(),
+  options: NewQuotaCheckerOptionsSchema.optional().default({}),
+}),
+```
+
+### 9.2 Backend - Quota Checker Implementation
+
+**Create `packages/backend/src/services/quota/checkers/new-checker-name.ts`:**
+
+```typescript
+import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
+import { QuotaChecker } from '../quota-checker';
+import { logger } from '../../../utils/logger';
+
+interface ProviderQuotaLimitResponse {
+  // Define the API response shape
+}
+
+export class NewQuotaCheckerNameQuotaChecker extends QuotaChecker {
+  private endpoint: string;
+
+  constructor(config: QuotaCheckerConfig) {
+    super(config);
+    this.endpoint = this.getOption<string>('endpoint', 'https://default.api.endpoint');
+  }
+
+  async checkQuota(): Promise<QuotaCheckResult> {
+    const apiKey = this.requireOption<string>('apiKey');
+
+    try {
+      logger.debug(`[new-checker-name] Calling ${this.endpoint}`);
+      
+      const response = await fetch(this.endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
+      }
+
+      const data: ProviderQuotaLimitResponse = await response.json();
+      
+      const windows: QuotaWindow[] = [];
+      const limits = data.data?.limits ?? [];
+
+      for (const limit of limits) {
+        // Map provider-specific fields to QuotaWindow
+        windows.push(this.createWindow(
+          'five_hour',           // windowType: 'five_hour' | 'daily' | 'monthly'
+          limit.total ?? 100,    // limit (max value)
+          limit.currentValue,   // current usage
+          limit.remaining,      // remaining (optional)
+          'percentage' | 'requests' | 'tokens',  // unit type
+          limit.nextResetTime ? new Date(limit.nextResetTime) : undefined,
+          'Human-readable label'
+        ));
+      }
+
+      return this.successResult(windows);
+    } catch (error) {
+      return this.errorResult(error as Error);
+    }
+  }
+}
+```
+
+### 9.3 Backend - Factory Registration
+
+**Update `packages/backend/src/services/quota/quota-checker-factory.ts`:**
+
+```typescript
+import { NewQuotaCheckerNameQuotaChecker } from './checkers/new-checker-name';
+
+const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
+  // ... existing entries
+  'new-checker-name': NewQuotaCheckerNameQuotaChecker,
+};
+```
+
+### 9.4 Frontend - UI Components
+
+**Create `packages/frontend/src/components/quota/NewCheckerQuotaConfig.tsx`:**
+
+```typescript
+import React from 'react';
+import { Input } from '../ui/Input';
+
+interface NewCheckerQuotaConfigProps {
+  options: Record<string, unknown>;
+  onChange: (options: Record<string, unknown>) => void;
+}
+
+export const NewCheckerQuotaConfig: React.FC<NewCheckerQuotaConfigProps> = ({
+  options,
+  onChange,
+}) => {
+  const handleChange = (key: string, value: string) => {
+    onChange({ ...options, [key]: value });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-1">
+        <label className="font-body text-[13px] font-medium text-text-secondary">
+          Endpoint (optional)
+        </label>
+        <Input
+          value={(options.endpoint as string) ?? ''}
+          onChange={(e) => handleChange('endpoint', e.target.value)}
+          placeholder="https://api.provider.com/quota"
+        />
+      </div>
+    </div>
+  );
+};
+```
+
+**Create `packages/frontend/src/components/quota/NewCheckerQuotaDisplay.tsx`:**
+
+```typescript
+import React from 'react';
+import { clsx } from 'clsx';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
+
+interface NewCheckerQuotaDisplayProps {
+  result: QuotaCheckResult;
+  isCollapsed: boolean;
+}
+
+export const NewCheckerQuotaDisplay: React.FC<NewCheckerQuotaDisplayProps> = ({
+  result,
+  isCollapsed,
+}) => {
+  if (!result.success) {
+    return (
+      <div className="px-2 py-2">
+        <div className={clsx("flex items-center gap-2 text-danger", isCollapsed && "justify-center")}>
+          <AlertTriangle size={16} />
+          {!isCollapsed && <span className="text-xs">Error</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const windows = result.windows || [];
+  const primaryWindow = windows[0]; // Choose appropriate window
+  const overallStatus = primaryWindow?.status || 'ok';
+
+  const statusColors: Record<QuotaStatus, string> = {
+    ok: 'bg-success',
+    warning: 'bg-warning',
+    critical: 'bg-danger',
+    exhausted: 'bg-danger',
+  };
+
+  if (isCollapsed) {
+    return (
+      <div className="px-2 py-2 flex justify-center">
+        {overallStatus === 'ok' ? (
+          <CheckCircle2 size={18} className="text-success" />
+        ) : (
+          <AlertTriangle size={18} className={clsx(overallStatus === 'warning' ? 'text-warning' : 'text-danger')} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 py-1 space-y-1">
+      {/* Render progress bars for each window */}
+      {windows.map((window) => (
+        <div key={window.windowType} className="space-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold text-text-secondary">{window.label}:</span>
+          </div>
+          <div className="relative h-2">
+            <div className="h-2 rounded-md bg-bg-hover overflow-hidden">
+              <div
+                className={clsx(
+                  'h-full rounded-md transition-all',
+                  statusColors[window.status || 'ok']
+                )}
+                style={{ width: `${Math.min(100, Math.max(0, window.utilizationPercent))}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+### 9.5 Frontend - Export & Integration
+
+**Update `packages/frontend/src/components/quota/index.ts`:**
+
+```typescript
+export { NewCheckerQuotaDisplay } from './NewCheckerQuotaDisplay';
+export { NewCheckerQuotaConfig } from './NewCheckerQuotaConfig';
+```
+
+**Update `packages/frontend/src/lib/api.ts`:**
+
+```typescript
+const VALID_QUOTA_CHECKER_TYPES = new Set([
+  'synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'new-checker-name'
+]);
+```
+
+**Update `packages/frontend/src/pages/Providers.tsx`:**
+
+1. Import the config component:
+```typescript
+import { NewCheckerQuotaConfig } from '../components/quota/NewCheckerQuotaConfig';
+```
+
+2. Add to QUOTA_CHECKER_TYPES:
+```typescript
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'new-checker-name'] as const;
+```
+
+3. Add conditional rendering for the config form:
+```typescript
+{selectedQuotaCheckerType === 'new-checker-name' && (
+  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+    <NewCheckerQuotaConfig
+      options={editingProvider.quotaChecker?.options || {}}
+      onChange={(options) => setEditingProvider({
+        ...editingProvider,
+        quotaChecker: { ...editingProvider.quotaChecker, options }
+      })}
+    />
+  </div>
+)}
+```
+
+**Update `packages/frontend/src/components/layout/Sidebar.tsx`:**
+
+1. Import the display component:
+```typescript
+import { NewCheckerQuotaDisplay } from '../quota';
+```
+
+2. Add conditional rendering:
+```typescript
+if (quota.checkerId.includes('new-checker-name')) {
+  return (
+    <NewCheckerQuotaDisplay result={result} isCollapsed={isCollapsed} />
+  );
+}
+```
+
+### 9.6 Key Patterns
+
+- **Window Types:** Use `five_hour`, `daily`, or `monthly` depending on the provider's quota window
+- **Unit Types:** Use `percentage`, `requests`, or `tokens` depending on what the provider reports
+- **Status Values:** Return `ok`, `warning`, `critical`, or `exhausted` based on utilization thresholds
+- **Debug Logging:** Use `[new-checker-name]` prefix in logger.debug() calls for easy troubleshooting
+- **Error Handling:** Always return `errorResult()` on failures, `successResult()` on success
+
+### 9.7 Implementing a Balance-Style Quota Checker
+
+Some providers (like Moonshot AI, Naga) provide a prepaid account balance rather than time-based rate limits. These "balance-style" checkers have specific requirements:
+
+#### Key Differences from Rate-Limit Checkers
+
+| Aspect | Rate-Limit Checker | Balance Checker |
+|--------|-------------------|----------------|
+| Window Type | `five_hour`, `daily`, `monthly` | `subscription` |
+| Unit Type | `requests`, `tokens`, `percentage` | `dollars` |
+| API Key | May require separate provisioning key | Inherits from provider config |
+| Display | Progress bar with usage/limit | Wallet icon with remaining balance |
+
+#### API Key Inheritance
+
+The system automatically injects the provider's API key into quota checker options. In your checker implementation, use:
+
+```typescript
+const apiKey = this.requireOption<string>('apiKey');
+```
+
+This works because `config.ts` automatically injects the provider's `api_key` into the checker's options (see lines 396-401 in `packages/backend/src/config.ts`):
+
+```typescript
+// Inject the provider's API key for quota checkers that need it
+const apiKey = providerConfig.api_key?.trim();
+if (apiKey && apiKey.toLowerCase() !== 'oauth' && options.apiKey === undefined) {
+  options.apiKey = apiKey;
+}
+```
+
+#### Balance Checker Implementation Pattern
+
+**Backend - Quota Checker:**
+
+```typescript
+interface ProviderBalanceResponse {
+  code: number;
+  data: {
+    available_balance: number;
+    voucher_balance?: number;
+    cash_balance?: number;
+  };
+  status: boolean;
+}
+
+export class MoonshotQuotaChecker extends QuotaChecker {
+  private endpoint: string;
+
+  constructor(config: QuotaCheckerConfig) {
+    super(config);
+    this.endpoint = this.getOption<string>('endpoint', 'https://api.moonshot.ai/v1/users/me/balance');
+  }
+
+  async checkQuota(): Promise<QuotaCheckResult> {
+    const apiKey = this.requireOption<string>('apiKey');
+
+    try {
+      const response = await fetch(this.endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
+      }
+
+      const data: ProviderBalanceResponse = await response.json();
+
+      if (!data.status || data.code !== 0) {
+        return this.errorResult(new Error(`API error: code=${data.code}`));
+      }
+
+      const { available_balance } = data.data;
+
+      // Use 'subscription' window type for prepaid balances
+      // Use 'dollars' as the unit
+      const window: QuotaWindow = this.createWindow(
+        'subscription',           // windowType: prepaid balance
+        undefined,                // limit: not applicable for balance
+        undefined,                // used: not applicable
+        available_balance,        // remaining: the balance
+        'dollars',                // unit type
+        undefined,                // resetsAt: no reset for prepaid
+        'Provider account balance' // description
+      );
+
+      return this.successResult([window]);
+    } catch (error) {
+      return this.errorResult(error as Error);
+    }
+  }
+}
+```
+
+#### Frontend - Display Component
+
+Balance checkers should display the remaining balance with a wallet icon:
+
+```typescript
+import { Wallet, AlertTriangle } from 'lucide-react';
+import { formatCost } from '../../lib/format';
+
+export const MoonshotQuotaDisplay: React.FC<QuotaDisplayProps> = ({
+  result,
+  isCollapsed,
+}) => {
+  if (!result.success) {
+    return (
+      <div className="px-2 py-2">
+        <div className="flex items-center gap-2 text-danger">
+          <AlertTriangle size={16} />
+          {!isCollapsed && <span className="text-xs">Error</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const windows = result.windows || [];
+  const subscriptionWindow = windows.find(w => w.windowType === 'subscription');
+  const balance = subscriptionWindow?.remaining;
+
+  if (isCollapsed) {
+    return (
+      <div className="px-2 py-2 flex justify-center">
+        <Wallet size={18} className="text-info" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 py-1 space-y-1">
+      <div className="flex items-center gap-2">
+        <Wallet size={14} className="text-info" />
+        <span className="text-xs font-semibold">Provider Name</span>
+      </div>
+      {balance !== undefined && (
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-text-secondary">Balance</span>
+          <span className="text-xs font-semibold text-info">
+            {formatCost(balance)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+#### Frontend - Config Component
+
+Balance checkers that inherit the API key only need an optional endpoint field:
+
+```typescript
+export const MoonshotQuotaConfig: React.FC<QuotaConfigProps> = ({
+  options,
+  onChange,
+}) => {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-1">
+        <label className="font-body text-[13px] font-medium text-text-secondary">
+          Endpoint (optional)
+        </label>
+        <Input
+          value={(options.endpoint as string) ?? ''}
+          onChange={(e) => onChange({ ...options, endpoint: e.target.value })}
+          placeholder="https://api.provider.com/v1/users/me/balance"
+        />
+      </div>
+    </div>
+  );
+};
+```
+
+**Do NOT add an apiKey field** - the checker will automatically inherit the API key from the provider configuration.
