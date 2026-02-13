@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.14.3 - 2026-02-13
+
+### Performance: Add clear button and canonical model grouping with improved chart labels
+
+## New Features
+
+- **Clear Button and Canonical Model Grouping**: Added a clear button and implemented canonical model grouping for better data organization ([3a2d500](https://github.com/mcowger/plexus/commit/3a2d500))
+
+## Bug Fixes
+
+- **Full Target Model Name in Chart Labels**: Chart labels now display the full target model name for improved clarity ([be51f89](https://github.com/mcowger/plexus/commit/be51f89))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.14.2 - 2026-02-12
 
 ### v0.14.2: Quota checker UI and Naga quota fixes
