@@ -24,7 +24,7 @@ const PerformanceBarChart = ({
 
   const chartData = (reverse ? [...data] : data).map(row => ({
     ...row,
-    label: row.provider
+    label: row.target_model ? `${row.provider}/${row.target_model}` : row.provider
   }));
   const metricLabel = metric === 'avg_tokens_per_sec' ? 'Avg throughput' : 'Avg TTFT';
 
