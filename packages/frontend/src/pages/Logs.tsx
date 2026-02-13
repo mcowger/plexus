@@ -6,7 +6,7 @@ import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon, ShieldCheck, RotateCcw } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -544,6 +544,17 @@ export const Logs = () => {
                                                         </span>
                                                     </div>
                                                 </div>
+                                                {/* Row 3: Retry indicator */}
+                                                {log.attemptCount && log.attemptCount > 1 && (
+                                                    <div style={{ display: 'flex', gap: '16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-orange-500">
+                                                            <RotateCcw size={12} />
+                                                            <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
+                                                                {log.attemptCount}x
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">

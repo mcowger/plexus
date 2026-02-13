@@ -56,6 +56,26 @@
 # [REQUIRED] Admin Key for Dashboard and Management API Access
 adminKey: "change-me-to-a-secure-admin-password"
 
+# Optional: Global failover policy for multi-target model aliases
+# - enabled: Master switch for internal retry/failover behavior
+# - retryableStatusCodes: HTTP status codes that trigger failover attempts
+#   Default behavior: retry all non-2xx status codes except 400 and 422
+# - retryableErrors: transport/runtime error names that trigger failover
+#   Common examples: ECONNREFUSED, ETIMEDOUT, ENOTFOUND
+failover:
+  enabled: true
+  # retryableStatusCodes:
+  #   - 408
+  #   - 429
+  #   - 500
+  #   - 502
+  #   - 503
+  #   - 504
+  # retryableErrors:
+  #   - ECONNREFUSED
+  #   - ETIMEDOUT
+  #   - ENOTFOUND
+
 providers:
   # Standard OpenAI Configuration
   # API type is automatically inferred as 'chat' from the URL

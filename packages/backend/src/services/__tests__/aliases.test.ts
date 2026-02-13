@@ -1,6 +1,7 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { Router } from "../router";
 import { setConfigForTesting } from "../../config";
+import { CooldownManager } from "../cooldown-manager";
 
 describe("Router Aliases", () => {
     const mockConfig = {
@@ -154,5 +155,170 @@ describe("Router Direct Provider/Model Routing", () => {
         await expect(Router.resolve("stima/gemini-2.5-flash")).rejects.toThrow(
             "Model 'stima/gemini-2.5-flash' not found in configuration"
         );
+    });
+});
+
+describe("Router.resolveCandidates", () => {
+    const cooldownManager = CooldownManager.getInstance();
+
+    afterEach(() => {
+        spyOn(cooldownManager, 'filterHealthyTargets').mockRestore();
+    });
+
+    test("returns empty array when model alias does not exist", async () => {
+        setConfigForTesting({
+            providers: {
+                "p1": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    models: { "m1": {} }
+                }
+            },
+            models: {},
+            keys: {},
+            adminKey: "secret"
+        } as any);
+
+        const result = await Router.resolveCandidates("unknown-model");
+        expect(result).toEqual([]);
+    });
+
+    test("returns empty array when alias has no targets", async () => {
+        setConfigForTesting({
+            providers: {
+                "p1": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    models: { "m1": {} }
+                }
+            },
+            models: {
+                "empty-model": {
+                    targets: []
+                }
+            },
+            keys: {},
+            adminKey: "secret"
+        } as any);
+
+        const result = await Router.resolveCandidates("empty-model");
+        expect(result).toEqual([]);
+    });
+
+    test("returns empty array when all targets are disabled", async () => {
+        setConfigForTesting({
+            providers: {
+                "p1": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    enabled: true,
+                    models: { "m1": {} }
+                },
+                "p2": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    enabled: false,
+                    models: { "m2": {} }
+                }
+            },
+            models: {
+                "disabled-model": {
+                    targets: [
+                        { provider: "p1", model: "m1", enabled: false },
+                        { provider: "p2", model: "m2" }
+                    ]
+                }
+            },
+            keys: {},
+            adminKey: "secret"
+        } as any);
+
+        const result = await Router.resolveCandidates("disabled-model");
+        expect(result).toEqual([]);
+    });
+
+    test("returns empty array when all targets are on cooldown", async () => {
+        setConfigForTesting({
+            providers: {
+                "p1": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    models: { "m1": {} }
+                },
+                "p2": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    models: { "m2": {} }
+                }
+            },
+            models: {
+                "cooldown-model": {
+                    selector: "in_order",
+                    targets: [
+                        { provider: "p1", model: "m1" },
+                        { provider: "p2", model: "m2" }
+                    ]
+                }
+            },
+            keys: {},
+            adminKey: "secret"
+        } as any);
+
+        spyOn(cooldownManager, 'filterHealthyTargets').mockResolvedValue([]);
+
+        const result = await Router.resolveCandidates("cooldown-model");
+        expect(result).toEqual([]);
+    });
+
+    test("returns only healthy enabled candidates in selector order with alias metadata", async () => {
+        setConfigForTesting({
+            providers: {
+                "p1": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    enabled: true,
+                    models: { "m1": { pricing: { source: "simple", input: 1, output: 1 } } }
+                },
+                "p2": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    enabled: true,
+                    models: { "m2": { pricing: { source: "simple", input: 2, output: 2 } } }
+                },
+                "p3": {
+                    type: "openai",
+                    api_base_url: "https://api.openai.com/v1",
+                    enabled: true,
+                    models: { "m3": { pricing: { source: "simple", input: 3, output: 3 } } }
+                }
+            },
+            models: {
+                "canonical-candidates": {
+                    selector: "in_order",
+                    targets: [
+                        { provider: "p1", model: "m1" },
+                        { provider: "p2", model: "m2", enabled: false },
+                        { provider: "p3", model: "m3" }
+                    ],
+                    additional_aliases: ["candidates-alias"]
+                }
+            },
+            keys: {},
+            adminKey: "secret"
+        } as any);
+
+        // Simulate p1 being unhealthy after disabled filtering
+        spyOn(cooldownManager, 'filterHealthyTargets').mockResolvedValue([
+            { provider: 'p3', model: 'm3' }
+        ] as any);
+
+        const result = await Router.resolveCandidates("candidates-alias");
+
+        expect(result).toHaveLength(1);
+        expect(result[0]?.provider).toBe("p3");
+        expect(result[0]?.model).toBe("m3");
+        expect(result[0]?.incomingModelAlias).toBe("candidates-alias");
+        expect(result[0]?.canonicalModel).toBe("canonical-candidates");
+        expect(result[0]?.modelConfig).toBeDefined();
     });
 });

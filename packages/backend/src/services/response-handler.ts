@@ -35,6 +35,20 @@ export async function handleResponse(
     unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
   usageRecord.provider = unifiedResponse.plexus?.provider || "unknown";
   usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel || null;
+  usageRecord.attemptCount = (unifiedResponse.plexus as any)?.attemptCount || 1;
+  usageRecord.finalAttemptProvider =
+    ((unifiedResponse.plexus as any)?.finalAttemptProvider as string | undefined) ||
+    usageRecord.provider ||
+    null;
+  usageRecord.finalAttemptModel =
+    ((unifiedResponse.plexus as any)?.finalAttemptModel as string | undefined) ||
+    usageRecord.selectedModelName ||
+    null;
+  usageRecord.allAttemptedProviders =
+    ((unifiedResponse.plexus as any)?.allAttemptedProviders as string | undefined) ||
+    JSON.stringify([
+      `${usageRecord.provider || "unknown"}/${usageRecord.selectedModelName || unifiedResponse.model}`,
+    ]);
 
   let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
   usageRecord.outgoingApiType = outgoingApiType?.toLocaleLowerCase();

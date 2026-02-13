@@ -274,9 +274,13 @@ export class UsageStorageService extends EventEmitter {
                     attribution: schema.requestUsage.attribution,
                     incomingApiType: schema.requestUsage.incomingApiType,
                     provider: schema.requestUsage.provider,
+                    attemptCount: schema.requestUsage.attemptCount,
                     incomingModelAlias: schema.requestUsage.incomingModelAlias,
                     canonicalModelName: schema.requestUsage.canonicalModelName,
                     selectedModelName: schema.requestUsage.selectedModelName,
+                    finalAttemptProvider: schema.requestUsage.finalAttemptProvider,
+                    finalAttemptModel: schema.requestUsage.finalAttemptModel,
+                    allAttemptedProviders: schema.requestUsage.allAttemptedProviders,
                     outgoingApiType: schema.requestUsage.outgoingApiType,
                     tokensInput: schema.requestUsage.tokensInput,
                     tokensOutput: schema.requestUsage.tokensOutput,
@@ -318,9 +322,13 @@ export class UsageStorageService extends EventEmitter {
                 attribution: row.attribution,
                 incomingApiType: row.incomingApiType ?? '',
                 provider: row.provider,
+                attemptCount: row.attemptCount ?? 1,
                 incomingModelAlias: row.incomingModelAlias,
                 canonicalModelName: row.canonicalModelName,
                 selectedModelName: row.selectedModelName,
+                finalAttemptProvider: row.finalAttemptProvider,
+                finalAttemptModel: row.finalAttemptModel,
+                allAttemptedProviders: row.allAttemptedProviders,
                 outgoingApiType: row.outgoingApiType,
                 tokensInput: row.tokensInput,
                 tokensOutput: row.tokensOutput,
@@ -419,13 +427,14 @@ export class UsageStorageService extends EventEmitter {
         timeToFirstTokenMs: number | null,
         outputTokens: number | null,
         durationMs: number,
-        requestId: string
+        requestId: string,
+        success: boolean = true
     ) {
         try {
             const retentionLimit = this.getPerformanceRetentionLimit();
 
             let tokensPerSec: number | null = null;
-            if (outputTokens && durationMs > 0) {
+            if (success && outputTokens && durationMs > 0) {
                 const streamingTimeMs = timeToFirstTokenMs ? durationMs - timeToFirstTokenMs : durationMs;
                 tokensPerSec = streamingTimeMs > 0 ? (outputTokens / streamingTimeMs) * 1000 : null;
             }
@@ -435,10 +444,12 @@ export class UsageStorageService extends EventEmitter {
                 model,
                 canonicalModelName,
                 requestId,
-                timeToFirstTokenMs,
-                totalTokens: outputTokens,
-                durationMs,
+                timeToFirstTokenMs: success ? timeToFirstTokenMs : null,
+                totalTokens: success ? outputTokens : null,
+                durationMs: success ? durationMs : null,
                 tokensPerSec,
+                successCount: success ? 1 : 0,
+                failureCount: success ? 0 : 1,
                 createdAt: Date.now()
             });
 
@@ -465,6 +476,42 @@ export class UsageStorageService extends EventEmitter {
         } catch (error) {
             logger.error(`Failed to update performance metrics for ${provider}:${model}`, error);
         }
+    }
+
+    async recordFailedAttempt(
+        provider: string,
+        model: string,
+        canonicalModelName: string | null,
+        requestId: string
+    ) {
+        await this.updatePerformanceMetrics(
+            provider,
+            model,
+            canonicalModelName,
+            null,
+            null,
+            0,
+            requestId,
+            false
+        );
+    }
+
+    async recordSuccessfulAttempt(
+        provider: string,
+        model: string,
+        canonicalModelName: string | null,
+        requestId: string
+    ) {
+        await this.updatePerformanceMetrics(
+            provider,
+            model,
+            canonicalModelName,
+            null,
+            null,
+            0,
+            requestId,
+            true
+        );
     }
 
     async getProviderPerformance(provider?: string, model?: string): Promise<any[]> {
@@ -494,6 +541,8 @@ export class UsageStorageService extends EventEmitter {
                     minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
                     maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
                     sampleCount: sql<number>`COUNT(*)`,
+                    successCount: sql<number>`SUM(${this.schema.providerPerformance.successCount})`,
+                    failureCount: sql<number>`SUM(${this.schema.providerPerformance.failureCount})`,
                     lastUpdated: sql<number>`MAX(${this.schema.providerPerformance.createdAt})`
                 })
                 .from(this.schema.providerPerformance)
@@ -519,10 +568,12 @@ export class UsageStorageService extends EventEmitter {
                 max_ttft_ms: row.maxTtftMs ?? 0,
                 avg_tokens_per_sec: row.avgTokensPerSec ?? 0,
                 min_tokens_per_sec: row.minTokensPerSec ?? 0,
-                max_tokens_per_sec: row.maxTokensPerSec ?? 0,
-                sample_count: row.sampleCount ?? 0,
-                last_updated: row.lastUpdated ?? 0
-            }));
+                    max_tokens_per_sec: row.maxTokensPerSec ?? 0,
+                    sample_count: row.sampleCount ?? 0,
+                    success_count: row.successCount ?? 0,
+                    failure_count: row.failureCount ?? 0,
+                    last_updated: row.lastUpdated ?? 0
+                }));
 
             // When filtering by canonical model, include providers seen in request usage
             // even if no provider_performance row exists yet for that provider/model.
@@ -552,6 +603,8 @@ export class UsageStorageService extends EventEmitter {
                             min_tokens_per_sec: 0,
                             max_tokens_per_sec: 0,
                             sample_count: 0,
+                            success_count: 0,
+                            failure_count: 0,
                             last_updated: 0
                         });
                     }

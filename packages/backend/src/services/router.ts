@@ -1,7 +1,8 @@
 import { logger } from 'src/utils/logger';
-import { getConfig, ProviderConfig, getProviderTypes } from '../config';
+import { getConfig, ModelTarget, ProviderConfig, getProviderTypes } from '../config';
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
+import { EnrichedModelTarget } from './selectors/base';
 
 export interface RouteResult {
     provider: string; // provider key in config
@@ -13,6 +14,179 @@ export interface RouteResult {
 }
 
 export class Router {
+    static async resolveCandidates(modelName: string, incomingApiType?: string): Promise<RouteResult[]> {
+        const config = getConfig();
+
+        // Resolve canonical alias and additional aliases
+        let alias = config.models?.[modelName];
+        let canonicalModel = modelName;
+
+        if (!alias && config.models) {
+            for (const [key, value] of Object.entries(config.models)) {
+                if (value.additional_aliases?.includes(modelName)) {
+                    alias = value;
+                    canonicalModel = key;
+                    break;
+                }
+            }
+        }
+
+        if (!alias || !alias.targets || alias.targets.length === 0) {
+            return [];
+        }
+
+        // Filter out disabled targets and disabled providers
+        const enabledTargets = alias.targets.filter(target => {
+            if (target.enabled === false) {
+                return false;
+            }
+            const providerConfig = config.providers[target.provider];
+            return providerConfig && providerConfig.enabled !== false;
+        });
+
+        if (enabledTargets.length === 0) {
+            return [];
+        }
+
+        let healthyTargets = await CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
+
+        if (healthyTargets.length < enabledTargets.length) {
+            const filteredCount = enabledTargets.length - healthyTargets.length;
+            logger.warn(`Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`);
+        }
+
+        if (healthyTargets.length === 0) {
+            return [];
+        }
+
+        // Filter targets based on model type when incoming API is embeddings
+        if (incomingApiType === 'embeddings') {
+            const embeddingsTargets = healthyTargets.filter(target => {
+                const providerConfig = config.providers[target.provider];
+                if (!providerConfig) return false;
+
+                // Check if this specific model is marked as embeddings type
+                if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+                    const modelConfig = providerConfig.models[target.model];
+                    if (modelConfig?.type === 'embeddings') {
+                        return true;
+                    }
+                    // If model has explicit type set to 'chat', exclude it
+                    if (modelConfig?.type === 'chat') {
+                        return false;
+                    }
+                }
+
+                // Check if alias is marked as embeddings type
+                if (alias.type === 'embeddings') {
+                    return true;
+                }
+
+                // Check if provider supports embeddings via URL
+                const providerTypes = getProviderTypes(providerConfig);
+                return providerTypes.includes('embeddings');
+            });
+
+            if (embeddingsTargets.length > 0) {
+                logger.info(`Router: Filtered to ${embeddingsTargets.length} embeddings-compatible targets (from ${healthyTargets.length} total).`);
+                healthyTargets = embeddingsTargets;
+            } else {
+                logger.warn(`Router: No embeddings-compatible targets found for '${modelName}'. Falling back to all healthy targets.`);
+            }
+        }
+
+        // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
+        if (alias.priority === 'api_match' && incomingApiType) {
+            const normalizedIncoming = incomingApiType.toLowerCase();
+
+            const compatibleTargets = healthyTargets.filter(target => {
+                const providerConfig = config.providers[target.provider];
+                if (!providerConfig) return false;
+
+                const providerTypes = getProviderTypes(providerConfig);
+
+                let modelSpecificTypes: string[] | undefined = undefined;
+                if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+                    modelSpecificTypes = providerConfig.models[target.model]?.access_via;
+                }
+
+                const availableTypes = modelSpecificTypes || providerTypes;
+                return availableTypes.some(t => t.toLowerCase() === normalizedIncoming);
+            });
+
+            if (compatibleTargets.length > 0) {
+                logger.info(`Router: 'api_match' priority active. Narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} API-compatible targets.`);
+                healthyTargets = compatibleTargets;
+            } else {
+                logger.info(`Router: 'api_match' priority active, but no targets support '${incomingApiType}'. Falling back to all healthy targets.`);
+            }
+        }
+
+        const enrichedTargets: EnrichedModelTarget[] = healthyTargets.map(target => {
+            const providerConfig = config.providers[target.provider];
+            let modelConfig = undefined;
+            if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
+                modelConfig = providerConfig.models[target.model];
+            }
+            return { ...target, route: { modelConfig } };
+        });
+
+        const selectorStrategy = alias.selector || 'random';
+        const selector = SelectorFactory.getSelector(selectorStrategy);
+
+        // Order targets according to selector strategy by repeatedly selecting from remaining candidates.
+        // This preserves selector priority while returning all candidates.
+        const orderedTargets: ModelTarget[] = [];
+        const remainingTargets: EnrichedModelTarget[] = [...enrichedTargets];
+
+        while (remainingTargets.length > 0) {
+            const selected = await selector.select(remainingTargets);
+            if (!selected) {
+                break;
+            }
+
+            orderedTargets.push(selected);
+
+            const selectedIndex = remainingTargets.findIndex(
+                t => t.provider === selected.provider && t.model === selected.model
+            );
+            if (selectedIndex >= 0) {
+                remainingTargets.splice(selectedIndex, 1);
+            } else {
+                // Defensive fallback to avoid infinite loop if selector returns a non-member target
+                remainingTargets.shift();
+            }
+        }
+
+        // Fallback if selector returns null early
+        for (const target of remainingTargets) {
+            orderedTargets.push(target);
+        }
+
+        return orderedTargets
+            .map(target => {
+                const providerConfig = config.providers[target.provider];
+                if (!providerConfig) {
+                    return null;
+                }
+
+                let modelConfig = undefined;
+                if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+                    modelConfig = providerConfig.models[target.model];
+                }
+
+                return {
+                    provider: target.provider,
+                    model: target.model,
+                    config: providerConfig,
+                    modelConfig,
+                    incomingModelAlias: modelName,
+                    canonicalModel
+                } as RouteResult;
+            })
+            .filter((result): result is RouteResult => result !== null);
+    }
+
     static async resolve(modelName: string, incomingApiType?: string): Promise<RouteResult> {
         const config = getConfig();
 

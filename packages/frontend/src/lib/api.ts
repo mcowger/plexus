@@ -251,6 +251,8 @@ export interface UsageRecord {
     // Response metadata
     toolCallsCount?: number;
     finishReason?: string;
+    // Retry metadata
+    attemptCount?: number;
 }
 
 interface BackendResponse<T> {

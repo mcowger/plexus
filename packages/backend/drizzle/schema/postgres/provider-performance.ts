@@ -10,6 +10,8 @@ export const providerPerformance = pgTable('provider_performance', {
   totalTokens: integer('total_tokens'),
   durationMs: real('duration_ms'),
   tokensPerSec: real('tokens_per_sec'),
+  failureCount: integer('failure_count').notNull().default(0),
+  successCount: integer('success_count').notNull().default(0),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 }, (table) => ({
   lookupIdx: index('idx_provider_performance_lookup')

@@ -50,6 +50,13 @@
       "when": 1770940396607,
       "tag": "0006_tearful_sharon_ventura",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771012705955,
+      "tag": "0007_previous_supreme_intelligence",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,8 @@ export const providerPerformance = sqliteTable('provider_performance', {
   totalTokens: integer('total_tokens'),
   durationMs: real('duration_ms'),
   tokensPerSec: real('tokens_per_sec'),
+  failureCount: integer('failure_count').notNull().default(0),
+  successCount: integer('success_count').notNull().default(0),
   createdAt: integer('created_at').notNull(),
 }, (table) => ({
   lookupIdx: index('idx_provider_performance_lookup')

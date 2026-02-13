@@ -12,9 +12,13 @@ const createUsageRecord = (requestId: string, provider: string, incomingModelAli
   attribution: null,
   incomingApiType: 'chat',
   provider,
+  attemptCount: 1,
   incomingModelAlias,
   canonicalModelName,
   selectedModelName,
+  finalAttemptProvider: provider,
+  finalAttemptModel: selectedModelName,
+  allAttemptedProviders: JSON.stringify([`${provider}/${selectedModelName}`]),
   outgoingApiType: 'chat',
   tokensInput: 100,
   tokensOutput: 100,
@@ -201,5 +205,32 @@ describe('UsageStorageService performance metrics', () => {
       .all('provider-c', 'model-3') as Array<{ provider: string; model: string; count: number }>;
 
     expect(rows[0]?.count).toBe(5);
+  });
+
+  it('tracks success_count and failure_count for provider/model aggregates', async () => {
+    const storage = new UsageStorageService();
+
+    await storage.updatePerformanceMetrics('provider-d', 'model-4', null, 100, 100, 1000, 'd-success-1');
+    await storage.updatePerformanceMetrics('provider-d', 'model-4', null, 120, 110, 1000, 'd-success-2');
+    await storage.updatePerformanceMetrics('provider-d', 'model-4', null, null, null, 0, 'd-failure-1', false);
+
+    const rows = await storage.getProviderPerformance('provider-d', 'model-4');
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.success_count).toBe(2);
+    expect(rows[0]?.failure_count).toBe(1);
+    expect(rows[0]?.sample_count).toBe(3);
+  });
+
+  it('records failover-style failed and successful attempts via dedicated helpers', async () => {
+    const storage = new UsageStorageService();
+
+    await storage.recordFailedAttempt('provider-e', 'model-5', null, 'e-failure-1');
+    await storage.recordSuccessfulAttempt('provider-e', 'model-5', null, 'e-success-1');
+
+    const rows = await storage.getProviderPerformance('provider-e', 'model-5');
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.success_count).toBe(1);
+    expect(rows[0]?.failure_count).toBe(1);
+    expect(rows[0]?.sample_count).toBe(2);
   });
 });

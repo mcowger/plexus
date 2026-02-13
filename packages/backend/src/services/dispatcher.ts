@@ -7,99 +7,419 @@ import { RouteResult } from "./router";
 import { DebugManager } from "./debug-manager";
 import { UsageStorageService } from "./usage-storage";
 import { CooldownParserRegistry } from "./cooldown-parsers";
-import { getProviderTypes } from "../config";
+import { getConfig, getProviderTypes } from "../config";
 import { getModels } from "@mariozechner/pi-ai";
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
 
+  private async recordAttemptMetric(route: RouteResult, requestId: string | undefined, success: boolean): Promise<void> {
+    if (!this.usageStorage) return;
+
+    const metricRequestId = requestId || `failover-attempt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (success) {
+      await this.usageStorage.recordSuccessfulAttempt(
+        route.provider,
+        route.model,
+        route.canonicalModel ?? null,
+        metricRequestId
+      );
+      return;
+    }
+
+    await this.usageStorage.recordFailedAttempt(
+      route.provider,
+      route.model,
+      route.canonicalModel ?? null,
+      metricRequestId
+    );
+  }
+
   setUsageStorage(storage: UsageStorageService) {
     this.usageStorage = storage;
   }
+
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
-    // 1. Route
-    const route = await Router.resolve(request.model, request.incomingApiType);
+    const config = getConfig();
+    const failover = config.failover;
+    const failoverEnabled = failover?.enabled !== false;
 
-    // Determine Target API Type
-    const { targetApiType, selectionReason } = this.selectTargetApiType(
-      route,
-      request.incomingApiType
-    );
+    // 1. Route (ordered candidates)
+    let candidates = await Router.resolveCandidates(request.model, request.incomingApiType);
 
-    logger.info(
-      `Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`
-    );
-
-    // 2. Get Transformer
-    const transformerType = targetApiType;
-    const transformer = TransformerFactory.getTransformer(transformerType);
-
-    // 3. Transform Request
-    const requestWithTargetModel = { ...request, model: route.model };
-
-    const { payload: providerPayload, bypassTransformation } =
-      await this.transformRequestPayload(
-        requestWithTargetModel,
-        route,
-        transformer,
-        targetApiType
-      );
-
-    // Capture transformed request
-    if (request.requestId) {
-      DebugManager.getInstance().addTransformedRequest(request.requestId, providerPayload);
+    // Fallback for direct/provider/model syntax and legacy single-route behavior
+    if (candidates.length === 0) {
+      const singleRoute = await Router.resolve(request.model, request.incomingApiType);
+      candidates = [singleRoute];
     }
 
-    if (this.isOAuthRoute(route, targetApiType)) {
-      return await this.dispatchOAuthRequest(
-        providerPayload,
-        request,
-        route,
-        targetApiType,
-        transformer
-      );
+    if (candidates.length === 0) {
+      throw new Error(`No route candidates found for model '${request.model}'`);
     }
 
-    // 4. Execute Request
-    const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
+    const targets = failoverEnabled ? candidates : [candidates[0]!];
+    const attemptedProviders: string[] = [];
+    let lastError: any = null;
 
-    const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
+    for (let i = 0; i < targets.length; i++) {
+      const route = targets[i]!;
+      attemptedProviders.push(`${route.provider}/${route.model}`);
 
-    const incomingApi = request.incomingApiType || "unknown";
+      try {
+        // Determine Target API Type
+        const { targetApiType, selectionReason } = this.selectTargetApiType(
+          route,
+          request.incomingApiType
+        );
 
-    logger.info(
-      `Dispatching ${request.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
-    );
+        logger.info(
+          `Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`
+        );
 
-    logger.silly("Upstream Request Payload", providerPayload);
+        // 2. Get Transformer
+        const transformerType = targetApiType;
+        const transformer = TransformerFactory.getTransformer(transformerType);
 
-    const response = await this.executeProviderRequest(url, headers, providerPayload);
+        // 3. Transform Request
+        const requestWithTargetModel = { ...request, model: route.model };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText, url, headers, targetApiType);
+        const { payload: providerPayload, bypassTransformation } =
+          await this.transformRequestPayload(
+            requestWithTargetModel,
+            route,
+            transformer,
+            targetApiType
+          );
+
+        // Capture transformed request
+        if (request.requestId) {
+          DebugManager.getInstance().addTransformedRequest(request.requestId, providerPayload);
+        }
+
+        if (this.isOAuthRoute(route, targetApiType)) {
+          try {
+            const oauthResponse = await this.dispatchOAuthRequest(
+              providerPayload,
+              request,
+              route,
+              targetApiType,
+              transformer
+            );
+            await this.recordAttemptMetric(route, request.requestId, true);
+            this.attachAttemptMetadata(oauthResponse, attemptedProviders, route);
+            return oauthResponse;
+          } catch (oauthError: any) {
+            lastError = oauthError;
+            const canRetry =
+              failoverEnabled &&
+              i < targets.length - 1 &&
+              this.isRetryableOAuthError(oauthError);
+
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
+              );
+              continue;
+            }
+
+            throw oauthError;
+          }
+        }
+
+        // 4. Execute Request
+        const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
+        const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
+        const incomingApi = request.incomingApiType || "unknown";
+
+        logger.info(
+          `Dispatching ${request.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
+        );
+
+        logger.silly("Upstream Request Payload", providerPayload);
+
+        const response = await this.executeProviderRequest(url, headers, providerPayload);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const canRetry =
+            failoverEnabled &&
+            i < targets.length - 1 &&
+            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
+
+          try {
+            await this.handleProviderError(response, route, errorText, url, headers, targetApiType);
+          } catch (e: any) {
+            lastError = e;
+
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying after HTTP ${response.status} from ${route.provider}/${route.model}`
+              );
+              continue;
+            }
+
+            throw e;
+          }
+        }
+
+        // 5. Handle Response
+        if (request.stream) {
+          const streamProbe = await this.probeStreamingStart(response);
+
+          if (!streamProbe.ok) {
+            const error = streamProbe.error;
+            lastError = error;
+
+            const canRetry =
+              failoverEnabled &&
+              i < targets.length - 1 &&
+              !streamProbe.streamStarted &&
+              this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
+              );
+              continue;
+            }
+
+            throw error;
+          }
+
+          const streamResponse = this.handleStreamingResponse(
+            streamProbe.response,
+            request,
+            route,
+            targetApiType,
+            bypassTransformation
+          );
+          await this.recordAttemptMetric(route, request.requestId, true);
+          this.attachAttemptMetadata(streamResponse, attemptedProviders, route);
+          return streamResponse;
+        }
+
+        const nonStreamingResponse = await this.handleNonStreamingResponse(
+          response,
+          request,
+          route,
+          targetApiType,
+          transformer,
+          bypassTransformation
+        );
+        await this.recordAttemptMetric(route, request.requestId, true);
+        this.attachAttemptMetadata(nonStreamingResponse, attemptedProviders, route);
+        return nonStreamingResponse;
+      } catch (error: any) {
+        lastError = error;
+
+        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        await this.recordAttemptMetric(route, request.requestId, false);
+
+        const canRetryNetwork =
+          failoverEnabled &&
+          i < targets.length - 1 &&
+          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+        if (canRetryNetwork) {
+          logger.warn(
+            `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+          );
+          continue;
+        }
+
+        throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
+      }
     }
 
-    // 5. Handle Response
-    if (request.stream) {
-      return this.handleStreamingResponse(
-        response,
-        request,
-        route,
-        targetApiType,
-        bypassTransformation
-      );
-    } else {
-      return await this.handleNonStreamingResponse(
-        response,
-        request,
-        route,
-        targetApiType,
-        transformer,
-        bypassTransformation
-      );
+    throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
+  }
+
+  private isRetryableStatus(statusCode: number, retryableStatusCodes: number[]): boolean {
+    return retryableStatusCodes.includes(statusCode);
+  }
+
+  /**
+   * Determines if an OAuth error is retryable.
+   * Retryable errors include network issues, rate limiting, and transient failures.
+   */
+  private isRetryableOAuthError(error: any): boolean {
+    if (!error) return false;
+
+    const errorMessage = error.message?.toLowerCase() || '';
+    const statusCode = error.status || error.statusCode;
+
+    // Retry on network errors (no status code means network failure)
+    if (!statusCode) {
+      return true;
+    }
+
+    // Retry on 5xx server errors
+    if (statusCode >= 500 && statusCode < 600) {
+      return true;
+    }
+
+    // Retry on 429 rate limiting
+    if (statusCode === 429) {
+      return true;
+    }
+
+    // Retry on specific transient error messages
+    const retryablePatterns = [
+      'timeout',
+      'econnrefused',
+      'ECONNREFUSED',
+      'etimedout',
+      'ETIMEDOUT',
+      'network',
+      'socket',
+      'temporary',
+      'unavailable',
+      'service unavailable'
+    ];
+
+    for (const pattern of retryablePatterns) {
+      if (errorMessage.includes(pattern)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isRetryableNetworkError(error: any, retryableErrors: string[]): boolean {
+    if (!error) return false;
+    const code = String(error.code || "").toUpperCase();
+    const message = String(error.message || "").toUpperCase();
+    return retryableErrors.some((token) => {
+      const normalized = token.toUpperCase();
+      return code.includes(normalized) || message.includes(normalized);
+    });
+  }
+
+  private async probeStreamingStart(response: Response): Promise<
+    | { ok: true; response: Response }
+    | { ok: false; error: Error; streamStarted: boolean }
+  > {
+    if (!response.body) {
+      return { ok: true, response };
+    }
+
+    const reader = response.body.getReader();
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<{ timeout: true }>((resolve) => {
+      timeoutId = setTimeout(() => resolve({ timeout: true }), 100);
+    });
+
+    try {
+      const readResult = await Promise.race([reader.read(), timeoutPromise]);
+
+      if ((readResult as any).timeout) {
+        const passthrough = new ReadableStream<Uint8Array>({
+          async pull(controller) {
+            try {
+              const next = await reader.read();
+              if (next.done) {
+                controller.close();
+              } else {
+                controller.enqueue(next.value);
+              }
+            } catch (error) {
+              controller.error(error);
+            }
+          },
+          cancel(reason) {
+            return reader.cancel(reason);
+          },
+        });
+
+        return {
+          ok: true,
+          response: new Response(passthrough, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+          }),
+        };
+      }
+
+      const first = readResult as ReadableStreamReadResult<Uint8Array>;
+      const replay = new ReadableStream<Uint8Array>({
+        start(controller) {
+          if (!first.done && first.value) {
+            controller.enqueue(first.value);
+          }
+        },
+        async pull(controller) {
+          try {
+            const next = await reader.read();
+            if (next.done) {
+              controller.close();
+            } else {
+              controller.enqueue(next.value);
+            }
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+        cancel(reason) {
+          return reader.cancel(reason);
+        },
+      });
+
+      return {
+        ok: true,
+        response: new Response(replay, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        }),
+      };
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+        streamStarted: false,
+      };
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
+
+  private attachAttemptMetadata(
+    response: any,
+    attemptedProviders: string[],
+    finalRoute: RouteResult
+  ): void {
+    response.plexus = {
+      ...(response.plexus || {}),
+      attemptCount: attemptedProviders.length,
+      finalAttemptProvider: finalRoute.provider,
+      finalAttemptModel: finalRoute.model,
+      allAttemptedProviders: JSON.stringify(attemptedProviders),
+    } as any;
+  }
+
+  private buildAllTargetsFailedError(lastError: any, attemptedProviders: string[]): Error {
+    const summary = attemptedProviders.length > 0 ? attemptedProviders.join(", ") : "none";
+    const baseMessage = lastError?.message || "Unknown provider error";
+    const enriched = new Error(`All targets failed: ${summary}. Last error: ${baseMessage}`) as any;
+
+    enriched.cause = lastError;
+    enriched.routingContext = {
+      ...(lastError?.routingContext || {}),
+      allAttemptedProviders: attemptedProviders,
+      attemptCount: attemptedProviders.length,
+      statusCode: lastError?.routingContext?.statusCode || 500,
+    };
+
+    return enriched;
+  }
+
   setupHeaders(route: RouteResult, apiType: string, request: UnifiedChatRequest): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -722,74 +1042,126 @@ export class Dispatcher {
    * - Always use /embeddings endpoint
    */
   async dispatchEmbeddings(request: any): Promise<any> {
-    // 1. Route using existing Router with 'embeddings' as the API type
-    const route = await Router.resolve(request.model, 'embeddings');
+    const config = getConfig();
+    const failover = config.failover;
+    const failoverEnabled = failover?.enabled !== false;
 
-    // 2. Build URL (embeddings always use /embeddings endpoint)
-    const baseUrl = this.resolveBaseUrl(route, 'embeddings');
-    const url = `${baseUrl}/embeddings`;
-
-    // 3. Setup headers (Bearer auth, no streaming)
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    };
-
-    if (route.config.api_key) {
-      headers["Authorization"] = `Bearer ${route.config.api_key}`;
+    let candidates = await Router.resolveCandidates(request.model, 'embeddings');
+    if (candidates.length === 0) {
+      const singleRoute = await Router.resolve(request.model, 'embeddings');
+      candidates = [singleRoute];
     }
 
-    if (route.config.headers) {
-      Object.assign(headers, route.config.headers);
-    }
+    const targets = failoverEnabled ? candidates : [candidates[0]!];
+    const attemptedProviders: string[] = [];
+    let lastError: any = null;
 
-    // 4. Transform request (just model substitution)
-    const payload = {
-      ...request.originalBody,
-      model: route.model
-    };
+    for (let i = 0; i < targets.length; i++) {
+      const route = targets[i]!;
+      attemptedProviders.push(`${route.provider}/${route.model}`);
 
-    if (route.config.extraBody) {
-      Object.assign(payload, route.config.extraBody);
-    }
+      try {
+        const baseUrl = this.resolveBaseUrl(route, 'embeddings');
+        const url = `${baseUrl}/embeddings`;
 
-    logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
-    logger.silly("Embeddings Request Payload", payload);
-    
-    if (request.requestId) {
-      DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
-    }
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        };
 
-    // 5. Execute request
-    const response = await this.executeProviderRequest(url, headers, payload);
+        if (route.config.api_key) {
+          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+        }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText, url, headers, 'embeddings');
-    }
+        if (route.config.headers) {
+          Object.assign(headers, route.config.headers);
+        }
 
-    // 6. Parse and enrich response
-    const responseBody = await response.json();
-    logger.silly("Embeddings Response Payload", responseBody);
-    
-    if (request.requestId) {
-      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
-    }
+        const payload = {
+          ...request.originalBody,
+          model: route.model
+        };
 
-    const enrichedResponse: any = {
-      ...responseBody,
-      plexus: {
-        provider: route.provider,
-        model: route.model,
-        apiType: 'embeddings',
-        pricing: route.modelConfig?.pricing,
-        providerDiscount: route.config.discount,
-        canonicalModel: route.canonicalModel,
-        config: route.config,
+        if (route.config.extraBody) {
+          Object.assign(payload, route.config.extraBody);
+        }
+
+        logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
+        logger.silly("Embeddings Request Payload", payload);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+        }
+
+        const response = await this.executeProviderRequest(url, headers, payload);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const canRetry =
+            failoverEnabled &&
+            i < targets.length - 1 &&
+            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
+
+          try {
+            await this.handleProviderError(response, route, errorText, url, headers, 'embeddings');
+          } catch (e: any) {
+            lastError = e;
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying embeddings after HTTP ${response.status} from ${route.provider}/${route.model}`
+              );
+              continue;
+            }
+            throw e;
+          }
+        }
+
+        const responseBody = await response.json();
+        logger.silly("Embeddings Response Payload", responseBody);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+        }
+
+        const enrichedResponse: any = {
+          ...responseBody,
+          plexus: {
+            provider: route.provider,
+            model: route.model,
+            apiType: 'embeddings',
+            pricing: route.modelConfig?.pricing,
+            providerDiscount: route.config.discount,
+            canonicalModel: route.canonicalModel,
+            config: route.config,
+          }
+        };
+
+        await this.recordAttemptMetric(route, request.requestId, true);
+        this.attachAttemptMetadata(enrichedResponse, attemptedProviders, route);
+        return enrichedResponse;
+      } catch (error: any) {
+        lastError = error;
+        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        await this.recordAttemptMetric(route, request.requestId, false);
+
+        const canRetryNetwork =
+          failoverEnabled &&
+          i < targets.length - 1 &&
+          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+        if (canRetryNetwork) {
+          logger.warn(
+            `Failover: retrying embeddings after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+          );
+          continue;
+        }
+
+        throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
       }
-    };
+    }
 
-    return enrichedResponse;
+    throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
   }
 
   /**
@@ -797,87 +1169,141 @@ export class Dispatcher {
    * Handles multipart/form-data file uploads to OpenAI-compatible transcription endpoints
    */
   async dispatchTranscription(request: UnifiedTranscriptionRequest): Promise<UnifiedTranscriptionResponse> {
-    // 1. Route using existing Router with 'transcriptions' as the API type
-    const route = await Router.resolve(request.model, 'transcriptions');
-
-    // 2. Build URL (transcriptions use /audio/transcriptions endpoint)
-    const baseUrl = this.resolveBaseUrl(route, 'transcriptions');
-    const url = `${baseUrl}/audio/transcriptions`;
-
-    // 3. Setup headers (multipart/form-data will be set by fetch automatically)
-    const headers: Record<string, string> = {};
-
-    if (route.config.api_key) {
-      headers["Authorization"] = `Bearer ${route.config.api_key}`;
-    }
-
-    if (route.config.headers) {
-      Object.assign(headers, route.config.headers);
-    }
-
-    // 4. Transform request to FormData
     const { TranscriptionsTransformer } = await import('../transformers/transcriptions');
     const transformer = new TranscriptionsTransformer();
-    const formData = await transformer.transformRequest(request);
 
-    logger.info(`Dispatching transcription ${request.model} to ${route.provider}:${route.model}`);
-    logger.silly("Transcription Request", { model: request.model, filename: request.filename });
-    
-    if (request.requestId) {
-      DebugManager.getInstance().addTransformedRequest(request.requestId, { 
-        model: request.model, 
-        filename: request.filename,
-        mimeType: request.mimeType,
-        language: request.language,
-        prompt: request.prompt,
-        response_format: request.response_format,
-        temperature: request.temperature
-      });
+    const config = getConfig();
+    const failover = config.failover;
+    const failoverEnabled = failover?.enabled !== false;
+
+    let candidates = await Router.resolveCandidates(request.model, 'transcriptions');
+    if (candidates.length === 0) {
+      const singleRoute = await Router.resolve(request.model, 'transcriptions');
+      candidates = [singleRoute];
     }
 
-    // 5. Execute request with FormData
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: formData
-    });
+    const targets = failoverEnabled ? candidates : [candidates[0]!];
+    const attemptedProviders: string[] = [];
+    let lastError: any = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText, url, headers, 'transcriptions');
+    for (let i = 0; i < targets.length; i++) {
+      const route = targets[i]!;
+      attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      try {
+        const baseUrl = this.resolveBaseUrl(route, 'transcriptions');
+        const url = `${baseUrl}/audio/transcriptions`;
+
+        const headers: Record<string, string> = {};
+
+        if (route.config.api_key) {
+          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+        }
+
+        if (route.config.headers) {
+          Object.assign(headers, route.config.headers);
+        }
+
+        const formData = await transformer.transformRequest({
+          ...request,
+          model: route.model,
+        });
+
+        logger.info(`Dispatching transcription ${request.model} to ${route.provider}:${route.model}`);
+        logger.silly("Transcription Request", { model: request.model, filename: request.filename });
+
+        if (request.requestId) {
+          DebugManager.getInstance().addTransformedRequest(request.requestId, {
+            model: request.model,
+            filename: request.filename,
+            mimeType: request.mimeType,
+            language: request.language,
+            prompt: request.prompt,
+            response_format: request.response_format,
+            temperature: request.temperature,
+          });
+        }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const canRetry =
+            failoverEnabled &&
+            i < targets.length - 1 &&
+            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
+
+          try {
+            await this.handleProviderError(response, route, errorText, url, headers, 'transcriptions');
+          } catch (e: any) {
+            lastError = e;
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying transcription after HTTP ${response.status} from ${route.provider}/${route.model}`
+              );
+              continue;
+            }
+            throw e;
+          }
+        }
+
+        const responseFormat = request.response_format || 'json';
+        let responseBody: any;
+
+        if (responseFormat === 'text') {
+          responseBody = await response.text();
+        } else {
+          responseBody = await response.json();
+        }
+
+        logger.silly("Transcription Response", responseBody);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+        }
+
+        const unifiedResponse = await transformer.transformResponse(responseBody, responseFormat);
+
+        unifiedResponse.plexus = {
+          provider: route.provider,
+          model: route.model,
+          apiType: 'transcriptions',
+          pricing: route.modelConfig?.pricing,
+          providerDiscount: route.config.discount,
+          canonicalModel: route.canonicalModel,
+          config: route.config,
+        };
+
+        await this.recordAttemptMetric(route, request.requestId, true);
+        this.attachAttemptMetadata(unifiedResponse, attemptedProviders, route);
+        return unifiedResponse;
+      } catch (error: any) {
+        lastError = error;
+        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        await this.recordAttemptMetric(route, request.requestId, false);
+
+        const canRetryNetwork =
+          failoverEnabled &&
+          i < targets.length - 1 &&
+          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+        if (canRetryNetwork) {
+          logger.warn(
+            `Failover: retrying transcription after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+          );
+          continue;
+        }
+
+        throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
+      }
     }
 
-    // 6. Parse response based on format
-    const responseFormat = request.response_format || 'json';
-    let responseBody: any;
-    
-    if (responseFormat === 'text') {
-      responseBody = await response.text();
-    } else {
-      responseBody = await response.json();
-    }
-    
-    logger.silly("Transcription Response", responseBody);
-    
-    if (request.requestId) {
-      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
-    }
-
-    // 7. Transform response to unified format
-    const unifiedResponse = await transformer.transformResponse(responseBody, responseFormat);
-
-    // 8. Add plexus metadata
-    unifiedResponse.plexus = {
-      provider: route.provider,
-      model: route.model,
-      apiType: 'transcriptions',
-      pricing: route.modelConfig?.pricing,
-      providerDiscount: route.config.discount,
-      canonicalModel: route.canonicalModel,
-      config: route.config,
-    };
-
-    return unifiedResponse;
+    throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
   }
 
   /**
@@ -886,87 +1312,166 @@ export class Dispatcher {
    * Supports both binary audio responses and SSE streaming
    */
   async dispatchSpeech(request: UnifiedSpeechRequest): Promise<UnifiedSpeechResponse> {
-    // 1. Route using existing Router with 'speech' as the API type
-    const route = await Router.resolve(request.model, 'speech');
-
-    // 2. Build URL (speech uses /audio/speech endpoint)
-    const baseUrl = this.resolveBaseUrl(route, 'speech');
-    const url = `${baseUrl}/audio/speech`;
-
-    // 3. Setup headers
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (route.config.api_key) {
-      headers["Authorization"] = `Bearer ${route.config.api_key}`;
-    }
-
-    if (route.config.headers) {
-      Object.assign(headers, route.config.headers);
-    }
-
-    // 4. Transform request (model substitution and optional params)
     const { SpeechTransformer } = await import('../transformers/speech');
     const transformer = new SpeechTransformer();
-    const payload = await transformer.transformRequest({
-      ...request,
-      model: route.model,
-    });
 
-    if (route.config.extraBody) {
-      Object.assign(payload, route.config.extraBody);
+    const config = getConfig();
+    const failover = config.failover;
+    const failoverEnabled = failover?.enabled !== false;
+
+    let candidates = await Router.resolveCandidates(request.model, 'speech');
+    if (candidates.length === 0) {
+      const singleRoute = await Router.resolve(request.model, 'speech');
+      candidates = [singleRoute];
     }
 
-    logger.info(`Dispatching speech ${request.model} to ${route.provider}:${route.model}`);
-    logger.silly("Speech Request Payload", payload);
+    const targets = failoverEnabled ? candidates : [candidates[0]!];
+    const attemptedProviders: string[] = [];
+    let lastError: any = null;
 
-    if (request.requestId) {
-      DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+    for (let i = 0; i < targets.length; i++) {
+      const route = targets[i]!;
+      attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      try {
+        const baseUrl = this.resolveBaseUrl(route, 'speech');
+        const url = `${baseUrl}/audio/speech`;
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+
+        if (route.config.api_key) {
+          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+        }
+
+        if (route.config.headers) {
+          Object.assign(headers, route.config.headers);
+        }
+
+        const payload = await transformer.transformRequest({
+          ...request,
+          model: route.model,
+        });
+
+        if (route.config.extraBody) {
+          Object.assign(payload, route.config.extraBody);
+        }
+
+        logger.info(`Dispatching speech ${request.model} to ${route.provider}:${route.model}`);
+        logger.silly("Speech Request Payload", payload);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+        }
+
+        const isStreamed = request.stream_format === 'sse';
+        const acceptHeader = isStreamed ? 'text/event-stream' : 'audio/*';
+        headers["Accept"] = acceptHeader;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const canRetry =
+            failoverEnabled &&
+            i < targets.length - 1 &&
+            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
+
+          try {
+            await this.handleProviderError(response, route, errorText, url, headers, 'speech');
+          } catch (e: any) {
+            lastError = e;
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying speech after HTTP ${response.status} from ${route.provider}/${route.model}`
+              );
+              continue;
+            }
+            throw e;
+          }
+        }
+
+        let responseForProcessing = response;
+        if (isStreamed) {
+          const streamProbe = await this.probeStreamingStart(response);
+
+          if (!streamProbe.ok) {
+            const error = streamProbe.error;
+            lastError = error;
+
+            const canRetry =
+              failoverEnabled &&
+              i < targets.length - 1 &&
+              !streamProbe.streamStarted &&
+              this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying speech stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
+              );
+              continue;
+            }
+
+            throw error;
+          }
+
+          responseForProcessing = streamProbe.response;
+        }
+
+        const responseBuffer = Buffer.from(await responseForProcessing.arrayBuffer());
+        logger.silly("Speech Response", { size: responseBuffer.length, isStreamed });
+
+        if (request.requestId) {
+          DebugManager.getInstance().addRawResponse(request.requestId, { size: responseBuffer.length, isStreamed });
+        }
+
+        const unifiedResponse = await transformer.transformResponse(responseBuffer, {
+          stream_format: request.stream_format,
+          response_format: request.response_format,
+        });
+
+        unifiedResponse.plexus = {
+          provider: route.provider,
+          model: route.model,
+          apiType: 'speech',
+          pricing: route.modelConfig?.pricing,
+          providerDiscount: route.config.discount,
+          canonicalModel: route.canonicalModel,
+          config: route.config,
+        };
+
+        await this.recordAttemptMetric(route, request.requestId, true);
+        this.attachAttemptMetadata(unifiedResponse, attemptedProviders, route);
+        return unifiedResponse;
+      } catch (error: any) {
+        lastError = error;
+        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        await this.recordAttemptMetric(route, request.requestId, false);
+
+        const canRetryNetwork =
+          failoverEnabled &&
+          i < targets.length - 1 &&
+          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+        if (canRetryNetwork) {
+          logger.warn(
+            `Failover: retrying speech after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+          );
+          continue;
+        }
+
+        throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
+      }
     }
 
-    // 5. Execute request
-    const isStreamed = request.stream_format === 'sse';
-    const acceptHeader = isStreamed ? 'text/event-stream' : 'audio/*';
-    headers["Accept"] = acceptHeader;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText, url, headers, 'speech');
-    }
-
-    // 6. Handle response (binary or streaming)
-    const responseBuffer = Buffer.from(await response.arrayBuffer());
-    logger.silly("Speech Response", { size: responseBuffer.length, isStreamed });
-
-    if (request.requestId) {
-      DebugManager.getInstance().addRawResponse(request.requestId, { size: responseBuffer.length, isStreamed });
-    }
-
-    // 7. Transform response
-    const unifiedResponse = await transformer.transformResponse(responseBuffer, {
-      stream_format: request.stream_format,
-      response_format: request.response_format,
-    });
-
-    // 8. Add plexus metadata
-    unifiedResponse.plexus = {
-      provider: route.provider,
-      model: route.model,
-      apiType: 'speech',
-      pricing: route.modelConfig?.pricing,
-      providerDiscount: route.config.discount,
-      canonicalModel: route.canonicalModel,
-      config: route.config,
-    };
-
-    return unifiedResponse;
+    throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
   }
 
   /**
@@ -974,81 +1479,132 @@ export class Dispatcher {
    * Handles JSON body requests to OpenAI-compatible image generation endpoints
    */
   async dispatchImageGenerations(request: UnifiedImageGenerationRequest): Promise<UnifiedImageGenerationResponse> {
-    // 1. Route using existing Router with 'images' as the API type
-    const route = await Router.resolve(request.model, 'images');
-
-    // 2. Build URL (image generations use /images/generations endpoint)
-    const baseUrl = this.resolveBaseUrl(route, 'images');
-    const url = `${baseUrl}/images/generations`;
-
-    // 3. Setup headers
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    };
-
-    if (route.config.api_key) {
-      headers["Authorization"] = `Bearer ${route.config.api_key}`;
-    }
-
-    if (route.config.headers) {
-      Object.assign(headers, route.config.headers);
-    }
-
-    // 4. Transform request (model substitution and optional params)
     const { ImageTransformer } = await import('../transformers/image');
     const transformer = new ImageTransformer();
-    const payload = await transformer.transformGenerationRequest({
-      ...request,
-      model: route.model,
-    });
 
-    if (route.config.extraBody) {
-      Object.assign(payload, route.config.extraBody);
+    const config = getConfig();
+    const failover = config.failover;
+    const failoverEnabled = failover?.enabled !== false;
+
+    let candidates = await Router.resolveCandidates(request.model, 'images');
+    if (candidates.length === 0) {
+      const singleRoute = await Router.resolve(request.model, 'images');
+      candidates = [singleRoute];
     }
 
-    logger.info(`Dispatching image generation ${request.model} to ${route.provider}:${route.model}`);
-    logger.silly("Image Generation Request Payload", payload);
+    const targets = failoverEnabled ? candidates : [candidates[0]!];
+    const attemptedProviders: string[] = [];
+    let lastError: any = null;
 
-    if (request.requestId) {
-      DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+    for (let i = 0; i < targets.length; i++) {
+      const route = targets[i]!;
+      attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      try {
+        const baseUrl = this.resolveBaseUrl(route, 'images');
+        const url = `${baseUrl}/images/generations`;
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        };
+
+        if (route.config.api_key) {
+          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+        }
+
+        if (route.config.headers) {
+          Object.assign(headers, route.config.headers);
+        }
+
+        const payload = await transformer.transformGenerationRequest({
+          ...request,
+          model: route.model,
+        });
+
+        if (route.config.extraBody) {
+          Object.assign(payload, route.config.extraBody);
+        }
+
+        logger.info(`Dispatching image generation ${request.model} to ${route.provider}:${route.model}`);
+        logger.silly("Image Generation Request Payload", payload);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
+        }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const canRetry =
+            failoverEnabled &&
+            i < targets.length - 1 &&
+            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
+
+          try {
+            await this.handleProviderError(response, route, errorText, url, headers, 'images');
+          } catch (e: any) {
+            lastError = e;
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying image generation after HTTP ${response.status} from ${route.provider}/${route.model}`
+              );
+              continue;
+            }
+            throw e;
+          }
+        }
+
+        const responseBody = await response.json();
+        logger.silly("Image Generation Response", responseBody);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+        }
+
+        const unifiedResponse = await transformer.transformGenerationResponse(responseBody);
+
+        unifiedResponse.plexus = {
+          provider: route.provider,
+          model: route.model,
+          apiType: 'images',
+          pricing: route.modelConfig?.pricing,
+          providerDiscount: route.config.discount,
+          canonicalModel: route.canonicalModel,
+          config: route.config,
+        };
+
+        await this.recordAttemptMetric(route, request.requestId, true);
+        this.attachAttemptMetadata(unifiedResponse, attemptedProviders, route);
+        return unifiedResponse;
+      } catch (error: any) {
+        lastError = error;
+        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        await this.recordAttemptMetric(route, request.requestId, false);
+
+        const canRetryNetwork =
+          failoverEnabled &&
+          i < targets.length - 1 &&
+          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+        if (canRetryNetwork) {
+          logger.warn(
+            `Failover: retrying image generation after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+          );
+          continue;
+        }
+
+        throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
+      }
     }
 
-    // 5. Execute request
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText, url, headers, 'images');
-    }
-
-    // 6. Parse JSON response
-    const responseBody = await response.json();
-    logger.silly("Image Generation Response", responseBody);
-
-    if (request.requestId) {
-      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
-    }
-
-    // 7. Transform response
-    const unifiedResponse = await transformer.transformGenerationResponse(responseBody);
-
-    // 8. Add plexus metadata
-    unifiedResponse.plexus = {
-      provider: route.provider,
-      model: route.model,
-      apiType: 'images',
-      pricing: route.modelConfig?.pricing,
-      providerDiscount: route.config.discount,
-      canonicalModel: route.canonicalModel,
-      config: route.config,
-    };
-
-    return unifiedResponse;
+    throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
   }
 
   /**
@@ -1057,77 +1613,128 @@ export class Dispatcher {
    * Supports single image upload with optional mask
    */
   async dispatchImageEdits(request: UnifiedImageEditRequest): Promise<UnifiedImageEditResponse> {
-    // 1. Route using existing Router with 'images' as the API type
-    const route = await Router.resolve(request.model, 'images');
-
-    // 2. Build URL (image edits use /images/edits endpoint)
-    const baseUrl = this.resolveBaseUrl(route, 'images');
-    const url = `${baseUrl}/images/edits`;
-
-    // 3. Setup headers (no Content-Type - fetch will set it for FormData)
-    const headers: Record<string, string> = {};
-
-    if (route.config.api_key) {
-      headers["Authorization"] = `Bearer ${route.config.api_key}`;
-    }
-
-    if (route.config.headers) {
-      Object.assign(headers, route.config.headers);
-    }
-
-    // 4. Transform request to FormData
     const { ImageTransformer } = await import('../transformers/image');
     const transformer = new ImageTransformer();
-    const formData = await transformer.transformEditRequest({
-      ...request,
-      model: route.model,
-    });
 
-    logger.info(`Dispatching image edit ${request.model} to ${route.provider}:${route.model}`);
-    logger.silly("Image Edit Request", { model: request.model, filename: request.filename, hasMask: !!request.mask });
+    const config = getConfig();
+    const failover = config.failover;
+    const failoverEnabled = failover?.enabled !== false;
 
-    if (request.requestId) {
-      DebugManager.getInstance().addTransformedRequest(request.requestId, {
-        model: request.model,
-        filename: request.filename,
-        hasMask: !!request.mask,
-      });
+    let candidates = await Router.resolveCandidates(request.model, 'images');
+    if (candidates.length === 0) {
+      const singleRoute = await Router.resolve(request.model, 'images');
+      candidates = [singleRoute];
     }
 
-    // 5. Execute request with FormData
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const targets = failoverEnabled ? candidates : [candidates[0]!];
+    const attemptedProviders: string[] = [];
+    let lastError: any = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      await this.handleProviderError(response, route, errorText, url, headers, 'images');
+    for (let i = 0; i < targets.length; i++) {
+      const route = targets[i]!;
+      attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      try {
+        const baseUrl = this.resolveBaseUrl(route, 'images');
+        const url = `${baseUrl}/images/edits`;
+
+        const headers: Record<string, string> = {};
+
+        if (route.config.api_key) {
+          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+        }
+
+        if (route.config.headers) {
+          Object.assign(headers, route.config.headers);
+        }
+
+        const formData = await transformer.transformEditRequest({
+          ...request,
+          model: route.model,
+        });
+
+        logger.info(`Dispatching image edit ${request.model} to ${route.provider}:${route.model}`);
+        logger.silly("Image Edit Request", { model: request.model, filename: request.filename, hasMask: !!request.mask });
+
+        if (request.requestId) {
+          DebugManager.getInstance().addTransformedRequest(request.requestId, {
+            model: request.model,
+            filename: request.filename,
+            hasMask: !!request.mask,
+          });
+        }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const canRetry =
+            failoverEnabled &&
+            i < targets.length - 1 &&
+            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
+
+          try {
+            await this.handleProviderError(response, route, errorText, url, headers, 'images');
+          } catch (e: any) {
+            lastError = e;
+            if (canRetry) {
+              await this.recordAttemptMetric(route, request.requestId, false);
+              logger.warn(
+                `Failover: retrying image edit after HTTP ${response.status} from ${route.provider}/${route.model}`
+              );
+              continue;
+            }
+            throw e;
+          }
+        }
+
+        const responseBody = await response.json();
+        logger.silly("Image Edit Response", responseBody);
+
+        if (request.requestId) {
+          DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
+        }
+
+        const unifiedResponse = await transformer.transformEditResponse(responseBody);
+
+        unifiedResponse.plexus = {
+          provider: route.provider,
+          model: route.model,
+          apiType: 'images',
+          pricing: route.modelConfig?.pricing,
+          providerDiscount: route.config.discount,
+          canonicalModel: route.canonicalModel,
+          config: route.config,
+        };
+
+        await this.recordAttemptMetric(route, request.requestId, true);
+        this.attachAttemptMetadata(unifiedResponse, attemptedProviders, route);
+        return unifiedResponse;
+      } catch (error: any) {
+        lastError = error;
+        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        await this.recordAttemptMetric(route, request.requestId, false);
+
+        const canRetryNetwork =
+          failoverEnabled &&
+          i < targets.length - 1 &&
+          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+
+        if (canRetryNetwork) {
+          logger.warn(
+            `Failover: retrying image edit after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+          );
+          continue;
+        }
+
+        throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
+      }
     }
 
-    // 6. Parse JSON response
-    const responseBody = await response.json();
-    logger.silly("Image Edit Response", responseBody);
-
-    if (request.requestId) {
-      DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
-    }
-
-    // 7. Transform response
-    const unifiedResponse = await transformer.transformEditResponse(responseBody);
-
-    // 8. Add plexus metadata
-    unifiedResponse.plexus = {
-      provider: route.provider,
-      model: route.model,
-      apiType: 'images',
-      pricing: route.modelConfig?.pricing,
-      providerDiscount: route.config.discount,
-      canonicalModel: route.canonicalModel,
-      config: route.config,
-    };
-
-    return unifiedResponse;
+    throw this.buildAllTargetsFailedError(lastError, attemptedProviders);
   }
 }

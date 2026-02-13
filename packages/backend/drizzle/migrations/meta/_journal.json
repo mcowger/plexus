@@ -57,6 +57,13 @@
       "when": 1770940383480,
       "tag": "0007_useful_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1771012705662,
+      "tag": "0008_striped_gauntlet",
+      "breakpoints": true
     }
   ]
 }
