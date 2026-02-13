@@ -53,7 +53,7 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'User-Agent': this.userAgent,
-        'Version': '0.98.0',
+        'Version': '0.101.0',
       };
 
       if (accountId) {

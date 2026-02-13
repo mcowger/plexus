@@ -244,7 +244,7 @@ export class OAuthTransformer implements Transformer {
     const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
     const baseHeaders = {
       ...(filteredOptions as any).headers,
-      Version: '0.98.0'
+      Version: '0.101.0'
     };
     requestOptions.headers = baseHeaders;
     const isClaudeCodeAgent =
