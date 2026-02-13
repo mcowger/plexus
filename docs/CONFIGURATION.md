@@ -619,7 +619,7 @@ providers:
     api_key: "..."
     api_base_url: https://api.example.com/v1
     quota_checker:
-      type: synthetic | naga | nanogpt | openai-codex | claude-code
+      type: synthetic | naga | nanogpt | openai-codex | claude-code | zai | moonshot | minimax
       enabled: true
       intervalMinutes: 30
       # optional
@@ -644,6 +644,15 @@ providers:
 - `nanogpt`: NanoGPT usage checker.
 - `openai-codex`: Codex OAuth-backed checker.
 - `claude-code`: Claude Code OAuth-backed checker.
+- `zai`: ZAI balance-based checker.
+- `moonshot`: Moonshot balance-based checker.
+- `minimax`: MiniMax balance-based checker (requires `options.groupid` and `options.hertzSession`).
+
+**MiniMax options:**
+- `options.groupid` (**required**): MiniMax GroupId appended to `query_balance?GroupId=...`.
+- `options.hertzSession` (**required**): value for `HERTZ-SESSION` cookie sent to MiniMax.
+
+Treat `hertzSession` like a password/secret. Do not commit real values to source control.
 
 **Examples:**
 
@@ -668,6 +677,17 @@ providers:
       type: openai-codex
       enabled: true
       intervalMinutes: 10
+
+  minimax:
+    api_base_url: https://api.minimax.chat/v1
+    api_key: dummy
+    quota_checker:
+      type: minimax
+      enabled: true
+      intervalMinutes: 30
+      options:
+        groupid: "1234567890"
+        hertzSession: "paste-session-cookie-here"
 ```
 
 **Quota Monitoring API:**

@@ -54,6 +54,7 @@ export interface QuotaCheckResult {
 
 export interface QuotaCheckerInfo {
   checkerId: string;
+  checkerType?: string;
   oauthAccountId?: string;
   oauthProvider?: string;
   latest: QuotaSnapshot[];

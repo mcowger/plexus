@@ -616,14 +616,18 @@ const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'cl
 import { NewCheckerQuotaDisplay } from '../quota';
 ```
 
-2. Add conditional rendering:
+2. Add conditional rendering (use `checkerType` when available):
 ```typescript
-if (quota.checkerId.includes('new-checker-name')) {
+const checkerIdentifier = (quota.checkerType || quota.checkerId).toLowerCase();
+
+if (checkerIdentifier.includes('new-checker-name')) {
   return (
     <NewCheckerQuotaDisplay result={result} isCollapsed={isCollapsed} />
   );
 }
 ```
+
+Why: `checkerId` may be a custom connection name, so UI routing should key off the implementation type (`checkerType`) rather than assuming the ID contains the type string.
 
 ### 9.6 Key Patterns
 
@@ -812,3 +816,19 @@ export const MoonshotQuotaConfig: React.FC<QuotaConfigProps> = ({
 ```
 
 **Do NOT add an apiKey field** - the checker will automatically inherit the API key from the provider configuration.
+
+#### MiniMax Balance Checker Notes
+
+MiniMax is also a balance-style checker, but unlike Moonshot/Naga API-key patterns it requires two explicit options:
+
+- `options.groupid` (**required**)
+- `options.hertzSession` (**required**, sensitive; treat like a password)
+
+Request pattern:
+
+```text
+GET https://platform.minimax.io/account/query_balance?GroupId=<groupid>
+Cookie: HERTZ-SESSION=<hertzSession>
+```
+
+Map `available_amount` as the primary balance into a `subscription` window with `unit: dollars`.
