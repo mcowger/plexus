@@ -120,6 +120,39 @@ interface FetchedModel {
   };
 }
 
+interface ModelIdInputProps {
+  modelId: string;
+  onCommit: (oldId: string, newId: string) => void;
+}
+
+const ModelIdInput = ({ modelId, onCommit }: ModelIdInputProps) => {
+  const [draftId, setDraftId] = useState(modelId);
+
+  useEffect(() => {
+    setDraftId(modelId);
+  }, [modelId]);
+
+  const commit = () => {
+    if (!draftId || draftId === modelId) return;
+    onCommit(modelId, draftId);
+  };
+
+  return (
+    <Input
+      label="Model ID"
+      value={draftId}
+      onChange={(e) => setDraftId(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          commit();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+    />
+  );
+};
+
 const OAUTH_PROVIDER_MODELS: Record<string, FetchedModel[]> = {
   anthropic: [
     { id: 'claude-3-5-haiku-20241022', name: 'Claude Haiku 3.5' },
@@ -1558,10 +1591,9 @@ export const Providers = () => {
                                       </div>
                                       {openModelIdx === mId && (
                                           <div style={{padding: '8px', borderTop: '1px solid var(--color-border-glass)', display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                                              <Input
-                                                label="Model ID"
-                                                value={mId}
-                                                onChange={(e) => updateModelId(mId, e.target.value)}
+                                              <ModelIdInput
+                                                modelId={mId}
+                                                onCommit={updateModelId}
                                               />
 
                                               <div className="grid gap-4 grid-cols-3">
