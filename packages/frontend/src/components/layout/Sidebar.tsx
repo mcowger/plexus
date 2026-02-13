@@ -17,6 +17,7 @@ import {
   NanoGPTQuotaDisplay,
   ZAIQuotaDisplay,
   MoonshotQuotaDisplay,
+  MiniMaxQuotaDisplay,
 } from '../quota';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
@@ -378,6 +379,17 @@ export const Sidebar: React.FC = () => {
                       if (quota.checkerId.includes('moonshot')) {
                         return (
                           <MoonshotQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+
+                      // Use MiniMax display for minimax checkers
+                      if (quota.checkerId.includes('minimax')) {
+                        return (
+                          <MiniMaxQuotaDisplay
                             key={quota.checkerId}
                             result={result}
                             isCollapsed={isCollapsed}

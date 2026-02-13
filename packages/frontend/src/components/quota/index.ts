@@ -8,3 +8,5 @@ export { ZAIQuotaDisplay } from './ZAIQuotaDisplay';
 export { ZAIQuotaConfig } from './ZAIQuotaConfig';
 export { MoonshotQuotaDisplay } from './MoonshotQuotaDisplay';
 export { MoonshotQuotaConfig } from './MoonshotQuotaConfig';
+export { MiniMaxQuotaDisplay } from './MiniMaxQuotaDisplay';
+export { MiniMaxQuotaConfig } from './MiniMaxQuotaConfig';

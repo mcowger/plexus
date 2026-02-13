@@ -14,6 +14,7 @@ import { SyntheticQuotaConfig } from '../components/quota/SyntheticQuotaConfig';
 import { NanoGPTQuotaConfig } from '../components/quota/NanoGPTQuotaConfig';
 import { ZAIQuotaConfig } from '../components/quota/ZAIQuotaConfig';
 import { MoonshotQuotaConfig } from '../components/quota/MoonshotQuotaConfig';
+import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -25,7 +26,7 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot'] as const;
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax'] as const;
 const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -230,6 +231,15 @@ export const Providers = () => {
     if (quotaType === 'naga') {
       if (!options.apiKey || !(options.apiKey as string).trim()) {
         return 'Provisioning API Key is required for Naga quota checker';
+      }
+    }
+
+    if (quotaType === 'minimax') {
+      if (!options.groupid || !(options.groupid as string).trim()) {
+        return 'Group ID is required for MiniMax quota checker';
+      }
+      if (!options.hertzSession || !(options.hertzSession as string).trim()) {
+        return 'HERTZ-SESSION cookie value is required for MiniMax quota checker';
       }
     }
     
@@ -1442,6 +1452,21 @@ export const Providers = () => {
                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'moonshot' && (
                               <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                                 <MoonshotQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'minimax' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <MiniMaxQuotaConfig
                                   options={editingProvider.quotaChecker?.options || {}}
                                   onChange={(options) => setEditingProvider({
                                     ...editingProvider,

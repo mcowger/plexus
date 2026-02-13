@@ -83,6 +83,11 @@ const MoonshotQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const MiniMaxQuotaCheckerOptionsSchema = z.object({
+  groupid: z.string().trim().min(1, 'MiniMax groupid is required'),
+  hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -118,6 +123,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: MoonshotQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('minimax'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: MiniMaxQuotaCheckerOptionsSchema,
   }),
 ]);
 
