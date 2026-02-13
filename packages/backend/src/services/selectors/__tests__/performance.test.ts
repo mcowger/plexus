@@ -23,6 +23,16 @@ describe('PerformanceSelector', () => {
   });
 
   it('should select fastest target based on avg_tokens_per_sec', async () => {
+    const config: PlexusConfig = {
+      providers: {},
+      models: {},
+      keys: {},
+      adminKey: 'test',
+      quotas: [],
+      performanceExplorationRate: 0,
+    };
+    setConfigForTesting(config);
+
     mockGetProviderPerformance.mockImplementation((provider, model) => {
       if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 10 }]);
       if (provider === 'p2') return Promise.resolve([{ avg_tokens_per_sec: 50 }]); // Fastest
@@ -151,19 +161,21 @@ describe('PerformanceSelector', () => {
         { provider: 'p2', model: 'm2' }
       ];
 
-      // With 5% rate, should select fastest most of the time
-      let fastestCount = 0;
-      const iterations = 100;
-      for (let i = 0; i < iterations; i++) {
-        const selected = await selector.select(targets);
-        if (selected === targets[0]) {
-          fastestCount++;
-        }
-      }
+      // Deterministic assertions for default exploration behavior (0.05)
+      const originalRandom = Math.random;
+      try {
+        // Explore path: 0.01 < 0.05, should pick non-best target
+        Math.random = () => 0.01;
+        const explored = await selector.select(targets);
+        expect(explored).toEqual(targets[1]!);
 
-      // Should select fastest ~95% of the time (with some tolerance for randomness)
-      expect(fastestCount).toBeGreaterThan(iterations * 0.85); // At least 85%
-      expect(fastestCount).toBeLessThan(iterations * 0.99); // Less than 99%
+        // Non-explore path: 0.99 >= 0.05, should pick best target
+        Math.random = () => 0.99;
+        const nonExplored = await selector.select(targets);
+        expect(nonExplored).toEqual(targets[0]!);
+      } finally {
+        Math.random = originalRandom;
+      }
     });
   });
 });
