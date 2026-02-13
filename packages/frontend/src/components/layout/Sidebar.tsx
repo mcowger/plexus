@@ -15,6 +15,7 @@ import {
   NagaQuotaDisplay,
   OpenAICodexQuotaDisplay,
   NanoGPTQuotaDisplay,
+  ZAIQuotaDisplay,
 } from '../quota';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
@@ -354,6 +355,17 @@ export const Sidebar: React.FC = () => {
                       if (quota.checkerId.includes('openai-codex') || quota.checkerId.includes('codex')) {
                         return (
                           <OpenAICodexQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+
+                      // Use ZAI display for zai checkers
+                      if (quota.checkerId.includes('zai')) {
+                        return (
+                          <ZAIQuotaDisplay
                             key={quota.checkerId}
                             result={result}
                             isCollapsed={isCollapsed}

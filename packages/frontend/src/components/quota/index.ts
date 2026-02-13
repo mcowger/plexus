@@ -4,3 +4,5 @@ export { ClaudeCodeQuotaDisplay } from './ClaudeCodeQuotaDisplay';
 export { NagaQuotaDisplay } from './NagaQuotaDisplay';
 export { OpenAICodexQuotaDisplay } from './OpenAICodexQuotaDisplay';
 export { NanoGPTQuotaDisplay } from './NanoGPTQuotaDisplay';
+export { ZAIQuotaDisplay } from './ZAIQuotaDisplay';
+export { ZAIQuotaConfig } from './ZAIQuotaConfig';

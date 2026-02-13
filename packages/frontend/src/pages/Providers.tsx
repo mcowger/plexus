@@ -12,6 +12,7 @@ import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
 import { NagaQuotaConfig } from '../components/quota/NagaQuotaConfig';
 import { SyntheticQuotaConfig } from '../components/quota/SyntheticQuotaConfig';
 import { NanoGPTQuotaConfig } from '../components/quota/NanoGPTQuotaConfig';
+import { ZAIQuotaConfig } from '../components/quota/ZAIQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -23,7 +24,7 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code'] as const;
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai'] as const;
 const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -1410,6 +1411,21 @@ export const Providers = () => {
                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'nanogpt' && (
                               <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                                 <NanoGPTQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'zai' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <ZAIQuotaConfig
                                   options={editingProvider.quotaChecker?.options || {}}
                                   onChange={(options) => setEditingProvider({
                                     ...editingProvider,
