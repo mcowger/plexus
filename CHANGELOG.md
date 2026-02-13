@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.14.4 - 2026-02-13
+
+### v0.14.4: failover alias retries, expanded quota checker support, and OpenAI Codex model updates
+
+## Main features
+- Added an internal retry mechanism for failover model aliases with multiple targets, improving resilience when upstream targets fail ([78841ba](https://github.com/mcowger/plexus/commit/78841ba)).
+- Expanded quota checker coverage:
+  - Added OpenRouter balance-style quota checker ([6358585](https://github.com/mcowger/plexus/commit/6358585)).
+  - Added Moonshot AI quota checker support ([f271503](https://github.com/mcowger/plexus/commit/f271503)).
+  - Added ZAI quota checker support ([d214872](https://github.com/mcowger/plexus/commit/d214872)).
+- Updated OpenAI Codex integration:
+  - Added `gpt-5.3-codex-spark` and set Version header to `0.101.0` ([3677549](https://github.com/mcowger/plexus/commit/3677549)).
+
+## Fixes and smaller improvements
+- Fixed OpenAI Codex request shaping by stripping temperature for `gpt-5.2` ([0ea60eb](https://github.com/mcowger/plexus/commit/0ea60eb)).
+- Frontend UX fix: prevented model ID input focus loss in the providers modal ([a533bd8](https://github.com/mcowger/plexus/commit/a533bd8)).
+- Providers config fix: preserved empty base URL entries when changing API type ([dc142f0](https://github.com/mcowger/plexus/commit/dc142f0)).
+- Quota UI/docs fix: route displays by checker type and document MiniMax ([7b623e8](https://github.com/mcowger/plexus/commit/7b623e8)).
+- Fixed MiniMax quota checker options not repopulating when reopening modal ([f76afd1](https://github.com/mcowger/plexus/commit/f76afd1)).
+- Backend test reliability improvements for performance metrics and selector stability ([ff69748](https://github.com/mcowger/plexus/commit/ff69748)).
+
+## Maintenance
+- Removed unintended opencode config artifact ([01a0044](https://github.com/mcowger/plexus/commit/01a0044)).
+- Dependency updates ([6d3837b](https://github.com/mcowger/plexus/commit/6d3837b)).
+- Initial commit marker included in range ([38c65d6](https://github.com/mcowger/plexus/commit/38c65d6)).
+
+Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.14.3 - 2026-02-13
 
 ### Performance: Add clear button and canonical model grouping with improved chart labels
