@@ -1345,7 +1345,8 @@ export const Providers = () => {
                                       quotaChecker: {
                                         type: quotaType,
                                         enabled: true,
-                                        intervalMinutes: Math.max(1, editingProvider.quotaChecker?.intervalMinutes || 30)
+                                        intervalMinutes: Math.max(1, editingProvider.quotaChecker?.intervalMinutes || 30),
+                                        options: editingProvider.quotaChecker?.options
                                       }
                                     });
                                   }}
