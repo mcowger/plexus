@@ -1,19 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
-import {
-  api,
-  type Cooldown,
-  type LiveDashboardSnapshot,
-  type ProviderPerformanceData,
-  STAT_LABELS,
-  type Stat,
-  type TodayMetrics,
-  type UsageData
-} from '../lib/api';
+import { api, STAT_LABELS } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTimeAgo, formatTokens, formatTPS } from '../lib/format';
-import { Activity, AlertTriangle, Database, Server, Signal, Zap, Clock } from 'lucide-react';
+import { Activity, AlertTriangle, Database, Server, Signal, Zap, Clock, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Button } from '../components/ui/shadcn-button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/shadcn-table';
 import {
   ResponsiveContainer,
   LineChart,
@@ -25,8 +24,8 @@ import {
   Area,
   AreaChart
 } from 'recharts';
-
-type TimeRange = 'hour' | 'day' | 'week' | 'month';
+import { useMetricsStream } from '../features/metrics/hooks/useMetricsStream';
+import type { LiveDashboardSnapshot } from '../lib/api';
 
 const LIVE_WINDOW_MINUTES = 5;
 const LIVE_REQUEST_LIMIT = 1200;
@@ -66,151 +65,129 @@ const getStatusTone = (status: string) => {
   return 'text-danger bg-red-500/15 border border-danger/30';
 };
 
+/**
+ * Connection status indicator component
+ */
+const ConnectionIndicator = ({
+  status,
+  isStale,
+  onReconnect
+}: {
+  status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+  isStale: boolean;
+  onReconnect: () => void;
+}) => {
+  const getStatusConfig = () => {
+    switch (status) {
+      case 'connected':
+        return isStale
+          ? { icon: <Wifi size={14} />, text: 'Stale', color: 'text-warning' }
+          : { icon: <Wifi size={14} />, text: 'Live', color: 'text-success' };
+      case 'connecting':
+        return { icon: <RefreshCw size={14} className="animate-spin" />, text: 'Connecting...', color: 'text-text-muted' };
+      case 'reconnecting':
+        return { icon: <RefreshCw size={14} className="animate-spin" />, text: 'Reconnecting...', color: 'text-warning' };
+      case 'error':
+      case 'disconnected':
+        return { icon: <WifiOff size={14} />, text: 'Disconnected', color: 'text-danger' };
+      default:
+        return { icon: <Wifi size={14} />, text: 'Unknown', color: 'text-text-muted' };
+    }
+  };
+
+  const config = getStatusConfig();
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`flex items-center gap-1.5 text-xs ${config.color}`}>
+        {config.icon}
+        {config.text}
+      </span>
+      {(status === 'error' || status === 'disconnected') && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onReconnect}
+        >
+          Reconnect
+        </Button>
+      )}
+    </div>
+  );
+};
+
 export const LiveMetrics = () => {
-  const [stats, setStats] = useState<Stat[]>([]);
-  const [usageData, setUsageData] = useState<UsageData[]>([]);
-  const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [timeAgo, setTimeAgo] = useState<string>('Just now');
-  const [activityRange, setActivityRange] = useState<TimeRange>('day');
-  const [streamConnected, setStreamConnected] = useState<boolean>(false);
-  const [liveSnapshot, setLiveSnapshot] = useState<LiveDashboardSnapshot>(EMPTY_LIVE_SNAPSHOT);
-  const [providerPerformance, setProviderPerformance] = useState<ProviderPerformanceData[]>([]);
-  const [todayMetrics, setTodayMetrics] = useState<TodayMetrics>({
+  // Use unified SSE hook instead of individual polling hooks
+  const {
+    dashboardData,
+    liveSnapshot: sseLiveSnapshot,
+    providerPerformance,
+    cooldowns,
+    connectionStatus,
+    lastEventTime,
+    isStale,
+    reconnect
+  } = useMetricsStream({
+    autoConnect: true,
+    reconnectDelay: 3000,
+    maxReconnectAttempts: 5,
+    staleThreshold: 60000,
+    liveWindowMinutes: LIVE_WINDOW_MINUTES,
+    liveRequestLimit: LIVE_REQUEST_LIMIT
+  });
+
+  // Use live snapshot from SSE or empty state
+  const liveSnapshot = sseLiveSnapshot ?? EMPTY_LIVE_SNAPSHOT;
+
+  // Compute time ago from last event
+  const timeAgo = useMemo(() => {
+    if (!lastEventTime) return 'Just now';
+    const diff = Math.floor((Date.now() - lastEventTime) / 1000);
+    if (diff < 5) return 'Just now';
+    return formatTimeAgo(diff);
+  }, [lastEventTime]);
+
+  // Get stats from dashboard data or use defaults
+  const stats = useMemo(() => {
+    return dashboardData?.stats.filter((stat) =>
+      stat.label !== STAT_LABELS.PROVIDERS &&
+      stat.label !== STAT_LABELS.DURATION
+    ) ?? [];
+  }, [dashboardData?.stats]);
+
+  // Get today metrics from dashboard data or use defaults
+  const todayMetrics = dashboardData?.todayMetrics ?? {
     requests: 0,
     inputTokens: 0,
     outputTokens: 0,
     reasoningTokens: 0,
     cachedTokens: 0,
     totalCost: 0
-  });
-
-  const liveRefreshTimerRef = useRef<number | null>(null);
-
-  const loadData = useCallback(async () => {
-    const dashboardData = await api.getDashboardData(activityRange);
-    setStats(dashboardData.stats.filter((stat) =>
-      stat.label !== STAT_LABELS.PROVIDERS &&
-      stat.label !== STAT_LABELS.DURATION
-    ));
-    setUsageData(dashboardData.usageData);
-    setCooldowns(dashboardData.cooldowns);
-    setTodayMetrics(dashboardData.todayMetrics);
-    setLastUpdated(new Date());
-  }, [activityRange]);
-
-  const loadLiveData = useCallback(async () => {
-    const [snapshot, performanceRows] = await Promise.all([
-      api.getLiveDashboardSnapshot(LIVE_WINDOW_MINUTES, LIVE_REQUEST_LIMIT),
-      api.getProviderPerformance()
-    ]);
-
-    setLiveSnapshot(snapshot);
-    setProviderPerformance(performanceRows);
-    setLastUpdated(new Date());
-  }, []);
-
-  useEffect(() => {
-    void loadData();
-    const interval = window.setInterval(() => {
-      void loadData();
-    }, 30000);
-    return () => window.clearInterval(interval);
-  }, [loadData]);
-
-  useEffect(() => {
-    void loadLiveData();
-    const interval = window.setInterval(() => {
-      void loadLiveData();
-    }, 10000);
-    return () => window.clearInterval(interval);
-  }, [loadLiveData]);
-
-  useEffect(() => {
-    setStreamConnected(true);
-    const unsubscribe = api.subscribeToUsageEvents({
-      onLog: () => {
-        setStreamConnected(true);
-        if (liveRefreshTimerRef.current !== null) {
-          window.clearTimeout(liveRefreshTimerRef.current);
-        }
-        liveRefreshTimerRef.current = window.setTimeout(() => {
-          void loadLiveData();
-        }, 900);
-      },
-      onError: () => {
-        setStreamConnected(false);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      if (liveRefreshTimerRef.current !== null) {
-        window.clearTimeout(liveRefreshTimerRef.current);
-      }
-    };
-  }, [loadLiveData]);
-
-  useEffect(() => {
-    const updateTime = () => {
-      const diffSeconds = Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
-      if (diffSeconds < 5) {
-        setTimeAgo('Just now');
-        return;
-      }
-      setTimeAgo(formatTimeAgo(diffSeconds));
-    };
-
-    updateTime();
-    const interval = window.setInterval(updateTime, 10000);
-    return () => window.clearInterval(interval);
-  }, [lastUpdated]);
+  };
 
   const providerPerformanceByProvider = useMemo(() => {
-    const totals = new Map<string, {
-      ttftWeighted: number;
-      tpsWeighted: number;
-      samples: number;
-    }>();
+    const byProvider = new Map<string, { avgTtftMs: number; avgTokensPerSec: number }>();
 
     for (const row of providerPerformance) {
-      const key = row.provider || 'unknown';
-      const weight = Math.max(1, Number(row.sample_count || 0));
-      const current = totals.get(key) ?? { ttftWeighted: 0, tpsWeighted: 0, samples: 0 };
+      const provider = row.provider || 'unknown';
+      const existing = byProvider.get(provider);
 
-      current.samples += weight;
-      current.ttftWeighted += Number(row.avg_ttft_ms || 0) * weight;
-      current.tpsWeighted += Number(row.avg_tokens_per_sec || 0) * weight;
-      totals.set(key, current);
-    }
-
-    const byProvider = new Map<string, { avgTtftMs: number; avgTokensPerSec: number }>();
-    for (const [provider, metric] of totals.entries()) {
-      const samples = Math.max(1, metric.samples);
-      byProvider.set(provider, {
-        avgTtftMs: metric.ttftWeighted / samples,
-        avgTokensPerSec: metric.tpsWeighted / samples
-      });
+      if (existing) {
+        // Weighted average update
+        const samples = Math.max(1, row.sample_count || 1);
+        existing.avgTtftMs = (existing.avgTtftMs + (row.avg_ttft_ms || 0) * samples) / (samples + 1);
+        existing.avgTokensPerSec = (existing.avgTokensPerSec + (row.avg_tokens_per_sec || 0) * samples) / (samples + 1);
+      } else {
+        byProvider.set(provider, {
+          avgTtftMs: row.avg_ttft_ms || 0,
+          avgTokensPerSec: row.avg_tokens_per_sec || 0
+        });
+      }
     }
 
     return byProvider;
   }, [providerPerformance]);
 
-  const renderActivityTimeControls = () => (
-    <div style={{ display: 'flex', gap: '8px' }}>
-      {(['hour', 'day', 'week', 'month'] as TimeRange[]).map((range) => (
-        <Button
-          key={range}
-          size="sm"
-          variant={activityRange === range ? 'primary' : 'secondary'}
-          onClick={() => setActivityRange(range)}
-          style={{ textTransform: 'capitalize' }}
-        >
-          {range}
-        </Button>
-      ))}
-    </div>
-  );
 
   const handleClearCooldowns = async () => {
     if (window.confirm('Are you sure you want to clear all provider cooldowns?')) {
@@ -239,13 +216,20 @@ export const LiveMetrics = () => {
           )}
         </div>
 
-        <Badge
-          status={streamConnected ? 'connected' : 'warning'}
-          secondaryText={`Window: last ${LIVE_WINDOW_MINUTES}m`}
-          style={{ minWidth: '190px' }}
-        >
-          {streamConnected ? 'Live Stream Active' : 'Live Stream Reconnecting'}
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge
+            status={connectionStatus === 'connected' && !isStale ? 'connected' : 'warning'}
+            secondaryText={`Window: last ${LIVE_WINDOW_MINUTES}m`}
+            style={{ minWidth: '190px' }}
+          >
+            {connectionStatus === 'connected' && !isStale ? 'Live Stream Active' : 'Stream Reconnecting'}
+          </Badge>
+          <ConnectionIndicator
+            status={connectionStatus}
+            isStale={isStale}
+            onReconnect={reconnect}
+          />
+        </div>
       </div>
 
       <div className="mb-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
@@ -341,13 +325,13 @@ export const LiveMetrics = () => {
             className="alert-card"
             style={{ borderColor: 'var(--color-warning)' }}
             extra={
-              <button
-                className="bg-transparent text-text border-0 hover:bg-amber-500/10 !py-1.5 !px-3.5 !text-xs"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleClearCooldowns}
-                style={{ color: 'var(--color-warning)' }}
               >
                 Clear All
-              </button>
+              </Button>
             }
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -584,39 +568,39 @@ export const LiveMetrics = () => {
             <div className="py-8 text-sm text-text-secondary">No provider traffic in the selected live window.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left text-text-secondary border-b border-border-glass">
-                    <th className="py-2 pr-2">Provider</th>
-                    <th className="py-2 pr-2">Req</th>
-                    <th className="py-2 pr-2">Success</th>
-                    <th className="py-2 pr-2">Tokens</th>
-                    <th className="py-2 pr-2">Cost</th>
-                    <th className="py-2 pr-2">Avg Latency</th>
-                    <th className="py-2 pr-2">Perf</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Req</TableHead>
+                    <TableHead>Success</TableHead>
+                    <TableHead>Tokens</TableHead>
+                    <TableHead>Cost</TableHead>
+                    <TableHead>Avg Latency</TableHead>
+                    <TableHead>Perf</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {liveSnapshot.providers.slice(0, 8).map((provider) => {
                     const perf = providerPerformanceByProvider.get(provider.provider);
                     return (
-                      <tr key={provider.provider} className="border-b border-border-glass/60">
-                        <td className="py-2 pr-2 text-text font-medium">{provider.provider}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatNumber(provider.requests, 0)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{(provider.successRate * 100).toFixed(1)}%</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatTokens(provider.totalTokens)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatCost(provider.totalCost, 6)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatMs(provider.avgDurationMs)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">
+                      <TableRow key={provider.provider}>
+                        <TableCell className="font-medium">{provider.provider}</TableCell>
+                        <TableCell>{formatNumber(provider.requests, 0)}</TableCell>
+                        <TableCell>{(provider.successRate * 100).toFixed(1)}%</TableCell>
+                        <TableCell>{formatTokens(provider.totalTokens)}</TableCell>
+                        <TableCell>{formatCost(provider.totalCost, 6)}</TableCell>
+                        <TableCell>{formatMs(provider.avgDurationMs)}</TableCell>
+                        <TableCell>
                           {perf
                             ? `${formatTPS(perf.avgTokensPerSec)} tok/s · ${formatMs(perf.avgTtftMs)}`
                             : '—'}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </Card>

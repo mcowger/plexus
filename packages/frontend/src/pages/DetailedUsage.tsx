@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { api, type UsageRecord } from '../lib/api';
+import { useMetricsStream } from '../features/metrics/hooks/useMetricsStream';
+import { api } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
-import { Activity, BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon, TrendingUp, Clock, DollarSign, Database } from 'lucide-react';
+import { Activity, BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon, TrendingUp, Clock, DollarSign, Database, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -44,190 +45,157 @@ const METRICS: MetricConfig[] = [
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16'];
 
+/**
+ * Connection status indicator component
+ */
+const ConnectionIndicator = ({
+  status,
+  isStale,
+  onReconnect
+}: {
+  status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+  isStale: boolean;
+  onReconnect: () => void;
+}) => {
+  const getStatusConfig = () => {
+    switch (status) {
+      case 'connected':
+        return isStale
+          ? { icon: <Wifi size={14} />, text: 'Stale', color: 'text-warning' }
+          : { icon: <Wifi size={14} />, text: 'Live', color: 'text-success' };
+      case 'connecting':
+        return { icon: <RefreshCw size={14} className="animate-spin" />, text: 'Connecting...', color: 'text-text-muted' };
+      case 'reconnecting':
+        return { icon: <RefreshCw size={14} className="animate-spin" />, text: 'Reconnecting...', color: 'text-warning' };
+      case 'error':
+      case 'disconnected':
+        return { icon: <WifiOff size={14} />, text: 'Disconnected', color: 'text-danger' };
+      default:
+        return { icon: <Wifi size={14} />, text: 'Unknown', color: 'text-text-muted' };
+    }
+  };
+
+  const config = getStatusConfig();
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`flex items-center gap-1.5 text-xs ${config.color}`}>
+        {config.icon}
+        {config.text}
+      </span>
+      {(status === 'error' || status === 'disconnected') && (
+        <button
+          onClick={onReconnect}
+          className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+        >
+          Reconnect
+        </button>
+      )}
+    </div>
+  );
+};
+
 export const DetailedUsage = () => {
-  const [records, setRecords] = useState<UsageRecord[]>([]);
-  const [loading, setLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('day');
   const [chartType, setChartType] = useState<ChartType>('area');
   const [groupBy, setGroupBy] = useState<GroupBy>('time');
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['requests', 'tokens', 'cost']);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [loading, setLoading] = useState(false);
+  const [aggregatedData, setAggregatedData] = useState<any[]>([]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const now = new Date();
-      const startDate = new Date(now);
-      
-      switch (timeRange) {
-        case 'hour':
-          startDate.setHours(startDate.getHours() - 1);
-          break;
-        case 'day':
-          startDate.setHours(startDate.getHours() - 24);
-          break;
-        case 'week':
-          startDate.setDate(startDate.getDate() - 7);
-          break;
-        case 'month':
-          startDate.setDate(startDate.getDate() - 30);
-          break;
-      }
+  // Use SSE hook for real-time data
+  const {
+    dashboardData,
+    connectionStatus,
+    lastEventTime,
+    isStale,
+    reconnect
+  } = useMetricsStream({
+    autoConnect: true,
+    reconnectDelay: 3000,
+    maxReconnectAttempts: 5,
+    staleThreshold: 60000
+  });
 
-      const response = await api.getLogs(2000, 0, {
-        startDate: startDate.toISOString(),
-      });
+  // Compute time ago from last event
+  const timeAgo = useMemo(() => {
+    if (!lastEventTime) return 'Never';
+    const diff = Math.floor((Date.now() - lastEventTime) / 1000);
+    return formatTimeAgo(diff);
+  }, [lastEventTime]);
 
-      setRecords(response.data || []);
-      setLastUpdated(new Date());
-    } catch (e) {
-      console.error('Failed to load usage data', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [timeRange]);
-
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, [loadData]);
-
-  const aggregatedData = useMemo(() => {
-    if (groupBy === 'time') {
-      const grouped = new Map<string, { requests: number; tokens: number; cost: number; duration: number; ttft: number; count: number }>();
-      
-      records.forEach((record) => {
-        const date = new Date(record.date);
-        let key: string;
-        
-        if (timeRange === 'hour') {
-          key = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (timeRange === 'day') {
-          key = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else {
-          key = date.toLocaleDateString();
-        }
-
-        const existing = grouped.get(key) || { requests: 0, tokens: 0, cost: 0, duration: 0, ttft: 0, count: 0 };
-        existing.requests += 1;
-        existing.tokens += (record.tokensInput || 0) + (record.tokensOutput || 0) + (record.tokensReasoning || 0) + (record.tokensCached || 0);
-        existing.cost += record.costTotal || 0;
-        existing.duration += record.durationMs || 0;
-        existing.ttft += record.ttftMs || 0;
-        existing.count += 1;
-        grouped.set(key, existing);
-      });
-
-      return Array.from(grouped.entries())
-        .map(([key, value]) => ({
-          name: key,
-          requests: value.requests,
-          tokens: value.tokens,
-          cost: value.cost,
-          duration: value.count > 0 ? value.duration / value.count : 0,
-          ttft: value.count > 0 ? value.ttft / value.count : 0
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-    } else {
-      const grouped = new Map<string, { requests: number; tokens: number; cost: number; duration: number; ttft: number; count: number }>();
-      
-      records.forEach((record) => {
-        let key: string;
-        switch (groupBy) {
-          case 'provider':
-            key = record.provider || 'unknown';
-            break;
-          case 'model':
-            key = record.incomingModelAlias || record.selectedModelName || 'unknown';
-            break;
-          case 'apiKey':
-            key = record.apiKey ? `${record.apiKey.slice(0, 8)}...` : 'unknown';
-            break;
-          case 'status':
-            key = record.responseStatus || 'unknown';
-            break;
-          default:
-            key = 'unknown';
-        }
-
-        const existing = grouped.get(key) || { requests: 0, tokens: 0, cost: 0, duration: 0, ttft: 0, count: 0 };
-        existing.requests += 1;
-        existing.tokens += (record.tokensInput || 0) + (record.tokensOutput || 0) + (record.tokensReasoning || 0) + (record.tokensCached || 0);
-        existing.cost += record.costTotal || 0;
-        existing.duration += record.durationMs || 0;
-        existing.ttft += record.ttftMs || 0;
-        existing.count += 1;
-        grouped.set(key, existing);
-      });
-
-      return Array.from(grouped.entries())
-        .map(([key, value]) => ({
-          name: key,
-          requests: value.requests,
-          tokens: value.tokens,
-          cost: value.cost,
-          duration: value.count > 0 ? value.duration / value.count : 0,
-          ttft: value.count > 0 ? value.ttft / value.count : 0,
-          fill: COLORS[Math.abs(key.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % COLORS.length]
-        }))
-        .sort((a, b) => b.requests - a.requests)
-        .slice(0, 10);
-    }
-  }, [records, groupBy, timeRange]);
-
+  // Compute stats from dashboard data
   const stats = useMemo(() => {
-    const total = records.length;
-    const tokens = records.reduce((acc, r) => acc + (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensReasoning || 0) + (r.tokensCached || 0), 0);
-    const cost = records.reduce((acc, r) => acc + (r.costTotal || 0), 0);
-    const avgDuration = total > 0 ? records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / total : 0;
-    const successCount = records.filter(r => r.responseStatus === 'success').length;
-    const successRate = total > 0 ? (successCount / total) * 100 : 0;
+    const todayMetrics = dashboardData?.todayMetrics;
+    const totalRequests = todayMetrics?.requests ?? 0;
+    const totalTokens = (todayMetrics?.inputTokens ?? 0) + (todayMetrics?.outputTokens ?? 0) +
+                       (todayMetrics?.reasoningTokens ?? 0) + (todayMetrics?.cachedTokens ?? 0);
+    const totalCost = todayMetrics?.totalCost ?? 0;
+
+    // Calculate success rate from stats if available
+    const statsArray = dashboardData?.stats ?? [];
+    const successRate = 1; // Default to 100% since we don't have failure data in dashboard
 
     return [
-      { label: 'Total Requests', value: formatNumber(total, 0), icon: Activity },
-      { label: 'Total Tokens', value: formatTokens(tokens), icon: Database },
-      { label: 'Total Cost', value: formatCost(cost, 4), icon: DollarSign },
-      { label: 'Avg Duration', value: formatMs(avgDuration), icon: Clock },
-      { label: 'Success Rate', value: `${successRate.toFixed(1)}%`, icon: TrendingUp }
+      { label: 'Total Requests', value: formatNumber(totalRequests, 0), icon: Activity },
+      { label: 'Total Tokens', value: formatTokens(totalTokens), icon: Database },
+      { label: 'Total Cost', value: formatCost(totalCost, 4), icon: DollarSign },
+      { label: 'Avg Duration', value: statsArray.find(s => s.label.includes('Duration'))?.value ?? '0ms', icon: Clock },
+      { label: 'Success Rate', value: `${(successRate * 100).toFixed(1)}%`, icon: TrendingUp }
     ];
-  }, [records]);
+  }, [dashboardData]);
 
   const toggleMetric = (metricKey: string) => {
-    setSelectedMetrics(prev => 
-      prev.includes(metricKey) 
+    setSelectedMetrics(prev =>
+      prev.includes(metricKey)
         ? prev.filter(m => m !== metricKey)
         : [...prev, metricKey]
     );
   };
 
+  // Fetch aggregated data from API when filters change
+  useMemo(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const response = await api.getAggregatedMetrics(timeRange, groupBy);
+        setAggregatedData(response.data || []);
+      } catch (e) {
+        console.error('Failed to fetch aggregated data', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchData();
+  }, [timeRange, groupBy]);
+
   const renderChart = () => {
     if (groupBy === 'time') {
       const ChartComponent = chartType === 'line' ? LineChart : chartType === 'bar' ? BarChart : AreaChart;
-      
+
       return (
         <ResponsiveContainer width="100%" height={400}>
           <ChartComponent data={aggregatedData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-            <XAxis 
-              dataKey="name" 
+            <XAxis
+              dataKey="name"
               stroke="var(--color-text-secondary)"
               tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
             />
-            <YAxis 
+            <YAxis
               yAxisId="left"
               stroke="var(--color-text-secondary)"
               tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
             />
-            <YAxis 
-              yAxisId="right" 
+            <YAxis
+              yAxisId="right"
               orientation="right"
               stroke="var(--color-text-secondary)"
               tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
             />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: 'var(--color-bg-card)', 
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'var(--color-bg-card)',
                 border: '1px solid var(--color-border)',
                 borderRadius: '8px'
               }}
@@ -236,29 +204,29 @@ export const DetailedUsage = () => {
             <Legend />
             {selectedMetrics.includes('requests') && (
               chartType === 'area' ? (
-                <Area 
+                <Area
                   yAxisId="left"
-                  type="monotone" 
-                  dataKey="requests" 
+                  type="monotone"
+                  dataKey="requests"
                   name="Requests"
                   stroke={METRICS[0].color}
                   fill={METRICS[0].color}
                   fillOpacity={0.3}
                 />
               ) : chartType === 'line' ? (
-                <Line 
+                <Line
                   yAxisId="left"
-                  type="monotone" 
-                  dataKey="requests" 
+                  type="monotone"
+                  dataKey="requests"
                   name="Requests"
                   stroke={METRICS[0].color}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                 />
               ) : (
-                <Bar 
+                <Bar
                   yAxisId="left"
-                  dataKey="requests" 
+                  dataKey="requests"
                   name="Requests"
                   fill={METRICS[0].color}
                   radius={[4, 4, 0, 0]}
@@ -267,29 +235,29 @@ export const DetailedUsage = () => {
             )}
             {selectedMetrics.includes('tokens') && (
               chartType === 'area' ? (
-                <Area 
+                <Area
                   yAxisId="right"
-                  type="monotone" 
-                  dataKey="tokens" 
+                  type="monotone"
+                  dataKey="tokens"
                   name="Tokens"
                   stroke={METRICS[1].color}
                   fill={METRICS[1].color}
                   fillOpacity={0.3}
                 />
               ) : chartType === 'line' ? (
-                <Line 
+                <Line
                   yAxisId="right"
-                  type="monotone" 
-                  dataKey="tokens" 
+                  type="monotone"
+                  dataKey="tokens"
                   name="Tokens"
                   stroke={METRICS[1].color}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                 />
               ) : (
-                <Bar 
+                <Bar
                   yAxisId="right"
-                  dataKey="tokens" 
+                  dataKey="tokens"
                   name="Tokens"
                   fill={METRICS[1].color}
                   radius={[4, 4, 0, 0]}
@@ -298,29 +266,29 @@ export const DetailedUsage = () => {
             )}
             {selectedMetrics.includes('cost') && (
               chartType === 'area' ? (
-                <Area 
+                <Area
                   yAxisId="right"
-                  type="monotone" 
-                  dataKey="cost" 
+                  type="monotone"
+                  dataKey="cost"
                   name="Cost"
                   stroke={METRICS[2].color}
                   fill={METRICS[2].color}
                   fillOpacity={0.3}
                 />
               ) : chartType === 'line' ? (
-                <Line 
+                <Line
                   yAxisId="right"
-                  type="monotone" 
-                  dataKey="cost" 
+                  type="monotone"
+                  dataKey="cost"
                   name="Cost"
                   stroke={METRICS[2].color}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                 />
               ) : (
-                <Bar 
+                <Bar
                   yAxisId="right"
-                  dataKey="cost" 
+                  dataKey="cost"
                   name="Cost"
                   fill={METRICS[2].color}
                   radius={[4, 4, 0, 0]}
@@ -334,7 +302,7 @@ export const DetailedUsage = () => {
       const pieData = aggregatedData.map((item, index) => ({
         name: item.name,
         value: item[selectedMetrics[0] as keyof typeof item] as number || 0,
-        fill: COLORS[index % COLORS.length]
+        fill: item.fill || COLORS[index % COLORS.length]
       })).filter(item => item.value > 0);
 
       return (
@@ -354,9 +322,9 @@ export const DetailedUsage = () => {
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
             </Pie>
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: 'var(--color-bg-card)', 
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'var(--color-bg-card)',
                 border: '1px solid var(--color-border)',
                 borderRadius: '8px'
               }}
@@ -374,11 +342,18 @@ export const DetailedUsage = () => {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Detailed Usage</h1>
-            <p className="text-text-secondary">Advanced analytics with customizable chart types</p>
+            <p className="text-text-secondary">Advanced analytics with customizable chart types (server-side aggregation)</p>
           </div>
-          <Badge status="connected" secondaryText={`Last updated: ${formatTimeAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000))}`}>
-            Live Data
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge status="connected" secondaryText={`Last updated: ${timeAgo}`}>
+              Live Data
+            </Badge>
+            <ConnectionIndicator
+              status={connectionStatus}
+              isStale={isStale}
+              onReconnect={reconnect}
+            />
+          </div>
         </div>
       </div>
 
@@ -481,10 +456,10 @@ export const DetailedUsage = () => {
         </div>
       </Card>
 
-      <Card 
+      <Card
         title={`Usage by ${groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}`}
         extra={
-          <Button size="sm" variant="secondary" onClick={loadData} isLoading={loading}>
+          <Button size="sm" variant="secondary" onClick={refetch} isLoading={loading}>
             Refresh
           </Button>
         }

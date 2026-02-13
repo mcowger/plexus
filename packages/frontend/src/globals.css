@@ -2,7 +2,7 @@
 @source "../src/**/*.{tsx,ts,jsx,js}";
 
 @theme {
-  /* Colors. */
+  /* Legacy Colors (kept for backwards compatibility) */
   --color-bg-deep: #000000;
   --color-bg-surface: #0F172A;
   --color-bg-card: rgba(15, 23, 42, 0.8);
@@ -24,6 +24,46 @@
   --color-border: #334155;
   --color-border-glass: rgba(255, 255, 255, 0.1);
   --color-glow: rgba(245, 158, 11, 0.3);
+
+  /* shadcn/ui Design Tokens - Light Theme */
+  --color-background: #ffffff;
+  --color-foreground: #09090b;
+  --color-card: #ffffff;
+  --color-card-foreground: #09090b;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #09090b;
+  --color-primary-foreground: #fafafa;
+  --color-secondary-foreground: #09090b;
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #71717a;
+  --color-accent: #f4f4f5;
+  --color-accent-foreground: #09090b;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
+  --color-border: #e4e4e7;
+  --color-input: #e4e4e7;
+  --color-ring: #a1a1aa;
+
+  /* shadcn/ui Design Tokens - Dark Theme */
+  --color-background-dark: #09090b;
+  --color-foreground-dark: #fafafa;
+  --color-card-dark: #09090b;
+  --color-card-foreground-dark: #fafafa;
+  --color-popover-dark: #09090b;
+  --color-popover-foreground-dark: #fafafa;
+  --color-primary-dark: #fafafa;
+  --color-primary-foreground-dark: #18181b;
+  --color-secondary-dark: #27272a;
+  --color-secondary-foreground-dark: #fafafa;
+  --color-muted-dark: #27272a;
+  --color-muted-foreground-dark: #a1a1aa;
+  --color-accent-dark: #27272a;
+  --color-accent-foreground-dark: #fafafa;
+  --color-destructive-dark: #ef4444;
+  --color-destructive-foreground-dark: #fafafa;
+  --color-border-dark: #27272a;
+  --color-input-dark: #27272a;
+  --color-ring-dark: #d4d4d8;
 
   /* Fonts */
   --font-heading: 'Space Grotesk', sans-serif;
@@ -64,6 +104,57 @@
     box-sizing: border-box;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Default (Dark) Theme - matches existing design */
+  :root {
+    --background: var(--color-bg-deep);
+    --foreground: var(--color-text);
+    --card: var(--color-bg-card);
+    --card-foreground: var(--color-text);
+    --popover: var(--color-bg-surface);
+    --popover-foreground: var(--color-text);
+    --primary: var(--color-primary);
+    --primary-foreground: #000000;
+    --secondary: var(--color-bg-glass);
+    --secondary-foreground: var(--color-text);
+    --muted: var(--color-bg-surface);
+    --muted-foreground: var(--color-text-muted);
+    --accent: var(--color-cta);
+    --accent-foreground: var(--color-text);
+    --destructive: var(--color-danger);
+    --destructive-foreground: var(--color-text);
+    --border: var(--color-border);
+    --input: var(--color-border);
+    --ring: var(--color-primary);
+    --radius: 0.625rem;
+  }
+
+  /* Light Theme Override */
+  [data-theme="light"] {
+    --background: var(--color-background);
+    --foreground: var(--color-foreground);
+    --card: var(--color-card);
+    --card-foreground: var(--color-card-foreground);
+    --popover: var(--color-popover);
+    --popover-foreground: var(--color-popover-foreground);
+    --primary: #18181b;
+    --primary-foreground: var(--color-primary-foreground);
+    --secondary: var(--color-secondary);
+    --secondary-foreground: var(--color-secondary-foreground);
+    --muted: var(--color-muted);
+    --muted-foreground: var(--color-muted-foreground);
+    --accent: var(--color-accent);
+    --accent-foreground: var(--color-accent-foreground);
+    --destructive: var(--color-destructive);
+    --destructive-foreground: var(--color-destructive-foreground);
+    --border: var(--color-border);
+    --input: var(--color-input);
+    --ring: var(--color-ring);
+  }
+
   body {
     font-family: var(--font-body);
     font-size: 0.875rem;
@@ -73,6 +164,40 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* shadcn/ui component base styles */
+  .bg-background { background-color: var(--background); }
+  .bg-foreground { background-color: var(--foreground); }
+  .bg-card { background-color: var(--card); }
+  .bg-popover { background-color: var(--popover); }
+  .bg-primary { background-color: var(--primary); }
+  .bg-secondary { background-color: var(--secondary); }
+  .bg-muted { background-color: var(--muted); }
+  .bg-accent { background-color: var(--accent); }
+  .bg-destructive { background-color: var(--destructive); }
+
+  .text-background { color: var(--background); }
+  .text-foreground { color: var(--foreground); }
+  .text-card { color: var(--card); }
+  .text-card-foreground { color: var(--card-foreground); }
+  .text-popover { color: var(--popover); }
+  .text-popover-foreground { color: var(--popover-foreground); }
+  .text-primary { color: var(--primary); }
+  .text-primary-foreground { color: var(--primary-foreground); }
+  .text-secondary { color: var(--secondary); }
+  .text-secondary-foreground { color: var(--secondary-foreground); }
+  .text-muted { color: var(--muted); }
+  .text-muted-foreground { color: var(--muted-foreground); }
+  .text-accent { color: var(--accent); }
+  .text-accent-foreground { color: var(--accent-foreground); }
+  .text-destructive { color: var(--destructive); }
+  .text-destructive-foreground { color: var(--destructive-foreground); }
+
+  .border-border { border-color: var(--border); }
+  .border-input { border-color: var(--input); }
+  .border-ring { border-color: var(--ring); }
+
+  .ring-ring { --tw-ring-color: var(--ring); }
 
   /* Scrollbar */
   ::-webkit-scrollbar {

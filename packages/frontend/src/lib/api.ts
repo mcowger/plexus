@@ -2063,5 +2063,103 @@ quota_checker: provider.quotaChecker?.type
           const newYaml = stringify(config);
           await api.saveConfig(newYaml);
       }
+  },
+
+  // New server-side aggregation endpoints
+  getChartData: async (timeRange: 'hour' | 'day' | 'week' | 'month' = 'day', metrics: string[] = ['requests', 'tokens', 'cost']): Promise<{
+      timeRange: string;
+      granularity: 'minute' | 'hour' | 'day';
+      data: Array<{
+          name: string;
+          requests: number;
+          tokens: number;
+          cost: number;
+          duration: number;
+          ttft: number;
+          fill?: string;
+      }>;
+      total: number;
+      generatedAt: string;
+  }> => {
+      try {
+          const metricsParam = metrics.join(',');
+          const url = `${API_BASE}/api/v1/metrics/chart-data?timeRange=${timeRange}&metrics=${metricsParam}`;
+          const res = await fetchWithAuth(url);
+          if (!res.ok) throw new Error('Failed to fetch chart data');
+          return await res.json();
+      } catch (e) {
+          console.error('API Error getChartData', e);
+          return {
+              timeRange,
+              granularity: 'hour',
+              data: [],
+              total: 0,
+              generatedAt: new Date().toISOString()
+          };
+      }
+  },
+
+  getAggregatedMetrics: async (groupBy: 'time' | 'provider' | 'model' | 'apiKey' | 'status' = 'provider', timeRange: 'hour' | 'day' | 'week' | 'month' = 'day'): Promise<{
+      groupBy: string;
+      timeRange: string;
+      data: Array<{
+          name: string;
+          requests: number;
+          tokens: number;
+          cost: number;
+          duration: number;
+          ttft: number;
+          fill?: string;
+      }>;
+      total: number;
+      generatedAt: string;
+  }> => {
+      try {
+          const url = `${API_BASE}/api/v1/metrics/aggregated?groupBy=${groupBy}&timeRange=${timeRange}`;
+          const res = await fetchWithAuth(url);
+          if (!res.ok) throw new Error('Failed to fetch aggregated metrics');
+          return await res.json();
+      } catch (e) {
+          console.error('API Error getAggregatedMetrics', e);
+          return {
+              groupBy,
+              timeRange,
+              data: [],
+              total: 0,
+              generatedAt: new Date().toISOString()
+          };
+      }
+  },
+
+  getMetricsStats: async (timeRange: 'hour' | 'day' | 'week' | 'month' = 'day'): Promise<{
+      timeRange: string;
+      stats: {
+          requests: number;
+          tokens: number;
+          cost: number;
+          avgDuration: number;
+          successRate: number;
+      };
+      generatedAt: string;
+  }> => {
+      try {
+          const url = `${API_BASE}/api/v1/metrics/stats?timeRange=${timeRange}`;
+          const res = await fetchWithAuth(url);
+          if (!res.ok) throw new Error('Failed to fetch metrics stats');
+          return await res.json();
+      } catch (e) {
+          console.error('API Error getMetricsStats', e);
+          return {
+              timeRange,
+              stats: {
+                  requests: 0,
+                  tokens: 0,
+                  cost: 0,
+                  avgDuration: 0,
+                  successRate: 1
+              },
+              generatedAt: new Date().toISOString()
+          };
+      }
   }
 };
