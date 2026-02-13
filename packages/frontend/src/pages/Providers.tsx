@@ -15,6 +15,7 @@ import { NanoGPTQuotaConfig } from '../components/quota/NanoGPTQuotaConfig';
 import { ZAIQuotaConfig } from '../components/quota/ZAIQuotaConfig';
 import { MoonshotQuotaConfig } from '../components/quota/MoonshotQuotaConfig';
 import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
+import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -26,7 +27,7 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax'] as const;
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter'] as const;
 const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -1468,6 +1469,21 @@ export const Providers = () => {
                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'minimax' && (
                               <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                                 <MiniMaxQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'openrouter' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <OpenRouterQuotaConfig
                                   options={editingProvider.quotaChecker?.options || {}}
                                   onChange={(options) => setEditingProvider({
                                     ...editingProvider,
