@@ -396,9 +396,26 @@ export class UsageStorageService extends EventEmitter {
         }
     }
 
+    async deletePerformanceByModel(model: string): Promise<boolean> {
+        try {
+            this.ensureDb();
+
+            await this.db!
+                .delete(this.schema.providerPerformance)
+                .where(sql`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model}) = ${model}`);
+
+            logger.info(`Deleted performance data for model: ${model}`);
+            return true;
+        } catch (error) {
+            logger.error(`Failed to delete performance data for model ${model}`, error);
+            return false;
+        }
+    }
+
     async updatePerformanceMetrics(
         provider: string,
         model: string,
+        canonicalModelName: string | null,
         timeToFirstTokenMs: number | null,
         outputTokens: number | null,
         durationMs: number,
@@ -416,6 +433,7 @@ export class UsageStorageService extends EventEmitter {
             await this.ensureDb().insert(this.schema.providerPerformance).values({
                 provider,
                 model,
+                canonicalModelName,
                 requestId,
                 timeToFirstTokenMs,
                 totalTokens: outputTokens,
@@ -452,154 +470,64 @@ export class UsageStorageService extends EventEmitter {
     async getProviderPerformance(provider?: string, model?: string): Promise<any[]> {
         this.ensureDb();
 
-        const describeError = (error: unknown) => {
-            if (error instanceof Error) {
-                return {
-                    name: error.name,
-                    message: error.message,
-                    stack: error.stack
-                };
-            }
-            return { value: String(error) };
-        };
-
-        const getFallbackFromUsage = async () => {
-            try {
-                const modelNameExpr = sql<string>`COALESCE(${this.schema.requestUsage.canonicalModelName}, ${this.schema.requestUsage.incomingModelAlias}, ${this.schema.requestUsage.selectedModelName})`;
-                const conditions = [
-                    sql`${this.schema.requestUsage.provider} IS NOT NULL`,
-                    sql`${modelNameExpr} IS NOT NULL`,
-                    sql`(${this.schema.requestUsage.ttftMs} IS NOT NULL OR ${this.schema.requestUsage.tokensPerSec} IS NOT NULL)`
-                ];
-
-                if (provider) {
-                    conditions.push(eq(this.schema.requestUsage.provider, provider));
-                }
-                if (model) {
-                    conditions.push(sql`${modelNameExpr} = ${model}`);
-                }
-
-                const whereClause = and(...conditions);
-
-                const rows = await this.ensureDb()
-                    .select({
-                        provider: this.schema.requestUsage.provider,
-                        model: modelNameExpr,
-                        targetModel: this.schema.requestUsage.selectedModelName,
-                        avgTtftMs: sql<number>`AVG(${this.schema.requestUsage.ttftMs})`,
-                        minTtftMs: sql<number>`MIN(${this.schema.requestUsage.ttftMs})`,
-                        maxTtftMs: sql<number>`MAX(${this.schema.requestUsage.ttftMs})`,
-                        avgTokensPerSec: sql<number>`AVG(${this.schema.requestUsage.tokensPerSec})`,
-                        minTokensPerSec: sql<number>`MIN(${this.schema.requestUsage.tokensPerSec})`,
-                        maxTokensPerSec: sql<number>`MAX(${this.schema.requestUsage.tokensPerSec})`,
-                        sampleCount: sql<number>`COUNT(*)`,
-                        lastUpdated: sql<number>`MAX(${this.schema.requestUsage.createdAt})`
-                    })
-                    .from(this.schema.requestUsage)
-                    .where(whereClause)
-                    .groupBy(
-                        this.schema.requestUsage.provider,
-                        this.schema.requestUsage.selectedModelName,
-                        modelNameExpr
-                    )
-                    .orderBy(desc(sql`AVG(${this.schema.requestUsage.tokensPerSec})`));
-
-                logger.debug('Provider performance fallback query succeeded', {
-                    providerFilter: provider ?? null,
-                    modelFilter: model ?? null,
-                    rowCount: rows.length,
-                    source: 'request_usage'
-                });
-
-                return rows.map(row => ({
-                    provider: row.provider,
-                    model: row.model,
-                    target_model: row.targetModel,
-                    avg_ttft_ms: row.avgTtftMs ?? 0,
-                    min_ttft_ms: row.minTtftMs ?? 0,
-                    max_ttft_ms: row.maxTtftMs ?? 0,
-                    avg_tokens_per_sec: row.avgTokensPerSec ?? 0,
-                    min_tokens_per_sec: row.minTokensPerSec ?? 0,
-                    max_tokens_per_sec: row.maxTokensPerSec ?? 0,
-                    sample_count: row.sampleCount ?? 0,
-                    last_updated: row.lastUpdated ?? 0
-                }));
-            } catch (fallbackError) {
-                logger.error('Failed fallback provider performance query from request_usage', {
-                    providerFilter: provider ?? null,
-                    modelFilter: model ?? null,
-                    error: describeError(fallbackError)
-                });
-                return [];
-            }
-        };
-
         try {
-            logger.debug('Running provider performance query', {
-                providerFilter: provider ?? null,
-                modelFilter: model ?? null,
-                source: 'provider_performance+request_usage'
-            });
-
             const conditions = [];
-            const modelNameExpr = sql<string>`COALESCE(${this.schema.requestUsage.canonicalModelName}, ${this.schema.requestUsage.incomingModelAlias}, ${this.schema.providerPerformance.model})`;
             
             if (provider) {
                 conditions.push(eq(this.schema.providerPerformance.provider, provider));
             }
             if (model) {
-                conditions.push(sql`${modelNameExpr} = ${model}`);
+                conditions.push(sql`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model}) = ${model}`);
             }
 
             const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-            const selection = {
-                provider: this.schema.providerPerformance.provider,
-                model: modelNameExpr,
-                targetModel: this.schema.providerPerformance.model,
-                avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
-                minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
-                maxTtftMs: sql<number>`MAX(${this.schema.providerPerformance.timeToFirstTokenMs})`,
-                avgTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.tokensPerSec})`,
-                minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
-                maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
-                sampleCount: sql<number>`COUNT(*)`,
-                lastUpdated: sql<number>`MAX(${this.schema.providerPerformance.createdAt})`
-            };
-
-            const baseQuery = this.ensureDb()
-                .select(selection)
-                .from(this.schema.providerPerformance)
-                .leftJoin(
-                    this.schema.requestUsage,
-                    eq(this.schema.providerPerformance.requestId, this.schema.requestUsage.requestId)
-                );
-
             const results = whereClause
-                ? await baseQuery
+                ? await this.db!
+                    .select({
+                        provider: this.schema.providerPerformance.provider,
+                        model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+                        targetModel: this.schema.providerPerformance.model,
+                        avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                        minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                        maxTtftMs: sql<number>`MAX(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                        avgTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.tokensPerSec})`,
+                        minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
+                        maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
+                        sampleCount: sql<number>`COUNT(*)`,
+                        lastUpdated: sql<number>`MAX(${this.schema.providerPerformance.createdAt})`
+                    })
+                    .from(this.schema.providerPerformance)
                     .where(whereClause)
                     .groupBy(
                         this.schema.providerPerformance.provider,
                         this.schema.providerPerformance.model,
-                        modelNameExpr
+                        this.schema.providerPerformance.canonicalModelName
                     )
                     .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`))
-                : await baseQuery
+                : await this.db!
+                    .select({
+                        provider: this.schema.providerPerformance.provider,
+                        model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+                        targetModel: this.schema.providerPerformance.model,
+                        avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                        minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                        maxTtftMs: sql<number>`MAX(${this.schema.providerPerformance.timeToFirstTokenMs})`,
+                        avgTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.tokensPerSec})`,
+                        minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
+                        maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
+                        sampleCount: sql<number>`COUNT(*)`,
+                        lastUpdated: sql<number>`MAX(${this.schema.providerPerformance.createdAt})`
+                    })
+                    .from(this.schema.providerPerformance)
                     .groupBy(
                         this.schema.providerPerformance.provider,
                         this.schema.providerPerformance.model,
-                        modelNameExpr
+                        this.schema.providerPerformance.canonicalModelName
                     )
                     .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
 
-            logger.debug('Provider performance primary query completed', {
-                providerFilter: provider ?? null,
-                modelFilter: model ?? null,
-                rowCount: results.length,
-                source: 'provider_performance'
-            });
-
-            const mappedPrimaryRows = results.map(row => ({
+            return results.map(row => ({
                 provider: row.provider,
                 model: row.model,
                 target_model: row.targetModel,
@@ -612,41 +540,9 @@ export class UsageStorageService extends EventEmitter {
                 sample_count: row.sampleCount ?? 0,
                 last_updated: row.lastUpdated ?? 0
             }));
-
-            if (!results || results.length === 0) {
-                logger.warn('Provider performance primary query returned no rows, using fallback', {
-                    providerFilter: provider ?? null,
-                    modelFilter: model ?? null
-                });
-                return await getFallbackFromUsage();
-            }
-
-            if (!model) {
-                return mappedPrimaryRows;
-            }
-
-            const fallbackRows = await getFallbackFromUsage();
-            const mergedRows = new Map<string, any>();
-
-            for (const row of mappedPrimaryRows) {
-                mergedRows.set(`${row.provider}:${row.target_model}:${row.model}`, row);
-            }
-
-            for (const row of fallbackRows) {
-                const key = `${row.provider}:${row.target_model}:${row.model}`;
-                if (!mergedRows.has(key)) {
-                    mergedRows.set(key, row);
-                }
-            }
-
-            return Array.from(mergedRows.values()).sort((a, b) => b.avg_tokens_per_sec - a.avg_tokens_per_sec);
         } catch (error) {
-            logger.error('Failed to get provider performance', {
-                providerFilter: provider ?? null,
-                modelFilter: model ?? null,
-                error: describeError(error)
-            });
-            return await getFallbackFromUsage();
+            logger.error('Failed to get provider performance', { provider, model, error });
+            return [];
         }
     }
 }

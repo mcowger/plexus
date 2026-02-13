@@ -5,6 +5,7 @@ export const providerPerformance = sqliteTable('provider_performance', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   provider: text('provider').notNull(),
   model: text('model').notNull(),
+  canonicalModelName: text('canonical_model_name'),
   requestId: text('request_id'),
   timeToFirstTokenMs: real('time_to_first_token_ms'),
   totalTokens: integer('total_tokens'),

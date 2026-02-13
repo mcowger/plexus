@@ -1,0 +1,1 @@
+ALTER TABLE "provider_performance" ADD COLUMN "canonical_model_name" text;

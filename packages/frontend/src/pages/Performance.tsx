@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Gauge, TimerReset } from 'lucide-react';
+import { BarChart3, Gauge, TimerReset, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { api, type ProviderPerformanceData } from '../lib/api';
 import { formatMs, formatNumber } from '../lib/format';
@@ -104,12 +104,25 @@ export const Performance = () => {
   const [rows, setRows] = useState<ProviderPerformanceData[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const loadPerformance = async () => {
     setLoading(true);
     const data = await api.getProviderPerformance();
     setRows(data);
     setLoading(false);
+  };
+
+  const clearPerformance = async () => {
+    if (!selectedModel) return;
+    if (!confirm(`Are you sure you want to clear all performance data for "${selectedModel}"?`)) return;
+    
+    setClearing(true);
+    const success = await api.clearProviderPerformance(selectedModel);
+    if (success) {
+      await loadPerformance();
+    }
+    setClearing(false);
   };
 
   useEffect(() => {
@@ -177,6 +190,17 @@ export const Performance = () => {
 
           <Button size="sm" variant="secondary" onClick={loadPerformance} isLoading={loading}>
             Refresh
+          </Button>
+
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={clearPerformance}
+            isLoading={clearing}
+            disabled={!selectedModel || selectedRows.length === 0}
+          >
+            <Trash2 size={14} className="mr-1" />
+            Clear
           </Button>
 
           <div className="text-sm text-text-secondary">

@@ -23,4 +23,23 @@ export async function registerPerformanceRoutes(fastify: FastifyInstance, usageS
 
         return reply.send(performance);
     });
+
+    fastify.delete('/v0/management/performance', async (request, reply) => {
+        const query = request.query as any;
+        const model = query.model;
+
+        if (!model) {
+            return reply.status(400).send({ error: 'Model parameter is required' });
+        }
+
+        logger.info('Deleting performance data for model', { model });
+
+        const success = await usageStorage.deletePerformanceByModel(model);
+
+        if (!success) {
+            return reply.status(500).send({ error: 'Failed to delete performance data' });
+        }
+
+        return reply.send({ success: true, model });
+    });
 }

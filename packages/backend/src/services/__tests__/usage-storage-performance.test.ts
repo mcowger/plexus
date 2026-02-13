@@ -52,11 +52,11 @@ describe('UsageStorageService performance metrics', () => {
     const storage = new UsageStorageService();
 
     for (let i = 0; i < 3; i++) {
-      await storage.updatePerformanceMetrics('provider-b', 'model-2', 100, 100, 1000, `b-${i}`);
+      await storage.updatePerformanceMetrics('provider-b', 'model-2', null, 100, 100, 1000, `b-${i}`);
     }
 
     for (let i = 0; i < 103; i++) {
-      await storage.updatePerformanceMetrics('provider-a', 'model-1', 100, 100, 1000, `a-${i}`);
+      await storage.updatePerformanceMetrics('provider-a', 'model-1', null, 100, 100, 1000, `a-${i}`);
     }
 
     const rows = storage
@@ -75,12 +75,12 @@ describe('UsageStorageService performance metrics', () => {
   it('returns grouped aggregates for provider/model and supports filters', async () => {
     const storage = new UsageStorageService();
 
-    await storage.updatePerformanceMetrics('provider-a', 'model-x', 100, 100, 1000, 'a-1'); // 100 tps
-    await storage.updatePerformanceMetrics('provider-a', 'model-x', 140, 200, 1000, 'a-2'); // 200 tps
-    await storage.updatePerformanceMetrics('provider-a', 'model-x', 120, 300, 1500, 'a-3'); // 200 tps
+    await storage.updatePerformanceMetrics('provider-a', 'model-x', null, 100, 100, 1000, 'a-1'); // 100 tps
+    await storage.updatePerformanceMetrics('provider-a', 'model-x', null, 140, 200, 1000, 'a-2'); // 200 tps
+    await storage.updatePerformanceMetrics('provider-a', 'model-x', null, 120, 300, 1500, 'a-3'); // 200 tps
 
-    await storage.updatePerformanceMetrics('provider-b', 'model-x', 80, 50, 1000, 'b-1'); // 50 tps
-    await storage.updatePerformanceMetrics('provider-b', 'model-x', 90, 100, 1000, 'b-2'); // 100 tps
+    await storage.updatePerformanceMetrics('provider-b', 'model-x', null, 80, 50, 1000, 'b-1'); // 50 tps
+    await storage.updatePerformanceMetrics('provider-b', 'model-x', null, 90, 100, 1000, 'b-2'); // 100 tps
 
     const allForModel = await storage.getProviderPerformance(undefined, 'model-x');
     expect(allForModel.length).toBe(2);
@@ -143,6 +143,7 @@ describe('UsageStorageService performance metrics', () => {
       await storage.updatePerformanceMetrics(
         fixture.provider,
         fixture.selected,
+        null,
         100 + index,
         100,
         1000,
@@ -168,7 +169,7 @@ describe('UsageStorageService performance metrics', () => {
     await storage.saveRequest(
       createUsageRecord(requestIdA, 'zai', 'glm-4.7', 'glm-4.7', 'glm-4.7')
     );
-    await storage.updatePerformanceMetrics('zai', 'glm-4.7', 100, 100, 1000, requestIdA);
+    await storage.updatePerformanceMetrics('zai', 'glm-4.7', null, 100, 100, 1000, requestIdA);
 
     const requestIdB = 'merge-b';
     await storage.saveRequest({
@@ -190,7 +191,7 @@ describe('UsageStorageService performance metrics', () => {
     const storage = new UsageStorageService();
 
     for (let i = 0; i < 8; i++) {
-      await storage.updatePerformanceMetrics('provider-c', 'model-3', 100, 100, 1000, `c-${i}`);
+      await storage.updatePerformanceMetrics('provider-c', 'model-3', null, 100, 100, 1000, `c-${i}`);
     }
 
     const rows = storage

@@ -982,6 +982,18 @@ export const api = {
     }
   },
 
+  clearProviderPerformance: async (model: string): Promise<boolean> => {
+    try {
+      const url = `${API_BASE}/v0/management/performance?model=${encodeURIComponent(model)}`;
+      const res = await fetchWithAuth(url, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to clear provider performance');
+      return true;
+    } catch (e) {
+      console.error('API Error clearProviderPerformance', e);
+      return false;
+    }
+  },
+
   getLogs: async (limit: number = 50, offset: number = 0, filters: Record<string, any> = {}): Promise<{ data: UsageRecord[], total: number }> => {
       const params = new URLSearchParams({
           limit: limit.toString(),

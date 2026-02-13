@@ -4,6 +4,7 @@ export const providerPerformance = pgTable('provider_performance', {
   id: serial('id').primaryKey(),
   provider: text('provider').notNull(),
   model: text('model').notNull(),
+  canonicalModelName: text('canonical_model_name'),
   requestId: text('request_id'),
   timeToFirstTokenMs: real('time_to_first_token_ms'),
   totalTokens: integer('total_tokens'),

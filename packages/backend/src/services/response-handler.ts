@@ -244,6 +244,7 @@ async function finalizeUsage(
     await usageStorage.updatePerformanceMetrics(
       usageRecord.provider,
       usageRecord.selectedModelName,
+      usageRecord.canonicalModelName ?? null,
       usageRecord.durationMs,
       outputTokens > 0 ? outputTokens : null,
       usageRecord.durationMs,
