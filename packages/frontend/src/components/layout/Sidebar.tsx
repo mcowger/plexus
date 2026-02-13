@@ -18,6 +18,7 @@ import {
   ZAIQuotaDisplay,
   MoonshotQuotaDisplay,
   MiniMaxQuotaDisplay,
+  OpenRouterQuotaDisplay,
 } from '../quota';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
 import logo from '../../assets/plexus_logo_transparent.png';
@@ -394,6 +395,17 @@ export const Sidebar: React.FC = () => {
                       if (checkerIdentifier.includes('minimax')) {
                         return (
                           <MiniMaxQuotaDisplay
+                            key={quota.checkerId}
+                            result={result}
+                            isCollapsed={isCollapsed}
+                          />
+                        );
+                      }
+
+                      // Use OpenRouter display for openrouter checkers
+                      if (checkerIdentifier.includes('openrouter')) {
+                        return (
+                          <OpenRouterQuotaDisplay
                             key={quota.checkerId}
                             result={result}
                             isCollapsed={isCollapsed}
