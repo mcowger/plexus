@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.14.5 - 2026-02-13
+
+### v0.14.5: OAuth cooldown registration fix
+
+### Main change
+- Fixed OAuth cooldown registration behavior to ensure cooldown is correctly recorded during OAuth flows ([e437515](https://github.com/mcowger/plexus/commit/e437515)).
+
+### Smaller changes
+- OAuth cooldown registration fix and stabilization ([e437515](https://github.com/mcowger/plexus/commit/e437515)).
+
+Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.14.4 - 2026-02-13
 
 ### v0.14.4: failover alias retries, expanded quota checker support, and OpenAI Codex model updates
