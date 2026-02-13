@@ -118,6 +118,7 @@ export class Dispatcher {
 
             if (canRetry) {
               await this.recordAttemptMetric(route, request.requestId, false);
+              CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
               logger.warn(
                 `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
               );
