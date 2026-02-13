@@ -34,6 +34,11 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
     };
   };
 
+  const getCheckerType = (checkerId: string): string | undefined => {
+    const quotaConfig = quotaConfigById.get(checkerId);
+    return quotaConfig?.type;
+  };
+
   fastify.get('/v0/management/quotas', async (request, reply) => {
     try {
       const checkerIds = quotaScheduler.getCheckerIds();
@@ -43,11 +48,12 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
       for (const checkerId of checkerIds) {
         try {
           const latest = await quotaScheduler.getLatestQuota(checkerId);
-          results.push({ checkerId, latest, ...getOAuthMetadata(checkerId) });
+          results.push({ checkerId, checkerType: getCheckerType(checkerId), latest, ...getOAuthMetadata(checkerId) });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
           results.push({
             checkerId,
+            checkerType: getCheckerType(checkerId),
             latest: [],
             error: error instanceof Error ? error.message : 'Unknown error',
             ...getOAuthMetadata(checkerId),
@@ -71,6 +77,7 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
       const latest = await quotaScheduler.getLatestQuota(checkerId);
       return {
         checkerId,
+        checkerType: getCheckerType(checkerId),
         latest: latest.map(normalizeQuotaSnapshot),
         ...getOAuthMetadata(checkerId),
       };

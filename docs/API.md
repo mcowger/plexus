@@ -350,6 +350,7 @@ The Quota Management APIs provide endpoints for monitoring provider rate limits 
   [
     {
       "checkerId": "synthetic-main",
+      "checkerType": "synthetic",
       "latest": [
         {
           "provider": "synthetic",
@@ -366,6 +367,10 @@ The Quota Management APIs provide endpoints for monitoring provider rate limits 
     }
   ]
   ```
+
+- **Notes:**
+  - `checkerId` is the configured checker identifier (defaults to provider name, but may be custom).
+  - `checkerType` is the checker implementation type (e.g. `naga`, `moonshot`, `minimax`) and should be used for UI type routing.
 
 ### Get Latest Quota
 

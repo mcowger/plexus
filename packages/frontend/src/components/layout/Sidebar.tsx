@@ -298,6 +298,10 @@ export const Sidebar: React.FC = () => {
                 ) : (
                   <div className="space-y-1">
                     {quotas.map((quota) => {
+                      const checkerType = (quota.checkerType || '').toLowerCase();
+                      const checkerId = quota.checkerId.toLowerCase();
+                      const checkerIdentifier = checkerType || checkerId;
+
                       const result = getQuotaResult(quota.checkerId) ?? {
                         provider: 'unknown',
                         checkerId: quota.checkerId,
@@ -310,7 +314,7 @@ export const Sidebar: React.FC = () => {
                       };
                       
                       // Use Synthetic display for synthetic checkers
-                      if (quota.checkerId.includes('synthetic')) {
+                      if (checkerIdentifier.includes('synthetic')) {
                         return (
                           <SyntheticQuotaDisplay
                             key={quota.checkerId}
@@ -321,7 +325,7 @@ export const Sidebar: React.FC = () => {
                       }
                       
                       // Use Claude Code display for claude checkers
-                      if (quota.checkerId.includes('claude')) {
+                      if (checkerIdentifier.includes('claude')) {
                         return (
                           <ClaudeCodeQuotaDisplay
                             key={quota.checkerId}
@@ -332,7 +336,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Use Naga display for naga checkers
-                      if (quota.checkerId.includes('naga')) {
+                      if (checkerIdentifier.includes('naga')) {
                         return (
                           <NagaQuotaDisplay
                             key={quota.checkerId}
@@ -343,7 +347,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Use NanoGPT display for nanogpt checkers
-                      if (quota.checkerId.includes('nanogpt')) {
+                      if (checkerIdentifier.includes('nanogpt')) {
                         return (
                           <NanoGPTQuotaDisplay
                             key={quota.checkerId}
@@ -354,7 +358,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Use OpenAI Codex display for codex checkers
-                      if (quota.checkerId.includes('openai-codex') || quota.checkerId.includes('codex')) {
+                      if (checkerIdentifier.includes('openai-codex') || checkerIdentifier.includes('codex')) {
                         return (
                           <OpenAICodexQuotaDisplay
                             key={quota.checkerId}
@@ -365,7 +369,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Use ZAI display for zai checkers
-                      if (quota.checkerId.includes('zai')) {
+                      if (checkerIdentifier.includes('zai')) {
                         return (
                           <ZAIQuotaDisplay
                             key={quota.checkerId}
@@ -376,7 +380,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Use Moonshot display for moonshot checkers
-                      if (quota.checkerId.includes('moonshot')) {
+                      if (checkerIdentifier.includes('moonshot')) {
                         return (
                           <MoonshotQuotaDisplay
                             key={quota.checkerId}
@@ -387,7 +391,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Use MiniMax display for minimax checkers
-                      if (quota.checkerId.includes('minimax')) {
+                      if (checkerIdentifier.includes('minimax')) {
                         return (
                           <MiniMaxQuotaDisplay
                             key={quota.checkerId}
@@ -398,7 +402,7 @@ export const Sidebar: React.FC = () => {
                       }
 
                       // Fallback: show checker ID for unknown types
-                      console.warn(`Unknown quota checker type: ${quota.checkerId}`);
+                      console.warn(`Unknown quota checker type: ${quota.checkerType || quota.checkerId}`);
                       return null;
                     })}
                   </div>
