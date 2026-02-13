@@ -110,6 +110,7 @@ export class UsageInspector extends PassThrough {
                 this.usageStorage.updatePerformanceMetrics(
                   this.usageRecord.provider,
                   this.usageRecord.selectedModelName,
+                  this.usageRecord.canonicalModelName ?? null,
                   this.usageRecord.ttftMs || null,
                   stats.outputTokens > 0 ? stats.outputTokens : null,
                   this.usageRecord.durationMs,

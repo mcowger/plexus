@@ -50,6 +50,13 @@
       "when": 1770155143107,
       "tag": "0006_spooky_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1770940383480,
+      "tag": "0007_useful_gamma_corps",
+      "breakpoints": true
     }
   ]
 }
