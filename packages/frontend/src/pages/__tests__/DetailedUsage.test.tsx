@@ -51,7 +51,7 @@ describe('DetailedUsage Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    vi.mocked(api.getLogs).mockResolvedValue(mockUsageResponse);
+    api.getLogs.mockResolvedValue(mockUsageResponse);
   });
 
   afterEach(() => {
@@ -95,7 +95,7 @@ describe('DetailedUsage Page', () => {
       expectedStartDate.setHours(expectedStartDate.getHours() - 24);
 
       await waitFor(() => {
-        const callArgs = vi.mocked(api.getLogs).mock.calls[0];
+        const callArgs = api.getLogs.mock.calls[0];
         const filters = callArgs[2];
         const startDate = new Date(filters?.startDate || '');
 
@@ -118,7 +118,7 @@ describe('DetailedUsage Page', () => {
       fireEvent.click(hourButton);
 
       await waitFor(() => {
-        const callArgs = vi.mocked(api.getLogs).mock.calls;
+        const callArgs = api.getLogs.mock.calls;
         const lastCall = callArgs[callArgs.length - 1];
         const filters = lastCall[2];
         const startDate = new Date(filters?.startDate || '');
@@ -264,7 +264,7 @@ describe('DetailedUsage Page', () => {
         },
       };
 
-      vi.mocked(api.getLogs).mockResolvedValue(largeDataset);
+      api.getLogs.mockResolvedValue(largeDataset);
 
       const startTime = Date.now();
       render(<DetailedUsage />);
@@ -283,7 +283,7 @@ describe('DetailedUsage Page', () => {
 
   describe('Error Handling', () => {
     it('should handle API errors gracefully', async () => {
-      vi.mocked(api.getLogs).mockRejectedValue(new Error('API Error'));
+      api.getLogs.mockRejectedValue(new Error('API Error'));
 
       render(<DetailedUsage />);
 
@@ -294,7 +294,7 @@ describe('DetailedUsage Page', () => {
     });
 
     it('should show loading state', async () => {
-      vi.mocked(api.getLogs).mockImplementation(
+      api.getLogs.mockImplementation(
         () => new Promise((resolve) => setTimeout(resolve, 1000))
       );
 

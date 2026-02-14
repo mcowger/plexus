@@ -91,10 +91,10 @@ describe('Metrics Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    vi.mocked(api.getDashboardData).mockResolvedValue(mockDashboardData);
-    vi.mocked(api.getLiveDashboardSnapshot).mockResolvedValue(mockLiveSnapshot);
-    vi.mocked(api.getProviderPerformance).mockResolvedValue(mockProviderPerformance);
-    vi.mocked(api.subscribeToUsageEvents).mockReturnValue({
+    api.getDashboardData.mockResolvedValue(mockDashboardData);
+    api.getLiveDashboardSnapshot.mockResolvedValue(mockLiveSnapshot);
+    api.getProviderPerformance.mockResolvedValue(mockProviderPerformance);
+    api.subscribeToUsageEvents.mockReturnValue({
       close: vi.fn(),
     } as unknown as EventSource);
   });
@@ -190,7 +190,7 @@ describe('Metrics Page', () => {
 
   describe('Error Handling', () => {
     it('should handle API errors gracefully', async () => {
-      vi.mocked(api.getDashboardData).mockRejectedValue(new Error('API Error'));
+      api.getDashboardData.mockRejectedValue(new Error('API Error'));
 
       render(<Metrics />);
 

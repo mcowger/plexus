@@ -94,10 +94,10 @@ describe('LiveMetrics Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    vi.mocked(api.getDashboardData).mockResolvedValue(mockDashboardData);
-    vi.mocked(api.getLiveDashboardSnapshot).mockResolvedValue(mockLiveSnapshot);
-    vi.mocked(api.getProviderPerformance).mockResolvedValue([]);
-    vi.mocked(api.subscribeToUsageEvents).mockReturnValue({
+    api.getDashboardData.mockResolvedValue(mockDashboardData);
+    api.getLiveDashboardSnapshot.mockResolvedValue(mockLiveSnapshot);
+    api.getProviderPerformance.mockResolvedValue([]);
+    api.subscribeToUsageEvents.mockReturnValue({
       close: vi.fn(),
       onmessage: null,
       onerror: null,
@@ -170,7 +170,7 @@ describe('LiveMetrics Page', () => {
         withCredentials: false,
       };
 
-      vi.mocked(api.subscribeToUsageEvents).mockReturnValue(mockEventSource as unknown as EventSource);
+      api.subscribeToUsageEvents.mockReturnValue(mockEventSource as unknown as EventSource);
 
       render(<LiveMetrics />);
 
@@ -263,7 +263,7 @@ describe('LiveMetrics Page', () => {
 
     it('should close SSE connection on unmount', async () => {
       const mockClose = vi.fn();
-      vi.mocked(api.subscribeToUsageEvents).mockReturnValue({
+      api.subscribeToUsageEvents.mockReturnValue({
         close: mockClose,
       } as unknown as EventSource);
 
