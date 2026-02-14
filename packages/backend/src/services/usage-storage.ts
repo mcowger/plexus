@@ -544,40 +544,60 @@ export class UsageStorageService extends EventEmitter {
                 conditions.push(eq(this.schema.providerPerformance.provider, provider));
             }
             if (model) {
-                conditions.push(sql`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.requestUsage.canonicalModelName}, ${this.schema.providerPerformance.model}) = ${model}`);
+                conditions.push(
+                    eq(
+                        sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+                        model
+                    )
+                );
             }
 
             const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-            const perfRows = await this.db!
-                .select({
-                    provider: this.schema.providerPerformance.provider,
-                    model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.requestUsage.canonicalModelName}, ${this.schema.providerPerformance.model})`,
-                    targetModel: this.schema.providerPerformance.model,
-                    avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
-                    minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
-                    maxTtftMs: sql<number>`MAX(${this.schema.providerPerformance.timeToFirstTokenMs})`,
-                    avgTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.tokensPerSec})`,
-                    minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
-                    maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
-                    sampleCount: sql<number>`COUNT(*)`,
-                    successCount: sql<number>`SUM(${this.schema.providerPerformance.successCount})`,
-                    failureCount: sql<number>`SUM(${this.schema.providerPerformance.failureCount})`,
-                    lastUpdated: sql<number>`MAX(${this.schema.providerPerformance.createdAt})`
-                })
-                .from(this.schema.providerPerformance)
-                .leftJoin(
-                    this.schema.requestUsage,
-                    eq(this.schema.providerPerformance.requestId, this.schema.requestUsage.requestId)
-                )
-                .where(whereClause)
-                .groupBy(
-                    this.schema.providerPerformance.provider,
-                    this.schema.providerPerformance.model,
-                    this.schema.providerPerformance.canonicalModelName,
-                    this.schema.requestUsage.canonicalModelName
-                )
-                .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
+            const perfRows = whereClause
+                ? await this.db!
+                    .select({
+                        provider: this.schema.providerPerformance.provider,
+                        model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+                        targetModel: this.schema.providerPerformance.model,
+                        avgTtftMs: avg(this.schema.providerPerformance.timeToFirstTokenMs),
+                        minTtftMs: min(this.schema.providerPerformance.timeToFirstTokenMs),
+                        maxTtftMs: max(this.schema.providerPerformance.timeToFirstTokenMs),
+                        avgTokensPerSec: avg(this.schema.providerPerformance.tokensPerSec),
+                        minTokensPerSec: min(this.schema.providerPerformance.tokensPerSec),
+                        maxTokensPerSec: max(this.schema.providerPerformance.tokensPerSec),
+                        sampleCount: count(),
+                        lastUpdated: max(this.schema.providerPerformance.createdAt)
+                    })
+                    .from(this.schema.providerPerformance)
+                    .where(whereClause)
+                    .groupBy(
+                        this.schema.providerPerformance.provider,
+                        this.schema.providerPerformance.model,
+                        this.schema.providerPerformance.canonicalModelName
+                    )
+                    .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`))
+                : await this.db!
+                    .select({
+                        provider: this.schema.providerPerformance.provider,
+                        model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+                        targetModel: this.schema.providerPerformance.model,
+                        avgTtftMs: avg(this.schema.providerPerformance.timeToFirstTokenMs),
+                        minTtftMs: min(this.schema.providerPerformance.timeToFirstTokenMs),
+                        maxTtftMs: max(this.schema.providerPerformance.timeToFirstTokenMs),
+                        avgTokensPerSec: avg(this.schema.providerPerformance.tokensPerSec),
+                        minTokensPerSec: min(this.schema.providerPerformance.tokensPerSec),
+                        maxTokensPerSec: max(this.schema.providerPerformance.tokensPerSec),
+                        sampleCount: count(),
+                        lastUpdated: max(this.schema.providerPerformance.createdAt)
+                    })
+                    .from(this.schema.providerPerformance)
+                    .groupBy(
+                        this.schema.providerPerformance.provider,
+                        this.schema.providerPerformance.model,
+                        this.schema.providerPerformance.canonicalModelName
+                    )
+                    .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
 
             const mappedRows = perfRows.map(row => ({
                 provider: row.provider,
