@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.14.7 - 2026-02-14
+
+### v0.14.7: Move Quotas trackers to dedicated page
+
+## Main feature
+
+- Added a new **`/ui/quotas`** page to display the quota tracker in the UI ([`9d7aee2`](https://github.com/mcowger/plexus/commit/9d7aee2)).
+
+## Additional changes
+
+- No additional commits in this release beyond the quota tracker UI page addition.
+
+Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.14.6 - 2026-02-14
 
 ### v0.14.6: Expand provider model/quota support (Claude Opus 4.6, OpenAI Codex, Claude Code)
