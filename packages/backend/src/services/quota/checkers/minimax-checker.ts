@@ -23,7 +23,7 @@ export class MiniMaxQuotaChecker extends QuotaChecker {
 
     try {
       const endpoint = `https://platform.minimax.io/account/query_balance?GroupId=${encodeURIComponent(groupid)}`;
-      logger.debug(`[minimax] Calling ${endpoint}`);
+      logger.silly(`[minimax] Calling ${endpoint}`);
 
       const response = await fetch(endpoint, {
         method: 'GET',

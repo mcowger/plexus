@@ -242,10 +242,17 @@ export class OAuthTransformer implements Transformer {
     const { filteredOptions, strippedParameters } = filterPiAiRequestOptions(rawOptions, model);
     const isClaudeCodeToken = apiKey.includes('sk-ant-oat');
     const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
-    const baseHeaders = {
-      ...(filteredOptions as any).headers,
-      Version: '0.101.0'
+    let userAgent = '';
+    if (provider === 'openai-codex') {
+      userAgent = 'codex_cli_rs/0.101.0 (Debian 13.0.0; x86_64) WindowsTerminal';
+    }
+
+    const baseHeaders: Record<string, string> = {
+      ...((filteredOptions as any).headers as Record<string, string>),
+      Version: '0.101.0',
+      ...(userAgent ? { 'User-Agent': userAgent } : {}),
     };
+
     requestOptions.headers = baseHeaders;
     const isClaudeCodeAgent =
       typeof clientHeaders?.['x-app'] === 'string' &&
