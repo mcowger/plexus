@@ -17,7 +17,7 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
   async checkQuota(): Promise<QuotaCheckResult> {
     try {
       const apiKey = await this.resolveApiKey();
-      logger.debug(`[claude-code-checker] Making inference request to ${this.endpoint}?beta=true`);
+      logger.silly(`[claude-code-checker] Making inference request to ${this.endpoint}?beta=true`);
 
       const response = await fetch(`${this.endpoint}?beta=true`, {
         method: 'POST',
@@ -45,7 +45,7 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
         }),
       });
 
-      logger.debug(`[claude-code-checker] Response status: ${response.status}`);
+      logger.silly(`[claude-code-checker] Response status: ${response.status}`);
 
       if (!response.ok) {
         return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
@@ -61,8 +61,8 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
       const sevenDayUtil = response.headers.get('anthropic-ratelimit-unified-7d-utilization');
       const sevenDayLimit = response.headers.get('anthropic-ratelimit-unified-7d-limit');
 
-      logger.debug(`[claude-code-checker] 5h - limit: ${fiveHourLimit}, reset: ${fiveHourReset}, util: ${fiveHourUtil}`);
-      logger.debug(`[claude-code-checker] 7d - limit: ${sevenDayLimit}, reset: ${sevenDayReset}, util: ${sevenDayUtil}`);
+      logger.silly(`[claude-code-checker] 5h - limit: ${fiveHourLimit}, reset: ${fiveHourReset}, util: ${fiveHourUtil}`);
+      logger.silly(`[claude-code-checker] 7d - limit: ${sevenDayLimit}, reset: ${sevenDayReset}, util: ${sevenDayUtil}`);
 
       const windows: QuotaWindow[] = [];
 
@@ -92,7 +92,7 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
         ));
       }
 
-      logger.debug(`[claude-code-checker] Returning ${windows.length} windows`);
+      logger.silly(`[claude-code-checker] Returning ${windows.length} windows`);
       return this.successResult(windows);
     } catch (error) {
       return this.errorResult(error as Error);

@@ -16,6 +16,52 @@ adminKey: "admin-secret"
 `;
 
 describe('config quota checker validation', () => {
+  it('accepts openai-codex quota checker type', () => {
+    const config = validateConfig(`
+providers:
+  codex-provider:
+    api_base_url: "oauth://"
+    api_key: "oauth"
+    oauth_provider: "openai-codex"
+    oauth_account: "test-account"
+    quota_checker:
+      type: openai-codex
+models: {}
+keys: {}
+adminKey: "admin-secret"
+`);
+
+    expect(config.quotas).toHaveLength(1);
+    expect(config.quotas[0]).toMatchObject({
+      provider: 'codex-provider',
+      type: 'openai-codex',
+      intervalMinutes: 30,
+    });
+  });
+
+  it('accepts claude-code quota checker type', () => {
+    const config = validateConfig(`
+providers:
+  claude-provider:
+    api_base_url: "oauth://"
+    api_key: "oauth"
+    oauth_provider: "anthropic"
+    oauth_account: "test-account"
+    quota_checker:
+      type: claude-code
+models: {}
+keys: {}
+adminKey: "admin-secret"
+`);
+
+    expect(config.quotas).toHaveLength(1);
+    expect(config.quotas[0]).toMatchObject({
+      provider: 'claude-provider',
+      type: 'claude-code',
+      intervalMinutes: 30,
+    });
+  });
+
   it('accepts minimax quota checker when groupid and hertzSession are provided', () => {
     const config = validateConfig(
       makeConfigYaml(`        groupid: "group-123"

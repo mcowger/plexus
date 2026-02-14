@@ -32,7 +32,7 @@ export class ZAIQuotaChecker extends QuotaChecker {
     const apiKey = this.requireOption<string>('apiKey');
 
     try {
-      logger.debug(`[zai-checker] Calling ${this.endpoint}`);
+      logger.silly(`[zai-checker] Calling ${this.endpoint}`);
       
       const response = await fetch(this.endpoint, {
         method: 'GET',
@@ -43,16 +43,16 @@ export class ZAIQuotaChecker extends QuotaChecker {
         },
       });
 
-      logger.debug(`[zai-checker] Response status: ${response.status}`);
+      logger.silly(`[zai-checker] Response status: ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.debug(`[zai-checker] Error response: ${errorText}`);
+        logger.silly(`[zai-checker] Error response: ${errorText}`);
         return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
       }
 
       const data: ZAIQuotaLimitResponse = await response.json();
-      logger.debug(`[zai-checker] Response data: ${JSON.stringify(data)}`);
+      logger.silly(`[zai-checker] Response data: ${JSON.stringify(data)}`);
       
       const windows: QuotaWindow[] = [];
       const limits = data.data?.limits ?? [];
@@ -83,7 +83,7 @@ export class ZAIQuotaChecker extends QuotaChecker {
         }
       }
 
-      logger.debug(`[zai-checker] Returning ${windows.length} windows`);
+      logger.silly(`[zai-checker] Returning ${windows.length} windows`);
       return this.successResult(windows);
     } catch (error) {
       return this.errorResult(error as Error);

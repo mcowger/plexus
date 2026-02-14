@@ -21,7 +21,7 @@ export class OpenRouterQuotaChecker extends QuotaChecker {
     const apiKey = this.requireOption<string>('apiKey');
 
     try {
-      logger.debug(`[openrouter] Calling ${this.endpoint}`);
+      logger.silly(`[openrouter] Calling ${this.endpoint}`);
 
       const response = await fetch(this.endpoint, {
         method: 'GET',

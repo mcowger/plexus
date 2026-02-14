@@ -25,7 +25,7 @@ export class MoonshotQuotaChecker extends QuotaChecker {
     const apiKey = this.requireOption<string>('apiKey');
 
     try {
-      logger.debug(`[moonshot] Calling ${this.endpoint}`);
+      logger.silly(`[moonshot] Calling ${this.endpoint}`);
 
       const response = await fetch(this.endpoint, {
         method: 'GET',

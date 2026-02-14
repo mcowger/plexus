@@ -17,8 +17,8 @@ let currentSchema: any = null;
 function createDrizzleLogger() {
   return {
     logQuery(query: string, params: unknown[]) {
-      if (process.env.LOG_LEVEL === 'debug') {
-        logger.debug(`Query: ${query}`);
+      if (process.env.LOG_LEVEL === 'silly') {
+        logger.silly(`Query: ${query}`);
       }
     },
   };
@@ -44,7 +44,7 @@ function resolvePath(relPath: string): string {
 
 export function initializeDatabase(connectionString?: string) {
   if (dbInstance) {
-    logger.debug('Database already initialized, skipping');
+    logger.silly('Database already initialized, skipping');
     return dbInstance;
   }
 
@@ -57,13 +57,13 @@ export function initializeDatabase(connectionString?: string) {
       throw new Error('DATABASE_URL environment variable is required for database connection');
     }
     
-    logger.debug(`Using DATABASE_URL: ${effectiveUri.substring(0, 30)}...`);
+    logger.silly(`Using DATABASE_URL: ${effectiveUri.substring(0, 30)}...`);
   }
 
   const { dialect, connectionString: connStr } = parseConnectionString(effectiveUri);
   currentDialect = dialect;
 
-  logger.info(`Initializing ${dialect} database...`);
+  logger.silly(`Initializing ${dialect} database...`);
   
   if (dialect === 'sqlite') {
     const dbPath = connStr === ':memory:' ? ':memory:' : resolvePath(connStr);
@@ -98,7 +98,7 @@ export function initializeDatabase(connectionString?: string) {
     
     // Set statement timeout to prevent long-running queries from blocking
     sqlClient`SET statement_timeout = '30s'`.catch((err) => {
-      logger.warn(`Failed to set statement_timeout: ${err}`);
+      logger.silly(`Failed to set statement_timeout: ${err}`);
     });
 
     const pgSchema = require('../../drizzle/schema/postgres/index');

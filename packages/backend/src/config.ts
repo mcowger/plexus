@@ -103,6 +103,17 @@ const OpenRouterQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const OpenAICodexQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+  userAgent: z.string().trim().min(1).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
+const ClaudeCodeQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+  model: z.string().trim().min(1).optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -152,6 +163,20 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: OpenRouterQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('openai-codex'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: OpenAICodexQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('claude-code'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ClaudeCodeQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 
