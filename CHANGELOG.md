@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.14.6 - 2026-02-14
+
+### v0.14.6: Expand provider model/quota support (Claude Opus 4.6, OpenAI Codex, Claude Code)
+
+## Main changes
+
+- Added **Claude Opus 4.6** to the Anthropic OAuth provider model list ([99f453a](https://github.com/mcowger/plexus/commit/99f453a)).
+- Added new quota checkers for **OpenAI Codex** and **Claude Code** ([49bc5c6](https://github.com/mcowger/plexus/commit/49bc5c6)).
+
+## Additional updates
+
+- Updated **pi-ai** dependency to **v0.52.12** ([49bc5c6](https://github.com/mcowger/plexus/commit/49bc5c6)).
+- Adjusted logging levels for related flows ([49bc5c6](https://github.com/mcowger/plexus/commit/49bc5c6)).
+
+Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.14.5 - 2026-02-13
 
 ### v0.14.5: OAuth cooldown registration fix
