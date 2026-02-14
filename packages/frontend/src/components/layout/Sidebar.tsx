@@ -1,26 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight, PieChart } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
-import { toBoolean, toIsoString } from '../../lib/normalize';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
-import {
-  SyntheticQuotaDisplay,
-  ClaudeCodeQuotaDisplay,
-  NagaQuotaDisplay,
-  OpenAICodexQuotaDisplay,
-  NanoGPTQuotaDisplay,
-  ZAIQuotaDisplay,
-  MoonshotQuotaDisplay,
-  MiniMaxQuotaDisplay,
-  OpenRouterQuotaDisplay,
-} from '../quota';
-import type { QuotaCheckerInfo, QuotaCheckResult } from '../../types/quota';
+
+
 import logo from '../../assets/plexus_logo_transparent.png';
 
 interface NavItemProps {
@@ -61,10 +50,9 @@ export const Sidebar: React.FC = () => {
   const appVersion = process.env.APP_VERSION || 'dev';
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [mainExpanded, setMainExpanded] = useState(true);
-  const [quotasExpanded, setQuotasExpanded] = useState(true);
   const [configExpanded, setConfigExpanded] = useState(true);
   const [devToolsExpanded, setDevToolsExpanded] = useState(false);
   const { logout } = useAuth();
@@ -72,17 +60,6 @@ export const Sidebar: React.FC = () => {
 
   useEffect(() => {
     api.getDebugMode().then(setDebugMode);
-  }, []);
-
-  useEffect(() => {
-    const fetchQuotas = async () => {
-      const data = await api.getQuotas();
-      setQuotas(data);
-    };
-    fetchQuotas();
-    // Refresh quotas every 30 seconds
-    const interval = setInterval(fetchQuotas, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const parseSemverTag = (tag: string): [number, number, number] | null => {
@@ -143,47 +120,6 @@ export const Sidebar: React.FC = () => {
     parseSemverTag(appVersion) &&
     compareSemverTags(appVersion, latestVersion) < 0
   );
-
-  // Convert QuotaSnapshot[] to QuotaCheckResult format for display
-  const getQuotaResult = (checkerId: string): QuotaCheckResult | undefined => {
-    const checker = quotas.find(q => q.checkerId === checkerId);
-    if (!checker || !checker.latest || checker.latest.length === 0) return undefined;
-    
-    // Get unique window types (in case of duplicates, take the most recent)
-    const windowsByType = new Map<string, typeof checker.latest[0]>();
-    for (const snapshot of checker.latest) {
-      const existing = windowsByType.get(snapshot.windowType);
-      if (!existing || snapshot.checkedAt > existing.checkedAt) {
-        windowsByType.set(snapshot.windowType, snapshot);
-      }
-    }
-    
-    const windows = Array.from(windowsByType.values()).map(snapshot => ({
-      windowType: snapshot.windowType as any,
-      windowLabel: snapshot.description || snapshot.windowType,
-      limit: snapshot.limit ?? undefined,
-      used: snapshot.used ?? undefined,
-      remaining: snapshot.remaining ?? undefined,
-      utilizationPercent: snapshot.utilizationPercent ?? 0,
-      unit: (snapshot.unit as any) || 'percentage',
-      resetsAt: toIsoString(snapshot.resetsAt) ?? undefined,
-      resetInSeconds: snapshot.resetInSeconds !== null && snapshot.resetInSeconds !== undefined ? snapshot.resetInSeconds : undefined,
-      status: (snapshot.status as any) || 'ok',
-    }));
-    
-    const firstSnapshot = checker.latest[0];
-    const errorFromSnapshots = checker.latest.find((snapshot) => snapshot.errorMessage)?.errorMessage || undefined;
-    return {
-      provider: firstSnapshot.provider,
-      checkerId: firstSnapshot.checkerId,
-      oauthAccountId: checker.oauthAccountId,
-      oauthProvider: checker.oauthProvider,
-      checkedAt: toIsoString(firstSnapshot.checkedAt) ?? new Date(0).toISOString(),
-      success: toBoolean(firstSnapshot.success),
-      error: errorFromSnapshots,
-      windows,
-    };
-  };
 
   const handleToggleClick = () => {
       setShowConfirm(true);
@@ -266,162 +202,12 @@ export const Sidebar: React.FC = () => {
                 <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
                 <NavItem to="/performance" icon={Gauge} label="Performance" isCollapsed={isCollapsed} />
                 <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
+                <NavItem to="/quotas" icon={PieChart} label="Quotas" isCollapsed={isCollapsed} />
               </>
             )}
         </div>
 
-        {/* Quotas Section */}
-        <div className="mt-4 px-2">
-            <button
-              onClick={() => setQuotasExpanded(!quotasExpanded)}
-              className="w-full flex items-center justify-between mb-1 group"
-            >
-              <h3 className={clsx(
-                "font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200",
-                isCollapsed && "opacity-0 h-0 overflow-hidden"
-              )}>Quotas</h3>
-              {!isCollapsed && (
-                <ChevronRight
-                  size={14}
-                  className={clsx(
-                    "text-text-muted transition-transform duration-200 group-hover:text-text",
-                    quotasExpanded && "rotate-90"
-                  )}
-                />
-              )}
-            </button>
-            {(quotasExpanded || isCollapsed) && (
-              <>
-                {quotas.length === 0 ? (
-                  !isCollapsed && (
-                    <p className="text-xs text-text-muted px-2">No quota checkers configured</p>
-                  )
-                ) : (
-                  <div className="space-y-1">
-                    {quotas.map((quota) => {
-                      const checkerType = (quota.checkerType || '').toLowerCase();
-                      const checkerId = quota.checkerId.toLowerCase();
-                      const checkerIdentifier = checkerType || checkerId;
 
-                      const result = getQuotaResult(quota.checkerId) ?? {
-                        provider: 'unknown',
-                        checkerId: quota.checkerId,
-                        oauthAccountId: quota.oauthAccountId,
-                        oauthProvider: quota.oauthProvider,
-                        checkedAt: new Date().toISOString(),
-                        success: false,
-                        error: 'No quota data available yet',
-                        windows: [],
-                      };
-                      
-                      // Use Synthetic display for synthetic checkers
-                      if (checkerIdentifier.includes('synthetic')) {
-                        return (
-                          <SyntheticQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-                      
-                      // Use Claude Code display for claude checkers
-                      if (checkerIdentifier.includes('claude')) {
-                        return (
-                          <ClaudeCodeQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use Naga display for naga checkers
-                      if (checkerIdentifier.includes('naga')) {
-                        return (
-                          <NagaQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use NanoGPT display for nanogpt checkers
-                      if (checkerIdentifier.includes('nanogpt')) {
-                        return (
-                          <NanoGPTQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use OpenAI Codex display for codex checkers
-                      if (checkerIdentifier.includes('openai-codex') || checkerIdentifier.includes('codex')) {
-                        return (
-                          <OpenAICodexQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use ZAI display for zai checkers
-                      if (checkerIdentifier.includes('zai')) {
-                        return (
-                          <ZAIQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use Moonshot display for moonshot checkers
-                      if (checkerIdentifier.includes('moonshot')) {
-                        return (
-                          <MoonshotQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use MiniMax display for minimax checkers
-                      if (checkerIdentifier.includes('minimax')) {
-                        return (
-                          <MiniMaxQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Use OpenRouter display for openrouter checkers
-                      if (checkerIdentifier.includes('openrouter')) {
-                        return (
-                          <OpenRouterQuotaDisplay
-                            key={quota.checkerId}
-                            result={result}
-                            isCollapsed={isCollapsed}
-                          />
-                        );
-                      }
-
-                      // Fallback: show checker ID for unknown types
-                      console.warn(`Unknown quota checker type: ${quota.checkerType || quota.checkerId}`);
-                      return null;
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-        </div>
 
         <div className="mt-4 px-2">
             <button
