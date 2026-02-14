@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { encode } from 'eventsource-encoder';
-import { and, gte, lte, sql } from 'drizzle-orm';
+import { and, gte, lte, sql, count, sum, avg } from 'drizzle-orm';
 import { getCurrentDialect, getSchema } from '../../db/client';
 import { UsageStorageService } from '../../services/usage-storage';
 

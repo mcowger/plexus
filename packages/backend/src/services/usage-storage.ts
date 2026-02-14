@@ -3,7 +3,7 @@ import { UsageRecord } from '../types/usage';
 import { getDatabase, getSchema } from '../db/client';
 import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
-import { eq, and, gte, lte, like, desc, sql, getTableName } from 'drizzle-orm';
+import { eq, and, gte, lte, like, desc, sql, getTableName, exists, count, sum, avg, min, max, notInArray } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 
 
@@ -307,8 +307,16 @@ export class UsageStorageService extends EventEmitter {
                     parallelToolCallsEnabled: schema.requestUsage.parallelToolCallsEnabled,
                     toolCallsCount: schema.requestUsage.toolCallsCount,
                     finishReason: schema.requestUsage.finishReason,
-                    hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.debugLogs} dl WHERE dl.request_id = request_usage.request_id)`,
-                    hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.inferenceErrors} ie WHERE ie.request_id = request_usage.request_id)`,
+                    hasDebug: exists(
+                        db.select({ _: sql`1` })
+                            .from(schema.debugLogs)
+                            .where(eq(schema.debugLogs.requestId, schema.requestUsage.requestId))
+                    ),
+                    hasError: exists(
+                        db.select({ _: sql`1` })
+                            .from(schema.inferenceErrors)
+                            .where(eq(schema.inferenceErrors.requestId, schema.requestUsage.requestId))
+                    ),
                 })
                 .from(schema.requestUsage)
                 .where(whereClause)
@@ -362,7 +370,7 @@ export class UsageStorageService extends EventEmitter {
             }));
 
             const countResults = await db
-                .select({ count: sql<number>`count(*)` })
+                .select({ count: count() })
                 .from(schema.requestUsage)
                 .where(whereClause);
 
@@ -414,7 +422,12 @@ export class UsageStorageService extends EventEmitter {
 
             await this.db!
                 .delete(this.schema.providerPerformance)
-                .where(sql`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model}) = ${model}`);
+                .where(
+                    eq(
+                        sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+                        model
+                    )
+                );
 
             logger.info(`Deleted performance data for model: ${model}`);
             return true;
@@ -457,24 +470,27 @@ export class UsageStorageService extends EventEmitter {
                 createdAt: Date.now()
             });
 
-            const subquery = this.ensureDb()
+            const idsToKeep = await this.ensureDb()
                 .select({ id: this.schema.providerPerformance.id })
                 .from(this.schema.providerPerformance)
                 .where(and(
-                    sql`${this.schema.providerPerformance.provider} = ${provider}`,
-                    sql`${this.schema.providerPerformance.model} = ${model}`
+                    eq(this.schema.providerPerformance.provider, provider),
+                    eq(this.schema.providerPerformance.model, model)
                 ))
                 .orderBy(desc(this.schema.providerPerformance.createdAt))
-                .limit(retentionLimit)
-                .as('sub');
+                .limit(retentionLimit);
 
-            await this.ensureDb()
-                .delete(this.schema.providerPerformance)
-                .where(and(
-                    eq(this.schema.providerPerformance.provider, provider),
-                    eq(this.schema.providerPerformance.model, model),
-                    sql`${this.schema.providerPerformance.id} NOT IN (SELECT id FROM ${subquery})`
-                ));
+            const idsToKeepArray = idsToKeep.map(row => row.id);
+
+            if (idsToKeepArray.length > 0) {
+                await this.ensureDb()
+                    .delete(this.schema.providerPerformance)
+                    .where(and(
+                        eq(this.schema.providerPerformance.provider, provider),
+                        eq(this.schema.providerPerformance.model, model),
+                        notInArray(this.schema.providerPerformance.id, idsToKeepArray)
+                    ));
+            }
 
             logger.debug(`Performance metrics updated for ${provider}:${model}`);
         } catch (error) {

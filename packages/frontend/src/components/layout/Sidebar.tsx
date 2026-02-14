@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-<<<<<<< HEAD
 import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight, PieChart, Plug, Zap, BarChart3 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
