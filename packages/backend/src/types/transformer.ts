@@ -37,6 +37,7 @@ export interface Transformer {
     input_tokens?: number;
     output_tokens?: number;
     cached_tokens?: number;
+    cache_creation_tokens?: number;
     reasoning_tokens?: number;
   } | undefined;
 }

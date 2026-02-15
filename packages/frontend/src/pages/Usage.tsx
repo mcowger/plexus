@@ -154,6 +154,7 @@ export const Usage = () => {
                 <Area type="monotone" dataKey="inputTokens" name="Input" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
                 <Area type="monotone" dataKey="outputTokens" name="Output" stroke="#ffc658" fill="#ffc658" fillOpacity={0.3} />
                 <Area type="monotone" dataKey="cachedTokens" name="Cached" stroke="#ff7300" fill="#ff7300" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="cacheWriteTokens" name="Cache Write" stroke="#a855f7" fill="#a855f7" fillOpacity={0.3} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

@@ -204,6 +204,7 @@ export class OAuthTransformer implements Transformer {
         input_tokens?: number;
         output_tokens?: number;
         cached_tokens?: number;
+        cache_creation_tokens?: number;
         reasoning_tokens?: number;
       }
     | undefined {
@@ -215,6 +216,7 @@ export class OAuthTransformer implements Transformer {
           input_tokens: event.message.usage.input,
           output_tokens: event.message.usage.output,
           cached_tokens: event.message.usage.cacheRead,
+          cache_creation_tokens: event.message.usage.cacheWrite,
           reasoning_tokens: 0
         };
       }

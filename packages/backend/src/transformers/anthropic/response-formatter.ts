@@ -83,10 +83,7 @@ export async function formatAnthropicResponse(
     stop_reason,
    stop_sequence: null,
     usage: {
-      // Usage Token Normalization: input_tokens = prompt_tokens - cached_tokens
-      input_tokens:
-        (response.usage?.input_tokens || 0) -
-        (response.usage?.cached_tokens || 0),
+      input_tokens: response.usage?.input_tokens || 0,
       output_tokens: response.usage?.output_tokens || 0,
       thinkingTokens: response.usage?.reasoning_tokens || 0,
       cache_read_input_tokens: response.usage?.cached_tokens || 0,

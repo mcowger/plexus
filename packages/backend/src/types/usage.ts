@@ -18,9 +18,11 @@ export interface UsageRecord {
     tokensOutput: number | null;
     tokensReasoning: number | null;
     tokensCached: number | null;
+    tokensCacheWrite?: number | null;
     costInput: number | null;
     costOutput: number | null;
     costCached: number | null;
+    costCacheWrite?: number | null;
     costTotal: number | null;
     costSource: string | null;
     costMetadata: string | null;

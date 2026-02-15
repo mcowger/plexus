@@ -29,6 +29,7 @@ export const Dashboard = () => {
     outputTokens: 0,
     reasoningTokens: 0,
     cachedTokens: 0,
+    cacheWriteTokens: 0,
     totalCost: 0
   });
 
@@ -148,12 +149,13 @@ export const Dashboard = () => {
               <Database size={20} />
             </div>
           </div>
-          <div className="font-heading text-3xl font-bold text-text my-1">{formatTokens(todayMetrics.inputTokens + todayMetrics.outputTokens + todayMetrics.reasoningTokens + todayMetrics.cachedTokens)}</div>
+          <div className="font-heading text-3xl font-bold text-text my-1">{formatTokens(todayMetrics.inputTokens + todayMetrics.outputTokens + todayMetrics.reasoningTokens + todayMetrics.cachedTokens + todayMetrics.cacheWriteTokens)}</div>
           <div className="text-xs text-text-muted space-y-0.5">
             <div>In: {formatTokens(todayMetrics.inputTokens)}</div>
             <div>Out: {formatTokens(todayMetrics.outputTokens)}</div>
             {todayMetrics.reasoningTokens > 0 && <div>Reasoning: {formatTokens(todayMetrics.reasoningTokens)}</div>}
             {todayMetrics.cachedTokens > 0 && <div>Cached: {formatTokens(todayMetrics.cachedTokens)}</div>}
+            {todayMetrics.cacheWriteTokens > 0 && <div>Cache Write: {formatTokens(todayMetrics.cacheWriteTokens)}</div>}
           </div>
         </div>
 

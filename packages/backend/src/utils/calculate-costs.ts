@@ -5,15 +5,17 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
     const inputTokens = usageRecord.tokensInput || 0;
     const outputTokens = usageRecord.tokensOutput || 0;
     const cachedTokens = usageRecord.tokensCached || 0;
+    const cacheWriteTokens = usageRecord.tokensCacheWrite || 0;
 
     let inputCost = 0;
     let outputCost = 0;
     let cachedCost = 0;
+    let cacheWriteCost = 0;
     let calculated = false;
 
     // Default to 'default' source with 0-cost metadata
     usageRecord.costSource = 'default';
-    usageRecord.costMetadata = JSON.stringify({ input: 0, output: 0, cached: 0 });
+    usageRecord.costMetadata = JSON.stringify({ input: 0, output: 0, cached: 0, cache_write: 0 });
 
     if (!pricing) return;
 
@@ -21,6 +23,7 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
         inputCost = (inputTokens / 1_000_000) * pricing.input;
         outputCost = (outputTokens / 1_000_000) * pricing.output;
         cachedCost = (cachedTokens / 1_000_000) * (pricing.cached || 0);
+        cacheWriteCost = (cacheWriteTokens / 1_000_000) * (pricing.cache_write || 0);
         calculated = true;
         
         usageRecord.costSource = 'simple';
@@ -35,6 +38,8 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
         if (match) {
             inputCost = (inputTokens / 1_000_000) * match.input_per_m;
             outputCost = (outputTokens / 1_000_000) * match.output_per_m;
+            cachedCost = (cachedTokens / 1_000_000) * (match.cached_per_m || 0);
+            cacheWriteCost = (cacheWriteTokens / 1_000_000) * (match.cache_write_per_m || 0);
             calculated = true;
             
             usageRecord.costSource = 'defined';
@@ -42,6 +47,8 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
                 source: 'defined',
                 input: match.input_per_m,
                 output: match.output_per_m,
+                cached: match.cached_per_m || 0,
+                cache_write: match.cache_write_per_m || 0,
                 range: match
             });
         }
@@ -52,10 +59,12 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
             const promptRate = parseFloat(openRouterPricing.prompt) || 0;
             const completionRate = parseFloat(openRouterPricing.completion) || 0;
             const cacheReadRate = parseFloat(openRouterPricing.input_cache_read || '0') || 0;
+            const cacheWriteRate = parseFloat(openRouterPricing.input_cache_write || '0') || 0;
 
             inputCost = inputTokens * promptRate;
             outputCost = outputTokens * completionRate;
             cachedCost = cachedTokens * cacheReadRate;
+            cacheWriteCost = cacheWriteTokens * cacheWriteRate;
 
             const effectiveDiscount = pricing.discount ?? providerDiscount;
 
@@ -64,6 +73,7 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
                 inputCost *= multiplier;
                 outputCost *= multiplier;
                 cachedCost *= multiplier;
+                cacheWriteCost *= multiplier;
             }
 
             calculated = true;
@@ -74,6 +84,7 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
                 prompt: promptRate,
                 completion: completionRate,
                 input_cache_read: cacheReadRate,
+                input_cache_write: cacheWriteRate,
                 discount: effectiveDiscount
             });
         }
@@ -83,6 +94,7 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
         usageRecord.costInput = Number(inputCost.toFixed(8));
         usageRecord.costOutput = Number(outputCost.toFixed(8));
         usageRecord.costCached = Number(cachedCost.toFixed(8));
-        usageRecord.costTotal = Number((inputCost + outputCost + cachedCost).toFixed(8));
+        usageRecord.costCacheWrite = Number(cacheWriteCost.toFixed(8));
+        usageRecord.costTotal = Number((inputCost + outputCost + cachedCost + cacheWriteCost).toFixed(8));
     }
 }

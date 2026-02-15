@@ -4,6 +4,7 @@ import { UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage } from "../type
 import { createParser } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
 import { logger } from "../utils/logger";
+import { normalizeOpenAIChatUsage, normalizeOpenAIResponsesUsage } from "../utils/usage-normalizer";
 
 /**
  * ResponsesTransformer
@@ -207,14 +208,7 @@ export class ResponsesTransformer implements Transformer {
       // Case 2: Responses API format (passthrough mode)
       // Extract usage from Responses API format
       const usage = response.usage
-        ? {
-            input_tokens: response.usage.input_tokens || 0,
-            output_tokens: response.usage.output_tokens || 0,
-            total_tokens: response.usage.total_tokens || 0,
-            reasoning_tokens: response.usage.output_tokens_details?.reasoning_tokens || 0,
-            cached_tokens: response.usage.input_tokens_details?.cached_tokens || 0,
-            cache_creation_tokens: 0,
-          }
+        ? normalizeOpenAIResponsesUsage(response.usage)
         : undefined;
 
       // Find the first message output item for content
@@ -247,16 +241,7 @@ export class ResponsesTransformer implements Transformer {
       const message = choice?.message;
 
       const usage = response.usage
-        ? {
-            input_tokens: response.usage.prompt_tokens || 0,
-            output_tokens: response.usage.completion_tokens || 0,
-            total_tokens: response.usage.total_tokens || 0,
-            reasoning_tokens:
-              response.usage.completion_tokens_details?.reasoning_tokens || 0,
-            cached_tokens:
-              response.usage.prompt_tokens_details?.cached_tokens || 0,
-            cache_creation_tokens: 0,
-          }
+        ? normalizeOpenAIChatUsage(response.usage)
         : undefined;
 
       return {
@@ -276,6 +261,9 @@ export class ResponsesTransformer implements Transformer {
    */
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
     const outputItems = this.convertChatResponseToOutputItems(response);
+    const totalInputTokens = response.usage
+      ? (response.usage.input_tokens || 0) + (response.usage.cached_tokens || 0) + (response.usage.cache_creation_tokens || 0)
+      : 0;
 
     return {
       id: this.generateResponseId(),
@@ -286,7 +274,7 @@ export class ResponsesTransformer implements Transformer {
       model: response.model,
       output: outputItems,
       usage: response.usage ? {
-        input_tokens: response.usage.input_tokens,
+        input_tokens: totalInputTokens,
         input_tokens_details: {
           cached_tokens: response.usage.cached_tokens || 0
         },
@@ -617,20 +605,14 @@ export class ResponsesTransformer implements Transformer {
               } else if (data.type === 'response.completed') {
                 // Final chunk with usage data and finish reason
                 const usage = data.response?.usage;
+                const normalizedUsage = usage ? normalizeOpenAIResponsesUsage(usage) : undefined;
                 controller.enqueue({
                   id: responseId,
                   model: responseModel,
                   created: Math.floor(Date.now() / 1000),
                   delta: {},
                   finish_reason: 'stop',
-                  usage: usage ? {
-                    input_tokens: usage.input_tokens || 0,
-                    output_tokens: usage.output_tokens || 0,
-                    total_tokens: usage.total_tokens || 0,
-                    reasoning_tokens: usage.output_tokens_details?.reasoning_tokens || 0,
-                    cached_tokens: usage.input_tokens_details?.cached_tokens || 0,
-                    cache_creation_tokens: 0
-                  } : undefined
+                  usage: normalizedUsage
                 });
               }
             } catch (e) {
@@ -991,11 +973,11 @@ export class ResponsesTransformer implements Transformer {
                   status: 'completed',
                   model: responseModel,
                   output: outputItems,
-                  usage: lastUsage ? {
-                    input_tokens: lastUsage.input_tokens,
-                    output_tokens: lastUsage.output_tokens,
-                    total_tokens: lastUsage.total_tokens,
-                    input_tokens_details: {
+              usage: lastUsage ? {
+                input_tokens: (lastUsage.input_tokens || 0) + (lastUsage.cached_tokens || 0) + (lastUsage.cache_creation_tokens || 0),
+                output_tokens: lastUsage.output_tokens,
+                total_tokens: lastUsage.total_tokens,
+                input_tokens_details: {
                       cached_tokens: lastUsage.cached_tokens || 0
                     },
                     output_tokens_details: {
@@ -1109,7 +1091,7 @@ export class ResponsesTransformer implements Transformer {
                   model: responseModel,
                   output: outputItems,
                   usage: lastUsage ? {
-                    input_tokens: lastUsage.input_tokens,
+                    input_tokens: (lastUsage.input_tokens || 0) + (lastUsage.cached_tokens || 0) + (lastUsage.cache_creation_tokens || 0),
                     output_tokens: lastUsage.output_tokens,
                     total_tokens: lastUsage.total_tokens,
                     input_tokens_details: {
@@ -1139,6 +1121,7 @@ export class ResponsesTransformer implements Transformer {
     input_tokens?: number;
     output_tokens?: number;
     cached_tokens?: number;
+    cache_creation_tokens?: number;
     reasoning_tokens?: number;
   } | undefined {
     try {
@@ -1146,11 +1129,13 @@ export class ResponsesTransformer implements Transformer {
       
       // For response.completed events
       if (event.type === 'response.completed' && event.response?.usage) {
+        const usage = normalizeOpenAIResponsesUsage(event.response.usage);
         return {
-          input_tokens: event.response.usage.input_tokens,
-          output_tokens: event.response.usage.output_tokens,
-          cached_tokens: event.response.usage.input_tokens_details?.cached_tokens,
-          reasoning_tokens: event.response.usage.output_tokens_details?.reasoning_tokens
+          input_tokens: usage.input_tokens,
+          output_tokens: usage.output_tokens,
+          cached_tokens: usage.cached_tokens,
+          cache_creation_tokens: usage.cache_creation_tokens,
+          reasoning_tokens: usage.reasoning_tokens
         };
       }
       

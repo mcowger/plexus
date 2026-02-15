@@ -58,9 +58,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
             stop_reason: null,
             stop_sequence: null,
             usage: {
-              input_tokens:
-                (chunk.usage?.input_tokens || 0) -
-                (chunk.usage?.cached_tokens || 0),
+              input_tokens: chunk.usage?.input_tokens || 0,
               output_tokens: chunk.usage?.output_tokens || 0,
               thinkingTokens: chunk.usage?.reasoning_tokens || 0,
               cache_read_input_tokens: chunk.usage?.cached_tokens || 0,
@@ -226,8 +224,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
             stop_sequence: null,
           },
           usage: {
-            input_tokens:
-              (lastUsage?.input_tokens ?? 0) - (lastUsage?.cached_tokens ?? 0),
+            input_tokens: lastUsage?.input_tokens ?? 0,
             output_tokens: lastUsage?.output_tokens ?? 0,
             thinkingTokens: lastUsage?.reasoning_tokens ?? 0,
             cache_read_input_tokens: lastUsage?.cached_tokens ?? 0,

@@ -66,7 +66,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
-                cached_tokens: 1000
+                cached_tokens: 1000,
+                cache_creation_tokens: 500
             }
         };
 
@@ -88,7 +89,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
         expect(usageRecord.costInput).toBeCloseTo(0.003, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.0075, 8);
         expect(usageRecord.costCached).toBeCloseTo(0.0003, 8);
-        expect(usageRecord.costTotal).toBeCloseTo(0.0108, 8);
+        expect(usageRecord.costCacheWrite).toBeCloseTo(0.0003, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.0111, 8);
     });
 
     test("should calculate costs for 'openrouter' pricing strategy (Missing Cache Rate)", async () => {
@@ -112,7 +114,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
-                cached_tokens: 1000
+                cached_tokens: 1000,
+                cache_creation_tokens: 500
             }
         };
 
@@ -134,6 +137,7 @@ describe("handleResponse - OpenRouter Pricing", () => {
         expect(usageRecord.costInput).toBeCloseTo(0.03, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.03, 8);
         expect(usageRecord.costCached).toBe(0);
+        expect(usageRecord.costCacheWrite).toBe(0);
         expect(usageRecord.costTotal).toBeCloseTo(0.06, 8);
     });
 
@@ -199,7 +203,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
-                cached_tokens: 1000
+                cached_tokens: 1000,
+                cache_creation_tokens: 500
             }
         };
 
@@ -221,7 +226,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
         expect(usageRecord.costInput).toBeCloseTo(0.0027, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.00675, 8);
         expect(usageRecord.costCached).toBeCloseTo(0.00027, 8);
-        expect(usageRecord.costTotal).toBeCloseTo(0.00972, 8);
+        expect(usageRecord.costCacheWrite).toBeCloseTo(0.00027, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.00999, 8);
         
         const metadata = JSON.parse(usageRecord.costMetadata || "{}");
         expect(metadata.discount).toBe(0.1);
@@ -249,7 +255,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
                 input_tokens: 1000,
                 output_tokens: 500,
                 total_tokens: 1500,
-                cached_tokens: 1000
+                cached_tokens: 1000,
+                cache_creation_tokens: 500
             }
         };
 
@@ -271,7 +278,8 @@ describe("handleResponse - OpenRouter Pricing", () => {
         expect(usageRecord.costInput).toBeCloseTo(0.0024, 8);
         expect(usageRecord.costOutput).toBeCloseTo(0.006, 8);
         expect(usageRecord.costCached).toBeCloseTo(0.00024, 8);
-        expect(usageRecord.costTotal).toBeCloseTo(0.00864, 8);
+        expect(usageRecord.costCacheWrite).toBeCloseTo(0.00024, 8);
+        expect(usageRecord.costTotal).toBeCloseTo(0.00888, 8);
         
         const metadata = JSON.parse(usageRecord.costMetadata || "{}");
         expect(metadata.discount).toBe(0.2);

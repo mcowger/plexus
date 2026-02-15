@@ -6,7 +6,7 @@ import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
 import { formatCost, formatMs, formatTPS } from '../lib/format';
-import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon, ShieldCheck, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, Trash2, Bug, Zap, ZapOff, AlertTriangle, Languages, MoveHorizontal, CloudUpload, CloudDownload, BrainCog, PackageOpen, Copy, Variable, AudioLines, Volume2, Wrench, MessagesSquare, PlugZap, CirclePause, Octagon, Hammer, RulerDimensionLine, ChevronDown, Image as ImageIcon, ShieldCheck, RotateCcw, PencilLine } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -414,7 +414,7 @@ export const Logs = () => {
                                         </td>
                                         <td
                                             className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                                            title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
+                                            title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)} • Cache Write: ${(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
                                             style={{ cursor: 'help' }}
                                         >
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -448,6 +448,16 @@ export const Logs = () => {
                                                         <PackageOpen size={12} className="text-orange-400" />
                                                         <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '30px' }}>
                                                             {(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}
+                                                            {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {/* Row 3: Cache Write */}
+                                                <div style={{ display: 'flex', gap: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <PencilLine size={12} className="text-fuchsia-400" />
+                                                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '30px' }}>
+                                                            {(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}
                                                             {log.tokensEstimated ? <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup> : null}
                                                         </span>
                                                     </div>
@@ -489,6 +499,12 @@ export const Logs = () => {
                                                             <PackageOpen size={10} className="text-orange-400" />
                                                             <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
                                                                 {log.costCached === 0 ? '∅' : formatCost(log.costCached || 0)}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <PencilLine size={10} className="text-fuchsia-400" />
+                                                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em', minWidth: '35px' }}>
+                                                                {log.costCacheWrite === 0 ? '∅' : formatCost(log.costCacheWrite || 0)}
                                                             </span>
                                                         </div>
                                                     </div>

@@ -125,7 +125,7 @@ describe("handleResponse", () => {
                     total_tokens: 333,
                     reasoning_tokens: 44,
                     cached_tokens: 55,
-                    cache_creation_tokens: 0
+                    cache_creation_tokens: 66
                 }
             };
 
@@ -145,6 +145,7 @@ describe("handleResponse", () => {
             expect(usageRecord.tokensOutput).toBe(222);
             expect(usageRecord.tokensReasoning).toBe(44);
             expect(usageRecord.tokensCached).toBe(55);
+            expect(usageRecord.tokensCacheWrite).toBe(66);
             expect(mockStorage.saveRequest).toHaveBeenCalled();
         });
 

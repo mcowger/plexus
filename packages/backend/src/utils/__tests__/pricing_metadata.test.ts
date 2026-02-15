@@ -72,7 +72,7 @@ describe("handleResponse - Pricing Metadata", () => {
 
         expect(usageRecord.costSource).toBe("default");
         const metadata = JSON.parse(usageRecord.costMetadata || "{}");
-        expect(metadata).toEqual({ input: 0, output: 0, cached: 0 });
+        expect(metadata).toEqual({ input: 0, output: 0, cached: 0, cache_write: 0 });
     });
 
     test("should set simple source and metadata", async () => {
@@ -162,6 +162,8 @@ describe("handleResponse - Pricing Metadata", () => {
             ...pricing,
             input: pricing.range[0]!.input_per_m,
             output: pricing.range[0]!.output_per_m,
+            cached: 0,
+            cache_write: 0,
             range: pricing.range[0]
         });
     });

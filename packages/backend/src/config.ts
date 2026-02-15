@@ -33,6 +33,7 @@ const PricingRangeSchema = z.object({
   input_per_m: z.number().min(0),
   output_per_m: z.number().min(0),
   cached_per_m: z.number().min(0).optional(),
+  cache_write_per_m: z.number().min(0).optional(),
 });
 
 const PricingSchema = z.discriminatedUnion('source', [
@@ -50,6 +51,7 @@ const PricingSchema = z.discriminatedUnion('source', [
     input: z.number().min(0),
     output: z.number().min(0),
     cached: z.number().min(0).optional(),
+    cache_write: z.number().min(0).optional(),
   }),
 ]);
 

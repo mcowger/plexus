@@ -5,6 +5,7 @@ import { UsageRecord } from "../../types/usage";
 import { calculateCosts } from "../../utils/calculate-costs";
 import { DebugManager } from "../debug-manager";
 import { estimateTokensFromReconstructed, estimateInputTokens } from "../../utils/estimate-tokens";
+import { normalizeOpenAIChatUsage } from "../../utils/usage-normalizer";
 
 export class UsageInspector extends PassThrough {
     private usageStorage: UsageStorageService;
@@ -53,6 +54,7 @@ export class UsageInspector extends PassThrough {
             inputTokens: 0,
             outputTokens: 0,
             cachedTokens: 0,
+            cacheWriteTokens: 0,
             reasoningTokens: 0
         };
 
@@ -66,6 +68,7 @@ export class UsageInspector extends PassThrough {
                     stats.inputTokens = usage.inputTokens || 0;
                     stats.outputTokens = usage.outputTokens || 0;
                     stats.cachedTokens = usage.cachedTokens || 0;
+                    stats.cacheWriteTokens = usage.cacheWriteTokens || 0;
                     stats.reasoningTokens = usage.reasoningTokens || 0;
                 }
 
@@ -94,6 +97,7 @@ export class UsageInspector extends PassThrough {
                 this.usageRecord.tokensInput = stats.inputTokens;
                 this.usageRecord.tokensOutput = stats.outputTokens;
                 this.usageRecord.tokensCached = stats.cachedTokens;
+                this.usageRecord.tokensCacheWrite = stats.cacheWriteTokens;
                 this.usageRecord.tokensReasoning = stats.reasoningTokens;
             }
 
@@ -132,24 +136,31 @@ export class UsageInspector extends PassThrough {
 
         switch (apiType) {
             case "chat":
-                return reconstructed.usage ? {
-                    inputTokens: reconstructed.usage.prompt_tokens || 0,
-                    outputTokens: reconstructed.usage.completion_tokens || 0,
-                    cachedTokens: reconstructed.usage.prompt_tokens_details?.cached_tokens ?? reconstructed.usage.cached_tokens ?? 0,
-                    reasoningTokens: reconstructed.usage.completion_tokens_details?.reasoning_tokens || 0
-                } : null;
+                if (!reconstructed.usage) return null;
+                {
+                    const usage = normalizeOpenAIChatUsage(reconstructed.usage);
+                    return {
+                        inputTokens: usage.input_tokens,
+                        outputTokens: usage.output_tokens,
+                        cachedTokens: usage.cached_tokens,
+                        cacheWriteTokens: usage.cache_creation_tokens,
+                        reasoningTokens: usage.reasoning_tokens
+                    };
+                }
             case "responses":
                 return reconstructed.usage ? {
                     inputTokens: reconstructed.usage.input_tokens || 0,
                     outputTokens: reconstructed.usage.output_tokens || 0,
                     cachedTokens: reconstructed.usage.input_tokens_details?.cached_tokens || 0,
+                    cacheWriteTokens: 0,
                     reasoningTokens: reconstructed.usage.output_tokens_details?.reasoning_tokens || 0
                 } : null;
             case "messages":
                 return reconstructed.usage ? {
                     inputTokens: reconstructed.usage.input_tokens || 0,
                     outputTokens: reconstructed.usage.output_tokens || 0,
-                    cachedTokens: reconstructed.usage.cache_read_input_tokens || reconstructed.usage.cache_creation_input_tokens || 0,
+                    cachedTokens: reconstructed.usage.cache_read_input_tokens || 0,
+                    cacheWriteTokens: reconstructed.usage.cache_creation_input_tokens || 0,
                     reasoningTokens: 0
                 } : null;
             case "gemini":
@@ -157,6 +168,7 @@ export class UsageInspector extends PassThrough {
                     inputTokens: reconstructed.usageMetadata.promptTokenCount || 0,
                     outputTokens: reconstructed.usageMetadata.candidatesTokenCount || 0,
                     cachedTokens: reconstructed.usageMetadata.cachedContentTokenCount || 0,
+                    cacheWriteTokens: 0,
                     reasoningTokens: 0
                 } : null;
             case "oauth":
@@ -164,6 +176,7 @@ export class UsageInspector extends PassThrough {
                     inputTokens: reconstructed.usage.input_tokens || 0,
                     outputTokens: reconstructed.usage.output_tokens || 0,
                     cachedTokens: reconstructed.usage.cached_tokens || 0,
+                    cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
                     reasoningTokens: reconstructed.usage.reasoning_tokens || 0
                 } : null;
             default:

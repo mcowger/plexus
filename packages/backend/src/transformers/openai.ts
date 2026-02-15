@@ -2,6 +2,7 @@ import { Transformer } from "../types/transformer";
 import { UnifiedChatRequest, UnifiedChatResponse } from "../types/unified";
 import { createParser, EventSourceMessage } from "eventsource-parser";
 import { encode } from "eventsource-encoder";
+import { normalizeOpenAIChatUsage } from "../utils/usage-normalizer";
 
 /**
  * OpenAITransformer
@@ -40,16 +41,7 @@ export class OpenAITransformer implements Transformer {
     const message = choice?.message;
 
     const usage = response.usage
-      ? {
-          input_tokens: response.usage.prompt_tokens || 0,
-          output_tokens: response.usage.completion_tokens || 0,
-          total_tokens: response.usage.total_tokens || 0,
-          reasoning_tokens:
-            response.usage.completion_tokens_details?.reasoning_tokens || 0,
-          cached_tokens:
-            response.usage.prompt_tokens_details?.cached_tokens || 0,
-          cache_creation_tokens: 0,
-        }
+      ? normalizeOpenAIChatUsage(response.usage)
       : undefined;
 
     return {
@@ -108,17 +100,7 @@ export class OpenAITransformer implements Transformer {
               const choice = data.choices?.[0];
 
               const usage = data.usage
-                ? {
-                    input_tokens: data.usage.prompt_tokens || 0,
-                    output_tokens: data.usage.completion_tokens || 0,
-                    total_tokens: data.usage.total_tokens || 0,
-                    reasoning_tokens:
-                      data.usage.completion_tokens_details?.reasoning_tokens ||
-                      0,
-                    cached_tokens:
-                      data.usage.prompt_tokens_details?.cached_tokens || 0,
-                    cache_creation_tokens: 0,
-                  }
+                ? normalizeOpenAIChatUsage(data.usage)
                 : undefined;
 
               const unifiedChunk = {
@@ -219,18 +201,20 @@ export class OpenAITransformer implements Transformer {
         input_tokens?: number;
         output_tokens?: number;
         cached_tokens?: number;
+        cache_creation_tokens?: number;
         reasoning_tokens?: number;
       }
     | undefined {
     try {
       const data = JSON.parse(dataStr);
       if (data.usage) {
+        const usage = normalizeOpenAIChatUsage(data.usage);
         return {
-          input_tokens: data.usage.prompt_tokens || 0,
-          output_tokens: data.usage.completion_tokens || 0,
-          cached_tokens: data.usage.prompt_tokens_details?.cached_tokens || 0,
-          reasoning_tokens:
-            data.usage.completion_tokens_details?.reasoning_tokens || 0,
+          input_tokens: usage.input_tokens,
+          output_tokens: usage.output_tokens,
+          cached_tokens: usage.cached_tokens,
+          cache_creation_tokens: usage.cache_creation_tokens,
+          reasoning_tokens: usage.reasoning_tokens,
         };
       }
     } catch (e) {

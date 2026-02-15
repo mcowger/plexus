@@ -231,6 +231,7 @@ async function finalizeUsage(
     usageRecord.tokensInput = unifiedResponse.usage.input_tokens;
     usageRecord.tokensOutput = unifiedResponse.usage.output_tokens;
     usageRecord.tokensCached = unifiedResponse.usage.cached_tokens;
+    usageRecord.tokensCacheWrite = unifiedResponse.usage.cache_creation_tokens;
     usageRecord.tokensReasoning = unifiedResponse.usage.reasoning_tokens;
   }
 

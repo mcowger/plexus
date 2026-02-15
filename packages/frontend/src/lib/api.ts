@@ -107,6 +107,7 @@ export interface UsageData {
   inputTokens: number;
   outputTokens: number;
   cachedTokens: number;
+  cacheWriteTokens: number;
 }
 
 export interface TodayMetrics {
@@ -115,6 +116,7 @@ export interface TodayMetrics {
   outputTokens: number;
   reasoningTokens: number;
   cachedTokens: number;
+  cacheWriteTokens: number;
   totalCost: number;
 }
 
@@ -228,10 +230,12 @@ export interface UsageRecord {
     tokensOutput?: number;
     tokensReasoning?: number;
     tokensCached?: number;
+    tokensCacheWrite?: number;
     tokensEstimated?: number;
     costInput?: number;
     costOutput?: number;
     costCached?: number;
+    costCacheWrite?: number;
     costTotal?: number;
     costSource?: string;
     costMetadata?: string;
@@ -267,6 +271,7 @@ interface UsageSummarySeriesPoint {
     inputTokens: number;
     outputTokens: number;
     cachedTokens: number;
+    cacheWriteTokens: number;
     tokens: number;
 }
 
@@ -331,6 +336,7 @@ const USAGE_PAGE_FIELDS: UsageRecordField[] = [
     'tokensInput',
     'tokensOutput',
     'tokensCached',
+    'tokensCacheWrite',
     'incomingModelAlias',
     'provider',
     'apiKey'
@@ -402,7 +408,8 @@ const buildUsageSeries = (
                 tokens: 0,
                 inputTokens: 0,
                 outputTokens: 0,
-                cachedTokens: 0
+                cachedTokens: 0,
+                cacheWriteTokens: 0
             };
         }
     }
@@ -423,19 +430,22 @@ const buildUsageSeries = (
                 tokens: 0,
                 inputTokens: 0,
                 outputTokens: 0,
-                cachedTokens: 0
+                cachedTokens: 0,
+                cacheWriteTokens: 0
             };
         }
 
         const inputTokens = record.tokensInput || 0;
         const outputTokens = record.tokensOutput || 0;
         const cachedTokens = record.tokensCached || 0;
+        const cacheWriteTokens = record.tokensCacheWrite || 0;
 
         grouped[key].requests++;
-        grouped[key].tokens += inputTokens + outputTokens;
+        grouped[key].tokens += inputTokens + outputTokens + cachedTokens + cacheWriteTokens;
         grouped[key].inputTokens += inputTokens;
         grouped[key].outputTokens += outputTokens;
         grouped[key].cachedTokens += cachedTokens;
+        grouped[key].cacheWriteTokens += cacheWriteTokens;
     });
 
     return Object.values(grouped);
@@ -467,14 +477,16 @@ const buildSummarySeries = (
         const inputTokens = point?.inputTokens || 0;
         const outputTokens = point?.outputTokens || 0;
         const cachedTokens = point?.cachedTokens || 0;
+        const cacheWriteTokens = point?.cacheWriteTokens || 0;
 
         grouped[label] = {
             timestamp: label,
             requests: point?.requests || 0,
-            tokens: point?.tokens || inputTokens + outputTokens,
+            tokens: point?.tokens || inputTokens + outputTokens + cachedTokens + cacheWriteTokens,
             inputTokens,
             outputTokens,
-            cachedTokens
+            cachedTokens,
+            cacheWriteTokens
         };
     }
 
@@ -708,7 +720,7 @@ export const api = {
         const usageResponse = await fetchUsageRecords({
             limit: 1000,
             startDate: startDate.toISOString(),
-            fields: ['tokensInput', 'tokensOutput', 'durationMs'],
+            fields: ['tokensInput', 'tokensOutput', 'tokensCached', 'tokensCacheWrite', 'durationMs'],
             cache: true
         });
 
@@ -717,7 +729,10 @@ export const api = {
 
         const records = usageResponse.data || [];
         const totalRequests = usageResponse.total;
-        const totalTokens = records.reduce((acc, r) => acc + (r.tokensInput || 0) + (r.tokensOutput || 0), 0);
+        const totalTokens = records.reduce(
+            (acc, r) => acc + (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensCached || 0) + (r.tokensCacheWrite || 0),
+            0
+        );
         const avgLatency = records.length
             ? Math.round(records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / records.length)
             : 0;
@@ -784,6 +799,7 @@ export const api = {
                 outputTokens: 0,
                 reasoningTokens: 0,
                 cachedTokens: 0,
+                cacheWriteTokens: 0,
                 totalCost: 0
             }
         };
@@ -817,7 +833,7 @@ export const api = {
         const usageResponse = await fetchUsageRecords({
             limit: 5000,
             startDate: startDate.toISOString(),
-            fields: ['date', 'tokensInput', 'tokensOutput', 'tokensReasoning', 'tokensCached', 'costTotal'],
+            fields: ['date', 'tokensInput', 'tokensOutput', 'tokensReasoning', 'tokensCached', 'tokensCacheWrite', 'costTotal'],
             cache: true
         });
 
@@ -827,6 +843,7 @@ export const api = {
             outputTokens: 0,
             reasoningTokens: 0,
             cachedTokens: 0,
+            cacheWriteTokens: 0,
             totalCost: 0
         };
 
@@ -836,6 +853,7 @@ export const api = {
             metrics.outputTokens += r.tokensOutput || 0;
             metrics.reasoningTokens += r.tokensReasoning || 0;
             metrics.cachedTokens += r.tokensCached || 0;
+            metrics.cacheWriteTokens += r.tokensCacheWrite || 0;
             metrics.totalCost += r.costTotal || 0;
         });
 
@@ -848,6 +866,7 @@ export const api = {
             outputTokens: 0,
             reasoningTokens: 0,
             cachedTokens: 0,
+            cacheWriteTokens: 0,
             totalCost: 0
         };
     }
@@ -874,7 +893,7 @@ export const api = {
                 aggregated[name] = { name, requests: 0, tokens: 0 };
             }
             aggregated[name].requests++;
-            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
+            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensCached || 0) + (r.tokensCacheWrite || 0);
         });
 
         return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
@@ -905,7 +924,7 @@ export const api = {
                 aggregated[name] = { name, requests: 0, tokens: 0 };
             }
             aggregated[name].requests++;
-            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
+            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensCached || 0) + (r.tokensCacheWrite || 0);
         });
 
         return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
@@ -936,7 +955,7 @@ export const api = {
                 aggregated[name] = { name, requests: 0, tokens: 0 };
             }
             aggregated[name].requests++;
-            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0);
+            aggregated[name].tokens += (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensCached || 0) + (r.tokensCacheWrite || 0);
         });
 
         return Object.values(aggregated).sort((a, b) => b.requests - a.requests);

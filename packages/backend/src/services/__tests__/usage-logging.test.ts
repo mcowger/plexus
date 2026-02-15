@@ -198,7 +198,8 @@ describe('UsageInspector', () => {
                 usage: {
                     input_tokens: 200,
                     output_tokens: 75,
-                    cache_read_input_tokens: 150
+                    cache_read_input_tokens: 150,
+                    cache_creation_input_tokens: 25
                 }
             });
 
@@ -217,6 +218,7 @@ describe('UsageInspector', () => {
 
             expect(capturedRecord).not.toBeNull();
             expect(capturedRecord!.tokensCached).toBe(150);
+            expect(capturedRecord!.tokensCacheWrite).toBe(25);
         });
 
         it('should handle Gemini cachedContentTokenCount', async () => {

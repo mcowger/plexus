@@ -1,14 +1,21 @@
 import { Selector, EnrichedModelTarget } from './base';
 import { ModelTarget } from '../../config';
 
-function calculatePriceForTarget(pricing: any, inputTokens: number, outputTokens: number, cachedTokens: number = 0): number {
+function calculatePriceForTarget(
+    pricing: any,
+    inputTokens: number,
+    outputTokens: number,
+    cachedTokens: number = 0,
+    cacheWriteTokens: number = 0
+): number {
     if (!pricing) return 0;
 
     if (pricing.source === 'simple') {
         const inputCost = (inputTokens / 1_000_000) * (pricing.input || 0);
         const outputCost = (outputTokens / 1_000_000) * (pricing.output || 0);
         const cachedCost = pricing.cached ? (cachedTokens / 1_000_000) * pricing.cached : 0;
-        return inputCost + outputCost + cachedCost;
+        const cacheWriteCost = pricing.cache_write ? (cacheWriteTokens / 1_000_000) * pricing.cache_write : 0;
+        return inputCost + outputCost + cachedCost + cacheWriteCost;
     } else if (pricing.source === 'defined' && Array.isArray(pricing.range)) {
         const match = pricing.range.find((r: any) => {
             const lower = r.lower_bound ?? 0;
@@ -19,7 +26,9 @@ function calculatePriceForTarget(pricing: any, inputTokens: number, outputTokens
         if (match) {
             const inputCost = (inputTokens / 1_000_000) * (match.input_per_m || 0);
             const outputCost = (outputTokens / 1_000_000) * (match.output_per_m || 0);
-            return inputCost + outputCost;
+            const cachedCost = (cachedTokens / 1_000_000) * (match.cached_per_m || 0);
+            const cacheWriteCost = (cacheWriteTokens / 1_000_000) * (match.cache_write_per_m || 0);
+            return inputCost + outputCost + cachedCost + cacheWriteCost;
         }
         return 0;
     } else if (pricing.source === 'openrouter' && pricing.slug) {
@@ -28,7 +37,14 @@ function calculatePriceForTarget(pricing: any, inputTokens: number, outputTokens
         if (openRouterPricing) {
             const promptRate = parseFloat(openRouterPricing.prompt) || 0;
             const completionRate = parseFloat(openRouterPricing.completion) || 0;
-            return (inputTokens * promptRate) + (outputTokens * completionRate);
+            const cacheReadRate = parseFloat(openRouterPricing.input_cache_read || '0') || 0;
+            const cacheWriteRate = parseFloat(openRouterPricing.input_cache_write || '0') || 0;
+            return (
+                (inputTokens * promptRate) +
+                (outputTokens * completionRate) +
+                (cachedTokens * cacheReadRate) +
+                (cacheWriteTokens * cacheWriteRate)
+            );
         }
         return 0;
     } else if (pricing.source === 'default') {
