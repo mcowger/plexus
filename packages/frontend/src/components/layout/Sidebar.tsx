@@ -287,7 +287,7 @@ export const Sidebar: React.FC = () => {
                 <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />
                 <NavItem to="/performance" icon={Gauge} label="Performance" isCollapsed={isCollapsed} />
                 <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
-                <NavItem to="/quotas" icon={PieChart} label="Quotas" isCollapsed={isCollapsed} />
+                <NavItem to="/quotas" icon={BarChart3} label="Quotas" isCollapsed={isCollapsed} />
               </>
             )}
         </div>
