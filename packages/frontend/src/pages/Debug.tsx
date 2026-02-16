@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import Editor from '@monaco-editor/react';
-import { RefreshCw, Clock, Database, ChevronDown, ChevronRight, Copy, Check, Trash2 } from 'lucide-react';
+import { RefreshCw, Clock, Database, ChevronDown, ChevronRight, Copy, Check, Trash2, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -28,6 +28,7 @@ export const Debug: React.FC = () => {
     const [detail, setDetail] = useState<DebugLogDetail | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const [copiedAll, setCopiedAll] = useState(false);
 
     // Delete Modal State
     const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
@@ -115,6 +116,10 @@ export const Debug: React.FC = () => {
         }
     }, [selectedId]);
 
+    useEffect(() => {
+        setCopiedAll(false);
+    }, [detail?.requestId]);
+
     const formatContent = (content: any) => {
         if (!content) return '';
         if (typeof content === 'string') {
@@ -127,6 +132,53 @@ export const Debug: React.FC = () => {
         return JSON.stringify(content, null, 2);
     };
 
+    const normalizeExportContent = (content: string | object | null | undefined) => {
+        if (content === undefined) return undefined;
+        if (content === null) return null;
+        if (typeof content === 'string') {
+            try {
+                return JSON.parse(content);
+            } catch {
+                return content;
+            }
+        }
+        return content;
+    };
+
+    const exportContent = useMemo(() => {
+        if (!detail) return '';
+        const payload = {
+            requestId: detail.requestId,
+            createdAt: detail.createdAt,
+            rawRequest: normalizeExportContent(detail.rawRequest),
+            transformedRequest: normalizeExportContent(detail.transformedRequest),
+            rawResponse: normalizeExportContent(detail.rawResponse),
+            rawResponseSnapshot: normalizeExportContent(detail.rawResponseSnapshot),
+            transformedResponse: normalizeExportContent(detail.transformedResponse),
+            transformedResponseSnapshot: normalizeExportContent(detail.transformedResponseSnapshot),
+        };
+        return JSON.stringify(payload, null, 2);
+    }, [detail]);
+
+    const handleCopyAll = async () => {
+        if (!exportContent) return;
+        await navigator.clipboard.writeText(exportContent);
+        setCopiedAll(true);
+        setTimeout(() => setCopiedAll(false), 2000);
+    };
+
+    const handleDownloadAll = () => {
+        if (!detail || !exportContent) return;
+        const blob = new Blob([exportContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date(detail.createdAt).toISOString().replace(/[:.]/g, '-');
+        link.href = url;
+        link.download = `debug-trace-${detail.requestId}-${timestamp}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
             <header className="flex justify-between items-center p-6 shrink-0">
@@ -134,7 +186,27 @@ export const Debug: React.FC = () => {
                     <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Debug Traces</h1>
                     <p className="text-[15px] text-text-secondary m-0">Inspect full request/response lifecycles</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                    {detail && (
+                        <>
+                            <Button
+                                variant="secondary"
+                                className="flex items-center gap-2"
+                                onClick={handleCopyAll}
+                                leftIcon={copiedAll ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                            >
+                                {copiedAll ? 'Copied' : 'Copy All'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                className="flex items-center gap-2"
+                                onClick={handleDownloadAll}
+                                leftIcon={<Download size={14} />}
+                            >
+                                Download
+                            </Button>
+                        </>
+                    )}
                     <Button onClick={handleDeleteAll} variant="danger" className="flex items-center gap-2" disabled={logs.length === 0}>
                         <Trash2 size={16} />
                         Delete All
@@ -198,30 +270,36 @@ export const Debug: React.FC = () => {
                 <div className="flex-1 bg-bg-deep overflow-y-auto flex flex-col relative">
                     {selectedId && detail ? (
                         <div className="flex flex-col">
-                             <AccordionPanel 
+                            <div className="sticky top-0 z-10 bg-bg-surface border-b border-border-glass px-4 py-3 flex items-center justify-between">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Selected Trace</span>
+                                    <span className="text-xs font-mono text-text-secondary">{detail.requestId}</span>
+                                </div>
+                            </div>
+                            <AccordionPanel 
                                 title="Raw Request" 
                                 content={formatContent(detail.rawRequest)} 
                                 color="text-blue-400"
                                 defaultOpen={true}
                             />
-                             <AccordionPanel 
+                            <AccordionPanel 
                                 title="Transformed Request" 
                                 content={formatContent(detail.transformedRequest)} 
                                 color="text-purple-400"
                             />
-                             <AccordionPanel 
+                            <AccordionPanel 
                                 title="Raw Response" 
                                 content={formatContent(detail.rawResponse)} 
                                 color="text-orange-400"
                             />
-                             {detail.rawResponseSnapshot && (
+                            {detail.rawResponseSnapshot && (
                                 <AccordionPanel 
                                     title="Raw Response (Reconstructed)" 
                                     content={formatContent(detail.rawResponseSnapshot)} 
                                     color="text-orange-400"
                                 />
-                             )}
-                             <AccordionPanel 
+                            )}
+                            <AccordionPanel 
                                 title="Transformed Response" 
                                 content={formatContent(detail.transformedResponse)} 
                                 color="text-green-400"
@@ -233,7 +311,7 @@ export const Debug: React.FC = () => {
                                     content={formatContent(detail.transformedResponseSnapshot)} 
                                     color="text-green-400"
                                 />
-                             )}
+                            )}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">
