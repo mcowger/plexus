@@ -3,7 +3,7 @@ import { UsageRecord } from '../types/usage';
 import { getDatabase, getSchema } from '../db/client';
 import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
-import { eq, and, gte, lte, like, desc, sql, getTableName, exists, count, sum, avg, min, max, notInArray } from 'drizzle-orm';
+import { eq, and, gte, lte, like, desc, sql, getTableName, exists, count, sum, avg, min, max, notInArray, inArray } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 
 
@@ -18,6 +18,10 @@ export interface UsageFilters {
     minDurationMs?: number;
     maxDurationMs?: number;
     responseStatus?: string;
+    /** Filter to only include records with non-null provider (exclude unknown) */
+    excludeUnknownProvider?: boolean;
+    /** Array of enabled provider names to include. If empty/null, include all */
+    enabledProviders?: string[];
 }
 
 export interface PaginationOptions {
@@ -260,6 +264,16 @@ export class UsageStorageService extends EventEmitter {
         }
         if (filters.responseStatus) {
             conditions.push(eq(schema.requestUsage.responseStatus, filters.responseStatus));
+        }
+
+        // Filter out unknown (null) providers when excludeUnknownProvider is true
+        if (filters.excludeUnknownProvider) {
+            conditions.push(sql`${schema.requestUsage.provider} IS NOT NULL`);
+        }
+
+        // Filter to only enabled providers
+        if (filters.enabledProviders && filters.enabledProviders.length > 0) {
+            conditions.push(inArray(schema.requestUsage.provider, filters.enabledProviders));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

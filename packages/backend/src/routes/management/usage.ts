@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { encode } from 'eventsource-encoder';
-import { and, gte, lte, sql, count, sum, avg } from 'drizzle-orm';
+import { and, gte, lte, sql, count, sum, avg, inArray } from 'drizzle-orm';
 import { getCurrentDialect, getSchema } from '../../db/client';
 import { UsageStorageService } from '../../services/usage-storage';
 
@@ -70,6 +70,16 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
         if (query.minDurationMs) filters.minDurationMs = parseInt(query.minDurationMs);
         if (query.maxDurationMs) filters.maxDurationMs = parseInt(query.maxDurationMs);
 
+        // Filter to exclude unknown (null) providers
+        if (query.excludeUnknownProvider === 'true') {
+            filters.excludeUnknownProvider = true;
+        }
+
+        // Filter to only enabled providers (comma-separated list)
+        if (query.enabledProviders) {
+            filters.enabledProviders = query.enabledProviders.split(',').map((p: string) => p.trim());
+        }
+
         try {
             const result = await usageStorage.getUsage(filters, { limit, offset });
             if (requestedFields.length === 0) {
@@ -98,6 +108,20 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
         const range = query.range || 'day';
         if (!['hour', 'day', 'week', 'month'].includes(range)) {
             return reply.code(400).send({ error: 'Invalid range' });
+        }
+
+        // Build filter conditions
+        const filterConditions: any[] = [];
+
+        // Filter to exclude unknown (null) providers
+        if (query.excludeUnknownProvider === 'true') {
+            filterConditions.push(sql`${schema.requestUsage.provider} IS NOT NULL`);
+        }
+
+        // Filter to only enabled providers
+        if (query.enabledProviders) {
+            const enabledList = query.enabledProviders.split(',').map((p: string) => p.trim());
+            filterConditions.push(inArray(schema.requestUsage.provider, enabledList));
         }
 
         const now = new Date();
@@ -145,6 +169,12 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
         const toNumber = (value: unknown) => (value === null || value === undefined ? 0 : Number(value));
 
         try {
+            const seriesWhereConditions = [
+                gte(schema.requestUsage.startTime, rangeStartMs),
+                lte(schema.requestUsage.startTime, nowMs),
+                ...filterConditions
+            ];
+
             const seriesRows = await db
                 .select({
                     bucketStartMs,
@@ -154,12 +184,15 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`
                 })
                 .from(schema.requestUsage)
-                .where(and(
-                    gte(schema.requestUsage.startTime, rangeStartMs),
-                    lte(schema.requestUsage.startTime, nowMs)
-                ))
+                .where(and(...seriesWhereConditions))
                 .groupBy(bucketStartMs)
                 .orderBy(bucketStartMs);
+
+            const statsWhereConditions = [
+                gte(schema.requestUsage.startTime, statsStartMs),
+                lte(schema.requestUsage.startTime, nowMs),
+                ...filterConditions
+            ];
 
             const statsRows = await db
                 .select({
@@ -169,10 +202,13 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     avgDurationMs: sql<number>`COALESCE(${avg(schema.requestUsage.durationMs)}, 0)`
                 })
                 .from(schema.requestUsage)
-                .where(and(
-                    gte(schema.requestUsage.startTime, statsStartMs),
-                    lte(schema.requestUsage.startTime, nowMs)
-                ));
+                .where(and(...statsWhereConditions));
+
+            const todayWhereConditions = [
+                gte(schema.requestUsage.startTime, todayStartMs),
+                lte(schema.requestUsage.startTime, nowMs),
+                ...filterConditions
+            ];
 
             const todayRows = await db
                 .select({
@@ -184,10 +220,7 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     totalCost: sql<number>`COALESCE(${sum(schema.requestUsage.costTotal)}, 0)`
                 })
                 .from(schema.requestUsage)
-                .where(and(
-                    gte(schema.requestUsage.startTime, todayStartMs),
-                    lte(schema.requestUsage.startTime, nowMs)
-                ));
+                .where(and(...todayWhereConditions));
 
             const statsRow = statsRows[0] || {
                 requests: 0,
