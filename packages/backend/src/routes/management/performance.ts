@@ -8,12 +8,30 @@ export async function registerPerformanceRoutes(fastify: FastifyInstance, usageS
         const provider = query.provider;
         const model = query.model;
 
+        // Parse filter parameters
+        const excludeUnknownProvider = query.excludeUnknownProvider === 'true';
+        const enabledProviders = query.enabledProviders
+            ? query.enabledProviders.split(',').map((p: string) => p.trim())
+            : null;
+
         logger.debug('Performance route request received', {
             providerFilter: provider ?? null,
-            modelFilter: model ?? null
+            modelFilter: model ?? null,
+            excludeUnknownProvider,
+            enabledProviders
         });
 
-        const performance = await usageStorage.getProviderPerformance(provider, model);
+        let performance = await usageStorage.getProviderPerformance(provider, model);
+
+        // Filter out unknown/null providers
+        if (excludeUnknownProvider) {
+            performance = performance.filter((p: any) => p.provider);
+        }
+
+        // Filter to only enabled providers
+        if (enabledProviders) {
+            performance = performance.filter((p: any) => enabledProviders.includes(p.provider));
+        }
 
         logger.debug('Performance route response generated', {
             providerFilter: provider ?? null,

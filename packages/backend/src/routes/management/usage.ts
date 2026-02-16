@@ -299,6 +299,14 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
     });
 
     fastify.get('/v0/management/events', async (request, reply) => {
+        const query = request.query as any;
+
+        // Parse filter parameters
+        const excludeUnknownProvider = query.excludeUnknownProvider === 'true';
+        const enabledProviders = query.enabledProviders
+            ? query.enabledProviders.split(',').map((p: string) => p.trim())
+            : null;
+
         reply.raw.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -308,6 +316,17 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
 
         const listener = async (record: any) => {
             if (reply.raw.destroyed) return;
+
+            // Filter out records with unknown/null provider
+            if (excludeUnknownProvider && !record.provider) {
+                return;
+            }
+
+            // Filter to only enabled providers
+            if (enabledProviders && !enabledProviders.includes(record.provider)) {
+                return;
+            }
+
             reply.raw.write(encode({
                 data: JSON.stringify(record),
                 event: 'log',
