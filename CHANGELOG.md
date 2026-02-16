@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.14.8 - 2026-02-16
+
+### Debug Trace Downloads and Token Accounting Improvements
+
+## New Features
+
+- **Debug Trace Downloads**: Added ability to download debug traces for improved troubleshooting and diagnostics. ([edf12d5](https://github.com/mcowger/plexus/commit/edf12d5))
+
+## Bug Fixes
+
+- Fixed token counting in Responses module. ([47e63ae](https://github.com/mcowger/plexus/commit/47e63ae))
+- Corrected usage token semantics and added cache-write accounting for more accurate usage tracking. ([2a1ecd0](https://github.com/mcowger/plexus/commit/2a1ecd0))
+
+---
+
+The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.14.7 - 2026-02-14
 
 ### v0.14.7: Move Quotas trackers to dedicated page
