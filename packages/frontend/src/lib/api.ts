@@ -2359,5 +2359,13 @@ quota_checker: provider.quotaChecker?.type
           const err = await res.json().catch(() => ({ error: 'Unknown error' }));
           throw new Error(err.error?.message || err.error || 'Failed to clear quota');
       }
+  },
+
+  /**
+   * Get comma-separated list of enabled provider names from config
+   * Used for filtering dashboards to only show enabled providers
+   */
+  getEnabledProviders: async (): Promise<string | undefined> => {
+      return await getEnabledProvidersList();
   }
 };

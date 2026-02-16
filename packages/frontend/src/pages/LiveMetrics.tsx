@@ -102,7 +102,7 @@ export const LiveMetrics = () => {
   const loadLiveData = useCallback(async () => {
     const [snapshot, performanceRows] = await Promise.all([
       api.getLiveDashboardSnapshot(LIVE_WINDOW_MINUTES, LIVE_REQUEST_LIMIT),
-      api.getProviderPerformance()
+      api.getProviderPerformance(undefined, undefined, { excludeUnknownProvider: true })
     ]);
 
     setLiveSnapshot(snapshot);
@@ -128,20 +128,32 @@ export const LiveMetrics = () => {
 
   useEffect(() => {
     setStreamConnected(true);
-    const unsubscribe = api.subscribeToUsageEvents({
-      onLog: () => {
-        setStreamConnected(true);
-        if (liveRefreshTimerRef.current !== null) {
-          window.clearTimeout(liveRefreshTimerRef.current);
+
+    // Create filtered subscription with enabled providers
+    let unsubscribe = () => {};
+
+    const setupSubscription = async () => {
+      const enabledProviders = await api.getEnabledProviders();
+      unsubscribe = api.subscribeToUsageEvents({
+        onLog: () => {
+          setStreamConnected(true);
+          if (liveRefreshTimerRef.current !== null) {
+            window.clearTimeout(liveRefreshTimerRef.current);
+          }
+          liveRefreshTimerRef.current = window.setTimeout(() => {
+            void loadLiveData();
+          }, 900);
+        },
+        onError: () => {
+          setStreamConnected(false);
         }
-        liveRefreshTimerRef.current = window.setTimeout(() => {
-          void loadLiveData();
-        }, 900);
-      },
-      onError: () => {
-        setStreamConnected(false);
-      }
-    });
+      }, {
+        excludeUnknownProvider: true,
+        enabledProviders
+      });
+    };
+
+    void setupSubscription();
 
     return () => {
       unsubscribe();
