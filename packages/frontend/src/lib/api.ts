@@ -372,6 +372,10 @@ interface UsageQueryParams<T extends UsageRecordField> {
     maxDurationMs?: number;
     fields?: T[];
     cache?: boolean;
+    /** Filter out records with null/unknown provider */
+    excludeUnknownProvider?: boolean;
+    /** Comma-separated list of enabled provider names to include */
+    enabledProviders?: string;
 }
 
 const USAGE_CACHE_TTL_MS = 20000;
@@ -595,6 +599,12 @@ const buildUsageQuery = <T extends UsageRecordField>(params: UsageQueryParams<T>
     if (params.minDurationMs !== undefined) searchParams.set('minDurationMs', String(params.minDurationMs));
     if (params.maxDurationMs !== undefined) searchParams.set('maxDurationMs', String(params.maxDurationMs));
 
+    // Provider filtering - exclude unknown/null providers
+    if (params.excludeUnknownProvider) searchParams.set('excludeUnknownProvider', 'true');
+
+    // Provider filtering - only include enabled providers
+    if (params.enabledProviders) searchParams.set('enabledProviders', params.enabledProviders);
+
     if (params.fields && params.fields.length > 0) {
         const fieldsValue = [...params.fields].sort().join(',');
         searchParams.set('fields', fieldsValue);
@@ -632,8 +642,17 @@ const fetchUsageRecords = async <T extends UsageRecordField>(
     return await res.json() as BackendResponse<Pick<UsageRecord, T>[]>;
 };
 
-const fetchUsageSummary = async (range: 'hour' | 'day' | 'week' | 'month', cache = true) => {
-    const queryString = `range=${range}`;
+const fetchUsageSummary = async (
+    range: 'hour' | 'day' | 'week' | 'month',
+    cache = true,
+    filters?: { excludeUnknownProvider?: boolean; enabledProviders?: string }
+) => {
+    const params = new URLSearchParams();
+    params.set('range', range);
+    if (filters?.excludeUnknownProvider) params.set('excludeUnknownProvider', 'true');
+    if (filters?.enabledProviders) params.set('enabledProviders', filters.enabledProviders);
+
+    const queryString = params.toString();
     const url = `${API_BASE}/v0/management/usage/summary?${queryString}`;
 
     if (cache) {
@@ -678,6 +697,21 @@ const fetchConfigCached = async (): Promise<PlexusConfig | null> => {
     configRequestCache.set('config', { expiresAt: Date.now() + CONFIG_CACHE_TTL_MS, promise });
     promise.catch(() => configRequestCache.delete('config'));
     return promise;
+};
+
+/**
+ * Get comma-separated list of enabled provider names from config
+ * This is used for filtering dashboards to only show enabled providers
+ */
+const getEnabledProvidersList = async (): Promise<string | undefined> => {
+    const config = await fetchConfigCached();
+    if (!config?.providers) return undefined;
+
+    const enabled = Object.entries(config.providers)
+        .filter(([_, p]) => p.enabled !== false) // Default to enabled if not specified
+        .map(([name, _]) => name);
+
+    return enabled.length > 0 ? enabled.join(',') : undefined;
 };
 
 interface PlexusConfig {
@@ -811,11 +845,14 @@ export const api = {
         const now = normalizeNow();
         const startDate = new Date(now);
         startDate.setDate(startDate.getDate() - 7);
+        const enabledProviders = await getEnabledProvidersList();
         const usageResponse = await fetchUsageRecords({
             limit: 1000,
             startDate: startDate.toISOString(),
             fields: ['tokensInput', 'tokensOutput', 'tokensCached', 'tokensCacheWrite', 'durationMs'],
-            cache: true
+            cache: true,
+            excludeUnknownProvider: true,
+            enabledProviders
         });
 
         const config = await fetchConfigCached();
@@ -852,7 +889,7 @@ export const api = {
     try {
         const now = normalizeNow();
         const [summary, cooldowns, config] = await Promise.all([
-            fetchUsageSummary(range, true),
+            fetchUsageSummary(range, true, { excludeUnknownProvider: true, enabledProviders: await getEnabledProvidersList() }),
             api.getCooldowns(),
             fetchConfigCached()
         ]);
@@ -923,11 +960,14 @@ export const api = {
     try {
       const windowStartMs = Date.now() - (safeWindowMinutes * 60 * 1000);
       const startDate = new Date(windowStartMs).toISOString();
+      const enabledProviders = await getEnabledProvidersList();
       const usageResponse = await fetchUsageRecords({
         limit: safeLimit,
         startDate,
         fields: LIVE_DASHBOARD_FIELDS,
-        cache: false
+        cache: false,
+        excludeUnknownProvider: true,
+        enabledProviders
       });
 
       const toNumber = (value: unknown) => {
@@ -1103,8 +1143,16 @@ export const api = {
   subscribeToUsageEvents: (handlers: {
     onLog: (record: UsageRecord) => void;
     onError?: (event: Event) => void;
+  }, filters?: {
+    excludeUnknownProvider?: boolean;
+    enabledProviders?: string;
   }): (() => void) => {
-    const streamUrl = `${API_BASE}/v0/management/events`;
+    const params = new URLSearchParams();
+    if (filters?.excludeUnknownProvider) params.set('excludeUnknownProvider', 'true');
+    if (filters?.enabledProviders) params.set('enabledProviders', filters.enabledProviders);
+
+    const queryString = params.toString();
+    const streamUrl = `${API_BASE}/v0/management/events${queryString ? `?${queryString}` : ''}`;
     const source = new EventSource(streamUrl);
 
     const onLogEvent: EventListener = (event) => {
@@ -1136,11 +1184,14 @@ export const api = {
     try {
         const now = normalizeNow();
         const { startDate } = getUsageRangeConfig(range, now);
+        const enabledProviders = await getEnabledProvidersList();
         const usageResponse = await fetchUsageRecords({
             limit: 5000,
             startDate: startDate.toISOString(),
             fields: USAGE_PAGE_FIELDS,
-            cache: true
+            cache: true,
+            excludeUnknownProvider: true,
+            enabledProviders
         });
 
         return buildUsageSeries(usageResponse.data || [], range, now);
@@ -1155,12 +1206,15 @@ export const api = {
         const now = normalizeNow();
         const startDate = new Date(now);
         startDate.setHours(0, 0, 0, 0);
+        const enabledProviders = await getEnabledProvidersList();
 
         const usageResponse = await fetchUsageRecords({
             limit: 5000,
             startDate: startDate.toISOString(),
             fields: ['date', 'tokensInput', 'tokensOutput', 'tokensReasoning', 'tokensCached', 'tokensCacheWrite', 'costTotal'],
-            cache: true
+            cache: true,
+            excludeUnknownProvider: true,
+            enabledProviders
         });
 
         const metrics: TodayMetrics = {
@@ -1291,11 +1345,17 @@ export const api = {
     }
   },
 
-  getProviderPerformance: async (model?: string, provider?: string): Promise<ProviderPerformanceData[]> => {
+  getProviderPerformance: async (
+    model?: string,
+    provider?: string,
+    filters?: { excludeUnknownProvider?: boolean; enabledProviders?: string }
+  ): Promise<ProviderPerformanceData[]> => {
     try {
       const params = new URLSearchParams();
       if (model) params.set('model', model);
       if (provider) params.set('provider', provider);
+      if (filters?.excludeUnknownProvider) params.set('excludeUnknownProvider', 'true');
+      if (filters?.enabledProviders) params.set('enabledProviders', filters.enabledProviders);
 
       const query = params.toString();
       const url = `${API_BASE}/v0/management/performance${query ? `?${query}` : ''}`;
