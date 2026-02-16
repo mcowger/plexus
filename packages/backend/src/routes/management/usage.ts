@@ -110,20 +110,6 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
             return reply.code(400).send({ error: 'Invalid range' });
         }
 
-        // Build filter conditions
-        const filterConditions: any[] = [];
-
-        // Filter to exclude unknown (null) providers
-        if (query.excludeUnknownProvider === 'true') {
-            filterConditions.push(sql`${schema.requestUsage.provider} IS NOT NULL`);
-        }
-
-        // Filter to only enabled providers
-        if (query.enabledProviders) {
-            const enabledList = query.enabledProviders.split(',').map((p: string) => p.trim());
-            filterConditions.push(inArray(schema.requestUsage.provider, enabledList));
-        }
-
         const now = new Date();
         now.setSeconds(0, 0);
         const rangeStart = new Date(now);
@@ -160,6 +146,20 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
         const rangeStartMs = rangeStart.getTime();
         const statsStartMs = statsStart.getTime();
         const todayStartMs = todayStart.getTime();
+
+        // Build filter conditions (now that schema is available)
+        const filterConditions: any[] = [];
+
+        // Filter to exclude unknown (null) providers
+        if (query.excludeUnknownProvider === 'true') {
+            filterConditions.push(sql`${schema.requestUsage.provider} IS NOT NULL`);
+        }
+
+        // Filter to only enabled providers
+        if (query.enabledProviders) {
+            const enabledList = query.enabledProviders.split(',').map((p: string) => p.trim());
+            filterConditions.push(inArray(schema.requestUsage.provider, enabledList));
+        }
 
         const stepMsLiteral = sql.raw(String(stepMs));
         const bucketStartMs = dialect === 'sqlite'
