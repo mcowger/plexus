@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plexus</title>
+    <script>
+      // Auto-login with default key if none exists
+      if (!localStorage.getItem('plexus_admin_key')) {
+        localStorage.setItem('plexus_admin_key', 'change-me-to-a-secure-admin-password');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
