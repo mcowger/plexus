@@ -248,7 +248,7 @@ export async function proxyMcpRequest(
     logger.silly(`[mcp-proxy] Content-Type: ${contentType}`);
 
     if (contentType?.includes('text/event-stream') || method === 'GET') {
-      logger.silly(`[mcp-proxy] Streaming response detected`);
+      logger.debug(`[mcp-proxy] Streaming response detected`);
       if (response.body) {
         return {
           status: response.status,

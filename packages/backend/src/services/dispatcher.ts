@@ -796,7 +796,7 @@ export class Dispatcher {
     let bypassTransformation = false;
 
     if (this.shouldUsePassThrough(request, targetApiType, route)) {
-      logger.info(
+      logger.debug(
         `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
       );
       providerPayload = JSON.parse(JSON.stringify(request.originalBody));
@@ -980,7 +980,7 @@ export class Dispatcher {
     targetApiType: string,
     bypassTransformation: boolean
   ): UnifiedChatResponse {
-    logger.info("Streaming response detected");
+    logger.debug("Streaming response detected");
 
     const rawStream = response.body!;
 
