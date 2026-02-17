@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.15.3 - 2026-02-17
+
+### v0.15.3: Extend Claude Code OAuth model support with claude-sonnet-4-6
+
+## Main changes
+
+- Added `claude-sonnet-4-6` to the Claude Code OAuth model list ([7e64e39](https://github.com/mcowger/plexus/commit/7e64e39)).
+
+## Additional changes
+
+- No additional code changes in this release beyond the model list update.
+
+Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.15.2 - 2026-02-17
 
 ### v0.15.2 MCP tool tracking and streaming fixes
