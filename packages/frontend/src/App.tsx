@@ -13,6 +13,7 @@ import { SystemLogs } from './pages/SystemLogs';
 import { Debug } from './pages/Debug';
 import { Errors } from './pages/Errors';
 import { Quotas } from './pages/Quotas';
+import { McpPage } from './pages/Mcp';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SidebarProvider } from './contexts/SidebarContext';
@@ -69,6 +70,7 @@ const AppRoutes = () => {
                             <Route path="/debug" element={<Debug />} />
                             <Route path="/errors" element={<Errors />} />
                             <Route path="/quotas" element={<Quotas />} />
+                            <Route path="/mcp" element={<McpPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </MainLayout>

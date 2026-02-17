@@ -64,6 +64,13 @@
       "when": 1771133224425,
       "tag": "0008_wild_silver_fox",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771349963959,
+      "tag": "0009_keen_mentor",
+      "breakpoints": true
     }
   ]
 }

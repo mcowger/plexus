@@ -193,6 +193,122 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
         }
     });
 
+    // MCP Server Management
+    fastify.get('/v0/management/mcp-servers', async (_request, reply) => {
+        const configPath = getConfigPath();
+        if (!configPath) {
+            return reply.code(500).send({ error: 'Configuration path not determined' });
+        }
+
+        try {
+            const file = Bun.file(configPath);
+            if (!(await file.exists())) {
+                return reply.code(404).send({ error: 'Configuration file not found' });
+            }
+
+            const configContent = await file.text();
+            const parsed = (yaml.parse(configContent) as any) || {};
+            const mcpServers = parsed.mcp_servers || {};
+
+            return reply.send(mcpServers);
+        } catch (e: any) {
+            logger.error('Failed to get MCP servers', e);
+            return reply.code(500).send({ error: e.message });
+        }
+    });
+
+    fastify.post('/v0/management/mcp-servers/:serverName', async (request, reply) => {
+        const configPath = getConfigPath();
+        if (!configPath) {
+            return reply.code(500).send({ error: 'Configuration path not determined' });
+        }
+
+        const params = request.params as { serverName: string };
+        const serverName = params.serverName;
+        const body = request.body as { upstream_url?: string; enabled?: boolean; headers?: Record<string, string> };
+
+        if (!body || !body.upstream_url) {
+            return reply.code(400).send({ error: 'upstream_url is required' });
+        }
+
+        // Validate server name (slug pattern)
+        if (!/^[a-z0-9][a-z0-9-_]{1,62}$/.test(serverName)) {
+            return reply.code(400).send({ error: 'Invalid server name. Must be a slug (lowercase letters, numbers, hyphens, underscores, 2-63 characters)' });
+        }
+
+        try {
+            const file = Bun.file(configPath);
+            if (!(await file.exists())) {
+                return reply.code(404).send({ error: 'Configuration file not found' });
+            }
+
+            const configContent = await file.text();
+            const parsed = (yaml.parse(configContent) as any) || {};
+            
+            if (!parsed.mcp_servers) {
+                parsed.mcp_servers = {};
+            }
+
+            parsed.mcp_servers[serverName] = {
+                upstream_url: body.upstream_url,
+                enabled: body.enabled !== false,
+                headers: body.headers || {}
+            };
+
+            const updatedConfig = yaml.stringify(parsed);
+            validateConfig(updatedConfig);
+
+            await Bun.write(configPath, updatedConfig);
+            logger.info(`MCP server '${serverName}' saved via API at ${configPath}`);
+            await loadConfig(configPath);
+
+            return reply.send({ success: true, name: serverName, ...parsed.mcp_servers[serverName] });
+        } catch (e: any) {
+            logger.error(`Failed to save MCP server '${serverName}'`, e);
+            return reply.code(500).send({ error: e.message });
+        }
+    });
+
+    fastify.delete('/v0/management/mcp-servers/:serverName', async (request, reply) => {
+        const configPath = getConfigPath();
+        if (!configPath) {
+            return reply.code(500).send({ error: 'Configuration path not determined' });
+        }
+
+        const params = request.params as { serverName: string };
+        const serverName = params.serverName;
+
+        try {
+            const file = Bun.file(configPath);
+            if (!(await file.exists())) {
+                return reply.code(404).send({ error: 'Configuration file not found' });
+            }
+
+            const configContent = await file.text();
+            const parsed = (yaml.parse(configContent) as any) || {};
+            const mcpServers = parsed.mcp_servers || {};
+
+            if (!mcpServers[serverName]) {
+                return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+            }
+
+            delete mcpServers[serverName];
+            parsed.mcp_servers = mcpServers;
+
+            const updatedConfig = yaml.stringify(parsed);
+            validateConfig(updatedConfig);
+
+            await Bun.write(configPath, updatedConfig);
+            logger.info(`MCP server '${serverName}' deleted via API at ${configPath}`);
+            await loadConfig(configPath);
+
+            return reply.send({ success: true });
+        } catch (e: any) {
+            logger.error(`Failed to delete MCP server '${serverName}'`, e);
+            return reply.code(500).send({ error: e.message });
+        }
+    });
+
     // Support YAML and Plain Text payloads for management API
     fastify.addContentTypeParser(['text/plain', 'application/x-yaml', 'text/yaml'], { parseAs: 'string' }, (req, body, done) => {
         done(null, body);
