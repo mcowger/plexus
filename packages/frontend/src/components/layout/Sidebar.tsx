@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight, PieChart } from 'lucide-react';
+import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight, PieChart, Plug } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -383,6 +383,7 @@ export const Sidebar: React.FC = () => {
                 <NavItem to="/providers" icon={Server} label="Providers" isCollapsed={isCollapsed} />
                 <NavItem to="/models" icon={Box} label="Models" isCollapsed={isCollapsed} />
                 <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
+                <NavItem to="/mcp" icon={Plug} label="MCP" isCollapsed={isCollapsed} />
                 <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
               </>
             )}
