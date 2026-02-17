@@ -91,3 +91,13 @@ export function formatTPS(tps: number): string {
     if (tps === 0) return '0';
     return tps.toFixed(1);
 }
+
+/**
+ * Convert string to Title Case (e.g., "hello-world" -> "Hello World")
+ */
+export function toTitleCase(str: string): string {
+    return str
+        .split(/[-_\s]+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { api } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { RefreshCw, Wallet, Cpu } from 'lucide-react';
+import { RefreshCw, Cpu } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../types/quota';
 import { toBoolean, toIsoString } from '../lib/normalize';
@@ -17,6 +17,7 @@ import {
   MiniMaxQuotaDisplay,
   OpenRouterQuotaDisplay,
   KiloQuotaDisplay,
+  CombinedBalancesCard,
 } from '../components/quota';
 
 // Checker type categories
@@ -246,13 +247,13 @@ export const Quotas = () => {
     return wrapper(<SyntheticQuotaDisplay result={result} isCollapsed={false} />);
   };
 
-  // Render columns for checker types
+  // Render columns for checker types (responsive grid)
   const renderQuotaColumns = (groups: [string, QuotaCheckerInfo[]][]) => {
     return (
       <div 
         className="grid gap-4" 
         style={{ 
-          gridTemplateColumns: `repeat(${Math.max(Math.min(groups.length, 8), 3)}, minmax(250px, 1fr))`,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
         }}
       >
         {groups.map(([checkerType, quotasList]) => {
@@ -306,14 +307,15 @@ export const Quotas = () => {
         </Card>
       ) : (
         <div className="space-y-8">
-          {/* Balance Type Section */}
+          {/* Combined Balances Card */}
           {balanceGroups.length > 0 && (
             <section>
-              <div className="flex items-center gap-2 mb-6 pb-2 border-b border-border">
-                <Wallet size={20} className="text-info" />
-                <h2 className="font-heading text-xl font-semibold text-text">Account Balances</h2>
-              </div>
-              {renderQuotaColumns(balanceGroups)}
+              <CombinedBalancesCard
+                balanceQuotas={balanceGroups.flatMap(([_, quotasList]) => quotasList)}
+                onRefresh={handleRefresh}
+                refreshing={refreshing}
+                getQuotaResult={getQuotaResult}
+              />
             </section>
           )}
 

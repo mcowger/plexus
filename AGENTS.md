@@ -832,3 +832,59 @@ Cookie: HERTZ-SESSION=<hertzSession>
 ```
 
 Map `available_amount` as the primary balance into a `subscription` window with `unit: dollars`.
+
+#### Combined Balances Card Integration
+
+**IMPORTANT:** When adding a new balance-style quota checker, you must update TWO frontend locations:
+
+1. **Create individual display component** (e.g., `NagaQuotaDisplay.tsx`) - This is still required for the sidebar display
+2. **Update `CombinedBalancesCard.tsx`** - Add the new checker to the normalization logic
+
+**Update `packages/frontend/src/components/quota/CombinedBalancesCard.tsx`:**
+
+Add the new checker type to the `CHECKER_DISPLAY_NAMES` constant:
+```typescript
+const CHECKER_DISPLAY_NAMES: Record<string, string> = {
+  'openrouter': 'OpenRouter',
+  'minimax': 'MiniMax',
+  'moonshot': 'Moonshot',
+  'naga': 'Naga',
+  'kilo': 'Kilo',
+  'new-provider': 'New Provider Name',  // Add your new checker here
+};
+```
+
+And add normalization logic in the render loop (around line 50):
+```typescript
+let normalizedType = checkerType;
+if (checkerType.includes('openrouter')) normalizedType = 'openrouter';
+else if (checkerType.includes('minimax')) normalizedType = 'minimax';
+else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
+else if (checkerType.includes('naga')) normalizedType = 'naga';
+else if (checkerType.includes('kilo')) normalizedType = 'kilo';
+else if (checkerType.includes('new-provider')) normalizedType = 'new-provider';  // Add here
+```
+
+The Combined Balances Card provides a space-efficient view of all account balances on the Quotas page. Individual display components are still needed for the sidebar and other UI contexts.
+
+#### Sidebar Compact Cards Integration
+
+**IMPORTANT:** When adding a new quota checker (balance OR rate-limit style), you must update the sidebar filter lists to ensure the new checker appears in the compact sidebar cards.
+
+**Update `packages/frontend/src/components/layout/Sidebar.tsx`:**
+
+For **balance-style checkers**, add to the `BALANCE_CHECKERS` array (around line 212):
+```typescript
+const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'new-balance-checker'];
+```
+
+For **rate-limit checkers**, add to the `RATE_LIMIT_CHECKERS` array (around line 218):
+```typescript
+const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'new-rate-limit-checker'];
+```
+
+The sidebar will automatically display:
+- **CompactBalancesCard**: Shows all balance checkers with format "Provider: $BAL"
+- **CompactQuotasCard**: Shows all rate-limit checkers with format "Provider: 12% / 4%"
+
+Both cards are collapsible sections that navigate to the full Quotas page when clicked.
