@@ -163,37 +163,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
         reply.header('Content-Type', 'text/event-stream');
         reply.header('Cache-Control', 'no-cache');
         reply.header('Connection', 'keep-alive');
-        
-        const reader = result.stream.getReader();
-        
-        const queue: Uint8Array[] = [];
-        
-        const stream = new ReadableStream({
-          async start(controller) {
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                queue.push(value);
-                controller.enqueue(value);
-              }
-            } catch (e) {
-              controller.error(e);
-            } finally {
-              reader.releaseLock();
-            }
-          },
-          pull(controller) {
-            while (queue.length > 0) {
-              controller.enqueue(queue.shift()!);
-            }
-          },
-          cancel() {
-            reader.cancel().catch(() => {});
-          }
-        });
-        
-        return reply.send(stream);
+        return reply.send(result.stream);
       }
 
       if (result.body !== undefined) {
@@ -265,37 +235,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
         reply.header('Content-Type', 'text/event-stream');
         reply.header('Cache-Control', 'no-cache');
         reply.header('Connection', 'keep-alive');
-        
-        const reader = result.stream.getReader();
-        
-        const queue: Uint8Array[] = [];
-        
-        const stream = new ReadableStream({
-          async start(controller) {
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                queue.push(value);
-                controller.enqueue(value);
-              }
-            } catch (e) {
-              controller.error(e);
-            } finally {
-              reader.releaseLock();
-            }
-          },
-          pull(controller) {
-            while (queue.length > 0) {
-              controller.enqueue(queue.shift()!);
-            }
-          },
-          cancel() {
-            reader.cancel().catch(() => {});
-          }
-        });
-        
-        return reply.send(stream);
+        return reply.send(result.stream);
       }
 
       if (result.body !== undefined) {
