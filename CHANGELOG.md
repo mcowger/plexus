@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.15.4 - 2026-02-17
+
+### v0.15.4 - Dependency Updates and Log Level Adjustments
+
+## Highlights
+
+- **pi-ai Integration Updated**: Updated pi-ai dependency to v0.53.0, bringing new capabilities and improvements ([0a4335d](https://github.com/mcowger/plexus/commit/0a4335d))
+
+## Other Changes
+
+- **Dependency Upgrades**: General dependency updates for improved stability and security ([b9cfee0](https://github.com/mcowger/plexus/commit/b9cfee0))
+- **Log Level Adjustments**: Lowered log level for Pass-through, Streaming response, and Usage analysis from higher levels to debug for reduced noise in production ([79749cf](https://github.com/mcowger/plexus/commit/79749cf))
+
+---
+
+Docker image updated and available at ghcr.io/mcowger/plexus:latest
+
 ## v0.15.3 - 2026-02-17
 
 ### v0.15.3: Extend Claude Code OAuth model support with claude-sonnet-4-6
