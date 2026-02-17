@@ -2,7 +2,7 @@ import { logger } from '../../utils/logger';
 import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
 import { QuotaCheckerFactory } from './quota-checker-factory';
 import { QuotaEstimator } from './quota-estimator';
-import { toDbBoolean, toEpochMs } from '../../utils/normalize';
+import { toDbBoolean, toEpochMs, toDbTimestampMs } from '../../utils/normalize';
 import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
 import { and, eq, gte, desc } from 'drizzle-orm';
 
@@ -95,16 +95,11 @@ export class QuotaScheduler {
 
   private async persistResult(result: QuotaCheckResult): Promise<void> {
     const { db, schema } = this.ensureDb();
-    const isSqlite = getCurrentDialect() === 'sqlite';
-    const toDbTimestamp = (value: Date | number | string | null | undefined) => {
-      const timestamp = toEpochMs(value);
-      if (timestamp == null) return null;
-      return isSqlite ? new Date(timestamp) : timestamp;
-    };
+    const dialect = getCurrentDialect();
 
-    const checkedAt = toDbTimestamp(result.checkedAt);
+    const checkedAt = toDbTimestampMs(result.checkedAt, dialect);
     const now = Date.now();
-    const createdAt = toDbTimestamp(now);
+    const createdAt = toDbTimestampMs(now, dialect);
 
     if (!result.success) {
       try {
@@ -146,7 +141,7 @@ export class QuotaScheduler {
               remaining: window.remaining,
               utilizationPercent: window.utilizationPercent,
               unit: window.unit,
-              resetsAt: toDbTimestamp(window.resetsAt),
+              resetsAt: toDbTimestampMs(window.resetsAt, dialect),
               status: window.status ?? null,
               description: window.description ?? null,
               success: toDbBoolean(true),
@@ -174,7 +169,7 @@ export class QuotaScheduler {
               remaining: window.remaining,
               utilizationPercent: window.utilizationPercent,
               unit: window.unit,
-              resetsAt: toDbTimestamp(window.resetsAt),
+              resetsAt: toDbTimestampMs(window.resetsAt, dialect),
               status: window.status ?? null,
               description: window.description ?? null,
                success: toDbBoolean(true),

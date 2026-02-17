@@ -94,3 +94,43 @@ Inferred types are available in `packages/backend/src/db/types.ts`:
 ```typescript
 import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 ```
+
+### Dialect-Aware Timestamp Conversions
+
+SQLite and PostgreSQL schemas use different column types for timestamps, requiring dialect-aware conversion before inserting values. **Never write inline `dialect === 'postgres' ? ... : ...` timestamp logic.** Always use the shared utilities from `src/utils/normalize.ts`.
+
+#### Two Distinct Patterns
+
+**Pattern 1: `text` (SQLite) vs `timestamp` (PostgreSQL)**
+
+Used by: `mcp_request_usage.created_at`, `mcp_debug_logs.created_at`
+
+- SQLite `text('col')` — Drizzle expects a `string` (ISO 8601)
+- PostgreSQL `timestamp('col')` — Drizzle expects a `Date` object
+
+```typescript
+import { toDbTimestamp } from '../../utils/normalize';
+import { getCurrentDialect } from '../../db/client';
+
+const createdAt = toDbTimestamp(record.created_at, getCurrentDialect());
+// SQLite → "2026-02-09T17:36:14.297Z"  (string)
+// PG     → Date object
+```
+
+**Pattern 2: `integer(timestamp_ms)` (SQLite) vs `bigint(number)` (PostgreSQL)**
+
+Used by: `quota_snapshots.checked_at`, `quota_snapshots.resets_at`, `quota_snapshots.created_at`
+
+- SQLite `integer('col', { mode: 'timestamp_ms' })` — Drizzle expects a `Date` object
+- PostgreSQL `bigint('col', { mode: 'number' })` — Drizzle expects a `number` (epoch ms)
+
+```typescript
+import { toDbTimestampMs } from '../../utils/normalize';
+import { getCurrentDialect } from '../../db/client';
+
+const checkedAt = toDbTimestampMs(result.checkedAt, getCurrentDialect());
+// SQLite → Date object
+// PG     → 1739122574297  (number)
+```
+
+Both functions accept `Date | number | string | null | undefined` as input and return `null` for invalid/nullish values.
