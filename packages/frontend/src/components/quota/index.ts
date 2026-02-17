@@ -14,3 +14,5 @@ export { MiniMaxQuotaDisplay } from './MiniMaxQuotaDisplay';
 export { MiniMaxQuotaConfig } from './MiniMaxQuotaConfig';
 export { OpenRouterQuotaDisplay } from './OpenRouterQuotaDisplay';
 export { OpenRouterQuotaConfig } from './OpenRouterQuotaConfig';
+export { KiloQuotaDisplay } from './KiloQuotaDisplay';
+export { KiloQuotaConfig } from './KiloQuotaConfig';
