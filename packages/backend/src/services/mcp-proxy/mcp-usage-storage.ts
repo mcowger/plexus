@@ -3,6 +3,7 @@ import { getDatabase, getCurrentDialect } from '../../db/client';
 import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
 import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
 import { desc, eq, sql, and, like } from 'drizzle-orm';
+import { toDbTimestamp } from '../../utils/normalize';
 
 interface McpRequestUsageRecord {
   request_id: string;
@@ -57,10 +58,11 @@ export class McpUsageStorageService {
     try {
       const schema = this.getMcpSchema();
       const mcpRequestUsage = schema.mcpRequestUsage;
+      const createdAt = toDbTimestamp(record.created_at, getCurrentDialect()) as string & Date;
 
       await this.ensureDb().insert(mcpRequestUsage).values({
         requestId: record.request_id,
-        createdAt: record.created_at,
+        createdAt,
         startTime: record.start_time,
         durationMs: record.duration_ms,
         serverName: record.server_name,
@@ -87,6 +89,7 @@ export class McpUsageStorageService {
     try {
       const schema = this.getMcpSchema();
       const mcpDebugLogs = schema.mcpDebugLogs;
+      const createdAt = toDbTimestamp(record.created_at, getCurrentDialect()) as string & Date;
 
       await this.ensureDb().insert(mcpDebugLogs).values({
         requestId: record.request_id,
@@ -94,7 +97,7 @@ export class McpUsageStorageService {
         rawRequestBody: record.raw_request_body,
         rawResponseHeaders: record.raw_response_headers,
         rawResponseBody: record.raw_response_body,
-        createdAt: record.created_at,
+        createdAt,
       });
 
       logger.debug(`MCP debug log saved for request ${record.request_id}`);

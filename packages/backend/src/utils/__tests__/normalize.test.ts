@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { toBoolean, toDbBoolean, toEpochMs, toIsoString } from '../normalize';
+import { toBoolean, toDbBoolean, toEpochMs, toIsoString, toDbTimestamp, toDbTimestampMs } from '../normalize';
 
 describe('toBoolean', () => {
   test('handles boolean and numeric values', () => {
@@ -80,5 +80,61 @@ describe('toIsoString', () => {
     expect(toIsoString(undefined)).toBeNull();
     expect(toIsoString(null)).toBeNull();
     expect(toIsoString('not-a-date')).toBeNull();
+  });
+});
+
+describe('toDbTimestamp', () => {
+  // Pattern: SQLite text('col') vs PG timestamp('col')
+  // SQLite expects a string, PG expects a Date
+  const iso = '2026-02-09T17:36:14.297Z';
+  const epoch = Date.parse(iso);
+  const date = new Date(iso);
+
+  test('returns ISO string for sqlite', () => {
+    expect(toDbTimestamp(iso, 'sqlite')).toBe(iso);
+    expect(toDbTimestamp(epoch, 'sqlite')).toBe(iso);
+    expect(toDbTimestamp(date, 'sqlite')).toBe(iso);
+  });
+
+  test('returns Date for postgres', () => {
+    const result = toDbTimestamp(iso, 'postgres');
+    expect(result).toBeInstanceOf(Date);
+    expect((result as Date).getTime()).toBe(epoch);
+
+    expect((toDbTimestamp(epoch, 'postgres') as Date).getTime()).toBe(epoch);
+    expect((toDbTimestamp(date, 'postgres') as Date).getTime()).toBe(epoch);
+  });
+
+  test('returns null for invalid input', () => {
+    expect(toDbTimestamp(null, 'sqlite')).toBeNull();
+    expect(toDbTimestamp(undefined, 'postgres')).toBeNull();
+    expect(toDbTimestamp('not-a-date', 'sqlite')).toBeNull();
+  });
+});
+
+describe('toDbTimestampMs', () => {
+  // Pattern: SQLite integer('col', { mode: 'timestamp_ms' }) vs PG bigint('col', { mode: 'number' })
+  // SQLite expects a Date, PG expects a number (epoch ms)
+  const iso = '2026-02-09T17:36:14.297Z';
+  const epoch = Date.parse(iso);
+  const date = new Date(iso);
+
+  test('returns Date for sqlite', () => {
+    expect(toDbTimestampMs(iso, 'sqlite')).toBeInstanceOf(Date);
+    expect((toDbTimestampMs(iso, 'sqlite') as Date).getTime()).toBe(epoch);
+    expect((toDbTimestampMs(epoch, 'sqlite') as Date).getTime()).toBe(epoch);
+    expect((toDbTimestampMs(date, 'sqlite') as Date).getTime()).toBe(epoch);
+  });
+
+  test('returns number for postgres', () => {
+    expect(toDbTimestampMs(iso, 'postgres')).toBe(epoch);
+    expect(toDbTimestampMs(epoch, 'postgres')).toBe(epoch);
+    expect(toDbTimestampMs(date, 'postgres')).toBe(epoch);
+  });
+
+  test('returns null for invalid input', () => {
+    expect(toDbTimestampMs(null, 'sqlite')).toBeNull();
+    expect(toDbTimestampMs(undefined, 'postgres')).toBeNull();
+    expect(toDbTimestampMs('not-a-date', 'sqlite')).toBeNull();
   });
 });
