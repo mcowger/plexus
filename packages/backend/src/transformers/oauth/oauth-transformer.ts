@@ -319,11 +319,7 @@ export class OAuthTransformer implements Transformer {
       });
     }
 
-    logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request`, {
-      model: model.id,
-      provider,
-      accountId
-    });
+    logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", accountId: "${accountId}" }`);
 
     if (streaming) {
       try {
