@@ -1,12 +1,14 @@
-import { describe, expect, test, mock, beforeAll } from "bun:test";
+import { describe, expect, test, mock, beforeAll, spyOn } from "bun:test";
 import Fastify, { FastifyInstance } from "fastify";
 import { setConfigForTesting } from "../../../config";
 import { registerMcpRoutes } from "../index";
 import { McpUsageStorageService } from "../../../services/mcp-proxy/mcp-usage-storage";
+import * as mcpProxyService from "../../../services/mcp-proxy/mcp-proxy-service";
 
 describe("MCP Routes", () => {
   let fastify: FastifyInstance;
   let mockMcpUsageStorage: McpUsageStorageService;
+  let mockProxyMcpRequest: any;
 
   beforeAll(async () => {
     fastify = Fastify();
@@ -16,6 +18,16 @@ describe("MCP Routes", () => {
       saveRequest: mock(),
       saveDebugLog: mock()
     } as unknown as McpUsageStorageService;
+
+    // Mock the proxyMcpRequest function to avoid network calls
+    mockProxyMcpRequest = mock(async () => ({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      body: { jsonrpc: "2.0", id: 1, result: {} }
+    }));
+
+    // Spy on the module and replace the function
+    spyOn(mcpProxyService, 'proxyMcpRequest').mockImplementation(mockProxyMcpRequest);
 
     // Set config with keys and MCP servers
     setConfigForTesting({
@@ -282,6 +294,9 @@ describe("MCP Routes", () => {
     });
 
     test("GET /mcp/:name should proxy GET requests", async () => {
+      // Clear previous mock calls
+      (mockProxyMcpRequest as any).mockClear();
+
       const response = await fastify.inject({
         method: 'GET',
         url: '/mcp/test-server',
@@ -290,7 +305,8 @@ describe("MCP Routes", () => {
         }
       });
 
-      expect([200, 400, 404, 500, 502, 504]).toContain(response.statusCode);
+      expect(response.statusCode).toBe(200);
+      expect(mockProxyMcpRequest).toHaveBeenCalled();
     });
 
     test("DELETE /mcp/:name should proxy DELETE requests", async () => {
@@ -336,8 +352,9 @@ describe("MCP Routes", () => {
 
     test("should record usage on GET requests", async () => {
       (mockMcpUsageStorage.saveRequest as any).mockClear();
+      (mockProxyMcpRequest as any).mockClear();
 
-      await fastify.inject({
+      const response = await fastify.inject({
         method: 'GET',
         url: '/mcp/test-server',
         headers: {
@@ -345,6 +362,7 @@ describe("MCP Routes", () => {
         }
       });
 
+      expect(response.statusCode).toBe(200);
       expect(mockMcpUsageStorage.saveRequest).toHaveBeenCalled();
       const callArgs = (mockMcpUsageStorage.saveRequest as any).mock.calls[0][0];
       expect(callArgs.method).toBe('GET');

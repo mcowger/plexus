@@ -28,6 +28,7 @@ describe('PerformanceSelector', () => {
       models: {},
       keys: {},
       adminKey: 'test',
+      failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
       quotas: [],
       performanceExplorationRate: 0,
     };
@@ -85,6 +86,7 @@ describe('PerformanceSelector', () => {
         models: {},
         keys: {},
         adminKey: 'test',
+        failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
         quotas: [],
         performanceExplorationRate: 0,
       };
@@ -114,6 +116,7 @@ describe('PerformanceSelector', () => {
         models: {},
         keys: {},
         adminKey: 'test',
+        failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
         quotas: [],
         performanceExplorationRate: 1,
       };
@@ -146,6 +149,7 @@ describe('PerformanceSelector', () => {
         models: {},
         keys: {},
         adminKey: 'test',
+        failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
         quotas: [],
       };
       setConfigForTesting(config);
