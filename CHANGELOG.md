@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.15.1 - 2026-02-17
+
+### v0.15.1 database timestamp fix
+
+- Fix DB timestamps ([f7da012](https://github.com/mcowger/plexus/commitf7da012))
+
+Docker image updated and available at ghcr.io/mcowger/plexus:latest
+
 ## v0.15.0 - 2026-02-17
 
 ### v0.15.0 MCP proxy and management UI
