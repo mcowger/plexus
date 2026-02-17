@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.14.10 - 2026-02-17
+
+### Compact quota cards and responsive quotas page
+
+## New Features
+
+- **Compact quota/balance cards**: Added new compact quota and balance cards to the sidebar for improved space efficiency ([612c5fd](https://github.com/mcowger/plexus/commit/612c5fd))
+- **Responsive quotas page**: Made the quotas page fully responsive for better mobile and tablet support ([612c5fd](https://github.com/mcowger/plexus/commit/612c5fd))
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.14.9 - 2026-02-17
 
 ### v0.14.9: Add Kilo Quota Checker and New Skills
