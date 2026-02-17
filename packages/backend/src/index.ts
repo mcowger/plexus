@@ -163,7 +163,7 @@ const responsesStorage = new ResponsesStorageService();
 responsesStorage.startCleanupJob(1, 7);
 
 // --- Management API (v0) ---
-await registerManagementRoutes(fastify, usageStorage, dispatcher, quotaScheduler);
+await registerManagementRoutes(fastify, usageStorage, dispatcher, quotaScheduler, mcpUsageStorage);
 
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));

@@ -176,6 +176,25 @@ export interface McpServer {
   headers?: Record<string, string>;
 }
 
+export interface McpLogRecord {
+  request_id: string;
+  created_at: string;
+  start_time: number;
+  duration_ms: number | null;
+  server_name: string;
+  upstream_url: string;
+  method: 'POST' | 'GET' | 'DELETE';
+  jsonrpc_method: string | null;
+  api_key: string | null;
+  attribution: string | null;
+  source_ip: string | null;
+  response_status: number | null;
+  is_streamed: boolean;
+  has_debug: boolean;
+  error_code: string | null;
+  error_message: string | null;
+}
+
 export interface Model {
   id: string;
   name: string;
@@ -1840,6 +1859,48 @@ quota_checker: provider.quotaChecker?.type
       } catch (e) {
           console.error("API Error deleteMcpServer", e);
           throw e;
+      }
+  },
+
+  getMcpLogs: async (limit: number = 20, offset: number = 0, filters: { serverName?: string; apiKey?: string } = {}): Promise<{ data: McpLogRecord[]; total: number }> => {
+      try {
+          const params = new URLSearchParams({
+              limit: limit.toString(),
+              offset: offset.toString(),
+              ...(filters.serverName ? { serverName: filters.serverName } : {}),
+              ...(filters.apiKey ? { apiKey: filters.apiKey } : {}),
+          });
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/mcp-logs?${params}`);
+          if (!res.ok) throw new Error('Failed to fetch MCP logs');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getMcpLogs", e);
+          return { data: [], total: 0 };
+      }
+  },
+
+  deleteMcpLog: async (requestId: string): Promise<boolean> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/mcp-logs/${encodeURIComponent(requestId)}`, {
+              method: 'DELETE'
+          });
+          return res.ok;
+      } catch (e) {
+          console.error("API Error deleteMcpLog", e);
+          return false;
+      }
+  },
+
+  deleteAllMcpLogs: async (olderThanDays?: number): Promise<boolean> => {
+      try {
+          const params = olderThanDays != null ? `?olderThanDays=${olderThanDays}` : '';
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/mcp-logs${params}`, {
+              method: 'DELETE'
+          });
+          return res.ok;
+      } catch (e) {
+          console.error("API Error deleteAllMcpLogs", e);
+          return false;
       }
   }
 };

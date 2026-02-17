@@ -2,6 +2,7 @@ import { logger } from '../../utils/logger';
 import { getDatabase, getCurrentDialect } from '../../db/client';
 import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
 import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
+import { desc, eq, sql, and, like } from 'drizzle-orm';
 
 interface McpRequestUsageRecord {
   request_id: string;
@@ -99,6 +100,99 @@ export class McpUsageStorageService {
       logger.debug(`MCP debug log saved for request ${record.request_id}`);
     } catch (error) {
       logger.error('Failed to save MCP debug log', error);
+    }
+  }
+
+  async getLogs(options: {
+    limit?: number;
+    offset?: number;
+    serverName?: string;
+    apiKey?: string;
+  } = {}): Promise<{ data: McpRequestUsageRecord[]; total: number }> {
+    try {
+      const schema = this.getMcpSchema();
+      const table = schema.mcpRequestUsage;
+      const db = this.ensureDb();
+      const limit = options.limit ?? 20;
+      const offset = options.offset ?? 0;
+
+      const conditions = [];
+      if (options.serverName) {
+        conditions.push(like(table.serverName, `%${options.serverName}%`));
+      }
+      if (options.apiKey) {
+        conditions.push(like(table.apiKey, `%${options.apiKey}%`));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [rows, countRows] = await Promise.all([
+        db.select().from(table)
+          .where(whereClause)
+          .orderBy(desc(table.startTime))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: sql<number>`COUNT(*)` }).from(table).where(whereClause),
+      ]);
+
+      const total = Number(countRows[0]?.count ?? 0);
+
+      const data: McpRequestUsageRecord[] = rows.map((r: any) => ({
+        request_id: r.requestId,
+        created_at: r.createdAt,
+        start_time: r.startTime,
+        duration_ms: r.durationMs,
+        server_name: r.serverName,
+        upstream_url: r.upstreamUrl,
+        method: r.method,
+        jsonrpc_method: r.jsonrpcMethod,
+        api_key: r.apiKey,
+        attribution: r.attribution,
+        source_ip: r.sourceIp,
+        response_status: r.responseStatus,
+        is_streamed: Boolean(r.isStreamed),
+        has_debug: Boolean(r.hasDebug),
+        error_code: r.errorCode,
+        error_message: r.errorMessage,
+      }));
+
+      return { data, total };
+    } catch (error) {
+      logger.error('Failed to get MCP logs', error);
+      return { data: [], total: 0 };
+    }
+  }
+
+  async deleteLog(requestId: string): Promise<boolean> {
+    try {
+      const schema = this.getMcpSchema();
+      const table = schema.mcpRequestUsage;
+      const result = await this.ensureDb()
+        .delete(table)
+        .where(eq(table.requestId, requestId));
+      return true;
+    } catch (error) {
+      logger.error('Failed to delete MCP log', error);
+      return false;
+    }
+  }
+
+  async deleteAllLogs(beforeDate?: Date): Promise<boolean> {
+    try {
+      const schema = this.getMcpSchema();
+      const table = schema.mcpRequestUsage;
+      const db = this.ensureDb();
+
+      if (beforeDate) {
+        const beforeMs = beforeDate.getTime();
+        await db.delete(table).where(sql`${table.startTime} < ${beforeMs}`);
+      } else {
+        await db.delete(table);
+      }
+      return true;
+    } catch (error) {
+      logger.error('Failed to delete MCP logs', error);
+      return false;
     }
   }
 }
