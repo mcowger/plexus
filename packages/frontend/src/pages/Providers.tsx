@@ -177,7 +177,8 @@ const OAUTH_PROVIDER_MODELS: Record<string, FetchedModel[]> = {
     { id: 'claude-sonnet-4-0', name: 'Claude Sonnet 4 (latest)' },
     { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
     { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (latest)' },
-    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' }
+    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
+    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (latest)' }
   ],
   'openai-codex': [
     { id: 'gpt-5.1', name: 'GPT-5.1' },
