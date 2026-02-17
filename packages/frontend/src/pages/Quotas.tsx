@@ -16,10 +16,11 @@ import {
   MoonshotQuotaDisplay,
   MiniMaxQuotaDisplay,
   OpenRouterQuotaDisplay,
+  KiloQuotaDisplay,
 } from '../components/quota';
 
 // Checker type categories
-const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga'];
+const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
 const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt'];
 
 // Checker display names
@@ -28,6 +29,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'minimax': 'MiniMax',
   'moonshot': 'Moonshot',
   'naga': 'Naga',
+  'kilo': 'Kilo',
   'openai-codex': 'OpenAI Codex',
   'codex': 'Codex',
   'claude-code': 'Claude Code',
@@ -142,6 +144,8 @@ export const Quotas = () => {
         baseType = 'moonshot';
       } else if (baseType.includes('naga')) {
         baseType = 'naga';
+      } else if (baseType.includes('kilo')) {
+        baseType = 'kilo';
       } else if (baseType.includes('zai')) {
         baseType = 'zai';
       } else if (baseType.includes('synthetic')) {
@@ -231,6 +235,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('openrouter')) {
       return wrapper(<OpenRouterQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('kilo')) {
+      return wrapper(<KiloQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     // Fallback: generic display
