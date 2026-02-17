@@ -28,6 +28,6 @@
     "packages/*"
   ],
   "dependencies": {
-    "@mariozechner/pi-ai": "^0.52.12"
+    "@mariozechner/pi-ai": "^0.53.0"
   }
 }
