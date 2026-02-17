@@ -104,4 +104,32 @@ adminKey: "admin-secret"
       )
     ).toThrow('MiniMax groupid is required');
   });
+
+  it('accepts kilo quota checker with optional organizationId', () => {
+    const config = validateConfig(`
+providers:
+  kilo-provider:
+    api_base_url: "https://api.kilo.ai"
+    api_key: "kilo-api-key"
+    quota_checker:
+      type: kilo
+      options:
+        endpoint: "https://api.kilo.ai/api/profile/balance"
+        organizationId: "org-123"
+models: {}
+keys: {}
+adminKey: "admin-secret"
+`);
+
+    expect(config.quotas).toHaveLength(1);
+    expect(config.quotas[0]).toMatchObject({
+      id: 'kilo-provider',
+      provider: 'kilo-provider',
+      type: 'kilo',
+      options: {
+        endpoint: 'https://api.kilo.ai/api/profile/balance',
+        organizationId: 'org-123',
+      },
+    });
+  });
 });

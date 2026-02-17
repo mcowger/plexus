@@ -8,6 +8,7 @@ import { ZAIQuotaChecker } from './checkers/zai-checker';
 import { MoonshotQuotaChecker } from './checkers/moonshot-checker';
 import { MiniMaxQuotaChecker } from './checkers/minimax-checker';
 import { OpenRouterQuotaChecker } from './checkers/openrouter-checker';
+import { KiloQuotaChecker } from './checkers/kilo-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
@@ -19,6 +20,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   moonshot: MoonshotQuotaChecker,
   minimax: MiniMaxQuotaChecker,
   openrouter: OpenRouterQuotaChecker,
+  kilo: KiloQuotaChecker,
 };
 
 export class QuotaCheckerFactory {

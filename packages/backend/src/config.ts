@@ -105,6 +105,11 @@ const OpenRouterQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const KiloQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+  organizationId: z.string().trim().min(1).optional(),
+});
+
 const OpenAICodexQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
   userAgent: z.string().trim().min(1).optional(),
@@ -165,6 +170,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: OpenRouterQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('kilo'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: KiloQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('openai-codex'),
