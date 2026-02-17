@@ -1,0 +1,66 @@
+services:
+  plexus:
+    build:
+      context: .
+    image: plexus-metrics:local
+    container_name: plexus
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - LOG_LEVEL=info
+      - DATA_DIR=/app/data
+      - CONFIG_FILE=/app/config/plexus.yaml
+      - DATABASE_URL=sqlite:///app/data/plexus.db
+    volumes:
+      - ./config/plexus.metrics.yaml:/app/config/plexus.yaml:ro
+      - plexus-data:/app/data
+    networks:
+      - plexus-monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "19090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - plexus
+    networks:
+      - plexus-monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - plexus-monitoring
+
+volumes:
+  plexus-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  plexus-monitoring:
+    driver: bridge

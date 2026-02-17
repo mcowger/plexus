@@ -1,0 +1,18 @@
+adminKey: "admin123"
+providers:
+  local-openai:
+    display_name: Local OpenAI
+    api_base_url: https://api.openai.com/v1
+    api_key: "test-key"
+    models:
+      - gpt-4o-mini
+models:
+  gpt-4o-mini:
+    selector: random
+    targets:
+      - provider: local-openai
+        model: gpt-4o-mini
+keys:
+  local-test:
+    secret: "sk-test-plexus"
+    comment: "Local monitoring test key"
