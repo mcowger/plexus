@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.15.2 - 2026-02-17
+
+### v0.15.2 MCP tool tracking and streaming fixes
+
+- New feature: track `tool_name` for MCP tools/call requests ([1fa1a77](https://github.com/mcowger/plexus/commit1fa1a77))
+- Fix: pass upstream stream directly to replies instead of wrapping a new `ReadableStream` ([6beb866](https://github.com/mcowger/plexus/commit6beb866))
+- Fix: silence unhandled rejection from `reader.cancel()` on client disconnect ([cd9b9ab](https://github.com/mcowger/plexus/commitcd9b9ab))
+- Fix: update `mcp_request_usage` `start_time` and `duration_ms` to bigint in the PG schema ([94d8998](https://github.com/mcowger/plexus/commit94d8998))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.15.1 - 2026-02-17
 
 ### v0.15.1 database timestamp fix
