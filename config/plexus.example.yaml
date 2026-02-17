@@ -395,3 +395,21 @@ keys:
   test-key:
     secret: "sk-plexus-test-key-456"
     comment: "CI/CD Test Key"
+
+# 4. MCP SERVERS SECTION
+# -----------------------
+# Define upstream MCP (Model Context Protocol) servers to proxy through Plexus.
+# Each server is exposed at /mcp/:name where :name is the key below.
+#
+#   upstream_url: The full URL of the MCP server endpoint (http or https).
+#   enabled:      Whether this MCP server is active (default: true).
+#   headers:      (Optional) Static headers to include in every request to the upstream.
+mcp_servers:
+  # Example: Proxy to a remote MCP server
+  # mcpa:
+  #   upstream_url: "https://mcp-a.com/mcp"
+  #   enabled: true
+  #   headers:
+  #     Authorization: "Bearer upstream-secret"
+  #     X-Org: "my-org"
+

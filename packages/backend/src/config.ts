@@ -257,6 +257,12 @@ const QuotaConfigSchema = z.object({
   options: z.record(z.any()).default({}),
 });
 
+const McpServerConfigSchema = z.object({
+  upstream_url: z.string().url(),
+  enabled: z.boolean().default(true),
+  headers: z.record(z.string()).optional(),
+});
+
 const RawPlexusConfigSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
@@ -265,12 +271,14 @@ const RawPlexusConfigSchema = z.object({
   failover: FailoverPolicySchema.optional(),
   performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
+  mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
 }).passthrough();
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
   quotas: QuotaConfig[];
+  mcpServers?: Record<string, McpServerConfig>;
 };
 export type DatabaseConfig = {
   connectionString: string;
@@ -280,6 +288,7 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
 export type QuotaConfig = z.infer<typeof QuotaConfigSchema>;
+export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
 /**
  * Extract supported API types from the provider configuration.
@@ -381,6 +390,14 @@ function logConfigStats(config: PlexusConfig) {
         logger.warn(`  - Ignoring: ${quota.id} (${quota.type})`);
       });
     }
+
+    if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+      const mcpCount = Object.keys(config.mcpServers).length;
+      logger.info(`Loaded ${mcpCount} MCP Servers:`);
+      Object.entries(config.mcpServers).forEach(([name, server]) => {
+        logger.info(`  - ${name}: ${server.upstream_url} (enabled: ${server.enabled ?? true})`);
+      });
+    }
 }
 
 export function validateConfig(yamlContent: string): PlexusConfig {
@@ -395,6 +412,7 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
     ...config,
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
     quotas: buildProviderQuotaConfigs(config),
+    mcpServers: config.mcp_servers,
   };
 }
 

@@ -421,6 +421,56 @@ The Quota Management APIs provide endpoints for monitoring provider rate limits 
 
 ---
 
+## MCP Proxy API
+
+Plexus can proxy MCP (Model Context Protocol) servers. Configure MCP servers in `plexus.yaml` under the `mcp_servers` section.
+
+### MCP Endpoints
+
+Each configured MCP server is exposed at `/mcp/:name`:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/mcp/:name` | JSON-RPC message exchange |
+| GET | `/mcp/:name` | Server-Sent Events (SSE) for streaming |
+| DELETE | `/mcp/:name` | Session termination |
+
+**Path Parameters:**
+- `:name` - The key name from your `mcp_servers` configuration
+
+### Authentication
+
+All MCP endpoints require authentication using Plexus API keys:
+
+```bash
+# Include Authorization header with your Plexus API key
+curl -X POST http://localhost:4000/mcp/my-server \
+  -H "Authorization: Bearer sk-your-plexus-key" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{...},"id":0}'
+```
+
+### OAuth Discovery Endpoints
+
+Plexus provides OAuth 2.0 discovery endpoints for MCP client compatibility:
+
+| Endpoint | Description |
+|---------|-------------|
+| `GET /.well-known/oauth-authorization-server` | Authorization server metadata |
+| `GET /.well-known/oauth-protected-resource` | Protected resource metadata |
+| `GET /.well-known/openid-configuration` | OpenID Connect configuration |
+| `POST /register` | Dynamic client registration |
+
+These endpoints return metadata indicating that Plexus uses Bearer token (API key) authentication.
+
+### Request/Response
+
+MCP requests are proxied transparently to the upstream server. The request body is forwarded as-is (JSON-RPC), and responses are streamed back to the client.
+
+**Important:** Client authentication headers (`Authorization`, `x-api-key`) are NOT forwarded to upstream MCP servers. Only static headers configured in `plexus.yaml` are used for upstream authentication.
+
+---
+
 ## Quota Window Types
 
 Quota windows represent different time-based rate limit periods:
