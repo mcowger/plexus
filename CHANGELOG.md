@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.15.0 - 2026-02-17
+
+### v0.15.0 MCP proxy and management UI
+
+## Main features
+- MCP proxy functionality implemented ([b0dbde7](https://github.com/mcowger/plexus/commitb0dbde7))
+- MCP server management UI added ([83e7dfa](https://github.com/mcowger/plexus/commit83e7dfa))
+- MCP usage logs UI on MCP page ([085d689](https://github.com/mcowger/plexus/commit085d689))
+
+## Smaller changes
+- MCP proxy tests added ([011167b](https://github.com/mcowger/plexus/commit011167b))
+- Test type errors and flaky network tests fixed ([2c4b1ae](https://github.com/mcowger/plexus/commit2c4b1ae))
+- README updated ([2766ffb](https://github.com/mcowger/plexus/commit2766ffb))
+- Plan file removed ([4129273](https://github.com/mcowger/plexus/commit4129273))
+- Merge branch 'mcp' into main ([e2c865a](https://github.com/mcowger/plexus/commite2c865a))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.14.10 - 2026-02-17
 
 ### Compact quota cards and responsive quotas page
