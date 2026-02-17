@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.14.9 - 2026-02-17
+
+### v0.14.9: Add Kilo Quota Checker and New Skills
+
+### New Features
+
+- **Kilo Quota Checker**: Introduced a new balance-style quota checker for Kilo, including end-to-end testing capabilities.
+  - [c0d8454](https://github.com/mcowger/plexus/commit/c0d8454)
+- **New Skills**: Expanded the system's skill set with the addition of `shadcn` and `drizzle` integrations.
+  - [52e1a1e](https://github.com/mcowger/plexus/commit/52e1a1e)
+  - [ecab94a](https://github.com/mcowger/plexus/commit/ecab94a)
+
+### Chores
+
+- Updated `.gitignore` exclusions.
+  - [579e7f9](https://github.com/mcowger/plexus/commit/579e7f9)
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.14.8 - 2026-02-16
 
 ### Debug Trace Downloads and Token Accounting Improvements
