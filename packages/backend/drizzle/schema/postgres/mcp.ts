@@ -1,11 +1,11 @@
-import { pgTable, serial, text, integer, index, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, bigint, index, timestamp } from 'drizzle-orm/pg-core';
 
 export const mcpRequestUsage = pgTable('mcp_request_usage', {
   id: serial('id').primaryKey(),
   requestId: text('request_id').notNull().unique(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-  startTime: integer('start_time').notNull(),
-  durationMs: integer('duration_ms'),
+  startTime: bigint('start_time', { mode: 'number' }).notNull(),
+  durationMs: bigint('duration_ms', { mode: 'number' }),
   serverName: text('server_name').notNull(),
   upstreamUrl: text('upstream_url').notNull(),
   method: text('method').notNull(),
