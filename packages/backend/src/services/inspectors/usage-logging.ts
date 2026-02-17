@@ -122,7 +122,7 @@ export class UsageInspector extends PassThrough {
                 );
             }
 
-            logger.info(`[Inspector:Usage] Request ${this.usageRecord.requestId} usage analysis complete.`);
+            logger.debug(`[Inspector:Usage] Request ${this.usageRecord.requestId} usage analysis complete.`);
             DebugManager.getInstance().flush(this.usageRecord.requestId!);
             callback();
         } catch (err) {
