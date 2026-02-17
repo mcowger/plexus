@@ -189,7 +189,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
             }
           },
           cancel() {
-            reader.cancel();
+            reader.cancel().catch(() => {});
           }
         });
         
@@ -291,7 +291,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
             }
           },
           cancel() {
-            reader.cancel();
+            reader.cancel().catch(() => {});
           }
         });
         
