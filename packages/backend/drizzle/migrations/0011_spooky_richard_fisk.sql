@@ -1,0 +1,1 @@
+ALTER TABLE `mcp_request_usage` ADD `tool_name` text;

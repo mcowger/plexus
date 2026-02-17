@@ -7,6 +7,7 @@ import {
   validateServerName, 
   proxyMcpRequest,
   extractJsonRpcMethod,
+  extractToolName,
   redactSensitiveHeaders
 } from '../../services/mcp-proxy/mcp-proxy-service';
 import { getClientIp } from '../../utils/ip';
@@ -106,6 +107,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
       
       const body = request.body;
       const jsonrpcMethod = extractJsonRpcMethod(body);
+      const toolName = extractToolName(body);
       const isStreamed = false;
 
       logger.silly(`[mcp] POST /mcp/${serverName} - requestId: ${requestId}`);
@@ -134,6 +136,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
         upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
         method,
         jsonrpc_method: jsonrpcMethod,
+        tool_name: toolName,
         api_key: keyName,
         attribution,
         source_ip: sourceIp,
@@ -207,6 +210,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
         upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
         method,
         jsonrpc_method: null,
+        tool_name: null,
         api_key: keyName,
         attribution,
         source_ip: sourceIp,
@@ -276,6 +280,7 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
         upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
         method,
         jsonrpc_method: null,
+        tool_name: null,
         api_key: keyName,
         attribution,
         source_ip: sourceIp,

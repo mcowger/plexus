@@ -185,6 +185,7 @@ export interface McpLogRecord {
   upstream_url: string;
   method: 'POST' | 'GET' | 'DELETE';
   jsonrpc_method: string | null;
+  tool_name: string | null;
   api_key: string | null;
   attribution: string | null;
   source_ip: string | null;

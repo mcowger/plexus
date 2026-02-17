@@ -10,6 +10,7 @@ export const mcpRequestUsage = pgTable('mcp_request_usage', {
   upstreamUrl: text('upstream_url').notNull(),
   method: text('method').notNull(),
   jsonrpcMethod: text('jsonrpc_method'),
+  toolName: text('tool_name'),
   apiKey: text('api_key'),
   attribution: text('attribution'),
   sourceIp: text('source_ip'),

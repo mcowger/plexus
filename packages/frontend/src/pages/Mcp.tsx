@@ -453,11 +453,18 @@ export const McpPage: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* JSON-RPC Method */}
+                    {/* JSON-RPC Method + Tool Name */}
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                      <span className="font-mono text-xs">
-                        {log.jsonrpc_method || <span className="text-text-secondary">-</span>}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-xs">
+                          {log.jsonrpc_method || <span className="text-text-secondary">-</span>}
+                        </span>
+                        {log.tool_name && (
+                          <span className="font-mono text-xs text-info" title={log.tool_name}>
+                            {log.tool_name}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Duration */}

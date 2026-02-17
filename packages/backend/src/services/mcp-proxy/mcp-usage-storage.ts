@@ -14,6 +14,7 @@ interface McpRequestUsageRecord {
   upstream_url: string;
   method: 'POST' | 'GET' | 'DELETE';
   jsonrpc_method: string | null;
+  tool_name: string | null;
   api_key: string | null;
   attribution: string | null;
   source_ip: string | null;
@@ -69,6 +70,7 @@ export class McpUsageStorageService {
         upstreamUrl: record.upstream_url,
         method: record.method,
         jsonrpcMethod: record.jsonrpc_method,
+        toolName: record.tool_name,
         apiKey: record.api_key,
         attribution: record.attribution,
         sourceIp: record.source_ip,
@@ -149,6 +151,7 @@ export class McpUsageStorageService {
         upstream_url: r.upstreamUrl,
         method: r.method,
         jsonrpc_method: r.jsonrpcMethod,
+        tool_name: r.toolName ?? null,
         api_key: r.apiKey,
         attribution: r.attribution,
         source_ip: r.sourceIp,

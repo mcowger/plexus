@@ -136,6 +136,31 @@ export function extractJsonRpcMethod(body: unknown): string | null {
   return null;
 }
 
+/**
+ * Extracts the tool name from a JSON-RPC request body.
+ * For `tools/call` requests, the tool name is in `params.name`.
+ * Returns null for all other methods.
+ */
+export function extractToolName(body: unknown): string | null {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+
+  const rpcBody = body as Record<string, unknown>;
+
+  if (rpcBody.method !== 'tools/call') {
+    return null;
+  }
+
+  const params = rpcBody.params;
+  if (!params || typeof params !== 'object') {
+    return null;
+  }
+
+  const name = (params as Record<string, unknown>).name;
+  return typeof name === 'string' ? name : null;
+}
+
 export async function proxyMcpRequest(
   serverName: string,
   method: 'POST' | 'GET' | 'DELETE',
