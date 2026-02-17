@@ -10,6 +10,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates
 
+- **MCP Proxy Support**: Proxy streamable HTTP MCP servers through Plexus; each server is isolated per-request to prevent tool sprawl (stdio transport is not supported)
 - **OAuth Providers (pi-ai)**: Authenticate to Anthropic, GitHub Copilot, Gemini CLI, Antigravity, and OpenAI Codex via the Admin UI and route them with `oauth://` providers
 - **OAuth Management APIs**: Start, poll, prompt, and cancel OAuth login sessions via `/v0/management/oauth/*`
 - **Quota Tracking System**: Monitor provider rate limits and quotas with configurable checkers
@@ -79,6 +80,39 @@ Responses are stored for multi-turn conversation support:
 - **Retention**: 7-day TTL (configurable)
 - **Automatic Cleanup**: Hourly job removes expired responses and orphaned conversations
 - **Management API**: Retrieve, list, or delete stored responses via `/v1/responses/:response_id`
+
+## MCP Server Proxying
+
+Plexus can proxy [Model Context Protocol (MCP)](https://modelcontextprotocol.io) servers, surfacing their tools to any connected client without requiring the client to manage MCP connections directly.
+
+### Supported Transport
+
+Only **streamable HTTP** MCP servers are supported. The `stdio` transport is intentionally not supported, as it would require spawning and managing local processes, which is incompatible with a network gateway deployment model.
+
+### Per-Request Isolation
+
+Each request that uses MCP tooling connects to the configured MCP server(s) **in isolation**. A fresh session is created for every request and torn down when the request completes. This design prevents **tool sprawl** — the accumulation of stale tool registrations across sessions that can confuse models, inflate context windows, and produce unreliable tool selection.
+
+### Configuration
+
+Declare MCP servers in `config/plexus.yaml` under the relevant model alias or at the global level:
+
+```yaml
+mcp_servers:
+  - name: my-tools
+    url: https://my-mcp-server.example.com/mcp
+    # Optional: headers forwarded to the MCP server on each request
+    headers:
+      Authorization: "Bearer ${MY_MCP_TOKEN}"
+```
+
+### How It Works
+
+1. An incoming request arrives at Plexus (e.g., `/v1/chat/completions`).
+2. Plexus opens a **new** streamable HTTP session to each configured MCP server.
+3. Available tools are fetched and injected into the outgoing request to the upstream LLM provider.
+4. Any tool calls returned by the provider are executed against the MCP server within the same isolated session.
+5. Results are returned to the provider for the next turn, and the session is closed when the request cycle ends.
 
 ## License
 
