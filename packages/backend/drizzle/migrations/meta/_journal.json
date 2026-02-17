@@ -71,6 +71,13 @@
       "when": 1771133224200,
       "tag": "0009_concerned_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1771349868705,
+      "tag": "0010_absent_magma",
+      "breakpoints": true
     }
   ]
 }

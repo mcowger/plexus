@@ -591,6 +591,54 @@ This approach allows you to:
 - Maintain security without exposing separate secrets
 - Enable fine-grained usage analytics and cost allocation
 
+### MCP Servers (Optional)
+
+Plexus can act as a proxy for MCP (Model Context Protocol) servers. This allows you to expose remote MCP servers through Plexus with API key authentication.
+
+**Configuration Fields:**
+
+- **`upstream_url`**: (Required) The full URL of the MCP server endpoint. Supports both HTTP and HTTPS.
+- **`enabled`**: (Optional) Whether this MCP server is active. Defaults to `true`.
+- **`headers`**: (Optional) Static headers to include in every request to the upstream MCP server. Useful for authentication.
+
+**Example:**
+
+```yaml
+mcp_servers:
+  tavily:
+    upstream_url: "https://mcp.tavily.com/mcp/?tavilyApiKey=your-api-key"
+    enabled: true
+
+  filesystem:
+    upstream_url: "http://localhost:3001/mcp"
+    enabled: true
+    headers:
+      Authorization: "Bearer some-token"
+```
+
+**Endpoint Access:**
+
+MCP servers are exposed at `/mcp/:name` where `:name` is the key from your configuration:
+
+- `POST /mcp/:name` - JSON-RPC messages
+- `GET /mcp/:name` - Server-Sent Events (SSE) for streaming
+- `DELETE /mcp/:name` - Session termination
+
+**Authentication:**
+
+All MCP endpoints require authentication using Plexus API keys via the `Authorization: Bearer <key>` header. Client authentication headers are NOT forwarded to upstream servers - only static headers configured in `plexus.yaml` are used for upstream authentication.
+
+**OAuth Discovery Endpoints:**
+
+Plexus provides OAuth 2.0 discovery endpoints to support MCP clients that expect OAuth flows:
+
+- `GET /.well-known/oauth-authorization-server` - Authorization server metadata
+- `GET /.well-known/oauth-protected-resource` - Protected resource metadata  
+- `GET /.well-known/openid-configuration` - OpenID Connect configuration
+- `POST /register` - Dynamic client registration (returns static response indicating API key auth is used)
+
+These endpoints return metadata indicating that Plexus uses Bearer token authentication (API keys), allowing MCP clients to discover and use API key authentication.
+
 ### `adminKey` (Required)
 This global setting secures the Admin Dashboard and Management APIs (`/v0/*`). Cannot be configured via UI.
 

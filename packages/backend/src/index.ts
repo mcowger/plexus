@@ -17,6 +17,8 @@ import { OAuthAuthManager } from './services/oauth-auth-manager';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
+import { registerMcpRoutes } from './routes/mcp';
+import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
 
@@ -55,6 +57,7 @@ fastify.register(multipart, {
 
 const dispatcher = new Dispatcher();
 const usageStorage = new UsageStorageService();
+const mcpUsageStorage = new McpUsageStorageService();
 const quotaScheduler = QuotaScheduler.getInstance();
 
 // Initialize singletons with storage dependencies
@@ -150,6 +153,9 @@ fastify.setErrorHandler((error, request, reply) => {
 
 // --- Routes: v1 (Inference API) ---
 await registerInferenceRoutes(fastify, dispatcher, usageStorage);
+
+// --- Routes: MCP Proxy ---
+await registerMcpRoutes(fastify, mcpUsageStorage);
 
 // --- Response Storage Cleanup ---
 // Start cleanup job (runs every hour, deletes responses older than 7 days)
