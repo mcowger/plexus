@@ -10,6 +10,7 @@ import { registerSystemLogRoutes } from './management/system-logs';
 import { registerTestRoutes } from './management/test';
 import { registerQuotaRoutes } from './management/quotas';
 import { registerQuotaEnforcementRoutes } from './management/quota-enforcement';
+import { registerUserQuotaRoutes } from './management/user-quotas';
 import { registerOAuthRoutes } from './management/oauth';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { Dispatcher } from '../services/dispatcher';
@@ -36,4 +37,5 @@ export async function registerManagementRoutes(fastify: FastifyInstance, usageSt
     if (quotaEnforcer) {
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer);
     }
+    await registerUserQuotaRoutes(fastify);
 }
