@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.16.0 - 2026-02-18
+
+### v0.16.0: User Quota Management UI and Enforcement System with Anthropic Stream Handling Fix
+
+## New Features
+
+- **User Quota Management UI** - Added a new user interface for managing user quotas, allowing administrators to view and configure quota limits for users. ([fe2446c](https://github.com/mcowger/plexus/commit/fe2446c))
+
+- **User Quota Enforcement System** - Implemented a system to enforce quota limits on users, ensuring resource usage stays within configured boundaries. ([4ec7152](https://github.com/mcowger/plexus/commit/4ec7152))
+
+## Bug Fixes
+
+- **Anthropic Tool Call Stream Parse Handling** - Adjusted the parsing logic for tool call streams when using Anthropic API to ensure proper handling of streaming responses. ([d21b847](https://github.com/mcowger/plexus/commit/d21b847))
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.15.5 - 2026-02-18
 
 ### v0.15.5: Synthetic quota checker API update and streaming log improvements
