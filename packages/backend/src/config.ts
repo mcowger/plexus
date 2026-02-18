@@ -235,6 +235,26 @@ const ModelTargetSchema = z.object({
   enabled: z.boolean().default(true).optional(),
 });
 
+// Quota definition schemas for user quota enforcement
+const QuotaDefinitionSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('rolling'),
+    limitType: z.enum(['requests', 'tokens']),
+    limit: z.number().min(1),
+    duration: z.string().min(1), // e.g., "1h", "30m", "1d"
+  }),
+  z.object({
+    type: z.literal('daily'),
+    limitType: z.enum(['requests', 'tokens']),
+    limit: z.number().min(1),
+  }),
+  z.object({
+    type: z.literal('weekly'),
+    limitType: z.enum(['requests', 'tokens']),
+    limit: z.number().min(1),
+  }),
+]);
+
 const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
   priority: z.enum(['selector', 'api_match']).default('selector'),
@@ -246,6 +266,7 @@ const ModelConfigSchema = z.object({
 const KeyConfigSchema = z.object({
   secret: z.string(),
   comment: z.string().optional(),
+  quota: z.string().optional(), // References a quota definition name
 });
 
 const QuotaConfigSchema = z.object({
@@ -272,6 +293,7 @@ const RawPlexusConfigSchema = z.object({
   performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
+  user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
 }).passthrough();
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
@@ -288,6 +310,7 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
 export type QuotaConfig = z.infer<typeof QuotaConfigSchema>;
+export type QuotaDefinition = z.infer<typeof QuotaDefinitionSchema>;
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
 /**
@@ -388,6 +411,15 @@ function logConfigStats(config: PlexusConfig) {
       logger.warn(`DEPRECATED: Top-level 'quotas' array is no longer supported. Quota checkers should now be configured per-provider under providers.<name>.quota_checker. The top-level 'quotas' entries will be ignored.`);
       config.quotas.forEach((quota) => {
         logger.warn(`  - Ignoring: ${quota.id} (${quota.type})`);
+      });
+    }
+
+    if (config.user_quotas && Object.keys(config.user_quotas).length > 0) {
+      const userQuotaCount = Object.keys(config.user_quotas).length;
+      logger.info(`Loaded ${userQuotaCount} User Quota Definitions:`);
+      Object.entries(config.user_quotas).forEach(([name, quota]) => {
+        const quotaWithType = quota as { type: string; limitType: string; limit: number; duration?: string };
+        logger.info(`  - ${name}: ${quotaWithType.type} ${quotaWithType.limitType} (limit: ${quotaWithType.limit}${quotaWithType.duration ? `, duration: ${quotaWithType.duration}` : ''})`);
       });
     }
 

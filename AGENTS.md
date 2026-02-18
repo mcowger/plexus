@@ -209,14 +209,24 @@ To add a new table or modify existing schema:
    });
    ```
 
-2. **Generate migration**:
+2. **Update exports for new tables**: When adding a NEW table (not just columns), you MUST update `drizzle/schema/index.ts` to export the new schema so drizzle-kit can detect it:
+   ```typescript
+   // Add to SQLite exports (top section)
+   export * from './sqlite/new-table-name';
+   
+   // Add to PostgreSQL exports (bottom section)
+   export { newTableName as pgNewTableName } from './postgres/new-table-name';
+   ```
+   **CRITICAL**: Without updating these exports, `drizzle-kit generate` will report "No schema changes" and won't create migrations.
+
+3. **Generate migration**:
    ```bash
    bunx drizzle-kit generate
    ```
 
-3. **Review the generated SQL** in `drizzle/migrations/XXXX_description.sql`
+4. **Review the generated SQL** in `drizzle/migrations/XXXX_description.sql`
 
-4. **Restart the application** - migrations auto-apply on startup
+5. **Restart the application** - migrations auto-apply on startup
 
 ### 6.5 Type Definitions
 

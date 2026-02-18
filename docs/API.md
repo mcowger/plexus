@@ -421,6 +421,78 @@ The Quota Management APIs provide endpoints for monitoring provider rate limits 
 
 ---
 
+## User Quota Enforcement API (`/v0/management/quota`)
+
+Plexus supports per-API-key quota enforcement to limit usage by requests or tokens. Quotas are defined in the configuration and assigned to keys.
+
+### Clear Quota
+
+- **Endpoint:** `POST /v0/management/quota/clear`
+- **Description:** Resets quota usage to zero for a specific API key.
+- **Request Body:**
+  ```json
+  {
+    "key": "acme_corp"
+  }
+  ```
+- **Response Format:**
+  ```json
+  {
+    "success": true,
+    "key": "acme_corp",
+    "message": "Quota reset successfully"
+  }
+  ```
+
+### Get Quota Status
+
+- **Endpoint:** `GET /v0/management/quota/status/:key`
+- **Description:** Returns current quota status for an API key.
+- **Response Format (with quota assigned):**
+  ```json
+  {
+    "key": "acme_corp",
+    "quota_name": "premium_hourly",
+    "allowed": true,
+    "current_usage": 45000,
+    "limit": 100000,
+    "remaining": 55000,
+    "resets_at": "2026-02-19T01:00:00.000Z"
+  }
+  ```
+- **Response Format (no quota assigned):**
+  ```json
+  {
+    "key": "free_user",
+    "quota_name": null,
+    "allowed": true,
+    "current_usage": 0,
+    "limit": null,
+    "remaining": null,
+    "resets_at": null
+  }
+  ```
+
+### Quota Enforcement Behavior
+
+- **Quota Types:** Supports rolling (leaky bucket), daily, and weekly quotas
+- **Limit Types:** `requests` (count) or `tokens` (sum of input + output)
+- **Quota Exceeded Response:** When quota is exceeded, requests receive HTTP 429:
+  ```json
+  {
+    "error": {
+      "message": "Quota exceeded: premium_hourly limit of 100000 reached",
+      "type": "quota_exceeded",
+      "quota_name": "premium_hourly",
+      "current_usage": 125671,
+      "limit": 100000,
+      "resets_at": "2026-02-19T01:00:00.000Z"
+    }
+  }
+  ```
+
+---
+
 ## MCP Proxy API
 
 Plexus can proxy MCP (Model Context Protocol) servers. Configure MCP servers in `plexus.yaml` under the `mcp_servers` section.

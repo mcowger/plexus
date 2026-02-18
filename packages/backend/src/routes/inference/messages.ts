@@ -7,8 +7,10 @@ import { UsageRecord } from '../../types/usage';
 import { handleResponse } from '../../services/response-handler';
 import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
+import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
+import { checkQuotaMiddleware, recordQuotaUsage } from '../../services/quota/quota-middleware';
 
-export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService) {
+export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService, quotaEnforcer?: QuotaEnforcer) {
     /**
      * POST /v1/messages
      * Anthropic Compatible Endpoint.
@@ -53,19 +55,25 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
             }
 
             DebugManager.getInstance().startLog(requestId, body);
-            
+
+            // Check quota before processing
+            if (quotaEnforcer) {
+                const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+                if (!allowed) return;
+            }
+
             const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
-            
+
             // Determine if token estimation is needed
             const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
-            
+
             // Capture request metadata
             usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
             usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
-            // Anthropic doesn't have parallel_tool_calls like OpenAI, but can check for multi-tool preference
+            // Anthropic doesn't have a direct parallel tool calls setting like OpenAI, but can check for multi-tool preference
             usageRecord.parallelToolCallsEnabled = null;
-            
-            return await handleResponse(
+
+            const result = await handleResponse(
                 request,
                 reply,
                 unifiedResponse,
@@ -77,6 +85,13 @@ export async function registerMessagesRoute(fastify: FastifyInstance, dispatcher
                 shouldEstimateTokens,
                 body
             );
+
+            // Record quota usage after request completes
+            if (quotaEnforcer) {
+                await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
+            }
+
+            return result;
         } catch (e: any) {
             usageRecord.responseStatus = 'error';
             usageRecord.durationMs = Date.now() - startTime;

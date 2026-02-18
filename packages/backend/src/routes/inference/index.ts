@@ -3,6 +3,7 @@ import bearerAuth from '@fastify/bearer-auth';
 import { createAuthHook } from '../../utils/auth';
 import { Dispatcher } from '../../services/dispatcher';
 import { UsageStorageService } from '../../services/usage-storage';
+import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { registerModelsRoute } from './models';
 import { registerChatRoute } from './chat';
 import { registerMessagesRoute } from './messages';
@@ -13,7 +14,7 @@ import { registerSpeechRoute } from './speech';
 import { registerImagesRoute } from './images';
 import { registerResponsesRoute } from './responses';
 
-export async function registerInferenceRoutes(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService) {
+export async function registerInferenceRoutes(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService, quotaEnforcer?: QuotaEnforcer) {
     // Public Routes (Excluded from Auth)
     await registerModelsRoute(fastify);
     
@@ -25,10 +26,10 @@ export async function registerInferenceRoutes(fastify: FastifyInstance, dispatch
 
         await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
 
-        await registerChatRoute(protectedRoutes, dispatcher, usageStorage);
-        await registerMessagesRoute(protectedRoutes, dispatcher, usageStorage);
-        await registerGeminiRoute(protectedRoutes, dispatcher, usageStorage);
-        await registerResponsesRoute(protectedRoutes, dispatcher, usageStorage);
+        await registerChatRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+        await registerMessagesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+        await registerGeminiRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+        await registerResponsesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
         await registerEmbeddingsRoute(protectedRoutes, dispatcher, usageStorage);
         await registerTranscriptionsRoute(protectedRoutes, dispatcher, usageStorage);
         await registerSpeechRoute(protectedRoutes, dispatcher, usageStorage);
