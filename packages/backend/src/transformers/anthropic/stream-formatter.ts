@@ -25,6 +25,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
   let nextBlockIndex = 0;
   let activeBlockType: "text" | "thinking" | "tool_use" | null = null;
   let activeBlockIndex: number | null = null;
+  let activeToolCallId: string | null = null;
 
   // Track usage and finish reason across chunks
   let lastUsage: any = null;
@@ -78,6 +79,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
           });
         activeBlockType = null;
           activeBlockIndex = null;
+          activeToolCallId = null;
         }
       };
 
@@ -89,6 +91,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
 
     activeBlockIndex = nextBlockIndex++;
         activeBlockType = type;
+        activeToolCallId = type === "tool_use" ? (info?.id ?? null) : null;
 
         let content_block: any;
         if (type === "text") {
@@ -157,11 +160,21 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
         // Tool Calls
         if (chunk.delta.tool_calls) {
          for (const tc of chunk.delta.tool_calls) {
-            if (tc.id) {
+            const toolCallId = tc.id;
+            const shouldStartToolBlock =
+              activeBlockType !== "tool_use" ||
+              activeBlockIndex === null ||
+              (toolCallId !== undefined && toolCallId !== activeToolCallId);
+
+            if (shouldStartToolBlock) {
+              if (!toolCallId) {
+                continue;
+              }
+
               startBlock("tool_use", {
-       id: tc.id,
-             name: tc.function?.name,
-             });
+                id: toolCallId,
+                name: tc.function?.name,
+              });
             }
 
           if (tc.function?.arguments) {

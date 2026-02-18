@@ -353,25 +353,7 @@ export function piAiEventToChunk(
       return null;
     }
     case 'toolcall_end':
-      {
-        const { callId } = parseToolCallIds(event.toolCall.id);
-        return {
-          ...baseChunk,
-          delta: {
-            tool_calls: [
-              {
-                index: event.contentIndex,
-                id: callId || event.toolCall.id,
-                type: 'function',
-                function: {
-                  name: stripProxyPrefix(event.toolCall.name),
-                  arguments: JSON.stringify(event.toolCall.arguments)
-                }
-              }
-            ]
-          }
-        };
-      }
+      return null;
     case 'done':
       return {
         ...baseChunk,
