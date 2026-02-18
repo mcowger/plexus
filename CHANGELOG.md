@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.15.5 - 2026-02-18
+
+### v0.15.5: Synthetic quota checker API update and streaming log improvements
+
+## New Features
+
+- **Synthetic Quota Checker API Update**: Updated the synthetic quota checker to work with the new `freeToolCalls` API structure. This ensures proper integration with the latest quota management system.
+  - Commit: [e997e17](https://github.com/mcowger/plexus/commit/e997e17)
+
+## Improvements
+
+- **Condensed Streaming Logs**: Streaming request logs have been optimized to output as a single line instead of multiple lines, reducing log verbosity and improving readability.
+  - Commit: [3057c28](https://github.com/mcowger/plexus/commit/3057c28)
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.15.4 - 2026-02-17
 
 ### v0.15.4 - Dependency Updates and Log Level Adjustments
