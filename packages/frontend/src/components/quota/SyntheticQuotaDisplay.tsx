@@ -104,7 +104,7 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
         <div className="flex items-center gap-3 text-[10px] text-text-secondary">
           {dailyWindow && dailyWindow.limit && (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-text-secondary">Tools</span>
+              <span className="text-text-secondary">Free Tool Calls</span>
               <div className="relative flex-1 h-1.5 rounded-full bg-bg-hover overflow-hidden">
                 <div
                   className={clsx(

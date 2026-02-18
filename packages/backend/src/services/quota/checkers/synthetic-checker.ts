@@ -16,7 +16,7 @@ interface SyntheticQuotaResponse {
       renewsAt?: string;
     };
   };
-  toolCallDiscounts?: {
+  freeToolCalls?: {
     limit?: number;
     requests?: number;
     remaining?: number;
@@ -75,15 +75,15 @@ export class SyntheticQuotaChecker extends QuotaChecker {
         ));
       }
 
-      if (data.toolCallDiscounts) {
+      if (data.freeToolCalls) {
         windows.push(this.createWindow(
           'daily',
-          data.toolCallDiscounts.limit,
-          data.toolCallDiscounts.requests,
-          data.toolCallDiscounts.remaining,
+          data.freeToolCalls.limit,
+          data.freeToolCalls.requests,
+          data.freeToolCalls.remaining,
           'requests',
-          data.toolCallDiscounts.renewsAt ? new Date(data.toolCallDiscounts.renewsAt) : undefined,
-          'Daily tool call discount quota'
+          data.freeToolCalls.renewsAt ? new Date(data.freeToolCalls.renewsAt) : undefined,
+          'Daily free tool calls/small requests'
         ));
       }
 
