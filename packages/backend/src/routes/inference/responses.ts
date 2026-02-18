@@ -8,11 +8,14 @@ import { UsageRecord } from '../../types/usage';
 import { handleResponse } from '../../services/response-handler';
 import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
+import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
+import { checkQuotaMiddleware, recordQuotaUsage } from '../../services/quota/quota-middleware';
 
 export async function registerResponsesRoute(
   fastify: FastifyInstance,
   dispatcher: Dispatcher,
-  usageStorage: UsageStorageService
+  usageStorage: UsageStorageService,
+  quotaEnforcer?: QuotaEnforcer
 ) {
   const responsesStorage = new ResponsesStorageService();
 
@@ -119,7 +122,13 @@ export async function registerResponsesRoute(
       }
 
       DebugManager.getInstance().startLog(requestId, body);
-      
+
+      // Check quota before processing
+      if (quotaEnforcer) {
+        const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+        if (!allowed) return;
+      }
+
       const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
       
       // Determine if token estimation is needed
@@ -145,6 +154,11 @@ export async function registerResponsesRoute(
         body
       );
 
+      // Record quota usage after request completes
+      if (quotaEnforcer) {
+        await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
+      }
+
       // Store response if requested and not streaming
       if (body.store !== false && !body.stream) {
         const formattedResponse = await transformer.formatResponse(unifiedResponse);
@@ -155,7 +169,7 @@ export async function registerResponsesRoute(
           const conversationId = typeof body.conversation === 'string'
             ? body.conversation
             : body.conversation.id;
-          
+
           await responsesStorage.updateConversation(
             conversationId,
             formattedResponse.output,

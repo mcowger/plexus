@@ -1,0 +1,1 @@
+ALTER TABLE "quota_state" ADD COLUMN "limit_type" text NOT NULL;

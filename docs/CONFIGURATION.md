@@ -499,6 +499,7 @@ This section defines the API keys required to access the Plexus gateway inferenc
 - **Key Name**: A unique identifier for the key (e.g., `client-app-1`).
 - **`secret`**: The actual bearer token string clients must provide in the `Authorization` header.
 - **`comment`**: (Optional) A friendly description or owner name for the key.
+- **`quota`**: (Optional) The name of a quota definition from `user_quotas` to enforce for this key. See [User Quota Enforcement](#user-quota-enforcement) for details.
 
 **Example:**
 
@@ -747,6 +748,139 @@ Once configured, quota data is available via the Management API:
 - `POST /v0/management/quotas/:checkerId/check` - Trigger an immediate quota check
 
 See the [API Documentation](./API.md#quota-management) for response formats.
+
+### `user_quotas` (Optional)
+
+User quotas enable per-API-key usage enforcement. Unlike provider quota checkers (which monitor provider rate limits), user quotas limit how much an individual API key can consume.
+
+**Key Features:**
+- **Per-key enforcement**: Each API key can have its own quota
+- **Post-hoc enforcement**: Requests are processed even if they exceed quota; subsequent requests are blocked
+- **Rolling or calendar windows**: Leaky bucket (continuous decay) or fixed reset periods
+- **Requests or tokens**: Count requests or sum total token usage
+
+**Quota Types:**
+
+| Type | Description | Reset Behavior |
+|------|-------------|----------------|
+| `rolling` | Leaky bucket algorithm | Continuously "leaks" usage over time based on duration |
+| `daily` | Calendar day quota | Resets at UTC midnight every day |
+| `weekly` | Calendar week quota | Resets at UTC midnight on Sunday |
+
+**Limit Types:**
+
+- `requests`: Count each API call as 1 unit
+- `tokens`: Sum input + output + reasoning + cached tokens
+
+**Configuration Fields:**
+
+```yaml
+user_quotas:
+  <quota-name>:
+    type: rolling | daily | weekly
+    limitType: requests | tokens
+    limit: <number>
+    duration: <duration-string>  # Only for rolling type
+```
+
+- **`type`** (required): `rolling`, `daily`, or `weekly`
+- **`limitType`** (required): `requests` or `tokens`
+- **`limit`** (required): Maximum allowed usage
+- **`duration`** (required for `rolling`): Duration string like `1h`, `30m`, `1d`, `5h30m`
+
+**Duration Formats:**
+- `30s` - 30 seconds
+- `5m` - 5 minutes
+- `1h` - 1 hour
+- `2h30m` - 2 hours 30 minutes
+- `1d` - 1 day
+
+**Examples:**
+
+```yaml
+user_quotas:
+  # Rolling token quota - 100k tokens per hour
+  premium_hourly:
+    type: rolling
+    limitType: tokens
+    limit: 100000
+    duration: 1h
+
+  # Rolling request quota - 10 requests per 5 minutes
+  burst_limited:
+    type: rolling
+    limitType: requests
+    limit: 10
+    duration: 5m
+
+  # Daily request quota - 1000 requests per day
+  basic_daily:
+    type: daily
+    limitType: requests
+    limit: 1000
+
+  # Weekly token quota - 5M tokens per week
+  enterprise_weekly:
+    type: weekly
+    limitType: tokens
+    limit: 5000000
+```
+
+**Assigning Quotas to Keys:**
+
+```yaml
+keys:
+  acme_corp:
+    secret: "sk-acme-secret"
+    comment: "Acme Corp - Premium Plan"
+    quota: premium_hourly
+
+  dev_team:
+    secret: "sk-dev-secret"
+    comment: "Development team"
+    quota: burst_limited
+
+  free_user:
+    secret: "sk-free-secret"
+    quota: basic_daily
+
+  unlimited:
+    secret: "sk-unlimited"
+    comment: "Internal testing - no quota"
+    # No quota field = unlimited access
+```
+
+**How Rolling (Leaky Bucket) Quotas Work:**
+
+Rolling quotas use a "leaky bucket" algorithm where usage continuously decays over time:
+
+1. **Usage is recorded** after each request completes
+2. **On the next request**, usage "leaks" based on time elapsed:
+   - `leaked = elapsed_time * (limit / duration)`
+   - `current_usage = max(0, current_usage - leaked)`
+3. **New usage is added** to the remaining amount
+
+**Example:**
+- Quota: 10 requests per hour
+- You make 10 requests at 12:00 PM → `current_usage = 10`
+- At 12:30 PM (30 min later), you make another request:
+  - 50% of the hour elapsed → 5 requests "leaked"
+  - `current_usage = max(0, 10 - 5) = 5`
+  - New request adds 1 → `current_usage = 6`
+
+**Note:** Even for `requests` quotas, the current usage value stored in the database may be fractional due to the leak calculation. This is expected behavior.
+
+**Quota Change Detection:**
+
+If you change a quota's `limitType` (e.g., from `requests` to `tokens`) or assign a key to a different quota, Plexus automatically detects this and resets usage to zero. The database stores the quota name and limit type to detect changes.
+
+**Admin API:**
+
+Manage user quotas via the Management API:
+- `GET /v0/management/quota/status/:key` - Check quota status for a key
+- `POST /v0/management/quota/clear` - Reset quota usage to zero
+
+See the [API Documentation](./API.md#user-quota-enforcement-api) for details.
 
 ## Token Estimation
 

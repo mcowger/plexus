@@ -10,6 +10,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates
 
+- **User Quota Enforcement**: Per-API-key quota limits using rolling (leaky bucket), daily, or weekly windows. Limit by requests or tokens.
 - **MCP Proxy Support**: Proxy streamable HTTP MCP servers through Plexus; each server is isolated per-request to prevent tool sprawl (stdio transport is not supported)
 - **OAuth Providers (pi-ai)**: Authenticate to Anthropic, GitHub Copilot, Gemini CLI, Antigravity, and OpenAI Codex via the Admin UI and route them with `oauth://` providers
 - **OAuth Management APIs**: Start, poll, prompt, and cancel OAuth login sessions via `/v0/management/oauth/*`
@@ -21,7 +22,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 - **Token Estimation**: Automatic token counting for providers that don't return usage data
 - **Bulk Model Import**: Import models directly in provider configuration
 - **Direct Model Routing**: Route directly to provider models with `direct/provider/model` format
-- **Responses API Support**: Full OpenAI `/v1/responses` endpoint with multi-turn conversation support.  Inckudes support for previous_response_id tracking and injection, something many proxy tools lack.    
+- **Responses API Support**: Full OpenAI `/v1/responses` endpoint with multi-turn conversation support.  Inckudes support for previous_response_id tracking and injection, something many proxy tools lack.
 - **Automatic Response Cleanup**: Responses are retained for 7 days with hourly cleanup jobs to prevent database bloat
 
 ### Database & ORM
@@ -80,6 +81,65 @@ Responses are stored for multi-turn conversation support:
 - **Retention**: 7-day TTL (configurable)
 - **Automatic Cleanup**: Hourly job removes expired responses and orphaned conversations
 - **Management API**: Retrieve, list, or delete stored responses via `/v1/responses/:response_id`
+
+## User Quota Enforcement
+
+Plexus supports per-API-key quota enforcement to limit usage by requests or tokens. Assign quotas to keys and enforce limits using rolling (leaky bucket), daily, or weekly windows.
+
+### Features
+
+- **Per-Key Quotas**: Each API key can have its own quota or unlimited access
+- **Rolling (Leaky Bucket)**: Continuously "leaks" usage over time (e.g., 1000 requests/hour)
+- **Calendar Windows**: Daily (resets at UTC midnight) or Weekly (resets Sunday at UTC midnight)
+- **Limit Types**: Count `requests` or sum total `tokens` (input + output + reasoning + cached)
+- **Post-Hoc Enforcement**: Requests are processed even if they exceed quota; subsequent requests are blocked with HTTP 429
+- **Automatic Reset**: When quota type changes (requests→tokens or vice versa), usage resets automatically
+
+### Quick Example
+
+```yaml
+user_quotas:
+  premium_hourly:
+    type: rolling
+    limitType: tokens
+    limit: 100000
+    duration: 1h
+
+  basic_daily:
+    type: daily
+    limitType: requests
+    limit: 1000
+
+keys:
+  acme_corp:
+    secret: "sk-acme-secret"
+    quota: premium_hourly  # 100k tokens/hour
+
+  free_user:
+    secret: "sk-free-secret"
+    quota: basic_daily     # 1000 requests/day
+
+  internal_test:
+    secret: "sk-test-secret"
+    # No quota = unlimited
+```
+
+### How Rolling Quotas Work
+
+Rolling quotas use a "leaky bucket" algorithm:
+
+1. **Usage accumulates** after each request
+2. **On next request**, usage "leaks" based on elapsed time: `leaked = elapsed_time * (limit / duration)`
+3. **New usage added** to remaining amount
+
+**Example**: 10 requests/hour quota
+- You make 10 requests at 12:00 PM → `usage = 10`
+- At 12:30 PM (30 min later): 50% leaked → `usage = 5`
+- New request: `usage = 6`
+
+Even for `requests` quotas, the stored value may be fractional due to leak calculation—this is expected.
+
+See [Configuration Guide](docs/CONFIGURATION.md#user_quotas-optional) and [API Reference](docs/API.md#user-quota-enforcement-api) for details.
 
 ## MCP Server Proxying
 

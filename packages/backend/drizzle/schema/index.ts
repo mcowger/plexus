@@ -7,6 +7,7 @@ export * from './sqlite/provider-performance';
 export * from './sqlite/quota-snapshots';
 export * from './sqlite/responses';
 export * from './sqlite/mcp';
+export * from './sqlite/quota-state';
 export { requestUsageRelations, debugLogsRelations, inferenceErrorsRelations } from './sqlite/relations';
 
 // Dialect-specific PostgreSQL exports
@@ -18,3 +19,4 @@ export { providerPerformance as pgProviderPerformance } from './postgres/provide
 export { quotaSnapshots as pgQuotaSnapshots } from './postgres/quota-snapshots';
 export { responses as pgResponses, conversations as pgConversations, responseItems as pgResponseItems } from './postgres/responses';
 export { mcpRequestUsage as pgMcpRequestUsage, mcpDebugLogs as pgMcpDebugLogs } from './postgres/mcp';
+export { quotaState as pgQuotaState } from './postgres/quota-state';

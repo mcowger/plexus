@@ -19,6 +19,7 @@ import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
 import { registerMcpRoutes } from './routes/mcp';
 import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
+import { QuotaEnforcer } from './services/quota/quota-enforcer';
 import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
 
@@ -104,6 +105,15 @@ try {
     logger.error('Failed to initialize quota checkers', e);
 }
 
+// Initialize user quota enforcer (requires DB to be ready)
+let quotaEnforcer: QuotaEnforcer | undefined;
+try {
+    quotaEnforcer = new QuotaEnforcer();
+    logger.info('User quota enforcer initialized');
+} catch (e) {
+    logger.error('Failed to initialize user quota enforcer', e);
+}
+
 // --- Hooks & Global Logic ---
 
 // Global Unhandled Rejection Handler
@@ -152,7 +162,7 @@ fastify.setErrorHandler((error, request, reply) => {
 });
 
 // --- Routes: v1 (Inference API) ---
-await registerInferenceRoutes(fastify, dispatcher, usageStorage);
+await registerInferenceRoutes(fastify, dispatcher, usageStorage, quotaEnforcer);
 
 // --- Routes: MCP Proxy ---
 await registerMcpRoutes(fastify, mcpUsageStorage);
@@ -163,7 +173,7 @@ const responsesStorage = new ResponsesStorageService();
 responsesStorage.startCleanupJob(1, 7);
 
 // --- Management API (v0) ---
-await registerManagementRoutes(fastify, usageStorage, dispatcher, quotaScheduler, mcpUsageStorage);
+await registerManagementRoutes(fastify, usageStorage, dispatcher, quotaScheduler, mcpUsageStorage, quotaEnforcer);
 
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));
