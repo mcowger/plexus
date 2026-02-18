@@ -650,6 +650,14 @@ export interface KeyConfig {
     key: string; // The user-facing alias/name for the key (e.g. 'my-app')
     secret: string; // The actual sk-uuid
     comment?: string;
+    quota?: string; // Optional quota assignment
+}
+
+export interface UserQuota {
+    type: 'rolling' | 'daily' | 'weekly';
+    limitType: 'requests' | 'tokens';
+    limit: number;
+    duration?: string; // Required for rolling type
 }
 
 export interface QuotaConfig {
@@ -1080,7 +1088,8 @@ export const api = {
           return Object.entries(config.keys).map(([key, val]) => ({
               key,
               secret: val.secret,
-              comment: val.comment
+              comment: val.comment,
+              quota: val.quota
           }));
       } catch (e) {
           console.error("API Error getKeys", e);
@@ -1107,7 +1116,8 @@ export const api = {
 
       config.keys[keyConfig.key] = {
           secret: keyConfig.secret,
-          comment: keyConfig.comment
+          comment: keyConfig.comment,
+          ...(keyConfig.quota ? { quota: keyConfig.quota } : {})
       };
 
       const newYaml = stringify(config);
@@ -1902,6 +1912,100 @@ quota_checker: provider.quotaChecker?.type
       } catch (e) {
           console.error("API Error deleteAllMcpLogs", e);
           return false;
+      }
+  },
+
+  // User Quota Management
+  getUserQuotas: async (): Promise<Record<string, UserQuota>> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/user-quotas`);
+          if (!res.ok) throw new Error('Failed to fetch user quotas');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getUserQuotas", e);
+          return {};
+      }
+  },
+
+  getUserQuota: async (name: string): Promise<UserQuota | null> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/user-quotas/${encodeURIComponent(name)}`);
+          if (!res.ok) {
+              if (res.status === 404) return null;
+              throw new Error('Failed to fetch user quota');
+          }
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getUserQuota", e);
+          return null;
+      }
+  },
+
+  saveUserQuota: async (name: string, quota: UserQuota): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/user-quotas/${encodeURIComponent(name)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(quota)
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(err.error?.message || err.error || 'Failed to save quota');
+      }
+  },
+
+  updateUserQuota: async (name: string, updates: Partial<UserQuota>): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/user-quotas/${encodeURIComponent(name)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(err.error?.message || err.error || 'Failed to update quota');
+      }
+  },
+
+  deleteUserQuota: async (name: string): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/user-quotas/${encodeURIComponent(name)}`, {
+          method: 'DELETE'
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(err.error?.message || err.error || 'Failed to delete quota');
+      }
+  },
+
+  getQuotaStatus: async (key: string): Promise<{
+      key: string;
+      quota_name: string | null;
+      allowed: boolean;
+      current_usage: number;
+      limit: number | null;
+      remaining: number | null;
+      resets_at: string | null;
+  } | null> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/quota/status/${encodeURIComponent(key)}`);
+          if (!res.ok) {
+              if (res.status === 404) return null;
+              throw new Error('Failed to fetch quota status');
+          }
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getQuotaStatus", e);
+          return null;
+      }
+  },
+
+  clearQuota: async (key: string): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/quota/clear`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(err.error?.message || err.error || 'Failed to clear quota');
       }
   }
 };
