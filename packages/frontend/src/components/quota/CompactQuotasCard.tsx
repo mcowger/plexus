@@ -8,8 +8,9 @@ interface CompactQuotasCardProps {
   getQuotaResult: (quota: QuotaCheckerInfo) => any;
 }
 
-// Non-core usage types to exclude
+// Non-core usage types to exclude (but NOT for synthetic which has free tool calls)
 const EXCLUDED_USAGE_TYPES = ['tools', 'search', 'mcp', 'tool', 'discount'];
+const EXCLUDED_USAGE_TYPES_WITHOUT_TOOL_CALLS = ['search', 'mcp'];
 
 export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
   rateLimitQuotas,
@@ -45,18 +46,23 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
         const displayName = toTitleCase(quota.checkerId);
         const windows = result.windows || [];
         
-        // Filter out non-core usage types and sort by window type priority
+        // For synthetic quota, show subscription + free tool calls (daily window)
+        // For others, filter out tool/search windows
+        const isSynthetic = quota.checkerId.toLowerCase().includes('synthetic');
+        const exclusions = isSynthetic ? EXCLUDED_USAGE_TYPES_WITHOUT_TOOL_CALLS : EXCLUDED_USAGE_TYPES;
+        
         const coreWindows = windows.filter((w: any) => {
           const label = (w.windowLabel || '').toLowerCase();
-          return !EXCLUDED_USAGE_TYPES.some(excluded => label.includes(excluded));
+          return !exclusions.some(excluded => label.includes(excluded));
         });
 
-        // Sort windows: five_hour > daily > weekly > monthly
+        // Sort windows: subscription > five_hour > daily > weekly > monthly
         const windowPriority: Record<string, number> = {
-          'five_hour': 1,
-          'daily': 2,
-          'weekly': 3,
-          'monthly': 4,
+          'subscription': 1,
+          'five_hour': 2,
+          'daily': 3,
+          'weekly': 4,
+          'monthly': 5,
         };
         
         coreWindows.sort((a: any, b: any) => {
