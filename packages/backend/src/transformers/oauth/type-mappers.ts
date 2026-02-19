@@ -17,6 +17,87 @@ import type {
   MessageContent,
   UnifiedUsage
 } from '../../types/unified';
+import { logger } from '../../utils/logger';
+import { writeFileSync, appendFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
+
+// ---------------------------------------------------------------------------
+// Corruption detector
+// ---------------------------------------------------------------------------
+// Matches codepoints that should never appear in SSE-decoded JSON tool call
+// arguments: CJK Unified Ideographs, CJK extensions, Hangul, Hiragana,
+// Katakana, Kannada, and the supplementary Private Use Area (PUA).  These
+// ranges have zero overlap with valid ASCII/Latin JSON content and are a
+// reliable fingerprint of a TextDecoder mis-decode at a chunk boundary.
+const CORRUPTION_PATTERN =
+  /[\u2E80-\u9FFF\uAC00-\uD7AF\u3040-\u30FF\u0C80-\u0CFF\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u{100000}-\u{10FFFF}]/u;
+
+const CORRUPTION_LOG_DIR = '/tmp/plexus-corruption';
+let corruptionLogPath: string | null = null;
+
+function getCorruptionLogPath(): string {
+  if (!corruptionLogPath) {
+    try {
+      mkdirSync(CORRUPTION_LOG_DIR, { recursive: true });
+    } catch { /* already exists */ }
+    corruptionLogPath = join(CORRUPTION_LOG_DIR, `oauth-corruption-${Date.now()}.jsonl`);
+  }
+  return corruptionLogPath;
+}
+
+function toHexEscapes(str: string): string {
+  let out = '';
+  for (const ch of str) {
+    const cp = ch.codePointAt(0)!;
+    out += cp > 0x7e ? `\\u{${cp.toString(16).toUpperCase()}}` : ch;
+  }
+  return out;
+}
+
+function checkForCorruption(
+  context: string,
+  delta: string,
+  event: AssistantMessageEvent
+): void {
+  if (!CORRUPTION_PATTERN.test(delta)) return;
+
+  // Collect all suspicious codepoints for the log
+  const suspiciousCodepoints: string[] = [];
+  for (const ch of delta) {
+    const cp = ch.codePointAt(0)!;
+    if (cp > 0x7e) {
+      suspiciousCodepoints.push(`U+${cp.toString(16).toUpperCase().padStart(4, '0')} (${ch})`);
+    }
+  }
+
+  const record = {
+    timestamp: new Date().toISOString(),
+    context,
+    eventType: event.type,
+    deltaLength: delta.length,
+    deltaRaw: delta,
+    deltaHex: toHexEscapes(delta),
+    suspiciousCodepoints,
+    fullEvent: JSON.stringify(event)
+  };
+
+  // Log at CRITICAL level so it surfaces regardless of log-level configuration
+  logger.error(
+    `[OAuthCorruptionDetector] CRITICAL: Suspicious codepoints detected in ${context}. ` +
+    `event.type=${event.type} deltaLength=${delta.length} ` +
+    `codepoints=[${suspiciousCodepoints.join(', ')}] ` +
+    `deltaHex="${record.deltaHex}"`,
+    { corruptionRecord: record }
+  );
+
+  // Also write to a dedicated file so the evidence survives log rotation
+  // and is easy to retrieve from the container
+  try {
+    appendFileSync(getCorruptionLogPath(), JSON.stringify(record) + '\n', 'utf8');
+  } catch (e) {
+    logger.error('[OAuthCorruptionDetector] Failed to write corruption record to file', e as Error);
+  }
+}
 
 export function unifiedToContext(request: UnifiedChatRequest): Context {
   const context: Context = {
@@ -296,11 +377,13 @@ export function piAiEventToChunk(
         delta: { role: 'assistant' }
       };
     case 'text_delta':
+      checkForCorruption('text_delta', event.delta, event);
       return {
         ...baseChunk,
         delta: { content: event.delta }
       };
     case 'thinking_delta':
+      checkForCorruption('thinking_delta', event.delta, event);
       return {
         ...baseChunk,
         delta: {
@@ -332,6 +415,7 @@ export function piAiEventToChunk(
     case 'toolcall_delta': {
       const toolCall = event.partial?.content?.[event.contentIndex];
       if (toolCall && toolCall.type === 'toolCall') {
+        checkForCorruption('toolcall_delta', event.delta, event);
         const { callId } = parseToolCallIds((toolCall as any).id);
         return {
           ...baseChunk,
