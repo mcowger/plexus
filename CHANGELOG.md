@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.16.1 - 2026-02-19
+
+### v0.16.1: Quota and Balance History Display
+
+Show popups of quota usage history and balance history when clicking a quota card
+
 ## v0.16.0 - 2026-02-18
 
 ### v0.16.0: User Quota Management UI and Enforcement System with Anthropic Stream Handling Fix
