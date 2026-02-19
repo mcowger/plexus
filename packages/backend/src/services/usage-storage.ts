@@ -581,6 +581,8 @@ export class UsageStorageService extends EventEmitter {
                         minTokensPerSec: min(this.schema.providerPerformance.tokensPerSec),
                         maxTokensPerSec: max(this.schema.providerPerformance.tokensPerSec),
                         sampleCount: count(),
+                        successCount: sql<number>`COALESCE(${sum(this.schema.providerPerformance.successCount)}, 0)`,
+                        failureCount: sql<number>`COALESCE(${sum(this.schema.providerPerformance.failureCount)}, 0)`,
                         lastUpdated: max(this.schema.providerPerformance.createdAt)
                     })
                     .from(this.schema.providerPerformance)
@@ -603,6 +605,8 @@ export class UsageStorageService extends EventEmitter {
                         minTokensPerSec: min(this.schema.providerPerformance.tokensPerSec),
                         maxTokensPerSec: max(this.schema.providerPerformance.tokensPerSec),
                         sampleCount: count(),
+                        successCount: sql<number>`COALESCE(${sum(this.schema.providerPerformance.successCount)}, 0)`,
+                        failureCount: sql<number>`COALESCE(${sum(this.schema.providerPerformance.failureCount)}, 0)`,
                         lastUpdated: max(this.schema.providerPerformance.createdAt)
                     })
                     .from(this.schema.providerPerformance)
@@ -617,16 +621,16 @@ export class UsageStorageService extends EventEmitter {
                 provider: row.provider,
                 model: row.model,
                 target_model: row.targetModel,
-                avg_ttft_ms: row.avgTtftMs ?? 0,
-                min_ttft_ms: row.minTtftMs ?? 0,
-                max_ttft_ms: row.maxTtftMs ?? 0,
-                avg_tokens_per_sec: row.avgTokensPerSec ?? 0,
-                min_tokens_per_sec: row.minTokensPerSec ?? 0,
-                    max_tokens_per_sec: row.maxTokensPerSec ?? 0,
-                    sample_count: row.sampleCount ?? 0,
-                    success_count: row.successCount ?? 0,
-                    failure_count: row.failureCount ?? 0,
-                    last_updated: row.lastUpdated ?? 0
+                avg_ttft_ms: Number(row.avgTtftMs) || 0,
+                min_ttft_ms: Number(row.minTtftMs) || 0,
+                max_ttft_ms: Number(row.maxTtftMs) || 0,
+                avg_tokens_per_sec: Number(row.avgTokensPerSec) || 0,
+                min_tokens_per_sec: Number(row.minTokensPerSec) || 0,
+                    max_tokens_per_sec: Number(row.maxTokensPerSec) || 0,
+                    sample_count: Number(row.sampleCount) || 0,
+                    success_count: Number(row.successCount) || 0,
+                    failure_count: Number(row.failureCount) || 0,
+                    last_updated: Number(row.lastUpdated) || 0
                 }));
 
             // When filtering by canonical model, include providers seen in request usage

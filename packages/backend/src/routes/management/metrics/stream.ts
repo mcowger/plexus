@@ -16,6 +16,12 @@ interface StreamQuery {
     limit?: string;
 }
 
+function isKnownProvider(provider: unknown): boolean {
+    if (typeof provider !== 'string') return false;
+    const normalized = provider.trim().toLowerCase();
+    return normalized !== '' && normalized !== 'unknown';
+}
+
 export function registerStreamRoute(
     fastify: FastifyInstance,
     usageStorage: UsageStorageService
@@ -195,6 +201,10 @@ export function registerStreamRoute(
 
         // Listen for new usage records
         const usageListener = (record: unknown) => {
+            const maybeRecord = record as { provider?: unknown };
+            if (!isKnownProvider(maybeRecord.provider)) {
+                return;
+            }
             sendEvent('usage_update', record);
         };
 

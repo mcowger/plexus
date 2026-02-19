@@ -8,6 +8,10 @@ import { UsageStorageService } from '../../../services/usage-storage';
 import { GroupBy, TimeRange } from './types';
 import { getTimeRangeBounds } from './time';
 
+function knownProviderOnly(providerColumn: unknown) {
+    return sql`${providerColumn} IS NOT NULL AND TRIM(${providerColumn}) != '' AND LOWER(TRIM(${providerColumn})) != 'unknown'`;
+}
+
 export interface ChartDataRow {
     bucketStartMs: number;
     requests: number;
@@ -107,7 +111,8 @@ export async function fetchChartData(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, startTime),
-            lte(schema.requestUsage.startTime, endTime)
+            lte(schema.requestUsage.startTime, endTime),
+            knownProviderOnly(schema.requestUsage.provider)
         ))
         .groupBy(bucketSql)
         .orderBy(bucketSql);
@@ -174,7 +179,8 @@ export async function fetchAggregatedData(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, startTime),
-            lte(schema.requestUsage.startTime, endTime)
+            lte(schema.requestUsage.startTime, endTime),
+            knownProviderOnly(schema.requestUsage.provider)
         ))
         .groupBy(groupByColumn)
         .orderBy(desc(count()));
@@ -217,7 +223,8 @@ export async function fetchStats(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, startTime),
-            lte(schema.requestUsage.startTime, endTime)
+            lte(schema.requestUsage.startTime, endTime),
+            knownProviderOnly(schema.requestUsage.provider)
         ));
 
     const row = rows[0];
@@ -261,7 +268,8 @@ export async function fetchLiveRequests(
         })
         .from(schema.requestUsage)
         .where(and(
-            gte(schema.requestUsage.startTime, windowStartMs)
+            gte(schema.requestUsage.startTime, windowStartMs),
+            knownProviderOnly(schema.requestUsage.provider)
         ))
         .orderBy(desc(schema.requestUsage.startTime))
         .limit(limit);
@@ -304,7 +312,8 @@ export async function fetchDashboardSeries(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, startTime),
-            lte(schema.requestUsage.startTime, endTime)
+            lte(schema.requestUsage.startTime, endTime),
+            knownProviderOnly(schema.requestUsage.provider)
         ))
         .groupBy(bucketSql)
         .orderBy(bucketSql);
@@ -349,7 +358,8 @@ export async function fetchWeeklyStats(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, startTime),
-            lte(schema.requestUsage.startTime, endTime)
+            lte(schema.requestUsage.startTime, endTime),
+            knownProviderOnly(schema.requestUsage.provider)
         ));
 
     const row = rows[0];
@@ -389,7 +399,8 @@ export async function fetchTodayMetrics(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, startOfDay),
-            lte(schema.requestUsage.startTime, Date.now())
+            lte(schema.requestUsage.startTime, Date.now()),
+            knownProviderOnly(schema.requestUsage.provider)
         ));
 
     const row = rows[0];
@@ -420,6 +431,7 @@ export async function fetchProviderPerformanceRecords(
         .from(schema.requestUsage)
         .where(and(
             gte(schema.requestUsage.startTime, Date.now() - 7 * 24 * 60 * 60 * 1000),
+            knownProviderOnly(schema.requestUsage.provider),
             or(
                 gt(schema.requestUsage.ttftMs, 0),
                 gt(schema.requestUsage.tokensPerSec, 0)

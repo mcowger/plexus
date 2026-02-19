@@ -181,7 +181,8 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     requests: count(),
                     inputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensInput)}, 0)`,
                     outputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensOutput)}, 0)`,
-                    cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`
+                    cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`,
+                    cacheWriteTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCacheWrite)}, 0)`
                 })
                 .from(schema.requestUsage)
                 .where(and(...seriesWhereConditions))
@@ -199,6 +200,8 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     requests: count(),
                     inputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensInput)}, 0)`,
                     outputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensOutput)}, 0)`,
+                    cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`,
+                    cacheWriteTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCacheWrite)}, 0)`,
                     avgDurationMs: sql<number>`COALESCE(${avg(schema.requestUsage.durationMs)}, 0)`
                 })
                 .from(schema.requestUsage)
@@ -217,6 +220,7 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     outputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensOutput)}, 0)`,
                     reasoningTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensReasoning)}, 0)`,
                     cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`,
+                    cacheWriteTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCacheWrite)}, 0)`,
                     totalCost: sql<number>`COALESCE(${sum(schema.requestUsage.costTotal)}, 0)`
                 })
                 .from(schema.requestUsage)

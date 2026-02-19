@@ -7,6 +7,12 @@ import { AggregatedRow, ChartDataRow } from './queries';
 import { getBucketFormat } from './time';
 import { LiveRequestRecord, ProviderPerformanceRecord } from './queries';
 
+function isKnownProvider(value: unknown): boolean {
+    if (typeof value !== 'string') return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized !== '' && normalized !== 'unknown';
+}
+
 export interface ProviderAccumulator {
     requests: number;
     successes: number;
@@ -152,9 +158,11 @@ export function computeLiveSnapshot(
 
     const providerStats = new Map<string, ProviderAccumulator>();
 
-    for (const record of records) {
+    const knownRecords = records.filter(record => isKnownProvider(record.provider));
+
+    for (const record of knownRecords) {
         requestCount++;
-        const provider = String(record.provider || 'unknown');
+        const provider = String(record.provider);
         const status = String(record.responseStatus || 'unknown').toLowerCase();
         const isSuccess = status === 'success';
 
@@ -235,7 +243,7 @@ export function computeLiveSnapshot(
         }))
         .sort((a, b) => b.requests - a.requests);
 
-    const recentRequests: ProcessedRequest[] = records.slice(0, 20).map(record => {
+    const recentRequests: ProcessedRequest[] = knownRecords.slice(0, 20).map(record => {
         const inputTokens = Number(record.tokensInput) || 0;
         const outputTokens = Number(record.tokensOutput) || 0;
         const reasoningTokens = Number(record.tokensReasoning) || 0;
@@ -244,7 +252,7 @@ export function computeLiveSnapshot(
         return {
             requestId: String(record.requestId || ''),
             date: String(record.date || ''),
-            provider: String(record.provider || 'unknown'),
+            provider: String(record.provider),
             model: String(record.selectedModelName || record.incomingModelAlias || 'unknown'),
             responseStatus: String(record.responseStatus || 'unknown'),
             totalTokens: inputTokens + outputTokens + reasoningTokens + cachedTokens,
@@ -282,7 +290,11 @@ export function computeProviderPerformance(
     }>();
 
     for (const row of records) {
-        const provider = String(row.provider || 'unknown');
+        if (!isKnownProvider(row.provider)) {
+            continue;
+        }
+
+        const provider = String(row.provider);
         const model = String(row.incomingModelAlias || row.selectedModelName || 'unknown');
         const key = `${provider}:${model}`;
 
