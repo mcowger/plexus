@@ -182,7 +182,10 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     inputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensInput)}, 0)`,
                     outputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensOutput)}, 0)`,
                     cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`,
-                    cacheWriteTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCacheWrite)}, 0)`
+                    cacheWriteTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCacheWrite)}, 0)`,
+                    totalCost: sql<number>`COALESCE(${sum(schema.requestUsage.costTotal)}, 0)`,
+                    avgDurationMs: sql<number>`COALESCE(${avg(schema.requestUsage.durationMs)}, 0)`,
+                    avgTtftMs: sql<number>`COALESCE(${avg(schema.requestUsage.ttftMs)}, 0)`
                 })
                 .from(schema.requestUsage)
                 .where(and(...seriesWhereConditions))
@@ -202,6 +205,7 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     outputTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensOutput)}, 0)`,
                     cachedTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCached)}, 0)`,
                     cacheWriteTokens: sql<number>`COALESCE(${sum(schema.requestUsage.tokensCacheWrite)}, 0)`,
+                    totalCost: sql<number>`COALESCE(${sum(schema.requestUsage.costTotal)}, 0)`,
                     avgDurationMs: sql<number>`COALESCE(${avg(schema.requestUsage.durationMs)}, 0)`
                 })
                 .from(schema.requestUsage)
@@ -232,6 +236,7 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                 outputTokens: 0,
                 cachedTokens: 0,
                 cacheWriteTokens: 0,
+                totalCost: 0,
                 avgDurationMs: 0
             };
 
@@ -254,11 +259,15 @@ export async function registerUsageRoutes(fastify: FastifyInstance, usageStorage
                     outputTokens: toNumber(row.outputTokens),
                     cachedTokens: toNumber(row.cachedTokens),
                     cacheWriteTokens: toNumber(row.cacheWriteTokens),
-                    tokens: toNumber(row.inputTokens) + toNumber(row.outputTokens) + toNumber(row.cachedTokens) + toNumber(row.cacheWriteTokens)
+                    tokens: toNumber(row.inputTokens) + toNumber(row.outputTokens) + toNumber(row.cachedTokens) + toNumber(row.cacheWriteTokens),
+                    totalCost: toNumber(row.totalCost),
+                    avgDurationMs: toNumber(row.avgDurationMs),
+                    avgTtftMs: toNumber(row.avgTtftMs)
                 })),
                 stats: {
                     totalRequests: toNumber(statsRow.requests),
                     totalTokens: toNumber(statsRow.inputTokens) + toNumber(statsRow.outputTokens) + toNumber(statsRow.cachedTokens) + toNumber(statsRow.cacheWriteTokens),
+                    totalCost: toNumber(statsRow.totalCost),
                     avgDurationMs: toNumber(statsRow.avgDurationMs)
                 },
                 today: {

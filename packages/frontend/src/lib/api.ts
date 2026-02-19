@@ -334,7 +334,7 @@ interface BackendResponse<T> {
     error?: string;
 }
 
-interface UsageSummarySeriesPoint {
+export interface UsageSummarySeriesPoint {
     bucketStartMs: number;
     requests: number;
     inputTokens: number;
@@ -342,14 +342,18 @@ interface UsageSummarySeriesPoint {
     cachedTokens: number;
     cacheWriteTokens: number;
     tokens: number;
+    totalCost: number;
+    avgDurationMs: number;
+    avgTtftMs: number;
 }
 
-interface UsageSummaryResponse {
+export interface UsageSummaryResponse {
     range: 'hour' | 'day' | 'week' | 'month';
     series: UsageSummarySeriesPoint[];
     stats: {
         totalRequests: number;
         totalTokens: number;
+        totalCost: number;
         avgDurationMs: number;
     };
     today: TodayMetrics;
@@ -935,6 +939,16 @@ export const api = {
             }
         };
     }
+  },
+
+  getUsageSummary: async (
+    range: 'hour' | 'day' | 'week' | 'month' = 'day',
+    filters?: { excludeUnknownProvider?: boolean; enabledProviders?: string }
+  ): Promise<UsageSummaryResponse> => {
+    return fetchUsageSummary(range, true, {
+      excludeUnknownProvider: filters?.excludeUnknownProvider,
+      enabledProviders: filters?.enabledProviders
+    });
   },
 
   getLiveDashboardSnapshot: async (windowMinutes: number = 5, limit: number = 500): Promise<LiveDashboardSnapshot> => {

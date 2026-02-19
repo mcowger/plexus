@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { api, type UsageRecord } from '../lib/api';
+import { api, type UsageRecord, type UsageSummaryResponse } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
 import { Activity, BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon, TrendingUp, Clock, DollarSign, Database } from 'lucide-react';
 import {
@@ -44,8 +44,38 @@ const METRICS: MetricConfig[] = [
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16'];
 
+const getRangeStartDate = (range: TimeRange, now: Date) => {
+  const startDate = new Date(now);
+
+  switch (range) {
+    case 'hour':
+      startDate.setHours(startDate.getHours() - 1);
+      break;
+    case 'day':
+      startDate.setHours(startDate.getHours() - 24);
+      break;
+    case 'week':
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case 'month':
+      startDate.setDate(startDate.getDate() - 30);
+      break;
+  }
+
+  return startDate;
+};
+
+const formatBucketLabel = (range: TimeRange, bucketStartMs: number) => {
+  const date = new Date(bucketStartMs);
+  if (range === 'hour' || range === 'day') {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleDateString();
+};
+
 export const DetailedUsage = () => {
   const [records, setRecords] = useState<UsageRecord[]>([]);
+  const [summary, setSummary] = useState<UsageSummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('day');
   const [chartType, setChartType] = useState<ChartType>('area');
@@ -57,28 +87,17 @@ export const DetailedUsage = () => {
     setLoading(true);
     try {
       const now = new Date();
-      const startDate = new Date(now);
-      
-      switch (timeRange) {
-        case 'hour':
-          startDate.setHours(startDate.getHours() - 1);
-          break;
-        case 'day':
-          startDate.setHours(startDate.getHours() - 24);
-          break;
-        case 'week':
-          startDate.setDate(startDate.getDate() - 7);
-          break;
-        case 'month':
-          startDate.setDate(startDate.getDate() - 30);
-          break;
-      }
+      const startDate = getRangeStartDate(timeRange, now);
 
-      const response = await api.getLogs(2000, 0, {
-        startDate: startDate.toISOString(),
-      });
+      const [summaryResponse, logsResponse] = await Promise.all([
+        api.getUsageSummary(timeRange),
+        api.getLogs(5000, 0, {
+          startDate: startDate.toISOString(),
+        })
+      ]);
 
-      setRecords(response.data || []);
+      setSummary(summaryResponse);
+      setRecords(logsResponse.data || []);
       setLastUpdated(new Date());
     } catch (e) {
       console.error('Failed to load usage data', e);
@@ -94,41 +113,59 @@ export const DetailedUsage = () => {
   }, [loadData]);
 
   const aggregatedData = useMemo(() => {
+    if (groupBy === 'time' && summary?.range === timeRange) {
+      return summary.series
+        .map((point) => ({
+          bucketStartMs: point.bucketStartMs,
+          name: formatBucketLabel(timeRange, point.bucketStartMs),
+          requests: point.requests,
+          tokens: point.tokens,
+          cost: point.totalCost || 0,
+          duration: point.avgDurationMs || 0,
+          ttft: point.avgTtftMs || 0
+        }))
+        .sort((a, b) => a.bucketStartMs - b.bucketStartMs)
+        .map(({ bucketStartMs: _bucketStartMs, ...point }) => point);
+    }
+
     if (groupBy === 'time') {
-      const grouped = new Map<string, { requests: number; tokens: number; cost: number; duration: number; ttft: number; count: number }>();
-      
+      const grouped = new Map<number, { requests: number; tokens: number; cost: number; duration: number; ttft: number; count: number }>();
+
       records.forEach((record) => {
         const date = new Date(record.date);
-        let key: string;
-        
-        if (timeRange === 'hour') {
-          key = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (timeRange === 'day') {
-          key = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else {
-          key = date.toLocaleDateString();
+        if (Number.isNaN(date.getTime())) {
+          return;
         }
 
-        const existing = grouped.get(key) || { requests: 0, tokens: 0, cost: 0, duration: 0, ttft: 0, count: 0 };
+        if (timeRange === 'hour') {
+          date.setSeconds(0, 0);
+        } else if (timeRange === 'day') {
+          date.setMinutes(0, 0, 0);
+        } else {
+          date.setHours(0, 0, 0, 0);
+        }
+
+        const bucketStartMs = date.getTime();
+        const existing = grouped.get(bucketStartMs) || { requests: 0, tokens: 0, cost: 0, duration: 0, ttft: 0, count: 0 };
         existing.requests += 1;
         existing.tokens += (record.tokensInput || 0) + (record.tokensOutput || 0) + (record.tokensReasoning || 0) + (record.tokensCached || 0);
         existing.cost += record.costTotal || 0;
         existing.duration += record.durationMs || 0;
         existing.ttft += record.ttftMs || 0;
         existing.count += 1;
-        grouped.set(key, existing);
+        grouped.set(bucketStartMs, existing);
       });
 
       return Array.from(grouped.entries())
-        .map(([key, value]) => ({
-          name: key,
+        .sort((a, b) => a[0] - b[0])
+        .map(([bucketStartMs, value]) => ({
+          name: formatBucketLabel(timeRange, bucketStartMs),
           requests: value.requests,
           tokens: value.tokens,
           cost: value.cost,
           duration: value.count > 0 ? value.duration / value.count : 0,
           ttft: value.count > 0 ? value.ttft / value.count : 0
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        }));
     } else {
       const grouped = new Map<string, { requests: number; tokens: number; cost: number; duration: number; ttft: number; count: number }>();
       
@@ -174,15 +211,19 @@ export const DetailedUsage = () => {
         .sort((a, b) => b.requests - a.requests)
         .slice(0, 10);
     }
-  }, [records, groupBy, timeRange]);
+  }, [records, summary, groupBy, timeRange]);
 
   const stats = useMemo(() => {
-    const total = records.length;
-    const tokens = records.reduce((acc, r) => acc + (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensReasoning || 0) + (r.tokensCached || 0), 0);
-    const cost = records.reduce((acc, r) => acc + (r.costTotal || 0), 0);
-    const avgDuration = total > 0 ? records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / total : 0;
+    const total = summary?.stats.totalRequests ?? records.length;
+    const tokens = summary?.stats.totalTokens
+      ?? records.reduce((acc, r) => acc + (r.tokensInput || 0) + (r.tokensOutput || 0) + (r.tokensReasoning || 0) + (r.tokensCached || 0), 0);
+    const cost = summary?.stats.totalCost
+      ?? records.reduce((acc, r) => acc + (r.costTotal || 0), 0);
+    const avgDuration = summary?.stats.avgDurationMs
+      ?? (total > 0 ? records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / total : 0);
     const successCount = records.filter(r => r.responseStatus === 'success').length;
-    const successRate = total > 0 ? (successCount / total) * 100 : 0;
+    const successRateBase = records.length;
+    const successRate = successRateBase > 0 ? (successCount / successRateBase) * 100 : 0;
 
     return [
       { label: 'Total Requests', value: formatNumber(total, 0), icon: Activity },
@@ -191,7 +232,7 @@ export const DetailedUsage = () => {
       { label: 'Avg Duration', value: formatMs(avgDuration), icon: Clock },
       { label: 'Success Rate', value: `${successRate.toFixed(1)}%`, icon: TrendingUp }
     ];
-  }, [records]);
+  }, [records, summary]);
 
   const toggleMetric = (metricKey: string) => {
     setSelectedMetrics(prev => 
