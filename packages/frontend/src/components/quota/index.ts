@@ -20,3 +20,4 @@ export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';
 export { QuotaHistoryModal } from './QuotaHistoryModal';
+export { BalanceHistoryModal } from './BalanceHistoryModal';

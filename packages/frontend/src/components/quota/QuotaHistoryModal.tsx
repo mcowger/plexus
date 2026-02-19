@@ -13,11 +13,10 @@ import { clsx } from 'clsx';
 import { X, Clock, Calendar, TrendingDown, Activity } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { api } from '../../lib/api';
-import { formatCost, formatNumber } from '../../lib/format';
 import type { QuotaCheckerInfo, QuotaSnapshot } from '../../types/quota';
 import { Button } from '../ui/Button';
 
-type TimeRange = '12h' | '24h' | '1w' | '4w';
+type TimeRange = '1h' | '3h' | '6h' | '12h' | '24h' | '1w' | '4w';
 
 interface QuotaHistoryModalProps {
   isOpen: boolean;
@@ -26,18 +25,12 @@ interface QuotaHistoryModalProps {
   displayName: string;
 }
 
-interface HistoryDataPoint {
-  timestamp: number;
-  date: Date;
-  label: string;
-  used?: number | null;
-  remaining?: number | null;
-  limit?: number | null;
-  utilizationPercent: number;
-  unit: string;
-}
+
 
 const TIME_RANGE_CONFIG: Record<TimeRange, { label: string; days: number; interval: string }> = {
+  '1h': { label: '1 Hour', days: 1 / 24, interval: 'hour' },
+  '3h': { label: '3 Hours', days: 3 / 24, interval: 'hour' },
+  '6h': { label: '6 Hours', days: 6 / 24, interval: 'hour' },
   '12h': { label: '12 Hours', days: 0.5, interval: 'hour' },
   '24h': { label: '24 Hours', days: 1, interval: 'hour' },
   '1w': { label: '1 Week', days: 7, interval: 'day' },
@@ -101,100 +94,155 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
     fetchHistory();
   }, [isOpen, quota, selectedRange]);
 
-  // Process history data for the chart
-  const chartData: HistoryDataPoint[] = useMemo(() => {
-    if (!history.length) return [];
+  // Colors for different window types
+  const WINDOW_COLORS: Record<string, string> = {
+    'five_hour': '#3b82f6',    // blue
+    'toolcalls': '#06b6d4',    // cyan
+    'search': '#8b5cf6',       // violet
+    'daily': '#10b981',        // emerald
+    'weekly': '#a855f7',       // purple
+    'monthly': '#f59e0b',      // amber
+    'subscription': '#ec4899', // pink
+    'custom': '#6b7280',       // gray
+  };
+
+  // Process history data for the chart - group by window type
+  const { chartData, windowTypes } = useMemo(() => {
+    if (!history.length) return { chartData: [], windowTypes: [] as string[] };
 
     const timeRange: TimeRange = selectedRange;
 
-    return history.map((snapshot: QuotaSnapshot) => {
-      const date = new Date(snapshot.checkedAt as string);
+    // Filter to only successful snapshots with valid utilization data
+    const validSnapshots = history.filter((snapshot: QuotaSnapshot) => 
+      snapshot.success && 
+      snapshot.utilizationPercent !== null && 
+      snapshot.utilizationPercent !== undefined
+    );
+
+    // Group by window type
+    const snapshotsByWindow = new Map<string, QuotaSnapshot[]>();
+    for (const snapshot of validSnapshots) {
+      const windowType = snapshot.windowType || 'custom';
+      const existing = snapshotsByWindow.get(windowType) || [];
+      existing.push(snapshot);
+      snapshotsByWindow.set(windowType, existing);
+    }
+
+    // Get unique timestamps for all data points
+    const allTimestamps = new Set<number>();
+    for (const snapshot of validSnapshots) {
+      allTimestamps.add(new Date(snapshot.checkedAt as string).getTime());
+    }
+    const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+
+    // Build chart data with all window types as separate columns
+    const data = sortedTimestamps.map((timestamp) => {
+      const date = new Date(timestamp);
       const range = TIME_RANGE_CONFIG[timeRange];
 
       // Format label based on time range
       let label: string;
       if (range.days <= 1) {
-        // For 12h/24h, show hour:minute
         label = date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
         });
       } else {
-        // For 1w/4w, show month/day
         label = date.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
         });
       }
 
-      return {
-        timestamp: date.getTime(),
+      const point: Record<string, number | string | Date | null> = {
+        timestamp,
         date,
         label,
-        used: snapshot.used,
-        remaining: snapshot.remaining,
-        limit: snapshot.limit,
-        utilizationPercent: snapshot.utilizationPercent ?? 0,
-        unit: snapshot.unit || 'percentage',
       };
+
+      // Add utilization for each window type at this timestamp
+      for (const [windowType, snapshots] of snapshotsByWindow) {
+        const snapshot = snapshots.find(s => 
+          new Date(s.checkedAt as string).getTime() === timestamp
+        );
+        if (snapshot) {
+          point[windowType] = snapshot.utilizationPercent ?? null;
+          // Also store metadata for the first window type (for tooltip)
+          if (!point['unit']) {
+            point['unit'] = snapshot.unit || 'percentage';
+            point['used'] = snapshot.used;
+            point['remaining'] = snapshot.remaining;
+            point['limit'] = snapshot.limit;
+            point['windowType'] = windowType;
+          }
+        } else {
+          point[windowType] = null;
+        }
+      }
+
+      return point;
     });
+
+    // Sort window types by priority
+    const priorityOrder = ['five_hour', 'toolcalls', 'search', 'daily', 'weekly', 'monthly', 'subscription', 'custom'];
+    const sortedWindowTypes = Array.from(snapshotsByWindow.keys()).sort((a, b) => {
+      const aIdx = priorityOrder.indexOf(a);
+      const bIdx = priorityOrder.indexOf(b);
+      return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+    });
+
+    return { chartData: data, windowTypes: sortedWindowTypes };
   }, [history, selectedRange]);
 
-  // Determine the primary metric to display
-  const primaryMetric = useMemo(() => {
-    if (!chartData.length) return null;
-
-    // Find the most common unit in the data
-    const unitCounts = new Map<string, number>();
-    for (const point of chartData) {
-      unitCounts.set(point.unit, (unitCounts.get(point.unit) || 0) + 1);
-    }
-    const primaryUnit = Array.from(unitCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'percentage';
-
-    // Get the latest data point for current values
-    const latest = chartData[chartData.length - 1];
-
-    return {
-      unit: primaryUnit,
-      latest,
-      hasUsage: latest.used !== null && latest.used !== undefined,
-      hasRemaining: latest.remaining !== null && latest.remaining !== undefined,
-      hasLimit: latest.limit !== null && latest.limit !== undefined,
-    };
-  }, [chartData]);
-
-  // Format tooltip values
-  const formatTooltipValue = (value: number, unit: string): string => {
-    if (unit === 'dollars') return formatCost(value);
-    if (unit === 'percentage') return `${value.toFixed(1)}%`;
-    if (unit === 'tokens') return formatNumber(value, 0);
-    return formatNumber(value, 0);
-  };
-
-  // Calculate statistics
+  // Calculate statistics across all window types
   const stats = useMemo(() => {
-    if (!chartData.length) return null;
+    if (!chartData.length || !windowTypes.length) return null;
 
-    const values = chartData.map((d) => d.utilizationPercent);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    // Collect all utilization values across all window types
+    const allValues: number[] = [];
+    for (const point of chartData) {
+      for (const windowType of windowTypes) {
+        const value = point[windowType];
+        if (typeof value === 'number') {
+          allValues.push(value);
+        }
+      }
+    }
+
+    if (!allValues.length) return null;
+
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
+    const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
 
     // Calculate trend (compare first half to second half)
     const midPoint = Math.floor(chartData.length / 2);
     const firstHalf = chartData.slice(0, midPoint);
     const secondHalf = chartData.slice(midPoint);
+
     const firstAvg = firstHalf.length
-      ? firstHalf.reduce((a, b) => a + b.utilizationPercent, 0) / firstHalf.length
+      ? firstHalf.reduce((sum, point) => {
+          const vals = windowTypes
+            .map((wt) => point[wt])
+            .filter((v): v is number => typeof v === 'number');
+          return vals.length ? sum + vals.reduce((a, b) => a + b, 0) / vals.length : sum;
+        }, 0) / firstHalf.length
       : 0;
+
     const secondAvg = secondHalf.length
-      ? secondHalf.reduce((a, b) => a + b.utilizationPercent, 0) / secondHalf.length
+      ? secondHalf.reduce((sum, point) => {
+          const vals = windowTypes
+            .map((wt) => point[wt])
+            .filter((v): v is number => typeof v === 'number');
+          return vals.length ? sum + vals.reduce((a, b) => a + b, 0) / vals.length : sum;
+        }, 0) / secondHalf.length
       : 0;
+
     const trend = secondAvg - firstAvg;
 
     return { min, max, avg, trend };
-  }, [chartData]);
+  }, [chartData, windowTypes]);
 
   // Handle escape key
   useEffect(() => {
@@ -335,22 +383,39 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                 No historical data available for this time range
               </div>
             ) : (
-              <div className="h-[300px]">
+              <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={chartData}
                     margin={{
                       top: 10,
-                      right: 20,
-                      bottom: 20,
+                      right: 30,
+                      bottom: 60,
                       left: 10,
                     }}
                   >
                     <defs>
-                      <linearGradient id="colorUtilization" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
+                      {windowTypes.map((windowType) => (
+                        <linearGradient
+                          key={windowType}
+                          id={`color${windowType}`}
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={WINDOW_COLORS[windowType] || '#6b7280'}
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={WINDOW_COLORS[windowType] || '#6b7280'}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      ))}
                     </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -373,31 +438,43 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                       domain={[0, 100]}
                     />
                     <Tooltip
-                      content={({ active, payload, label }: { active?: boolean; payload?: ReadonlyArray<{ payload: HistoryDataPoint }>; label?: string | number }) => {
+                      content={({ active, payload, label }: { 
+                        active?: boolean; 
+                        payload?: ReadonlyArray<{ 
+                          dataKey: string; 
+                          value: number; 
+                          color: string;
+                          payload: Record<string, unknown>;
+                        }>; 
+                        label?: string | number 
+                      }) => {
                         if (active && payload && payload.length) {
-                          const data = payload[0].payload as HistoryDataPoint;
                           return (
-                            <div className="bg-bg-card border border-border rounded-lg p-3 shadow-lg">
+                            <div className="bg-bg-card border border-border rounded-lg p-3 shadow-lg min-w-[180px]">
                               <p className="text-xs text-text-secondary mb-2">{label}</p>
                               <div className="space-y-1">
-                                <p className="text-sm font-medium text-text">
-                                  Utilization: {data.utilizationPercent.toFixed(1)}%
-                                </p>
-                                {data.used !== null && data.used !== undefined && (
-                                  <p className="text-xs text-text-secondary">
-                                    Used: {formatTooltipValue(data.used, data.unit)}
-                                  </p>
-                                )}
-                                {data.remaining !== null && data.remaining !== undefined && (
-                                  <p className="text-xs text-text-secondary">
-                                    Remaining: {formatTooltipValue(data.remaining, data.unit)}
-                                  </p>
-                                )}
-                                {data.limit !== null && data.limit !== undefined && (
-                                  <p className="text-xs text-text-secondary">
-                                    Limit: {formatTooltipValue(data.limit, data.unit)}
-                                  </p>
-                                )}
+                                {payload
+                                  .filter((p) => p.value !== null && p.value !== undefined)
+                                  .map((p) => {
+                                    const windowType = p.dataKey;
+                                    const displayName = windowType
+                                      .replace(/_/g, ' ')
+                                      .replace(/\b\w/g, (l) => l.toUpperCase());
+                                    return (
+                                      <div key={windowType} className="flex items-center gap-2">
+                                        <div
+                                          className="w-2 h-2 rounded-full"
+                                          style={{ backgroundColor: p.color }}
+                                        />
+                                        <span className="text-xs text-text-secondary flex-1">
+                                          {displayName}:
+                                        </span>
+                                        <span className="text-xs font-medium text-text">
+                                          {typeof p.value === 'number' ? `${p.value.toFixed(1)}%` : p.value}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                               </div>
                             </div>
                           );
@@ -414,7 +491,8 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                         value: 'Warning',
                         fill: '#f59e0b',
                         fontSize: 10,
-                        position: 'insideRight',
+                        position: 'right',
+                        dx: -5,
                       }}
                     />
                     {/* Critical line at 90% */}
@@ -426,71 +504,42 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                         value: 'Critical',
                         fill: '#ef4444',
                         fontSize: 10,
-                        position: 'insideRight',
+                        position: 'right',
+                        dx: -5,
                       }}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey="utilizationPercent"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorUtilization)"
-                      name="Utilization %"
-                    />
+                    {windowTypes.map((windowType) => (
+                      <Area
+                        key={windowType}
+                        type="monotone"
+                        dataKey={windowType}
+                        stroke={WINDOW_COLORS[windowType] || '#6b7280'}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill={`url(#color${windowType})`}
+                        name={windowType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                        connectNulls={false}
+                      />
+                    ))}
                   </AreaChart>
                 </ResponsiveContainer>
+                {/* Legend */}
+                <div className="flex flex-wrap justify-center gap-4 mt-4 pt-2">
+                  {windowTypes.map((windowType) => (
+                    <div key={windowType} className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: WINDOW_COLORS[windowType] || '#6b7280' }}
+                      />
+                      <span className="text-xs text-text-secondary">
+                        {windowType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-
-          {/* Current Status Summary */}
-          {primaryMetric && (
-            <div className="bg-bg-subtle rounded-lg border border-border p-4">
-              <h3 className="text-sm font-semibold text-text-secondary mb-3">Current Status</h3>
-              <div className="grid grid-cols-3 gap-4">
-                {primaryMetric.hasUsage && (
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Used</p>
-                    <p className="text-base font-medium text-text">
-                      {formatTooltipValue(primaryMetric.latest.used!, primaryMetric.unit)}
-                    </p>
-                  </div>
-                )}
-                {primaryMetric.hasRemaining && (
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Remaining</p>
-                    <p className="text-base font-medium text-text">
-                      {formatTooltipValue(primaryMetric.latest.remaining!, primaryMetric.unit)}
-                    </p>
-                  </div>
-                )}
-                {primaryMetric.hasLimit && (
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Limit</p>
-                    <p className="text-base font-medium text-text">
-                      {formatTooltipValue(primaryMetric.latest.limit!, primaryMetric.unit)}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs text-text-secondary mb-1">Utilization</p>
-                  <p
-                    className={clsx(
-                      'text-base font-medium',
-                      primaryMetric.latest.utilizationPercent >= 90
-                        ? 'text-danger'
-                        : primaryMetric.latest.utilizationPercent >= 70
-                          ? 'text-warning'
-                          : 'text-success'
-                    )}
-                  >
-                    {primaryMetric.latest.utilizationPercent.toFixed(1)}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}

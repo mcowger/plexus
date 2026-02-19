@@ -4,7 +4,7 @@ import { Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
 import { formatCost } from '../../lib/format';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
-import { QuotaHistoryModal } from './QuotaHistoryModal';
+import { BalanceHistoryModal } from './BalanceHistoryModal';
 
 interface CombinedBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
@@ -169,7 +169,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
         </div>
       </div>
 
-      <QuotaHistoryModal
+      <BalanceHistoryModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         quota={selectedQuota}

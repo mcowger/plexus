@@ -19,6 +19,7 @@ import {
   KiloQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
+  BalanceHistoryModal,
 } from '../components/quota';
 
 // Checker type categories
@@ -48,6 +49,13 @@ export const Quotas = () => {
   const [selectedQuota, setSelectedQuota] = useState<QuotaCheckerInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDisplayName, setSelectedDisplayName] = useState('');
+  const [isBalanceModal, setIsBalanceModal] = useState(false);
+
+  // Check if a quota is a balance-based checker
+  const isBalanceChecker = (quota: QuotaCheckerInfo): boolean => {
+    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
+    return BALANCE_CHECKERS.some(bc => checkerType.includes(bc));
+  };
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -184,6 +192,7 @@ export const Quotas = () => {
   const handleCardClick = (quota: QuotaCheckerInfo, displayName: string) => {
     setSelectedQuota(quota);
     setSelectedDisplayName(displayName);
+    setIsBalanceModal(isBalanceChecker(quota));
     setIsModalOpen(true);
   };
 
@@ -191,6 +200,7 @@ export const Quotas = () => {
     setIsModalOpen(false);
     setSelectedQuota(null);
     setSelectedDisplayName('');
+    setIsBalanceModal(false);
   };
 
   // Render the appropriate quota display component based on checker type
@@ -355,12 +365,21 @@ export const Quotas = () => {
         </div>
       )}
 
-      <QuotaHistoryModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        quota={selectedQuota}
-        displayName={selectedDisplayName}
-      />
+      {isBalanceModal ? (
+        <BalanceHistoryModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          quota={selectedQuota}
+          displayName={selectedDisplayName}
+        />
+      ) : (
+        <QuotaHistoryModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          quota={selectedQuota}
+          displayName={selectedDisplayName}
+        />
+      )}
     </div>
   );
 };
