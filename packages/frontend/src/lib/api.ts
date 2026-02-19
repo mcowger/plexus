@@ -191,6 +191,14 @@ export interface ProviderPerformanceData {
   last_updated: number;
 }
 
+export interface BuildInfo {
+  version: string;
+  buildSha: string | null;
+  buildTime: string | null;
+  startedAt: string;
+  displayVersion: string;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -1431,6 +1439,17 @@ export const api = {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config`);
     if (!res.ok) throw new Error('Failed to fetch config');
     return await res.text();
+  },
+
+  getBuildInfo: async (): Promise<BuildInfo | null> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/build`);
+      if (!res.ok) throw new Error('Failed to fetch build info');
+      return await res.json() as BuildInfo;
+    } catch (e) {
+      console.error('API Error getBuildInfo', e);
+      return null;
+    }
   },
 
   saveConfig: async (config: string): Promise<void> => {

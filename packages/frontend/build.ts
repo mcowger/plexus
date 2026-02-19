@@ -59,6 +59,8 @@ const runBuild = async () => {
       define: {
         "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
         "process.env.APP_VERSION": JSON.stringify(process.env.APP_VERSION || "dev"),
+        "process.env.APP_BUILD_SHA": JSON.stringify(process.env.APP_BUILD_SHA || ""),
+        "process.env.APP_BUILD_TIME": JSON.stringify(process.env.APP_BUILD_TIME || ""),
       },
     });
 

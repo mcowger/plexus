@@ -22,6 +22,7 @@ import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { QuotaEnforcer } from './services/quota/quota-enforcer';
 import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
+import { getBuildInfo } from './utils/build-info';
 
 /**
  * Plexus Backend Server
@@ -83,6 +84,9 @@ try {
     logger.error('Failed to load config or pricing', e);
     process.exit(1);
 }
+
+const buildInfo = getBuildInfo();
+logger.info(`Build info: ${buildInfo.displayVersion}${buildInfo.buildTime ? ` (${buildInfo.buildTime})` : ''}`);
 
 // --- Database Initialization ---
 // Initialize database before quota checkers (which need DB access)

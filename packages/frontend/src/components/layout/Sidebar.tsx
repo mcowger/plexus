@@ -49,9 +49,12 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, isCollapsed })
 };
 
 export const Sidebar: React.FC = () => {
-  const appVersion = process.env.APP_VERSION || 'dev';
+  const envAppVersion = process.env.APP_VERSION || 'dev';
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [buildVersion, setBuildVersion] = useState<string>(envAppVersion);
+  const [buildVersionBase, setBuildVersionBase] = useState<string>(envAppVersion);
+  const [buildMeta, setBuildMeta] = useState<string>('');
 
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [mainExpanded, setMainExpanded] = useState(true);
@@ -66,6 +69,29 @@ export const Sidebar: React.FC = () => {
   useEffect(() => {
     api.getDebugMode().then(setDebugMode);
   }, []);
+
+  useEffect(() => {
+    const loadBuildInfo = async () => {
+      const info = await api.getBuildInfo();
+      if (!info) {
+        return;
+      }
+
+      setBuildVersion(info.displayVersion || info.version || envAppVersion);
+      setBuildVersionBase(info.version || envAppVersion);
+      const parsedBuildTime = info.buildTime ? new Date(info.buildTime) : null;
+      const buildTimeLabel = parsedBuildTime && !Number.isNaN(parsedBuildTime.getTime())
+        ? `Built: ${parsedBuildTime.toLocaleString()}`
+        : (info.buildTime ? `Build Ref: ${info.buildTime}` : '');
+      const metaParts = [
+        buildTimeLabel,
+        info.buildSha ? `SHA: ${info.buildSha}` : '',
+      ].filter(Boolean);
+      setBuildMeta(metaParts.join(' | '));
+    };
+
+    void loadBuildInfo();
+  }, [envAppVersion]);
 
   // Fetch quotas
   useEffect(() => {
@@ -134,8 +160,8 @@ export const Sidebar: React.FC = () => {
 
   const isOutdated = Boolean(
     latestVersion &&
-    parseSemverTag(appVersion) &&
-    compareSemverTags(appVersion, latestVersion) < 0
+    parseSemverTag(buildVersionBase) &&
+    compareSemverTags(buildVersionBase, latestVersion) < 0
   );
 
   const handleToggleClick = () => {
@@ -237,7 +263,9 @@ export const Sidebar: React.FC = () => {
           <div className="flex flex-col">
             <h1 className="font-heading text-lg font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">Plexus</h1>
             <div className="flex items-center gap-1 text-[10px] leading-none text-text-muted">
-              <span>{appVersion}</span>
+              <Tooltip content={buildMeta || `Build ${buildVersion}`} position="bottom">
+                <span>{buildVersion}</span>
+              </Tooltip>
               {isOutdated && (
                 <Tooltip content={`Update available: ${latestVersion}`} position="bottom">
                   <span className="inline-flex text-primary" aria-label={`Outdated version. Latest is ${latestVersion}`}>

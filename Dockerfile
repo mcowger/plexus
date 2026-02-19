@@ -4,7 +4,11 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 ARG APP_VERSION=dev
+ARG APP_BUILD_SHA=
+ARG APP_BUILD_TIME=
 ENV APP_VERSION=${APP_VERSION}
+ENV APP_BUILD_SHA=${APP_BUILD_SHA}
+ENV APP_BUILD_TIME=${APP_BUILD_TIME}
 
 # Copy root package files
 COPY package.json bun.lock ./

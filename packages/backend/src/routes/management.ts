@@ -14,6 +14,7 @@ import { registerUserQuotaRoutes } from './management/user-quotas';
 import { registerOAuthRoutes } from './management/oauth';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { registerMetricsRoutes } from './management/metrics';
+import { registerBuildInfoRoutes } from './management/build-info';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -21,6 +22,7 @@ import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage'
 
 export async function registerManagementRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService, dispatcher: Dispatcher, quotaScheduler?: QuotaScheduler, mcpUsageStorage?: McpUsageStorageService, quotaEnforcer?: QuotaEnforcer) {
     await registerConfigRoutes(fastify);
+    await registerBuildInfoRoutes(fastify);
     await registerUsageRoutes(fastify, usageStorage);
     await registerCooldownRoutes(fastify);
     await registerPerformanceRoutes(fastify, usageStorage);
