@@ -18,6 +18,7 @@ import {
   OpenRouterQuotaDisplay,
   KiloQuotaDisplay,
   CombinedBalancesCard,
+  QuotaHistoryModal,
 } from '../components/quota';
 
 // Checker type categories
@@ -44,6 +45,9 @@ export const Quotas = () => {
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
+  const [selectedQuota, setSelectedQuota] = useState<QuotaCheckerInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDisplayName, setSelectedDisplayName] = useState('');
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -177,19 +181,38 @@ export const Quotas = () => {
       .sort(([a], [b]) => a.localeCompare(b));
   }, [groupedQuotas]);
 
+  const handleCardClick = (quota: QuotaCheckerInfo, displayName: string) => {
+    setSelectedQuota(quota);
+    setSelectedDisplayName(displayName);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedQuota(null);
+    setSelectedDisplayName('');
+  };
+
   // Render the appropriate quota display component based on checker type
-  const renderQuotaDisplay = (quota: QuotaCheckerInfo) => {
+  const renderQuotaDisplay = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
     const result = getQuotaResult(quota);
     const checkerIdentifier = (quota.checkerType || quota.checkerId).toLowerCase();
     
     // Add refresh button wrapper
     const wrapper = (children: React.ReactNode) => (
-      <div key={quota.checkerId} className="bg-bg-card border border-border rounded-lg p-4 relative">
+      <div 
+        key={quota.checkerId} 
+        onClick={() => handleCardClick(quota, groupDisplayName)}
+        className="bg-bg-card border border-border rounded-lg p-4 relative cursor-pointer hover:border-primary/50 transition-colors"
+      >
         <div className="absolute top-2 right-2">
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => handleRefresh(quota.checkerId)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefresh(quota.checkerId);
+            }}
             disabled={refreshing.has(quota.checkerId)}
           >
             <RefreshCw size={14} className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')} />
@@ -265,7 +288,7 @@ export const Quotas = () => {
                 {displayName}
               </h3>
               <div className="flex flex-col gap-3">
-                {quotasList.map(quota => renderQuotaDisplay(quota))}
+                {quotasList.map(quota => renderQuotaDisplay(quota, displayName))}
               </div>
             </div>
           );
@@ -331,6 +354,13 @@ export const Quotas = () => {
           )}
         </div>
       )}
+
+      <QuotaHistoryModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        quota={selectedQuota}
+        displayName={selectedDisplayName}
+      />
     </div>
   );
 };
