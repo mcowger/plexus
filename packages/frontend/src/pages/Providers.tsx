@@ -154,79 +154,6 @@ const ModelIdInput = ({ modelId, onCommit }: ModelIdInputProps) => {
   );
 };
 
-const OAUTH_PROVIDER_MODELS: Record<string, FetchedModel[]> = {
-  anthropic: [
-    { id: 'claude-3-5-haiku-20241022', name: 'Claude Haiku 3.5' },
-    { id: 'claude-3-5-haiku-latest', name: 'Claude Haiku 3.5 (latest)' },
-    { id: 'claude-3-5-sonnet-20240620', name: 'Claude Sonnet 3.5' },
-    { id: 'claude-3-5-sonnet-20241022', name: 'Claude Sonnet 3.5 v2' },
-    { id: 'claude-3-7-sonnet-20250219', name: 'Claude Sonnet 3.7' },
-    { id: 'claude-3-7-sonnet-latest', name: 'Claude Sonnet 3.7 (latest)' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude Haiku 3' },
-    { id: 'claude-3-opus-20240229', name: 'Claude Opus 3' },
-    { id: 'claude-3-sonnet-20240229', name: 'Claude Sonnet 3' },
-    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (latest)' },
-    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-    { id: 'claude-opus-4-0', name: 'Claude Opus 4 (latest)' },
-    { id: 'claude-opus-4-1', name: 'Claude Opus 4.1 (latest)' },
-    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1' },
-    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4' },
-    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5 (latest)' },
-    { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
-    { id: 'claude-opus-4-6', name: 'Claude Opus 4.6 (latest)' },
-    { id: 'claude-sonnet-4-0', name: 'Claude Sonnet 4 (latest)' },
-    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
-    { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (latest)' },
-    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
-    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (latest)' }
-  ],
-  'openai-codex': [
-    { id: 'gpt-5.1', name: 'GPT-5.1' },
-    { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
-    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
-    { id: 'gpt-5.2', name: 'GPT-5.2' },
-    { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' },
-    { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex' },
-    { id: 'gpt-5.3-codex-spark', name: 'GPT-5.3 Codex Spark' }
-  ],
-  'github-copilot': [
-    { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5' },
-    { id: 'claude-opus-4.5', name: 'Claude Opus 4.5' },
-    { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
-    { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
-    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
-    { id: 'gpt-4.1', name: 'GPT-4.1' },
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'gpt-5', name: 'GPT-5' },
-    { id: 'gpt-5-mini', name: 'GPT-5-mini' },
-    { id: 'gpt-5.1', name: 'GPT-5.1' },
-    { id: 'gpt-5.1-codex', name: 'GPT-5.1-Codex' },
-    { id: 'gpt-5.1-codex-max', name: 'GPT-5.1-Codex-max' },
-    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1-Codex-mini' },
-    { id: 'gpt-5.2', name: 'GPT-5.2' },
-    { id: 'gpt-5.2-codex', name: 'GPT-5.2-Codex' },
-    { id: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
-  ],
-  'google-gemini-cli': [
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Cloud Code Assist)' },
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Cloud Code Assist)' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Cloud Code Assist)' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview (Cloud Code Assist)' },
-    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview (Cloud Code Assist)' }
-  ],
-  'google-antigravity': [
-    { id: 'claude-opus-4-5-thinking', name: 'Claude Opus 4.5 Thinking (Antigravity)' },
-    { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (Antigravity)' },
-    { id: 'claude-sonnet-4-5-thinking', name: 'Claude Sonnet 4.5 Thinking (Antigravity)' },
-    { id: 'gemini-3-flash', name: 'Gemini 3 Flash (Antigravity)' },
-    { id: 'gemini-3-pro-high', name: 'Gemini 3 Pro High (Antigravity)' },
-    { id: 'gemini-3-pro-low', name: 'Gemini 3 Pro Low (Antigravity)' },
-    { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B Medium (Antigravity)' }
-  ]
-};
-
 export const Providers = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -787,19 +714,31 @@ export const Providers = () => {
   const handleFetchModels = async () => {
     if (isOAuthMode) {
       const oauthProvider = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
-      const oauthModels = OAUTH_PROVIDER_MODELS[oauthProvider] || [];
-      const sortedModels = [...oauthModels].sort((a, b) => a.id.localeCompare(b.id));
-
-      if (sortedModels.length === 0) {
-        setFetchError(`No known models found for OAuth provider '${oauthProvider}'.`);
-        setFetchedModels([]);
-        setSelectedModelIds(new Set());
-        return;
-      }
-
-      setFetchedModels(sortedModels);
-      setSelectedModelIds(new Set());
+      
+      setIsFetchingModels(true);
       setFetchError(null);
+      
+      try {
+        const models = await api.getOAuthProviderModels(oauthProvider);
+        const sortedModels = [...models].sort((a, b) => a.id.localeCompare(b.id));
+        
+        if (sortedModels.length === 0) {
+          setFetchError(`No models found for OAuth provider '${oauthProvider}'.`);
+          setFetchedModels([]);
+          setSelectedModelIds(new Set());
+          return;
+        }
+        
+        setFetchedModels(sortedModels);
+        setSelectedModelIds(new Set());
+        setFetchError(null);
+      } catch (error) {
+        console.error('Failed to fetch OAuth models:', error);
+        setFetchError(error instanceof Error ? error.message : 'Failed to fetch models');
+        setFetchedModels([]);
+      } finally {
+        setIsFetchingModels(false);
+      }
       return;
     }
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { OAuthLoginSessionManager } from '../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 import type { OAuthProvider, OAuthProviderId } from '@mariozechner/pi-ai';
+import { getModels } from '@mariozechner/pi-ai';
 
 const startSessionSchema = z.object({
   providerId: z.string().min(1),
@@ -21,6 +22,10 @@ const inputSchema = z.object({
 const credentialStatusQuerySchema = z.object({
   providerId: z.string().min(1),
   accountId: z.string().min(1)
+});
+
+const getModelsQuerySchema = z.object({
+  providerId: z.string().min(1)
 });
 
 const toProviderResponse = (provider: { id: string; name: string; usesCallbackServer?: boolean }) => ({
@@ -133,6 +138,29 @@ export async function registerOAuthRoutes(
     try {
       const session = await sessionManager.cancel(sessionId);
       return reply.send({ data: session });
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  fastify.get('/v0/management/oauth/models', async (request, reply) => {
+    const parsed = getModelsQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid query parameters', details: parsed.error.errors });
+    }
+
+    try {
+      const models = getModels(parsed.data.providerId as any);
+      const modelList = models.map(model => ({
+        id: model.id,
+        name: model.name,
+        context_length: model.contextWindow,
+        pricing: model.cost ? {
+          prompt: model.cost.input.toString(),
+          completion: model.cost.output.toString()
+        } : undefined
+      }));
+      return reply.send({ data: modelList });
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
     }

@@ -1776,6 +1776,17 @@ quota_checker: provider.quotaChecker?.type
       return json.data;
   },
 
+  getOAuthProviderModels: async (providerId: string): Promise<{ id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[]> => {
+      const query = new URLSearchParams({ providerId }).toString();
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/models?${query}`);
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to fetch OAuth provider models');
+      }
+      const json = await res.json() as { data: { id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[] };
+      return json.data || [];
+  },
+
   getConfigQuotas: async (): Promise<QuotaConfig[]> => {
       try {
           const yamlStr = await api.getConfig();
