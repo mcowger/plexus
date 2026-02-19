@@ -1,0 +1,1 @@
+ALTER TABLE "provider_cooldowns" ADD COLUMN "consecutive_failures" bigint DEFAULT 0 NOT NULL;

@@ -345,4 +345,42 @@ describe("Dispatcher Failover", () => {
     expect(meta?.finalAttemptProvider).toBe("p2");
     expect(response.data?.[0]?.embedding).toEqual([0.1, 0.2]);
   });
+
+  test("non-retryable 413 (Payload Too Large) does NOT failover", async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock.mockImplementation(async () => errorResponse(413, "payload too large"));
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+      throw new Error("expected dispatch to fail");
+    } catch (error: any) {
+      expect(error.message).toContain("All targets failed");
+      expect(error.routingContext?.attemptCount).toBe(1);
+      expect(error.routingContext?.statusCode).toBe(413);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test("413 error does NOT trigger cooldown", async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock.mockImplementation(async () => errorResponse(413, "payload too large"));
+
+    const dispatcher = new Dispatcher();
+    const cm = CooldownManager.getInstance();
+    
+    // Clear any existing cooldowns
+    await cm.clearCooldown();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+    } catch (error: any) {
+      // Expected to fail
+    }
+
+    // Provider should NOT be on cooldown after 413
+    const cooldowns = cm.getCooldowns();
+    expect(cooldowns).toHaveLength(0);
+  });
 });

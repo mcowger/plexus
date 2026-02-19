@@ -8,7 +8,7 @@ import { QuotaScheduler } from './services/quota/quota-scheduler';
 // --- Zod Schemas ---
 
 const DEFAULT_RETRYABLE_STATUS_CODES = Array.from({ length: 500 }, (_, index) => index + 100).filter(
-  (code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 422
+  (code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 413 && code !== 422
 );
 
 const FailoverPolicySchema = z.object({
@@ -284,12 +284,18 @@ const McpServerConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
 });
 
+const CooldownPolicySchema = z.object({
+  initialMinutes: z.number().min(1).default(2),
+  maxMinutes: z.number().min(1).default(300),
+});
+
 const RawPlexusConfigSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
   keys: z.record(z.string(), KeyConfigSchema),
   adminKey: z.string(),
   failover: FailoverPolicySchema.optional(),
+  cooldown: CooldownPolicySchema.optional(),
   performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
@@ -297,8 +303,10 @@ const RawPlexusConfigSchema = z.object({
 }).passthrough();
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
+export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
+  cooldown?: CooldownPolicy;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
 };
@@ -443,6 +451,7 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
   return {
     ...config,
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
+    cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
     quotas: buildProviderQuotaConfigs(config),
     mcpServers: config.mcp_servers,
   };

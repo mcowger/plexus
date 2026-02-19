@@ -118,7 +118,9 @@ export class Dispatcher {
 
             if (canRetry) {
               await this.recordAttemptMetric(route, request.requestId, false);
-              CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+              if (this.shouldTriggerCooldown(oauthError)) {
+                CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+              }
               logger.warn(
                 `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
               );
@@ -199,6 +201,7 @@ export class Dispatcher {
             bypassTransformation
           );
           await this.recordAttemptMetric(route, request.requestId, true);
+          CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
           this.attachAttemptMetadata(streamResponse, attemptedProviders, route);
           return streamResponse;
         }
@@ -212,12 +215,20 @@ export class Dispatcher {
           bypassTransformation
         );
         await this.recordAttemptMetric(route, request.requestId, true);
+        CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
         this.attachAttemptMetadata(nonStreamingResponse, attemptedProviders, route);
         return nonStreamingResponse;
       } catch (error: any) {
         lastError = error;
 
-        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        // Only mark provider failure for retryable errors
+        // Non-retryable errors (400, 413, 422) should NOT trigger cooldown
+        const statusCode = error?.routingContext?.statusCode;
+        const isNonRetryableClientError = statusCode === 400 || statusCode === 413 || statusCode === 422;
+        
+        if (!isNonRetryableClientError) {
+          CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        }
         await this.recordAttemptMetric(route, request.requestId, false);
 
         const canRetryNetwork =
@@ -241,6 +252,19 @@ export class Dispatcher {
 
   private isRetryableStatus(statusCode: number, retryableStatusCodes: number[]): boolean {
     return retryableStatusCodes.includes(statusCode);
+  }
+
+  /**
+   * Determines if an error should trigger a provider cooldown.
+   * Non-retryable client errors (400, 413, 422) should NOT trigger cooldown.
+   */
+  private shouldTriggerCooldown(error: any): boolean {
+    const statusCode = error?.routingContext?.statusCode || error?.status || error?.statusCode;
+    // Don't cooldown for non-retryable client errors
+    if (statusCode === 400 || statusCode === 413 || statusCode === 422) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -1143,7 +1167,9 @@ export class Dispatcher {
         return enrichedResponse;
       } catch (error: any) {
         lastError = error;
-        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        if (this.shouldTriggerCooldown(error)) {
+          CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        }
         await this.recordAttemptMetric(route, request.requestId, false);
 
         const canRetryNetwork =
@@ -1285,7 +1311,9 @@ export class Dispatcher {
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
-        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        if (this.shouldTriggerCooldown(error)) {
+          CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        }
         await this.recordAttemptMetric(route, request.requestId, false);
 
         const canRetryNetwork =
@@ -1453,7 +1481,9 @@ export class Dispatcher {
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
-        CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        if (this.shouldTriggerCooldown(error)) {
+          CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
+        }
         await this.recordAttemptMetric(route, request.requestId, false);
 
         const canRetryNetwork =

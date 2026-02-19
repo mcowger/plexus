@@ -1,0 +1,1 @@
+ALTER TABLE `provider_cooldowns` ADD `consecutive_failures` integer DEFAULT 0 NOT NULL;
