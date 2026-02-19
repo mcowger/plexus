@@ -99,6 +99,13 @@
       "when": 1771453450747,
       "tag": "0013_shocking_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1771484129368,
+      "tag": "0014_foamy_iron_fist",
+      "breakpoints": true
     }
   ]
 }

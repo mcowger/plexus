@@ -10,6 +10,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates
 
+- **Escalating Cooldown System**: Exponential backoff for provider cooldowns (2min → 4min → 8min → ... → 5hr cap). Success resets failure count. 413 Payload Too Large errors skip cooldowns.
 - **User Quota Enforcement**: Per-API-key quota limits using rolling (leaky bucket), daily, or weekly windows. Limit by requests or tokens.
 - **MCP Proxy Support**: Proxy streamable HTTP MCP servers through Plexus; each server is isolated per-request to prevent tool sprawl (stdio transport is not supported)
 - **OAuth Providers (pi-ai)**: Authenticate to Anthropic, GitHub Copilot, Gemini CLI, Antigravity, and OpenAI Codex via the Admin UI and route them with `oauth://` providers
@@ -140,6 +141,60 @@ Rolling quotas use a "leaky bucket" algorithm:
 Even for `requests` quotas, the stored value may be fractional due to leak calculation—this is expected.
 
 See [Configuration Guide](docs/CONFIGURATION.md#user_quotas-optional) and [API Reference](docs/API.md#user-quota-enforcement-api) for details.
+
+## Provider Cooldown System
+
+Plexus implements an intelligent **escalating cooldown system** that temporarily removes unhealthy providers from the routing pool using exponential backoff. This prevents hammering dead providers while allowing quick recovery when they become healthy again.
+
+### How It Works
+
+When a provider encounters an error (except for non-retryable client errors like 400, 413, 422), it enters a cooldown period:
+
+| Failure # | Duration |
+|-----------|----------|
+| 1st | 2 minutes |
+| 2nd | 4 minutes |
+| 3rd | 8 minutes |
+| 4th | 16 minutes |
+| 5th | 32 minutes |
+| 6th | 64 minutes (~1 hour) |
+| 7th | 128 minutes (~2 hours) |
+| 8th | 256 minutes (~4 hours) |
+| 9th+ | 300 minutes (5 hour cap) |
+
+**Key Features:**
+- **Exponential backoff**: Each failure doubles the cooldown duration (C(n) = min(C_max, C_0 × 2^n))
+- **Hard cap**: Maximum cooldown is 5 hours (300 minutes)
+- **Success resets**: Any successful request resets the failure count to 0
+- **413 handling**: Payload Too Large errors (413) do NOT trigger cooldowns - these are client-side errors that won't resolve with retries
+- **Configurable**: Initial duration and max duration are configurable via `plexus.yaml`
+
+### Configuration
+
+Add the optional `cooldown` section to your `plexus.yaml`:
+
+```yaml
+# Optional: Configure cooldown behavior
+cooldown:
+  initialMinutes: 2      # First failure: 2 minutes (default)
+  maxMinutes: 300       # Cap at 5 hours (default)
+```
+
+**Defaults:**
+- `initialMinutes`: 2
+- `maxMinutes`: 300 (5 hours)
+
+If omitted, Plexus uses the default values.
+
+### Management API
+
+Monitor and manage cooldowns via the Management API:
+
+- `GET /v0/management/cooldowns` - List all active cooldowns
+- `DELETE /v0/management/cooldowns` - Clear all cooldowns
+- `DELETE /v0/management/cooldowns/:provider?model=:model` - Clear cooldown for specific provider/model
+
+See [Configuration Guide](docs/CONFIGURATION.md#cooldown-optional) for details.
 
 ## MCP Server Proxying
 
