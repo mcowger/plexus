@@ -121,6 +121,14 @@ const ClaudeCodeQuotaCheckerOptionsSchema = z.object({
   model: z.string().trim().min(1).optional(),
 });
 
+const CopilotQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+  userAgent: z.string().trim().min(1).optional(),
+  editorVersion: z.string().trim().min(1).optional(),
+  apiVersion: z.string().trim().min(1).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -191,6 +199,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: ClaudeCodeQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('copilot'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: CopilotQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 
@@ -570,6 +585,7 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
   const oauthQuotaCheckers: Record<string, { type: string; intervalMinutes: number }> = {
     'openai-codex': { type: 'openai-codex', intervalMinutes: 5 },
     'claude-code': { type: 'claude-code', intervalMinutes: 5 },
+    'github-copilot': { type: 'copilot', intervalMinutes: 5 },
   };
 
   for (const [providerId, providerConfig] of Object.entries(config.providers)) {

@@ -9,6 +9,7 @@ import { MoonshotQuotaChecker } from './checkers/moonshot-checker';
 import { MiniMaxQuotaChecker } from './checkers/minimax-checker';
 import { OpenRouterQuotaChecker } from './checkers/openrouter-checker';
 import { KiloQuotaChecker } from './checkers/kilo-checker';
+import { CopilotQuotaChecker } from './checkers/copilot-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
@@ -21,6 +22,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   minimax: MiniMaxQuotaChecker,
   openrouter: OpenRouterQuotaChecker,
   kilo: KiloQuotaChecker,
+  copilot: CopilotQuotaChecker,
 };
 
 export class QuotaCheckerFactory {

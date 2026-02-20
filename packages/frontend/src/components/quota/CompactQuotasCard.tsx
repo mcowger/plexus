@@ -27,6 +27,7 @@ const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   if (id.includes('zai')) return 'zai';
   if (id.includes('nanogpt') || id.includes('nano')) return 'nanogpt';
   if (id.includes('naga')) return 'naga';
+  if (id.includes('copilot')) return 'copilot';
   return 'default';
 };
 
@@ -58,6 +59,10 @@ const getTrackedWindowsForChecker = (category: string, windows: any[]): string[]
       return Array.from(availableTypes)
         .filter(t => t !== 'subscription') // Exclude balance-style windows
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99));
+
+    case 'copilot':
+      // Copilot: monthly only
+      return ['monthly'].filter(t => availableTypes.has(t));
 
     default:
       // Default: Show up to 2 most important windows by priority

@@ -16,6 +16,8 @@ export { OpenRouterQuotaDisplay } from './OpenRouterQuotaDisplay';
 export { OpenRouterQuotaConfig } from './OpenRouterQuotaConfig';
 export { KiloQuotaDisplay } from './KiloQuotaDisplay';
 export { KiloQuotaConfig } from './KiloQuotaConfig';
+export { CopilotQuotaDisplay } from './CopilotQuotaDisplay';
+export { CopilotQuotaConfig } from './CopilotQuotaConfig';
 export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';

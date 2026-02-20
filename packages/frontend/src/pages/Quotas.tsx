@@ -17,6 +17,7 @@ import {
   MiniMaxQuotaDisplay,
   OpenRouterQuotaDisplay,
   KiloQuotaDisplay,
+  CopilotQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
@@ -24,7 +25,7 @@ import {
 
 // Checker type categories
 const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt'];
+const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot'];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
@@ -40,6 +41,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'zai': 'ZAI',
   'synthetic': 'Synthetic',
   'nanogpt': 'NanoGPT',
+  'copilot': 'GitHub Copilot',
 };
 
 export const Quotas = () => {
@@ -273,6 +275,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('kilo')) {
       return wrapper(<KiloQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('copilot')) {
+      return wrapper(<CopilotQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     // Fallback: generic display

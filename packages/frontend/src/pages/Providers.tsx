@@ -35,6 +35,7 @@ const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null =
   if (!oauthProvider) return null;
   if (oauthProvider === 'openai-codex') return 'openai-codex';
   if (oauthProvider === 'anthropic' || oauthProvider === 'claude-code') return 'claude-code';
+  if (oauthProvider === 'github-copilot') return 'copilot';
   return null;
 };
 
