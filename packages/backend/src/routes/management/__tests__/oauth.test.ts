@@ -187,18 +187,21 @@ describe('OAuth management routes', () => {
     
     // Verify the first model has expected structure
     const firstModel = json.data[0];
-    expect(firstModel.id).toBeDefined();
-    expect(typeof firstModel.id).toBe('string');
-    
-    // Check optional fields exist if present
-    if (firstModel.name) {
-      expect(typeof firstModel.name).toBe('string');
-    }
-    if (firstModel.context_length) {
-      expect(typeof firstModel.context_length).toBe('number');
-    }
-    if (firstModel.pricing) {
-      expect(firstModel.pricing).toBeDefined();
+    expect(firstModel).toBeDefined();
+    if (firstModel) {
+      expect(firstModel.id).toBeDefined();
+      expect(typeof firstModel.id).toBe('string');
+      
+      // Check optional fields exist if present
+      if (firstModel.name) {
+        expect(typeof firstModel.name).toBe('string');
+      }
+      if (firstModel.context_length) {
+        expect(typeof firstModel.context_length).toBe('number');
+      }
+      if (firstModel.pricing) {
+        expect(firstModel.pricing).toBeDefined();
+      }
     }
   });
 

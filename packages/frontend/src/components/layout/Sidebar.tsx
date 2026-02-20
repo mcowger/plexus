@@ -64,7 +64,7 @@ export const Sidebar: React.FC = () => {
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   useEffect(() => {
-    api.getDebugMode().then(setDebugMode);
+    api.getDebugMode().then(result => setDebugMode(result.enabled));
   }, []);
 
   // Fetch quotas
@@ -145,7 +145,7 @@ export const Sidebar: React.FC = () => {
   const confirmToggle = async () => {
       try {
           const newState = await api.setDebugMode(!debugMode);
-          setDebugMode(newState);
+          setDebugMode(newState.enabled);
       } catch (e) {
           console.error("Failed to toggle debug mode", e);
       } finally {
