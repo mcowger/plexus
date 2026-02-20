@@ -338,7 +338,7 @@ const summaryRequestCache = new Map<string, { expiresAt: number; promise: Promis
 const CONFIG_CACHE_TTL_MS = 20000;
 const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<PlexusConfig | null> }>();
 
-const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo']);
+const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate']);
 
 const normalizeProviderQuotaChecker = (
     checker?: { type?: string; enabled?: boolean; intervalMinutes?: number; options?: Record<string, unknown> }

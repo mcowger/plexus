@@ -17,6 +17,7 @@ import { MoonshotQuotaConfig } from '../components/quota/MoonshotQuotaConfig';
 import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
 import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig';
 import { KiloQuotaConfig } from '../components/quota/KiloQuotaConfig';
+import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -28,7 +29,7 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo'] as const;
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate'] as const;
 const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -206,6 +207,12 @@ export const Providers = () => {
       }
       if (!options.hertzSession || !(options.hertzSession as string).trim()) {
         return 'HERTZ-SESSION cookie value is required for MiniMax quota checker';
+      }
+    }
+
+    if (quotaType === 'wisdomgate') {
+      if (!options.session || !(options.session as string).trim()) {
+        return 'Session cookie is required for Wisdom Gate quota checker';
       }
     }
     
@@ -1478,6 +1485,21 @@ export const Providers = () => {
                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kilo' && (
                               <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                                 <KiloQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'wisdomgate' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <WisdomGateQuotaConfig
                                   options={editingProvider.quotaChecker?.options || {}}
                                   onChange={(options) => setEditingProvider({
                                     ...editingProvider,
