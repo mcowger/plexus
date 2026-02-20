@@ -18,6 +18,8 @@ export { KiloQuotaDisplay } from './KiloQuotaDisplay';
 export { KiloQuotaConfig } from './KiloQuotaConfig';
 export { CopilotQuotaDisplay } from './CopilotQuotaDisplay';
 export { CopilotQuotaConfig } from './CopilotQuotaConfig';
+export { WisdomGateQuotaDisplay } from './WisdomGateQuotaDisplay';
+export { WisdomGateQuotaConfig } from './WisdomGateQuotaConfig';
 export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';

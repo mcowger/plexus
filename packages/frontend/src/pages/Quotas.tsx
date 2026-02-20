@@ -18,6 +18,7 @@ import {
   OpenRouterQuotaDisplay,
   KiloQuotaDisplay,
   CopilotQuotaDisplay,
+  WisdomGateQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
@@ -25,7 +26,7 @@ import {
 
 // Checker type categories
 const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot'];
+const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate'];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
@@ -42,6 +43,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'synthetic': 'Synthetic',
   'nanogpt': 'NanoGPT',
   'copilot': 'GitHub Copilot',
+  'wisdomgate': 'Wisdom Gate',
 };
 
 export const Quotas = () => {
@@ -167,6 +169,8 @@ export const Quotas = () => {
         baseType = 'synthetic';
       } else if (baseType.includes('nanogpt')) {
         baseType = 'nanogpt';
+      } else if (baseType.includes('wisdomgate')) {
+        baseType = 'wisdomgate';
       }
 
       if (!groups[baseType]) {
@@ -279,6 +283,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('copilot')) {
       return wrapper(<CopilotQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('wisdomgate')) {
+      return wrapper(<WisdomGateQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     // Fallback: generic display
