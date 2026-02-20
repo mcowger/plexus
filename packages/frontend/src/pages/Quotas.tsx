@@ -25,7 +25,7 @@ import {
 } from '../components/quota';
 
 // Checker type categories
-const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
+const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
 const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate'];
 
 // Checker display names

@@ -20,6 +20,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'moonshot': 'Moonshot',
   'naga': 'Naga',
   'kilo': 'Kilo',
+  'apertis': 'Apertis',
 };
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
@@ -49,6 +50,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
     else if (checkerType.includes('naga')) normalizedType = 'naga';
     else if (checkerType.includes('kilo')) normalizedType = 'kilo';
+    else if (checkerType.includes('apertis')) normalizedType = 'apertis';
     return CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
   };
 
@@ -73,6 +75,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
     else if (checkerType.includes('naga')) normalizedType = 'naga';
     else if (checkerType.includes('kilo')) normalizedType = 'kilo';
+    else if (checkerType.includes('apertis')) normalizedType = 'apertis';
 
     const displayName = CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
     const windows = result.windows || [];
