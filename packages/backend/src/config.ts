@@ -133,6 +133,11 @@ const WisdomGateQuotaCheckerOptionsSchema = z.object({
   session: z.string().trim().min(1, 'Wisdom Gate session cookie is required'),
 });
 
+const ApertisQuotaCheckerOptionsSchema = z.object({
+  session: z.string().trim().min(1, 'Apertis session cookie is required'),
+  endpoint: z.string().url().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -217,6 +222,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: WisdomGateQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('apertis'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ApertisQuotaCheckerOptionsSchema,
   }),
 ]);
 

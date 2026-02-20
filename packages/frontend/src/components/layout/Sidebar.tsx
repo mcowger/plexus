@@ -210,7 +210,7 @@ export const Sidebar: React.FC = () => {
   };
 
   // Filter for balance-type checkers (subscription window type)
-  const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
+  const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
   const balanceQuotas = quotas.filter(quota => {
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
     return BALANCE_CHECKERS.some(bc => checkerType.includes(bc));

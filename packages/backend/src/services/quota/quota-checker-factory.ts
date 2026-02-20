@@ -11,6 +11,7 @@ import { OpenRouterQuotaChecker } from './checkers/openrouter-checker';
 import { KiloQuotaChecker } from './checkers/kilo-checker';
 import { CopilotQuotaChecker } from './checkers/copilot-checker';
 import { WisdomGateQuotaChecker } from './checkers/wisdomgate-checker';
+import { ApertisQuotaChecker } from './checkers/apertis-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
@@ -25,6 +26,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   kilo: KiloQuotaChecker,
   copilot: CopilotQuotaChecker,
   wisdomgate: WisdomGateQuotaChecker,
+  apertis: ApertisQuotaChecker,
 };
 
 export class QuotaCheckerFactory {

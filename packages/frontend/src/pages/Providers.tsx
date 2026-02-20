@@ -18,6 +18,7 @@ import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
 import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig';
 import { KiloQuotaConfig } from '../components/quota/KiloQuotaConfig';
 import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig';
+import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -29,7 +30,7 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate'] as const;
+const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate', 'apertis'] as const;
 const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -1500,6 +1501,21 @@ export const Providers = () => {
                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'wisdomgate' && (
                               <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                                 <WisdomGateQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <ApertisQuotaConfig
                                   options={editingProvider.quotaChecker?.options || {}}
                                   onChange={(options) => setEditingProvider({
                                     ...editingProvider,
