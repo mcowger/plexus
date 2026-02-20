@@ -1561,28 +1561,38 @@ quota_checker: provider.quotaChecker?.type
       }
   },
 
-  getDebugMode: async (): Promise<boolean> => {
+  getDebugMode: async (): Promise<{ enabled: boolean; providers: string[] | null }> => {
       try {
           const res = await fetchWithAuth(`${API_BASE}/v0/management/debug`);
           if (!res.ok) throw new Error('Failed to fetch debug status');
           const json = await res.json();
-          return !!json.enabled;
+          return { 
+              enabled: !!json.enabled,
+              providers: json.providers || null
+          };
       } catch (e) {
           console.error("API Error getDebugMode", e);
-          return false;
+          return { enabled: false, providers: null };
       }
   },
 
-  setDebugMode: async (enabled: boolean): Promise<boolean> => {
+  setDebugMode: async (enabled: boolean, providers?: string[] | null): Promise<{ enabled: boolean; providers: string[] | null }> => {
       try {
+          const body: { enabled: boolean; providers?: string[] | null } = { enabled };
+          if (providers !== undefined) {
+              body.providers = providers;
+          }
           const res = await fetchWithAuth(`${API_BASE}/v0/management/debug`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ enabled })
+              body: JSON.stringify(body)
           });
           if (!res.ok) throw new Error('Failed to set debug status');
           const json = await res.json();
-          return !!json.enabled;
+          return { 
+              enabled: !!json.enabled,
+              providers: json.providers || null
+          };
       } catch (e) {
           console.error("API Error setDebugMode", e);
           throw e;

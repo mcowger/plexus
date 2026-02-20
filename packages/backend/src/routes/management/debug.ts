@@ -4,16 +4,33 @@ import { UsageStorageService } from '../../services/usage-storage';
 
 export async function registerDebugRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService) {
     fastify.get('/v0/management/debug', (request, reply) => {
-        return reply.send({ enabled: DebugManager.getInstance().isEnabled() });
+        const debugManager = DebugManager.getInstance();
+        return reply.send({ 
+            enabled: debugManager.isEnabled(),
+            providers: debugManager.getProviderFilter()
+        });
     });
 
     fastify.post('/v0/management/debug', async (request, reply) => {
         const body = request.body as any;
+        const debugManager = DebugManager.getInstance();
+        
         if (typeof body.enabled === 'boolean') {
-            DebugManager.getInstance().setEnabled(body.enabled);
-            return reply.send({ enabled: DebugManager.getInstance().isEnabled() });
+            debugManager.setEnabled(body.enabled);
         }
-        return reply.code(400).send({ error: "Invalid body. Expected { enabled: boolean }" });
+        
+        if (body.providers !== undefined) {
+            if (Array.isArray(body.providers)) {
+                debugManager.setProviderFilter(body.providers);
+            } else if (body.providers === null) {
+                debugManager.setProviderFilter(null);
+            }
+        }
+        
+        return reply.send({ 
+            enabled: debugManager.isEnabled(),
+            providers: debugManager.getProviderFilter()
+        });
     });
 
     fastify.get('/v0/management/debug/logs', async (request, reply) => {

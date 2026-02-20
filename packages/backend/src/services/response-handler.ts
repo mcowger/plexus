@@ -35,6 +35,11 @@ export async function handleResponse(
     unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
   usageRecord.provider = unifiedResponse.plexus?.provider || "unknown";
   usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel || null;
+  
+  // Set provider info for debug logging filter
+  if (usageRecord.provider) {
+    DebugManager.getInstance().setProviderForRequest(usageRecord.requestId!, usageRecord.provider);
+  }
   usageRecord.attemptCount = (unifiedResponse.plexus as any)?.attemptCount || 1;
   usageRecord.finalAttemptProvider =
     ((unifiedResponse.plexus as any)?.finalAttemptProvider as string | undefined) ||

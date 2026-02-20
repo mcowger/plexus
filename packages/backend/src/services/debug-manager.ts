@@ -11,6 +11,7 @@ export interface DebugLogRecord {
     transformedResponse?: any;
     rawResponseSnapshot?: any;
     transformedResponseSnapshot?: any;
+    provider?: string;
     createdAt?: number;
 }
 
@@ -18,6 +19,7 @@ export class DebugManager {
     private static instance: DebugManager;
     private storage: UsageStorageService | null = null;
     private enabled: boolean = false;
+    private providerFilter: string[] | null = null;
     private pendingLogs: Map<string, DebugLogRecord> = new Map();
     private ephemeralRequests: Set<string> = new Set();
 
@@ -41,6 +43,29 @@ export class DebugManager {
 
     isEnabled(): boolean {
         return this.enabled;
+    }
+
+    setProviderFilter(providers: string[] | null) {
+        this.providerFilter = providers;
+        logger.info(`Debug provider filter ${providers ? 'set to: ' + providers.join(', ') : 'cleared'}`);
+    }
+
+    getProviderFilter(): string[] | null {
+        return this.providerFilter;
+    }
+
+    shouldLogProvider(provider: string): boolean {
+        if (!this.providerFilter || this.providerFilter.length === 0) {
+            return true; // No filter set, log all providers
+        }
+        return this.providerFilter.includes(provider);
+    }
+
+    setProviderForRequest(requestId: string, provider: string) {
+        const log = this.pendingLogs.get(requestId);
+        if (log) {
+            log.provider = provider;
+        }
     }
 
     startLog(requestId: string, rawRequest: any) {
@@ -147,6 +172,13 @@ export class DebugManager {
         if (!this.storage) return;
         const log = this.pendingLogs.get(requestId);
         if (log) {
+            // Check provider filter
+            if (log.provider && !this.shouldLogProvider(log.provider)) {
+                logger.debug(`[DebugManager] Skipping flush for ${requestId} - provider '${log.provider}' not in filter`);
+                this.pendingLogs.delete(requestId);
+                return;
+            }
+            
             logger.debug(`[DebugManager] Flushing debug log for ${requestId}`);
             this.storage.saveDebugLog(log);
             this.pendingLogs.delete(requestId);

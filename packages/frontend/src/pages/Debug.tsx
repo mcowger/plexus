@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import Editor from '@monaco-editor/react';
-import { RefreshCw, Clock, Database, ChevronDown, ChevronRight, Copy, Check, Trash2, Download } from 'lucide-react';
+import { RefreshCw, Clock, Database, ChevronDown, ChevronRight, Copy, Check, Trash2, Download, Filter, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { useLocation } from 'react-router-dom';
+import type { Provider } from '../lib/api';
 
 interface DebugLogMeta {
     requestId: string;
@@ -29,6 +30,12 @@ export const Debug: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [copiedAll, setCopiedAll] = useState(false);
+
+    // Provider filter state
+    const [providers, setProviders] = useState<Provider[]>([]);
+    const [debugEnabled, setDebugEnabled] = useState(false);
+    const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     // Delete Modal State
     const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
@@ -120,6 +127,66 @@ export const Debug: React.FC = () => {
         setCopiedAll(false);
     }, [detail?.requestId]);
 
+    // Fetch providers and debug status
+    useEffect(() => {
+        const fetchProvidersAndStatus = async () => {
+            try {
+                const [providersData, debugStatus] = await Promise.all([
+                    api.getProviders(),
+                    api.getDebugMode()
+                ]);
+                setProviders(providersData);
+                setDebugEnabled(debugStatus.enabled);
+                setSelectedProviders(debugStatus.providers || []);
+            } catch (e) {
+                console.error('Failed to fetch providers or debug status', e);
+            }
+        };
+        fetchProvidersAndStatus();
+    }, []);
+
+    // Close filter dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.provider-filter-dropdown')) {
+                setIsFilterOpen(false);
+            }
+        };
+        
+        if (isFilterOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isFilterOpen]);
+
+    const handleProviderToggle = (providerId: string) => {
+        setSelectedProviders(prev => {
+            const newSelection = prev.includes(providerId)
+                ? prev.filter(id => id !== providerId)
+                : [...prev, providerId];
+            return newSelection;
+        });
+    };
+
+    const applyProviderFilter = async () => {
+        try {
+            await api.setDebugMode(debugEnabled, selectedProviders.length > 0 ? selectedProviders : null);
+            setIsFilterOpen(false);
+        } catch (e) {
+            console.error('Failed to apply provider filter', e);
+        }
+    };
+
+    const clearProviderFilter = async () => {
+        setSelectedProviders([]);
+        try {
+            await api.setDebugMode(debugEnabled, null);
+        } catch (e) {
+            console.error('Failed to clear provider filter', e);
+        }
+    };
+
     const formatContent = (content: any) => {
         if (!content) return '';
         if (typeof content === 'string') {
@@ -187,6 +254,78 @@ export const Debug: React.FC = () => {
                     <p className="text-[15px] text-text-secondary m-0">Inspect full request/response lifecycles</p>
                 </div>
                 <div className="flex gap-2 items-center">
+                    {/* Provider Filter */}
+                    <div className="relative provider-filter-dropdown">
+                        <Button
+                            variant="secondary"
+                            className={clsx(
+                                "flex items-center gap-2",
+                                selectedProviders.length > 0 && "border-primary"
+                            )}
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            leftIcon={<Filter size={14} />}
+                        >
+                            Filter
+                            {selectedProviders.length > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-white rounded-full">
+                                    {selectedProviders.length}
+                                </span>
+                            )}
+                        </Button>
+                        
+                        {isFilterOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-72 bg-bg-surface border border-border-glass rounded-lg shadow-lg z-50 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm font-medium text-text">Provider Filter</span>
+                                    {selectedProviders.length > 0 && (
+                                        <button
+                                            onClick={clearProviderFilter}
+                                            className="text-xs text-text-muted hover:text-text transition-colors flex items-center gap-1"
+                                        >
+                                            <X size={12} />
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-xs text-text-muted mb-3">
+                                    Only log requests for selected providers
+                                </p>
+                                <div className="max-h-64 overflow-y-auto space-y-1">
+                                    {providers.map(provider => (
+                                        <label
+                                            key={provider.id}
+                                            className="flex items-center gap-2 p-2 rounded hover:bg-bg-hover cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedProviders.includes(provider.id)}
+                                                onChange={() => handleProviderToggle(provider.id)}
+                                                className="rounded border-border-glass text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-text">{provider.name || provider.id}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2 mt-4 pt-3 border-t border-border-glass">
+                                    <Button
+                                        variant="secondary"
+                                        className="flex-1 text-xs"
+                                        onClick={() => setIsFilterOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        className="flex-1 text-xs"
+                                        onClick={applyProviderFilter}
+                                    >
+                                        Apply
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {detail && (
                         <>
                             <Button
