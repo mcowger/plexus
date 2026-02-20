@@ -4,7 +4,7 @@ import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
-import { Search, Plus, Trash2, Edit2, Copy, RefreshCw, Check, Shield, AlertCircle, BarChart3, X } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, Copy, RefreshCw, Check, Shield, AlertCircle, BarChart3 } from 'lucide-react';
 import { formatNumber } from '../lib/format';
 
 const EMPTY_KEY: KeyConfig = {
@@ -214,13 +214,6 @@ export const Keys = () => {
       navigator.clipboard.writeText(text);
       setCopiedKey(keyId);
       setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const getQuotaDisplayName = (quotaName?: string) => {
-      if (!quotaName) return null;
-      const quota = quotas[quotaName];
-      if (!quota) return quotaName;
-      return `${quotaName} (${quota.type}, ${quota.limit} ${quota.limitType})`;
   };
 
   const filteredKeys = keys.filter(k => 
