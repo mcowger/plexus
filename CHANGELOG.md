@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.16.5 - 2026-02-20
+
+### Live Logging Adjustments
+
+Added selector to system logs page enabling dynamic changing of logging levels.
+
 ## v0.16.4 - 2026-02-20
 
 ### v0.16.4 - OAuth schema preservation and bug fixes
