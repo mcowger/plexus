@@ -1,7 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { clsx } from 'clsx';
 import { toTitleCase } from '../../lib/format';
 import type { QuotaCheckerInfo } from '../../types/quota';
+import {
+  Bot,
+  MessageSquare,
+  Zap,
+  Terminal,
+  Cpu,
+  Shield,
+  Github,
+  AlertTriangle,
+} from 'lucide-react';
 
 interface CompactQuotasCardProps {
   rateLimitQuotas: QuotaCheckerInfo[];
@@ -31,41 +42,94 @@ const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   return 'default';
 };
 
+// Get display name for each checker category
+const getTypeDisplayName = (category: string): string => {
+  const names: Record<string, string> = {
+    'codex': 'Codex',
+    'claude': 'Claude',
+    'zai': 'Zai',
+    'synthetic': 'Synthetic',
+    'nanogpt': 'NanoGPT',
+    'naga': 'Naga',
+    'copilot': 'Copilot',
+  };
+  return names[category] || toTitleCase(category);
+};
+
+// Format checker display name as "Type: Name" (e.g., "Codex: Alt2" or "Copilot")
+const formatCheckerDisplayName = (quota: QuotaCheckerInfo): string => {
+  const category = getCheckerCategory(quota);
+  const checkerId = quota.checkerId;
+  const typeName = getTypeDisplayName(category);
+  
+  // Clean up the checker ID - remove type prefix and normalize
+  let displayPart = checkerId;
+  
+  // Remove common type prefixes
+  const prefixes = ['openai-', 'claude-', 'github-', 'copilot-', 'synthetic-', 'zai-', 'nano-', 'naga-'];
+  for (const prefix of prefixes) {
+    if (displayPart.toLowerCase().startsWith(prefix)) {
+      displayPart = displayPart.slice(prefix.length);
+      break;
+    }
+  }
+  
+  // Shorten "github copilot" to just "copilot" or remove if redundant
+  displayPart = displayPart.replace(/github\s+/gi, '').trim();
+  
+  // If the display part is the same as the type or empty, just return the type
+  if (!displayPart || displayPart.toLowerCase() === typeName.toLowerCase()) {
+    return typeName;
+  }
+  
+  // Return "Type: Name" format
+  return `${typeName}: ${toTitleCase(displayPart)}`;
+};
+
+// Get icon for each checker category
+const getCheckerIcon = (category: string) => {
+  const iconClass = "w-3.5 h-3.5 text-text-muted flex-shrink-0";
+  switch (category) {
+    case 'codex':
+      return <Bot className={iconClass} />;
+    case 'claude':
+      return <MessageSquare className={iconClass} />;
+    case 'zai':
+      return <Zap className={iconClass} />;
+    case 'synthetic':
+      return <Terminal className={iconClass} />;
+    case 'nanogpt':
+      return <Cpu className={iconClass} />;
+    case 'naga':
+      return <Shield className={iconClass} />;
+    case 'copilot':
+      return <Github className={iconClass} />;
+    default:
+      return <Bot className={iconClass} />;
+  }
+};
+
 // Define which windows to show for each checker type
-// Returns array of windowType strings in display order
 const getTrackedWindowsForChecker = (category: string, windows: any[]): string[] => {
   const availableTypes = new Set(windows.map(w => w.windowType));
 
   switch (category) {
     case 'synthetic':
-      // Synthetic: 5h limit, tool calls (search hidden - too crowded)
       return ['five_hour', 'toolcalls'].filter(t => availableTypes.has(t));
-
     case 'claude':
     case 'codex':
-      // Claude Code & OpenAI Codex: 5h + weekly
       return ['five_hour', 'weekly'].filter(t => availableTypes.has(t));
-
     case 'zai':
-      // ZAI: 5h tokens + monthly MCP
       return ['five_hour', 'monthly'].filter(t => availableTypes.has(t));
-
     case 'nanogpt':
-      // NanoGPT: daily + monthly
       return ['daily', 'monthly'].filter(t => availableTypes.has(t));
-
     case 'naga':
-      // Naga: Show all available windows sorted by priority
       return Array.from(availableTypes)
-        .filter(t => t !== 'subscription') // Exclude balance-style windows
+        .filter(t => t !== 'subscription')
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99));
-
     case 'copilot':
-      // Copilot: monthly only
       return ['monthly'].filter(t => availableTypes.has(t));
-
     default:
-      // Default: Show up to 2 most important windows by priority
       return Array.from(availableTypes)
         .filter(t => t !== 'subscription')
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99))
@@ -73,17 +137,44 @@ const getTrackedWindowsForChecker = (category: string, windows: any[]): string[]
   }
 };
 
-// Format window type for display (abbreviated)
+// Mini progress bar component
+const MiniProgressBar: React.FC<{ percent: number; className?: string }> = ({ percent, className }) => {
+  const clampedPercent = Math.max(0, Math.min(100, percent));
+
+  // Determine color based on utilization
+  const getBarColor = () => {
+    if (clampedPercent >= 90) return 'bg-gradient-to-r from-danger to-danger/80';
+    if (clampedPercent >= 70) return 'bg-gradient-to-r from-warning to-warning/80';
+    return 'bg-gradient-to-r from-success to-success/80';
+  };
+
+  return (
+    <div
+      className={clsx(
+        'bg-bg-subtle rounded-full overflow-hidden border border-border/30 h-2',
+        className
+      )}
+    >
+      <div
+        className={clsx(
+          'h-full rounded-full transition-all duration-500 ease-out',
+          getBarColor()
+        )}
+        style={{ width: `${clampedPercent}%` }}
+      />
+    </div>
+  );
+};
+
+// Format window label (very compact)
 const formatWindowLabel = (windowType: string): string => {
   const labels: Record<string, string> = {
-    'five_hour': '', // Primary - no label
-    'daily': '',     // Primary - no label  
-    'toolcalls': 'TC',
-    'search': 'S',
-    'weekly': '1w',
-    'monthly': '1m',
+    'toolcalls': 't',
+    'search': 's',
+    'weekly': 'w',
+    'monthly': 'm',
   };
-  return labels[windowType] || windowType.slice(0, 2).toUpperCase();
+  return labels[windowType] || '';
 };
 
 export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
@@ -102,7 +193,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
 
   return (
     <div
-      className="px-2 py-1 space-y-0.5 cursor-pointer hover:bg-bg-hover transition-colors"
+      className="px-2 py-1 space-y-1 cursor-pointer hover:bg-bg-hover transition-colors"
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -115,63 +206,73 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
     >
       {rateLimitQuotas.map((quota) => {
         const result = getQuotaResult(quota);
-        const displayName = toTitleCase(quota.checkerId);
+        const displayName = formatCheckerDisplayName(quota);
         const windows = result.windows || [];
-
         const category = getCheckerCategory(quota);
-        const trackedWindowTypes = getTrackedWindowsForChecker(category, windows);
+        const icon = getCheckerIcon(category);
 
-        // Get windows in priority order
+        if (!result.success) {
+          return (
+            <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
+              {icon}
+              <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
+              <AlertTriangle className="w-3 h-3 text-danger flex-shrink-0" />
+            </div>
+          );
+        }
+
+        const trackedWindowTypes = getTrackedWindowsForChecker(category, windows);
         const trackedWindows = trackedWindowTypes
           .map(type => windows.find((w: any) => w.windowType === type))
           .filter(Boolean);
 
-        // Format: "Primary%" or "Primary% / Label: Secondary%"
         const primaryWindow = trackedWindows[0];
-        const secondaryWindows = trackedWindows.slice(1);
-
         if (!primaryWindow) {
           return (
-            <div key={quota.checkerId} className="flex items-center justify-between min-w-0">
-              <span className="text-xs text-text-secondary truncate">{displayName}:</span>
-              {!result.success ? (
-                <span className="text-xs text-danger flex-shrink-0 ml-2">Error</span>
-              ) : (
-                <span className="text-xs text-text-muted flex-shrink-0">—</span>
-              )}
+            <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
+              {icon}
+              <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
+              <span className="text-[11px] text-text-muted flex-shrink-0">—</span>
             </div>
           );
         }
 
         const primaryPct = Math.round(primaryWindow.utilizationPercent || 0);
+        const secondaryWindows = trackedWindows.slice(1);
 
-        // Build display string
-        let displayValue: string;
-        if (secondaryWindows.length === 0) {
-          displayValue = `${primaryPct}%`;
-        } else if (secondaryWindows.length === 1) {
-          const sec = secondaryWindows[0];
-          const secPct = Math.round(sec.utilizationPercent || 0);
-          const secLabel = formatWindowLabel(sec.windowType);
-          displayValue = secLabel ? `${primaryPct}% / ${secLabel}:${secPct}%` : `${primaryPct}% / ${secPct}%`;
-        } else {
-          // Multiple secondaries - show all with labels
-          const secondaryStr = secondaryWindows.map(w => {
-            const pct = Math.round(w.utilizationPercent || 0);
-            const label = formatWindowLabel(w.windowType);
-            return label ? `${label}:${pct}%` : `${pct}%`;
-          }).join(' / ');
-          displayValue = `${primaryPct}% / ${secondaryStr}`;
-        }
-
+        // All providers: name on row 1, bar(s) on row 2
         return (
-          <div key={quota.checkerId} className="flex items-center justify-between min-w-0">
-            <span className="text-xs text-text-secondary truncate">
-              {displayName}:
-            </span>
-            <span className="text-xs font-semibold text-text-secondary tabular-nums flex-shrink-0 ml-2">
-              {displayValue}
-            </span>
+          <div key={quota.checkerId} className="flex flex-col gap-0.5 py-0.5">
+            {/* Row 1: Icon + Name */}
+            <div className="flex items-center gap-2 min-w-0">
+              {icon}
+              <span className="text-[11px] text-text-secondary truncate flex-1 min-w-0">{displayName}</span>
+            </div>
+            {/* Row 2: Bar(s) side by side (70/30 split if multiple) */}
+            <div className="flex items-center gap-1 pl-5">
+              {/* Primary bar (full width if single, 70% if multiple) */}
+              <div className={clsx(
+                "flex items-center gap-1 min-w-0",
+                secondaryWindows.length > 0 ? "flex-[7]" : "flex-1"
+              )}>
+                <MiniProgressBar percent={primaryPct} className="w-full flex-shrink" />
+                <span className="text-[10px] font-medium text-text-secondary tabular-nums w-6 text-right flex-shrink-0">
+                  {primaryPct}%
+                </span>
+              </div>
+              {/* Secondary bar (30%) - only if exists */}
+              {secondaryWindows[0] && (
+                <div className="flex items-center gap-0.5 flex-[3] min-w-0">
+                  <MiniProgressBar percent={Math.round(secondaryWindows[0].utilizationPercent || 0)} className="w-full flex-shrink" />
+                  <span className="text-[10px] text-text-muted w-2 flex-shrink-0 text-center">
+                    {formatWindowLabel(secondaryWindows[0].windowType)}
+                  </span>
+                  <span className="text-[10px] text-text-muted tabular-nums w-6 text-right flex-shrink-0">
+                    {Math.round(secondaryWindows[0].utilizationPercent || 0)}%
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
