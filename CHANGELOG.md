@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.16.3 - 2026-02-20
+
+### Add Apertis and Wisdom Gate Provider Support with Debug Logging
+
+## New Features
+
+- **Apertis (stima.tech) Balance Quota Checker**: Added support for monitoring Apertis provider quotas ([344845e](https://github.com/mcowger/plexus/commit/344845e))
+- **Wisdom Gate Quota Checker**: Implemented quota checking functionality for Wisdom Gate provider ([4c4a5f3](https://github.com/mcowger/plexus/commit/4c4a5f3))
+- **Provider-Specific Debug Logging Filter**: Added filtering capability for provider-specific debug logs to improve troubleshooting ([6abad39](https://github.com/mcowger/plexus/commit/6abad39))
+
+## Fixes
+
+- **TypeScript Error Resolution**: Resolved TypeScript compilation errors in tests and frontend components ([533b21e](https://github.com/mcowger/plexus/commit/533b21e))
+
+---
+
+The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.16.2 - 2026-02-20
 
 ### Add GitHub Copilot quota checker and exponential backoff cooldown system
