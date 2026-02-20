@@ -208,6 +208,97 @@ export const LiveMetrics = () => {
     return byProvider;
   }, [providerPerformance]);
 
+  const providerPerformanceByModel = useMemo(() => {
+    const totals = new Map<string, {
+      ttftWeighted: number;
+      tpsWeighted: number;
+      samples: number;
+    }>();
+
+    for (const row of providerPerformance) {
+      const provider = row.provider || 'unknown';
+      const model = row.model || 'unknown';
+      const key = `${provider}::${model}`;
+      const weight = Math.max(1, Number(row.sample_count || 0));
+      const current = totals.get(key) ?? { ttftWeighted: 0, tpsWeighted: 0, samples: 0 };
+
+      current.samples += weight;
+      current.ttftWeighted += Number(row.avg_ttft_ms || 0) * weight;
+      current.tpsWeighted += Number(row.avg_tokens_per_sec || 0) * weight;
+      totals.set(key, current);
+    }
+
+    const byModel = new Map<string, { avgTtftMs: number; avgTokensPerSec: number }>();
+    for (const [key, metric] of totals.entries()) {
+      const samples = Math.max(1, metric.samples);
+      byModel.set(key, {
+        avgTtftMs: metric.ttftWeighted / samples,
+        avgTokensPerSec: metric.tpsWeighted / samples
+      });
+    }
+
+    return byModel;
+  }, [providerPerformance]);
+
+  const modelPulse = useMemo(() => {
+    const totals = new Map<string, {
+      provider: string;
+      model: string;
+      requests: number;
+      successes: number;
+      totalTokens: number;
+      totalCost: number;
+      durationTotalMs: number;
+      ttftTotalMs: number;
+      tpsTotal: number;
+    }>();
+
+    for (const request of liveSnapshot.recentRequests) {
+      const provider = request.provider || 'unknown';
+      const model = request.model || 'unknown';
+      const key = `${provider}::${model}`;
+      const current = totals.get(key) ?? {
+        provider,
+        model,
+        requests: 0,
+        successes: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        durationTotalMs: 0,
+        ttftTotalMs: 0,
+        tpsTotal: 0,
+      };
+
+      current.requests += 1;
+      if ((request.responseStatus || '').toLowerCase() === 'success') {
+        current.successes += 1;
+      }
+      current.totalTokens += Number(request.totalTokens || 0);
+      current.totalCost += Number(request.costTotal || 0);
+      current.durationTotalMs += Number(request.durationMs || 0);
+      current.ttftTotalMs += Number(request.ttftMs || 0);
+      current.tpsTotal += Number(request.tokensPerSec || 0);
+      totals.set(key, current);
+    }
+
+    return Array.from(totals.values())
+      .map((item) => {
+        const requests = Math.max(1, item.requests);
+        return {
+          provider: item.provider,
+          model: item.model,
+          requests: item.requests,
+          successRate: item.successes / requests,
+          totalTokens: item.totalTokens,
+          totalCost: item.totalCost,
+          avgDurationMs: item.durationTotalMs / requests,
+          avgTtftMs: item.ttftTotalMs / requests,
+          avgTokensPerSec: item.tpsTotal / requests,
+        };
+      })
+      .sort((a, b) => b.requests - a.requests || b.totalTokens - a.totalTokens);
+  }, [liveSnapshot.recentRequests]);
+
   const renderActivityTimeControls = () => (
     <div style={{ display: 'flex', gap: '8px' }}>
       {(['hour', 'day', 'week', 'month'] as TimeRange[]).map((range) => (
@@ -587,51 +678,100 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
-        <Card
-          title={`Provider Pulse (${LIVE_WINDOW_MINUTES}m)`}
-          extra={<Signal size={16} className={streamConnected ? 'text-success' : 'text-warning'} />}
-        >
-          {liveSnapshot.providers.length === 0 ? (
-            <div className="py-8 text-sm text-text-secondary">No provider traffic in the selected live window.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left text-text-secondary border-b border-border-glass">
-                    <th className="py-2 pr-2">Provider</th>
-                    <th className="py-2 pr-2">Req</th>
-                    <th className="py-2 pr-2">Success</th>
-                    <th className="py-2 pr-2">Tokens</th>
-                    <th className="py-2 pr-2">Cost</th>
-                    <th className="py-2 pr-2">Avg Latency</th>
-                    <th className="py-2 pr-2">Perf</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {liveSnapshot.providers.slice(0, 8).map((provider) => {
-                    const perf = providerPerformanceByProvider.get(provider.provider);
-                    return (
-                      <tr key={provider.provider} className="border-b border-border-glass/60">
-                        <td className="py-2 pr-2 text-text font-medium">{provider.provider}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatNumber(provider.requests, 0)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{(provider.successRate * 100).toFixed(1)}%</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatTokens(provider.totalTokens)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatCost(provider.totalCost, 6)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">{formatMs(provider.avgDurationMs)}</td>
-                        <td className="py-2 pr-2 text-text-secondary">
-                          {perf
-                            ? `${formatTPS(perf.avgTokensPerSec)} tok/s · ${formatMs(perf.avgTtftMs)}`
-                            : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-4">
+          <Card
+            title={`Provider Pulse (${LIVE_WINDOW_MINUTES}m)`}
+            extra={<Signal size={16} className={streamConnected ? 'text-success' : 'text-warning'} />}
+          >
+            {liveSnapshot.providers.length === 0 ? (
+              <div className="py-8 text-sm text-text-secondary">No provider traffic in the selected live window.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="text-left text-text-secondary border-b border-border-glass">
+                      <th className="py-2 pr-2">Provider</th>
+                      <th className="py-2 pr-2">Req</th>
+                      <th className="py-2 pr-2">Success</th>
+                      <th className="py-2 pr-2">Tokens</th>
+                      <th className="py-2 pr-2">Cost</th>
+                      <th className="py-2 pr-2">Avg Latency</th>
+                      <th className="py-2 pr-2">Perf</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liveSnapshot.providers.slice(0, 8).map((provider) => {
+                      const perf = providerPerformanceByProvider.get(provider.provider);
+                      return (
+                        <tr key={provider.provider} className="border-b border-border-glass/60">
+                          <td className="py-2 pr-2 text-text font-medium">{provider.provider}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatNumber(provider.requests, 0)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{(provider.successRate * 100).toFixed(1)}%</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatTokens(provider.totalTokens)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatCost(provider.totalCost, 6)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatMs(provider.avgDurationMs)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">
+                            {perf
+                              ? `${formatTPS(perf.avgTokensPerSec)} tok/s · ${formatMs(perf.avgTtftMs)}`
+                              : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card
+            title={`Model Pulse (${LIVE_WINDOW_MINUTES}m)`}
+            extra={<Signal size={16} className={streamConnected ? 'text-success' : 'text-warning'} />}
+          >
+            {modelPulse.length === 0 ? (
+              <div className="py-8 text-sm text-text-secondary">No model traffic in the selected live window.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="text-left text-text-secondary border-b border-border-glass">
+                      <th className="py-2 pr-2">Model</th>
+                      <th className="py-2 pr-2">Provider</th>
+                      <th className="py-2 pr-2">Req</th>
+                      <th className="py-2 pr-2">Success</th>
+                      <th className="py-2 pr-2">Tokens</th>
+                      <th className="py-2 pr-2">Cost</th>
+                      <th className="py-2 pr-2">Avg Latency</th>
+                      <th className="py-2 pr-2">Perf</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modelPulse.slice(0, 8).map((row) => {
+                      const perf = providerPerformanceByModel.get(`${row.provider}::${row.model}`);
+                      const avgTps = perf ? perf.avgTokensPerSec : row.avgTokensPerSec;
+                      const avgTtft = perf ? perf.avgTtftMs : row.avgTtftMs;
+                      return (
+                        <tr key={`${row.provider}-${row.model}`} className="border-b border-border-glass/60">
+                          <td className="py-2 pr-2 text-text font-medium">{row.model}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{row.provider}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatNumber(row.requests, 0)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{(row.successRate * 100).toFixed(1)}%</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatTokens(row.totalTokens)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatCost(row.totalCost, 6)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">{formatMs(row.avgDurationMs)}</td>
+                          <td className="py-2 pr-2 text-text-secondary">
+                            {`${formatTPS(avgTps)} tok/s · ${formatMs(avgTtft)}`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
 
         <Card title="Live Request Stream" extra={<span className="text-xs text-text-secondary">Latest 20</span>}>
           {liveSnapshot.recentRequests.length === 0 ? (

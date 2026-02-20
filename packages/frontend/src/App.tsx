@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
-import { Metrics } from './pages/Metrics';
+import { A2AConsole } from './pages/A2AConsole';
 import { LiveMetrics } from './pages/LiveMetrics';
 import { DetailedUsage } from './pages/DetailedUsage';
 import { Usage } from './pages/Usage';
@@ -62,7 +62,7 @@ const AppRoutes = () => {
                     <MainLayout>
                         <Routes>
                             <Route path="/" element={<Dashboard />} />
-                            <Route path="/metrics" element={<Metrics />} />
+                            <Route path="/metrics" element={<A2AConsole />} />
                             <Route path="/live-metrics" element={<LiveMetrics />} />
                             <Route path="/detailed-usage" element={<DetailedUsage />} />
                             <Route path="/usage" element={<Usage />} />

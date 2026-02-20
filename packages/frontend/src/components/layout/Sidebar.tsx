@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight, PieChart, Plug, Zap, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Activity, Gauge, Settings, Server, Box, FileText, Database, LogOut, AlertTriangle, Key, PanelLeftClose, PanelLeftOpen, ChevronRight, Plug, Zap, BarChart3, Bot } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -67,7 +67,7 @@ export const Sidebar: React.FC = () => {
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   useEffect(() => {
-    api.getDebugMode().then(setDebugMode);
+    api.getDebugMode().then(result => setDebugMode(result.enabled));
   }, []);
 
   useEffect(() => {
@@ -171,7 +171,7 @@ export const Sidebar: React.FC = () => {
   const confirmToggle = async () => {
       try {
           const newState = await api.setDebugMode(!debugMode);
-          setDebugMode(newState);
+          setDebugMode(newState.enabled);
       } catch (e) {
           console.error("Failed to toggle debug mode", e);
       } finally {
@@ -236,14 +236,14 @@ export const Sidebar: React.FC = () => {
   };
 
   // Filter for balance-type checkers (subscription window type)
-  const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
+  const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
   const balanceQuotas = quotas.filter(quota => {
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
     return BALANCE_CHECKERS.some(bc => checkerType.includes(bc));
   });
 
   // Filter for rate-limit checkers
-  const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt'];
+  const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate'];
   const rateLimitQuotas = quotas.filter(quota => {
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
     return RATE_LIMIT_CHECKERS.some(rc => checkerType.includes(rc));
@@ -309,7 +309,7 @@ export const Sidebar: React.FC = () => {
             {(mainExpanded || isCollapsed) && (
               <>
                 <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
-                <NavItem to="/metrics" icon={Gauge} label="Metrics" isCollapsed={isCollapsed} />
+                <NavItem to="/metrics" icon={Bot} label="A2A Console" isCollapsed={isCollapsed} />
                 <NavItem to="/live-metrics" icon={Zap} label="Live Metrics" isCollapsed={isCollapsed} />
                 <NavItem to="/detailed-usage" icon={BarChart3} label="Detailed Usage" isCollapsed={isCollapsed} />
                 <NavItem to="/usage" icon={Activity} label="Usage" isCollapsed={isCollapsed} />

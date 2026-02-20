@@ -64,6 +64,12 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   return res;
 };
 
+const withA2AHeaders = (headers?: HeadersInit): Headers => {
+  const next = new Headers(headers || {});
+  next.set('A2A-Version', '0.3');
+  return next;
+};
+
 function normalizeQuotaSnapshot(snapshot: QuotaSnapshot): QuotaSnapshot {
   return {
     ...snapshot,
@@ -208,6 +214,7 @@ export interface Provider {
   oauthProvider?: string;
   oauthAccount?: string;
   enabled: boolean;
+  disableCooldown?: boolean;
   estimateTokens?: boolean;
   discount?: number;
   headers?: Record<string, string>;
@@ -246,6 +253,101 @@ export interface McpLogRecord {
   error_code: string | null;
   error_message: string | null;
 }
+
+export interface A2AAgentSkill {
+  id: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+  examples?: string[];
+  inputModes?: string[];
+  outputModes?: string[];
+}
+
+export interface A2AAgentCard {
+  name: string;
+  description?: string;
+  version: string;
+  url: string;
+  capabilities: {
+    streaming?: boolean;
+    pushNotifications?: boolean;
+    stateTransitionHistory?: boolean;
+    extensions?: string[];
+  };
+  skills: A2AAgentSkill[];
+  defaultInputModes?: string[];
+  defaultOutputModes?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export type A2ATaskState =
+  | 'submitted'
+  | 'working'
+  | 'input-required'
+  | 'auth-required'
+  | 'completed'
+  | 'failed'
+  | 'canceled'
+  | 'rejected';
+
+export interface A2AMessagePart {
+  type: 'text' | 'file' | 'data';
+  text?: string;
+  file?: {
+    name?: string;
+    mimeType?: string;
+    uri?: string;
+    bytesBase64?: string;
+  };
+  data?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface A2ATask {
+  id: string;
+  contextId: string;
+  status: {
+    state: A2ATaskState;
+    timestamp: string;
+    message?: {
+      role: 'user' | 'agent' | 'system';
+      parts: A2AMessagePart[];
+      metadata?: Record<string, unknown>;
+    };
+  };
+  artifacts?: Array<{
+    artifactId?: string;
+    name?: string;
+    description?: string;
+    parts: A2AMessagePart[];
+    metadata?: Record<string, unknown>;
+  }>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface A2ATaskEvent {
+  taskId: string;
+  eventType: string;
+  sequence: number;
+  payload: Record<string, unknown>;
+  createdAt?: string;
+}
+
+export interface A2APushConfig {
+  configId: string;
+  taskId: string;
+  endpoint: string;
+  authentication?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  enabled: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export type A2AStreamConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'closed';
+
+const TERMINAL_A2A_STATES = new Set<A2ATaskState>(['completed', 'failed', 'canceled', 'rejected']);
 
 export interface Model {
   id: string;
@@ -397,7 +499,7 @@ const summaryRequestCache = new Map<string, { expiresAt: number; promise: Promis
 const CONFIG_CACHE_TTL_MS = 20000;
 const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<PlexusConfig | null> }>();
 
-const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo']);
+const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate']);
 
 const normalizeProviderQuotaChecker = (
     checker?: { type?: string; enabled?: boolean; intervalMinutes?: number; options?: Record<string, unknown> }
@@ -736,6 +838,7 @@ interface PlexusConfig {
         display_name?: string;
         models?: string[] | Record<string, any>;
         enabled?: boolean; // Custom field we might want to preserve if we could
+        disable_cooldown?: boolean;
         estimateTokens?: boolean;
         discount?: number;
         headers?: Record<string, string>;
@@ -1554,6 +1657,7 @@ export const api = {
                 oauthProvider: val.oauth_provider,
                 oauthAccount: val.oauth_account,
                 enabled: val.enabled !== false, // Default to true if not present
+                disableCooldown: val.disable_cooldown === true,
                 estimateTokens: val.estimateTokens || false,
                 discount: val.discount,
                 headers: val.headers,
@@ -1597,6 +1701,7 @@ export const api = {
               api_key: p.apiKey,
               ...(p.oauthProvider && { oauth_provider: p.oauthProvider }),
               ...(p.oauthAccount && { oauth_account: p.oauthAccount }),
+              disable_cooldown: p.disableCooldown === true,
               api_base_url: p.apiBaseUrl,
               display_name: p.name,
               discount: p.discount,
@@ -1649,6 +1754,7 @@ export const api = {
           api_key: provider.apiKey,
           ...(provider.oauthProvider && { oauth_provider: provider.oauthProvider }),
           ...(provider.oauthAccount && { oauth_account: provider.oauthAccount }),
+          disable_cooldown: provider.disableCooldown === true,
           api_base_url: provider.apiBaseUrl,
           display_name: provider.name,
           estimateTokens: provider.estimateTokens,
@@ -1946,28 +2052,38 @@ quota_checker: provider.quotaChecker?.type
       }
   },
 
-  getDebugMode: async (): Promise<boolean> => {
+  getDebugMode: async (): Promise<{ enabled: boolean; providers: string[] | null }> => {
       try {
           const res = await fetchWithAuth(`${API_BASE}/v0/management/debug`);
           if (!res.ok) throw new Error('Failed to fetch debug status');
           const json = await res.json();
-          return !!json.enabled;
+          return { 
+              enabled: !!json.enabled,
+              providers: json.providers || null
+          };
       } catch (e) {
           console.error("API Error getDebugMode", e);
-          return false;
+          return { enabled: false, providers: null };
       }
   },
 
-  setDebugMode: async (enabled: boolean): Promise<boolean> => {
+  setDebugMode: async (enabled: boolean, providers?: string[] | null): Promise<{ enabled: boolean; providers: string[] | null }> => {
       try {
+          const body: { enabled: boolean; providers?: string[] | null } = { enabled };
+          if (providers !== undefined) {
+              body.providers = providers;
+          }
           const res = await fetchWithAuth(`${API_BASE}/v0/management/debug`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ enabled })
+              body: JSON.stringify(body)
           });
           if (!res.ok) throw new Error('Failed to set debug status');
           const json = await res.json();
-          return !!json.enabled;
+          return { 
+              enabled: !!json.enabled,
+              providers: json.providers || null
+          };
       } catch (e) {
           console.error("API Error setDebugMode", e);
           throw e;
@@ -2161,6 +2277,17 @@ quota_checker: provider.quotaChecker?.type
       return json.data;
   },
 
+  getOAuthProviderModels: async (providerId: string): Promise<{ id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[]> => {
+      const query = new URLSearchParams({ providerId }).toString();
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/models?${query}`);
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to fetch OAuth provider models');
+      }
+      const json = await res.json() as { data: { id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[] };
+      return json.data || [];
+  },
+
   getConfigQuotas: async (): Promise<QuotaConfig[]> => {
       try {
           const yamlStr = await api.getConfig();
@@ -2213,6 +2340,287 @@ quota_checker: provider.quotaChecker?.type
           const newYaml = stringify(config);
           await api.saveConfig(newYaml);
       }
+  },
+
+  getA2APublicAgentCard: async (): Promise<A2AAgentCard | null> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/.well-known/agent-card.json`, {
+              headers: withA2AHeaders()
+          });
+          if (!res.ok) throw new Error('Failed to fetch A2A agent card');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getA2APublicAgentCard", e);
+          return null;
+      }
+  },
+
+  getA2AExtendedAgentCard: async (): Promise<A2AAgentCard | null> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/a2a/extendedAgentCard`, {
+              headers: withA2AHeaders()
+          });
+          if (!res.ok) throw new Error('Failed to fetch extended A2A card');
+          return await res.json();
+      } catch (e) {
+          console.error("API Error getA2AExtendedAgentCard", e);
+          return null;
+      }
+  },
+
+  sendA2AMessage: async (payload: {
+      message: {
+          role: 'user' | 'agent' | 'system';
+          parts: A2AMessagePart[];
+          metadata?: Record<string, unknown>;
+      };
+      contextId?: string;
+      taskId?: string;
+      agentId?: string;
+      metadata?: Record<string, unknown>;
+      configuration?: {
+          idempotencyKey?: string;
+      };
+  }): Promise<{ task: A2ATask }> => {
+      const res = await fetchWithAuth(`${API_BASE}/a2a/message/send`, {
+          method: 'POST',
+          headers: withA2AHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to send A2A message');
+      }
+      return await res.json();
+  },
+
+  listA2ATasks: async (params: {
+      contextId?: string;
+      status?: A2ATaskState;
+      limit?: number;
+      offset?: number;
+  } = {}): Promise<{ tasks: A2ATask[]; total: number }> => {
+      const query = new URLSearchParams();
+      if (params.contextId) query.set('contextId', params.contextId);
+      if (params.status) query.set('status', params.status);
+      if (params.limit !== undefined) query.set('limit', String(params.limit));
+      if (params.offset !== undefined) query.set('offset', String(params.offset));
+
+      const suffix = query.toString() ? `?${query.toString()}` : '';
+      const res = await fetchWithAuth(`${API_BASE}/a2a/tasks${suffix}`, {
+          headers: withA2AHeaders()
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to list A2A tasks');
+      }
+      return await res.json();
+  },
+
+  getA2ATask: async (taskId: string): Promise<{ task: A2ATask }> => {
+      const res = await fetchWithAuth(`${API_BASE}/a2a/tasks/${encodeURIComponent(taskId)}`, {
+          headers: withA2AHeaders()
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to fetch A2A task');
+      }
+      return await res.json();
+  },
+
+  cancelA2ATask: async (taskId: string, reason?: string): Promise<{ task: A2ATask }> => {
+      const res = await fetchWithAuth(`${API_BASE}/a2a/tasks/${encodeURIComponent(taskId)}/cancel`, {
+          method: 'POST',
+          headers: withA2AHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ reason })
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to cancel A2A task');
+      }
+      return await res.json();
+  },
+
+  listA2APushConfigs: async (taskId: string): Promise<{ configs: A2APushConfig[] }> => {
+      const res = await fetchWithAuth(`${API_BASE}/a2a/tasks/${encodeURIComponent(taskId)}/pushNotificationConfigs`, {
+          headers: withA2AHeaders()
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to list push notification configs');
+      }
+      return await res.json();
+  },
+
+  createA2APushConfig: async (
+      taskId: string,
+      payload: {
+          configId?: string;
+          config: {
+              endpoint: string;
+              authentication?: Record<string, unknown>;
+              metadata?: Record<string, unknown>;
+          };
+      }
+  ): Promise<{ config: A2APushConfig }> => {
+      const res = await fetchWithAuth(`${API_BASE}/a2a/tasks/${encodeURIComponent(taskId)}/pushNotificationConfigs`, {
+          method: 'POST',
+          headers: withA2AHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to create push notification config');
+      }
+      return await res.json();
+  },
+
+  deleteA2APushConfig: async (taskId: string, configId: string): Promise<void> => {
+      const res = await fetchWithAuth(`${API_BASE}/a2a/tasks/${encodeURIComponent(taskId)}/pushNotificationConfigs/${encodeURIComponent(configId)}`, {
+          method: 'DELETE',
+          headers: withA2AHeaders()
+      });
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || 'Failed to delete push notification config');
+      }
+  },
+
+  subscribeA2ATask: (
+      taskId: string,
+      handlers: {
+          onEvent: (event: A2ATaskEvent) => void;
+          onError?: (event: Event) => void;
+          onStatusChange?: (status: A2AStreamConnectionStatus) => void;
+      },
+      options?: { afterSequence?: number }
+  ): (() => void) => {
+      let source: EventSource | null = null;
+      let closed = false;
+      let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+      let retryAttempt = 0;
+      let lastSequence = options?.afterSequence ?? 0;
+
+      const clearReconnectTimer = () => {
+          if (reconnectTimer) {
+              clearTimeout(reconnectTimer);
+              reconnectTimer = null;
+          }
+      };
+
+      const buildUrl = () => {
+          const params = new URLSearchParams();
+          params.set('a2a_version', '0.3');
+          if (lastSequence > 0) {
+              params.set('afterSequence', String(lastSequence));
+          }
+          const adminKey = localStorage.getItem('plexus_admin_key');
+          if (adminKey) {
+              params.set('admin_key', adminKey);
+          }
+          return `${API_BASE}/a2a/tasks/${encodeURIComponent(taskId)}/subscribe?${params.toString()}`;
+      };
+
+      const scheduleReconnect = () => {
+          if (closed) return;
+          retryAttempt += 1;
+          const delayMs = Math.min(30000, 1000 * Math.pow(2, retryAttempt - 1));
+          handlers.onStatusChange?.('reconnecting');
+          clearReconnectTimer();
+          const reconnectAttempt = retryAttempt;
+          reconnectTimer = setTimeout(() => {
+              if (closed || reconnectAttempt !== retryAttempt) {
+                  return;
+              }
+              connect();
+          }, delayMs);
+      };
+
+      const onEvent = (event: MessageEvent<string>) => {
+          try {
+              const parsed = JSON.parse(event.data || '{}') as { taskId?: string; payload?: Record<string, unknown>; createdAt?: string };
+              const sequence = event.lastEventId ? Number(event.lastEventId) : 0;
+              if (Number.isFinite(sequence) && sequence > lastSequence) {
+                  lastSequence = sequence;
+              }
+              handlers.onEvent({
+                  taskId: parsed.taskId || taskId,
+                  eventType: event.type,
+                  sequence: Number.isFinite(sequence) ? sequence : 0,
+                  payload: parsed.payload || {},
+                  createdAt: parsed.createdAt,
+              });
+
+              const maybeState = parsed.payload?.state;
+              if (typeof maybeState === 'string' && TERMINAL_A2A_STATES.has(maybeState as A2ATaskState)) {
+                  closed = true;
+                  clearReconnectTimer();
+                  handlers.onStatusChange?.('closed');
+                  if (source) {
+                      source.removeEventListener('task-status-update', onEvent as EventListener);
+                      source.removeEventListener('task-artifact-update', onEvent as EventListener);
+                      source.removeEventListener('task-message', onEvent as EventListener);
+                      source.removeEventListener('task-complete', onEvent as EventListener);
+                      source.removeEventListener('task-failed', onEvent as EventListener);
+                      source.close();
+                      source = null;
+                  }
+              }
+          } catch (error) {
+              console.error('Failed to parse A2A SSE event', error);
+          }
+      };
+
+      const connect = () => {
+          if (closed) return;
+
+          handlers.onStatusChange?.(retryAttempt > 0 ? 'reconnecting' : 'connecting');
+          source = new EventSource(buildUrl());
+
+          source.onopen = () => {
+              retryAttempt = 0;
+              handlers.onStatusChange?.('connected');
+          };
+
+          source.addEventListener('task-status-update', onEvent as EventListener);
+          source.addEventListener('task-artifact-update', onEvent as EventListener);
+          source.addEventListener('task-message', onEvent as EventListener);
+          source.addEventListener('task-complete', onEvent as EventListener);
+          source.addEventListener('task-failed', onEvent as EventListener);
+
+          source.onerror = (event) => {
+              handlers.onError?.(event);
+
+              if (source) {
+                  source.removeEventListener('task-status-update', onEvent as EventListener);
+                  source.removeEventListener('task-artifact-update', onEvent as EventListener);
+                  source.removeEventListener('task-message', onEvent as EventListener);
+                  source.removeEventListener('task-complete', onEvent as EventListener);
+                  source.removeEventListener('task-failed', onEvent as EventListener);
+                  source.close();
+                  source = null;
+              }
+
+              scheduleReconnect();
+          };
+      };
+
+      connect();
+
+      return () => {
+          closed = true;
+          handlers.onStatusChange?.('closed');
+          clearReconnectTimer();
+          if (source) {
+              source.removeEventListener('task-status-update', onEvent as EventListener);
+              source.removeEventListener('task-artifact-update', onEvent as EventListener);
+              source.removeEventListener('task-message', onEvent as EventListener);
+              source.removeEventListener('task-complete', onEvent as EventListener);
+              source.removeEventListener('task-failed', onEvent as EventListener);
+              source.close();
+              source = null;
+          }
+      };
   },
 
   getMcpServers: async (): Promise<Record<string, { upstream_url: string; enabled: boolean; headers?: Record<string, string> }>> => {
