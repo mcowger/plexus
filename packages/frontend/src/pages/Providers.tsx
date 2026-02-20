@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Provider, OAuthSession } from '../lib/api';
+import { api, Provider, OAuthSession, initQuotaCheckerTypes, getQuotaCheckerTypes } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -30,8 +30,8 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate', 'apertis'] as const;
-const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
+// Fallback list for UI display until types are fetched from backend
+const QUOTA_CHECKER_TYPES_FALLBACK = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate', 'apertis', 'copilot'] as const;
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
@@ -163,6 +163,7 @@ export const Providers = () => {
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([...QUOTA_CHECKER_TYPES_FALLBACK]);
 
   const [oauthSessionId, setOauthSessionId] = useState<string | null>(null);
   const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
@@ -173,6 +174,14 @@ export const Providers = () => {
   const [oauthCredentialReady, setOauthCredentialReady] = useState(false);
   const [oauthCredentialChecking, setOauthCredentialChecking] = useState(false);
 
+  // Fetch quota checker types from backend on mount
+  useEffect(() => {
+    initQuotaCheckerTypes().then(() => {
+      const types = Array.from(getQuotaCheckerTypes());
+      setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
+    });
+  }, []);
+
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
     editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
@@ -182,8 +191,8 @@ export const Providers = () => {
   const selectableQuotaCheckerTypes = forcedOAuthQuotaCheckerType
     ? [forcedOAuthQuotaCheckerType]
     : isOAuthMode
-      ? QUOTA_CHECKER_TYPES.filter((type) => type !== 'openai-codex' && type !== 'claude-code')
-      : QUOTA_CHECKER_TYPES.filter((type) => type !== 'openai-codex' && type !== 'claude-code');
+      ? quotaCheckerTypes.filter((type) => type !== 'openai-codex' && type !== 'claude-code')
+      : quotaCheckerTypes.filter((type) => type !== 'openai-codex' && type !== 'claude-code');
   const selectedQuotaCheckerType = forcedOAuthQuotaCheckerType
     ? forcedOAuthQuotaCheckerType
     : (editingProvider.quotaChecker?.type && selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type)
@@ -324,25 +333,12 @@ export const Providers = () => {
           alert('OAuth account is required');
           return;
         }
-        if (providerToSave.quotaChecker) {
-          const quotaType = providerToSave.quotaChecker.type?.trim();
-          if (!quotaType) {
-            providerToSave = {
-              ...providerToSave,
-              quotaChecker: undefined
-            };
-          } else {
-            const isValidQuotaType = VALID_QUOTA_CHECKER_TYPES.has(quotaType);
-            providerToSave = {
-              ...providerToSave,
-              quotaChecker: {
-                type: quotaType,
-                intervalMinutes: Math.max(1, providerToSave.quotaChecker.intervalMinutes || 30),
-                enabled: isValidQuotaType ? providerToSave.quotaChecker.enabled !== false : false,
-                options: providerToSave.quotaChecker.options
-              }
-            };
-          }
+        // Quota checker validation is handled by the backend - just pass through as-is
+        if (providerToSave.quotaChecker && !providerToSave.quotaChecker.type?.trim()) {
+          providerToSave = {
+            ...providerToSave,
+            quotaChecker: undefined
+          };
         }
         if (isOAuthMode && providerToSave.oauthProvider) {
           const forcedType = getForcedOAuthQuotaCheckerType(providerToSave.oauthProvider);
@@ -1361,9 +1357,7 @@ export const Providers = () => {
                                       quotaChecker: {
                                         type: selectedQuotaCheckerType,
                                         enabled: selectedQuotaCheckerType
-                                          ? VALID_QUOTA_CHECKER_TYPES.has(selectedQuotaCheckerType)
-                                            ? editingProvider.quotaChecker?.enabled !== false
-                                            : false
+                                          ? editingProvider.quotaChecker?.enabled !== false
                                           : false,
                                         intervalMinutes
                                       }

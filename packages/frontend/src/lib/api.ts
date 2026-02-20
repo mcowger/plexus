@@ -345,7 +345,58 @@ const summaryRequestCache = new Map<string, { expiresAt: number; promise: Promis
 const CONFIG_CACHE_TTL_MS = 20000;
 const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<PlexusConfig | null> }>();
 
-const VALID_QUOTA_CHECKER_TYPES = new Set(['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate']);
+// Cache for quota checker types fetched from backend
+let quotaCheckerTypesCache: Set<string> | null = null;
+let quotaCheckerTypesCacheTime: number = 0;
+const QUOTA_TYPES_CACHE_TTL_MS = 60000; // 1 minute cache
+
+// Fallback types - will be used until fetched from server
+const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
+    'synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 
+    'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 
+    'wisdomgate', 'apertis', 'copilot'
+]);
+
+/**
+ * Fetch valid quota checker types from the backend
+ */
+async function fetchQuotaCheckerTypes(): Promise<Set<string>> {
+    const now = Date.now();
+    if (quotaCheckerTypesCache && (now - quotaCheckerTypesCacheTime) < QUOTA_TYPES_CACHE_TTL_MS) {
+        return quotaCheckerTypesCache;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/v0/management/quota-checker-types`);
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data.types)) {
+                quotaCheckerTypesCache = new Set(data.types);
+                quotaCheckerTypesCacheTime = now;
+                return quotaCheckerTypesCache;
+            }
+        }
+    } catch (error) {
+        // Silently fail and use fallback
+    }
+
+    return FALLBACK_QUOTA_CHECKER_TYPES;
+}
+
+/**
+ * Get valid quota checker types (sync version - returns fallback if not fetched)
+ * Call fetchQuotaCheckerTypes() early to populate the cache
+ */
+export function getQuotaCheckerTypes(): Set<string> {
+    return quotaCheckerTypesCache || FALLBACK_QUOTA_CHECKER_TYPES;
+}
+
+/**
+ * Initialize quota checker types cache
+ */
+export async function initQuotaCheckerTypes(): Promise<void> {
+    await fetchQuotaCheckerTypes();
+}
 
 const normalizeProviderQuotaChecker = (
     checker?: { type?: string; enabled?: boolean; intervalMinutes?: number; options?: Record<string, unknown> }
@@ -355,7 +406,7 @@ const normalizeProviderQuotaChecker = (
     const type = checker.type?.trim();
     if (!type) return undefined;
 
-    const isValidType = VALID_QUOTA_CHECKER_TYPES.has(type);
+    const isValidType = getQuotaCheckerTypes().has(type);
     return {
         type,
         enabled: isValidType ? checker.enabled !== false : false,
@@ -1082,7 +1133,10 @@ export const api = {
     });
     if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to save config');
+        const error = new Error(err.error || 'Failed to save config');
+        (error as any).details = err.details;
+        (error as any).status = res.status;
+        throw error;
     }
   },
 

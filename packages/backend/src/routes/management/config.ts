@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import yaml from 'yaml';
 import { logger } from '../../utils/logger';
-import { getConfigPath, validateConfig, loadConfig } from '../../config';
+import { getConfigPath, validateConfig, loadConfig, VALID_QUOTA_CHECKER_TYPES } from '../../config';
 
 export async function registerConfigRoutes(fastify: FastifyInstance) {
     fastify.get('/v0/management/config', async (request, reply) => {
@@ -307,6 +307,14 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
             logger.error(`Failed to delete MCP server '${serverName}'`, e);
             return reply.code(500).send({ error: e.message });
         }
+    });
+
+    // Quota checker types endpoint - single source of truth
+    fastify.get('/v0/management/quota-checker-types', async (_request, reply) => {
+        return reply.send({
+            types: VALID_QUOTA_CHECKER_TYPES,
+            count: VALID_QUOTA_CHECKER_TYPES.length
+        });
     });
 
     // Support YAML and Plain Text payloads for management API
