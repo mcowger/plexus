@@ -4,6 +4,9 @@ import { EventEmitter } from 'events';
 
 const { combine, timestamp, printf, colorize, splat, json } = winston.format;
 
+export const SUPPORTED_LOG_LEVELS = ['error', 'warn', 'info', 'debug', 'verbose', 'silly'] as const;
+export type LogLevel = typeof SUPPORTED_LOG_LEVELS[number];
+
 
 // Event emitter for streaming logs
 export const logEmitter = new EventEmitter();
@@ -34,18 +37,56 @@ const consoleFormat = printf(({ level, message, timestamp, ...metadata }) => {
 });
 
 // Determine log level: If DEBUG=true is set, use 'debug' level unless LOG_LEVEL is explicitly set
-export const getLogLevel = (): string => {
-  if (process.env.LOG_LEVEL) {
-    return process.env.LOG_LEVEL;
+const normalizeLogLevel = (level: unknown): LogLevel | null => {
+  if (typeof level !== 'string') {
+    return null;
   }
+
+  const normalized = level.trim().toLowerCase();
+  if (SUPPORTED_LOG_LEVELS.includes(normalized as LogLevel)) {
+    return normalized as LogLevel;
+  }
+
+  return null;
+};
+
+export const getStartupLogLevel = (): LogLevel => {
+  const envLogLevel = normalizeLogLevel(process.env.LOG_LEVEL);
+  if (envLogLevel) {
+    return envLogLevel;
+  }
+
   if (process.env.DEBUG === 'true') {
     return 'debug';
   }
+
   return 'info';
 };
 
+let currentLogLevel: LogLevel = getStartupLogLevel();
+
+export const getCurrentLogLevel = (): LogLevel => currentLogLevel;
+
+export const setCurrentLogLevel = (level: string): LogLevel => {
+  const normalized = normalizeLogLevel(level);
+  if (!normalized) {
+    throw new Error(`Invalid log level '${level}'. Supported levels: ${SUPPORTED_LOG_LEVELS.join(', ')}`);
+  }
+
+  currentLogLevel = normalized;
+  logger.level = normalized;
+  return normalized;
+};
+
+export const resetCurrentLogLevel = (): LogLevel => {
+  const startupLevel = getStartupLogLevel();
+  currentLogLevel = startupLevel;
+  logger.level = startupLevel;
+  return startupLevel;
+};
+
 export const logger = winston.createLogger({
-  level: getLogLevel(),
+  level: currentLogLevel,
   // Default format
   format: combine(
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),

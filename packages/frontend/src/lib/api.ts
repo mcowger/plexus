@@ -196,6 +196,13 @@ export interface McpLogRecord {
   error_message: string | null;
 }
 
+export interface LoggingLevelState {
+  level: string;
+  startupLevel: string;
+  supportedLevels: string[];
+  ephemeral: boolean;
+}
+
 export interface Model {
   id: string;
   name: string;
@@ -1597,6 +1604,68 @@ quota_checker: provider.quotaChecker?.type
           console.error("API Error setDebugMode", e);
           throw e;
       }
+  },
+
+  getLoggingLevel: async (): Promise<LoggingLevelState> => {
+      try {
+          const res = await fetchWithAuth(`${API_BASE}/v0/management/logging/level`);
+          if (!res.ok) throw new Error('Failed to fetch logging level');
+          const json = await res.json() as LoggingLevelState;
+          return {
+              level: json.level,
+              startupLevel: json.startupLevel,
+              supportedLevels: Array.isArray(json.supportedLevels) ? json.supportedLevels : ['error', 'warn', 'info', 'debug', 'verbose', 'silly'],
+              ephemeral: !!json.ephemeral,
+          };
+      } catch (e) {
+          console.error('API Error getLoggingLevel', e);
+          return {
+              level: 'info',
+              startupLevel: 'info',
+              supportedLevels: ['error', 'warn', 'info', 'debug', 'verbose', 'silly'],
+              ephemeral: true,
+          };
+      }
+  },
+
+  setLoggingLevel: async (level: string): Promise<LoggingLevelState> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/logging/level`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ level }),
+      });
+
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to set logging level');
+      }
+
+      const json = await res.json() as LoggingLevelState;
+      return {
+          level: json.level,
+          startupLevel: json.startupLevel,
+          supportedLevels: Array.isArray(json.supportedLevels) ? json.supportedLevels : ['error', 'warn', 'info', 'debug', 'verbose', 'silly'],
+          ephemeral: !!json.ephemeral,
+      };
+  },
+
+  resetLoggingLevel: async (): Promise<LoggingLevelState> => {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/logging/level`, {
+          method: 'DELETE',
+      });
+
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to reset logging level');
+      }
+
+      const json = await res.json() as LoggingLevelState;
+      return {
+          level: json.level,
+          startupLevel: json.startupLevel,
+          supportedLevels: Array.isArray(json.supportedLevels) ? json.supportedLevels : ['error', 'warn', 'info', 'debug', 'verbose', 'silly'],
+          ephemeral: !!json.ephemeral,
+      };
   },
 
   testModel: async (provider: string, model: string, apiType?: string): Promise<{ success: boolean; error?: string; durationMs: number; response?: string; apiType?: string }> => {

@@ -13,7 +13,29 @@ import { mock } from "bun:test";
  * 3. Tests can still spy on these methods if they need to verify logging behavior.
  */
 
+const SUPPORTED_LOG_LEVELS = ['error', 'warn', 'info', 'debug', 'verbose', 'silly'] as const;
+
+type MockLogLevel = typeof SUPPORTED_LOG_LEVELS[number];
+
+const normalizeLogLevel = (value: unknown): MockLogLevel | null => {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().toLowerCase();
+    return (SUPPORTED_LOG_LEVELS as readonly string[]).includes(normalized)
+        ? normalized as MockLogLevel
+        : null;
+};
+
+const getStartupLogLevel = (): MockLogLevel => {
+    const envLevel = normalizeLogLevel(process.env.LOG_LEVEL);
+    if (envLevel) return envLevel;
+    if (process.env.DEBUG === 'true') return 'debug';
+    return 'info';
+};
+
+let currentLogLevel: MockLogLevel = getStartupLogLevel();
+
 const mockLogger = {
+    level: currentLogLevel,
     error: mock(),
     warn: mock(),
     info: mock(),
@@ -34,8 +56,25 @@ const loggerPaths = [
 for (const path of loggerPaths) {
     mock.module(path, () => ({
         logger: mockLogger,
-        logEmitter: { emit: mock(), on: mock() },
-        StreamTransport: class {}
+        logEmitter: { emit: mock(), on: mock(), off: mock() },
+        StreamTransport: class {},
+        SUPPORTED_LOG_LEVELS,
+        getStartupLogLevel,
+        getCurrentLogLevel: () => currentLogLevel,
+        setCurrentLogLevel: (level: string) => {
+            const normalized = normalizeLogLevel(level);
+            if (!normalized) {
+                throw new Error(`Invalid log level '${level}'. Supported levels: ${SUPPORTED_LOG_LEVELS.join(', ')}`);
+            }
+            currentLogLevel = normalized;
+            mockLogger.level = normalized;
+            return normalized;
+        },
+        resetCurrentLogLevel: () => {
+            currentLogLevel = getStartupLogLevel();
+            mockLogger.level = currentLogLevel;
+            return currentLogLevel;
+        }
     }));
 }
 

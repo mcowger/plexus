@@ -417,6 +417,40 @@ Manage debug logging mode to capture full request/response lifecycles for troubl
   { "success": true }
   ```
 
+### Logging Level Management
+
+Manage backend log verbosity at runtime without editing `LOG_LEVEL`.
+
+#### Get Logging Level
+- **Endpoint:** `GET /v0/management/logging/level`
+- **Description:** Returns the current runtime logging level, startup default, and supported values.
+- **Response Format:**
+  ```json
+  {
+    "level": "debug",
+    "startupLevel": "info",
+    "supportedLevels": ["error", "warn", "info", "debug", "verbose", "silly"],
+    "ephemeral": true
+  }
+  ```
+
+#### Set Logging Level
+- **Endpoint:** `POST /v0/management/logging/level`
+- **Description:** Updates logging level immediately for the running process.
+- **Request Body:**
+  ```json
+  {
+    "level": "silly"
+  }
+  ```
+- **Notes:**
+  - Changes are runtime-only and are not persisted.
+  - The selected level resets to startup behavior on process restart.
+
+#### Reset Logging Level
+- **Endpoint:** `DELETE /v0/management/logging/level`
+- **Description:** Resets the runtime override back to the startup default (`LOG_LEVEL`, or `DEBUG=true`, or `info`).
+
 #### Delete All Debug Logs
 - **Endpoint:** `DELETE /v0/management/debug/logs`
 - **Description:** Deletes all debug logs.

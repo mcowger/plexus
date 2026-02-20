@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { getDatabaseConfig } from '../config';
-import { logger } from '../utils/logger';
+import { getCurrentLogLevel, logger } from '../utils/logger';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -17,7 +17,7 @@ let currentSchema: any = null;
 function createDrizzleLogger() {
   return {
     logQuery(query: string, params: unknown[]) {
-      if (process.env.LOG_LEVEL === 'silly') {
+      if (getCurrentLogLevel() === 'silly') {
         logger.silly(`Query: ${query}`);
       }
     },
