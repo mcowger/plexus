@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.16.4 - 2026-02-20
+
+### v0.16.4 - OAuth schema preservation and bug fixes
+
+## New Features
+
+No major new features in this release.
+
+## Bug Fixes
+
+- **Preserve nested object/array schemas in OAuth tool conversion** ([3fb03c9](https://github.com/mcowger/plexus/commit/3fb03c9)) - Fixed an issue where nested object and array schemas were not properly preserved during OAuth tool conversion, ensuring schema integrity for complex data structures.
+
+## Docker Image
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.3 - 2026-02-20
 
 ### Add Apertis and Wisdom Gate Provider Support with Debug Logging
