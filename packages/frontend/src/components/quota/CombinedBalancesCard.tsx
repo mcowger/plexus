@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
-import { formatCost } from '../../lib/format';
+import { formatCost, toTitleCase } from '../../lib/format';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
 import { BalanceHistoryModal } from './BalanceHistoryModal';
@@ -90,14 +90,13 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
           <div className="flex items-center gap-2">
             <Wallet size={14} className="text-info flex-shrink-0" />
             <span className="text-sm font-semibold text-text">
-              {displayName}
+              {toTitleCase(quota.checkerId)}
             </span>
           </div>
-          {result.oauthAccountId && (
-            <div className="text-xs text-text-muted pl-5 truncate">
-              Account: {result.oauthAccountId}
-            </div>
-          )}
+          <div className="text-xs text-text-muted pl-5 truncate">
+            {displayName}
+            {result.oauthAccountId && ` • Account: ${result.oauthAccountId}`}
+          </div>
         </div>
 
         {/* Center: Balance or Error */}
