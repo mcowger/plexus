@@ -48,11 +48,15 @@ export class QuotaScheduler {
 
     for (const [id, checker] of this.checkers) {
       try {
-        await this.runCheckNow(id);
         const intervalMs = checker.config.intervalMinutes * 60 * 1000;
         const intervalId = setInterval(() => this.runCheckNow(id), intervalMs);
         this.intervals.set(id, intervalId);
         logger.info(`Scheduled quota checker '${id}' to run every ${checker.config.intervalMinutes} minutes`);
+
+        // Run initial check asynchronously without blocking startup
+        this.runCheckNow(id).catch(error => {
+          logger.error(`Initial quota check failed for '${id}': ${error}`);
+        });
       } catch (error) {
         logger.error(`Failed to schedule quota checker '${id}': ${error}`);
       }
@@ -295,11 +299,15 @@ export class QuotaScheduler {
         this.checkers.set(config.id, checker);
         logger.info(`Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`);
 
-        await this.runCheckNow(config.id);
         const intervalMs = checker.config.intervalMinutes * 60 * 1000;
         const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
         this.intervals.set(config.id, intervalId);
         logger.info(`Scheduled quota checker '${config.id}' to run every ${checker.config.intervalMinutes} minutes`);
+
+        // Run initial check asynchronously without blocking
+        this.runCheckNow(config.id).catch(error => {
+          logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
+        });
       } catch (error) {
         logger.error(`Failed to register quota checker '${config.id}' on reload: ${error}`);
       }
