@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.16.2 - 2026-02-20
+
+### Add GitHub Copilot quota checker and exponential backoff cooldown system
+
+## What's New in v0.16.2
+
+### New Features
+- **GitHub Copilot Quota Checker**: Added support for monitoring GitHub Copilot quota usage ([a4b1461](https://github.com/mcowger/plexus/commit/a4b1461))
+- **Escalating Cooldown System**: Implemented exponential backoff for cooldown periods to improve rate limiting handling ([ace43ae](https://github.com/mcowger/plexus/commit/ace43ae))
+
+### Fixes
+- **Non-blocking Quota Checks**: Changed initial quota checks to be non-blocking to prevent delays during server startup ([878d4a3](https://github.com/mcowger/plexus/commit/878d4a3))
+
+### Improvements
+- **OAuth Provider Fetching**: Updated OAuth provider fetching logic ([3705e90](https://github.com/mcowger/plexus/commit/3705e90))
+- **UI Enhancements**:
+  - Display `checkerId` in CombinedBalancesCard to distinguish between multiple accounts ([f0e672d](https://github.com/mcowger/plexus/commit/f0e672d))
+  - Group providers by type in CompactQuotasCard for better organization ([6c17477](https://github.com/mcowger/plexus/commit/6c17477))
+  - Improved CompactQuotasCard sidebar display ([adcc97f](https://github.com/mcowger/plexus/commit/adcc97f))
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.1 - 2026-02-19
 
 ### v0.16.1: Quota and Balance History Display
