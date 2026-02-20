@@ -191,91 +191,107 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
     navigate('/quotas');
   };
 
+  // Group quotas by category and sort within each group
+  const groupedQuotas = rateLimitQuotas.reduce((acc, quota) => {
+    const category = getCheckerCategory(quota);
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(quota);
+    return acc;
+  }, {} as Record<string, QuotaCheckerInfo[]>);
+
+  // Flatten back to array with groups together
+  const sortedQuotas: QuotaCheckerInfo[] = [];
+  Object.entries(groupedQuotas).forEach(([, quotas]) => {
+    sortedQuotas.push(...quotas);
+  });
+
   return (
     <div
-      className="px-2 py-1 space-y-1 cursor-pointer hover:bg-bg-hover transition-colors"
-      onClick={handleClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleClick();
-        }
-      }}
-    >
-      {rateLimitQuotas.map((quota) => {
-        const result = getQuotaResult(quota);
-        const displayName = formatCheckerDisplayName(quota);
-        const windows = result.windows || [];
-        const category = getCheckerCategory(quota);
-        const icon = getCheckerIcon(category);
+        className="px-2 py-1 space-y-1 cursor-pointer hover:bg-bg-hover transition-colors"
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
+      >
+        {sortedQuotas.map((quota) => {
+          const result = getQuotaResult(quota);
+          const displayName = formatCheckerDisplayName(quota);
+          const windows = result.windows || [];
+          const category = getCheckerCategory(quota);
+          const icon = getCheckerIcon(category);
 
-        if (!result.success) {
-          return (
-            <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
-              {icon}
-              <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
-              <AlertTriangle className="w-3 h-3 text-danger flex-shrink-0" />
-            </div>
-          );
-        }
-
-        const trackedWindowTypes = getTrackedWindowsForChecker(category, windows);
-        const trackedWindows = trackedWindowTypes
-          .map(type => windows.find((w: any) => w.windowType === type))
-          .filter(Boolean);
-
-        const primaryWindow = trackedWindows[0];
-        if (!primaryWindow) {
-          return (
-            <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
-              {icon}
-              <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
-              <span className="text-[11px] text-text-muted flex-shrink-0">—</span>
-            </div>
-          );
-        }
-
-        const primaryPct = Math.round(primaryWindow.utilizationPercent || 0);
-        const secondaryWindows = trackedWindows.slice(1);
-
-        // All providers: name on row 1, bar(s) on row 2
-        return (
-          <div key={quota.checkerId} className="flex flex-col gap-0.5 py-0.5">
-            {/* Row 1: Icon + Name */}
-            <div className="flex items-center gap-2 min-w-0">
-              {icon}
-              <span className="text-[11px] text-text-secondary truncate flex-1 min-w-0">{displayName}</span>
-            </div>
-            {/* Row 2: Bar(s) side by side (70/30 split if multiple) */}
-            <div className="flex items-center gap-1 pl-5">
-              {/* Primary bar (full width if single, 70% if multiple) */}
-              <div className={clsx(
-                "flex items-center gap-1 min-w-0",
-                secondaryWindows.length > 0 ? "flex-[7]" : "flex-1"
-              )}>
-                <MiniProgressBar percent={primaryPct} className="w-full flex-shrink" />
-                <span className="text-[10px] font-medium text-text-secondary tabular-nums w-6 text-right flex-shrink-0">
-                  {primaryPct}%
-                </span>
+          if (!result.success) {
+            return (
+              <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
+                {icon}
+                <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
+                <AlertTriangle className="w-3 h-3 text-danger flex-shrink-0" />
               </div>
-              {/* Secondary bar (30%) - only if exists */}
-              {secondaryWindows[0] && (
-                <div className="flex items-center gap-0.5 flex-[3] min-w-0">
-                  <MiniProgressBar percent={Math.round(secondaryWindows[0].utilizationPercent || 0)} className="w-full flex-shrink" />
-                  <span className="text-[10px] text-text-muted w-2 flex-shrink-0 text-center">
-                    {formatWindowLabel(secondaryWindows[0].windowType)}
-                  </span>
-                  <span className="text-[10px] text-text-muted tabular-nums w-6 text-right flex-shrink-0">
-                    {Math.round(secondaryWindows[0].utilizationPercent || 0)}%
+            );
+          }
+
+          const trackedWindowTypes = getTrackedWindowsForChecker(category, windows);
+          const trackedWindows = trackedWindowTypes
+            .map(type => windows.find((w: any) => w.windowType === type))
+            .filter(Boolean);
+
+          const primaryWindow = trackedWindows[0];
+          if (!primaryWindow) {
+            return (
+              <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
+                {icon}
+                <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
+                <span className="text-[11px] text-text-muted flex-shrink-0">—</span>
+              </div>
+            );
+          }
+
+          const primaryPct = Math.round(primaryWindow.utilizationPercent || 0);
+          const secondaryWindows = trackedWindows.slice(1);
+
+          // All providers: name on row 1, bar(s) on row 2
+          return (
+            <div key={quota.checkerId} className="flex flex-col gap-0.5 py-0.5">
+              {/* Row 1: Icon + Name */}
+              <div className="flex items-center gap-2 min-w-0">
+                {icon}
+                <span className="text-[11px] text-text-secondary truncate flex-1 min-w-0">{displayName}</span>
+              </div>
+              {/* Row 2: Bar(s) side by side (70/30 split if multiple) */}
+              <div className="flex items-center gap-1 pl-5">
+                {/* Primary bar (full width if single, 70% if multiple) */}
+                <div className={clsx(
+                  "flex items-center gap-1 min-w-0",
+                  secondaryWindows.length > 0 ? "flex-[7]" : "flex-1"
+                )}>
+                  <MiniProgressBar percent={primaryPct} className="w-full flex-shrink" />
+                  <span className="text-[10px] font-medium text-text-secondary tabular-nums w-6 text-right flex-shrink-0">
+                    {primaryPct}%
                   </span>
                 </div>
-              )}
+                {/* Secondary bar (30%) - only if exists */}
+                {secondaryWindows[0] && (
+                  <div className="flex items-center gap-0.5 flex-[3] min-w-0">
+                    <MiniProgressBar percent={Math.round(secondaryWindows[0].utilizationPercent || 0)} className="w-full flex-shrink" />
+                    <span className="text-[10px] text-text-muted w-2 flex-shrink-0 text-center">
+                      {formatWindowLabel(secondaryWindows[0].windowType)}
+                    </span>
+                    <span className="text-[10px] text-text-muted tabular-nums w-6 text-right flex-shrink-0">
+                      {Math.round(secondaryWindows[0].utilizationPercent || 0)}%
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
   );
 };
