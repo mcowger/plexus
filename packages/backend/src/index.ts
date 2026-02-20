@@ -18,6 +18,9 @@ import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
 import { registerMcpRoutes } from './routes/mcp';
+import { registerA2ARoutes } from './routes/a2a';
+import { A2AService } from './services/a2a/a2a-service';
+import { A2APushDeliveryService } from './services/a2a/a2a-push-delivery';
 import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { QuotaEnforcer } from './services/quota/quota-enforcer';
 import { initializeDatabase } from './db/client';
@@ -171,6 +174,10 @@ await registerInferenceRoutes(fastify, dispatcher, usageStorage, quotaEnforcer);
 // --- Routes: MCP Proxy ---
 await registerMcpRoutes(fastify, mcpUsageStorage);
 
+await registerA2ARoutes(fastify);
+const a2aPushDelivery = A2APushDeliveryService.getInstance();
+a2aPushDelivery.start(A2AService.getInstance());
+
 // --- Response Storage Cleanup ---
 // Start cleanup job (runs every hour, deletes responses older than 7 days)
 const responsesStorage = new ResponsesStorageService();
@@ -239,6 +246,7 @@ const start = async () => {
         const shutdown = async (signal: string) => {
             logger.info(`Received ${signal}, shutting down gracefully...`);
             quotaScheduler.stop();
+            a2aPushDelivery.stop();
             await fastify.close();
             const { closeDatabase } = await import('./db/client');
             await closeDatabase();

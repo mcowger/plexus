@@ -80,11 +80,31 @@ export function initializeDatabase(connectionString?: string) {
     sqlite.exec('PRAGMA foreign_keys = ON');
 
     const sqliteSchema = require('../../drizzle/schema/sqlite/index');
-    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } = sqliteSchema;
+    const {
+      requestUsage,
+      providerCooldowns,
+      debugLogs,
+      inferenceErrors,
+      providerPerformance,
+      a2aAgents,
+      a2aTasks,
+      a2aTaskEvents,
+      a2aPushNotificationConfigs,
+    } = sqliteSchema;
 
     currentSchema = sqliteSchema;
     dbInstance = drizzle(sqlite, {
-      schema: { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance },
+      schema: {
+        requestUsage,
+        providerCooldowns,
+        debugLogs,
+        inferenceErrors,
+        providerPerformance,
+        a2aAgents,
+        a2aTasks,
+        a2aTaskEvents,
+        a2aPushNotificationConfigs,
+      },
       logger: createDrizzleLogger(),
     });
   } else {
@@ -102,11 +122,31 @@ export function initializeDatabase(connectionString?: string) {
     });
 
     const pgSchema = require('../../drizzle/schema/postgres/index');
-    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } = pgSchema;
+    const {
+      requestUsage,
+      providerCooldowns,
+      debugLogs,
+      inferenceErrors,
+      providerPerformance,
+      a2aAgents,
+      a2aTasks,
+      a2aTaskEvents,
+      a2aPushNotificationConfigs,
+    } = pgSchema;
 
     currentSchema = pgSchema;
     dbInstance = drizzlePg(sqlClient, {
-      schema: { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance },
+      schema: {
+        requestUsage,
+        providerCooldowns,
+        debugLogs,
+        inferenceErrors,
+        providerPerformance,
+        a2aAgents,
+        a2aTasks,
+        a2aTaskEvents,
+        a2aPushNotificationConfigs,
+      },
       logger: createDrizzleLogger(),
     });
   }
