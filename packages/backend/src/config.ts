@@ -761,3 +761,22 @@ export function getDatabaseConfig(): DatabaseConfig | null {
     }
     return { connectionString: databaseUrl };
 }
+
+// Valid quota checker types - single source of truth
+export const VALID_QUOTA_CHECKER_TYPES = [
+    'naga',
+    'synthetic',
+    'nanogpt',
+    'zai',
+    'moonshot',
+    'minimax',
+    'openrouter',
+    'kilo',
+    'openai-codex',
+    'claude-code',
+    'copilot',
+    'wisdomgate',
+    'apertis',
+] as const;
+
+export type QuotaCheckerType = typeof VALID_QUOTA_CHECKER_TYPES[number];
