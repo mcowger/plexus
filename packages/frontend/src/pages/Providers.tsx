@@ -1639,7 +1639,8 @@ export const Providers = () => {
                                                               source: 'simple',
                                                               input: mCfg.pricing?.input || 0,
                                                               output: mCfg.pricing?.output || 0,
-                                                              cached: mCfg.pricing?.cached || 0
+                                                              cached: mCfg.pricing?.cached || 0,
+                                                              cache_write: mCfg.pricing?.cache_write || 0
                                                             };
                                                           } else if (newSource === 'openrouter') {
                                                             newPricing = {
@@ -1743,21 +1744,26 @@ export const Providers = () => {
                                               </div>
 
                                               {mCfg.pricing?.source === 'simple' && (
-                                                  <div className="grid grid-cols-3 gap-4" style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)'}}>
-                                                      <Input 
+                                                  <div className="grid grid-cols-4 gap-4" style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)'}}>
+                                                      <Input
                                                         label="Input $/M" type="number" step="0.000001"
                                                         value={mCfg.pricing.input || 0}
                                                         onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, input: parseFloat(e.target.value) } })}
                                                       />
-                                                      <Input 
+                                                      <Input
                                                         label="Output $/M" type="number" step="0.000001"
                                                         value={mCfg.pricing.output || 0}
                                                         onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, output: parseFloat(e.target.value) } })}
                                                       />
-                                                      <Input 
+                                                      <Input
                                                         label="Cached $/M" type="number" step="0.000001"
                                                         value={mCfg.pricing.cached || 0}
                                                         onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, cached: parseFloat(e.target.value) } })}
+                                                      />
+                                                      <Input
+                                                        label="Cache Write $/M" type="number" step="0.000001"
+                                                        value={mCfg.pricing.cache_write || 0}
+                                                        onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, cache_write: parseFloat(e.target.value) } })}
                                                       />
                                                   </div>
                                               )}

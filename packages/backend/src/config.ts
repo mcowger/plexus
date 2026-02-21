@@ -75,7 +75,7 @@ const OAuthProviderSchema = z.enum([
 
 const NagaQuotaCheckerOptionsSchema = z.object({
   apiKey: z.string().min(1, "Naga provisioning key is required"),
-  max: z.number().positive("Max balance must be a positive number"),
+  max: z.number().positive("Max balance must be a positive number").optional(),
   endpoint: z.string().url().optional(),
 });
 
