@@ -293,13 +293,32 @@ const QuotaDefinitionSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+// ─── Model Behaviors ───────────────────────────────────────────────
+// Each behavior has a `type` discriminant so new behaviors can be added without
+// touching existing ones.  Add new z.object({ type: z.literal('...'), ... })
+// entries to the discriminatedUnion array.
+
+const StripAdaptiveThinkingBehaviorSchema = z.object({
+  type: z.literal('strip_adaptive_thinking'),
+  enabled: z.boolean().default(true),
+});
+
+// Union of all known behavior schemas – extend here for future behaviors
+const ModelBehaviorSchema = z.discriminatedUnion('type', [
+  StripAdaptiveThinkingBehaviorSchema,
+]);
+
 const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  advanced: z.array(ModelBehaviorSchema).optional(),
 });
+
+export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
+export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinkingBehaviorSchema>;
 
 const KeyConfigSchema = z.object({
   secret: z.string(),
