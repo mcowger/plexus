@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.16.6 - 2026-02-21
+
+### Fix Naga maximum value boundary condition
+
+## Bug Fixes
+
+- **Naga max value**: Resolved an issue with the undesired Naga maximum value ([8027146](https://github.com/mcowger/plexus/commit/8027146))
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.5 - 2026-02-20
 
 ### Live Logging Adjustments
