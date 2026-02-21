@@ -103,6 +103,7 @@ const EMPTY_PROVIDER: Provider = {
     oauthProvider: '',
     oauthAccount: '',
     enabled: true,
+    disableCooldown: false,
     estimateTokens: false,
     apiBaseUrl: {},
     headers: {},
@@ -1525,6 +1526,21 @@ export const Providers = () => {
                       </div>
                 </div>
 
+
+                {/* Disable Cooldown */}
+                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                  <div className="flex items-center gap-2" style={{minHeight: '38px'}}>
+            <Switch
+                      checked={editingProvider.disableCooldown || false}
+                      onChange={(checked) => setEditingProvider({...editingProvider, disableCooldown: checked})}
+                />
+                 <label className="font-body text-[13px] font-medium text-text" style={{marginBottom: 0}}>Disable Cooldowns</label>
+                </div>
+                  <div className="font-body text-[11px] text-text-secondary" style={{lineHeight: 1.35, marginTop: '4px'}}>
+                    When enabled, this provider will never be placed on cooldown due to errors — it will always remain eligible for routing regardless of consecutive failures.
+                    <span className="text-warning" style={{marginLeft: '6px'}}>Use only for providers with reliable external rate-limit handling.</span>
+                  </div>
+                </div>
                   </div>
                 )}
               </div>
