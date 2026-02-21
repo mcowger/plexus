@@ -48,12 +48,22 @@ export class Router {
             return [];
         }
 
-        let healthyTargets = await CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
+    // Separate targets whose provider has cooldowns disabled (they always pass through)
+        const cooldownExemptTargets1 = enabledTargets.filter(t => config.providers[t.provider]?.disable_cooldown === true);
+        const cooldownEligibleTargets1 = enabledTargets.filter(t => config.providers[t.provider]?.disable_cooldown !== true);
 
-        if (healthyTargets.length < enabledTargets.length) {
-            const filteredCount = enabledTargets.length - healthyTargets.length;
+        const filteredEligible1 = await CooldownManager.getInstance().filterHealthyTargets(cooldownEligibleTargets1);
+
+        if (filteredEligible1.length < cooldownEligibleTargets1.length) {
+        const filteredCount = cooldownEligibleTargets1.length - filteredEligible1.length;
             logger.warn(`Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`);
         }
+
+        if (cooldownExemptTargets1.length > 0) {
+            logger.debug(`Router: ${cooldownExemptTargets1.length} target(s) for '${modelName}' bypassed cooldown check (disable_cooldown=true).`);
+    }
+
+        let healthyTargets = [...filteredEligible1, ...cooldownExemptTargets1];
 
         if (healthyTargets.length === 0) {
             return [];
@@ -267,20 +277,31 @@ export class Router {
                     throw new Error(`All targets for model alias '${modelName}' are disabled.`);
                 }
 
-                let healthyTargets = await CooldownManager.getInstance().filterHealthyTargets(enabledTargets);
 
-                if (healthyTargets.length < enabledTargets.length) {
-                    const filteredCount = enabledTargets.length - healthyTargets.length;
+                // Separate targets whose provider has cooldowns disabled (they always pass through)
+                const cooldownExemptTargets2 = enabledTargets.filter(t => config.providers[t.provider]?.disable_cooldown === true);
+                const cooldownEligibleTargets2 = enabledTargets.filter(t => config.providers[t.provider]?.disable_cooldown !== true);
+
+            const filteredEligible2 = await CooldownManager.getInstance().filterHealthyTargets(cooldownEligibleTargets2);
+
+                if (filteredEligible2.length < cooldownEligibleTargets2.length) {
+             const filteredCount = cooldownEligibleTargets2.length - filteredEligible2.length;
                     logger.warn(`Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`);
-                }
+          }
+
+                if (cooldownExemptTargets2.length > 0) {
+                    logger.debug(`Router: ${cooldownExemptTargets2.length} target(s) for '${modelName}' bypassed cooldown check (disable_cooldown=true).`);
+             }
+
+                let healthyTargets = [...filteredEligible2, ...cooldownExemptTargets2];
 
                 if (healthyTargets.length === 0) {
-                    throw new Error(`All providers for model alias '${modelName}' are currently on cooldown.`);
+                throw new Error(`All providers for model alias '${modelName}' are currently on cooldown.`);
                 }
 
                 // Filter targets based on model type when incoming API is embeddings
-                if (incomingApiType === 'embeddings') {
-                    const embeddingsTargets = healthyTargets.filter(target => {
+         if (incomingApiType === 'embeddings') {
+                 const embeddingsTargets = healthyTargets.filter(target => {
                         const providerConfig = config.providers[target.provider];
                         if (!providerConfig) return false;
 

@@ -244,6 +244,7 @@ const ProviderConfigSchema = z.object({
   oauth_provider: OAuthProviderSchema.optional(),
   oauth_account: z.string().min(1).optional(),
   enabled: z.boolean().default(true).optional(),
+  disable_cooldown: z.boolean().optional().default(false),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
     z.array(z.string()),

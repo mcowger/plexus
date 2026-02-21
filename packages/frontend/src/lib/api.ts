@@ -157,6 +157,7 @@ export interface Provider {
   oauthProvider?: string;
   oauthAccount?: string;
   enabled: boolean;
+  disableCooldown?: boolean;
   estimateTokens?: boolean;
   discount?: number;
   headers?: Record<string, string>;
@@ -699,7 +700,8 @@ interface PlexusConfig {
         api_base_url?: string | Record<string, string>;
         display_name?: string;
         models?: string[] | Record<string, any>;
-        enabled?: boolean; // Custom field we might want to preserve if we could
+            enabled?: boolean; // Custom field we might want to preserve if we could
+        disable_cooldown?: boolean;
         estimateTokens?: boolean;
         discount?: number;
         headers?: Record<string, string>;
@@ -1243,6 +1245,7 @@ export const api = {
                 oauthAccount: val.oauth_account,
                 enabled: val.enabled !== false, // Default to true if not present
                 estimateTokens: val.estimateTokens || false,
+                disableCooldown: val.disable_cooldown === true,
                 discount: val.discount,
                 headers: val.headers,
                 extraBody: val.extraBody,
@@ -1288,6 +1291,7 @@ export const api = {
               api_base_url: p.apiBaseUrl,
               display_name: p.name,
               discount: p.discount,
+              disable_cooldown: p.disableCooldown === true ? true : undefined,
               headers: p.headers,
               extraBody: p.extraBody,
                models: p.models,
@@ -1340,6 +1344,7 @@ export const api = {
           api_base_url: provider.apiBaseUrl,
           display_name: provider.name,
           estimateTokens: provider.estimateTokens,
+          disable_cooldown: provider.disableCooldown === true ? true : undefined,
           discount: provider.discount,
           headers: provider.headers,
           extraBody: provider.extraBody,
