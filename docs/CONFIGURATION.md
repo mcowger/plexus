@@ -218,6 +218,8 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`estimateTokens`**: (Optional, default: `false`) Enable automatic token estimation for providers that don't return usage data in their responses. When enabled, Plexus will reconstruct the response content and estimate token counts using a character-based heuristic algorithm. See [Token Estimation](#token-estimation) for details.
 
+- **`disable_cooldown`**: (Optional, default: `false`) When set to `true`, this provider is **never** placed on cooldown. All targets backed by this provider will always remain eligible for routing regardless of how many consecutive errors they encounter. See [Disabling Cooldowns Per Provider](#disabling-cooldowns-per-provider) for details.
+
 ### OAuth Providers (pi-ai)
 
 Plexus supports OAuth-backed providers (Anthropic, GitHub Copilot, Gemini CLI, Antigravity, OpenAI Codex) through the [pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai) library.
@@ -961,6 +963,53 @@ Once configured, cooldown data is available via the Management API:
 - `DELETE /v0/management/cooldowns/:provider?model=:model` - Clear specific provider/model cooldown
 
 See the [API Documentation](./API.md#cooldown-management) for response formats.
+
+## Disabling Cooldowns Per Provider
+
+By default, any provider that encounters retryable errors is subject to the global [exponential backoff cooldown system](#cooldown-optional). In some cases you may want to opt a specific provider out entirely — for example, a provider that manages its own rate limiting externally, a local model server that should always be retried, or a provider used only for testing where cooldown filtering is an inconvenience.
+
+Set `disable_cooldown: true` on a provider to prevent it from ever being placed on cooldown:
+
+```yaml
+providers:
+  local-ollama:
+    display_name: Local Ollama
+    api_base_url: http://localhost:11434/v1
+    api_key: ollama
+    disable_cooldown: true   # Never removed from routing due to errors
+    models:
+      - llama3.2
+      - mistral
+  my-reliable-proxy:
+    display_name: Reliable Proxy
+    api_base_url: https://my-proxy.internal/v1
+    api_key: "sk-proxy-key"
+    disable_cooldown: true   # Proxy handles retries itself
+    models:
+      - gpt-4o
+```
+
+**Behavior:**
+
+- Targets backed by a provider with `disable_cooldown: true` **bypass** the `CooldownManager` health check entirely — they are always treated as healthy for routing purposes.
+- Error recording still happens normally: the provider can still log failures to `inference_errors` and update performance metrics.
+- The provider is still subject to failover: if a request to it fails and other targets exist, Plexus will try those other targets as normal. `disable_cooldown` only prevents the provider from being *excluded from future routing decisions*.
+- Other providers in the same model alias are unaffected — they continue to accumulate cooldowns as usual.
+
+**When to use:**
+
+| Scenario | Recommended |
+|----------|-------------|
+| Local model server (Ollama, LM Studio) where latency spikes are normal | ✅ Yes |
+| Provider with its own external rate-limit handling | ✅ Yes |
+| Primary fallback that must always be available | ✅ Yes |
+| Testing provider where cooldowns interfere with development | ✅ Yes |
+| Production cloud provider with unreliable endpoints | ❌ No — let cooldowns protect routing |
+| Provider that frequently returns 429s | ❌ No — cooldowns reduce downstream pressure |
+
+**Configuration in the Admin UI:**
+
+The toggle is available in the provider edit modal under **Advanced → Disable Cooldowns**.
 
 ## Token Estimation
 
