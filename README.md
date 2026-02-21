@@ -10,6 +10,7 @@ Plexus unifies interactions with multiple AI providers (OpenAI, Anthropic, Gemin
 
 ### Recent Updates
 
+- **Per-Request Pricing**: New `per_request` pricing source charges a flat dollar amount per API call, regardless of token count. Useful for providers that bill by the request rather than by token.
 - **Escalating Cooldown System**: Exponential backoff for provider cooldowns (2min → 4min → 8min → ... → 5hr cap). Success resets failure count. 413 Payload Too Large errors skip cooldowns.
 - **User Quota Enforcement**: Per-API-key quota limits using rolling (leaky bucket), daily, or weekly windows. Limit by requests or tokens.
 - **MCP Proxy Support**: Proxy streamable HTTP MCP servers through Plexus; each server is isolated per-request to prevent tool sprawl (stdio transport is not supported)

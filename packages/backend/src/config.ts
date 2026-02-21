@@ -53,6 +53,10 @@ const PricingSchema = z.discriminatedUnion('source', [
     cached: z.number().min(0).optional(),
     cache_write: z.number().min(0).optional(),
   }),
+  z.object({
+    source: z.literal('per_request'),
+    amount: z.number().min(0),
+  }),
 ]);
 
 const ModelProviderConfigSchema = z.object({

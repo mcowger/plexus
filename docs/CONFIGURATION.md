@@ -208,7 +208,69 @@ This section defines the upstream AI providers that Plexus will route requests t
           source: simple
           input: 0.00002
           output: 0
+      # Per-request flat fee (e.g. image generation, subscription-style APIs)
+      dall-e-3:
+        type: image
+        pricing:
+          source: per_request
+          amount: 0.04
     ```
+
+### Model Pricing Sources
+
+Each model entry can include a `pricing` block that controls how request costs are calculated and recorded. Four sources are supported:
+
+| Source | Description |
+|--------|-------------|
+| `simple` | Token-based pricing with fixed per-million rates for input, output, cached reads, and cache writes. |
+| `openrouter` | Fetches live per-token rates from OpenRouter by model slug. Supports an optional discount multiplier. |
+| `defined` | Tiered token-based pricing where the rate depends on input token volume (range buckets). |
+| `per_request` | Flat fee per API call, regardless of token count. |
+
+**`simple`** — fixed rates per million tokens:
+```yaml
+pricing:
+  source: simple
+  input: 3.00        # $ per million input tokens
+  output: 15.00      # $ per million output tokens
+  cached: 0.30       # $ per million cache-read tokens (optional)
+  cache_write: 3.75  # $ per million cache-write tokens (optional)
+```
+
+**`openrouter`** — live rates pulled from the OpenRouter pricing API:
+```yaml
+pricing:
+  source: openrouter
+  slug: anthropic/claude-3.5-sonnet   # OpenRouter model identifier
+  discount: 0.1                        # Optional: 10% discount applied to all rates
+```
+
+**`defined`** — tiered rates by input token volume:
+```yaml
+pricing:
+  source: defined
+  range:
+    - lower_bound: 0
+      upper_bound: 200000
+      input_per_m: 3.00
+      output_per_m: 15.00
+    - lower_bound: 200001
+      upper_bound: .inf          # Infinity
+      input_per_m: 1.50
+      output_per_m: 7.50
+      cached_per_m: 0.15         # optional
+```
+
+**`per_request`** — flat fee per call, independent of token usage. Useful for providers that bill per image, per audio second, or per API call:
+```yaml
+pricing:
+  source: per_request
+  amount: 0.04   # $ charged for every request, regardless of tokens
+```
+
+The full cost is stored under `costInput` in the usage record, with `costOutput`, `costCached`, and `costCacheWrite` all set to zero. `costSource` will be `per_request` and `costMetadata` will contain `{"amount": 0.04}`.
+
+The optional provider-level `discount` field applies a global multiplier to `simple` and `openrouter` pricing only — it has no effect on `per_request` pricing.
 
 - **`headers`**: (Optional) Custom HTTP headers to include in every request to this provider.
 
@@ -454,7 +516,7 @@ This is particularly useful when you have:
 - Cost-conscious fallbacks (e.g., primary provider is premium, fallbacks are cheaper)
 - Specific provider ordering requirements based on business logic
 
-- **`cost`**: Routes to the provider with the lowest configured pricing. Plexus uses a standardized comparison (1000 input tokens + 500 output tokens) to compare costs across providers. Requires pricing configuration on model definitions.
+- **`cost`**: Routes to the provider with the lowest configured pricing. Plexus uses a standardized comparison (1000 input tokens + 500 output tokens) to compare costs across providers. Requires pricing configuration on model definitions. For `per_request` pricing, the flat fee amount is used directly as the comparison value regardless of token volume.
 
 - **`performance`**: Routes to the provider with the highest average throughput (tokens per second). Uses historical performance data collected from actual requests. Falls back to the first target if no performance data exists yet.
 

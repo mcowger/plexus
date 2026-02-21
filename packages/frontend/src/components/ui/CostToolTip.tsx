@@ -99,6 +99,19 @@ export const CostToolTip: React.FC<CostToolTipProps> = ({ source, costMetadata, 
                     )}
                 </div>
             );
+        } else if (s === 'per_request') {
+            content = (
+                <div style={containerStyle}>
+                 <div style={headerStyle}>Source: Per Request</div>
+             <div style={gridStyle}>
+                     <span style={labelStyle}>Amount:</span>
+                    <span style={valueStyle}>${formatRate(data.amount)}</span>
+               </div>
+              <div style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '11px', marginTop: '4px' }}>
+              Flat fee per API call
+                 </div>
+                </div>
+            );
         } else if (s === 'openrouter') {
             content = (
                 <div style={containerStyle}>
