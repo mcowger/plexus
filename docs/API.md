@@ -1,156 +1,563 @@
-# Plexus 2 API Documentation
+# Plexus API Documentation
 
-This document describes the API endpoints available in Plexus 2.
-
-## Standard Inference APIs
-
-Plexus 2 provides compatibility layers for major AI provider formats.
-
-### Chat Compatible (OpenAI)
-- **Endpoint:** `POST /v1/chat/completions`
-- **Description:** Compatible with the OpenAI Chat Completions API.
-- **Documentation:** See [OpenAI API Reference](https://platform.openai.com/docs/api-reference/chat) for request and response formats.
-
-### Messages Compatible (Anthropic)
-- **Endpoint:** `POST /v1/messages`
-- **Description:** Compatible with the Anthropic Messages API.
-- **Documentation:** See [Anthropic API Reference](https://docs.anthropic.com/en/api/messages) for request and response formats.
-
-### Embeddings Compatible (OpenAI)
-- **Endpoint:** `POST /v1/embeddings`
-- **Description:** Compatible with the OpenAI Embeddings API. Works with any provider that supports OpenAI-compatible embeddings (OpenAI, Voyage AI, Cohere, Google, etc.).
-- **Documentation:** See [OpenAI Embeddings API Reference](https://platform.openai.com/docs/api-reference/embeddings) for request and response formats.
-- **Model Type:** Models must be configured with `type: embeddings` to be accessible via this endpoint.
-- **Pass-through:** Embeddings requests are always pass-through (no protocol transformation needed).
-
-### Audio Transcriptions Compatible (OpenAI)
-- **Endpoint:** `POST /v1/audio/transcriptions`
-- **Description:** Compatible with the OpenAI Audio Transcriptions API. Accepts multipart/form-data with audio files and transcribes them to text.
-- **Documentation:** See [OpenAI Audio API Reference](https://platform.openai.com/docs/api-reference/audio/createTranscription) for request and response formats.
-- **Model Type:** Models must be configured with `type: transcriptions` to be accessible via this endpoint.
-- **Supported Models:** `whisper-1`, `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`, and compatible models.
-- **Supported Formats:** Audio files up to 25MB in formats: mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm.
-- **Response Formats:** Currently supports `json` and `text` formats. Additional formats (srt, vtt, verbose_json, diarized_json) coming in future versions.
-- **Streaming:** Not supported in v1 (coming in future versions).
-- **Pass-through:** Transcription requests are always pass-through (no protocol transformation needed).
-
-### Audio Speech Compatible (OpenAI)
-- **Endpoint:** `POST /v1/audio/speech`
-- **Description:** Compatible with the OpenAI Audio Speech API. Generates audio from text using text-to-speech models.
-- **Documentation:** See [OpenAI Audio Speech API Reference](https://platform.openai.com/docs/api-reference/audio/createSpeech) for request and response formats.
-- **Model Type:** Models must be configured with `type: speech` to be accessible via this endpoint.
-- **Supported Models:** `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, and compatible TTS models.
-- **Request Body (JSON):**
-  - `model` (required): TTS model identifier
-  - `input` (required): Text to convert to speech (max 4096 characters)
-  - `voice` (required): Voice to use (alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse, marin, cedar)
-  - `instructions` (optional): Voice style control (not supported on tts-1 or tts-1-hd)
-  - `response_format` (optional): Output format (mp3, opus, aac, flac, wav, pcm). Default: mp3
-  - `speed` (optional): Speed multiplier (0.25-4.0). Default: 1.0
-  - `stream_format` (optional): Streaming format (sse, audio). Default: audio. Not supported on tts-1 or tts-1-hd.
-- **Response:**
-  - Binary audio file (default) with appropriate Content-Type header
-  - SSE stream when `stream_format: "sse"` with `speech.audio.delta` and `speech.audio.done` events
-- **Pass-through:** Speech requests are always pass-through (no protocol transformation needed).
-
-### Image Generation Compatible (OpenAI)
-- **Endpoint:** `POST /v1/images/generations`
-- **Description:** Compatible with the OpenAI Images Generation API. Creates images from text prompts using any provider supporting OpenAI-compatible image generation (OpenAI, Stability AI, Flux, etc.).
-- **Documentation:** See [OpenAI Images API Reference](https://platform.openai.com/docs/api-reference/images/create) for request and response formats.
-- **Model Type:** Models must be configured with `type: image` to be accessible via this endpoint.
-- **Supported Models:** `dall-e-2`, `dall-e-3`, `gpt-image-1`, `gpt-image-1.5`, `flux-1-schnell`, `flux-2-pro`, and compatible image generation models.
-- **Request Body (JSON):**
-  - `model` (required): Image generation model identifier
-  - `prompt` (required): Text description of the desired image(s)
-  - `n` (optional): Number of images to generate (1-10). Default: 1
-  - `size` (optional): Image dimensions. Supported: `256x256`, `512x512`, `1024x1024`, `1792x1024`, `1024x1792`. Default varies by model
-  - `response_format` (optional): Output format (`url` or `b64_json`). Default: `url`
-  - `quality` (optional): Image quality (`standard`, `hd`, `high`, `medium`, `low`). Model dependent
-  - `style` (optional): Image style (`vivid`, `natural`). DALL-E 3 only
-  - `user` (optional): Unique identifier for end-user tracking
-- **Response:**
-  - JSON object with `created` timestamp and `data` array
-  - Each image object contains `url` (valid for 60 minutes) or `b64_json`
-  - Optional `revised_prompt` showing the actual prompt used
-  - Optional `usage` field with token counts (GPT Image models)
-- **Pass-through:** Image generation requests are always pass-through (no protocol transformation needed).
-
-### Image Editing Compatible (OpenAI)
-- **Endpoint:** `POST /v1/images/edits`
-- **Description:** Compatible with the OpenAI Images Edit API. Edits or extends an image given an original image and a prompt. Supports single image upload with optional mask.
-- **Documentation:** See [OpenAI Images Edit API Reference](https://platform.openai.com/docs/api-reference/images/createEdit) for request and response formats.
-- **Model Type:** Models must be configured with `type: image` to be accessible via this endpoint.
-- **Supported Models:** `dall-e-2`, `gpt-image-1`, `gpt-image-1.5`, and compatible image editing models.
-- **Request Body (multipart/form-data):**
-  - `image` (required): The image to edit. PNG file, less than 4MB
-  - `prompt` (required): Text description of the desired edit
-  - `mask` (optional): Additional image whose transparent areas indicate where to edit. Must match image dimensions
-  - `model` (optional): Model identifier. Provider dependent
-  - `n` (optional): Number of images to generate (1-10). Default: 1
-  - `size` (optional): Image dimensions. DALL-E 2 supports: `256x256`, `512x512`, `1024x1024`. Default: `1024x1024`
-  - `response_format` (optional): Output format (`url` or `b64_json`). Default: `url`
-  - `quality` (optional): Image quality for GPT Image models (`standard`, `high`, `medium`, `low`)
-  - `user` (optional): Unique identifier for end-user tracking
-- **Response:**
-  - JSON object with `created` timestamp and `data` array
-  - Each image object contains `url` (valid for 60 minutes) or `b64_json`
-  - Optional `revised_prompt` showing the actual prompt used
-- **Pass-through:** Image editing requests are always pass-through (no protocol transformation needed).
-
-### Gemini Compatible (Google)
-- **Endpoint:** `POST /v1beta/models/{model}:{action}`
-- **Description:** Compatible with the Google Generative Language API (Gemini).
-- **Supported Actions:** `generateContent`, `streamGenerateContent`.
-- **Documentation:** See [Gemini API Reference](https://ai.google.dev/api/rest/v1beta/models/generateContent) for request and response formats.
+This document describes all HTTP endpoints available in Plexus.
 
 ---
 
+## Authentication
+
+All inference endpoints (`/v1/*`, `/v1beta/*`) require authentication. Management endpoints (`/v0/*`) do not require API key auth.
+
+### Accepted Credentials
+
+Plexus accepts a key via any of the following, checked in this order:
+
+| Method | Example |
+|--------|---------|
+| `Authorization` header | `Authorization: Bearer sk-my-key` |
+| `Authorization` header (no prefix) | `Authorization: sk-my-key` (prefix added automatically) |
+| `x-api-key` header | `x-api-key: sk-my-key` |
+| `x-goog-api-key` header | `x-goog-api-key: sk-my-key` |
+| `?key=` query parameter | `GET /v1/models?key=sk-my-key` |
+
+Keys are matched against the `secret` field of entries in the `keys` section of `plexus.yaml`. See [CONFIGURATION.md](./CONFIGURATION.md) for how to define keys.
+
+### Dynamic Key Attribution
+
+To tag a request with an attribution label for usage tracking, append `:label` to the key:
+
+```
+Authorization: Bearer sk-my-key:copilot
+```
+
+The label is stored in `attribution` on every usage record for that request. See [CONFIGURATION.md — Dynamic Key Attribution](./CONFIGURATION.md#dynamic-key-attribution) for details.
+
+### Auth Failure Response
+
+Failed auth returns HTTP `401`:
+
+```json
+{
+  "error": {
+    "message": "...",
+    "type": "auth_error",
+    "code": 401
+  }
+}
+```
+
+### Public Endpoints (No Auth Required)
+
+- `GET /health`
+- `GET /v1/models`
+- `GET /v1/openrouter/models`
+- All `/.well-known/*` and `/register` MCP discovery endpoints
+
+---
+
+## Health Check
+
+- **Endpoint:** `GET /health`
+- **Description:** Returns `OK` if the server is running.
+- **Response:** `200 OK` with body `OK`
+
+---
+
+## Standard Inference APIs
+
+All inference endpoints below require authentication (see above). Requests are routed to a backend provider based on the `model` field and `plexus.yaml` configuration.
+
+### Chat Completions (OpenAI-compatible)
+
+- **Endpoint:** `POST /v1/chat/completions`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Chat Completions API.
+- **Documentation:** [OpenAI Chat Completions Reference](https://platform.openai.com/docs/api-reference/chat)
+
+### Messages (Anthropic-compatible)
+
+- **Endpoint:** `POST /v1/messages`
+- **Auth:** Required
+- **Description:** Compatible with the Anthropic Messages API.
+- **Documentation:** [Anthropic Messages Reference](https://docs.anthropic.com/en/api/messages)
+
+### Responses (OpenAI Responses API-compatible)
+
+- **Endpoint:** `POST /v1/responses`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Responses API. Supports multi-turn conversations via `previous_response_id`, tool use, and reasoning. Plexus stores response state server-side so clients only need to send new input and a reference to the previous response.
+
+#### Retrieve a Response
+
+- **Endpoint:** `GET /v1/responses/:response_id`
+- **Auth:** Required
+- **Description:** Retrieves a previously stored response by ID.
+
+#### Delete a Response
+
+- **Endpoint:** `DELETE /v1/responses/:response_id`
+- **Auth:** Required
+- **Description:** Deletes a stored response.
+
+#### Get Conversation
+
+- **Endpoint:** `GET /v1/conversations/:conversation_id`
+- **Auth:** Required
+- **Description:** Retrieves all items in a stored conversation thread.
+
+### Gemini (Google-compatible)
+
+- **Endpoint:** `POST /v1beta/models/{model}:{action}`
+- **Auth:** Required
+- **Description:** Compatible with the Google Generative Language API (Gemini).
+- **Supported Actions:** `generateContent`, `streamGenerateContent`
+- **Documentation:** [Gemini API Reference](https://ai.google.dev/api/rest/v1beta/models/generateContent)
+
+### Embeddings (OpenAI-compatible)
+
+- **Endpoint:** `POST /v1/embeddings`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Embeddings API. Works with any provider that supports OpenAI-compatible embeddings.
+- **Model Type:** Models must be configured with `type: embeddings`.
+- **Pass-through:** Always pass-through (no protocol transformation).
+- **Documentation:** [OpenAI Embeddings Reference](https://platform.openai.com/docs/api-reference/embeddings)
+
+### Audio Transcriptions (OpenAI-compatible)
+
+- **Endpoint:** `POST /v1/audio/transcriptions`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Audio Transcriptions API. Accepts `multipart/form-data` with audio files.
+- **Model Type:** Models must be configured with `type: transcriptions`.
+- **Supported Formats:** mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm (max 25 MB)
+- **Response Formats:** `json`, `text`
+- **Pass-through:** Always pass-through.
+- **Documentation:** [OpenAI Audio Reference](https://platform.openai.com/docs/api-reference/audio/createTranscription)
+
+### Audio Speech (OpenAI-compatible)
+
+- **Endpoint:** `POST /v1/audio/speech`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Audio Speech API. Generates audio from text.
+- **Model Type:** Models must be configured with `type: speech`.
+- **Request Body (JSON):**
+  - `model` (required): TTS model identifier
+  - `input` (required): Text to convert (max 4096 chars)
+  - `voice` (required): `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`, `verse`, `marin`, `cedar`
+  - `instructions` (optional): Voice style control (not supported on `tts-1` / `tts-1-hd`)
+  - `response_format` (optional): `mp3`, `opus`, `aac`, `flac`, `wav`, `pcm` — default `mp3`
+  - `speed` (optional): 0.25–4.0 — default `1.0`
+  - `stream_format` (optional): `sse` or `audio` — default `audio`. Not supported on `tts-1` / `tts-1-hd`.
+- **Response:** Binary audio with appropriate `Content-Type`, or SSE stream with `speech.audio.delta` / `speech.audio.done` events when `stream_format: "sse"`.
+- **Pass-through:** Always pass-through.
+- **Documentation:** [OpenAI Speech Reference](https://platform.openai.com/docs/api-reference/audio/createSpeech)
+
+### Image Generation (OpenAI-compatible)
+
+- **Endpoint:** `POST /v1/images/generations`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Images Generation API.
+- **Model Type:** Models must be configured with `type: image`.
+- **Request Body (JSON):**
+  - `model` (required): Image generation model identifier
+  - `prompt` (required): Text description of the desired image
+  - `n` (optional): Number of images, 1–10 — default `1`
+  - `size` (optional): `256x256`, `512x512`, `1024x1024`, `1792x1024`, `1024x1792`
+  - `response_format` (optional): `url` or `b64_json` — default `url`
+  - `quality` (optional): `standard`, `hd`, `high`, `medium`, `low`
+  - `style` (optional): `vivid` or `natural` (DALL-E 3 only)
+  - `user` (optional): End-user tracking ID
+- **Response:**
+  ```json
+  {
+    "created": 1735689599,
+    "data": [
+      { "url": "https://...", "revised_prompt": "..." }
+    ]
+  }
+  ```
+- **Pass-through:** Always pass-through.
+- **Documentation:** [OpenAI Images Reference](https://platform.openai.com/docs/api-reference/images/create)
+
+### Image Editing (OpenAI-compatible)
+
+- **Endpoint:** `POST /v1/images/edits`
+- **Auth:** Required
+- **Description:** Compatible with the OpenAI Images Edit API. Accepts `multipart/form-data`.
+- **Model Type:** Models must be configured with `type: image`.
+- **Request Body (multipart/form-data):**
+  - `image` (required): PNG file, < 4 MB
+  - `prompt` (required): Description of desired edit
+  - `mask` (optional): PNG mask (transparent = edit here)
+  - `model` (optional): Model identifier
+  - `n` (optional): 1–10 — default `1`
+  - `size` (optional): `256x256`, `512x512`, `1024x1024` — default `1024x1024`
+  - `response_format` (optional): `url` or `b64_json` — default `url`
+  - `quality` (optional): `standard`, `high`, `medium`, `low`
+  - `user` (optional): End-user tracking ID
+- **Pass-through:** Always pass-through.
+- **Documentation:** [OpenAI Images Edit Reference](https://platform.openai.com/docs/api-reference/images/createEdit)
+
+### List Models
+
+- **Endpoint:** `GET /v1/models`
+- **Auth:** Not required
+- **Description:** Returns all configured model aliases and their targets.
+
+- **Endpoint:** `GET /v1/openrouter/models`
+- **Auth:** Not required
+- **Description:** Returns models fetched from OpenRouter (requires an OpenRouter provider configured in `plexus.yaml`).
+
+---
 ## Management APIs (`/v0/management`)
 
-The Management APIs provide endpoints for inspecting the system configuration and querying usage data.
+Management endpoints do **not** require API key authentication. They are intended for administrative use and should be network-restricted in production.
 
-### Dashboard Overview
+### Configuration
+
+#### Get Configuration
 - **Endpoint:** `GET /v0/management/config`
-- **Description:** Retrieves the current raw configuration file (`plexus.yaml`).
+- **Description:** Returns the raw `plexus.yaml` configuration file.
 - **Response Header:** `Content-Type: application/x-yaml`
-- **Response Body:** Raw YAML content of the configuration file.
+- **Response Body:** Raw YAML content.
 
-### Update Configuration
+#### Update Configuration
 - **Endpoint:** `POST /v0/management/config`
-- **Description:** Updates the system configuration file.
-- **Request Header:** `Content-Type: application/x-yaml` or `text/plain`
-- **Request Body:** Raw YAML content for the new configuration.
-- **Validation:** strict schema adherence required.
+- **Description:** Replaces the configuration file. Validates the YAML against the full schema before writing.
+- **Request Headers:** `Content-Type: application/x-yaml` or `text/plain`
+- **Request Body:** Complete YAML configuration.
 - **Responses:**
-    - `200 OK`: Configuration updated successfully. Returns the new config in body.
-    - `400 Bad Request`: Validation failed. Response JSON includes error details.
-    - `500 Internal Server Error`: File write failed or path not resolved.
-
-### Model Alias Management
+  - `200 OK`: Config written and reloaded. Returns new config as YAML.
+  - `400 Bad Request`: Schema validation failed. Body contains `{ "error": "...", "details": [...] }`.
+  - `500 Internal Server Error`: File write failed.
 
 #### Delete Model Alias
 - **Endpoint:** `DELETE /v0/management/models/:aliasId`
-- **Description:** Deletes a single model alias from the `models` section of the loaded configuration.
-- **Path Parameters:**
-  - `aliasId`: Model alias ID to delete.
+- **Path Parameters:** `aliasId` — the alias key to remove.
 - **Responses:**
-  - `200 OK`: Alias deleted successfully.
-    ```json
-    { "success": true }
-    ```
-  - `404 Not Found`: Configuration file missing or alias does not exist.
-  - `500 Internal Server Error`: Failed to update configuration.
+  - `200 OK`: `{ "success": true }`
+  - `404 Not Found`: Config file or alias not found.
+  - `500 Internal Server Error`: Write failed.
 
 #### Delete All Model Aliases
 - **Endpoint:** `DELETE /v0/management/models`
-- **Description:** Deletes all configured model aliases by clearing the `models` map in config.
 - **Responses:**
-  - `200 OK`: All aliases deleted successfully.
+  - `200 OK`: `{ "success": true, "deletedCount": 18 }`
+  - `404 Not Found`: Config file not found.
+
+#### Delete Provider
+- **Endpoint:** `DELETE /v0/management/providers/:providerId`
+- **Path Parameters:** `providerId` — provider key from config.
+- **Query Parameters:**
+  - `cascade` (optional, `true`/`false`): When `true`, also removes all model targets that reference this provider.
+- **Responses:**
+  - `200 OK`:
     ```json
-    { "success": true, "deletedCount": 18 }
+    {
+      "success": true,
+      "provider": "openai_direct",
+      "removedTargets": 3,
+      "affectedAliases": ["fast-model", "smart-model"]
+    }
     ```
-  - `404 Not Found`: Configuration file missing.
-  - `500 Internal Server Error`: Failed to update configuration.
+    `removedTargets` and `affectedAliases` are only present when `cascade=true`.
+  - `404 Not Found`: Config file or provider not found.
+
+---
+
+### Usage Records
+
+#### List Usage Records
+- **Endpoint:** `GET /v0/management/usage`
+- **Query Parameters:**
+  - `limit` (optional, int): Records to return — default `50`.
+  - `offset` (optional, int): Records to skip — default `0`.
+  - `startDate` (optional): ISO date string, e.g. `2025-01-01`.
+  - `endDate` (optional): ISO date string.
+  - `apiKey` (optional): Filter by API key name.
+  - `attribution` (optional): Filter by attribution label.
+  - `incomingApiType` (optional): `chat`, `messages`, `responses`, etc.
+  - `provider` (optional): Upstream provider name.
+  - `incomingModelAlias` (optional): Model name requested by the client.
+  - `selectedModelName` (optional): Actual upstream model used.
+  - `outgoingApiType` (optional): API format used with the provider.
+  - `responseStatus` (optional): `success` or `error`.
+  - `minDurationMs` (optional, int): Minimum request duration.
+  - `maxDurationMs` (optional, int): Maximum request duration.
+  - `fields` (optional): Comma-separated list of field names to return. When provided, only those fields are included in each record. Valid values are any field names from the response object below.
+
+- **Response Format:**
+  ```json
+  {
+    "data": [ { ...UsageRecord... } ],
+    "total": 1250
+  }
+  ```
+
+- **UsageRecord Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `requestId` | string | UUID for the request |
+| `date` | string | ISO timestamp |
+| `startTime` | number | Epoch ms when the request started |
+| `sourceIp` | string\|null | Client IP address |
+| `apiKey` | string\|null | API key name used |
+| `attribution` | string\|null | Attribution label from Dynamic Key Attribution |
+| `incomingApiType` | string | API format received (`chat`, `messages`, `responses`, etc.) |
+| `provider` | string\|null | Provider key from config |
+| `attemptCount` | number | Number of dispatch attempts (including retries) |
+| `incomingModelAlias` | string\|null | Model name sent by the client |
+| `canonicalModelName` | string\|null | Normalized model identifier |
+| `selectedModelName` | string\|null | Actual model name sent to provider |
+| `finalAttemptProvider` | string\|null | Provider used on the final attempt |
+| `finalAttemptModel` | string\|null | Model used on the final attempt |
+| `allAttemptedProviders` | string\|null | JSON array of all providers tried |
+| `outgoingApiType` | string\|null | API format used with the provider |
+| `tokensInput` | number\|null | Input tokens |
+| `tokensOutput` | number\|null | Output tokens |
+| `tokensReasoning` | number\|null | Reasoning/thinking tokens |
+| `tokensCached` | number\|null | Cache read tokens |
+| `tokensCacheWrite` | number\|null | Cache write tokens |
+| `tokensEstimated` | number\|null | `1` if token counts were estimated |
+| `costInput` | number\|null | Input cost in USD |
+| `costOutput` | number\|null | Output cost in USD |
+| `costCached` | number\|null | Cache read cost in USD |
+| `costCacheWrite` | number\|null | Cache write cost in USD |
+| `costTotal` | number\|null | Total cost in USD |
+| `costSource` | string\|null | Pricing method used (see below) |
+| `costMetadata` | string\|null | JSON string with pricing detail |
+| `durationMs` | number | Total request duration in ms |
+| `ttftMs` | number\|null | Time to first token in ms |
+| `tokensPerSec` | number\|null | Output tokens per second |
+| `isStreamed` | boolean | Whether the response was streamed |
+| `isPassthrough` | boolean | Whether request was passed through untransformed |
+| `responseStatus` | string | `success` or `error` |
+| `toolsDefined` | number\|null | Number of tools defined in the request |
+| `messageCount` | number\|null | Number of messages in the request |
+| `parallelToolCallsEnabled` | boolean\|null | Whether parallel tool calls were enabled |
+| `toolCallsCount` | number\|null | Number of tool calls in the response |
+| `finishReason` | string\|null | Stop reason from the provider |
+| `hasDebug` | boolean | Whether a debug log exists for this request |
+| `hasError` | boolean | Whether an error log exists for this request |
+
+- **`costSource` values:**
+  - `default`: No pricing configured; all cost fields are zero.
+  - `simple`: Per-token pricing from `input_price_per_million` / `output_price_per_million` on the model.
+  - `openrouter`: Pricing fetched from OpenRouter at request time.
+  - `defined`: Explicit pricing from `pricing.input` / `pricing.output` in model config.
+  - `per_request`: Flat fee per call; full amount in `costInput`, others zero.
+
+#### Usage Summary
+- **Endpoint:** `GET /v0/management/usage/summary`
+- **Description:** Returns aggregated time-series data and totals for a time range.
+- **Query Parameters:**
+  - `range` (optional): `hour`, `day`, `week`, `month` — default `day`
+- **Response Format:**
+  ```json
+  {
+    "range": "day",
+    "series": [
+      {
+        "bucketStartMs": 1735689600000,
+        "requests": 42,
+        "inputTokens": 12500,
+        "outputTokens": 8300,
+        "cachedTokens": 1200,
+        "cacheWriteTokens": 400,
+        "tokens": 22400
+      }
+    ],
+    "stats": {
+      "totalRequests": 1250,
+      "totalTokens": 580000,
+      "avgDurationMs": 1340
+    },
+    "today": {
+      "requests": 85,
+      "inputTokens": 24000,
+      "outputTokens": 16000,
+      "reasoningTokens": 800,
+      "cachedTokens": 2400,
+      "cacheWriteTokens": 600,
+      "totalCost": 0.42
+    }
+  }
+  ```
+  - `series`: Time-bucketed request counts and token totals for the requested range.
+  - `stats`: Aggregated totals over the last 7 days.
+  - `today`: Totals since midnight local time, including cost.
+
+#### Delete All Usage Records
+- **Endpoint:** `DELETE /v0/management/usage`
+- **Query Parameters:**
+  - `olderThanDays` (optional, int): Only delete records older than this many days. Omit to delete all records.
+- **Response:** `{ "success": true }`
+
+#### Delete Single Usage Record
+- **Endpoint:** `DELETE /v0/management/usage/:requestId`
+- **Path Parameters:** `requestId` — UUID of the record to delete.
+- **Responses:**
+  - `200 OK`: `{ "success": true }`
+  - `404 Not Found`: Record not found.
+
+---
+
+### Debug Mode
+
+#### Get Debug Status
+- **Endpoint:** `GET /v0/management/debug`
+- **Response:**
+  ```json
+  { "enabled": true, "providers": ["openai", "anthropic"] }
+  ```
+  - `providers`: List of provider IDs being logged, or `null` to log all.
+
+#### Set Debug Mode
+- **Endpoint:** `POST /v0/management/debug`
+- **Request Body:**
+  ```json
+  { "enabled": true, "providers": ["openai"] }
+  ```
+  - `enabled` (required): Enable or disable debug logging.
+  - `providers` (optional): Limit logging to specific provider IDs. Omit or set `null` for all providers.
+
+#### List Debug Logs
+- **Endpoint:** `GET /v0/management/debug/logs`
+- **Query Parameters:**
+  - `limit` (optional): Default `50`.
+  - `offset` (optional): Default `0`.
+- **Response:**
+  ```json
+  [{ "requestId": "uuid", "createdAt": 1735689599000 }]
+  ```
+
+#### Get Debug Log Detail
+- **Endpoint:** `GET /v0/management/debug/logs/:requestId`
+- **Response:**
+  ```json
+  {
+    "requestId": "uuid",
+    "rawRequest": {},
+    "transformedRequest": {},
+    "rawResponse": {},
+    "transformedResponse": {},
+    "rawResponseSnapshot": {},
+    "transformedResponseSnapshot": {},
+    "createdAt": 1735689599000
+  }
+  ```
+
+#### Delete Debug Log
+- **Endpoint:** `DELETE /v0/management/debug/logs/:requestId`
+- **Response:** `{ "success": true }`
+
+#### Delete All Debug Logs
+- **Endpoint:** `DELETE /v0/management/debug/logs`
+- **Response:** `{ "success": true }`
+
+---
+
+### Logging Level
+
+Manage backend log verbosity at runtime without restarting.
+
+#### Get Logging Level
+- **Endpoint:** `GET /v0/management/logging/level`
+- **Response:**
+  ```json
+  {
+    "level": "debug",
+    "startupLevel": "info",
+    "supportedLevels": ["error", "warn", "info", "debug", "verbose", "silly"],
+    "ephemeral": true
+  }
+  ```
+
+#### Set Logging Level
+- **Endpoint:** `POST /v0/management/logging/level`
+- **Request Body:** `{ "level": "silly" }`
+- **Notes:** Runtime-only. Resets on process restart.
+
+#### Reset Logging Level
+- **Endpoint:** `DELETE /v0/management/logging/level`
+- **Description:** Resets back to the startup default (`LOG_LEVEL` env, `DEBUG=true`, or `info`).
+
+---
+
+### Cooldowns
+
+#### List Active Cooldowns
+- **Endpoint:** `GET /v0/management/cooldowns`
+- **Response:**
+  ```json
+  [
+    {
+      "provider": "openai_direct",
+      "model": "gpt-4o",
+      "expiry": 1735689999000,
+      "timeRemainingMs": 120000,
+      "consecutiveFailures": 3
+    }
+  ]
+  ```
+  Providers configured with `disable_cooldown: true` never appear here.
+
+#### Clear All Cooldowns
+- **Endpoint:** `DELETE /v0/management/cooldowns`
+- **Response:** `{ "success": true }`
+
+#### Clear Cooldowns for a Provider
+- **Endpoint:** `DELETE /v0/management/cooldowns/:provider`
+- **Path Parameters:** `provider` — provider key from config.
+- **Query Parameters:**
+  - `model` (optional): Limit the clear to a single provider+model pair.
+- **Response:** `{ "success": true }`
+
+---
+
+### Provider Test
+
+Run a lightweight test inference request to verify a provider/model pair.
+
+- **Endpoint:** `POST /v0/management/test`
+- **Request Body:**
+  ```json
+  { "provider": "openai", "model": "gpt-4o", "apiType": "chat" }
+  ```
+  `apiType`: `chat`, `messages`, `gemini`, `responses`, `embeddings`, `images`, `speech`, `oauth`
+- **Response:**
+  ```json
+  { "success": true, "durationMs": 420, "apiType": "chat", "response": "acknowledged" }
+  ```
+
+---
+
+### Performance Metrics
+
+#### Get Performance Metrics
+- **Endpoint:** `GET /v0/management/performance`
+- **Query Parameters:**
+  - `provider` (optional): Filter by provider name.
+  - `model` (optional): Filter by model name.
+- **Response:**
+  ```json
+  [
+    {
+      "provider": "openai_direct",
+      "model": "gpt-4o",
+      "avg_ttft_ms": 320.5,
+      "min_ttft_ms": 210.0,
+      "max_ttft_ms": 550.2,
+      "avg_tokens_per_sec": 65.4,
+      "min_tokens_per_sec": 45.1,
+      "max_tokens_per_sec": 88.9,
+      "sample_count": 10,
+      "last_updated": 1735689599000
+    }
+  ]
+  ```
+
+---
 
 ### OAuth Providers
 
@@ -158,29 +565,15 @@ Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, Git
 
 #### List OAuth Providers
 - **Endpoint:** `GET /v0/management/oauth/providers`
-- **Description:** Returns the OAuth providers available on this server.
-- **Response Format:**
+- **Response:**
   ```json
-  {
-    "data": [
-      {
-        "id": "openai-codex",
-        "name": "OpenAI Codex",
-        "usesCallbackServer": false
-      }
-    ],
-    "total": 1
-  }
+  { "data": [{ "id": "openai-codex", "name": "OpenAI Codex", "usesCallbackServer": false }], "total": 1 }
   ```
 
 #### Start OAuth Session
 - **Endpoint:** `POST /v0/management/oauth/sessions`
-- **Description:** Starts an OAuth login session for a provider/account pair.
-- **Request Body:**
-  ```json
-  { "providerId": "openai-codex", "accountId": "work" }
-  ```
-- **Response Format:**
+- **Request Body:** `{ "providerId": "openai-codex", "accountId": "work" }`
+- **Response:**
   ```json
   {
     "data": {
@@ -199,333 +592,250 @@ Plexus exposes OAuth helpers for providers backed by pi-ai (Anthropic OAuth, Git
 
 #### Get OAuth Session
 - **Endpoint:** `GET /v0/management/oauth/sessions/:id`
-- **Description:** Fetches the latest session status for polling.
+- **Description:** Poll for latest session status.
 
 #### Submit OAuth Prompt
 - **Endpoint:** `POST /v0/management/oauth/sessions/:id/prompt`
-- **Description:** Sends a prompt response back to the OAuth session (e.g., confirmation codes).
-- **Request Body:**
-  ```json
-  { "value": "yes" }
-  ```
+- **Request Body:** `{ "value": "yes" }`
 
-#### Submit OAuth Manual Code
+#### Submit Manual Code
 - **Endpoint:** `POST /v0/management/oauth/sessions/:id/manual-code`
-- **Description:** Submits a manual redirect code when the provider requires it.
-- **Request Body:**
-  ```json
-  { "value": "4/0Ad..." }
-  ```
+- **Request Body:** `{ "value": "4/0Ad..." }`
 
 #### Cancel OAuth Session
 - **Endpoint:** `POST /v0/management/oauth/sessions/:id/cancel`
-- **Description:** Cancels an active OAuth session.
 
 #### Delete OAuth Credentials
 - **Endpoint:** `DELETE /v0/management/oauth/credentials`
-- **Description:** Deletes stored OAuth credentials for a provider/account pair.
-- **Request Body:**
+- **Request Body:** `{ "providerId": "openai-codex", "accountId": "work" }`
+- **Response:** `{ "data": { "deleted": true } }`
+
+---
+### Inference Error Logs
+
+Error records are saved automatically whenever an inference request fails.
+
+#### List Error Logs
+- **Endpoint:** `GET /v0/management/errors`
+- **Query Parameters:**
+  - `limit` (optional): Default `50`.
+  - `offset` (optional): Default `0`.
+- **Response:** Array of error log objects.
+
+#### Delete All Error Logs
+- **Endpoint:** `DELETE /v0/management/errors`
+- **Response:** `{ "success": true }`
+
+#### Delete Single Error Log
+- **Endpoint:** `DELETE /v0/management/errors/:requestId`
+- **Path Parameters:** `requestId` — UUID of the error to delete.
+- **Responses:**
+  - `200 OK`: `{ "success": true }`
+  - `404 Not Found`: Log not found.
+
+---
+
+### MCP Proxy Logs
+
+Usage records for requests proxied through the MCP proxy.
+
+#### List MCP Logs
+- **Endpoint:** `GET /v0/management/mcp-logs`
+- **Query Parameters:**
+  - `limit` (optional): Default `20`.
+  - `offset` (optional): Default `0`.
+  - `serverName` (optional): Filter by MCP server name.
+  - `apiKey` (optional): Filter by API key name.
+- **Response:**
   ```json
-  { "providerId": "openai-codex", "accountId": "work" }
-  ```
-- **Response Format:**
-  ```json
-  { "data": { "deleted": true } }
+  { "data": [ { ...McpRequestUsageRecord... } ], "total": 45 }
   ```
 
-### Provider Test
+#### Delete All MCP Logs
+- **Endpoint:** `DELETE /v0/management/mcp-logs`
+- **Query Parameters:**
+  - `olderThanDays` (optional, int): Only delete logs older than this many days. Omit to delete all.
+- **Response:** `{ "success": true }`
 
-Run a lightweight test request for a provider/model pair. Supports `chat`, `messages`, `gemini`, `responses`, `embeddings`, `images`, `speech`, and `oauth`.
+#### Delete Single MCP Log
+- **Endpoint:** `DELETE /v0/management/mcp-logs/:requestId`
+- **Path Parameters:** `requestId` — UUID of the log to delete.
+- **Responses:**
+  - `200 OK`: `{ "success": true }`
+  - `404 Not Found`: Log not found.
 
-- **Endpoint:** `POST /v0/management/test`
-- **Request Body:**
-  ```json
-  { "provider": "openai", "model": "gpt-4o", "apiType": "chat" }
-  ```
-- **Response Format:**
+---
+
+### MCP Server Configuration
+
+Manage MCP server entries in `plexus.yaml` via the API.
+
+#### List MCP Servers
+- **Endpoint:** `GET /v0/management/mcp-servers`
+- **Response:** Object mapping server names to their config:
   ```json
   {
-    "success": true,
-    "durationMs": 420,
-    "apiType": "chat",
-    "response": "acknowledged"
-  }
-  ```
-
-### Usage Records
-- **Endpoint:** `GET /v0/management/usage`
-- **Description:** Returns a paginated list of usage records with support for extensive filtering.
-- **Query Parameters:**
-  - `limit` (optional): Number of records to return (default: 50).
-  - `offset` (optional): Number of records to skip (default: 0).
-  - `startDate` (optional): ISO date string (e.g., `2023-01-01`).
-  - `endDate` (optional): ISO date string.
-  - `apiKey` (optional): Filter by API key name (e.g., `app-key`).
-  - `attribution` (optional): Filter by attribution label (e.g., `copilot`, `claude`). Used to track usage by feature or application variant when using [Dynamic Key Attribution](./CONFIGURATION.md#dynamic-key-attribution).
-  - `incomingApiType` (optional): e.g., `chat`, `messages`.
-  - `provider` (optional): The upstream provider name.
-  - `incomingModelAlias` (optional): The model name requested by the client.
-  - `selectedModelName` (optional): The actual upstream model name used.
-  - `outgoingApiType` (optional): The API format used to communicate with the provider.
-  - `minDurationMs` (optional): Minimum request duration in milliseconds.
-  - `maxDurationMs` (optional): Maximum request duration in milliseconds.
-  - `responseStatus` (optional): e.g., `success`, `error`.
-
-- **Response Format:**
-  ```json
-  {
-    "data": [
-      {
-        "requestId": "uuid",
-        "date": "2025-12-31T23:59:59.000Z",
-        "sourceIp": "127.0.0.1",
-        "apiKey": "app-key",
-        "attribution": "copilot",
-        "incomingApiType": "chat",
-        "provider": "openai_direct",
-        "incomingModelAlias": "fast-model",
-        "selectedModelName": "gpt-4o-mini",
-        "outgoingApiType": "chat",
-        "tokensInput": 150,
-        "tokensOutput": 450,
-        "tokensReasoning": 0,
-        "tokensCached": 50,
-        "costInput": 0.00075,
-        "costOutput": 0.00675,
-        "costTotal": 0.0075,
-        "costSource": "simple",
-        "startTime": 1735689599000,
-        "durationMs": 1200,
-        "ttftMs": 350.5,
-        "tokensPerSec": 45.2,
-        "isStreamed": false,
-        "isPassthrough": false,
-        "responseStatus": "success"
-      }
-    ],
-    "total": 1250
-  }
-  ```
-
-**Response Fields:**
-- `attribution` (optional, string or null): Optional label appended to the API key for tracking usage by feature or application variant. Set when using [Dynamic Key Attribution](./CONFIGURATION.md#dynamic-key-attribution) (e.g., `copilot`, `claude`, `mobile:v2.5`). Null if no attribution was provided with the request.
-- `costSource` (string): Indicates which pricing method was used to calculate the cost for this request. Possible values:
-  - `default`: No pricing configured; all cost fields are zero.
-  - `simple`: Per-token pricing defined directly on the model (`input_price_per_million` / `output_price_per_million`).
-  - `openrouter`: Pricing fetched from the OpenRouter API at request time.
-  - `defined`: Explicit per-token pricing defined in the model config via `pricing.input` / `pricing.output`.
-  - `per_request`: Flat fee per API call regardless of token count; the full amount is stored in `costInput`, and `costOutput`/`costCached`/`costCacheWrite` are zero.
-- `costMetadata` (string, JSON): Provider-specific pricing detail encoded as a JSON string. Contents vary by `costSource`:
-  - `simple` / `defined`: `{"inputRate": <per-million>, "outputRate": <per-million>}`
-  - `openrouter`: `{"inputRate": <per-million>, "outputRate": <per-million>}` (rates returned by OpenRouter)
-  - `per_request`: `{"amount": <flat-fee>}`
-  - `default`: `{}`
-
-### Performance Metrics
-- **Endpoint:** `GET /v0/management/performance`
-- **Description:** Returns aggregated performance metrics (TTFT, TPS) for providers and models.
-- **Query Parameters:**
-  - `provider` (optional): Filter by provider name.
-  - `model` (optional): Filter by model name.
-
-- **Response Format:**
-  ```json
-  [
-    {
-      "provider": "openai_direct",
-      "model": "gpt-4o",
-      "avg_ttft_ms": 320.5,
-      "min_ttft_ms": 210.0,
-      "max_ttft_ms": 550.2,
-      "avg_tokens_per_sec": 65.4,
-      "min_tokens_per_sec": 45.1,
-      "max_tokens_per_sec": 88.9,
-      "sample_count": 10,
-      "last_updated": 1735689599000
+    "my-server": {
+      "upstream_url": "http://localhost:3001",
+      "enabled": true,
+      "headers": {}
     }
-  ]
-  ```
-
-### Debug Mode Management
-
-Manage debug logging mode to capture full request/response lifecycles for troubleshooting.
-
-#### Get Debug Status
-- **Endpoint:** `GET /v0/management/debug`
-- **Description:** Returns the current debug mode status and provider filter settings.
-- **Response Format:**
-  ```json
-  {
-    "enabled": true,
-    "providers": ["openai", "anthropic"]
-  }
-  ```
-- **Response Fields:**
-  - `enabled` (boolean): Whether debug logging is currently active.
-  - `providers` (string[] | null): List of provider IDs to filter logs by. When `null` or empty, all providers are logged.
-
-#### Set Debug Mode
-- **Endpoint:** `POST /v0/management/debug`
-- **Description:** Enables or disables debug logging and optionally sets a provider filter.
-- **Request Body:**
-  ```json
-  {
-    "enabled": true,
-    "providers": ["openai", "anthropic"]
-  }
-  ```
-- **Request Fields:**
-  - `enabled` (required, boolean): Enable or disable debug logging.
-  - `providers` (optional, string[]): Array of provider IDs to filter logs by. Only requests to these providers will be logged. Set to `null` or omit to log all providers.
-- **Response Format:**
-  ```json
-  {
-    "enabled": true,
-    "providers": ["openai", "anthropic"]
   }
   ```
 
-#### List Debug Logs
-- **Endpoint:** `GET /v0/management/debug/logs`
-- **Description:** Returns a list of debug log metadata (request ID and timestamp).
-- **Query Parameters:**
-  - `limit` (optional): Number of logs to return (default: 50).
-  - `offset` (optional): Number of logs to skip (default: 0).
-- **Response Format:**
+#### Create or Update MCP Server
+- **Endpoint:** `POST /v0/management/mcp-servers/:serverName`
+- **Path Parameters:** `serverName` — slug (lowercase letters, numbers, hyphens, underscores, 2–63 chars).
+- **Request Body (JSON):**
+  - `upstream_url` (required): URL of the upstream MCP server.
+  - `enabled` (optional, boolean): Default `true`.
+  - `headers` (optional, object): Static headers to forward to the upstream server.
+- **Responses:**
+  - `200 OK`: `{ "success": true, "name": "my-server", "upstream_url": "...", "enabled": true, "headers": {} }`
+  - `400 Bad Request`: Missing `upstream_url` or invalid server name.
+  - `404 Not Found`: Config file not found.
+
+#### Delete MCP Server
+- **Endpoint:** `DELETE /v0/management/mcp-servers/:serverName`
+- **Path Parameters:** `serverName` — name of the MCP server to remove.
+- **Responses:**
+  - `200 OK`: `{ "success": true }`
+  - `404 Not Found`: Server or config file not found.
+
+---
+
+### User Quota Definitions
+
+CRUD for per-key quota definitions stored in `plexus.yaml`. These define *what* a quota is — to assign a quota to a key, set `quota: <name>` on the key in config. See [CONFIGURATION.md — User Quotas](./CONFIGURATION.md#user-quotas).
+
+#### List All Quota Definitions
+- **Endpoint:** `GET /v0/management/user-quotas`
+- **Response:** Object mapping quota names to their definitions:
   ```json
-  [
-    {
-      "requestId": "uuid-string",
-      "createdAt": 1735689599000
+  {
+    "premium_hourly": {
+      "type": "rolling",
+      "duration": "1h",
+      "limit": 100000,
+      "limitType": "tokens"
     }
-  ]
-  ```
-
-#### Get Debug Log Detail
-- **Endpoint:** `GET /v0/management/debug/logs/:requestId`
-- **Description:** Returns full debug trace for a specific request.
-- **Path Parameters:**
-  - `requestId`: The request ID to retrieve.
-- **Response Format:**
-  ```json
-  {
-    "requestId": "uuid-string",
-    "rawRequest": { ... },
-    "transformedRequest": { ... },
-    "rawResponse": { ... },
-    "transformedResponse": { ... },
-    "rawResponseSnapshot": { ... },
-    "transformedResponseSnapshot": { ... },
-    "createdAt": 1735689599000
   }
   ```
 
-#### Delete Debug Log
-- **Endpoint:** `DELETE /v0/management/debug/logs/:requestId`
-- **Description:** Deletes a specific debug log.
-- **Response Format:**
-  ```json
-  { "success": true }
-  ```
+#### Get a Quota Definition
+- **Endpoint:** `GET /v0/management/user-quotas/:name`
+- **Path Parameters:** `name` — quota name.
+- **Responses:**
+  - `200 OK`: `{ "name": "premium_hourly", "type": "rolling", ... }`
+  - `404 Not Found`: Quota not found.
 
-### Logging Level Management
+#### Create or Replace a Quota Definition
+- **Endpoint:** `POST /v0/management/user-quotas/:name`
+- **Path Parameters:** `name` — slug (lowercase, numbers, hyphens/underscores, 2–63 chars).
+- **Request Body (JSON):**
+  - `type` (required): `rolling`, `daily`, or `weekly`.
+  - `limitType` (required): `requests` or `tokens`.
+  - `limit` (required, number): Maximum allowed value.
+  - `duration` (required for `type: rolling`): Duration string, e.g. `1h`, `30m`, `1d`.
+- **Responses:**
+  - `200 OK`: `{ "success": true, "name": "...", "quota": { ... } }`
+  - `400 Bad Request`: Invalid name, missing fields, or schema validation failure.
 
-Manage backend log verbosity at runtime without editing `LOG_LEVEL`.
+#### Partially Update a Quota Definition
+- **Endpoint:** `PATCH /v0/management/user-quotas/:name`
+- **Path Parameters:** `name` — quota name.
+- **Request Body (JSON):** Any subset of quota fields to update. Merged with existing definition.
+- **Responses:**
+  - `200 OK`: `{ "success": true, "name": "...", "quota": { ... } }`
+  - `404 Not Found`: Quota not found.
 
-#### Get Logging Level
-- **Endpoint:** `GET /v0/management/logging/level`
-- **Description:** Returns the current runtime logging level, startup default, and supported values.
-- **Response Format:**
+#### Delete a Quota Definition
+- **Endpoint:** `DELETE /v0/management/user-quotas/:name`
+- **Path Parameters:** `name` — quota name.
+- **Notes:** Returns `409 Conflict` if any configured key is currently assigned this quota. Remove or reassign the key first.
+- **Responses:**
+  - `200 OK`: `{ "success": true, "name": "...", "message": "..." }`
+  - `404 Not Found`: Quota not found.
+  - `409 Conflict`: Quota is assigned to one or more keys.
+
+---
+
+### Quota Checker Types
+
+#### List Valid Quota Checker Types
+- **Endpoint:** `GET /v0/management/quota-checker-types`
+- **Description:** Returns the list of built-in quota checker type strings that can be used in `plexus.yaml`.
+- **Response:**
   ```json
   {
-    "level": "debug",
-    "startupLevel": "info",
-    "supportedLevels": ["error", "warn", "info", "debug", "verbose", "silly"],
-    "ephemeral": true
+    "types": ["naga", "synthetic", "nanogpt", "zai", "moonshot", "minimax", "openrouter", "kilo", "openai-codex", "claude-code", "copilot", "wisdomgate", "apertis"],
+    "count": 13
   }
-  ```
-
-#### Set Logging Level
-- **Endpoint:** `POST /v0/management/logging/level`
-- **Description:** Updates logging level immediately for the running process.
-- **Request Body:**
-  ```json
-  {
-    "level": "silly"
-  }
-  ```
-- **Notes:**
-  - Changes are runtime-only and are not persisted.
-  - The selected level resets to startup behavior on process restart.
-
-#### Reset Logging Level
-- **Endpoint:** `DELETE /v0/management/logging/level`
-- **Description:** Resets the runtime override back to the startup default (`LOG_LEVEL`, or `DEBUG=true`, or `info`).
-
-#### Delete All Debug Logs
-- **Endpoint:** `DELETE /v0/management/debug/logs`
-- **Description:** Deletes all debug logs.
-- **Response Format:**
-  ```json
-  { "success": true }
-  ```
-
-### Cooldown Management
-
-#### List Active Cooldowns
-- **Endpoint:** `GET /v0/management/cooldowns`
-- **Description:** Returns all providers and models currently on cooldown, with time remaining.
-- **Response Format:**
-  ```json
-  [
-    {
-      "provider": "openai_direct",
-      "model": "gpt-4o",
-      "expiry": 1735689999000,
-      "timeRemainingMs": 120000,
-      "consecutiveFailures": 3
-    }
-  ]
-  ```
-- **Response Fields:**
-  - `provider`: Provider key from config.
-  - `model`: Model slug for that provider.
-  - `expiry`: Epoch milliseconds when the cooldown expires.
-  - `timeRemainingMs`: Milliseconds remaining on the cooldown.
-  - `consecutiveFailures`: Number of consecutive failures that led to this cooldown.
-- **Notes:** Providers configured with `disable_cooldown: true` will never appear in this list, even after errors.
-
-#### Clear All Cooldowns
-- **Endpoint:** `DELETE /v0/management/cooldowns`
-- **Description:** Immediately clears all active cooldowns, making every provider eligible for routing again.
-- **Response Format:**
-  ```json
-  { "success": true }
-  ```
-
-#### Clear Specific Cooldown
-- **Endpoint:** `DELETE /v0/management/cooldowns/:provider`
-- **Description:** Clears all cooldowns for a specific provider, or a specific provider+model pair.
-- **Path Parameters:**
-  - `provider`: The provider key from config.
-- **Query Parameters:**
-  - `model` (optional): Limit the clear to a single provider+model combination.
-- **Response Format:**
-  ```json
-  { "success": true }
   ```
 
 ---
 
+### User Quota Enforcement
+
+#### Clear Quota Usage
+- **Endpoint:** `POST /v0/management/quota/clear`
+- **Description:** Resets quota usage counters to zero for a specific API key.
+- **Request Body:** `{ "key": "acme_corp" }`
+- **Response:** `{ "success": true, "key": "acme_corp", "message": "Quota reset successfully" }`
+
+#### Get Quota Status
+- **Endpoint:** `GET /v0/management/quota/status/:key`
+- **Path Parameters:** `key` — API key name.
+- **Response (quota assigned):**
+  ```json
+  {
+    "key": "acme_corp",
+    "quota_name": "premium_hourly",
+    "allowed": true,
+    "current_usage": 45000,
+    "limit": 100000,
+    "remaining": 55000,
+    "resets_at": "2026-02-19T01:00:00.000Z"
+  }
+  ```
+- **Response (no quota assigned):**
+  ```json
+  {
+    "key": "free_user",
+    "quota_name": null,
+    "allowed": true,
+    "current_usage": 0,
+    "limit": null,
+    "remaining": null,
+    "resets_at": null
+  }
+  ```
+
+#### Quota Enforcement Behavior
+
+When a quota is exceeded, inference requests receive HTTP `429`:
+
+```json
+{
+  "error": {
+    "message": "Quota exceeded: premium_hourly limit of 100000 reached",
+    "type": "quota_exceeded",
+    "quota_name": "premium_hourly",
+    "current_usage": 125671,
+    "limit": 100000,
+    "resets_at": "2026-02-19T01:00:00.000Z"
+  }
+}
+```
+
+---
 ## Quota Management (`/v0/quotas`)
 
-The Quota Management APIs provide endpoints for monitoring provider rate limits and quotas.
+Monitor provider-level rate limits and account quotas. These are distinct from *user* quotas — they track the upstream provider's limits, not per-key limits.
 
 ### List All Quota Checkers
-
 - **Endpoint:** `GET /v0/quotas`
-- **Description:** Returns a list of all configured quota checkers with their latest status.
-- **Response Format:**
+- **Response:**
   ```json
   [
     {
@@ -547,25 +857,19 @@ The Quota Management APIs provide endpoints for monitoring provider rate limits 
     }
   ]
   ```
+  - `checkerId`: Configured checker identifier (may be a custom name).
+  - `checkerType`: Checker implementation type (e.g. `naga`, `moonshot`). Use this for UI type routing, not `checkerId`.
 
-- **Notes:**
-  - `checkerId` is the configured checker identifier (defaults to provider name, but may be custom).
-  - `checkerType` is the checker implementation type (e.g. `naga`, `moonshot`, `minimax`) and should be used for UI type routing.
-
-### Get Latest Quota
-
+### Get Latest Quota for a Checker
 - **Endpoint:** `GET /v0/quotas/:checkerId`
-- **Description:** Returns the latest quota status for a specific checker.
-- **Response Format:** Same as list all checkers but for a single checker.
+- **Response:** Same shape as above but for a single checker.
 
 ### Get Quota History
-
 - **Endpoint:** `GET /v0/quotas/:checkerId/history`
 - **Query Parameters:**
-  - `windowType` (optional): Filter by window type (e.g., `subscription`, `five_hour`, `weekly`)
-  - `since` (optional): Start date. Can be ISO timestamp or relative format like `7d`, `30d`
-
-- **Response Format:**
+  - `windowType` (optional): Filter by window type, e.g. `subscription`, `five_hour`, `daily`.
+  - `since` (optional): Start date. ISO timestamp or relative format: `7d`, `30d`.
+- **Response:**
   ```json
   {
     "checkerId": "anthropic-pro",
@@ -594,142 +898,88 @@ The Quota Management APIs provide endpoints for monitoring provider rate limits 
   ```
 
 ### Trigger Immediate Check
-
 - **Endpoint:** `POST /v0/quotas/:checkerId/check`
-- **Description:** Triggers an immediate quota check for the specified checker.
-- **Response Format:** Returns the `QuotaCheckResult` immediately.
+- **Description:** Forces an immediate quota check outside the normal polling interval.
+- **Response:** The `QuotaCheckResult` for the checker.
 
 ---
 
-## User Quota Enforcement API (`/v0/management/quota`)
+## Server-Sent Event Streams
 
-Plexus supports per-API-key quota enforcement to limit usage by requests or tokens. Quotas are defined in the configuration and assigned to keys.
+These endpoints use `text/event-stream` (SSE) for real-time data. Connect with an `EventSource` or `curl -N`. Each connection is kept alive with periodic `ping` events every 10 seconds.
 
-### Clear Quota
-
-- **Endpoint:** `POST /v0/management/quota/clear`
-- **Description:** Resets quota usage to zero for a specific API key.
-- **Request Body:**
-  ```json
-  {
-    "key": "acme_corp"
-  }
+### Live Usage Events
+- **Endpoint:** `GET /v0/management/events`
+- **Description:** Streams a `log` event for every completed inference request as it is saved to the database. Useful for real-time dashboards.
+- **Event format:**
   ```
-- **Response Format:**
-  ```json
-  {
-    "success": true,
-    "key": "acme_corp",
-    "message": "Quota reset successfully"
-  }
+  event: log
+  data: { ...UsageRecord... }
+  id: 1735689599000
   ```
 
-### Get Quota Status
-
-- **Endpoint:** `GET /v0/management/quota/status/:key`
-- **Description:** Returns current quota status for an API key.
-- **Response Format (with quota assigned):**
-  ```json
-  {
-    "key": "acme_corp",
-    "quota_name": "premium_hourly",
-    "allowed": true,
-    "current_usage": 45000,
-    "limit": 100000,
-    "remaining": 55000,
-    "resets_at": "2026-02-19T01:00:00.000Z"
-  }
+### System Log Stream
+- **Endpoint:** `GET /v0/system/logs/stream`
+- **Description:** Streams all backend log entries in real-time as `syslog` events.
+- **Event format:**
   ```
-- **Response Format (no quota assigned):**
-  ```json
-  {
-    "key": "free_user",
-    "quota_name": null,
-    "allowed": true,
-    "current_usage": 0,
-    "limit": null,
-    "remaining": null,
-    "resets_at": null
-  }
-  ```
-
-### Quota Enforcement Behavior
-
-- **Quota Types:** Supports rolling (leaky bucket), daily, and weekly quotas
-- **Limit Types:** `requests` (count) or `tokens` (sum of input + output)
-- **Quota Exceeded Response:** When quota is exceeded, requests receive HTTP 429:
-  ```json
-  {
-    "error": {
-      "message": "Quota exceeded: premium_hourly limit of 100000 reached",
-      "type": "quota_exceeded",
-      "quota_name": "premium_hourly",
-      "current_usage": 125671,
-      "limit": 100000,
-      "resets_at": "2026-02-19T01:00:00.000Z"
-    }
-  }
+  event: syslog
+  data: { "level": "info", "message": "...", "timestamp": "..." }
+  id: 1735689599000
   ```
 
 ---
 
-## MCP Proxy API
+## MCP Proxy (`/mcp/:name`)
 
-Plexus can proxy MCP (Model Context Protocol) servers. Configure MCP servers in `plexus.yaml` under the `mcp_servers` section.
+Plexus can proxy MCP (Model Context Protocol) servers configured under `mcp_servers` in `plexus.yaml`.
 
 ### MCP Endpoints
 
-Each configured MCP server is exposed at `/mcp/:name`:
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/mcp/:name` | JSON-RPC message exchange |
-| GET | `/mcp/:name` | Server-Sent Events (SSE) for streaming |
-| DELETE | `/mcp/:name` | Session termination |
+| `POST` | `/mcp/:name` | JSON-RPC message exchange |
+| `GET`  | `/mcp/:name` | Server-Sent Events for streaming |
+| `DELETE` | `/mcp/:name` | Session termination |
 
 **Path Parameters:**
-- `:name` - The key name from your `mcp_servers` configuration
+- `:name` — key from your `mcp_servers` configuration.
 
 ### Authentication
 
-All MCP endpoints require authentication using Plexus API keys:
+MCP endpoints require a valid Plexus API key:
 
 ```bash
-# Include Authorization header with your Plexus API key
 curl -X POST http://localhost:4000/mcp/my-server \
   -H "Authorization: Bearer sk-your-plexus-key" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{...},"id":0}'
 ```
 
+**Important:** Client `Authorization` and `x-api-key` headers are **not** forwarded to the upstream MCP server. Only static headers from `plexus.yaml` are used for upstream authentication.
+
 ### OAuth Discovery Endpoints
 
-Plexus provides OAuth 2.0 discovery endpoints for MCP client compatibility:
+Plexus exposes OAuth 2.0 discovery endpoints for MCP client compatibility. These are unauthenticated.
 
 | Endpoint | Description |
-|---------|-------------|
+|----------|-------------|
 | `GET /.well-known/oauth-authorization-server` | Authorization server metadata |
 | `GET /.well-known/oauth-protected-resource` | Protected resource metadata |
 | `GET /.well-known/openid-configuration` | OpenID Connect configuration |
 | `POST /register` | Dynamic client registration |
 
-These endpoints return metadata indicating that Plexus uses Bearer token (API key) authentication.
-
-### Request/Response
-
-MCP requests are proxied transparently to the upstream server. The request body is forwarded as-is (JSON-RPC), and responses are streamed back to the client.
-
-**Important:** Client authentication headers (`Authorization`, `x-api-key`) are NOT forwarded to upstream MCP servers. Only static headers configured in `plexus.yaml` are used for upstream authentication.
+These return metadata indicating Plexus uses Bearer token (API key) authentication.
 
 ---
 
-## Quota Window Types
+## Reference Tables
 
-Quota windows represent different time-based rate limit periods:
+### Quota Window Types
 
 | Window Type | Description |
-|------------|-------------|
-| `subscription` | Monthly/billing cycle based quota |
+|-------------|-------------|
+| `subscription` | Monthly/billing-cycle quota or prepaid balance |
 | `hourly` | Hourly rolling window |
 | `five_hour` | 5-hour rolling window (Anthropic) |
 | `daily` | Daily reset quota |
@@ -737,11 +987,11 @@ Quota windows represent different time-based rate limit periods:
 | `monthly` | Calendar month quota |
 | `custom` | Provider-specific window |
 
-## Quota Status Levels
+### Quota Status Levels
 
 | Status | Utilization | Description |
 |--------|-------------|-------------|
-| `ok` | 0-75% | Healthy, plenty of quota remaining |
-| `warning` | 75-90% | Approaching exhaustion, plan accordingly |
-| `critical` | 90-100% | Near exhaustion, take action soon |
+| `ok` | 0–75% | Healthy, plenty of quota remaining |
+| `warning` | 75–90% | Approaching exhaustion |
+| `critical` | 90–100% | Near exhaustion, take action soon |
 | `exhausted` | 100% | Quota fully consumed, requests will fail |
