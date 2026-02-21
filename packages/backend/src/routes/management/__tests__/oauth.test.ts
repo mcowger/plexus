@@ -173,4 +173,59 @@ describe('OAuth management routes', () => {
     expect(authJson['manual-provider']).toBeDefined();
     expect(authJson['manual-provider'].accounts[accountId].access).toBe('manual-access');
   });
+
+  it('fetches OAuth provider models', async () => {
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/oauth/models?providerId=anthropic'
+    });
+
+    expect(response.statusCode).toBe(200);
+    const json = response.json() as { data: Array<{ id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }> };
+    expect(Array.isArray(json.data)).toBe(true);
+    expect(json.data.length).toBeGreaterThan(0);
+    
+    // Verify the first model has expected structure
+    const firstModel = json.data[0];
+    expect(firstModel).toBeDefined();
+    if (firstModel) {
+      expect(firstModel.id).toBeDefined();
+      expect(typeof firstModel.id).toBe('string');
+      
+      // Check optional fields exist if present
+      if (firstModel.name) {
+        expect(typeof firstModel.name).toBe('string');
+      }
+      if (firstModel.context_length) {
+        expect(typeof firstModel.context_length).toBe('number');
+      }
+      if (firstModel.pricing) {
+        expect(firstModel.pricing).toBeDefined();
+      }
+    }
+  });
+
+  it('returns 400 for invalid providerId', async () => {
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/oauth/models?providerId='
+    });
+
+    expect(response.statusCode).toBe(400);
+    const json = response.json() as { error: string };
+    expect(json.error).toBeDefined();
+  });
+
+  it('handles unknown provider gracefully', async () => {
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/oauth/models?providerId=unknown-provider'
+    });
+
+    // getModels returns empty array for unknown providers instead of throwing
+    expect(response.statusCode).toBe(200);
+    const json = response.json() as { data: Array<any> };
+    expect(Array.isArray(json.data)).toBe(true);
+    expect(json.data.length).toBe(0);
+  });
 });

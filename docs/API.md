@@ -335,6 +335,130 @@ Run a lightweight test request for a provider/model pair. Supports `chat`, `mess
   ]
   ```
 
+### Debug Mode Management
+
+Manage debug logging mode to capture full request/response lifecycles for troubleshooting.
+
+#### Get Debug Status
+- **Endpoint:** `GET /v0/management/debug`
+- **Description:** Returns the current debug mode status and provider filter settings.
+- **Response Format:**
+  ```json
+  {
+    "enabled": true,
+    "providers": ["openai", "anthropic"]
+  }
+  ```
+- **Response Fields:**
+  - `enabled` (boolean): Whether debug logging is currently active.
+  - `providers` (string[] | null): List of provider IDs to filter logs by. When `null` or empty, all providers are logged.
+
+#### Set Debug Mode
+- **Endpoint:** `POST /v0/management/debug`
+- **Description:** Enables or disables debug logging and optionally sets a provider filter.
+- **Request Body:**
+  ```json
+  {
+    "enabled": true,
+    "providers": ["openai", "anthropic"]
+  }
+  ```
+- **Request Fields:**
+  - `enabled` (required, boolean): Enable or disable debug logging.
+  - `providers` (optional, string[]): Array of provider IDs to filter logs by. Only requests to these providers will be logged. Set to `null` or omit to log all providers.
+- **Response Format:**
+  ```json
+  {
+    "enabled": true,
+    "providers": ["openai", "anthropic"]
+  }
+  ```
+
+#### List Debug Logs
+- **Endpoint:** `GET /v0/management/debug/logs`
+- **Description:** Returns a list of debug log metadata (request ID and timestamp).
+- **Query Parameters:**
+  - `limit` (optional): Number of logs to return (default: 50).
+  - `offset` (optional): Number of logs to skip (default: 0).
+- **Response Format:**
+  ```json
+  [
+    {
+      "requestId": "uuid-string",
+      "createdAt": 1735689599000
+    }
+  ]
+  ```
+
+#### Get Debug Log Detail
+- **Endpoint:** `GET /v0/management/debug/logs/:requestId`
+- **Description:** Returns full debug trace for a specific request.
+- **Path Parameters:**
+  - `requestId`: The request ID to retrieve.
+- **Response Format:**
+  ```json
+  {
+    "requestId": "uuid-string",
+    "rawRequest": { ... },
+    "transformedRequest": { ... },
+    "rawResponse": { ... },
+    "transformedResponse": { ... },
+    "rawResponseSnapshot": { ... },
+    "transformedResponseSnapshot": { ... },
+    "createdAt": 1735689599000
+  }
+  ```
+
+#### Delete Debug Log
+- **Endpoint:** `DELETE /v0/management/debug/logs/:requestId`
+- **Description:** Deletes a specific debug log.
+- **Response Format:**
+  ```json
+  { "success": true }
+  ```
+
+### Logging Level Management
+
+Manage backend log verbosity at runtime without editing `LOG_LEVEL`.
+
+#### Get Logging Level
+- **Endpoint:** `GET /v0/management/logging/level`
+- **Description:** Returns the current runtime logging level, startup default, and supported values.
+- **Response Format:**
+  ```json
+  {
+    "level": "debug",
+    "startupLevel": "info",
+    "supportedLevels": ["error", "warn", "info", "debug", "verbose", "silly"],
+    "ephemeral": true
+  }
+  ```
+
+#### Set Logging Level
+- **Endpoint:** `POST /v0/management/logging/level`
+- **Description:** Updates logging level immediately for the running process.
+- **Request Body:**
+  ```json
+  {
+    "level": "silly"
+  }
+  ```
+- **Notes:**
+  - Changes are runtime-only and are not persisted.
+  - The selected level resets to startup behavior on process restart.
+
+#### Reset Logging Level
+- **Endpoint:** `DELETE /v0/management/logging/level`
+- **Description:** Resets the runtime override back to the startup default (`LOG_LEVEL`, or `DEBUG=true`, or `info`).
+
+#### Delete All Debug Logs
+- **Endpoint:** `DELETE /v0/management/debug/logs`
+- **Description:** Deletes all debug logs.
+- **Response Format:**
+  ```json
+  { "success": true }
+  ```
+
 ---
 
 ## Quota Management (`/v0/quotas`)

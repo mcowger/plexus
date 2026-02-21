@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Pause, Play, Trash2 } from 'lucide-react';
+import { Terminal, Pause, Play, Trash2, RotateCcw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
+import { api } from '../lib/api';
 
 interface LogEntry {
   level: string;
@@ -13,6 +14,12 @@ interface LogEntry {
 export const SystemLogs: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isPaused, setIsPaused] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState('info');
+  const [startupLevel, setStartupLevel] = useState('info');
+  const [supportedLevels, setSupportedLevels] = useState<string[]>(['error', 'warn', 'info', 'debug', 'verbose', 'silly']);
+  const [selectedLevel, setSelectedLevel] = useState('info');
+  const [isUpdatingLevel, setIsUpdatingLevel] = useState(false);
+  const [levelError, setLevelError] = useState<string | null>(null);
   const isPausedRef = useRef(false);
   const { adminKey } = useAuth();
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -29,6 +36,18 @@ export const SystemLogs: React.FC = () => {
       disconnect();
     };
   }, [adminKey]);
+
+  useEffect(() => {
+    const loadLoggingLevel = async () => {
+      const state = await api.getLoggingLevel();
+      setCurrentLevel(state.level);
+      setStartupLevel(state.startupLevel);
+      setSupportedLevels(state.supportedLevels);
+      setSelectedLevel(state.level);
+    };
+
+    loadLoggingLevel();
+  }, []);
 
   const disconnect = () => {
     if (abortControllerRef.current) {
@@ -117,6 +136,40 @@ export const SystemLogs: React.FC = () => {
 
   const clearLogs = () => setLogs([]);
 
+  const applyLoggingLevel = async () => {
+    if (selectedLevel === currentLevel) return;
+
+    setIsUpdatingLevel(true);
+    setLevelError(null);
+    try {
+      const state = await api.setLoggingLevel(selectedLevel);
+      setCurrentLevel(state.level);
+      setStartupLevel(state.startupLevel);
+      setSupportedLevels(state.supportedLevels);
+      setSelectedLevel(state.level);
+    } catch (error) {
+      setLevelError(error instanceof Error ? error.message : 'Failed to update logging level');
+    } finally {
+      setIsUpdatingLevel(false);
+    }
+  };
+
+  const resetLoggingLevel = async () => {
+    setIsUpdatingLevel(true);
+    setLevelError(null);
+    try {
+      const state = await api.resetLoggingLevel();
+      setCurrentLevel(state.level);
+      setStartupLevel(state.startupLevel);
+      setSupportedLevels(state.supportedLevels);
+      setSelectedLevel(state.level);
+    } catch (error) {
+      setLevelError(error instanceof Error ? error.message : 'Failed to reset logging level');
+    } finally {
+      setIsUpdatingLevel(false);
+    }
+  };
+
   const getLevelClass = (level: string) => {
     switch (level) {
       case 'error': return 'error';
@@ -140,6 +193,33 @@ export const SystemLogs: React.FC = () => {
         <div className="flex items-center justify-between px-6 py-5 border-b border-border-glass">
           <h3 className="font-heading text-lg font-semibold text-text m-0">Live Output</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
+            <select
+              value={selectedLevel}
+              onChange={(event) => setSelectedLevel(event.target.value)}
+              className="rounded-md border border-border-glass bg-bg-surface px-3 py-1.5 text-sm text-text"
+              disabled={isUpdatingLevel}
+            >
+              {supportedLevels.map((level) => (
+                <option key={level} value={level}>{level}</option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={applyLoggingLevel}
+              disabled={isUpdatingLevel || selectedLevel === currentLevel}
+            >
+              Apply Level
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={resetLoggingLevel}
+              disabled={isUpdatingLevel || currentLevel === startupLevel}
+              leftIcon={<RotateCcw size={14} />}
+            >
+              Reset
+            </Button>
             <Button 
                 variant="secondary" 
                 size="sm" 
@@ -157,6 +237,10 @@ export const SystemLogs: React.FC = () => {
                 Clear
             </Button>
           </div>
+        </div>
+        <div className="px-6 py-2 text-xs text-text-secondary border-b border-border-glass">
+          Current level: <span className="text-text font-semibold">{currentLevel}</span> | Startup default: <span className="text-text font-semibold">{startupLevel}</span> | Runtime changes reset on restart
+          {levelError && <span className="ml-2 text-danger">({levelError})</span>}
         </div>
         
         <div className="flex-1 bg-[#0f172a] p-3 overflow-y-auto font-mono text-[13px] text-[#e2e8f0] rounded-sm">

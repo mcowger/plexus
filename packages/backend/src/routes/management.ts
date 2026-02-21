@@ -15,6 +15,7 @@ import { registerOAuthRoutes } from './management/oauth';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { registerMetricsRoutes } from './management/metrics';
 import { registerBuildInfoRoutes } from './management/build-info';
+import { registerLoggingRoutes } from './management/logging';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -32,6 +33,7 @@ export async function registerManagementRoutes(fastify: FastifyInstance, usageSt
     await registerMetricsRoutes(fastify, usageStorage);
     await registerTestRoutes(fastify, dispatcher);
     await registerOAuthRoutes(fastify);
+    await registerLoggingRoutes(fastify);
     if (quotaScheduler) {
       await registerQuotaRoutes(fastify, quotaScheduler);
     }

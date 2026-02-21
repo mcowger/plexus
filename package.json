@@ -28,6 +28,7 @@
     "packages/*"
   ],
   "dependencies": {
-    "@mariozechner/pi-ai": "^0.53.0"
+    "@mariozechner/pi-ai": "^0.53.1",
+    "parse-duration": "^2.1.5"
   }
 }

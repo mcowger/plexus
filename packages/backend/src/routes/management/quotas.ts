@@ -95,7 +95,7 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
 
       if (querystring.since) {
         if (querystring.since.endsWith('d')) {
-          const days = parseInt(querystring.since.slice(0, -1), 10);
+          const days = parseFloat(querystring.since.slice(0, -1));
           since = Date.now() - days * 24 * 60 * 60 * 1000;
         } else {
           since = new Date(querystring.since).getTime();

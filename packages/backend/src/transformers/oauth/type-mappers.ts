@@ -169,37 +169,52 @@ function unifiedMessageToToolResult(msg: UnifiedMessage): ToolResultMessage {
   } as ToolResultMessage;
 }
 
+function mapPropertyValue(value: any): any {
+  const description = value?.description ? { description: value.description } : undefined;
+
+  switch (value?.type) {
+    case 'boolean':
+      return Type.Boolean(description);
+    case 'string':
+      return Type.String(description);
+    case 'number':
+      return Type.Number(description);
+    case 'integer':
+      return Type.Integer(description);
+    case 'array': {
+      const itemSchema = value?.items ? mapPropertyValue(value.items) : Type.Any();
+      return Type.Array(itemSchema, description);
+    }
+    case 'object': {
+      if (value?.properties) {
+        const nestedProps = Object.fromEntries(
+          Object.entries(value.properties).map(([k, v]: [string, any]) => [k, mapPropertyValue(v)])
+        );
+        // TypeBox auto-generates required from all properties; use Type.Unsafe to
+        // pass the reconstructed schema verbatim so required/additionalProperties
+        // from the original JSON Schema are preserved exactly.
+        return Type.Unsafe({
+          type: 'object' as const,
+          properties: nestedProps,
+          ...(value.required ? { required: value.required } : {}),
+          ...(value.additionalProperties !== undefined
+            ? { additionalProperties: value.additionalProperties }
+            : {}),
+          ...description
+        });
+      }
+      return Type.Any(description);
+    }
+    default:
+      return Type.Any(description);
+  }
+}
+
 function unifiedToolToPiAi(tool: UnifiedTool): PiAiTool {
   const parameters = Type.Object(
     Object.fromEntries(
       Object.entries(tool.function.parameters.properties || {}).map(
-        ([key, value]: [string, any]) => {
-          const description = value?.description ? { description: value.description } : undefined;
-          let mapped: any = Type.Any(description);
-
-          switch (value?.type) {
-            case 'boolean':
-              mapped = Type.Boolean(description);
-              break;
-            case 'string':
-              mapped = Type.String(description);
-              break;
-            case 'number':
-              mapped = Type.Number(description);
-              break;
-            case 'integer':
-              mapped = Type.Integer(description);
-              break;
-            case 'array':
-              mapped = Type.Array(Type.Any(), description);
-              break;
-            default:
-              mapped = Type.Any(description);
-              break;
-          }
-
-          return [key, mapped];
-        }
+        ([key, value]: [string, any]) => [key, mapPropertyValue(value)]
       )
     ),
     {

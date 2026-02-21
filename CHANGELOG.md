@@ -1,5 +1,75 @@
 # Changelog
 
+## v0.16.5 - 2026-02-20
+
+### Live Logging Adjustments
+
+Added selector to system logs page enabling dynamic changing of logging levels.
+
+## v0.16.4 - 2026-02-20
+
+### v0.16.4 - OAuth schema preservation and bug fixes
+
+## New Features
+
+No major new features in this release.
+
+## Bug Fixes
+
+- **Preserve nested object/array schemas in OAuth tool conversion** ([3fb03c9](https://github.com/mcowger/plexus/commit/3fb03c9)) - Fixed an issue where nested object and array schemas were not properly preserved during OAuth tool conversion, ensuring schema integrity for complex data structures.
+
+## Docker Image
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.16.3 - 2026-02-20
+
+### Add Apertis and Wisdom Gate Provider Support with Debug Logging
+
+## New Features
+
+- **Apertis (stima.tech) Balance Quota Checker**: Added support for monitoring Apertis provider quotas ([344845e](https://github.com/mcowger/plexus/commit/344845e))
+- **Wisdom Gate Quota Checker**: Implemented quota checking functionality for Wisdom Gate provider ([4c4a5f3](https://github.com/mcowger/plexus/commit/4c4a5f3))
+- **Provider-Specific Debug Logging Filter**: Added filtering capability for provider-specific debug logs to improve troubleshooting ([6abad39](https://github.com/mcowger/plexus/commit/6abad39))
+
+## Fixes
+
+- **TypeScript Error Resolution**: Resolved TypeScript compilation errors in tests and frontend components ([533b21e](https://github.com/mcowger/plexus/commit/533b21e))
+
+---
+
+The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
+## v0.16.2 - 2026-02-20
+
+### Add GitHub Copilot quota checker and exponential backoff cooldown system
+
+## What's New in v0.16.2
+
+### New Features
+- **GitHub Copilot Quota Checker**: Added support for monitoring GitHub Copilot quota usage ([a4b1461](https://github.com/mcowger/plexus/commit/a4b1461))
+- **Escalating Cooldown System**: Implemented exponential backoff for cooldown periods to improve rate limiting handling ([ace43ae](https://github.com/mcowger/plexus/commit/ace43ae))
+
+### Fixes
+- **Non-blocking Quota Checks**: Changed initial quota checks to be non-blocking to prevent delays during server startup ([878d4a3](https://github.com/mcowger/plexus/commit/878d4a3))
+
+### Improvements
+- **OAuth Provider Fetching**: Updated OAuth provider fetching logic ([3705e90](https://github.com/mcowger/plexus/commit/3705e90))
+- **UI Enhancements**:
+  - Display `checkerId` in CombinedBalancesCard to distinguish between multiple accounts ([f0e672d](https://github.com/mcowger/plexus/commit/f0e672d))
+  - Group providers by type in CompactQuotasCard for better organization ([6c17477](https://github.com/mcowger/plexus/commit/6c17477))
+  - Improved CompactQuotasCard sidebar display ([adcc97f](https://github.com/mcowger/plexus/commit/adcc97f))
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.16.1 - 2026-02-19
+
+### v0.16.1: Quota and Balance History Display
+
+Show popups of quota usage history and balance history when clicking a quota card
+
 ## v0.16.0 - 2026-02-18
 
 ### v0.16.0: User Quota Management UI and Enforcement System with Anthropic Stream Handling Fix

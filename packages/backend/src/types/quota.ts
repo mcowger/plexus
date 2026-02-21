@@ -2,6 +2,8 @@ export type QuotaWindowType =
   | 'subscription'
   | 'hourly'
   | 'five_hour'
+  | 'toolcalls'
+  | 'search'
   | 'daily'
   | 'weekly'
   | 'monthly'

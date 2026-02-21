@@ -53,37 +53,37 @@ export class SyntheticQuotaChecker extends QuotaChecker {
 
       if (data.subscription) {
         windows.push(this.createWindow(
-          'subscription',
+          'five_hour',
           data.subscription.limit,
           data.subscription.requests,
           data.subscription.remaining,
-          'dollars',
+          'requests',
           data.subscription.renewsAt ? new Date(data.subscription.renewsAt) : undefined,
-          'Monthly subscription quota'
+          '5-hour request quota'
         ));
       }
 
       if (data.search?.hourly) {
         windows.push(this.createWindow(
-          'hourly',
+          'search',
           data.search.hourly.limit,
           data.search.hourly.requests,
           data.search.hourly.remaining,
           'requests',
           data.search.hourly.renewsAt ? new Date(data.search.hourly.renewsAt) : undefined,
-          'Hourly search request quota'
+          'Search requests (hourly)'
         ));
       }
 
       if (data.freeToolCalls) {
         windows.push(this.createWindow(
-          'daily',
+          'toolcalls',
           data.freeToolCalls.limit,
           data.freeToolCalls.requests,
           data.freeToolCalls.remaining,
           'requests',
           data.freeToolCalls.renewsAt ? new Date(data.freeToolCalls.renewsAt) : undefined,
-          'Daily free tool calls/small requests'
+          'Free tool calls (5-hour)'
         ));
       }
 

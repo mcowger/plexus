@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
-import { formatCost } from '../../lib/format';
+import { formatCost, toTitleCase } from '../../lib/format';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
+import { BalanceHistoryModal } from './BalanceHistoryModal';
 
 interface CombinedBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
@@ -19,6 +20,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'moonshot': 'Moonshot',
   'naga': 'Naga',
   'kilo': 'Kilo',
+  'apertis': 'Apertis',
 };
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
@@ -27,6 +29,31 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   refreshing,
   getQuotaResult,
 }) => {
+  const [selectedQuota, setSelectedQuota] = useState<QuotaCheckerInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleRowClick = (quota: QuotaCheckerInfo) => {
+    setSelectedQuota(quota);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedQuota(null);
+  };
+
+  const getDisplayName = (quota: QuotaCheckerInfo): string => {
+    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
+    let normalizedType = checkerType;
+    if (checkerType.includes('openrouter')) normalizedType = 'openrouter';
+    else if (checkerType.includes('minimax')) normalizedType = 'minimax';
+    else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
+    else if (checkerType.includes('naga')) normalizedType = 'naga';
+    else if (checkerType.includes('kilo')) normalizedType = 'kilo';
+    else if (checkerType.includes('apertis')) normalizedType = 'apertis';
+    return CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
+  };
+
   if (balanceQuotas.length === 0) {
     return null;
   }
@@ -48,6 +75,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
     else if (checkerType.includes('naga')) normalizedType = 'naga';
     else if (checkerType.includes('kilo')) normalizedType = 'kilo';
+    else if (checkerType.includes('apertis')) normalizedType = 'apertis';
 
     const displayName = CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
     const windows = result.windows || [];
@@ -57,21 +85,21 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     return (
       <div
         key={quota.checkerId}
-        className="px-4 py-3 flex items-center justify-between hover:bg-bg-hover transition-colors"
+        onClick={() => handleRowClick(quota)}
+        className="px-4 py-3 flex items-center justify-between hover:bg-bg-hover transition-colors cursor-pointer"
       >
         {/* Left: Provider Name & Account */}
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Wallet size={14} className="text-info flex-shrink-0" />
             <span className="text-sm font-semibold text-text">
-              {displayName}
+              {toTitleCase(quota.checkerId)}
             </span>
           </div>
-          {result.oauthAccountId && (
-            <div className="text-xs text-text-muted pl-5 truncate">
-              Account: {result.oauthAccountId}
-            </div>
-          )}
+          <div className="text-xs text-text-muted pl-5 truncate">
+            {displayName}
+            {result.oauthAccountId && ` • Account: ${result.oauthAccountId}`}
+          </div>
         </div>
 
         {/* Center: Balance or Error */}
@@ -98,7 +126,10 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => onRefresh(quota.checkerId)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRefresh(quota.checkerId);
+            }}
             disabled={refreshing.has(quota.checkerId)}
             className="h-7 w-7 p-0"
           >
@@ -113,30 +144,39 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   };
 
   return (
-    <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
-        <Wallet size={18} className="text-info" />
-        <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
-      </div>
-
-      {/* Balance Grid - max 2 columns */}
-      <div className={clsx(
-        "grid gap-0",
-        shouldSplit ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
-      )}>
-        {/* Left Column */}
-        <div className="divide-y divide-border">
-          {leftColumn.map((quota) => renderBalanceRow(quota))}
+    <>
+      <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
+        {/* Header */}
+        <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
+          <Wallet size={18} className="text-info" />
+          <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
         </div>
 
-        {/* Right Column */}
-        {rightColumn.length > 0 && (
-          <div className="divide-y divide-border lg:border-l border-border">
-            {rightColumn.map((quota) => renderBalanceRow(quota))}
+        {/* Balance Grid - max 2 columns */}
+        <div className={clsx(
+          "grid gap-0",
+          shouldSplit ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
+        )}>
+          {/* Left Column */}
+          <div className="divide-y divide-border">
+            {leftColumn.map((quota) => renderBalanceRow(quota))}
           </div>
-        )}
+
+          {/* Right Column */}
+          {rightColumn.length > 0 && (
+            <div className="divide-y divide-border lg:border-l border-border">
+              {rightColumn.map((quota) => renderBalanceRow(quota))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      <BalanceHistoryModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        quota={selectedQuota}
+        displayName={selectedQuota ? getDisplayName(selectedQuota) : ''}
+      />
+    </>
   );
 };

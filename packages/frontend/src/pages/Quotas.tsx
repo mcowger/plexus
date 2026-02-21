@@ -17,12 +17,16 @@ import {
   MiniMaxQuotaDisplay,
   OpenRouterQuotaDisplay,
   KiloQuotaDisplay,
+  CopilotQuotaDisplay,
+  WisdomGateQuotaDisplay,
   CombinedBalancesCard,
+  QuotaHistoryModal,
+  BalanceHistoryModal,
 } from '../components/quota';
 
 // Checker type categories
-const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo'];
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt'];
+const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
+const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate'];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
@@ -38,12 +42,24 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'zai': 'ZAI',
   'synthetic': 'Synthetic',
   'nanogpt': 'NanoGPT',
+  'copilot': 'GitHub Copilot',
+  'wisdomgate': 'Wisdom Gate',
 };
 
 export const Quotas = () => {
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
+  const [selectedQuota, setSelectedQuota] = useState<QuotaCheckerInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDisplayName, setSelectedDisplayName] = useState('');
+  const [isBalanceModal, setIsBalanceModal] = useState(false);
+
+  // Check if a quota is a balance-based checker
+  const isBalanceChecker = (quota: QuotaCheckerInfo): boolean => {
+    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
+    return BALANCE_CHECKERS.some(bc => checkerType.includes(bc));
+  };
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -153,6 +169,8 @@ export const Quotas = () => {
         baseType = 'synthetic';
       } else if (baseType.includes('nanogpt')) {
         baseType = 'nanogpt';
+      } else if (baseType.includes('wisdomgate')) {
+        baseType = 'wisdomgate';
       }
 
       if (!groups[baseType]) {
@@ -177,19 +195,40 @@ export const Quotas = () => {
       .sort(([a], [b]) => a.localeCompare(b));
   }, [groupedQuotas]);
 
+  const handleCardClick = (quota: QuotaCheckerInfo, displayName: string) => {
+    setSelectedQuota(quota);
+    setSelectedDisplayName(displayName);
+    setIsBalanceModal(isBalanceChecker(quota));
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedQuota(null);
+    setSelectedDisplayName('');
+    setIsBalanceModal(false);
+  };
+
   // Render the appropriate quota display component based on checker type
-  const renderQuotaDisplay = (quota: QuotaCheckerInfo) => {
+  const renderQuotaDisplay = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
     const result = getQuotaResult(quota);
     const checkerIdentifier = (quota.checkerType || quota.checkerId).toLowerCase();
     
     // Add refresh button wrapper
     const wrapper = (children: React.ReactNode) => (
-      <div key={quota.checkerId} className="bg-bg-card border border-border rounded-lg p-4 relative">
+      <div 
+        key={quota.checkerId} 
+        onClick={() => handleCardClick(quota, groupDisplayName)}
+        className="bg-bg-card border border-border rounded-lg p-4 relative cursor-pointer hover:border-primary/50 transition-colors"
+      >
         <div className="absolute top-2 right-2">
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => handleRefresh(quota.checkerId)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefresh(quota.checkerId);
+            }}
             disabled={refreshing.has(quota.checkerId)}
           >
             <RefreshCw size={14} className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')} />
@@ -242,6 +281,14 @@ export const Quotas = () => {
       return wrapper(<KiloQuotaDisplay result={result} isCollapsed={false} />);
     }
 
+    if (checkerIdentifier.includes('copilot')) {
+      return wrapper(<CopilotQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('wisdomgate')) {
+      return wrapper(<WisdomGateQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
     // Fallback: generic display
     console.warn(`Unknown quota checker type: ${quota.checkerType || quota.checkerId}`);
     return wrapper(<SyntheticQuotaDisplay result={result} isCollapsed={false} />);
@@ -265,7 +312,7 @@ export const Quotas = () => {
                 {displayName}
               </h3>
               <div className="flex flex-col gap-3">
-                {quotasList.map(quota => renderQuotaDisplay(quota))}
+                {quotasList.map(quota => renderQuotaDisplay(quota, displayName))}
               </div>
             </div>
           );
@@ -330,6 +377,22 @@ export const Quotas = () => {
             </section>
           )}
         </div>
+      )}
+
+      {isBalanceModal ? (
+        <BalanceHistoryModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          quota={selectedQuota}
+          displayName={selectedDisplayName}
+        />
+      ) : (
+        <QuotaHistoryModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          quota={selectedQuota}
+          displayName={selectedDisplayName}
+        />
       )}
     </div>
   );

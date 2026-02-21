@@ -8,7 +8,7 @@ import { QuotaScheduler } from './services/quota/quota-scheduler';
 // --- Zod Schemas ---
 
 const DEFAULT_RETRYABLE_STATUS_CODES = Array.from({ length: 500 }, (_, index) => index + 100).filter(
-  (code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 422
+  (code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 413 && code !== 422
 );
 
 const FailoverPolicySchema = z.object({
@@ -121,6 +121,23 @@ const ClaudeCodeQuotaCheckerOptionsSchema = z.object({
   model: z.string().trim().min(1).optional(),
 });
 
+const CopilotQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+  userAgent: z.string().trim().min(1).optional(),
+  editorVersion: z.string().trim().min(1).optional(),
+  apiVersion: z.string().trim().min(1).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
+const WisdomGateQuotaCheckerOptionsSchema = z.object({
+  session: z.string().trim().min(1, 'Wisdom Gate session cookie is required'),
+});
+
+const ApertisQuotaCheckerOptionsSchema = z.object({
+  session: z.string().trim().min(1, 'Apertis session cookie is required'),
+  endpoint: z.string().url().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -191,6 +208,27 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: ClaudeCodeQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('copilot'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: CopilotQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('wisdomgate'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: WisdomGateQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('apertis'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ApertisQuotaCheckerOptionsSchema,
   }),
 ]);
 
@@ -284,12 +322,18 @@ const McpServerConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
 });
 
+const CooldownPolicySchema = z.object({
+  initialMinutes: z.number().min(1).default(2),
+  maxMinutes: z.number().min(1).default(300),
+});
+
 const RawPlexusConfigSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   models: z.record(z.string(), ModelConfigSchema),
   keys: z.record(z.string(), KeyConfigSchema),
   adminKey: z.string(),
   failover: FailoverPolicySchema.optional(),
+  cooldown: CooldownPolicySchema.optional(),
   performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
   mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
@@ -297,8 +341,10 @@ const RawPlexusConfigSchema = z.object({
 }).passthrough();
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
+export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
+  cooldown?: CooldownPolicy;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
 };
@@ -443,6 +489,7 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
   return {
     ...config,
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
+    cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
     quotas: buildProviderQuotaConfigs(config),
     mcpServers: config.mcp_servers,
   };
@@ -561,6 +608,7 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
   const oauthQuotaCheckers: Record<string, { type: string; intervalMinutes: number }> = {
     'openai-codex': { type: 'openai-codex', intervalMinutes: 5 },
     'claude-code': { type: 'claude-code', intervalMinutes: 5 },
+    'github-copilot': { type: 'copilot', intervalMinutes: 5 },
   };
 
   for (const [providerId, providerConfig] of Object.entries(config.providers)) {
@@ -713,3 +761,22 @@ export function getDatabaseConfig(): DatabaseConfig | null {
     }
     return { connectionString: databaseUrl };
 }
+
+// Valid quota checker types - single source of truth
+export const VALID_QUOTA_CHECKER_TYPES = [
+    'naga',
+    'synthetic',
+    'nanogpt',
+    'zai',
+    'moonshot',
+    'minimax',
+    'openrouter',
+    'kilo',
+    'openai-codex',
+    'claude-code',
+    'copilot',
+    'wisdomgate',
+    'apertis',
+] as const;
+
+export type QuotaCheckerType = typeof VALID_QUOTA_CHECKER_TYPES[number];

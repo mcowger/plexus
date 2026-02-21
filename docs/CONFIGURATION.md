@@ -882,6 +882,86 @@ Manage user quotas via the Management API:
 
 See the [API Documentation](./API.md#user-quota-enforcement-api) for details.
 
+### `cooldown` (Optional)
+
+The cooldown section configures the **escalating cooldown system** that temporarily removes unhealthy providers from the routing pool. When a provider encounters an error, it enters a cooldown period calculated using exponential backoff.
+
+**How It Works:**
+
+When a provider fails (except for non-retryable client errors like 400, 413, 422), the cooldown duration is calculated as:
+
+```
+C(n) = min(C_max, C_0 × 2^n)
+```
+
+Where:
+- `n` = consecutive failures (0-indexed, so first failure is n=0)
+- `C_0` = initial cooldown in minutes
+- `C_max` = maximum cooldown in minutes
+
+**Progression Example (with defaults):**
+
+| Failure # | Duration |
+|-----------|----------|
+| 1st | 2 minutes |
+| 2nd | 4 minutes |
+| 3rd | 8 minutes |
+| 4th | 16 minutes |
+| 5th | 32 minutes |
+| 6th | 64 minutes |
+| 7th | 128 minutes |
+| 8th | 256 minutes |
+| 9th+ | 300 minutes (cap) |
+
+**Key Behaviors:**
+- **Success resets**: Any successful request resets the consecutive failure count to 0
+- **413 handling**: Payload Too Large errors do NOT trigger cooldowns (client-side error)
+- **Per-target tracking**: Each provider+model combination tracks failures independently
+- **Persistence**: Cooldowns are persisted to the database and survive restarts
+
+**Configuration Fields:**
+
+```yaml
+cooldown:
+  initialMinutes: 2      # Initial cooldown duration in minutes (default: 2)
+  maxMinutes: 300      # Maximum cooldown duration in minutes (default: 300 = 5 hours)
+```
+
+- **`initialMinutes`** (optional): Duration for the first failure. Each subsequent failure doubles this value until the max is reached.
+- **`maxMinutes`** (optional): Hard cap on cooldown duration. Prevents cooldowns from becoming effectively permanent.
+
+**Example Configuration:**
+
+```yaml
+# Use defaults (2 min initial, 5 hour max)
+cooldown:
+  initialMinutes: 2
+  maxMinutes: 300
+```
+
+```yaml
+# More aggressive cooldowns (1 min initial, 1 hour max)
+cooldown:
+  initialMinutes: 1
+  maxMinutes: 60
+```
+
+```yaml
+# Conservative cooldowns (5 min initial, 24 hour max)
+cooldown:
+  initialMinutes: 5
+  maxMinutes: 1440
+```
+
+**Management API:**
+
+Once configured, cooldown data is available via the Management API:
+- `GET /v0/management/cooldowns` - List all active cooldowns with remaining time
+- `DELETE /v0/management/cooldowns` - Clear all cooldowns
+- `DELETE /v0/management/cooldowns/:provider?model=:model` - Clear specific provider/model cooldown
+
+See the [API Documentation](./API.md#cooldown-management) for response formats.
+
 ## Token Estimation
 
 Some AI providers (particularly free-tier models on OpenRouter and similar platforms) don't return usage data in their responses. This makes it difficult to track token consumption and calculate costs accurately.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Provider, OAuthSession } from '../lib/api';
+import { api, Provider, OAuthSession, initQuotaCheckerTypes, getQuotaCheckerTypes } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -17,6 +17,8 @@ import { MoonshotQuotaConfig } from '../components/quota/MoonshotQuotaConfig';
 import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
 import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig';
 import { KiloQuotaConfig } from '../components/quota/KiloQuotaConfig';
+import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig';
+import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -28,13 +30,14 @@ const OAUTH_PROVIDERS = [
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' }
 ];
 
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo'] as const;
-const VALID_QUOTA_CHECKER_TYPES = new Set<string>(QUOTA_CHECKER_TYPES);
+// Fallback list for UI display until types are fetched from backend
+const QUOTA_CHECKER_TYPES_FALLBACK = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 'wisdomgate', 'apertis', 'copilot'] as const;
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
   if (oauthProvider === 'openai-codex') return 'openai-codex';
   if (oauthProvider === 'anthropic' || oauthProvider === 'claude-code') return 'claude-code';
+  if (oauthProvider === 'github-copilot') return 'copilot';
   return null;
 };
 
@@ -154,85 +157,13 @@ const ModelIdInput = ({ modelId, onCommit }: ModelIdInputProps) => {
   );
 };
 
-const OAUTH_PROVIDER_MODELS: Record<string, FetchedModel[]> = {
-  anthropic: [
-    { id: 'claude-3-5-haiku-20241022', name: 'Claude Haiku 3.5' },
-    { id: 'claude-3-5-haiku-latest', name: 'Claude Haiku 3.5 (latest)' },
-    { id: 'claude-3-5-sonnet-20240620', name: 'Claude Sonnet 3.5' },
-    { id: 'claude-3-5-sonnet-20241022', name: 'Claude Sonnet 3.5 v2' },
-    { id: 'claude-3-7-sonnet-20250219', name: 'Claude Sonnet 3.7' },
-    { id: 'claude-3-7-sonnet-latest', name: 'Claude Sonnet 3.7 (latest)' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude Haiku 3' },
-    { id: 'claude-3-opus-20240229', name: 'Claude Opus 3' },
-    { id: 'claude-3-sonnet-20240229', name: 'Claude Sonnet 3' },
-    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (latest)' },
-    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-    { id: 'claude-opus-4-0', name: 'Claude Opus 4 (latest)' },
-    { id: 'claude-opus-4-1', name: 'Claude Opus 4.1 (latest)' },
-    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1' },
-    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4' },
-    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5 (latest)' },
-    { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
-    { id: 'claude-opus-4-6', name: 'Claude Opus 4.6 (latest)' },
-    { id: 'claude-sonnet-4-0', name: 'Claude Sonnet 4 (latest)' },
-    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
-    { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (latest)' },
-    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
-    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (latest)' }
-  ],
-  'openai-codex': [
-    { id: 'gpt-5.1', name: 'GPT-5.1' },
-    { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
-    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
-    { id: 'gpt-5.2', name: 'GPT-5.2' },
-    { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' },
-    { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex' },
-    { id: 'gpt-5.3-codex-spark', name: 'GPT-5.3 Codex Spark' }
-  ],
-  'github-copilot': [
-    { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5' },
-    { id: 'claude-opus-4.5', name: 'Claude Opus 4.5' },
-    { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
-    { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
-    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
-    { id: 'gpt-4.1', name: 'GPT-4.1' },
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'gpt-5', name: 'GPT-5' },
-    { id: 'gpt-5-mini', name: 'GPT-5-mini' },
-    { id: 'gpt-5.1', name: 'GPT-5.1' },
-    { id: 'gpt-5.1-codex', name: 'GPT-5.1-Codex' },
-    { id: 'gpt-5.1-codex-max', name: 'GPT-5.1-Codex-max' },
-    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1-Codex-mini' },
-    { id: 'gpt-5.2', name: 'GPT-5.2' },
-    { id: 'gpt-5.2-codex', name: 'GPT-5.2-Codex' },
-    { id: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
-  ],
-  'google-gemini-cli': [
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Cloud Code Assist)' },
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Cloud Code Assist)' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Cloud Code Assist)' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview (Cloud Code Assist)' },
-    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview (Cloud Code Assist)' }
-  ],
-  'google-antigravity': [
-    { id: 'claude-opus-4-5-thinking', name: 'Claude Opus 4.5 Thinking (Antigravity)' },
-    { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (Antigravity)' },
-    { id: 'claude-sonnet-4-5-thinking', name: 'Claude Sonnet 4.5 Thinking (Antigravity)' },
-    { id: 'gemini-3-flash', name: 'Gemini 3 Flash (Antigravity)' },
-    { id: 'gemini-3-pro-high', name: 'Gemini 3 Pro High (Antigravity)' },
-    { id: 'gemini-3-pro-low', name: 'Gemini 3 Pro Low (Antigravity)' },
-    { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B Medium (Antigravity)' }
-  ]
-};
-
 export const Providers = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([...QUOTA_CHECKER_TYPES_FALLBACK]);
 
   const [oauthSessionId, setOauthSessionId] = useState<string | null>(null);
   const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
@@ -243,6 +174,14 @@ export const Providers = () => {
   const [oauthCredentialReady, setOauthCredentialReady] = useState(false);
   const [oauthCredentialChecking, setOauthCredentialChecking] = useState(false);
 
+  // Fetch quota checker types from backend on mount
+  useEffect(() => {
+    initQuotaCheckerTypes().then(() => {
+      const types = Array.from(getQuotaCheckerTypes());
+      setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
+    });
+  }, []);
+
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
     editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
@@ -252,8 +191,8 @@ export const Providers = () => {
   const selectableQuotaCheckerTypes = forcedOAuthQuotaCheckerType
     ? [forcedOAuthQuotaCheckerType]
     : isOAuthMode
-      ? QUOTA_CHECKER_TYPES.filter((type) => type !== 'openai-codex' && type !== 'claude-code')
-      : QUOTA_CHECKER_TYPES.filter((type) => type !== 'openai-codex' && type !== 'claude-code');
+      ? quotaCheckerTypes.filter((type) => type !== 'openai-codex' && type !== 'claude-code')
+      : quotaCheckerTypes.filter((type) => type !== 'openai-codex' && type !== 'claude-code');
   const selectedQuotaCheckerType = forcedOAuthQuotaCheckerType
     ? forcedOAuthQuotaCheckerType
     : (editingProvider.quotaChecker?.type && selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type)
@@ -278,6 +217,12 @@ export const Providers = () => {
       }
       if (!options.hertzSession || !(options.hertzSession as string).trim()) {
         return 'HERTZ-SESSION cookie value is required for MiniMax quota checker';
+      }
+    }
+
+    if (quotaType === 'wisdomgate') {
+      if (!options.session || !(options.session as string).trim()) {
+        return 'Session cookie is required for Wisdom Gate quota checker';
       }
     }
     
@@ -388,25 +333,12 @@ export const Providers = () => {
           alert('OAuth account is required');
           return;
         }
-        if (providerToSave.quotaChecker) {
-          const quotaType = providerToSave.quotaChecker.type?.trim();
-          if (!quotaType) {
-            providerToSave = {
-              ...providerToSave,
-              quotaChecker: undefined
-            };
-          } else {
-            const isValidQuotaType = VALID_QUOTA_CHECKER_TYPES.has(quotaType);
-            providerToSave = {
-              ...providerToSave,
-              quotaChecker: {
-                type: quotaType,
-                intervalMinutes: Math.max(1, providerToSave.quotaChecker.intervalMinutes || 30),
-                enabled: isValidQuotaType ? providerToSave.quotaChecker.enabled !== false : false,
-                options: providerToSave.quotaChecker.options
-              }
-            };
-          }
+        // Quota checker validation is handled by the backend - just pass through as-is
+        if (providerToSave.quotaChecker && !providerToSave.quotaChecker.type?.trim()) {
+          providerToSave = {
+            ...providerToSave,
+            quotaChecker: undefined
+          };
         }
         if (isOAuthMode && providerToSave.oauthProvider) {
           const forcedType = getForcedOAuthQuotaCheckerType(providerToSave.oauthProvider);
@@ -787,19 +719,31 @@ export const Providers = () => {
   const handleFetchModels = async () => {
     if (isOAuthMode) {
       const oauthProvider = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
-      const oauthModels = OAUTH_PROVIDER_MODELS[oauthProvider] || [];
-      const sortedModels = [...oauthModels].sort((a, b) => a.id.localeCompare(b.id));
-
-      if (sortedModels.length === 0) {
-        setFetchError(`No known models found for OAuth provider '${oauthProvider}'.`);
-        setFetchedModels([]);
-        setSelectedModelIds(new Set());
-        return;
-      }
-
-      setFetchedModels(sortedModels);
-      setSelectedModelIds(new Set());
+      
+      setIsFetchingModels(true);
       setFetchError(null);
+      
+      try {
+        const models = await api.getOAuthProviderModels(oauthProvider);
+        const sortedModels = [...models].sort((a, b) => a.id.localeCompare(b.id));
+        
+        if (sortedModels.length === 0) {
+          setFetchError(`No models found for OAuth provider '${oauthProvider}'.`);
+          setFetchedModels([]);
+          setSelectedModelIds(new Set());
+          return;
+        }
+        
+        setFetchedModels(sortedModels);
+        setSelectedModelIds(new Set());
+        setFetchError(null);
+      } catch (error) {
+        console.error('Failed to fetch OAuth models:', error);
+        setFetchError(error instanceof Error ? error.message : 'Failed to fetch models');
+        setFetchedModels([]);
+      } finally {
+        setIsFetchingModels(false);
+      }
       return;
     }
 
@@ -1413,9 +1357,7 @@ export const Providers = () => {
                                       quotaChecker: {
                                         type: selectedQuotaCheckerType,
                                         enabled: selectedQuotaCheckerType
-                                          ? VALID_QUOTA_CHECKER_TYPES.has(selectedQuotaCheckerType)
-                                            ? editingProvider.quotaChecker?.enabled !== false
-                                            : false
+                                          ? editingProvider.quotaChecker?.enabled !== false
                                           : false,
                                         intervalMinutes
                                       }
@@ -1538,6 +1480,36 @@ export const Providers = () => {
                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kilo' && (
                               <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                                 <KiloQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'wisdomgate' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <WisdomGateQuotaConfig
+                                  options={editingProvider.quotaChecker?.options || {}}
+                                  onChange={(options) => setEditingProvider({
+                                    ...editingProvider,
+                                    quotaChecker: {
+                                      ...editingProvider.quotaChecker,
+                                      options
+                                    } as Provider['quotaChecker']
+                                  })}
+                                />
+                              </div>
+                            )}
+
+                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
+                              <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                                <ApertisQuotaConfig
                                   options={editingProvider.quotaChecker?.options || {}}
                                   onChange={(options) => setEditingProvider({
                                     ...editingProvider,
