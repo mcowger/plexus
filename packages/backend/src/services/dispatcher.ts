@@ -8,6 +8,7 @@ import { DebugManager } from "./debug-manager";
 import { UsageStorageService } from "./usage-storage";
 import { CooldownParserRegistry } from "./cooldown-parsers";
 import { getConfig, getProviderTypes } from "../config";
+import { applyModelBehaviors } from "./model-behaviors";
 import { getModels } from "@mariozechner/pi-ai";
 
 export class Dispatcher {
@@ -841,6 +842,17 @@ export class Dispatcher {
 
     if (route.config.extraBody) {
       providerPayload = { ...providerPayload, ...route.config.extraBody };
+    }
+
+    // Apply alias-level advanced behaviors (e.g. strip_adaptive_thinking)
+    if (route.canonicalModel) {
+      const aliasConfig = getConfig().models?.[route.canonicalModel];
+      if (aliasConfig?.advanced) {
+        providerPayload = applyModelBehaviors(providerPayload, aliasConfig.advanced, {
+          incomingApiType: request.incomingApiType ?? '',
+          canonicalModel: route.canonicalModel,
+        });
+      }
     }
 
     return { payload: providerPayload, bypassTransformation };

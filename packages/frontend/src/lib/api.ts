@@ -211,13 +211,25 @@ export interface Model {
     type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
 }
 
+// ─── Alias advanced behaviors ────────────────────────────────
+// Mirror of the backend ModelBehaviorSchema discriminated union.
+// Add new variants here as new behavior types are introduced in config.ts.
+
+export interface StripAdaptiveThinkingBehavior {
+    type: 'strip_adaptive_thinking';
+    enabled: boolean;
+}
+
+export type AliasBehavior = StripAdaptiveThinkingBehavior; // | NextBehavior | ...
+
 export interface Alias {
     id: string;
     aliases?: string[];
     selector?: string;
     priority?: 'selector' | 'api_match';
-  type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
+    type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
     targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
+    advanced?: AliasBehavior[];
 }
 
 export interface InferenceError {
@@ -1412,8 +1424,9 @@ quota_checker: provider.quotaChecker?.type
           selector: alias.selector,
           priority: alias.priority || 'selector',
           additional_aliases: alias.aliases,
-          ...(alias.type && { type: alias.type }),
-          targets: alias.targets.map(t => ({
+      ...(alias.type && { type: alias.type }),
+          ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
+    targets: alias.targets.map(t => ({
               provider: t.provider,
               model: t.model,
               ...(t.enabled === false && { enabled: false })
@@ -1502,6 +1515,7 @@ quota_checker: provider.quotaChecker?.type
                     selector: val.selector,
                     priority: val.priority,
                     type: val.type,
+                    advanced: val.advanced || [],
                     targets
                 });
             });
