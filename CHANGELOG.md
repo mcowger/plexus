@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.16.8 - 2026-02-21
+
+### v0.16.8: Provider cooldown controls and frontend UI reorganization
+
+## New Features
+
+- **Provider cooldown disable option** ([c1a6d04](https://github.com/mcowger/plexus/commit/c1a6d04)): Added `disable_cooldown` configuration option to allow per-provider control over cooldown behavior, with documentation ([84ee4c5](https://github.com/mcowger/plexus/commit/84ee4c5)).
+
+- **Frontend Providers modal redesign** ([0d07f0f](https://github.com/mcowger/plexus/commit/0d07f0f)): Reorganized the Providers modal layout using an accordion pattern for improved UX and information hierarchy.
+
+## Docker Image
+
+The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.7 - 2026-02-21
 
 ### v0.16.7: Advanced model alias behaviors and adaptive thinking controls
