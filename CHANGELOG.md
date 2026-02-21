@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.16.9 - 2026-02-21
+
+### Per-request flat-fee pricing and documentation overhaul
+
+## v0.16.9 Release Notes
+
+### New Features
+
+- **Per-request flat-fee pricing source** ([be46196](https://github.com/mcowger/plexus/commit/be46196)) - Added support for flat-fee pricing models on a per-request basis, enabling more flexible pricing configurations.
+
+### Documentation
+
+- **README and docs overhaul with screenshots** ([299d5be](https://github.com/mcowger/plexus/commit/299d5be)) - Comprehensive documentation improvements including real screenshots for better clarity and user guidance.
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.8 - 2026-02-21
 
 ### v0.16.8: Provider cooldown controls and frontend UI reorganization
