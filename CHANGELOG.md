@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.16.7 - 2026-02-21
+
+### v0.16.7: Advanced model alias behaviors and adaptive thinking controls
+
+## New Features
+
+- **Advanced Model Alias Behaviors**: Introduced `strip_adaptive_thinking` configuration option for enhanced control over model alias behavior ([8a3a03c](https://github.com/mcowger/plexus/commit/8a3a03c))
+
+## Notes
+
+The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.6 - 2026-02-21
 
 ### Fix Naga maximum value boundary condition
