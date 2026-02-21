@@ -1645,19 +1645,25 @@ export const Providers = () => {
                                                               slug: mCfg.pricing?.slug || '',
                                                               ...(mCfg.pricing?.discount !== undefined && { discount: mCfg.pricing.discount })
                                                             };
-                                                          } else if (newSource === 'defined') {
-                                                            newPricing = {
-                                                              source: 'defined',
-                                                              range: mCfg.pricing?.range || []
-                                                            };
-                                                          }
-                                                          
-                                                          updateModelConfig(mId, { pricing: newPricing });
+                                         } else if (newSource === 'defined') {
+                                 newPricing = {
+                                     source: 'defined',
+                         range: mCfg.pricing?.range || []
+                                                       };
+                                      } else if (newSource === 'per_request') {
+                                     newPricing = {
+                                              source: 'per_request',
+                                              amount: mCfg.pricing?.amount || 0,
+                                              };
+                                      }
+                                         
+                                    updateModelConfig(mId, { pricing: newPricing });
                                                         }}
                                                       >
-                                                          <option value="simple">Simple</option>
-                                                          <option value="openrouter">OpenRouter</option>
-                                                          <option value="defined">Ranges (Complex)</option>
+                                        <option value="simple">Simple</option>
+                                <option value="openrouter">OpenRouter</option>
+                                        <option value="defined">Ranges (Complex)</option>
+                                      <option value="per_request">Per Request (Flat Fee)</option>
                                                       </select>
                                                   </div>
                                                    {mCfg.type !== 'embeddings' && mCfg.type !== 'transcriptions' && mCfg.type !== 'speech' && mCfg.type !== 'image' && mCfg.type !== 'responses' && (
@@ -1875,12 +1881,28 @@ export const Providers = () => {
                                                               </div>
                                                           </div>
                                                       ))}
-                                                      {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
-                                                          <div className="text-text-muted italic text-center text-sm p-4">No ranges defined. Pricing will likely default to 0.</div>
-                                                      )}
-                                                  </div>
-                                              )}
-                                          </div>
+                                     {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
+                                            <div className="text-text-muted italic text-center text-sm p-4">No ranges defined. Pricing will likely default to 0.</div>
+                               )}
+                               </div>
+                                    )}
+
+                            {mCfg.pricing?.source === 'per_request' && (
+                              <div className="grid grid-cols-1 gap-4" style={{background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)'}}>
+                                       <Input
+                                            label="Cost Per Request ($)"
+                                            type="number"
+                                                    step="0.000001"
+                                            min="0"
+                                            value={mCfg.pricing.amount || 0}
+                                        onChange={(e) => updateModelConfig(mId, { pricing: { ...mCfg.pricing, amount: parseFloat(e.target.value) || 0 } })}
+                                       />
+                                  <div className="font-body text-[11px] text-text-secondary" style={{fontStyle: 'italic'}}>
+                                      A flat fee charged per API call, regardless of token count. The full amount is recorded as the request cost.
+                            </div>
+                              </div>
+                            )}
+                          </div>
                                       )}
                                   </div>
                               ))}

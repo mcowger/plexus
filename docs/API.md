@@ -309,6 +309,17 @@ Run a lightweight test request for a provider/model pair. Supports `chat`, `mess
 
 **Response Fields:**
 - `attribution` (optional, string or null): Optional label appended to the API key for tracking usage by feature or application variant. Set when using [Dynamic Key Attribution](./CONFIGURATION.md#dynamic-key-attribution) (e.g., `copilot`, `claude`, `mobile:v2.5`). Null if no attribution was provided with the request.
+- `costSource` (string): Indicates which pricing method was used to calculate the cost for this request. Possible values:
+  - `default`: No pricing configured; all cost fields are zero.
+  - `simple`: Per-token pricing defined directly on the model (`input_price_per_million` / `output_price_per_million`).
+  - `openrouter`: Pricing fetched from the OpenRouter API at request time.
+  - `defined`: Explicit per-token pricing defined in the model config via `pricing.input` / `pricing.output`.
+  - `per_request`: Flat fee per API call regardless of token count; the full amount is stored in `costInput`, and `costOutput`/`costCached`/`costCacheWrite` are zero.
+- `costMetadata` (string, JSON): Provider-specific pricing detail encoded as a JSON string. Contents vary by `costSource`:
+  - `simple` / `defined`: `{"inputRate": <per-million>, "outputRate": <per-million>}`
+  - `openrouter`: `{"inputRate": <per-million>, "outputRate": <per-million>}` (rates returned by OpenRouter)
+  - `per_request`: `{"amount": <flat-fee>}`
+  - `default`: `{}`
 
 ### Performance Metrics
 - **Endpoint:** `GET /v0/management/performance`
