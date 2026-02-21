@@ -459,6 +459,51 @@ Manage backend log verbosity at runtime without editing `LOG_LEVEL`.
   { "success": true }
   ```
 
+### Cooldown Management
+
+#### List Active Cooldowns
+- **Endpoint:** `GET /v0/management/cooldowns`
+- **Description:** Returns all providers and models currently on cooldown, with time remaining.
+- **Response Format:**
+  ```json
+  [
+    {
+      "provider": "openai_direct",
+      "model": "gpt-4o",
+      "expiry": 1735689999000,
+      "timeRemainingMs": 120000,
+      "consecutiveFailures": 3
+    }
+  ]
+  ```
+- **Response Fields:**
+  - `provider`: Provider key from config.
+  - `model`: Model slug for that provider.
+  - `expiry`: Epoch milliseconds when the cooldown expires.
+  - `timeRemainingMs`: Milliseconds remaining on the cooldown.
+  - `consecutiveFailures`: Number of consecutive failures that led to this cooldown.
+- **Notes:** Providers configured with `disable_cooldown: true` will never appear in this list, even after errors.
+
+#### Clear All Cooldowns
+- **Endpoint:** `DELETE /v0/management/cooldowns`
+- **Description:** Immediately clears all active cooldowns, making every provider eligible for routing again.
+- **Response Format:**
+  ```json
+  { "success": true }
+  ```
+
+#### Clear Specific Cooldown
+- **Endpoint:** `DELETE /v0/management/cooldowns/:provider`
+- **Description:** Clears all cooldowns for a specific provider, or a specific provider+model pair.
+- **Path Parameters:**
+  - `provider`: The provider key from config.
+- **Query Parameters:**
+  - `model` (optional): Limit the clear to a single provider+model combination.
+- **Response Format:**
+  ```json
+  { "success": true }
+  ```
+
 ---
 
 ## Quota Management (`/v0/quotas`)
