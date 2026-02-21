@@ -76,8 +76,8 @@ To test the full system manually (Frontend + Backend):
     ```bash
     bun dev
     ```
-2.  Open the Dashboard at `http://localhost:3000`.
-3.  Send requests to the API proxy at `http://localhost:3000/v1/...` using `curl` or `testcommands/test_request.ts`.
+2.  Open the Dashboard at `http://localhost:4000`.
+3.  Send requests to the API proxy at `http://localhost:4000/v1/...` using `curl` or `testcommands/test_request.ts`.
 
 ## Configuration Overrides
 The following environment variables are used during **Record Mode**:
