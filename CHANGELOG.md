@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.17.0 - 2026-02-22
+
+### v0.17.0: Extended quota checker integrations and model metadata enrichment
+
+## New Features
+
+### Quota Checker Integrations
+- Added Kimi Code checker support ([71d4cab](https://github.com/mcowger/plexus/commit/71d4cab))
+- Added MiniMax Coding checker support ([b79ce34](https://github.com/mcowger/plexus/commit/b79ce34))
+
+### Model Metadata Enrichment
+- Enhanced `/v1/models` endpoint with external metadata source integration ([483f6b9](https://github.com/mcowger/plexus/commit/483f6b9)), closes #30
+
+## Docker Image
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.10 - 2026-02-22
 
 ### Energy consumption tracking and quota history timestamp normalization
