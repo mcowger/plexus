@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.16.10 - 2026-02-22
+
+### Energy consumption tracking and quota history timestamp normalization
+
+## v0.16.10 Release Notes
+
+### Features
+- **Energy consumption estimation** ([2a7c8d2](https://github.com/mcowger/plexus/commit/2a7c8d2)): Added kWh energy consumption estimation and recording per request, enabling better tracking of resource utilization.
+
+### Fixes
+- **Quota history timestamp handling** ([0b17e8a](https://github.com/mcowger/plexus/commit/0b17e8a)): Fixed conversion of the `since` parameter to dialect-aware timestamps in `getQuotaHistory` endpoint for improved cross-database compatibility.
+
+### Docker Image
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.9 - 2026-02-21
 
 ### Per-request flat-fee pricing and documentation overhaul
