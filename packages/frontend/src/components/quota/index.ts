@@ -12,6 +12,8 @@ export { MoonshotQuotaDisplay } from './MoonshotQuotaDisplay';
 export { MoonshotQuotaConfig } from './MoonshotQuotaConfig';
 export { MiniMaxQuotaDisplay } from './MiniMaxQuotaDisplay';
 export { MiniMaxQuotaConfig } from './MiniMaxQuotaConfig';
+export { MiniMaxCodingQuotaDisplay } from './MiniMaxCodingQuotaDisplay';
+export { MiniMaxCodingQuotaConfig } from './MiniMaxCodingQuotaConfig';
 export { OpenRouterQuotaDisplay } from './OpenRouterQuotaDisplay';
 export { OpenRouterQuotaConfig } from './OpenRouterQuotaConfig';
 export { KiloQuotaDisplay } from './KiloQuotaDisplay';

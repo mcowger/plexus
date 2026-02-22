@@ -11,6 +11,7 @@ import {
   Cpu,
   Shield,
   Github,
+  Code2,
   AlertTriangle,
 } from 'lucide-react';
 
@@ -35,6 +36,7 @@ const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   if (id.includes('synthetic')) return 'synthetic';
   if (id.includes('claude-code') || id.includes('claude')) return 'claude';
   if (id.includes('openai-codex') || id.includes('codex')) return 'codex';
+  if (id.includes('minimax-coding')) return 'minimax-coding';
   if (id.includes('zai')) return 'zai';
   if (id.includes('nanogpt') || id.includes('nano')) return 'nanogpt';
   if (id.includes('naga')) return 'naga';
@@ -51,6 +53,7 @@ const getTypeDisplayName = (category: string): string => {
     'synthetic': 'Synthetic',
     'nanogpt': 'NanoGPT',
     'naga': 'Naga',
+    'minimax-coding': 'MiniMax Coding',
     'copilot': 'Copilot',
   };
   return names[category] || toTitleCase(category);
@@ -66,7 +69,7 @@ const formatCheckerDisplayName = (quota: QuotaCheckerInfo): string => {
   let displayPart = checkerId;
   
   // Remove common type prefixes
-  const prefixes = ['openai-', 'claude-', 'github-', 'copilot-', 'synthetic-', 'zai-', 'nano-', 'naga-'];
+  const prefixes = ['openai-', 'claude-', 'github-', 'copilot-', 'minimax-', 'synthetic-', 'zai-', 'nano-', 'naga-'];
   for (const prefix of prefixes) {
     if (displayPart.toLowerCase().startsWith(prefix)) {
       displayPart = displayPart.slice(prefix.length);
@@ -102,6 +105,8 @@ const getCheckerIcon = (category: string) => {
       return <Cpu className={iconClass} />;
     case 'naga':
       return <Shield className={iconClass} />;
+    case 'minimax-coding':
+      return <Code2 className={iconClass} />;
     case 'copilot':
       return <Github className={iconClass} />;
     default:
@@ -127,6 +132,8 @@ const getTrackedWindowsForChecker = (category: string, windows: any[]): string[]
       return Array.from(availableTypes)
         .filter(t => t !== 'subscription')
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99));
+    case 'minimax-coding':
+      return ['custom'].filter(t => availableTypes.has(t));
     case 'copilot':
       return ['monthly'].filter(t => availableTypes.has(t));
     default:

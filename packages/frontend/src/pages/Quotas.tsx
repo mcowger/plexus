@@ -15,6 +15,7 @@ import {
   ZAIQuotaDisplay,
   MoonshotQuotaDisplay,
   MiniMaxQuotaDisplay,
+  MiniMaxCodingQuotaDisplay,
   OpenRouterQuotaDisplay,
   KiloQuotaDisplay,
   CopilotQuotaDisplay,
@@ -26,12 +27,13 @@ import {
 
 // Checker type categories
 const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate'];
+const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate', 'minimax-coding'];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'openrouter': 'OpenRouter',
   'minimax': 'MiniMax',
+  'minimax-coding': 'MiniMax Coding',
   'moonshot': 'Moonshot',
   'naga': 'Naga',
   'kilo': 'Kilo',
@@ -155,6 +157,8 @@ export const Quotas = () => {
         baseType = 'claude-code';
       } else if (baseType.includes('openrouter')) {
         baseType = 'openrouter';
+      } else if (baseType.includes('minimax-coding')) {
+        baseType = 'minimax-coding';
       } else if (baseType.includes('minimax')) {
         baseType = 'minimax';
       } else if (baseType.includes('moonshot')) {
@@ -267,6 +271,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('moonshot')) {
       return wrapper(<MoonshotQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('minimax-coding')) {
+      return wrapper(<MiniMaxCodingQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     if (checkerIdentifier.includes('minimax')) {

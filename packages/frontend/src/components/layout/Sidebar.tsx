@@ -217,7 +217,7 @@ export const Sidebar: React.FC = () => {
   });
 
   // Filter for rate-limit checkers
-  const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate'];
+  const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate', 'minimax-coding'];
   const rateLimitQuotas = quotas.filter(quota => {
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
     return RATE_LIMIT_CHECKERS.some(rc => checkerType.includes(rc));
