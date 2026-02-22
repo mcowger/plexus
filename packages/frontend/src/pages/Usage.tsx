@@ -3,6 +3,7 @@ import { api, UsageData, PieChartDataPoint } from '../lib/api';
 import { formatNumber, formatTokens } from '../lib/format';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { SlicesToasted } from '../components/SlicesToasted';
 import {
   AreaChart,
   Area,
@@ -287,6 +288,13 @@ export const Usage = () => {
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by API Key (Tokens)">
           {renderTimeControls()}
           <div style={{ height: 300, marginTop: '12px' }}>{renderPieChart('tokens', keyData)}</div>
+        </Card>
+
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Slices toasted">
+          {renderTimeControls()}
+          <div style={{ marginTop: '12px' }}>
+            <SlicesToasted data={data} />
+          </div>
         </Card>
       </div>
     </div>

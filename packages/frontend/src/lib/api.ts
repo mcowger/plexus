@@ -108,6 +108,7 @@ export interface UsageData {
   outputTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
+  kwhUsed: number;
 }
 
 export interface TodayMetrics {
@@ -328,6 +329,7 @@ interface UsageSummarySeriesPoint {
   outputTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
+  kwhUsed: number;
   tokens: number;
 }
 
@@ -468,6 +470,7 @@ const USAGE_PAGE_FIELDS: UsageRecordField[] = [
   'tokensOutput',
   'tokensCached',
   'tokensCacheWrite',
+  'kwhUsed',
   'incomingModelAlias',
   'provider',
   'apiKey',
@@ -540,6 +543,7 @@ const buildUsageSeries = (
         outputTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
       };
     }
   }
@@ -562,6 +566,7 @@ const buildUsageSeries = (
         outputTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
       };
     }
 
@@ -576,6 +581,7 @@ const buildUsageSeries = (
     grouped[key].outputTokens += outputTokens;
     grouped[key].cachedTokens += cachedTokens;
     grouped[key].cacheWriteTokens += cacheWriteTokens;
+    grouped[key].kwhUsed += record.kwhUsed || 0;
   });
 
   return Object.values(grouped);
@@ -614,6 +620,7 @@ const buildSummarySeries = (summary: UsageSummaryResponse, now: Date): UsageData
       outputTokens,
       cachedTokens,
       cacheWriteTokens,
+      kwhUsed: point?.kwhUsed || 0,
     };
   }
 

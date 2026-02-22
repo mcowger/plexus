@@ -33,6 +33,7 @@ const USAGE_FIELDS = new Set([
   'durationMs',
   'ttftMs',
   'tokensPerSec',
+  'kwhUsed',
   'isStreamed',
   'isPassthrough',
   'responseStatus',
@@ -158,6 +159,7 @@ export async function registerUsageRoutes(
           outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
           cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
+          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
         })
         .from(schema.requestUsage)
         .where(
@@ -232,6 +234,7 @@ export async function registerUsageRoutes(
           outputTokens: toNumber(row.outputTokens),
           cachedTokens: toNumber(row.cachedTokens),
           cacheWriteTokens: toNumber(row.cacheWriteTokens),
+          kwhUsed: toNumber(row.kwhUsed),
           tokens:
             toNumber(row.inputTokens) +
             toNumber(row.outputTokens) +
