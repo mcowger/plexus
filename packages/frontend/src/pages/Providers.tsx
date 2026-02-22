@@ -258,7 +258,7 @@ export const Providers = () => {
   const [isApiBaseUrlsOpen, setIsApiBaseUrlsOpen] = useState(true);
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(true);
 
   // Fetch Models Modal state
   const [isFetchModelsModalOpen, setIsFetchModelsModalOpen] = useState(false);
@@ -1397,7 +1397,14 @@ export const Providers = () => {
              onClick={() => setIsAdvancedOpen(o => !o)}
               className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
          >
-        <span className="font-body text-[13px] font-medium text-text-secondary">Advanced</span>
+        <div className="flex items-center gap-2">
+          <span className="font-body text-[13px] font-medium text-text-secondary">Advanced</span>
+          {editingProvider.disableCooldown && (
+            <Badge status="warning" style={{ fontSize: '10px', padding: '2px 8px' }}>
+              Timeout Bypass ON
+            </Badge>
+          )}
+        </div>
                {isAdvancedOpen
                     ? <ChevronDown size={14} className="text-text-muted" />
                  : <ChevronRight size={14} className="text-text-muted" />
