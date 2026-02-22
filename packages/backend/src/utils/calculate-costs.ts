@@ -59,35 +59,47 @@ export function calculateCosts(usageRecord: Partial<UsageRecord>, pricing: any, 
             const promptRate = parseFloat(openRouterPricing.prompt) || 0;
             const completionRate = parseFloat(openRouterPricing.completion) || 0;
             const cacheReadRate = parseFloat(openRouterPricing.input_cache_read || '0') || 0;
-            const cacheWriteRate = parseFloat(openRouterPricing.input_cache_write || '0') || 0;
+          const cacheWriteRate = parseFloat(openRouterPricing.input_cache_write || '0') || 0;
 
             inputCost = inputTokens * promptRate;
             outputCost = outputTokens * completionRate;
             cachedCost = cachedTokens * cacheReadRate;
             cacheWriteCost = cacheWriteTokens * cacheWriteRate;
 
-            const effectiveDiscount = pricing.discount ?? providerDiscount;
+          const effectiveDiscount = pricing.discount ?? providerDiscount;
 
             if (effectiveDiscount) {
                 const multiplier = 1 - effectiveDiscount;
                 inputCost *= multiplier;
                 outputCost *= multiplier;
-                cachedCost *= multiplier;
-                cacheWriteCost *= multiplier;
+      cachedCost *= multiplier;
+             cacheWriteCost *= multiplier;
             }
 
             calculated = true;
             
-            usageRecord.costSource = 'openrouter';
-            usageRecord.costMetadata = JSON.stringify({
+          usageRecord.costSource = 'openrouter';
+          usageRecord.costMetadata = JSON.stringify({
                 slug: pricing.slug,
-                prompt: promptRate,
-                completion: completionRate,
+              prompt: promptRate,
+           completion: completionRate,
                 input_cache_read: cacheReadRate,
-                input_cache_write: cacheWriteRate,
-                discount: effectiveDiscount
-            });
-        }
+         input_cache_write: cacheWriteRate,
+            discount: effectiveDiscount
+      });
+      }
+    } else if (pricing.source === 'per_request') {
+        // Flat fee per request — token counts are irrelevant.
+        // The full cost is attributed to the input bucket so that costTotal
+        // remains the simple sum of all four buckets without any schema change.
+        inputCost = pricing.amount;
+        outputCost = 0;
+        cachedCost = 0;
+        cacheWriteCost = 0;
+        calculated = true;
+
+        usageRecord.costSource = 'per_request';
+     usageRecord.costMetadata = JSON.stringify({ amount: pricing.amount });
     }
 
     if (calculated) {

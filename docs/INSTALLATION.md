@@ -20,12 +20,14 @@ docker pull ghcr.io/mcowger/plexus:latest
 docker run -p 4000:4000 \
   -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
   -v plexus-data:/app/data \
+  -e DATABASE_URL=sqlite:///app/data/plexus.db \
   -e LOG_LEVEL=info \
   ghcr.io/mcowger/plexus:latest
 ```
 
 -   Mount your configuration file to `/app/config/plexus.yaml`.
 -   Mount a volume to `/app/data` to persist usage logs and other data.
+-   `DATABASE_URL` is required — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string.
 -   Set `LOG_LEVEL` to control verbosity.
 
 ## Building the Docker Image
@@ -42,6 +44,7 @@ docker build -t plexus .
 docker run -p 4000:4000 \
   -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
   -v plexus-data:/app/data \
+  -e DATABASE_URL=sqlite:///app/data/plexus.db \
   -e LOG_LEVEL=info \
   plexus
 ```
@@ -85,27 +88,31 @@ The resulting executable will be named `plexus-macos` (or `plexus-linux` / `plex
 
 3. **Start Development Stack**:
    ```bash
-   bun run dev
+   DATABASE_URL=sqlite://./data/plexus.db bun run dev
    ```
 
 ## Environment Variables
 
 When running Plexus, you can use the following environment variables to control its behavior:
 
+- **`DATABASE_URL`** (**Required**): Database connection string.
+    - SQLite: `sqlite:///app/data/plexus.db` or `sqlite://./data/plexus.db`
+    - PostgreSQL: `postgres://user:password@host:5432/dbname`
 - **`CONFIG_FILE`**: Path to the `plexus.yaml` configuration file.
     - Default: `config/plexus.yaml` (relative to project root).
-- **`DATA_DIR`**: Directory where Plexus stores its SQLite database (`usage.sqlite`) for logs and cooldowns.
-    - Default: Falls back to the directory containing your configuration file, or a `data/` directory in the current working directory.
 - **`LOG_LEVEL`**: The verbosity of the server logs.
     - Supported values: `error`, `warn`, `info`, `debug`, `silly`.
     - Default: `info`.
     - Note: `silly` logs all request/response/transformations.
     - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
+- **`AUTH_JSON`** (Optional): Path to the OAuth credentials file used by OAuth-backed providers (Anthropic, GitHub Copilot, OpenAI Codex, etc.).
+    - Default: `./auth.json` (relative to server working directory).
+    - Only required if you have providers configured with `api_base_url: oauth://`.
 
 ### Example Usage
 
 ```bash
-CONFIG_FILE=./my-config.yaml DATA_DIR=./data LOG_LEVEL=debug ./plexus
+DATABASE_URL=sqlite://./data/plexus.db CONFIG_FILE=./my-config.yaml LOG_LEVEL=debug ./plexus
 ```
 
 ---

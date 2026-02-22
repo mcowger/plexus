@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.16.9 - 2026-02-21
+
+### Per-request flat-fee pricing and documentation overhaul
+
+## v0.16.9 Release Notes
+
+### New Features
+
+- **Per-request flat-fee pricing source** ([be46196](https://github.com/mcowger/plexus/commit/be46196)) - Added support for flat-fee pricing models on a per-request basis, enabling more flexible pricing configurations.
+
+### Documentation
+
+- **README and docs overhaul with screenshots** ([299d5be](https://github.com/mcowger/plexus/commit/299d5be)) - Comprehensive documentation improvements including real screenshots for better clarity and user guidance.
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.16.8 - 2026-02-21
+
+### v0.16.8: Provider cooldown controls and frontend UI reorganization
+
+## New Features
+
+- **Provider cooldown disable option** ([c1a6d04](https://github.com/mcowger/plexus/commit/c1a6d04)): Added `disable_cooldown` configuration option to allow per-provider control over cooldown behavior, with documentation ([84ee4c5](https://github.com/mcowger/plexus/commit/84ee4c5)).
+
+- **Frontend Providers modal redesign** ([0d07f0f](https://github.com/mcowger/plexus/commit/0d07f0f)): Reorganized the Providers modal layout using an accordion pattern for improved UX and information hierarchy.
+
+## Docker Image
+
+The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.16.7 - 2026-02-21
+
+### v0.16.7: Advanced model alias behaviors and adaptive thinking controls
+
+## New Features
+
+- **Advanced Model Alias Behaviors**: Introduced `strip_adaptive_thinking` configuration option for enhanced control over model alias behavior ([8a3a03c](https://github.com/mcowger/plexus/commit/8a3a03c))
+
+## Notes
+
+The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.16.6 - 2026-02-21
+
+### Fix Naga maximum value boundary condition
+
+## Bug Fixes
+
+- **Naga max value**: Resolved an issue with the undesired Naga maximum value ([8027146](https://github.com/mcowger/plexus/commit/8027146))
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.16.5 - 2026-02-20
 
 ### Live Logging Adjustments

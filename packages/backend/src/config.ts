@@ -53,6 +53,10 @@ const PricingSchema = z.discriminatedUnion('source', [
     cached: z.number().min(0).optional(),
     cache_write: z.number().min(0).optional(),
   }),
+  z.object({
+    source: z.literal('per_request'),
+    amount: z.number().min(0),
+  }),
 ]);
 
 const ModelProviderConfigSchema = z.object({
@@ -75,7 +79,7 @@ const OAuthProviderSchema = z.enum([
 
 const NagaQuotaCheckerOptionsSchema = z.object({
   apiKey: z.string().min(1, "Naga provisioning key is required"),
-  max: z.number().positive("Max balance must be a positive number"),
+  max: z.number().positive("Max balance must be a positive number").optional(),
   endpoint: z.string().url().optional(),
 });
 
@@ -244,6 +248,7 @@ const ProviderConfigSchema = z.object({
   oauth_provider: OAuthProviderSchema.optional(),
   oauth_account: z.string().min(1).optional(),
   enabled: z.boolean().default(true).optional(),
+  disable_cooldown: z.boolean().optional().default(false),
   discount: z.number().min(0).max(1).optional(),
   models: z.union([
     z.array(z.string()),
@@ -293,13 +298,32 @@ const QuotaDefinitionSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+// ─── Model Behaviors ───────────────────────────────────────────────
+// Each behavior has a `type` discriminant so new behaviors can be added without
+// touching existing ones.  Add new z.object({ type: z.literal('...'), ... })
+// entries to the discriminatedUnion array.
+
+const StripAdaptiveThinkingBehaviorSchema = z.object({
+  type: z.literal('strip_adaptive_thinking'),
+  enabled: z.boolean().default(true),
+});
+
+// Union of all known behavior schemas – extend here for future behaviors
+const ModelBehaviorSchema = z.discriminatedUnion('type', [
+  StripAdaptiveThinkingBehaviorSchema,
+]);
+
 const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  advanced: z.array(ModelBehaviorSchema).optional(),
 });
+
+export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
+export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinkingBehaviorSchema>;
 
 const KeyConfigSchema = z.object({
   secret: z.string(),
