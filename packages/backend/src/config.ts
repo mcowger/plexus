@@ -124,6 +124,10 @@ const OpenAICodexQuotaCheckerOptionsSchema = z.object({
   timeoutMs: z.number().int().positive().optional(),
 });
 
+const KimiCodeQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const ClaudeCodeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
   model: z.string().trim().min(1).optional(),
@@ -209,6 +213,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: OpenAICodexQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('kimi-code'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: KimiCodeQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('claude-code'),
@@ -824,6 +835,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
     'kilo',
     'openai-codex',
     'claude-code',
+    'kimi-code',
     'copilot',
     'wisdomgate',
     'apertis',

@@ -10,6 +10,7 @@ import { MiniMaxQuotaChecker } from './checkers/minimax-checker';
 import { MiniMaxCodingQuotaChecker } from './checkers/minimax-coding-checker';
 import { OpenRouterQuotaChecker } from './checkers/openrouter-checker';
 import { KiloQuotaChecker } from './checkers/kilo-checker';
+import { KimiCodeQuotaChecker } from './checkers/kimi-code-checker';
 import { CopilotQuotaChecker } from './checkers/copilot-checker';
 import { WisdomGateQuotaChecker } from './checkers/wisdomgate-checker';
 import { ApertisQuotaChecker } from './checkers/apertis-checker';
@@ -26,6 +27,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   'minimax-coding': MiniMaxCodingQuotaChecker,
   openrouter: OpenRouterQuotaChecker,
   kilo: KiloQuotaChecker,
+  'kimi-code': KimiCodeQuotaChecker,
   copilot: CopilotQuotaChecker,
   wisdomgate: WisdomGateQuotaChecker,
   apertis: ApertisQuotaChecker,

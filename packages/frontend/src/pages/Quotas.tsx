@@ -20,6 +20,7 @@ import {
   KiloQuotaDisplay,
   CopilotQuotaDisplay,
   WisdomGateQuotaDisplay,
+  KimiCodeQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
@@ -27,7 +28,7 @@ import {
 
 // Checker type categories
 const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate', 'minimax-coding'];
+const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'kimi-code', 'kimi', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate', 'minimax-coding'];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
@@ -44,6 +45,8 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   'zai': 'ZAI',
   'synthetic': 'Synthetic',
   'nanogpt': 'NanoGPT',
+  'kimi-code': 'Kimi Code',
+  'kimi': 'Kimi',
   'copilot': 'GitHub Copilot',
   'wisdomgate': 'Wisdom Gate',
 };
@@ -173,6 +176,8 @@ export const Quotas = () => {
         baseType = 'synthetic';
       } else if (baseType.includes('nanogpt')) {
         baseType = 'nanogpt';
+      } else if (baseType.includes('kimi-code') || baseType.includes('kimi')) {
+        baseType = 'kimi-code';
       } else if (baseType.includes('wisdomgate')) {
         baseType = 'wisdomgate';
       }
@@ -291,6 +296,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('copilot')) {
       return wrapper(<CopilotQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('kimi')) {
+      return wrapper(<KimiCodeQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     if (checkerIdentifier.includes('wisdomgate')) {
