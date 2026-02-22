@@ -2,44 +2,31 @@ import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig, QuotaWindowType
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 
-interface KimiUsageWindow {
-  name?: string;
-  title?: string;
-  scope?: string;
-  limit?: number;
-  used?: number;
-  remaining?: number;
-  reset_at?: string;
-  resetAt?: string;
-  reset_time?: string;
-  resetTime?: string;
-}
-
-interface KimiLimitWindow {
-  duration?: number;
-  timeUnit?: string;
+// Matches the actual Kimi Coding API response shape.
+// Note: numeric fields are returned as strings by the API.
+interface KimiUsage {
+  limit: string;
+  used: string;
+  remaining: string;
+  resetTime: string;
 }
 
 interface KimiLimitDetail {
-  limit?: number;
-  used?: number;
-  remaining?: number;
-  reset_at?: string;
-  resetAt?: string;
-  reset_time?: string;
-  resetTime?: string;
+  limit: string;
+  remaining: string;
+  resetTime: string;
 }
 
 interface KimiLimit {
-  name?: string;
-  title?: string;
-  scope?: string;
-  window?: KimiLimitWindow;
-  detail?: KimiLimitDetail;
+  window: {
+    duration: number;
+    timeUnit: string;
+  };
+  detail: KimiLimitDetail;
 }
 
 interface KimiUsageResponse {
-  usage?: KimiUsageWindow;
+  usage?: KimiUsage;
   limits?: KimiLimit[];
 }
 
@@ -62,7 +49,6 @@ export class KimiCodeQuotaChecker extends QuotaChecker {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Accept': 'application/json',
-          'Content-Type': 'application/json',
         },
       });
 
@@ -73,47 +59,33 @@ export class KimiCodeQuotaChecker extends QuotaChecker {
       const data: KimiUsageResponse = await response.json();
       const windows: QuotaWindow[] = [];
 
-      // Top-level usage window (typically the weekly limit)
       if (data.usage) {
-        const u = data.usage;
-        const label = u.name || u.title || u.scope || 'Usage limit';
-        const resetStr = u.reset_at || u.resetAt || u.reset_time || u.resetTime;
-        const resetsAt = resetStr ? new Date(resetStr) : undefined;
-        const windowType = this.inferWindowTypeFromLabel(label);
-
         windows.push(this.createWindow(
-          windowType,
-          u.limit,
-          u.used,
-          u.remaining,
-          'tokens',
-          resetsAt,
-          label,
+          'custom',
+          Number(data.usage.limit),
+          Number(data.usage.used),
+          Number(data.usage.remaining),
+          'requests',
+          new Date(data.usage.resetTime),
+          'Usage limit',
         ));
       }
 
-      // Per-interval rate limits from limits array
       if (data.limits) {
-        for (const limit of data.limits) {
-          const label = limit.name || limit.title || limit.scope || 'Rate limit';
-          const windowType = limit.window
-            ? this.inferWindowTypeFromDuration(limit.window)
-            : this.inferWindowTypeFromLabel(label);
+        for (const entry of data.limits) {
+          if (!entry.detail) continue;
 
-          if (!limit.detail) continue;
-
-          const d = limit.detail;
-          const resetStr = d.reset_at || d.resetAt || d.reset_time || d.resetTime;
-          const resetsAt = resetStr ? new Date(resetStr) : undefined;
+          const limit = Number(entry.detail.limit);
+          const remaining = Number(entry.detail.remaining);
 
           windows.push(this.createWindow(
-            windowType,
-            d.limit,
-            d.used,
-            d.remaining,
-            'tokens',
-            resetsAt,
-            label,
+            this.windowTypeFromDuration(entry.window),
+            limit,
+            limit - remaining,
+            remaining,
+            'requests',
+            new Date(entry.detail.resetTime),
+            'Rate limit',
           ));
         }
       }
@@ -125,24 +97,12 @@ export class KimiCodeQuotaChecker extends QuotaChecker {
     }
   }
 
-  private inferWindowTypeFromLabel(label: string): QuotaWindowType {
-    const lower = label.toLowerCase();
-    if (lower.includes('5h') || lower.includes('five hour') || lower.includes('5-hour')) return 'five_hour';
-    if (lower.includes('hour')) return 'hourly';
-    if (lower.includes('daily') || lower.includes('day')) return 'daily';
-    if (lower.includes('weekly') || lower.includes('week')) return 'weekly';
-    if (lower.includes('monthly') || lower.includes('month')) return 'monthly';
-    return 'custom';
-  }
-
-  private inferWindowTypeFromDuration(window: KimiLimitWindow): QuotaWindowType {
-    if (!window.duration || !window.timeUnit) return 'custom';
-
-    const unit = window.timeUnit.toUpperCase();
+  private windowTypeFromDuration(window: { duration: number; timeUnit: string }): QuotaWindowType {
     let totalMinutes = window.duration;
 
-    if (unit === 'HOUR') totalMinutes = window.duration * 60;
-    else if (unit === 'DAY') totalMinutes = window.duration * 60 * 24;
+    // API uses TIME_UNIT_MINUTE, TIME_UNIT_HOUR, etc.
+    if (window.timeUnit === 'TIME_UNIT_HOUR') totalMinutes *= 60;
+    else if (window.timeUnit === 'TIME_UNIT_DAY') totalMinutes *= 60 * 24;
 
     if (totalMinutes === 300) return 'five_hour';
     if (totalMinutes <= 60) return 'hourly';

@@ -140,7 +140,7 @@ const getTrackedWindowsForChecker = (category: string, windows: any[]): string[]
     case 'minimax-coding':
       return ['custom'].filter(t => availableTypes.has(t));
     case 'kimi':
-      return ['five_hour', 'weekly'].filter(t => availableTypes.has(t));
+      return ['custom', 'five_hour'].filter(t => availableTypes.has(t));
     case 'copilot':
       return ['monthly'].filter(t => availableTypes.has(t));
     default:

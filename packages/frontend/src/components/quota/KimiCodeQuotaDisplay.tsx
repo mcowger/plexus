@@ -28,10 +28,6 @@ export const KimiCodeQuotaDisplay: React.FC<KimiCodeQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const fiveHourWindow = windows.find(w => w.windowType === 'five_hour');
-  const weeklyWindow = windows.find(w => w.windowType === 'weekly');
-  const primaryWindow = fiveHourWindow || windows[0];
-  const secondaryWindow = weeklyWindow && weeklyWindow !== primaryWindow ? weeklyWindow : undefined;
 
   const statusRank: Record<string, number> = {
     ok: 0,
@@ -76,59 +72,34 @@ export const KimiCodeQuotaDisplay: React.FC<KimiCodeQuotaDisplayProps> = ({
         <span className="text-xs font-semibold text-text whitespace-nowrap">Kimi</span>
       </div>
 
-      {primaryWindow && (
-        <div className="space-y-1">
+      {windows.map((window) => (
+        <div key={window.windowLabel || window.windowType} className="space-y-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-semibold text-text-secondary">
-              {primaryWindow.windowType === 'five_hour' ? '5h' : primaryWindow.description || 'Usage'}:
+            <span className="text-xs font-semibold text-text-secondary truncate">
+              {window.description || window.windowLabel}
             </span>
-            <span className="text-[10px] text-text-muted">
-              {primaryWindow.resetInSeconds !== undefined && primaryWindow.resetInSeconds !== null
-                ? formatDuration(primaryWindow.resetInSeconds)
-                : '?'}
-            </span>
+            {window.resetInSeconds !== undefined && window.resetInSeconds !== null && (
+              <span className="text-[10px] text-text-muted ml-auto">
+                {formatDuration(window.resetInSeconds)}
+              </span>
+            )}
           </div>
           <div className="relative h-2">
-            <div className="h-2 rounded-md bg-bg-hover overflow-hidden mr-7">
+            <div className="h-2 rounded-md bg-bg-hover overflow-hidden mr-10">
               <div
                 className={clsx(
                   'h-full rounded-md transition-all duration-500 ease-out',
-                  barColorForStatus(primaryWindow.status)
+                  barColorForStatus(window.status)
                 )}
-                style={{ width: `${Math.min(100, Math.max(0, primaryWindow.utilizationPercent))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, window.utilizationPercent))}%` }}
               />
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-cyan-400">
-              {Math.round(primaryWindow.utilizationPercent)}%
+              {Math.round(window.utilizationPercent)}%
             </div>
           </div>
         </div>
-      )}
-
-      {secondaryWindow && (
-        <div className="flex items-center gap-3 text-[10px] text-text-secondary">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-text-secondary">
-              {secondaryWindow.windowType === 'weekly' ? '1w' : secondaryWindow.description || 'Limit'}:
-            </span>
-            <span className="text-text-muted">
-              {secondaryWindow.resetInSeconds !== undefined && secondaryWindow.resetInSeconds !== null
-                ? formatDuration(secondaryWindow.resetInSeconds)
-                : '?'}
-            </span>
-            <div className="relative flex-1 h-1.5 rounded-full bg-bg-hover overflow-hidden">
-              <div
-                className={clsx(
-                  'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
-                  barColorForStatus(secondaryWindow.status, 'bg-cyan-400')
-                )}
-                style={{ width: `${Math.min(100, Math.max(0, secondaryWindow.utilizationPercent))}%` }}
-              />
-            </div>
-          </div>
-          <span className="text-text">{Math.round(secondaryWindow.utilizationPercent)}%</span>
-        </div>
-      )}
+      ))}
     </div>
   );
 };

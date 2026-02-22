@@ -1385,28 +1385,28 @@ export const Providers = () => {
                       )}
 
                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kimi-code' && (
-                   <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <KimiCodeQuotaConfig
-                   options={editingProvider.quotaChecker?.options || {}}
+                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                   <KimiCodeQuotaConfig
+                     options={editingProvider.quotaChecker?.options || {}}
                      onChange={(options) => setEditingProvider({
-                         ...editingProvider,
-                        quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
-                       })}
-                          />
-                        </div>
-                      )}
+                       ...editingProvider,
+                       quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
+                     })}
+                   />
+                 </div>
+               )}
 
-                            {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
-                           <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                          <ApertisQuotaConfig
-                                options={editingProvider.quotaChecker?.options || {}}
-                         onChange={(options) => setEditingProvider({
-                                ...editingProvider,
-                                     quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
-                               })}
-                      />
-                      </div>
-                )}
+                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
+                            <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                           <ApertisQuotaConfig
+                                 options={editingProvider.quotaChecker?.options || {}}
+                          onChange={(options) => setEditingProvider({
+                                 ...editingProvider,
+                                      quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
+                                })}
+                        />
+                        </div>
+                  )}
 
                     {quotaValidationError && (
                   <div className="mt-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
