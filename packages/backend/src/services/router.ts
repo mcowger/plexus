@@ -3,6 +3,11 @@ import { getConfig, ModelTarget, ProviderConfig, getProviderTypes } from '../con
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
+import { classify } from '../classifier';
+import { mergeConfig as mergeClassifierConfig } from '../classifier/config';
+import { Tier, TIER_RANK } from '../classifier/types';
+import type { ClassifierInput } from '../classifier/types';
+import type { UnifiedChatRequest } from '../types/unified';
 
 export interface RouteResult {
   provider: string; // provider key in config
@@ -13,11 +18,117 @@ export interface RouteResult {
   canonicalModel?: string; // The canonical alias key in config
 }
 
+/** Returns true if the requested model name is the reserved "auto" classifier model */
+function isAutoModel(modelName: string): boolean {
+  return modelName === 'auto';
+}
+
+/**
+ * The tier rank order for agentic boost promotion.
+ */
+const TIER_ORDER: Tier[] = [Tier.HEARTBEAT, Tier.SIMPLE, Tier.MEDIUM, Tier.COMPLEX, Tier.REASONING];
+
 export class Router {
+  /**
+   * Resolve the auto model: classify the request, apply agentic boost,
+   * and return the tier-mapped model alias.
+   */
+  private static async resolveAutoModel(
+    requestContext: Pick<
+      UnifiedChatRequest,
+      'messages' | 'tools' | 'tool_choice' | 'response_format' | 'max_tokens'
+    >,
+    requestId?: string
+  ): Promise<string> {
+    const config = getConfig();
+    const autoConfig = config.auto;
+
+    if (!autoConfig || autoConfig.enabled === false) {
+      throw new Error(
+        'auto model not configured. Add an "auto:" block to your plexus.yaml configuration.'
+      );
+    }
+
+    // Build ClassifierInput from request context
+    const classifierInput: ClassifierInput = {
+      messages: (requestContext.messages ?? []) as ClassifierInput['messages'],
+      tools: requestContext.tools as ClassifierInput['tools'],
+      tool_choice: requestContext.tool_choice as ClassifierInput['tool_choice'],
+      response_format: requestContext.response_format as ClassifierInput['response_format'],
+      max_tokens: requestContext.max_tokens,
+    };
+
+    // Build classifier config from YAML overrides
+    const classifierOverrides = autoConfig.classifier ?? {};
+    const resolvedClassifierConfig = mergeClassifierConfig(classifierOverrides as any);
+
+    // Run the classifier
+    const result = classify(classifierInput, resolvedClassifierConfig);
+
+    logger.debug(
+      `[auto-router] Classification: tier=${result.tier} score=${result.score.toFixed(3)} confidence=${result.confidence.toFixed(3)} signals=${result.signals.join(',')}`,
+      {
+        requestId,
+        tier: result.tier,
+        score: result.score,
+        confidence: result.confidence,
+        agenticScore: result.agenticScore,
+        method: result.method,
+      }
+    );
+
+    // Apply agentic boost: if agenticScore > threshold, promote one tier
+    let boostedTier = result.tier;
+    const agenticThreshold = autoConfig.agentic_boost_threshold ?? 0.8;
+    if (result.agenticScore > agenticThreshold) {
+      const currentRank = TIER_RANK[result.tier];
+      const maxRank = TIER_RANK[Tier.REASONING];
+      const nextRank = Math.min(currentRank + 1, maxRank);
+      const nextTier = TIER_ORDER[nextRank] ?? Tier.REASONING;
+      if (nextTier !== result.tier) {
+        logger.debug(
+          `[auto-router] Agentic boost: ${result.tier} → ${nextTier} (agenticScore=${result.agenticScore.toFixed(2)} > threshold=${agenticThreshold})`
+        );
+        boostedTier = nextTier;
+      }
+    }
+
+    // Map tier to model alias
+    const tierModels = autoConfig.tier_models;
+    const tierAliasMap: Record<string, string> = {
+      HEARTBEAT: tierModels.heartbeat,
+      SIMPLE: tierModels.simple,
+      MEDIUM: tierModels.medium,
+      COMPLEX: tierModels.complex,
+      REASONING: tierModels.reasoning,
+    };
+
+    const resolvedAlias = tierAliasMap[boostedTier];
+    if (!resolvedAlias) {
+      throw new Error(`[auto-router] No tier_models mapping for tier: ${boostedTier}`);
+    }
+
+    logger.info(`[auto-router] Resolved 'auto' → tier=${boostedTier} → alias='${resolvedAlias}'`, {
+      requestId,
+    });
+
+    return resolvedAlias;
+  }
   static async resolveCandidates(
     modelName: string,
-    incomingApiType?: string
+    incomingApiType?: string,
+    requestContext?: Pick<
+      UnifiedChatRequest,
+      'messages' | 'tools' | 'tool_choice' | 'response_format' | 'max_tokens'
+    >,
+    requestId?: string
   ): Promise<RouteResult[]> {
+    // Intercept "auto" model — classify and re-resolve against tier-mapped alias
+    if (isAutoModel(modelName) && requestContext) {
+      const tierAlias = await Router.resolveAutoModel(requestContext, requestId);
+      return Router.resolveCandidates(tierAlias, incomingApiType);
+    }
+
     const config = getConfig();
 
     // Resolve canonical alias and additional aliases
@@ -217,7 +328,21 @@ export class Router {
       .filter((result): result is RouteResult => result !== null);
   }
 
-  static async resolve(modelName: string, incomingApiType?: string): Promise<RouteResult> {
+  static async resolve(
+    modelName: string,
+    incomingApiType?: string,
+    requestContext?: Pick<
+      UnifiedChatRequest,
+      'messages' | 'tools' | 'tool_choice' | 'response_format' | 'max_tokens'
+    >,
+    requestId?: string
+  ): Promise<RouteResult> {
+    // Intercept "auto" model — classify and re-resolve against tier-mapped alias
+    if (isAutoModel(modelName) && requestContext) {
+      const tierAlias = await Router.resolveAutoModel(requestContext, requestId);
+      return Router.resolve(tierAlias, incomingApiType);
+    }
+
     const config = getConfig();
 
     // 0. Check for direct provider/model syntax (e.g., "direct/stima/gemini-2.5-flash")
