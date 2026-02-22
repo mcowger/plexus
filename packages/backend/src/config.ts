@@ -104,6 +104,10 @@ const MiniMaxQuotaCheckerOptionsSchema = z.object({
   hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),
 });
 
+const MiniMaxCodingQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const OpenRouterQuotaCheckerOptionsSchema = z.object({
   apiKey: z.string().min(1, "OpenRouter management key is required"),
   endpoint: z.string().url().optional(),
@@ -233,6 +237,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: ApertisQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('minimax-coding'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: MiniMaxCodingQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 
@@ -794,6 +805,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
     'zai',
     'moonshot',
     'minimax',
+    'minimax-coding',
     'openrouter',
     'kilo',
     'openai-codex',

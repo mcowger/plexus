@@ -365,8 +365,8 @@ const QUOTA_TYPES_CACHE_TTL_MS = 60000; // 1 minute cache
 
 // Fallback types - will be used until fetched from server
 const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
-    'synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 
-    'zai', 'moonshot', 'minimax', 'openrouter', 'kilo', 
+    'synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code',
+    'zai', 'moonshot', 'minimax', 'minimax-coding', 'openrouter', 'kilo',
     'wisdomgate', 'apertis', 'copilot'
 ]);
 
@@ -734,7 +734,7 @@ export interface UserQuota {
 
 export interface QuotaConfig {
   id: string;
-  type: 'synthetic' | 'naga' | 'nanogpt' | 'codex' | 'claude-code' | 'zai' | 'moonshot' | 'minimax' | 'openrouter' | 'kilo';
+  type: 'synthetic' | 'naga' | 'nanogpt' | 'codex' | 'claude-code' | 'zai' | 'moonshot' | 'minimax' | 'minimax-coding' | 'openrouter' | 'kilo';
     provider: string;
     enabled: boolean;
     intervalMinutes: number;
