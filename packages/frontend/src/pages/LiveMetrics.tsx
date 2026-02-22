@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
 import {
   api,
   type Cooldown,
@@ -9,8 +8,7 @@ import {
   type ProviderPerformanceData,
   STAT_LABELS,
   type Stat,
-  type TodayMetrics,
-  type UsageData
+  type TodayMetrics
 } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTimeAgo, formatTokens, formatTPS } from '../lib/format';
 import { Activity, AlertTriangle, Database, Server, Signal, Zap, Clock } from 'lucide-react';
@@ -68,11 +66,10 @@ const getStatusTone = (status: string) => {
 
 export const LiveMetrics = () => {
   const [stats, setStats] = useState<Stat[]>([]);
-  const [usageData, setUsageData] = useState<UsageData[]>([]);
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [timeAgo, setTimeAgo] = useState<string>('Just now');
-  const [activityRange, setActivityRange] = useState<TimeRange>('day');
+  const [activityRange] = useState<TimeRange>('day');
   const [streamConnected, setStreamConnected] = useState<boolean>(false);
   const [liveSnapshot, setLiveSnapshot] = useState<LiveDashboardSnapshot>(EMPTY_LIVE_SNAPSHOT);
   const [providerPerformance, setProviderPerformance] = useState<ProviderPerformanceData[]>([]);
@@ -82,6 +79,7 @@ export const LiveMetrics = () => {
     outputTokens: 0,
     reasoningTokens: 0,
     cachedTokens: 0,
+    cacheWriteTokens: 0,
     totalCost: 0
   });
 
@@ -93,7 +91,6 @@ export const LiveMetrics = () => {
       stat.label !== STAT_LABELS.PROVIDERS &&
       stat.label !== STAT_LABELS.DURATION
     ));
-    setUsageData(dashboardData.usageData);
     setCooldowns(dashboardData.cooldowns);
     setTodayMetrics(dashboardData.todayMetrics);
     setLastUpdated(new Date());
@@ -298,22 +295,6 @@ export const LiveMetrics = () => {
       })
       .sort((a, b) => b.requests - a.requests || b.totalTokens - a.totalTokens);
   }, [liveSnapshot.recentRequests]);
-
-  const renderActivityTimeControls = () => (
-    <div style={{ display: 'flex', gap: '8px' }}>
-      {(['hour', 'day', 'week', 'month'] as TimeRange[]).map((range) => (
-        <Button
-          key={range}
-          size="sm"
-          variant={activityRange === range ? 'primary' : 'secondary'}
-          onClick={() => setActivityRange(range)}
-          style={{ textTransform: 'capitalize' }}
-        >
-          {range}
-        </Button>
-      ))}
-    </div>
-  );
 
   const handleClearCooldowns = async () => {
     if (window.confirm('Are you sure you want to clear all provider cooldowns?')) {

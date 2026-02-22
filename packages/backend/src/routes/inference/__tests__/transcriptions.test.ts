@@ -100,6 +100,7 @@ describe("Transcriptions Endpoint", () => {
             providers: {
                 openai: {
                     api_key: "sk-test",
+                    disable_cooldown: false,
                     api_base_url: "https://api.openai.com/v1",
                     estimateTokens: false,
                     models: {

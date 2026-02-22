@@ -51,3 +51,12 @@ plexus.exe
 sampledata/*.db
 auth.json
 packages/backend/config/
+
+# Upstream sync artifacts (backup/restore evidence)
+.upstream-backups/
+*.backup
+config-files.tgz
+database-url.txt
+summary.txt
+checksums.txt
+restored-files.list
