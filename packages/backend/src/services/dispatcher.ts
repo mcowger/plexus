@@ -905,6 +905,12 @@ export class Dispatcher {
     const cooldownManager = CooldownManager.getInstance();
 
     if (response.status >= 500 || [401, 403, 408, 429].includes(response.status)) {
+      const providerConfig = getConfig().providers?.[route.provider];
+      if (providerConfig?.disable_cooldown === true) {
+        logger.info(
+          `Skipping cooldown for provider '${route.provider}' model '${route.model}' (disable_cooldown=true)`
+        );
+      } else {
       let cooldownDuration: number | undefined;
 
       // For 429 errors, try to parse provider-specific cooldown duration
@@ -934,6 +940,7 @@ export class Dispatcher {
       // Mark provider+model as failed with optional duration
       // For non-429 errors, cooldownDuration will be undefined and default (10 minutes) will be used
       cooldownManager.markProviderFailure(route.provider, route.model, cooldownDuration);
+      }
     }
 
     // Create enriched error with routing context
