@@ -36,6 +36,14 @@ WORKDIR /app/backend
 # Install bash for debugging
 RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/*
 
+# Build metadata - redeclare ARGs and set ENV for runtime availability
+ARG APP_VERSION=dev
+ARG APP_BUILD_SHA=
+ARG APP_BUILD_TIME=
+ENV APP_VERSION=${APP_VERSION}
+ENV APP_BUILD_SHA=${APP_BUILD_SHA}
+ENV APP_BUILD_TIME=${APP_BUILD_TIME}
+
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/plexus-linux ./plexus
 
