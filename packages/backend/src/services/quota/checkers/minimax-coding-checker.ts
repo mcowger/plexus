@@ -51,12 +51,12 @@ export class MiniMaxCodingQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`MiniMax API error: ${data.base_resp?.status_msg || 'unknown error'}`));
       }
 
-      if (data.model_remains.length === 0) {
+      // All models share the same quota pool - use first entry
+      const firstModel = data.model_remains[0];
+    if (!firstModel) {
         return this.successResult([]);
       }
 
-      // All models share the same quota pool - use first entry
-      const firstModel = data.model_remains[0];
       const limit = firstModel.current_interval_total_count;
       // API field is misleading: "usage_count" is actually REMAINING, not used
       const remaining = firstModel.current_interval_usage_count;
