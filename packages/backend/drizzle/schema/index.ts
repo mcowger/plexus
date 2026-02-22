@@ -31,3 +31,5 @@ export {
   mcpDebugLogs as pgMcpDebugLogs,
 } from './postgres/mcp';
 export { quotaState as pgQuotaState } from './postgres/quota-state';
+export * from './sqlite/classifier-log';
+export { classifierLog as pgClassifierLog } from './postgres/classifier-log';

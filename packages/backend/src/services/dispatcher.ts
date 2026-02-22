@@ -63,11 +63,29 @@ export class Dispatcher {
     const failoverEnabled = failover?.enabled !== false;
 
     // 1. Route (ordered candidates)
-    let candidates = await Router.resolveCandidates(request.model, request.incomingApiType);
+    // Pass full request as requestContext so the auto-classifier can use it
+    const requestContext = {
+      messages: request.messages,
+      tools: request.tools,
+      tool_choice: request.tool_choice,
+      response_format: request.response_format,
+      max_tokens: request.max_tokens,
+    };
+    let candidates = await Router.resolveCandidates(
+      request.model,
+      request.incomingApiType,
+      requestContext,
+      request.requestId
+    );
 
     // Fallback for direct/provider/model syntax and legacy single-route behavior
     if (candidates.length === 0) {
-      const singleRoute = await Router.resolve(request.model, request.incomingApiType);
+      const singleRoute = await Router.resolve(
+        request.model,
+        request.incomingApiType,
+        requestContext,
+        request.requestId
+      );
       candidates = [singleRoute];
     }
 

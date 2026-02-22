@@ -681,4 +681,37 @@ export class UsageStorageService extends EventEmitter {
       return [];
     }
   }
+
+  async saveClassifierLog(record: {
+    requestId: string;
+    tier: string;
+    score: number;
+    confidence: number;
+    method: string;
+    reasoning: string;
+    signals: string; // JSON stringified array
+    agenticScore: number;
+    hasStructuredOutput: number | boolean; // SQLite uses 0|1
+    resolvedAlias?: string | null;
+    createdAt?: number;
+  }): Promise<void> {
+    try {
+      const hasStructuredOutputValue =
+        typeof record.hasStructuredOutput === 'boolean'
+          ? record.hasStructuredOutput
+            ? 1
+            : 0
+          : record.hasStructuredOutput;
+
+      await this.ensureDb()
+        .insert(this.schema.classifierLog)
+        .values({
+          ...record,
+          hasStructuredOutput: hasStructuredOutputValue,
+          createdAt: record.createdAt ?? Date.now(),
+        });
+    } catch (error) {
+      logger.warn('Failed to save classifier log record', { error, requestId: record.requestId });
+    }
+  }
 }

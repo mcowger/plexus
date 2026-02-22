@@ -385,6 +385,64 @@ const CooldownPolicySchema = z.object({
   maxMinutes: z.number().min(1).default(300),
 });
 
+const AutoTierModelsSchema = z.object({
+  heartbeat: z.string().min(1),
+  simple: z.string().min(1),
+  medium: z.string().min(1),
+  complex: z.string().min(1),
+  reasoning: z.string().min(1),
+});
+
+const ClassifierDimensionWeightsSchema = z
+  .object({
+    tokenCount: z.number().min(0),
+    codePresence: z.number().min(0),
+    reasoningMarkers: z.number().min(0),
+    multiStepPatterns: z.number().min(0),
+    simpleIndicators: z.number().min(0),
+    technicalTerms: z.number().min(0),
+    agenticTask: z.number().min(0),
+    toolPresence: z.number().min(0),
+    questionComplexity: z.number().min(0),
+    creativeMarkers: z.number().min(0),
+    constraintCount: z.number().min(0),
+    outputFormat: z.number().min(0),
+    conversationDepth: z.number().min(0),
+    imperativeVerbs: z.number().min(0),
+    referenceComplexity: z.number().min(0),
+    negationComplexity: z.number().min(0),
+  })
+  .strict(); // all 16 required if key is present
+
+const AutoConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  tier_models: AutoTierModelsSchema,
+  agentic_boost_threshold: z.number().min(0).max(1).default(0.8),
+  classifier: z
+    .object({
+      maxTokensForceComplex: z.number().optional(),
+      dimensionWeights: ClassifierDimensionWeightsSchema.optional(),
+      tierBoundaries: z
+        .object({
+          simpleMedium: z.number().optional(),
+          mediumComplex: z.number().optional(),
+          complexReasoning: z.number().optional(),
+        })
+        .optional(),
+      confidenceSteepness: z.number().optional(),
+      ambiguityThreshold: z.number().optional(),
+      ambiguousDefaultTier: z
+        .enum(['HEARTBEAT', 'SIMPLE', 'MEDIUM', 'COMPLEX', 'REASONING'])
+        .optional(),
+      reasoningOverrideMinMatches: z.number().int().optional(),
+      reasoningOverrideMinConfidence: z.number().optional(),
+      reasoningOverrideMinScore: z.number().optional(),
+      architectureOverrideConfidence: z.number().optional(),
+      architectureOverrideMinScore: z.number().optional(),
+    })
+    .optional(),
+});
+
 const RawPlexusConfigSchema = z
   .object({
     providers: z.record(z.string(), ProviderConfigSchema),
@@ -397,11 +455,13 @@ const RawPlexusConfigSchema = z
     latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
     user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
+    auto: AutoConfigSchema.optional(),
   })
   .passthrough();
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
 export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
+export type AutoConfig = z.infer<typeof AutoConfigSchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
   cooldown?: CooldownPolicy;

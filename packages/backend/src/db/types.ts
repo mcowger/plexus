@@ -18,6 +18,8 @@ export type NewProviderPerformance = InferInsertModel<typeof schema.providerPerf
 export type NewQuotaSnapshot = InferInsertModel<typeof schema.quotaSnapshots>;
 export type NewMcpRequestUsage = InferInsertModel<typeof schema.mcpRequestUsage>;
 export type NewMcpDebugLog = InferInsertModel<typeof schema.mcpDebugLogs>;
+export type ClassifierLogRecord = InferSelectModel<typeof schema.classifierLog>;
+export type NewClassifierLogRecord = InferInsertModel<typeof schema.classifierLog>;
 
 export type UsageRecord = Omit<RequestUsage, 'isStreamed' | 'isPassthrough'> & {
   isStreamed: boolean;
