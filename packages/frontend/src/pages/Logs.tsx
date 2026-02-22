@@ -744,7 +744,7 @@ export const Logs = () => {
                       className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
                       title={
                         log.kwhUsed != null && log.kwhUsed > 0
-                          ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${(log.kwhUsed / 0.02).toFixed(2)} toast slices`
+                          ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${(log.kwhUsed / 0.01).toFixed(2)} toast slices`
                           : undefined
                       }
                       style={

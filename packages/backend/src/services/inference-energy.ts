@@ -107,8 +107,8 @@ export function calculateInferenceFootprint(
  * equivalent to the given energy in kWh.
  */
 export function toastBreadEquivalent(kwh: number): number {
-  const kwhPerToast = 0.02; // ~20Wh to toast 2 slices
-  return Math.round((kwh / kwhPerToast) * 100) / 100;
+  const kwhPerSlice = 0.01; // ~20Wh to toast 2 slices => 10Wh per slice
+  return Math.round((kwh / kwhPerSlice) * 100) / 100;
 }
 
 // ----------------------------------------------------

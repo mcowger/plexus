@@ -12,7 +12,7 @@ interface SlicesToastedProps {
   data: UsageData[];
 }
 
-const KWH_PER_SLICE = 0.02;
+const KWH_PER_SLICE = 0.01;
 const SLICES_PER_LOAF = 20;
 const SLICE_LAYOUT_THRESHOLD = 18;
 const TOAST_COLUMNS = 6;
