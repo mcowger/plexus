@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/Button';
-import { Save, RotateCcw, AlertTriangle } from 'lucide-react';
-
+import { Save, RotateCcw, AlertTriangle, GitBranch, Clock, Package } from 'lucide-react';
+import type { BuildInfo } from '../lib/api';
 export const Config = () => {
   const [config, setConfig] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
 
   useEffect(() => {
     api.getConfig().then(setConfig);
+    api.getBuildInfo().then(setBuildInfo);
   }, []);
-
   const [validationErrors, setValidationErrors] = useState<Array<{path: string; message: string}> | null>(null);
 
   const handleSave = async () => {
@@ -84,6 +85,41 @@ export const Config = () => {
             />
         </div>
       </div>
+
+      {/* Build Source Panel */}
+      {buildInfo && (
+        <div className="glass-bg backdrop-blur-md border border-white/10 rounded-lg shadow-xl overflow-hidden transition-all duration-300 max-w-full shadow-[0_8px_32px_rgba(0,0,0,0.3)] mt-6">
+          <div className="flex items-center px-6 py-4 border-b border-border-glass bg-bg-subtle">
+            <GitBranch size={18} className="text-primary mr-3" />
+            <h3 className="font-heading text-lg font-semibold text-text m-0">Build Source</h3>
+          </div>
+          <div className="px-6 py-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="flex items-start gap-3">
+                <Package size={16} className="text-text-secondary mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="font-body text-[11px] font-medium text-text-secondary uppercase tracking-wider mb-1">Version</div>
+                  <div className="font-body text-sm text-text font-medium">{buildInfo.displayVersion || buildInfo.version || 'dev'}</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <GitBranch size={16} className="text-text-secondary mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="font-body text-[11px] font-medium text-text-secondary uppercase tracking-wider mb-1">Build SHA</div>
+                  <div className="font-body text-sm text-text font-medium font-mono">{buildInfo.buildSha ? buildInfo.buildSha.slice(0, 12) : 'N/A'}</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Clock size={16} className="text-text-secondary mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="font-body text-[11px] font-medium text-text-secondary uppercase tracking-wider mb-1">Build Time</div>
+                  <div className="font-body text-sm text-text font-medium">{buildInfo.buildTime ? new Date(buildInfo.buildTime).toLocaleString() : 'N/A'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

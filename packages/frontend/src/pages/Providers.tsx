@@ -1527,17 +1527,17 @@ export const Providers = () => {
                 </div>
 
 
-                {/* Disable Cooldown */}
+                {/* Disable Provider Timeouts (Cooldowns) */}
                 <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
                   <div className="flex items-center gap-2" style={{minHeight: '38px'}}>
             <Switch
                       checked={editingProvider.disableCooldown || false}
                       onChange={(checked) => setEditingProvider({...editingProvider, disableCooldown: checked})}
                 />
-                 <label className="font-body text-[13px] font-medium text-text" style={{marginBottom: 0}}>Disable Cooldowns</label>
+                 <label className="font-body text-[13px] font-medium text-text" style={{marginBottom: 0}}>Disable Provider Timeouts (Cooldowns)</label>
                 </div>
                   <div className="font-body text-[11px] text-text-secondary" style={{lineHeight: 1.35, marginTop: '4px'}}>
-                    When enabled, this provider will never be placed on cooldown due to errors — it will always remain eligible for routing regardless of consecutive failures.
+                    When enabled, this provider will never be placed on timeout/cooldown due to errors — it will always remain eligible for routing regardless of consecutive failures.
                     <span className="text-warning" style={{marginLeft: '6px'}}>Use only for providers with reliable external rate-limit handling.</span>
                   </div>
                 </div>
