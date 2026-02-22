@@ -313,6 +313,18 @@ const ModelBehaviorSchema = z.discriminatedUnion('type', [
   StripAdaptiveThinkingBehaviorSchema,
 ]);
 
+// ─── Model Metadata ──────────────────────
+// Optional reference to an external model catalog entry. When configured,
+// Plexus fetches metadata at startup and includes it in GET /v1/models.
+const ModelMetadataSchema = z.object({
+  source: z.enum(['openrouter', 'models.dev', 'catwalk']),
+  // Path within the source catalog:
+  //   openrouter:  "openai/gpt-4.1-nano"
+  //   models.dev:  "anthropic.claude-3-5-haiku-20241022"
+  //   catwalk:     "anthropic.claude-3-5-haiku-20241022"
+  source_path: z.string().min(1),
+});
+
 const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
   priority: z.enum(['selector', 'api_match']).default('selector'),
@@ -320,10 +332,12 @@ const ModelConfigSchema = z.object({
   additional_aliases: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
+  metadata: ModelMetadataSchema.optional(),
 });
 
 export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
 export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinkingBehaviorSchema>;
+export type ModelMetadata = z.infer<typeof ModelMetadataSchema>;
 
 const KeyConfigSchema = z.object({
   secret: z.string(),

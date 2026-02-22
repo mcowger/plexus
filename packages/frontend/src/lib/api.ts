@@ -223,6 +223,11 @@ export interface StripAdaptiveThinkingBehavior {
 
 export type AliasBehavior = StripAdaptiveThinkingBehavior; // | NextBehavior | ...
 
+export interface AliasMetadata {
+    source: 'openrouter' | 'models.dev' | 'catwalk';
+    source_path: string;
+}
+
 export interface Alias {
     id: string;
     aliases?: string[];
@@ -231,6 +236,7 @@ export interface Alias {
     type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
     targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
     advanced?: AliasBehavior[];
+    metadata?: AliasMetadata;
 }
 
 export interface InferenceError {
@@ -1429,15 +1435,16 @@ quota_checker: provider.quotaChecker?.type
 
       config.models[alias.id] = {
           selector: alias.selector,
-          priority: alias.priority || 'selector',
+        priority: alias.priority || 'selector',
           additional_aliases: alias.aliases,
       ...(alias.type && { type: alias.type }),
           ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
+          ...(alias.metadata && { metadata: alias.metadata }),
     targets: alias.targets.map(t => ({
-              provider: t.provider,
-              model: t.model,
+            provider: t.provider,
+          model: t.model,
               ...(t.enabled === false && { enabled: false })
-          }))
+        }))
       };
 
       const newYaml = stringify(config);
@@ -1517,13 +1524,14 @@ quota_checker: provider.quotaChecker?.type
                 });
 
                 aliases.push({
-                    id: key,
-                    aliases: val.additional_aliases || [],
-                    selector: val.selector,
-                    priority: val.priority,
+               id: key,
+                 aliases: val.additional_aliases || [],
+                 selector: val.selector,
+          priority: val.priority,
                     type: val.type,
-                    advanced: val.advanced || [],
-                    targets
+               advanced: val.advanced || [],
+                    targets,
+            metadata: val.metadata,
                 });
             });
         }
@@ -1928,6 +1936,31 @@ quota_checker: provider.quotaChecker?.type
       }
       const json = await res.json() as { data: OAuthSession };
       return json.data;
+  },
+
+  /**
+   * Search model metadata from an external catalog source.
+   * Used for autocomplete when assigning metadata to a model alias.
+   *
+   * @param source - "openrouter" | "models.dev" | "catwalk"
+   * @param query  - substring search (empty string = return all, up to limit)
+   * @param limit  - max results (default 50)
+   */
+  searchModelMetadata: async (
+      source: 'openrouter' | 'models.dev' | 'catwalk',
+      query?: string,
+      limit?: number,
+  ): Promise<{ data: { id: string; name: string }[]; count: number }> => {
+    const params = new URLSearchParams({ source });
+      if (query) params.set('q', query);
+      if (limit !== undefined) params.set('limit', String(limit));
+      const res = await fetch(`${API_BASE}/v1/metadata/search?${params}`);
+      if (!res.ok) {
+          // 503 means the source isn't loaded yet — return empty gracefully
+          if (res.status === 503) return { data: [], count: 0 };
+          throw new Error(`Failed to search model metadata: ${res.statusText}`);
+      }
+      return res.json();
   },
 
   getOAuthProviderModels: async (providerId: string): Promise<{ id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[]> => {

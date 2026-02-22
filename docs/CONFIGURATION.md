@@ -405,6 +405,47 @@ This section defines virtual model aliases that clients use in the `model` field
   - `model`: The upstream model name.
   - `enabled`: (Optional, default `true`) Set to `false` to temporarily skip this target.
 
+- **`metadata`**: (Optional) Link this alias to a model in an external catalog. When configured, Plexus fetches the model's metadata at startup and includes enriched fields (`name`, `description`, `context_length`, `architecture`, `pricing`, `supported_parameters`, `top_provider`) in the `GET /v1/models` response, following the OpenRouter model format. This is useful for clients that rely on model metadata to make routing decisions (e.g., context window selection).
+
+  **Fields:**
+  - `source` (required): The external catalog to use. One of: `openrouter`, `models.dev`, `catwalk`
+  - `source_path` (required): The model's identifier within that catalog.
+
+  **`source_path` format by source:**
+
+  | Source | Format | Example |
+  |--------|-----|---------|
+  | `openrouter` | `provider/model` | `openai/gpt-4.1-nano` |
+  | `models.dev` | `providerid.modelid` | `anthropic.claude-3-5-haiku-20241022` |
+  | `catwalk` | `providerid.modelid` | `anthropic.claude-3-5-haiku-20241022` |
+
+  **Example:**
+  ```yaml
+  models:
+    fast-model:
+      targets:
+        - provider: openai_direct
+          model: gpt-4.1-nano
+      metadata:
+        source: openrouter
+        source_path: openai/gpt-4.1-nano
+
+    smart-model:
+      targets:
+     - provider: my_anthropic
+          model: claude-3-5-haiku-20241022
+      metadata:
+        source: models.dev
+        source_path: anthropic.claude-3-5-haiku-20241022
+  ```
+
+  The metadata catalog is loaded at startup from:
+  - OpenRouter: `https://openrouter.ai/api/v1/models`
+  - models.dev: `https://models.dev/api.json`
+  - Catwalk: `https://catwalk.charm.sh/providers`
+
+  Metadata loading is non-fatal — if a source is unavailable, Plexus continues operating and returns base model information for aliases that reference that source.
+
 **Example with multiple targets and API priority:**
 
 ```yaml

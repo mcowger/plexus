@@ -1,0 +1,84 @@
+{
+  "anthropic": {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "models": {
+      "claude-3-5-haiku-20241022": {
+        "id": "claude-3-5-haiku-20241022",
+        "name": "Claude Haiku 3.5",
+        "family": "claude-haiku",
+        "attachment": true,
+        "reasoning": false,
+        "tool_call": true,
+      "temperature": true,
+        "modalities": {
+          "input": ["text", "image", "pdf"],
+          "output": ["text"]
+        },
+        "open_weights": false,
+        "cost": {
+          "input": 0.8,
+          "output": 4,
+          "cache_read": 0.08,
+          "cache_write": 1
+        },
+        "limit": {
+          "context": 200000,
+          "output": 8192
+      }
+      },
+      "claude-opus-4-20250514": {
+        "id": "claude-opus-4-20250514",
+        "name": "Claude Opus 4",
+        "family": "claude-opus",
+        "attachment": true,
+        "reasoning": true,
+     "tool_call": true,
+        "temperature": true,
+        "modalities": {
+          "input": ["text", "image"],
+          "output": ["text"]
+        },
+        "open_weights": false,
+        "cost": {
+          "input": 15,
+          "output": 75,
+          "cache_read": 1.5,
+          "cache_write": 18.75
+        },
+        "limit": {
+          "context": 200000,
+          "output": 32000
+      }
+      }
+    }
+  },
+  "openai": {
+    "id": "openai",
+    "name": "OpenAI",
+    "models": {
+      "gpt-4.1-nano": {
+     "id": "gpt-4.1-nano",
+        "name": "GPT-4.1 Nano",
+        "family": "gpt-nano",
+        "attachment": true,
+        "reasoning": false,
+        "tool_call": true,
+        "temperature": true,
+     "modalities": {
+      "input": ["text", "image"],
+          "output": ["text"]
+        },
+        "open_weights": false,
+        "cost": {
+          "input": 0.1,
+        "output": 0.4
+        },
+        "limit": {
+          "context": 1000000,
+          "output": 32768
+        }
+      }
+    }
+  }
+}

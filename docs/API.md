@@ -51,6 +51,7 @@ Failed auth returns HTTP `401`:
 - `GET /health`
 - `GET /v1/models`
 - `GET /v1/openrouter/models`
+- `GET /v1/metadata/search`
 - All `/.well-known/*` and `/register` MCP discovery endpoints
 
 ---
@@ -199,13 +200,78 @@ All inference endpoints below require authentication (see above). Requests are r
 
 ### List Models
 
-- **Endpoint:** `GET /v1/models`
-- **Auth:** Not required
-- **Description:** Returns all configured model aliases and their targets.
+#### GET /v1/models
 
-- **Endpoint:** `GET /v1/openrouter/models`
+- **Auth:** Not required
+- **Description:** Returns all configured model aliases. When an alias has a `metadata` block in `plexus.yaml`, the response includes enriched fields following the OpenRouter model format.
+
+- **Response:**
+  ```json
+  {
+    "object": "list",
+    "data": [
+      {
+        "id": "fast-model",
+        "object": "model",
+        "created": 1748000000,
+    "owned_by": "plexus",
+        "name": "OpenAI: GPT-4.1 Nano",
+        "description": "GPT-4.1 Nano is a lightweight model for fast tasks.",
+        "context_length": 1000000,
+        "architecture": {
+          "input_modalities": ["text", "image"],
+          "output_modalities": ["text"],
+          "tokenizer": "GPT"
+     },
+        "pricing": {
+          "prompt": "0.0000001",
+       "completion": "0.0000004",
+          "input_cache_read": "0.000000025"
+      },
+        "supported_parameters": ["temperature", "tools", "tool_choice", "max_tokens"],
+        "top_provider": {
+          "context_length": 1000000,
+          "max_completion_tokens": 32768
+        }
+      },
+      {
+        "id": "plain-model",
+        "object": "model",
+        "created": 1748000000,
+        "owned_by": "plexus"
+      }
+    ]
+  }
+  ```
+
+  Aliases without a `metadata` block return only: `id`, `object`, `created`, `owned_by`. Additional aliases (from `additional_aliases`) inherit the parent alias's metadata.
+
+#### GET /v1/openrouter/models
+
 - **Auth:** Not required
 - **Description:** Returns models fetched from OpenRouter (requires an OpenRouter provider configured in `plexus.yaml`).
+
+#### GET /v1/metadata/search
+
+- **Auth:** Not required
+- **Description:** Search a loaded metadata catalog for use in the admin UI autocomplete when assigning metadata to an alias.
+- **Query Parameters:**
+  - `source` (required): `openrouter`, `models.dev`, or `catwalk`
+  - `q` (optional): Substring search string. Omit or leave empty to return all models (up to `limit`).
+  - `limit` (optional, int): Maximum results to return. Default `50`, max `200`.
+- **Response:**
+  ```json
+  {
+    "data": [
+      { "id": "openai/gpt-4.1-nano", "name": "OpenAI: GPT-4.1 Nano" },
+      { "id": "openai/gpt-4o", "name": "OpenAI: GPT-4o" }
+    ],
+    "count": 2
+  }
+  ```
+- **Error Responses:**
+  - `400 Bad Request`: Missing or invalid `source` parameter.
+  - `503 Service Unavailable`: The requested source has not been loaded (either still loading or failed at startup).
 
 ---
 ## Management APIs (`/v0/management`)

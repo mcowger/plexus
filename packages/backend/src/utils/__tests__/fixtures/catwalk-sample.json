@@ -1,0 +1,63 @@
+[
+  {
+    "name": "Anthropic",
+    "id": "anthropic",
+    "api_key": "$ANTHROPIC_API_KEY",
+    "api_endpoint": "$ANTHROPIC_API_ENDPOINT",
+    "type": "anthropic",
+    "default_large_model_id": "claude-opus-4-20250514",
+    "default_small_model_id": "claude-3-5-haiku-20241022",
+    "models": [
+      {
+        "id": "claude-3-5-haiku-20241022",
+      "name": "Claude 3.5 Haiku",
+    "cost_per_1m_in": 0.8,
+        "cost_per_1m_out": 4,
+     "cost_per_1m_in_cached": 1,
+        "cost_per_1m_out_cached": 0.08,
+        "context_window": 200000,
+        "default_max_tokens": 5000,
+        "can_reason": false,
+      "has_reasoning_efforts": false,
+        "supports_attachments": true
+      },
+      {
+        "id": "claude-opus-4-20250514",
+        "name": "Claude Opus 4",
+        "cost_per_1m_in": 15,
+        "cost_per_1m_out": 75,
+      "cost_per_1m_in_cached": 18.75,
+        "cost_per_1m_out_cached": 1.5,
+        "context_window": 200000,
+        "default_max_tokens": 32000,
+        "can_reason": true,
+     "has_reasoning_efforts": false,
+        "supports_attachments": true
+      }
+    ]
+  },
+  {
+    "name": "OpenAI",
+    "id": "openai",
+    "api_key": "$OPENAI_API_KEY",
+    "api_endpoint": "$OPENAI_API_ENDPOINT",
+    "type": "openai",
+    "default_large_model_id": "gpt-4.1",
+    "default_small_model_id": "gpt-4.1-mini",
+    "models": [
+   {
+        "id": "gpt-4.1-mini",
+        "name": "GPT-4.1 Mini",
+        "cost_per_1m_in": 0.4,
+        "cost_per_1m_out": 1.6,
+        "cost_per_1m_in_cached": 0.1,
+        "cost_per_1m_out_cached": null,
+        "context_window": 1047576,
+        "default_max_tokens": 32768,
+        "can_reason": false,
+        "has_reasoning_efforts": false,
+        "supports_attachments": true
+      }
+    ]
+  }
+]

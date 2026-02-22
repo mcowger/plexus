@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { api, Alias, AliasBehavior, Provider, Model, Cooldown } from '../lib/api';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { api, Alias, AliasMetadata, AliasBehavior, Provider, Model, Cooldown } from '../lib/api';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
-import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2, Clock, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, GripVertical, Play, CheckCircle, XCircle, Loader2, Clock, Zap, ChevronDown, ChevronRight, BookOpen, X } from 'lucide-react';
 
 const EMPTY_ALIAS: Alias = {
     id: '',
@@ -28,6 +29,16 @@ export const Models = () => {
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isMetadataOpen, setIsMetadataOpen] = useState(false);
+
+  // Metadata search state
+  const [metadataQuery, setMetadataQuery] = useState('');
+  const [metadataResults, setMetadataResults] = useState<{ id: string; name: string }[]>([]);
+  const [isMetadataSearching, setIsMetadataSearching] = useState(false);
+  const [showMetadataDropdown, setShowMetadataDropdown] = useState(false);
+  const metadataSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const metadataInputWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
   // Delete Confirmation State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -72,12 +83,19 @@ export const Models = () => {
       setOriginalId(alias.id);
       // Deep copy to avoid mutating state directly
       setEditingAlias(JSON.parse(JSON.stringify(alias)));
+      // Reset metadata search UI state; populate search box if metadata is already configured
+      setMetadataQuery(alias.metadata?.source_path ?? '');
+      setMetadataResults([]);
+      setShowMetadataDropdown(false);
       setIsModalOpen(true);
   };
 
   const handleAddNew = () => {
       setOriginalId(null);
       setEditingAlias({ ...EMPTY_ALIAS, targets: [] });
+      setMetadataQuery('');
+      setMetadataResults([]);
+      setShowMetadataDropdown(false);
       setIsModalOpen(true);
   };
 
@@ -335,6 +353,49 @@ export const Models = () => {
       setEditingAlias({ ...editingAlias, advanced: next });
   };
 
+  /** Search metadata catalog for autocomplete */
+  const handleMetadataSearch = useCallback((query: string, source: AliasMetadata['source']) => {
+      setMetadataQuery(query);
+      if (metadataSearchRef.current) clearTimeout(metadataSearchRef.current);
+    if (!query.trim()) {
+          setMetadataResults([]);
+          setShowMetadataDropdown(false);
+          return;
+      }
+      setIsMetadataSearching(true);
+      setShowMetadataDropdown(true);
+      metadataSearchRef.current = setTimeout(async () => {
+          try {
+              const resp = await api.searchModelMetadata(source, query, 30);
+              setMetadataResults(resp.data);
+          } catch {
+              setMetadataResults([]);
+     } finally {
+              setIsMetadataSearching(false);
+          }
+      }, 250);
+  }, []);
+
+  /** Select a metadata result and set it on the alias */
+  const selectMetadataResult = (result: { id: string; name: string }) => {
+      const source = editingAlias.metadata?.source ?? 'openrouter';
+      setEditingAlias({
+          ...editingAlias,
+          metadata: { source, source_path: result.id }
+      });
+      setMetadataQuery(result.name);
+      setShowMetadataDropdown(false);
+      setMetadataResults([]);
+  };
+
+  /** Clear metadata from the alias */
+  const clearMetadata = () => {
+      const { metadata: _removed, ...rest } = editingAlias;
+      setEditingAlias(rest as Alias);
+      setMetadataQuery('');
+   setShowMetadataDropdown(false);
+  };
+
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', index.toString());
@@ -397,7 +458,8 @@ export const Models = () => {
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Type</th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Aliases</th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Selector</th>
-                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px'}}>Targets</th>
+                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Metadata</th>
+                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px'}}>Targets</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -450,12 +512,24 @@ export const Models = () => {
                                     </div>
                                 ) : <span style={{color: 'var(--color-text-secondary)', fontSize: '12px'}}>-</span>}
                             </td>
-                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                                <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border border-border-glass text-text-secondary" style={{fontSize: '11px', textTransform: 'capitalize'}}>
-                                    {alias.selector || 'random'} / {alias.priority || 'selector'}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px'}}>
+                     <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                          <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border-border-glass text-text-secondary" style={{fontSize: '11px', textTransform: 'capitalize'}}>
+               {alias.selector || 'random'} / {alias.priority || 'selector'}
+                          </span>
+                  </td>
+                <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                        {alias.metadata ? (
+                             <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                          <BookOpen size={11} className="text-primary" />
+                  <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary" style={{textTransform: 'capitalize'}}>
+                                {alias.metadata.source}
+                             </span>
+                              </div>
+                    ) : (
+                   <span style={{color: 'var(--color-text-secondary)', fontSize: '12px'}}>-</span>
+                     )}
+                        </td>
+                  <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px'}}>
                                 <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                                     {alias.targets.map((t, i) => {
                                         const provider = providers.find(p => p.id === t.provider);
@@ -757,9 +831,126 @@ export const Models = () => {
 
               <div className="h-px bg-border-glass" style={{margin: '4px 0'}}></div>
 
+              {/* Metadata accordion */}
+            <div className="border border-border-glass rounded-sm overflow-hidden">
+         <button
+                   type="button"
+                   onClick={() => setIsMetadataOpen(o => !o)}
+                 className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+                  >
+             <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                    <BookOpen size={13} className="text-text-muted" />
+               <span className="font-body text-[13px] font-medium text-text-secondary">Metadata</span>
+                 {editingAlias.metadata && (
+                           <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
+                              {editingAlias.metadata.source}
+              </span>
+                      )}
+               </div>
+                      {isMetadataOpen
+                     ? <ChevronDown size={14} className="text-text-muted" />
+                        : <ChevronRight size={14} className="text-text-muted" />
+                   }
+                  </button>
+
+                  {isMetadataOpen && (
+                    <div className="px-3 py-3 border-t border-border-glass" style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                      <p className="font-body text-[11px] text-text-muted">
+                    Link this alias to a model in an external catalog. When configured, Plexus includes
+                        enriched metadata (name, context length, pricing, supported parameters) in the{' '}
+                         <code className="text-primary">GET /v1/models</code> response.
+                    </p>
+
+                        {/* Source selector */}
+                        <div>
+                       <label className="font-body text-[12px] font-medium text-text-secondary" style={{display: 'block', marginBottom: '4px'}}>Source</label>
+                <select
+                         className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+             style={{padding: '5px 8px', height: '30px'}}
+                 value={editingAlias.metadata?.source ?? 'openrouter'}
+                    onChange={(e) => {
+                          const source = e.target.value as AliasMetadata['source'];
+                          setEditingAlias({
+                                  ...editingAlias,
+                         metadata: { source, source_path: editingAlias.metadata?.source_path ?? '' }
+                        });
+                          // Re-run search with new source if there's a query
+                             if (metadataQuery) handleMetadataSearch(metadataQuery, source);
+                  }}
+                          >
+                               <option value="openrouter">OpenRouter</option>
+                        <option value="models.dev">models.dev</option>
+                     <option value="catwalk">Catwalk (Charm)</option>
+                       </select>
+                    </div>
+
+                    {/* Search / source_path */}
+                      <div style={{position: 'relative'}}>
+                 <label className="font-body text-[12px] font-medium text-text-secondary" style={{display: 'block', marginBottom: '4px'}}>
+                       Model
+                       {editingAlias.metadata?.source_path && (
+                             <span className="ml-2 font-normal text-text-muted">({editingAlias.metadata.source_path})</span>
+                          )}
+                        </label>
+                <div style={{position: 'relative', display: 'flex', gap: '4px'}}>
+                  <div ref={metadataInputWrapperRef} style={{position: 'relative', flex: 1}}>
+                         <Input
+                            value={metadataQuery}
+                         onChange={(e) => {
+                         const source = editingAlias.metadata?.source ?? 'openrouter';
+                             handleMetadataSearch(e.target.value, source);
+                                  // Update rect so portal dropdown follows the input
+                                 if (metadataInputWrapperRef.current) {
+                                const r = metadataInputWrapperRef.current.getBoundingClientRect();
+                        setDropdownRect({ top: r.bottom + 2, left: r.left, width: r.width });
+                                   }
+                         }}
+                       onFocus={() => {
+                             if (metadataResults.length > 0) {
+                                     if (metadataInputWrapperRef.current) {
+                               const r = metadataInputWrapperRef.current.getBoundingClientRect();
+                   setDropdownRect({ top: r.bottom + 2, left: r.left, width: r.width });
+                        }
+                           setShowMetadataDropdown(true);
+                               }
+                             }}
+                   placeholder={`Search ${editingAlias.metadata?.source ?? 'openrouter'} catalog...`}
+                style={{width: '100%', paddingRight: isMetadataSearching ? '28px' : undefined}}
+           onBlur={() => setShowMetadataDropdown(false)}
+                />
+                         {isMetadataSearching && (
+                              <Loader2 size={14} className="animate-spin text-text-muted" style={{position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)'}} />
+                       )}
+                    </div>
+               {editingAlias.metadata && (
+                      <Button variant="ghost" size="sm" onClick={clearMetadata} style={{color: 'var(--color-danger)', padding: '4px', minHeight: 'auto'}} title="Remove metadata">
+                           <X size={14} />
+                 </Button>
+                  )}
+              </div>
+              </div>
+
+               {/* Selected metadata preview */}
+                          {editingAlias.metadata?.source_path && (
+                              <div className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2" style={{fontSize: '11px', color: 'var(--color-text-secondary)'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                    <CheckCircle size={12} className="text-success" />
+                      <span>
+                     Metadata assigned from <strong>{editingAlias.metadata.source}</strong>:{' '}
+                                 <code className="text-primary">{editingAlias.metadata.source_path}</code>
+                    </span>
+                                  </div>
+                         </div>
+                  )}
+                </div>
+                  )}
+              </div>
+
+              <div className="h-px bg-border-glass" style={{margin: '4px 0'}}></div>
+
               <div>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
-                      <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Targets</label>
+                    <label className="font-body text-[13px] font-medium text-text-secondary" style={{marginBottom: 0}}>Targets</label>
                       <div style={{display: 'flex', gap: '8px'}}>
                           <Button size="sm" variant="secondary" onClick={handleOpenAutoAdd} leftIcon={<Zap size={14}/>}>Auto Add</Button>
                           <Button size="sm" variant="secondary" onClick={addTarget} leftIcon={<Plus size={14}/>}>Add Target</Button>
@@ -1034,6 +1225,48 @@ export const Models = () => {
               </div>
           </div>
       </Modal>
+      {/* Metadata autocomplete portal — rendered outside accordion to avoid overflow:hidden clipping */}
+      {showMetadataDropdown && metadataResults.length > 0 && dropdownRect && createPortal(
+     <div
+          onMouseDown={(e) => e.preventDefault()}
+          style={{
+            position: 'fixed',
+            top: dropdownRect.top,
+            left: dropdownRect.left,
+         width: dropdownRect.width,
+            zIndex: 9999,
+               backgroundColor: '#1E293B',
+            border: '1px solid var(--color-border-glass)',
+            borderRadius: 'var(--radius-sm)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            maxHeight: '180px',
+            overflowY: 'auto',
+          }}
+        >
+          {metadataResults.map(result => (
+         <button
+              key={result.id}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); selectMetadataResult(result); }}
+        style={{
+                display: 'block',
+            width: '100%',
+          textAlign: 'left',
+                padding: '6px 10px',
+           background: 'none',
+            border: 'none',
+                cursor: 'pointer',
+              borderBottom: '1px solid var(--color-border-glass)',
+              }}
+              className="hover:bg-bg-hover transition-colors"
+            >
+              <div className="font-body text-[12px] font-medium text-text">{result.name}</div>
+              <div className="font-body text-[10px] text-text-muted">{result.id}</div>
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
      </div>
    );
  };

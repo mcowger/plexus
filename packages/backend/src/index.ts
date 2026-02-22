@@ -10,6 +10,7 @@ import { UsageStorageService } from './services/usage-storage';
 import { CooldownManager } from './services/cooldown-manager';
 import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
+import { ModelMetadataManager } from './services/model-metadata-manager';
 import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
 import { ResponsesStorageService } from './services/responses-storage';
@@ -78,7 +79,11 @@ try {
     // Eagerly initialize OAuth auth manager so auth.json schema migration
     // runs during startup (instead of waiting for first OAuth request).
     OAuthAuthManager.getInstance();
-    await PricingManager.getInstance().loadPricing();
+  await PricingManager.getInstance().loadPricing();
+    // Load model metadata from all configured sources (non-fatal on failure)
+    ModelMetadataManager.getInstance().loadAll().catch(e => {
+        logger.error('Failed to load model metadata', e);
+    });
 } catch (e) {
     logger.error('Failed to load config or pricing', e);
     process.exit(1);
