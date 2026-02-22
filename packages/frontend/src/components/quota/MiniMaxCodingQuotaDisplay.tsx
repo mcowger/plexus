@@ -76,7 +76,7 @@ export const MiniMaxCodingQuotaDisplay: React.FC<MiniMaxCodingQuotaDisplayProps>
         <div key={window.windowLabel || window.windowType} className="space-y-1">
           <div className="flex items-baseline gap-2">
             <span className="text-xs font-semibold text-text-secondary truncate">
-              {window.description?.replace(' coding requests', '') || window.windowLabel}
+              {window.description || window.windowLabel}
             </span>
             {window.resetInSeconds !== undefined && window.resetInSeconds !== null && (
               <span className="text-[10px] text-text-muted ml-auto">
