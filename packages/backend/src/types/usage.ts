@@ -44,4 +44,6 @@ export interface UsageRecord {
     // Response metadata
     toolCallsCount?: number | null;
     finishReason?: string | null;
+    // Energy estimation
+    kwhUsed?: number | null;
 }

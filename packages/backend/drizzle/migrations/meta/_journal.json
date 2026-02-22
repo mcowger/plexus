@@ -106,6 +106,13 @@
       "when": 1771484082173,
       "tag": "0014_boring_wolfpack",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1771732531746,
+      "tag": "0015_parched_rogue",
+      "breakpoints": true
     }
   ]
 }

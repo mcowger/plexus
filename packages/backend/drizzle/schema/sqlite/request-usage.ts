@@ -46,6 +46,8 @@ export const requestUsage = sqliteTable('request_usage', {
   // Response metadata
   toolCallsCount: integer('tool_calls_count'),
   finishReason: text('finish_reason'),
+  // Energy estimation
+  kwhUsed: real('kwh_used'),
 }, (table) => ({
   dateIdx: index('idx_request_usage_date').on(table.date),
   providerIdx: index('idx_request_usage_provider').on(table.provider),

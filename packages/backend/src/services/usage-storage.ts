@@ -305,8 +305,9 @@ export class UsageStorageService extends EventEmitter {
                     toolsDefined: schema.requestUsage.toolsDefined,
                     messageCount: schema.requestUsage.messageCount,
                     parallelToolCallsEnabled: schema.requestUsage.parallelToolCallsEnabled,
-                    toolCallsCount: schema.requestUsage.toolCallsCount,
-                    finishReason: schema.requestUsage.finishReason,
+                     toolCallsCount: schema.requestUsage.toolCallsCount,
+                  finishReason: schema.requestUsage.finishReason,
+                  kwhUsed: schema.requestUsage.kwhUsed,
                     hasDebug: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.debugLogs} dl WHERE dl.request_id = request_usage.request_id)`,
                     hasError: sql<boolean>`EXISTS(SELECT 1 FROM ${schema.inferenceErrors} ie WHERE ie.request_id = request_usage.request_id)`,
                 })
@@ -358,7 +359,8 @@ export class UsageStorageService extends EventEmitter {
                 messageCount: row.messageCount,
                 parallelToolCallsEnabled: !!row.parallelToolCallsEnabled,
                 toolCallsCount: row.toolCallsCount,
-                finishReason: row.finishReason
+            finishReason: row.finishReason,
+                kwhUsed: row.kwhUsed,
             }));
 
             const countResults = await db

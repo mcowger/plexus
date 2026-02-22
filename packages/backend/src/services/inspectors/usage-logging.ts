@@ -6,6 +6,7 @@ import { calculateCosts } from "../../utils/calculate-costs";
 import { DebugManager } from "../debug-manager";
 import { estimateTokensFromReconstructed, estimateInputTokens } from "../../utils/estimate-tokens";
 import { normalizeOpenAIChatUsage } from "../../utils/usage-normalizer";
+import { estimateKwhUsed } from "../inference-energy";
 
 export class UsageInspector extends PassThrough {
     private usageStorage: UsageStorageService;
@@ -107,7 +108,14 @@ export class UsageInspector extends PassThrough {
                 this.usageRecord.tokensPerSec = timeToTokensMs > 0 ? (stats.outputTokens / timeToTokensMs) * 1000 : 0;
             }
 
-            calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
+          calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
+
+            // Estimate energy consumption
+            this.usageRecord.kwhUsed = estimateKwhUsed(
+                stats.inputTokens,
+                stats.outputTokens
+            );
+
             this.usageStorage.saveRequest(this.usageRecord as UsageRecord);
 
             if (this.usageRecord.provider && this.usageRecord.selectedModelName) {

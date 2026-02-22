@@ -9,6 +9,7 @@ import { TransformerFactory } from "../services/transformer-factory";
 import { DebugLoggingInspector, UsageInspector } from "./inspectors";
 import { Readable } from "stream";
 import { DebugManager } from "./debug-manager";
+import { estimateKwhUsed } from "./inference-energy";
 /**
  * handleResponse
  *
@@ -255,6 +256,12 @@ async function finalizeUsage(
   if (outputTokens > 0 && usageRecord.durationMs > 0) {
     usageRecord.tokensPerSec = (outputTokens / usageRecord.durationMs) * 1000;
   }
+
+  // Estimate energy consumption
+  usageRecord.kwhUsed = estimateKwhUsed(
+    usageRecord.tokensInput ?? 0,
+    usageRecord.tokensOutput ?? 0
+  );
 
   // Persist usage record to database
   await usageStorage.saveRequest(usageRecord as UsageRecord);
