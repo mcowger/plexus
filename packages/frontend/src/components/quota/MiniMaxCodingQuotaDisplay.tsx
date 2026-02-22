@@ -38,7 +38,7 @@ export const MiniMaxCodingQuotaDisplay: React.FC<MiniMaxCodingQuotaDisplayProps>
 
   const overallStatus = windows.reduce((acc, window) => {
     const next = window.status || 'ok';
-    return statusRank[next] > statusRank[acc] ? next : acc;
+    return (statusRank[next] ?? 0) > (statusRank[acc] ?? 0) ? next : acc;
   }, 'ok');
 
   const statusColors: Record<QuotaStatus, string> = {
