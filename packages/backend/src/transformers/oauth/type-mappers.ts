@@ -5,7 +5,7 @@ import type {
   ToolResultMessage,
   AssistantMessageEvent,
   Tool as PiAiTool,
-  Usage
+  Usage,
 } from '@mariozechner/pi-ai';
 import { Type } from '@sinclair/typebox';
 import type {
@@ -15,13 +15,13 @@ import type {
   UnifiedMessage,
   UnifiedTool,
   MessageContent,
-  UnifiedUsage
+  UnifiedUsage,
 } from '../../types/unified';
 
 export function unifiedToContext(request: UnifiedChatRequest): Context {
   const context: Context = {
     messages: [],
-    tools: request.tools ? request.tools.map(unifiedToolToPiAi) : undefined
+    tools: request.tools ? request.tools.map(unifiedToolToPiAi) : undefined,
   };
 
   for (const msg of request.messages) {
@@ -50,7 +50,7 @@ function unifiedMessageToUserMessage(msg: UnifiedMessage): UserMessage {
     return {
       role: 'user',
       content: msg.content,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -70,7 +70,7 @@ function unifiedMessageToUserMessage(msg: UnifiedMessage): UserMessage {
         return {
           type: 'image' as const,
           data,
-          mimeType
+          mimeType,
         };
       }
 
@@ -83,7 +83,7 @@ function unifiedMessageToUserMessage(msg: UnifiedMessage): UserMessage {
   return {
     role: 'user',
     content,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   } as UserMessage;
 }
 
@@ -106,7 +106,7 @@ function unifiedMessageToAssistantMessage(msg: UnifiedMessage): AssistantMessage
         type: 'toolCall',
         id: toolCall.id,
         name: toolCall.function.name,
-        arguments: JSON.parse(toolCall.function.arguments)
+        arguments: JSON.parse(toolCall.function.arguments),
       } as any);
     }
   }
@@ -115,7 +115,7 @@ function unifiedMessageToAssistantMessage(msg: UnifiedMessage): AssistantMessage
     content.push({
       type: 'thinking',
       thinking: msg.thinking.content,
-      thinkingSignature: msg.thinking.signature
+      thinkingSignature: msg.thinking.signature,
     } as any);
   }
 
@@ -131,10 +131,10 @@ function unifiedMessageToAssistantMessage(msg: UnifiedMessage): AssistantMessage
       cacheRead: 0,
       cacheWrite: 0,
       totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
     stopReason: 'stop',
-    timestamp: Date.now()
+    timestamp: Date.now(),
   } as AssistantMessage;
 }
 
@@ -165,7 +165,7 @@ function unifiedMessageToToolResult(msg: UnifiedMessage): ToolResultMessage {
     toolName: msg.name || 'unknown',
     content,
     isError: false,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   } as ToolResultMessage;
 }
 
@@ -200,7 +200,7 @@ function mapPropertyValue(value: any): any {
           ...(value.additionalProperties !== undefined
             ? { additionalProperties: value.additionalProperties }
             : {}),
-          ...description
+          ...description,
         });
       }
       return Type.Any(description);
@@ -218,14 +218,14 @@ function unifiedToolToPiAi(tool: UnifiedTool): PiAiTool {
       )
     ),
     {
-      additionalProperties: tool.function.parameters.additionalProperties ?? false
+      additionalProperties: tool.function.parameters.additionalProperties ?? false,
     }
   );
 
   return {
     name: tool.function.name,
     description: tool.function.description || '',
-    parameters
+    parameters,
   } as PiAiTool;
 }
 
@@ -258,8 +258,8 @@ export function piAiMessageToUnified(
           type: 'function',
           function: {
             name: stripProxyPrefix(block.name) || block.name,
-            arguments: JSON.stringify(block.arguments)
-          }
+            arguments: JSON.stringify(block.arguments),
+          },
         });
       }
     }
@@ -279,9 +279,9 @@ export function piAiMessageToUnified(
     plexus: {
       provider,
       model,
-      apiType: 'oauth'
+      apiType: 'oauth',
     },
-    finishReason: mapStopReason(message.stopReason)
+    finishReason: mapStopReason(message.stopReason),
   };
 }
 
@@ -301,49 +301,48 @@ export function piAiEventToChunk(
     created: Math.floor(Date.now() / 1000),
     delta: {},
     finish_reason: null,
-    usage: undefined
+    usage: undefined,
   };
 
   switch (event.type) {
     case 'start':
       return {
         ...baseChunk,
-        delta: { role: 'assistant' }
+        delta: { role: 'assistant' },
       };
     case 'text_delta':
       return {
         ...baseChunk,
-        delta: { content: event.delta }
+        delta: { content: event.delta },
       };
     case 'thinking_delta':
       return {
         ...baseChunk,
         delta: {
           reasoning_content: event.delta,
-          thinking: { content: event.delta }
-        }
+          thinking: { content: event.delta },
+        },
       };
-    case 'toolcall_start':
-      {
-        const toolCall = event.partial?.content?.[event.contentIndex];
-        const { callId } = parseToolCallIds((toolCall as any)?.id);
-        return {
-          ...baseChunk,
-          delta: {
-            tool_calls: [
-              {
-                index: event.contentIndex,
-                id: callId || '',
-                type: 'function',
-                function: {
-                  name: stripProxyPrefix((toolCall as any)?.name) || '',
-                  arguments: ''
-                }
-              }
-            ]
-          }
-        };
-      }
+    case 'toolcall_start': {
+      const toolCall = event.partial?.content?.[event.contentIndex];
+      const { callId } = parseToolCallIds((toolCall as any)?.id);
+      return {
+        ...baseChunk,
+        delta: {
+          tool_calls: [
+            {
+              index: event.contentIndex,
+              id: callId || '',
+              type: 'function',
+              function: {
+                name: stripProxyPrefix((toolCall as any)?.name) || '',
+                arguments: '',
+              },
+            },
+          ],
+        },
+      };
+    }
     case 'toolcall_delta': {
       const toolCall = event.partial?.content?.[event.contentIndex];
       if (toolCall && toolCall.type === 'toolCall') {
@@ -358,11 +357,11 @@ export function piAiEventToChunk(
                 type: 'function',
                 function: {
                   name: stripProxyPrefix((toolCall as any).name),
-                  arguments: event.delta
-                }
-              }
-            ]
-          }
+                  arguments: event.delta,
+                },
+              },
+            ],
+          },
         };
       }
       return null;
@@ -373,13 +372,13 @@ export function piAiEventToChunk(
       return {
         ...baseChunk,
         finish_reason: mapStopReason(event.reason),
-        usage: piAiUsageToUnified(event.message.usage)
+        usage: piAiUsageToUnified(event.message.usage),
       };
     case 'error':
       return {
         ...baseChunk,
         finish_reason: event.reason === 'aborted' ? 'aborted' : 'error',
-        usage: piAiUsageToUnified(event.error.usage)
+        usage: piAiUsageToUnified(event.error.usage),
       };
     case 'text_start':
     case 'text_end':
@@ -398,7 +397,7 @@ function piAiUsageToUnified(usage: Usage): UnifiedUsage {
     total_tokens: usage.totalTokens,
     reasoning_tokens: 0,
     cached_tokens: usage.cacheRead,
-    cache_creation_tokens: usage.cacheWrite
+    cache_creation_tokens: usage.cacheWrite,
   };
 }
 

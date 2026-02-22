@@ -9,11 +9,10 @@ import { UsageSelector } from '../usage';
 import { UsageStorageService } from '../../usage-storage';
 
 describe('SelectorFactory', () => {
-    
   const mockStorage = {} as unknown as UsageStorageService;
-  
+
   beforeEach(() => {
-      SelectorFactory.setUsageStorage(mockStorage);
+    SelectorFactory.setUsageStorage(mockStorage);
   });
 
   it('should return RandomSelector for "random"', () => {
@@ -53,7 +52,7 @@ describe('SelectorFactory', () => {
   });
 
   it('should throw for unknown selector', () => {
-    expect(() => SelectorFactory.getSelector('unknown')).toThrow("Unknown selector type: unknown");
+    expect(() => SelectorFactory.getSelector('unknown')).toThrow('Unknown selector type: unknown');
   });
 
   it('should return UsageSelector for "usage"', () => {

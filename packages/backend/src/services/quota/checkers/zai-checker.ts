@@ -25,7 +25,10 @@ export class ZAIQuotaChecker extends QuotaChecker {
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.z.ai/api/monitor/usage/quota/limit');
+    this.endpoint = this.getOption<string>(
+      'endpoint',
+      'https://api.z.ai/api/monitor/usage/quota/limit'
+    );
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {
@@ -33,11 +36,11 @@ export class ZAIQuotaChecker extends QuotaChecker {
 
     try {
       logger.silly(`[zai-checker] Calling ${this.endpoint}`);
-      
+
       const response = await fetch(this.endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Accept-Language': 'en-US,en',
           'Content-Type': 'application/json',
         },
@@ -53,32 +56,36 @@ export class ZAIQuotaChecker extends QuotaChecker {
 
       const data: ZAIQuotaLimitResponse = await response.json();
       logger.silly(`[zai-checker] Response data: ${JSON.stringify(data)}`);
-      
+
       const windows: QuotaWindow[] = [];
       const limits = data.data?.limits ?? [];
 
       if (limits) {
         for (const limit of limits) {
           if (limit.type === 'TOKENS_LIMIT') {
-            windows.push(this.createWindow(
-              'five_hour',
-              100,
-              limit.percentage,
-              undefined,
-              'percentage',
-              undefined,
-              'Token usage (5 Hour)'
-            ));
+            windows.push(
+              this.createWindow(
+                'five_hour',
+                100,
+                limit.percentage,
+                undefined,
+                'percentage',
+                undefined,
+                'Token usage (5 Hour)'
+              )
+            );
           } else if (limit.type === 'TIME_LIMIT') {
-            windows.push(this.createWindow(
-              'monthly',
-              limit.total ?? limit.remaining,
-              limit.currentValue,
-              limit.remaining,
-              'requests',
-              limit.nextResetTime ? new Date(limit.nextResetTime) : undefined,
-              'MCP usage (1 Month)'
-            ));
+            windows.push(
+              this.createWindow(
+                'monthly',
+                limit.total ?? limit.remaining,
+                limit.currentValue,
+                limit.remaining,
+                'requests',
+                limit.nextResetTime ? new Date(limit.nextResetTime) : undefined,
+                'MCP usage (1 Month)'
+              )
+            );
           }
         }
       }

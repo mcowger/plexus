@@ -101,10 +101,13 @@ describe('NanoGPTQuotaChecker', () => {
 
   it('returns error when response has no daily/monthly windows', async () => {
     setFetchMock(async () => {
-      return new Response(JSON.stringify({ active: true, limits: { daily: 5000, monthly: 60000 } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ active: true, limits: { daily: 5000, monthly: 60000 } }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     });
 
     const checker = new NanoGPTQuotaChecker(makeConfig());
@@ -115,7 +118,9 @@ describe('NanoGPTQuotaChecker', () => {
   });
 
   it('returns error for non-200 response', async () => {
-    setFetchMock(async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
+    setFetchMock(
+      async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
+    );
 
     const checker = new NanoGPTQuotaChecker(makeConfig());
     const result = await checker.checkQuota();

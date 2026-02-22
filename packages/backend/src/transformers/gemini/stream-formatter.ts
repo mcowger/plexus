@@ -1,5 +1,5 @@
-import { Part } from "@google/genai";
-import { encode } from "eventsource-encoder";
+import { Part } from '@google/genai';
+import { encode } from 'eventsource-encoder';
 
 /**
  * Formats unified chunks back into Gemini's SSE format.
@@ -26,7 +26,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
           parts.push({
             functionCall: {
               name: tc.function.name,
-              args: JSON.parse(tc.function.arguments || "{}"),
+              args: JSON.parse(tc.function.arguments || '{}'),
             },
           });
         });
@@ -36,7 +36,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
         const geminiChunk = {
           candidates: [
             {
-              content: { role: "model", parts },
+              content: { role: 'model', parts },
               finishReason: chunk.finish_reason?.toUpperCase() || null,
               index: 0,
             },

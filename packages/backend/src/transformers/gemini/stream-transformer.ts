@@ -1,5 +1,5 @@
-import { createParser, EventSourceMessage } from "eventsource-parser";
-import { logger } from "../../utils/logger";
+import { createParser, EventSourceMessage } from 'eventsource-parser';
+import { logger } from '../../utils/logger';
 
 /**
  * Transforms a Gemini stream (Server-Sent Events) into unified stream format.
@@ -22,7 +22,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
     start(controller) {
       parser = createParser({
         onEvent: (event: EventSourceMessage) => {
-          if (event.data === "[DONE]") return;
+          if (event.data === '[DONE]') return;
           try {
             const data = JSON.parse(event.data);
             const candidate = data.candidates?.[0];
@@ -36,15 +36,12 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                   id: data.responseId,
                   model: data.modelVersion,
                   delta: {
-                    role: "assistant",
+                    role: 'assistant',
                     reasoning_content: part.thought ? part.text : undefined,
                     content: part.thought ? undefined : part.text,
                   },
                 };
-                logger.silly(
-                  `Gemini Transformer: Enqueueing unified chunk (text)`,
-                  chunk
-                );
+                logger.silly(`Gemini Transformer: Enqueueing unified chunk (text)`, chunk);
                 controller.enqueue(chunk);
               }
               if (part.functionCall) {
@@ -52,11 +49,11 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                   id: data.responseId,
                   model: data.modelVersion,
                   delta: {
-                    role: "assistant",
+                    role: 'assistant',
                     tool_calls: [
                       {
                         id: part.functionCall.name,
-                        type: "function",
+                        type: 'function',
                         function: {
                           name: part.functionCall.name,
                           arguments: JSON.stringify(part.functionCall.args),
@@ -65,10 +62,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                     ],
                   },
                 };
-                logger.silly(
-                  `Gemini Transformer: Enqueueing unified chunk (tool)`,
-                  chunk
-                );
+                logger.silly(`Gemini Transformer: Enqueueing unified chunk (tool)`, chunk);
                 controller.enqueue(chunk);
               }
             }
@@ -84,28 +78,21 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                       output_tokens: data.usageMetadata.candidatesTokenCount,
                       total_tokens: data.usageMetadata.totalTokenCount,
                       reasoning_tokens: data.usageMetadata.thoughtsTokenCount,
-                      cached_tokens:
-                        data.usageMetadata.cachedContentTokenCount,
+                      cached_tokens: data.usageMetadata.cachedContentTokenCount,
                     }
                   : undefined,
               };
-              logger.silly(
-                `Gemini Transformer: Enqueueing unified chunk (finish)`,
-                chunk
-              );
+              logger.silly(`Gemini Transformer: Enqueueing unified chunk (finish)`, chunk);
               controller.enqueue(chunk);
             }
           } catch (e) {
-            logger.error("Error parsing Gemini stream chunk", e);
+            logger.error('Error parsing Gemini stream chunk', e);
           }
         },
       });
     },
     transform(chunk, controller) {
-      const text =
-        typeof chunk === "string"
-          ? chunk
-          : decoder.decode(chunk, { stream: true });
+      const text = typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       parser.feed(text);
     },
   });

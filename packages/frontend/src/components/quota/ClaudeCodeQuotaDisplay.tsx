@@ -39,10 +39,12 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
     return (
       <div className="px-2 py-2">
         <Tooltip content={getErrorTooltipContent()} position="right">
-          <div className={clsx(
-            "flex items-center gap-2 text-danger cursor-help",
-            isCollapsed && "justify-center"
-          )}>
+          <div
+            className={clsx(
+              'flex items-center gap-2 text-danger cursor-help',
+              isCollapsed && 'justify-center'
+            )}
+          >
             <AlertTriangle size={16} />
             {!isCollapsed && <span className="text-xs">Error</span>}
           </div>
@@ -52,17 +54,18 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const fiveHourWindow = windows.find(w => w.windowType === 'five_hour');
-  const weeklyWindow = windows.find(w => w.windowType === 'weekly');
+  const fiveHourWindow = windows.find((w) => w.windowType === 'five_hour');
+  const weeklyWindow = windows.find((w) => w.windowType === 'weekly');
 
   // Determine overall status
-  const overallStatus = fiveHourWindow?.status === 'exhausted' || fiveHourWindow?.status === 'critical' 
-    ? 'critical'
-    : weeklyWindow?.status === 'exhausted' || weeklyWindow?.status === 'critical'
-    ? 'critical'
-    : fiveHourWindow?.status === 'warning' || weeklyWindow?.status === 'warning'
-    ? 'warning'
-    : 'ok';
+  const overallStatus =
+    fiveHourWindow?.status === 'exhausted' || fiveHourWindow?.status === 'critical'
+      ? 'critical'
+      : weeklyWindow?.status === 'exhausted' || weeklyWindow?.status === 'critical'
+        ? 'critical'
+        : fiveHourWindow?.status === 'warning' || weeklyWindow?.status === 'warning'
+          ? 'warning'
+          : 'ok';
 
   const statusColors: Record<QuotaStatus, string> = {
     ok: 'bg-success',
@@ -117,7 +120,9 @@ export const ClaudeCodeQuotaDisplay: React.FC<ClaudeCodeQuotaDisplayProps> = ({
                   'h-full rounded-md transition-all duration-500 ease-out',
                   barColorForStatus(fiveHourWindow.status, 'bg-info')
                 )}
-                style={{ width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%` }}
+                style={{
+                  width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%`,
+                }}
               />
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-info">

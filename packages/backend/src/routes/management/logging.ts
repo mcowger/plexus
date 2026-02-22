@@ -1,5 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { getCurrentLogLevel, getStartupLogLevel, logger, resetCurrentLogLevel, setCurrentLogLevel, SUPPORTED_LOG_LEVELS } from '../../utils/logger';
+import {
+  getCurrentLogLevel,
+  getStartupLogLevel,
+  logger,
+  resetCurrentLogLevel,
+  setCurrentLogLevel,
+  SUPPORTED_LOG_LEVELS,
+} from '../../utils/logger';
 
 export async function registerLoggingRoutes(fastify: FastifyInstance) {
   fastify.get('/v0/management/logging/level', async (_request, reply) => {
@@ -45,7 +52,9 @@ export async function registerLoggingRoutes(fastify: FastifyInstance) {
   fastify.delete('/v0/management/logging/level', async (_request, reply) => {
     const previousLevel = getCurrentLogLevel();
     const level = resetCurrentLogLevel();
-    logger.info(`Log level reset from '${previousLevel}' to startup default '${level}' via management API`);
+    logger.info(
+      `Log level reset from '${previousLevel}' to startup default '${level}' via management API`
+    );
 
     return reply.send({
       level,

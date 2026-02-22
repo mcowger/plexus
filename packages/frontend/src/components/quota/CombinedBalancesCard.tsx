@@ -15,12 +15,12 @@ interface CombinedBalancesCardProps {
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
-  'openrouter': 'OpenRouter',
-  'minimax': 'MiniMax',
-  'moonshot': 'Moonshot',
-  'naga': 'Naga',
-  'kilo': 'Kilo',
-  'apertis': 'Apertis',
+  openrouter: 'OpenRouter',
+  minimax: 'MiniMax',
+  moonshot: 'Moonshot',
+  naga: 'Naga',
+  kilo: 'Kilo',
+  apertis: 'Apertis',
 };
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
@@ -67,7 +67,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   const renderBalanceRow = (quota: QuotaCheckerInfo) => {
     const result = getQuotaResult(quota);
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-    
+
     // Normalize checker type name
     let normalizedType = checkerType;
     if (checkerType.includes('openrouter')) normalizedType = 'openrouter';
@@ -92,9 +92,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Wallet size={14} className="text-info flex-shrink-0" />
-            <span className="text-sm font-semibold text-text">
-              {toTitleCase(quota.checkerId)}
-            </span>
+            <span className="text-sm font-semibold text-text">{toTitleCase(quota.checkerId)}</span>
           </div>
           <div className="text-xs text-text-muted pl-5 truncate">
             {displayName}
@@ -153,10 +151,9 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
         </div>
 
         {/* Balance Grid - max 2 columns */}
-        <div className={clsx(
-          "grid gap-0",
-          shouldSplit ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
-        )}>
+        <div
+          className={clsx('grid gap-0', shouldSplit ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}
+        >
           {/* Left Column */}
           <div className="divide-y divide-border">
             {leftColumn.map((quota) => renderBalanceRow(quota))}

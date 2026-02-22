@@ -1,11 +1,7 @@
 import fs from 'fs';
 import { getAuthJsonPath } from '../config';
 import { logger } from '../utils/logger';
-import {
-  getOAuthApiKey,
-  type OAuthProvider,
-  type OAuthCredentials
-} from '@mariozechner/pi-ai';
+import { getOAuthApiKey, type OAuthProvider, type OAuthCredentials } from '@mariozechner/pi-ai';
 
 const LEGACY_ACCOUNT_ID = 'legacy';
 
@@ -66,8 +62,8 @@ const normalizeAuthData = (raw: unknown): { data: AuthRecord; migrated: boolean 
     migrated = true;
     normalized[provider] = {
       accounts: {
-        [LEGACY_ACCOUNT_ID]: legacyCredentials
-      }
+        [LEGACY_ACCOUNT_ID]: legacyCredentials,
+      },
     };
   }
 
@@ -120,11 +116,7 @@ export class OAuthAuthManager {
 
   private saveAuthFile(): void {
     try {
-      fs.writeFileSync(
-        this.authFilePath,
-        JSON.stringify(this.authData, null, 2),
-        'utf-8'
-      );
+      fs.writeFileSync(this.authFilePath, JSON.stringify(this.authData, null, 2), 'utf-8');
       logger.debug(`OAuth: Saved updated credentials to ${this.authFilePath}`);
     } catch (error) {
       logger.error(`OAuth: Failed to save ${this.authFilePath}:`, error);
@@ -165,7 +157,7 @@ export class OAuthAuthManager {
 
     this.authData[provider].accounts[accountId] = {
       type: 'oauth',
-      ...credentials
+      ...credentials,
     } as OAuthCredentials;
 
     this.saveAuthFile();
@@ -181,7 +173,9 @@ export class OAuthAuthManager {
 
     const resolvedAccountId = this.resolveAccountId(provider, accountId);
     if (!resolvedAccountId) {
-      throw new Error(`OAuth: accountId is required to resolve credentials for provider '${provider}'.`);
+      throw new Error(
+        `OAuth: accountId is required to resolve credentials for provider '${provider}'.`
+      );
     }
 
     const credentials = providerRecord.accounts?.[resolvedAccountId];
@@ -193,12 +187,12 @@ export class OAuthAuthManager {
     }
 
     const result = await getOAuthApiKey(provider, {
-      [provider]: credentials
+      [provider]: credentials,
     });
 
     if (!result) {
       throw new Error(
-          `OAuth: Not authenticated for provider '${provider}' and account '${resolvedAccountId}'. ` +
+        `OAuth: Not authenticated for provider '${provider}' and account '${resolvedAccountId}'. ` +
           `Please run OAuth login for this account.`
       );
     }
@@ -206,7 +200,7 @@ export class OAuthAuthManager {
     if (result.newCredentials) {
       providerRecord.accounts[resolvedAccountId] = {
         type: 'oauth',
-        ...result.newCredentials
+        ...result.newCredentials,
       } as OAuthCredentials;
       this.saveAuthFile();
     }

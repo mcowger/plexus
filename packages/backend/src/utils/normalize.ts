@@ -55,7 +55,10 @@ export function toIsoString(value: TimestampLike): string | null {
  * Use this for MCP tables and any other tables that use `text` on SQLite
  * and `timestamp` on PostgreSQL.
  */
-export function toDbTimestamp(value: TimestampLike, dialect: SupportedDialect): string | Date | null {
+export function toDbTimestamp(
+  value: TimestampLike,
+  dialect: SupportedDialect
+): string | Date | null {
   if (value == null) return null;
   const ms = toEpochMs(value);
   if (ms == null) return null;
@@ -72,7 +75,10 @@ export function toDbTimestamp(value: TimestampLike, dialect: SupportedDialect): 
  * Use this for quota_snapshots and any other tables that use
  * `integer(timestamp_ms)` on SQLite and `bigint(number)` on PostgreSQL.
  */
-export function toDbTimestampMs(value: TimestampLike, dialect: SupportedDialect): Date | number | null {
+export function toDbTimestampMs(
+  value: TimestampLike,
+  dialect: SupportedDialect
+): Date | number | null {
   if (value == null) return null;
   const ms = toEpochMs(value);
   if (ms == null) return null;

@@ -1,25 +1,25 @@
-import { test, expect, describe } from "bun:test";
-import { AnthropicTransformer } from "../anthropic";
-import { UnifiedChatStreamChunk } from "../../types/unified";
+import { test, expect, describe } from 'bun:test';
+import { AnthropicTransformer } from '../anthropic';
+import { UnifiedChatStreamChunk } from '../../types/unified';
 
-describe("AnthropicTransformer Stream Formatting", () => {
-  test("should include usage when it arrives after finish_reason", async () => {
+describe('AnthropicTransformer Stream Formatting', () => {
+  test('should include usage when it arrives after finish_reason', async () => {
     const transformer = new AnthropicTransformer();
     const stream = new ReadableStream<UnifiedChatStreamChunk>({
       start(controller) {
         // Chunk 1: Stop reason
         controller.enqueue({
-          id: "msg_1",
-          model: "claude",
+          id: 'msg_1',
+          model: 'claude',
           created: 1234567890,
-          delta: { role: "assistant", content: "Hello" },
-          finish_reason: "stop",
+          delta: { role: 'assistant', content: 'Hello' },
+          finish_reason: 'stop',
         });
 
         // Chunk 2: Usage (after stop)
         controller.enqueue({
-          id: "msg_1",
-          model: "claude",
+          id: 'msg_1',
+          model: 'claude',
           created: 1234567890,
           delta: {},
           usage: {
@@ -40,7 +40,7 @@ describe("AnthropicTransformer Stream Formatting", () => {
     const reader = formattedStream.getReader();
     const decoder = new TextDecoder();
 
-    let output = "";
+    let output = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -48,40 +48,40 @@ describe("AnthropicTransformer Stream Formatting", () => {
     }
 
     // Check for message_delta with usage
-    const events = output.split("\n\n").filter(Boolean);
-    const messageDeltaEvent = events.find(e => e.includes("message_delta"));
+    const events = output.split('\n\n').filter(Boolean);
+    const messageDeltaEvent = events.find((e) => e.includes('message_delta'));
 
     expect(messageDeltaEvent).toBeDefined();
 
-    const jsonStr = messageDeltaEvent?.split("data: ")[1];
+    const jsonStr = messageDeltaEvent?.split('data: ')[1];
     expect(jsonStr).toBeDefined();
     const data = JSON.parse(jsonStr!);
 
-    expect(data.type).toBe("message_delta");
+    expect(data.type).toBe('message_delta');
     expect(data.usage).toBeDefined();
     expect(data.usage.output_tokens).toBe(20);
-    expect(data.delta.stop_reason).toBe("end_turn");
+    expect(data.delta.stop_reason).toBe('end_turn');
   });
 
-  test("should include thinkingTokens in message_delta usage", async () => {
+  test('should include thinkingTokens in message_delta usage', async () => {
     const transformer = new AnthropicTransformer();
     const stream = new ReadableStream<UnifiedChatStreamChunk>({
       start(controller) {
         // Chunk 1: Content
         controller.enqueue({
-          id: "msg_2",
-          model: "claude",
+          id: 'msg_2',
+          model: 'claude',
           created: 1234567890,
-          delta: { role: "assistant", content: "Response with thinking" },
+          delta: { role: 'assistant', content: 'Response with thinking' },
         });
 
         // Chunk 2: Finish with usage including reasoning tokens
         controller.enqueue({
-          id: "msg_2",
-          model: "claude",
+          id: 'msg_2',
+          model: 'claude',
           created: 1234567890,
           delta: {},
-          finish_reason: "stop",
+          finish_reason: 'stop',
           usage: {
             input_tokens: 7,
             output_tokens: 325,
@@ -100,7 +100,7 @@ describe("AnthropicTransformer Stream Formatting", () => {
     const reader = formattedStream.getReader();
     const decoder = new TextDecoder();
 
-    let output = "";
+    let output = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -108,33 +108,33 @@ describe("AnthropicTransformer Stream Formatting", () => {
     }
 
     // Check for message_delta with thinkingTokens
-    const events = output.split("\n\n").filter(Boolean);
-    const messageDeltaEvent = events.find((e) => e.includes("message_delta"));
+    const events = output.split('\n\n').filter(Boolean);
+    const messageDeltaEvent = events.find((e) => e.includes('message_delta'));
 
     expect(messageDeltaEvent).toBeDefined();
 
-    const jsonStr = messageDeltaEvent?.split("data: ")[1];
+    const jsonStr = messageDeltaEvent?.split('data: ')[1];
     expect(jsonStr).toBeDefined();
     const data = JSON.parse(jsonStr!);
 
-    expect(data.type).toBe("message_delta");
+    expect(data.type).toBe('message_delta');
     expect(data.usage).toBeDefined();
     expect(data.usage.input_tokens).toBe(7);
     expect(data.usage.output_tokens).toBe(325);
     expect(data.usage.thinkingTokens).toBe(695);
-    expect(data.delta.stop_reason).toBe("end_turn");
+    expect(data.delta.stop_reason).toBe('end_turn');
   });
 
-  test("should handle zero thinkingTokens", async () => {
+  test('should handle zero thinkingTokens', async () => {
     const transformer = new AnthropicTransformer();
     const stream = new ReadableStream<UnifiedChatStreamChunk>({
       start(controller) {
         controller.enqueue({
-          id: "msg_3",
-          model: "claude",
+          id: 'msg_3',
+          model: 'claude',
           created: 1234567890,
-          delta: { role: "assistant", content: "Simple response" },
-          finish_reason: "stop",
+          delta: { role: 'assistant', content: 'Simple response' },
+          finish_reason: 'stop',
           usage: {
             input_tokens: 5,
             output_tokens: 10,
@@ -153,19 +153,19 @@ describe("AnthropicTransformer Stream Formatting", () => {
     const reader = formattedStream.getReader();
     const decoder = new TextDecoder();
 
-    let output = "";
+    let output = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       output += decoder.decode(value);
     }
 
-    const events = output.split("\n\n").filter(Boolean);
-    const messageDeltaEvent = events.find((e) => e.includes("message_delta"));
+    const events = output.split('\n\n').filter(Boolean);
+    const messageDeltaEvent = events.find((e) => e.includes('message_delta'));
 
     expect(messageDeltaEvent).toBeDefined();
 
-    const jsonStr = messageDeltaEvent?.split("data: ")[1];
+    const jsonStr = messageDeltaEvent?.split('data: ')[1];
     expect(jsonStr).toBeDefined();
     const data = JSON.parse(jsonStr!);
 

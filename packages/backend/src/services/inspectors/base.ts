@@ -1,11 +1,11 @@
 import { PassThrough } from 'stream';
 
 export abstract class BaseInspector {
-    protected requestId: string;
+  protected requestId: string;
 
-    constructor(requestId: string) {
-        this.requestId = requestId;
-    }
+  constructor(requestId: string) {
+    this.requestId = requestId;
+  }
 
-    abstract createInspector(providerApiType: string): PassThrough;
+  abstract createInspector(providerApiType: string): PassThrough;
 }

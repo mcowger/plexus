@@ -6,10 +6,7 @@ interface KimiCodeQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const KimiCodeQuotaConfig: React.FC<KimiCodeQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const KimiCodeQuotaConfig: React.FC<KimiCodeQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };

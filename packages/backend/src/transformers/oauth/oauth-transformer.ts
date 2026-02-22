@@ -2,19 +2,19 @@ import { Transformer } from '../../types/transformer';
 import type {
   UnifiedChatRequest,
   UnifiedChatResponse,
-  UnifiedChatStreamChunk
+  UnifiedChatStreamChunk,
 } from '../../types/unified';
 import {
   getModel,
   stream,
   complete,
   type OAuthProvider,
-  type Model as PiAiModel
+  type Model as PiAiModel,
 } from '@mariozechner/pi-ai';
 import {
   applyClaudeCodeToolProxy,
   filterPiAiRequestOptions,
-  proxyClaudeCodeToolName
+  proxyClaudeCodeToolName,
 } from '../../filters/pi-ai-request-filters';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 import { unifiedToContext, piAiMessageToUnified, piAiEventToChunk } from './type-mappers';
@@ -50,7 +50,7 @@ function streamFromAsyncIterable<T>(iterable: AsyncIterable<T>): ReadableStream<
     async cancel(reason) {
       closed = true;
       await iterator.return?.(reason);
-    }
+    },
   });
 }
 
@@ -84,7 +84,7 @@ function describeStreamResult(result: any): Record<string, any> {
     isReadableStream: isReadableStream(result),
     hasIterator: !!result && typeof result[Symbol.asyncIterator] === 'function',
     hasGetReader: !!result && typeof result.getReader === 'function',
-    constructorName: result?.constructor?.name || typeof result
+    constructorName: result?.constructor?.name || typeof result,
   };
 }
 
@@ -144,7 +144,7 @@ export class OAuthTransformer implements Transformer {
       messageCount: context.messages.length,
       hasSystemPrompt: !!context.systemPrompt,
       toolCount: context.tools?.length || 0,
-      optionKeys: Object.keys(options)
+      optionKeys: Object.keys(options),
     });
 
     return { context, options };
@@ -161,7 +161,7 @@ export class OAuthTransformer implements Transformer {
     logger.debug(`${this.name}: Converted pi-ai response to unified`, {
       hasContent: !!unified.content,
       hasToolCalls: !!unified.tool_calls,
-      usageTokens: unified.usage?.total_tokens
+      usageTokens: unified.usage?.total_tokens,
     });
 
     return unified;
@@ -181,7 +181,8 @@ export class OAuthTransformer implements Transformer {
         : readableStreamToAsyncIterable(streamInput as ReadableStream<any>);
 
       for await (const event of source) {
-        const provider = event.partial?.provider || event.message?.provider || event.error?.provider;
+        const provider =
+          event.partial?.provider || event.message?.provider || event.error?.provider;
         const chunk = piAiEventToChunk(event, event.partial?.model || 'unknown', provider);
         if (chunk) {
           yield chunk;
@@ -217,7 +218,7 @@ export class OAuthTransformer implements Transformer {
           output_tokens: event.message.usage.output,
           cached_tokens: event.message.usage.cacheRead,
           cache_creation_tokens: event.message.usage.cacheWrite,
-          reasoning_tokens: 0
+          reasoning_tokens: 0,
         };
       }
     } catch {
@@ -269,7 +270,9 @@ export class OAuthTransformer implements Transformer {
             requestOptions.toolChoice = proxyClaudeCodeToolName(requestOptions.toolChoice);
           } else if (typeof requestOptions.toolChoice === 'object') {
             if (typeof requestOptions.toolChoice.name === 'string') {
-              requestOptions.toolChoice.name = proxyClaudeCodeToolName(requestOptions.toolChoice.name);
+              requestOptions.toolChoice.name = proxyClaudeCodeToolName(
+                requestOptions.toolChoice.name
+              );
             }
             if (requestOptions.toolChoice.function?.name) {
               requestOptions.toolChoice.function.name = proxyClaudeCodeToolName(
@@ -287,12 +290,12 @@ export class OAuthTransformer implements Transformer {
         'anthropic-beta':
           'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14',
         'user-agent': 'claude-cli/2.1.2 (external, cli)',
-        'x-app': 'cli'
+        'x-app': 'cli',
       };
 
       requestOptions.headers = {
         ...claudeCodeHeaders,
-        ...baseHeaders
+        ...baseHeaders,
       };
     }
 
@@ -307,7 +310,7 @@ export class OAuthTransformer implements Transformer {
       isClaudeCodeToken,
       isClaudeCodeAgent,
       optionKeys: Object.keys(filteredOptions),
-      hasInjectedClaudeCodeHeaders: !!requestOptions.headers
+      hasInjectedClaudeCodeHeaders: !!requestOptions.headers,
     });
 
     if (strippedParameters.length > 0) {
@@ -315,11 +318,13 @@ export class OAuthTransformer implements Transformer {
         model: model.id,
         provider,
         accountId,
-        strippedParameters
+        strippedParameters,
       });
     }
 
-    logger.info(`${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", accountId: "${accountId}" }`);
+    logger.info(
+      `${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", accountId: "${accountId}" }`
+    );
 
     if (streaming) {
       try {

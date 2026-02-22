@@ -24,7 +24,10 @@ function createDrizzleLogger() {
   };
 }
 
-function parseConnectionString(uri: string): { dialect: SupportedDialect; connectionString: string } {
+function parseConnectionString(uri: string): {
+  dialect: SupportedDialect;
+  connectionString: string;
+} {
   if (uri.startsWith('sqlite://')) {
     return { dialect: 'sqlite', connectionString: uri.replace('sqlite://', '') };
   } else if (uri.startsWith('postgres://') || uri.startsWith('postgresql://')) {
@@ -49,14 +52,14 @@ export function initializeDatabase(connectionString?: string) {
   }
 
   let effectiveUri = connectionString;
-  
+
   if (!effectiveUri) {
     effectiveUri = process.env.DATABASE_URL;
-    
+
     if (!effectiveUri) {
       throw new Error('DATABASE_URL environment variable is required for database connection');
     }
-    
+
     logger.silly(`Using DATABASE_URL: ${effectiveUri.substring(0, 30)}...`);
   }
 
@@ -64,7 +67,7 @@ export function initializeDatabase(connectionString?: string) {
   currentDialect = dialect;
 
   logger.silly(`Initializing ${dialect} database...`);
-  
+
   if (dialect === 'sqlite') {
     const dbPath = connStr === ':memory:' ? ':memory:' : resolvePath(connStr);
 
@@ -80,7 +83,8 @@ export function initializeDatabase(connectionString?: string) {
     sqlite.exec('PRAGMA foreign_keys = ON');
 
     const sqliteSchema = require('../../drizzle/schema/sqlite/index');
-    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } = sqliteSchema;
+    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } =
+      sqliteSchema;
 
     currentSchema = sqliteSchema;
     dbInstance = drizzle(sqlite, {
@@ -95,14 +99,15 @@ export function initializeDatabase(connectionString?: string) {
       connect_timeout: 10,
       onnotice: () => {},
     });
-    
+
     // Set statement timeout to prevent long-running queries from blocking
     sqlClient`SET statement_timeout = '30s'`.catch((err) => {
       logger.silly(`Failed to set statement_timeout: ${err}`);
     });
 
     const pgSchema = require('../../drizzle/schema/postgres/index');
-    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } = pgSchema;
+    const { requestUsage, providerCooldowns, debugLogs, inferenceErrors, providerPerformance } =
+      pgSchema;
 
     currentSchema = pgSchema;
     dbInstance = drizzlePg(sqlClient, {
@@ -110,7 +115,7 @@ export function initializeDatabase(connectionString?: string) {
       logger: createDrizzleLogger(),
     });
   }
-  
+
   return dbInstance;
 }
 

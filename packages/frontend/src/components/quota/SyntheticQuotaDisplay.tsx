@@ -16,10 +16,9 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
   if (!result.success) {
     return (
       <div className="px-2 py-2">
-        <div className={clsx(
-          "flex items-center gap-2 text-danger",
-          isCollapsed && "justify-center"
-        )}>
+        <div
+          className={clsx('flex items-center gap-2 text-danger', isCollapsed && 'justify-center')}
+        >
           <AlertTriangle size={16} />
           {!isCollapsed && <span className="text-xs">Error</span>}
         </div>
@@ -28,14 +27,15 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  
+
   // Find windows by type
-  const fiveHourWindow = windows.find(w => w.windowType === 'five_hour');
-  const toolcallsWindow = windows.find(w => w.windowType === 'toolcalls');
-  const searchWindow = windows.find(w => w.windowType === 'search');
+  const fiveHourWindow = windows.find((w) => w.windowType === 'five_hour');
+  const toolcallsWindow = windows.find((w) => w.windowType === 'toolcalls');
+  const searchWindow = windows.find((w) => w.windowType === 'search');
 
   // Get overall status (prioritize five_hour, then toolcalls, then search)
-  const overallStatus = fiveHourWindow?.status || toolcallsWindow?.status || searchWindow?.status || 'ok';
+  const overallStatus =
+    fiveHourWindow?.status || toolcallsWindow?.status || searchWindow?.status || 'ok';
 
   const statusColors: Record<QuotaStatus, string> = {
     ok: 'bg-success',
@@ -90,7 +90,9 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
                   'h-full rounded-md transition-all duration-500 ease-out',
                   barColorForStatus(fiveHourWindow.status, 'bg-emerald-400')
                 )}
-                style={{ width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%` }}
+                style={{
+                  width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%`,
+                }}
               />
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-emerald-400">
@@ -111,7 +113,9 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
                     'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
                     barColorForStatus(toolcallsWindow.status, 'bg-cyan-400')
                   )}
-                  style={{ width: `${Math.min(100, Math.max(0, toolcallsWindow.utilizationPercent))}%` }}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, toolcallsWindow.utilizationPercent))}%`,
+                  }}
                 />
               </div>
               <span className="text-text">{Math.round(toolcallsWindow.utilizationPercent)}%</span>
@@ -126,7 +130,9 @@ export const SyntheticQuotaDisplay: React.FC<SyntheticQuotaDisplayProps> = ({
                     'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
                     barColorForStatus(searchWindow.status, 'bg-violet-400')
                   )}
-                  style={{ width: `${Math.min(100, Math.max(0, searchWindow.utilizationPercent))}%` }}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, searchWindow.utilizationPercent))}%`,
+                  }}
                 />
               </div>
               <span className="text-text">{Math.round(searchWindow.utilizationPercent)}%</span>

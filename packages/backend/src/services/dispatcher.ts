@@ -1,23 +1,39 @@
-import { UnifiedChatRequest, UnifiedChatResponse, UnifiedTranscriptionRequest, UnifiedTranscriptionResponse, UnifiedSpeechRequest, UnifiedSpeechResponse, UnifiedImageGenerationRequest, UnifiedImageGenerationResponse, UnifiedImageEditRequest, UnifiedImageEditResponse } from "../types/unified";
-import { Router } from "./router";
-import { TransformerFactory } from "./transformer-factory";
-import { logger } from "../utils/logger";
-import { CooldownManager } from "./cooldown-manager";
-import { RouteResult } from "./router";
-import { DebugManager } from "./debug-manager";
-import { UsageStorageService } from "./usage-storage";
-import { CooldownParserRegistry } from "./cooldown-parsers";
-import { getConfig, getProviderTypes } from "../config";
-import { applyModelBehaviors } from "./model-behaviors";
-import { getModels } from "@mariozechner/pi-ai";
+import {
+  UnifiedChatRequest,
+  UnifiedChatResponse,
+  UnifiedTranscriptionRequest,
+  UnifiedTranscriptionResponse,
+  UnifiedSpeechRequest,
+  UnifiedSpeechResponse,
+  UnifiedImageGenerationRequest,
+  UnifiedImageGenerationResponse,
+  UnifiedImageEditRequest,
+  UnifiedImageEditResponse,
+} from '../types/unified';
+import { Router } from './router';
+import { TransformerFactory } from './transformer-factory';
+import { logger } from '../utils/logger';
+import { CooldownManager } from './cooldown-manager';
+import { RouteResult } from './router';
+import { DebugManager } from './debug-manager';
+import { UsageStorageService } from './usage-storage';
+import { CooldownParserRegistry } from './cooldown-parsers';
+import { getConfig, getProviderTypes } from '../config';
+import { applyModelBehaviors } from './model-behaviors';
+import { getModels } from '@mariozechner/pi-ai';
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
 
-  private async recordAttemptMetric(route: RouteResult, requestId: string | undefined, success: boolean): Promise<void> {
+  private async recordAttemptMetric(
+    route: RouteResult,
+    requestId: string | undefined,
+    success: boolean
+  ): Promise<void> {
     if (!this.usageStorage) return;
 
-    const metricRequestId = requestId || `failover-attempt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const metricRequestId =
+      requestId || `failover-attempt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     if (success) {
       await this.usageStorage.recordSuccessfulAttempt(
@@ -113,9 +129,7 @@ export class Dispatcher {
           } catch (oauthError: any) {
             lastError = oauthError;
             const canRetry =
-              failoverEnabled &&
-              i < targets.length - 1 &&
-              this.isRetryableOAuthError(oauthError);
+              failoverEnabled && i < targets.length - 1 && this.isRetryableOAuthError(oauthError);
 
             if (canRetry) {
               await this.recordAttemptMetric(route, request.requestId, false);
@@ -135,13 +149,13 @@ export class Dispatcher {
         // 4. Execute Request
         const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
         const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
-        const incomingApi = request.incomingApiType || "unknown";
+        const incomingApi = request.incomingApiType || 'unknown';
 
         logger.info(
           `Dispatching ${request.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
         );
 
-        logger.silly("Upstream Request Payload", providerPayload);
+        logger.silly('Upstream Request Payload', providerPayload);
 
         const response = await this.executeProviderRequest(url, headers, providerPayload);
 
@@ -225,8 +239,9 @@ export class Dispatcher {
         // Only mark provider failure for retryable errors
         // Non-retryable errors (400, 413, 422) should NOT trigger cooldown
         const statusCode = error?.routingContext?.statusCode;
-        const isNonRetryableClientError = statusCode === 400 || statusCode === 413 || statusCode === 422;
-        
+        const isNonRetryableClientError =
+          statusCode === 400 || statusCode === 413 || statusCode === 422;
+
         if (!isNonRetryableClientError) {
           CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
         }
@@ -304,7 +319,7 @@ export class Dispatcher {
       'socket',
       'temporary',
       'unavailable',
-      'service unavailable'
+      'service unavailable',
     ];
 
     for (const pattern of retryablePatterns) {
@@ -318,17 +333,18 @@ export class Dispatcher {
 
   private isRetryableNetworkError(error: any, retryableErrors: string[]): boolean {
     if (!error) return false;
-    const code = String(error.code || "").toUpperCase();
-    const message = String(error.message || "").toUpperCase();
+    const code = String(error.code || '').toUpperCase();
+    const message = String(error.message || '').toUpperCase();
     return retryableErrors.some((token) => {
       const normalized = token.toUpperCase();
       return code.includes(normalized) || message.includes(normalized);
     });
   }
 
-  private async probeStreamingStart(response: Response): Promise<
-    | { ok: true; response: Response }
-    | { ok: false; error: Error; streamStarted: boolean }
+  private async probeStreamingStart(
+    response: Response
+  ): Promise<
+    { ok: true; response: Response } | { ok: false; error: Error; streamStarted: boolean }
   > {
     if (!response.body) {
       return { ok: true, response };
@@ -431,8 +447,8 @@ export class Dispatcher {
   }
 
   private buildAllTargetsFailedError(lastError: any, attemptedProviders: string[]): Error {
-    const summary = attemptedProviders.length > 0 ? attemptedProviders.join(", ") : "none";
-    const baseMessage = lastError?.message || "Unknown provider error";
+    const summary = attemptedProviders.length > 0 ? attemptedProviders.join(', ') : 'none';
+    const baseMessage = lastError?.message || 'Unknown provider error';
     const enriched = new Error(`All targets failed: ${summary}. Last error: ${baseMessage}`) as any;
 
     enriched.cause = lastError;
@@ -446,29 +462,33 @@ export class Dispatcher {
     return enriched;
   }
 
-  setupHeaders(route: RouteResult, apiType: string, request: UnifiedChatRequest): Record<string, string> {
+  setupHeaders(
+    route: RouteResult,
+    apiType: string,
+    request: UnifiedChatRequest
+  ): Record<string, string> {
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     };
 
     // Set Accept header based on streaming
     if (request.stream) {
-      headers["Accept"] = "text/event-stream";
+      headers['Accept'] = 'text/event-stream';
     } else {
-      headers["Accept"] = "application/json";
+      headers['Accept'] = 'application/json';
     }
 
     // Use static API key
     if (route.config.api_key) {
       const type = apiType.toLowerCase();
-      if (type === "messages") {
-        headers["x-api-key"] = route.config.api_key;
-        headers["anthropic-version"] = "2023-06-01";
-      } else if (type === "gemini") {
-        headers["x-goog-api-key"] = route.config.api_key;
+      if (type === 'messages') {
+        headers['x-api-key'] = route.config.api_key;
+        headers['anthropic-version'] = '2023-06-01';
+      } else if (type === 'gemini') {
+        headers['x-goog-api-key'] = route.config.api_key;
       } else {
         // Default to Bearer for Chat (OpenAI) and others
-        headers["Authorization"] = `Bearer ${route.config.api_key}`;
+        headers['Authorization'] = `Bearer ${route.config.api_key}`;
       }
     } else {
       throw new Error(`No API key configured for provider '${route.provider}'`);
@@ -507,9 +527,7 @@ export class Dispatcher {
     // The available types for this specific routing
     // If model specific types are defined and not empty, use them. Otherwise fallback to provider types.
     const availableTypes =
-      modelSpecificTypes && modelSpecificTypes.length > 0
-        ? modelSpecificTypes
-        : providerTypes;
+      modelSpecificTypes && modelSpecificTypes.length > 0 ? modelSpecificTypes : providerTypes;
 
     let targetApiType = availableTypes[0]; // Default to first one
 
@@ -518,7 +536,7 @@ export class Dispatcher {
         `No available API type found for provider '${route.provider}' and model '${route.model}'. Check configuration.`
       );
     }
-    let selectionReason = "default (first available)";
+    let selectionReason = 'default (first available)';
 
     // Try to match incoming
     if (incomingApiType) {
@@ -543,7 +561,7 @@ export class Dispatcher {
   private resolveBaseUrl(route: RouteResult, targetApiType: string): string {
     let rawBaseUrl: string;
 
-    if (typeof route.config.api_base_url === "string") {
+    if (typeof route.config.api_base_url === 'string') {
       rawBaseUrl = route.config.api_base_url;
     } else {
       // It's a record/map
@@ -551,7 +569,7 @@ export class Dispatcher {
       // Check exact match first, then fallback to just looking for keys that might match?
       // Actually the config keys should probably match the api types (chat, messages, etc)
       const specificUrl = route.config.api_base_url[typeKey];
-      const defaultUrl = route.config.api_base_url["default"];
+      const defaultUrl = route.config.api_base_url['default'];
 
       if (specificUrl) {
         rawBaseUrl = specificUrl;
@@ -585,7 +603,7 @@ export class Dispatcher {
     }
 
     // Ensure api_base_url doesn't end with slash
-    return rawBaseUrl.replace(/\/$/, "");
+    return rawBaseUrl.replace(/\/$/, '');
   }
 
   private isOAuthRoute(route: RouteResult, targetApiType: string): boolean {
@@ -612,7 +630,7 @@ export class Dispatcher {
       isReadableStream: this.isReadableStream(result),
       hasIterator: !!result && typeof result[Symbol.asyncIterator] === 'function',
       hasGetReader: !!result && typeof result.getReader === 'function',
-      constructorName: result?.constructor?.name || typeof result
+      constructorName: result?.constructor?.name || typeof result,
     };
   }
 
@@ -646,7 +664,7 @@ export class Dispatcher {
       async cancel(reason) {
         closed = true;
         await iterator.return?.(reason);
-      }
+      },
     });
   }
 
@@ -682,11 +700,12 @@ export class Dispatcher {
         model: route.model,
         targetApiType,
         streaming: !!request.stream,
-        hasOptions: !!oauthOptions
+        hasOptions: !!oauthOptions,
       });
 
       if (!oauthContext.systemPrompt) {
-        oauthContext.systemPrompt = this.resolveOAuthInstructions(request, oauthProvider) || oauthContext.systemPrompt;
+        oauthContext.systemPrompt =
+          this.resolveOAuthInstructions(request, oauthProvider) || oauthContext.systemPrompt;
       }
       const result = await transformer.executeRequest(
         oauthContext,
@@ -713,7 +732,7 @@ export class Dispatcher {
           model: request.model,
           content: null,
           stream: rawStream,
-          bypassTransformation: false
+          bypassTransformation: false,
         };
 
         this.enrichResponseWithMetadata(streamResponse, route, targetApiType);
@@ -736,7 +755,10 @@ export class Dispatcher {
 
     const isSupported = supportedModels.some((model) => model.id === modelId);
     if (!isSupported) {
-      const modelList = supportedModels.map((model) => model.id).sort().join(", ");
+      const modelList = supportedModels
+        .map((model) => model.id)
+        .sort()
+        .join(', ');
       throw new Error(
         `OAuth model '${modelId}' is not supported for provider '${oauthProvider}'. ` +
           `Supported models: ${modelList}`
@@ -748,7 +770,11 @@ export class Dispatcher {
     const message = error?.message || 'OAuth provider error';
     let statusCode = 500;
 
-    if (message.includes('Not authenticated') || message.includes('re-authenticate') || message.includes('expired')) {
+    if (
+      message.includes('Not authenticated') ||
+      message.includes('re-authenticate') ||
+      message.includes('expired')
+    ) {
       statusCode = 401;
     } else if (message.toLowerCase().includes('model') && message.toLowerCase().includes('not')) {
       statusCode = 400;
@@ -761,7 +787,7 @@ export class Dispatcher {
       oauthAccount: route.config.oauth_account,
       targetModel: route.model,
       targetApiType,
-      statusCode
+      statusCode,
     };
 
     return enriched;
@@ -785,7 +811,7 @@ export class Dispatcher {
     }
 
     if (oauthProvider === 'openai-codex') {
-      logger.info("OAuth: Inserted default instructions for openai-codex");
+      logger.info('OAuth: Inserted default instructions for openai-codex');
       return 'You are a helpful coding assistant.';
     }
 
@@ -883,7 +909,7 @@ export class Dispatcher {
     payload: any
   ): Promise<Response> {
     return await fetch(url, {
-      method: "POST",
+      method: 'POST',
       headers,
       body: JSON.stringify(payload),
     });
@@ -915,10 +941,7 @@ export class Dispatcher {
 
         // Try to parse cooldown duration from error message
         if (providerType) {
-          const parsedDuration = CooldownParserRegistry.parseCooldown(
-            providerType,
-            errorText
-          );
+          const parsedDuration = CooldownParserRegistry.parseCooldown(providerType, errorText);
 
           if (parsedDuration) {
             cooldownDuration = parsedDuration;
@@ -945,7 +968,7 @@ export class Dispatcher {
       url: url,
       headers: this.sanitizeHeaders(headers || {}),
       statusCode: response.status,
-      providerResponse: errorText
+      providerResponse: errorText,
     };
 
     throw error;
@@ -1016,12 +1039,12 @@ export class Dispatcher {
     targetApiType: string,
     bypassTransformation: boolean
   ): UnifiedChatResponse {
-    logger.debug("Streaming response detected");
+    logger.debug('Streaming response detected');
 
     const rawStream = response.body!;
 
     const streamResponse: UnifiedChatResponse = {
-      id: "stream-" + Date.now(),
+      id: 'stream-' + Date.now(),
       model: request.model,
       content: null,
       stream: rawStream,
@@ -1045,7 +1068,7 @@ export class Dispatcher {
     bypassTransformation: boolean
   ): Promise<UnifiedChatResponse> {
     const responseBody = JSON.parse(await response.text());
-    logger.silly("Upstream Response Payload", responseBody);
+    logger.silly('Upstream Response Payload', responseBody);
 
     if (request.requestId) {
       DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
@@ -1102,12 +1125,12 @@ export class Dispatcher {
         const url = `${baseUrl}/embeddings`;
 
         const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
         };
 
         if (route.config.api_key) {
-          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+          headers['Authorization'] = `Bearer ${route.config.api_key}`;
         }
 
         if (route.config.headers) {
@@ -1116,7 +1139,7 @@ export class Dispatcher {
 
         const payload = {
           ...request.originalBody,
-          model: route.model
+          model: route.model,
         };
 
         if (route.config.extraBody) {
@@ -1124,7 +1147,7 @@ export class Dispatcher {
         }
 
         logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
-        logger.silly("Embeddings Request Payload", payload);
+        logger.silly('Embeddings Request Payload', payload);
 
         if (request.requestId) {
           DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
@@ -1155,7 +1178,7 @@ export class Dispatcher {
         }
 
         const responseBody = await response.json();
-        logger.silly("Embeddings Response Payload", responseBody);
+        logger.silly('Embeddings Response Payload', responseBody);
 
         if (request.requestId) {
           DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
@@ -1171,7 +1194,7 @@ export class Dispatcher {
             providerDiscount: route.config.discount,
             canonicalModel: route.canonicalModel,
             config: route.config,
-          }
+          },
         };
 
         await this.recordAttemptMetric(route, request.requestId, true);
@@ -1207,7 +1230,9 @@ export class Dispatcher {
    * Dispatches audio transcription requests
    * Handles multipart/form-data file uploads to OpenAI-compatible transcription endpoints
    */
-  async dispatchTranscription(request: UnifiedTranscriptionRequest): Promise<UnifiedTranscriptionResponse> {
+  async dispatchTranscription(
+    request: UnifiedTranscriptionRequest
+  ): Promise<UnifiedTranscriptionResponse> {
     const { TranscriptionsTransformer } = await import('../transformers/transcriptions');
     const transformer = new TranscriptionsTransformer();
 
@@ -1236,7 +1261,7 @@ export class Dispatcher {
         const headers: Record<string, string> = {};
 
         if (route.config.api_key) {
-          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+          headers['Authorization'] = `Bearer ${route.config.api_key}`;
         }
 
         if (route.config.headers) {
@@ -1248,8 +1273,10 @@ export class Dispatcher {
           model: route.model,
         });
 
-        logger.info(`Dispatching transcription ${request.model} to ${route.provider}:${route.model}`);
-        logger.silly("Transcription Request", { model: request.model, filename: request.filename });
+        logger.info(
+          `Dispatching transcription ${request.model} to ${route.provider}:${route.model}`
+        );
+        logger.silly('Transcription Request', { model: request.model, filename: request.filename });
 
         if (request.requestId) {
           DebugManager.getInstance().addTransformedRequest(request.requestId, {
@@ -1266,7 +1293,7 @@ export class Dispatcher {
         const response = await fetch(url, {
           method: 'POST',
           headers,
-          body: formData
+          body: formData,
         });
 
         if (!response.ok) {
@@ -1277,7 +1304,14 @@ export class Dispatcher {
             this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
 
           try {
-            await this.handleProviderError(response, route, errorText, url, headers, 'transcriptions');
+            await this.handleProviderError(
+              response,
+              route,
+              errorText,
+              url,
+              headers,
+              'transcriptions'
+            );
           } catch (e: any) {
             lastError = e;
             if (canRetry) {
@@ -1300,7 +1334,7 @@ export class Dispatcher {
           responseBody = await response.json();
         }
 
-        logger.silly("Transcription Response", responseBody);
+        logger.silly('Transcription Response', responseBody);
 
         if (request.requestId) {
           DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
@@ -1379,11 +1413,11 @@ export class Dispatcher {
         const url = `${baseUrl}/audio/speech`;
 
         const headers: Record<string, string> = {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         };
 
         if (route.config.api_key) {
-          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+          headers['Authorization'] = `Bearer ${route.config.api_key}`;
         }
 
         if (route.config.headers) {
@@ -1400,7 +1434,7 @@ export class Dispatcher {
         }
 
         logger.info(`Dispatching speech ${request.model} to ${route.provider}:${route.model}`);
-        logger.silly("Speech Request Payload", payload);
+        logger.silly('Speech Request Payload', payload);
 
         if (request.requestId) {
           DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
@@ -1408,7 +1442,7 @@ export class Dispatcher {
 
         const isStreamed = request.stream_format === 'sse';
         const acceptHeader = isStreamed ? 'text/event-stream' : 'audio/*';
-        headers["Accept"] = acceptHeader;
+        headers['Accept'] = acceptHeader;
 
         const response = await fetch(url, {
           method: 'POST',
@@ -1467,10 +1501,13 @@ export class Dispatcher {
         }
 
         const responseBuffer = Buffer.from(await responseForProcessing.arrayBuffer());
-        logger.silly("Speech Response", { size: responseBuffer.length, isStreamed });
+        logger.silly('Speech Response', { size: responseBuffer.length, isStreamed });
 
         if (request.requestId) {
-          DebugManager.getInstance().addRawResponse(request.requestId, { size: responseBuffer.length, isStreamed });
+          DebugManager.getInstance().addRawResponse(request.requestId, {
+            size: responseBuffer.length,
+            isStreamed,
+          });
         }
 
         const unifiedResponse = await transformer.transformResponse(responseBuffer, {
@@ -1521,7 +1558,9 @@ export class Dispatcher {
    * Dispatches image generation requests
    * Handles JSON body requests to OpenAI-compatible image generation endpoints
    */
-  async dispatchImageGenerations(request: UnifiedImageGenerationRequest): Promise<UnifiedImageGenerationResponse> {
+  async dispatchImageGenerations(
+    request: UnifiedImageGenerationRequest
+  ): Promise<UnifiedImageGenerationResponse> {
     const { ImageTransformer } = await import('../transformers/image');
     const transformer = new ImageTransformer();
 
@@ -1548,12 +1587,12 @@ export class Dispatcher {
         const url = `${baseUrl}/images/generations`;
 
         const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
         };
 
         if (route.config.api_key) {
-          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+          headers['Authorization'] = `Bearer ${route.config.api_key}`;
         }
 
         if (route.config.headers) {
@@ -1569,8 +1608,10 @@ export class Dispatcher {
           Object.assign(payload, route.config.extraBody);
         }
 
-        logger.info(`Dispatching image generation ${request.model} to ${route.provider}:${route.model}`);
-        logger.silly("Image Generation Request Payload", payload);
+        logger.info(
+          `Dispatching image generation ${request.model} to ${route.provider}:${route.model}`
+        );
+        logger.silly('Image Generation Request Payload', payload);
 
         if (request.requestId) {
           DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
@@ -1605,7 +1646,7 @@ export class Dispatcher {
         }
 
         const responseBody = await response.json();
-        logger.silly("Image Generation Response", responseBody);
+        logger.silly('Image Generation Response', responseBody);
 
         if (request.requestId) {
           DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
@@ -1684,7 +1725,7 @@ export class Dispatcher {
         const headers: Record<string, string> = {};
 
         if (route.config.api_key) {
-          headers["Authorization"] = `Bearer ${route.config.api_key}`;
+          headers['Authorization'] = `Bearer ${route.config.api_key}`;
         }
 
         if (route.config.headers) {
@@ -1697,7 +1738,11 @@ export class Dispatcher {
         });
 
         logger.info(`Dispatching image edit ${request.model} to ${route.provider}:${route.model}`);
-        logger.silly("Image Edit Request", { model: request.model, filename: request.filename, hasMask: !!request.mask });
+        logger.silly('Image Edit Request', {
+          model: request.model,
+          filename: request.filename,
+          hasMask: !!request.mask,
+        });
 
         if (request.requestId) {
           DebugManager.getInstance().addTransformedRequest(request.requestId, {
@@ -1736,7 +1781,7 @@ export class Dispatcher {
         }
 
         const responseBody = await response.json();
-        logger.silly("Image Edit Response", responseBody);
+        logger.silly('Image Edit Response', responseBody);
 
         if (request.requestId) {
           DebugManager.getInstance().addRawResponse(request.requestId, responseBody);

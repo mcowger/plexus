@@ -20,14 +20,14 @@ export async function checkQuotaMiddleware(
   quotaEnforcer: QuotaEnforcer
 ): Promise<boolean> {
   const keyName = (request as any).keyName;
-  
+
   if (!keyName) {
     logger.debug('[QuotaMiddleware] No keyName found on request, skipping quota check');
     return true;
   }
 
   const result = await quotaEnforcer.checkQuota(keyName);
-  
+
   // No quota assigned, allow
   if (result === null) {
     return true;
@@ -43,9 +43,9 @@ export async function checkQuotaMiddleware(
         current_usage: result.currentUsage,
         limit: result.limit,
         resets_at: result.resetsAt?.toISOString() ?? null,
-      }
+      },
     };
-    
+
     reply.code(429).send(errorResponse);
     return false;
   }

@@ -24,7 +24,10 @@ export class CopilotQuotaChecker extends QuotaChecker {
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.github.com/copilot_internal/user');
+    this.endpoint = this.getOption<string>(
+      'endpoint',
+      'https://api.github.com/copilot_internal/user'
+    );
     this.userAgent = this.getOption<string>('userAgent', 'GitHubCopilotChat/0.26.7');
     this.editorVersion = this.getOption<string>('editorVersion', 'vscode/1.96.2');
     this.apiVersion = this.getOption<string>('apiVersion', '2025-04-01');
@@ -39,11 +42,13 @@ export class CopilotQuotaChecker extends QuotaChecker {
       const timeout = setTimeout(() => abortController.abort(), this.timeoutMs);
 
       logger.silly(`[copilot-checker] Requesting usage for '${this.id}' from ${this.endpoint}`);
-      logger.silly(`[copilot-checker] Token length: ${apiKey.length}, starts with: ${apiKey.substring(0, 10)}...`);
+      logger.silly(
+        `[copilot-checker] Token length: ${apiKey.length}, starts with: ${apiKey.substring(0, 10)}...`
+      );
 
       const headers = {
-        'Authorization': `token ${apiKey}`,
-        'Accept': 'application/json',
+        Authorization: `token ${apiKey}`,
+        Accept: 'application/json',
         'Content-Type': 'application/json',
         'Editor-Version': this.editorVersion,
         'User-Agent': this.userAgent,
@@ -64,7 +69,7 @@ export class CopilotQuotaChecker extends QuotaChecker {
       }
 
       const data: CopilotUsageResponse = await response.json();
-      
+
       const windows: QuotaWindow[] = [];
       const resetDate = data.quota_reset_date_utc ? new Date(data.quota_reset_date_utc) : undefined;
 
@@ -73,15 +78,17 @@ export class CopilotQuotaChecker extends QuotaChecker {
         const percentRemaining = pi.percent_remaining ?? 0;
         const usedPercent = Math.max(0, 100 - percentRemaining);
 
-        windows.push(this.createWindow(
-          'monthly',
-          100,
-          usedPercent,
-          percentRemaining,
-          'percentage',
-          resetDate,
-          'GitHub Copilot premium interactions'
-        ));
+        windows.push(
+          this.createWindow(
+            'monthly',
+            100,
+            usedPercent,
+            percentRemaining,
+            'percentage',
+            resetDate,
+            'GitHub Copilot premium interactions'
+          )
+        );
       }
 
       if (windows.length === 0) {
@@ -103,7 +110,8 @@ export class CopilotQuotaChecker extends QuotaChecker {
       return configuredApiKey;
     }
 
-    const provider = this.getOption<string>('oauthProvider', 'github-copilot').trim() || 'github-copilot';
+    const provider =
+      this.getOption<string>('oauthProvider', 'github-copilot').trim() || 'github-copilot';
     const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
 
@@ -113,7 +121,9 @@ export class CopilotQuotaChecker extends QuotaChecker {
       : authManager.getCredentials(provider as OAuthProvider);
 
     if (!credentials) {
-      throw new Error(`No OAuth credentials found for provider '${provider}'${oauthAccountId ? ` account '${oauthAccountId}'` : ''}`);
+      throw new Error(
+        `No OAuth credentials found for provider '${provider}'${oauthAccountId ? ` account '${oauthAccountId}'` : ''}`
+      );
     }
 
     // For Copilot, we need the 'refresh' token (ghu_...) not the 'access' cookie
@@ -129,7 +139,9 @@ export class CopilotQuotaChecker extends QuotaChecker {
         : await authManager.getApiKey(provider as OAuthProvider);
     } catch {
       authManager.reload();
-      logger.info(`[copilot-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`);
+      logger.info(
+        `[copilot-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`
+      );
       return oauthAccountId
         ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
         : await authManager.getApiKey(provider as OAuthProvider);

@@ -24,7 +24,7 @@ export class UsageSelector extends Selector {
     // We'll look at the last 24 hours of usage
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const today = new Date().toISOString();
-    
+
     const candidates: { target: ModelTarget; usageCount: number }[] = [];
 
     for (const target of targets) {
@@ -34,7 +34,7 @@ export class UsageSelector extends Selector {
           provider: target.provider,
           selectedModelName: target.model,
           startDate: oneDayAgo,
-          endDate: today
+          endDate: today,
         },
         { limit: 1000, offset: 0 }
       );
@@ -48,7 +48,9 @@ export class UsageSelector extends Selector {
     if (candidates.length > 0) {
       const leastUsed = candidates[0];
       if (leastUsed) {
-        logger.debug(`UsageSelector: Selected ${leastUsed.target.provider}/${leastUsed.target.model} with ${leastUsed.usageCount} recent requests`);
+        logger.debug(
+          `UsageSelector: Selected ${leastUsed.target.provider}/${leastUsed.target.model} with ${leastUsed.usageCount} recent requests`
+        );
         return leastUsed.target;
       }
     }

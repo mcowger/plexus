@@ -1,11 +1,11 @@
-import { Transformer } from "../../types/transformer";
-import { UnifiedChatRequest, UnifiedChatResponse } from "../../types/unified";
-import { parseGeminiRequest } from "./request-parser";
-import { buildGeminiRequest } from "./request-builder";
-import { transformGeminiResponse } from "./response-transformer";
-import { formatGeminiResponse } from "./response-formatter";
-import { transformGeminiStream } from "./stream-transformer";
-import { formatGeminiStream } from "./stream-formatter";
+import { Transformer } from '../../types/transformer';
+import { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
+import { parseGeminiRequest } from './request-parser';
+import { buildGeminiRequest } from './request-builder';
+import { transformGeminiResponse } from './response-transformer';
+import { formatGeminiResponse } from './response-formatter';
+import { transformGeminiStream } from './stream-transformer';
+import { formatGeminiStream } from './stream-formatter';
 
 /**
  * GeminiTransformer
@@ -22,8 +22,8 @@ import { formatGeminiStream } from "./stream-formatter";
  * all implementation details to focused, testable modules.
  */
 export class GeminiTransformer implements Transformer {
-  readonly name = "gemini";
-  readonly defaultEndpoint = "/v1beta/models/:modelAndAction";
+  readonly name = 'gemini';
+  readonly defaultEndpoint = '/v1beta/models/:modelAndAction';
 
   /**
    * getEndpoint
@@ -32,11 +32,9 @@ export class GeminiTransformer implements Transformer {
    * Note: This method is tightly coupled to Gemini's API structure and stays in the main class.
    */
   getEndpoint(request: UnifiedChatRequest): string {
-    const action = request.stream
-      ? "streamGenerateContent?alt=sse"
-      : "generateContent";
+    const action = request.stream ? 'streamGenerateContent?alt=sse' : 'generateContent';
     let model = request.model;
-    if (!model.startsWith("models/") && !model.startsWith("tunedModels/")) {
+    if (!model.startsWith('models/') && !model.startsWith('tunedModels/')) {
       model = `models/${model}`;
     }
     return `/v1beta/${model}:${action}`;
@@ -69,9 +67,7 @@ export class GeminiTransformer implements Transformer {
   /**
    * Extract usage from Gemini-style event data (already parsed JSON string)
    */
-  extractUsage(
-    dataStr: string
-  ):
+  extractUsage(dataStr: string):
     | {
         input_tokens?: number;
         output_tokens?: number;

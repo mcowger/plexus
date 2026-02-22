@@ -4,7 +4,13 @@ import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../..
 import { runMigrations } from '../../db/migrate';
 import { UsageRecord } from '../../types/usage';
 
-const createUsageRecord = (requestId: string, provider: string, incomingModelAlias: string, canonicalModelName: string, selectedModelName: string): UsageRecord => ({
+const createUsageRecord = (
+  requestId: string,
+  provider: string,
+  incomingModelAlias: string,
+  canonicalModelName: string,
+  selectedModelName: string
+): UsageRecord => ({
   requestId,
   date: new Date().toISOString(),
   sourceIp: '127.0.0.1',
@@ -36,7 +42,7 @@ const createUsageRecord = (requestId: string, provider: string, incomingModelAli
   responseStatus: 'success',
   ttftMs: 120,
   tokensPerSec: 100,
-  createdAt: Date.now()
+  createdAt: Date.now(),
 });
 
 describe('UsageStorageService performance metrics', () => {
@@ -56,17 +62,34 @@ describe('UsageStorageService performance metrics', () => {
     const storage = new UsageStorageService();
 
     for (let i = 0; i < 3; i++) {
-      await storage.updatePerformanceMetrics('provider-b', 'model-2', null, 100, 100, 1000, `b-${i}`);
+      await storage.updatePerformanceMetrics(
+        'provider-b',
+        'model-2',
+        null,
+        100,
+        100,
+        1000,
+        `b-${i}`
+      );
     }
 
     for (let i = 0; i < 103; i++) {
-      await storage.updatePerformanceMetrics('provider-a', 'model-1', null, 100, 100, 1000, `a-${i}`);
+      await storage.updatePerformanceMetrics(
+        'provider-a',
+        'model-1',
+        null,
+        100,
+        100,
+        1000,
+        `a-${i}`
+      );
     }
 
     const rows = storage
       .getDb()
-      .$client
-      .query('SELECT provider, model, COUNT(*) as count FROM provider_performance GROUP BY provider, model')
+      .$client.query(
+        'SELECT provider, model, COUNT(*) as count FROM provider_performance GROUP BY provider, model'
+      )
       .all() as Array<{ provider: string; model: string; count: number }>;
 
     const a = rows.find((r) => r.provider === 'provider-a' && r.model === 'model-1');
@@ -117,7 +140,7 @@ describe('UsageStorageService performance metrics', () => {
       totalTokens: 200,
       durationMs: 1000,
       tokensPerSec: 200,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     });
 
     const storage = new UsageStorageService();
@@ -135,7 +158,7 @@ describe('UsageStorageService performance metrics', () => {
       { provider: 'naga', selected: 'glm-4.7' },
       { provider: 'wisdomgate', selected: 'glm-4.7' },
       { provider: 'synthetic', selected: 'hf:zai-org/GLM-4.7' },
-      { provider: 'apertis', selected: 'glm-4.7-thinking' }
+      { provider: 'apertis', selected: 'glm-4.7-thinking' },
     ];
 
     for (const [index, fixture] of fixtures.entries()) {
@@ -179,7 +202,7 @@ describe('UsageStorageService performance metrics', () => {
     await storage.saveRequest({
       ...createUsageRecord(requestIdB, 'apertis', 'glm-4.7', 'glm-4.7', 'glm-4.7-thinking'),
       tokensPerSec: null,
-      ttftMs: 240
+      ttftMs: 240,
     });
 
     const rows = await storage.getProviderPerformance(undefined, 'glm-4.7');
@@ -195,13 +218,22 @@ describe('UsageStorageService performance metrics', () => {
     const storage = new UsageStorageService();
 
     for (let i = 0; i < 8; i++) {
-      await storage.updatePerformanceMetrics('provider-c', 'model-3', null, 100, 100, 1000, `c-${i}`);
+      await storage.updatePerformanceMetrics(
+        'provider-c',
+        'model-3',
+        null,
+        100,
+        100,
+        1000,
+        `c-${i}`
+      );
     }
 
     const rows = storage
       .getDb()
-      .$client
-      .query('SELECT provider, model, COUNT(*) as count FROM provider_performance WHERE provider = ? AND model = ? GROUP BY provider, model')
+      .$client.query(
+        'SELECT provider, model, COUNT(*) as count FROM provider_performance WHERE provider = ? AND model = ? GROUP BY provider, model'
+      )
       .all('provider-c', 'model-3') as Array<{ provider: string; model: string; count: number }>;
 
     expect(rows[0]?.count).toBe(5);
@@ -210,9 +242,34 @@ describe('UsageStorageService performance metrics', () => {
   it('tracks success_count and failure_count for provider/model aggregates', async () => {
     const storage = new UsageStorageService();
 
-    await storage.updatePerformanceMetrics('provider-d', 'model-4', null, 100, 100, 1000, 'd-success-1');
-    await storage.updatePerformanceMetrics('provider-d', 'model-4', null, 120, 110, 1000, 'd-success-2');
-    await storage.updatePerformanceMetrics('provider-d', 'model-4', null, null, null, 0, 'd-failure-1', false);
+    await storage.updatePerformanceMetrics(
+      'provider-d',
+      'model-4',
+      null,
+      100,
+      100,
+      1000,
+      'd-success-1'
+    );
+    await storage.updatePerformanceMetrics(
+      'provider-d',
+      'model-4',
+      null,
+      120,
+      110,
+      1000,
+      'd-success-2'
+    );
+    await storage.updatePerformanceMetrics(
+      'provider-d',
+      'model-4',
+      null,
+      null,
+      null,
+      0,
+      'd-failure-1',
+      false
+    );
 
     const rows = await storage.getProviderPerformance('provider-d', 'model-4');
     expect(rows.length).toBe(1);

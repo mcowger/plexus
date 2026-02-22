@@ -8,5 +8,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter basename="/ui">
       <App />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

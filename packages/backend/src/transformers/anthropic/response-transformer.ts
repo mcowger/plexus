@@ -1,5 +1,5 @@
-import { UnifiedChatResponse } from "../../types/unified";
-import { countTokens } from "../utils";
+import { UnifiedChatResponse } from '../../types/unified';
+import { countTokens } from '../utils';
 
 /**
  * Transforms an Anthropic API response into unified format.
@@ -10,23 +10,21 @@ import { countTokens } from "../utils";
  * - Implements token imputation logic for thinking tokens
  * - Normalizes usage statistics
  */
-export async function transformAnthropicResponse(
-  response: any
-): Promise<UnifiedChatResponse> {
+export async function transformAnthropicResponse(response: any): Promise<UnifiedChatResponse> {
   const contentBlocks = response.content || [];
-  let text = "";
-  let reasoning = "";
+  let text = '';
+  let reasoning = '';
   const toolCalls: any[] = [];
 
   for (const block of contentBlocks) {
-    if (block.type === "text") {
-    text += block.text;
-    } else if (block.type === "thinking") {
+    if (block.type === 'text') {
+      text += block.text;
+    } else if (block.type === 'thinking') {
       reasoning += block.thinking;
-    } else if (block.type === "tool_use") {
+    } else if (block.type === 'tool_use') {
       toolCalls.push({
         id: block.id,
-      type: "function",
+        type: 'function',
         function: {
           name: block.name,
           arguments: JSON.stringify(block.input),
@@ -38,8 +36,7 @@ export async function transformAnthropicResponse(
   const inputTokens = response.usage?.input_tokens || 0;
   const totalOutputTokens = response.usage?.output_tokens || 0;
   const cacheReadTokens = response.usage?.cache_read_input_tokens || 0;
-  const cacheCreationTokens =
-    response.usage?.cache_creation_input_tokens || 0;
+  const cacheCreationTokens = response.usage?.cache_creation_input_tokens || 0;
 
   let realOutputTokens = totalOutputTokens;
   let imputedThinkingTokens = 0;

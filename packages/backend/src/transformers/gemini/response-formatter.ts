@@ -1,5 +1,5 @@
-import { Part } from "@google/genai";
-import { UnifiedChatResponse } from "../../types/unified";
+import { Part } from '@google/genai';
+import { UnifiedChatResponse } from '../../types/unified';
 
 /**
  * Formats a unified response back to Gemini's format for returning to clients.
@@ -9,15 +9,12 @@ import { UnifiedChatResponse } from "../../types/unified";
  * - Handles thought signatures
  * - Formats usage metadata
  */
-export async function formatGeminiResponse(
-  response: UnifiedChatResponse
-): Promise<any> {
+export async function formatGeminiResponse(response: UnifiedChatResponse): Promise<any> {
   const parts: Part[] = [];
 
   if (response.reasoning_content) {
     const part: any = { text: response.reasoning_content, thought: true };
-    if (response.thinking?.signature)
-      part.thoughtSignature = response.thinking.signature;
+    if (response.thinking?.signature) part.thoughtSignature = response.thinking.signature;
     parts.push(part);
   }
 
@@ -31,11 +28,7 @@ export async function formatGeminiResponse(
           args: JSON.parse(tc.function.arguments),
         },
       };
-      if (
-        index === 0 &&
-        response.thinking?.signature &&
-        !response.reasoning_content
-      ) {
+      if (index === 0 && response.thinking?.signature && !response.reasoning_content) {
         part.thoughtSignature = response.thinking.signature;
       }
       parts.push(part);
@@ -43,9 +36,7 @@ export async function formatGeminiResponse(
   }
 
   return {
-    candidates: [
-      { content: { role: "model", parts }, finishReason: "STOP", index: 0 },
-    ],
+    candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP', index: 0 }],
     usageMetadata: response.usage
       ? {
           promptTokenCount: response.usage.input_tokens,

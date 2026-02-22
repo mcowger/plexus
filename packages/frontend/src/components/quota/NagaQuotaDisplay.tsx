@@ -9,17 +9,13 @@ interface NagaQuotaDisplayProps {
   isCollapsed: boolean;
 }
 
-export const NagaQuotaDisplay: React.FC<NagaQuotaDisplayProps> = ({
-  result,
-  isCollapsed,
-}) => {
+export const NagaQuotaDisplay: React.FC<NagaQuotaDisplayProps> = ({ result, isCollapsed }) => {
   if (!result.success) {
     return (
       <div className="px-2 py-2">
-        <div className={clsx(
-          "flex items-center gap-2 text-danger",
-          isCollapsed && "justify-center"
-        )}>
+        <div
+          className={clsx('flex items-center gap-2 text-danger', isCollapsed && 'justify-center')}
+        >
           <AlertTriangle size={16} />
           {!isCollapsed && <span className="text-xs">Error</span>}
         </div>
@@ -28,7 +24,7 @@ export const NagaQuotaDisplay: React.FC<NagaQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const subscriptionWindow = windows.find(w => w.windowType === 'subscription');
+  const subscriptionWindow = windows.find((w) => w.windowType === 'subscription');
   const balance = subscriptionWindow?.remaining;
 
   if (isCollapsed) {
@@ -51,9 +47,7 @@ export const NagaQuotaDisplay: React.FC<NagaQuotaDisplayProps> = ({
       {balance !== undefined && (
         <div className="flex items-baseline gap-2">
           <span className="text-xs font-semibold text-text-secondary">Balance</span>
-          <span className="text-xs font-semibold text-info ml-auto">
-            {formatCost(balance)}
-          </span>
+          <span className="text-xs font-semibold text-info ml-auto">{formatCost(balance)}</span>
         </div>
       )}
     </div>

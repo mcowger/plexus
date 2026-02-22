@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import Fastify from 'fastify';
 import { registerLoggingRoutes } from '../logging';
-import { getCurrentLogLevel, getStartupLogLevel, resetCurrentLogLevel, setCurrentLogLevel, SUPPORTED_LOG_LEVELS } from '../../../utils/logger';
+import {
+  getCurrentLogLevel,
+  getStartupLogLevel,
+  resetCurrentLogLevel,
+  setCurrentLogLevel,
+  SUPPORTED_LOG_LEVELS,
+} from '../../../utils/logger';
 
 describe('Logging management routes', () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -20,7 +26,7 @@ describe('Logging management routes', () => {
   it('returns current logging level state', async () => {
     const response = await fastify.inject({
       method: 'GET',
-      url: '/v0/management/logging/level'
+      url: '/v0/management/logging/level',
     });
 
     expect(response.statusCode).toBe(200);
@@ -41,7 +47,7 @@ describe('Logging management routes', () => {
     const response = await fastify.inject({
       method: 'POST',
       url: '/v0/management/logging/level',
-      payload: { level: 'debug' }
+      payload: { level: 'debug' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -54,7 +60,7 @@ describe('Logging management routes', () => {
     const response = await fastify.inject({
       method: 'POST',
       url: '/v0/management/logging/level',
-      payload: { level: 'trace' }
+      payload: { level: 'trace' },
     });
 
     expect(response.statusCode).toBe(400);
@@ -70,7 +76,7 @@ describe('Logging management routes', () => {
 
     const response = await fastify.inject({
       method: 'DELETE',
-      url: '/v0/management/logging/level'
+      url: '/v0/management/logging/level',
     });
 
     expect(response.statusCode).toBe(200);

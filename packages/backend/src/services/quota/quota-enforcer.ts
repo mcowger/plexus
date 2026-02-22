@@ -37,7 +37,7 @@ export class QuotaEnforcer {
    */
   async checkQuota(keyName: string): Promise<QuotaCheckResult | null> {
     const config = getConfig();
-    
+
     // Get key configuration
     const keyConfig = config.keys?.[keyName];
     if (!keyConfig) {
@@ -78,7 +78,7 @@ export class QuotaEnforcer {
       // No state exists yet, start fresh
       currentUsage = 0;
       lastUpdatedDate = nowDate;
-      
+
       // For calendar quotas, set window start
       if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
         windowStartDate = new Date(this.getWindowStart(quotaDef.type));
@@ -87,27 +87,31 @@ export class QuotaEnforcer {
       const state = existingState[0];
       const storedLimitType = state!.limitType as 'requests' | 'tokens';
       const storedQuotaName = state!.quotaName as string;
-      
+
       // Check if quota name has changed (key assigned to different quota)
       if (storedQuotaName !== quotaName) {
-        logger.info(`[QuotaEnforcer] Quota name changed for ${keyName} from '${storedQuotaName}' to '${quotaName}'. ` +
-          `Resetting usage.`);
+        logger.info(
+          `[QuotaEnforcer] Quota name changed for ${keyName} from '${storedQuotaName}' to '${quotaName}'. ` +
+            `Resetting usage.`
+        );
         currentUsage = 0;
         lastUpdatedDate = nowDate;
         windowStartDate = null;
-        
+
         // For calendar quotas, set new window start
         if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
           windowStartDate = new Date(this.getWindowStart(quotaDef.type));
         }
-      // Check if quota definition has changed (e.g., requests -> tokens)
+        // Check if quota definition has changed (e.g., requests -> tokens)
       } else if (storedLimitType !== quotaDef.limitType) {
-        logger.info(`[QuotaEnforcer] Quota ${quotaName} limitType changed from ${storedLimitType} to ${quotaDef.limitType}. ` +
-          `Resetting usage for ${keyName}.`);
+        logger.info(
+          `[QuotaEnforcer] Quota ${quotaName} limitType changed from ${storedLimitType} to ${quotaDef.limitType}. ` +
+            `Resetting usage for ${keyName}.`
+        );
         currentUsage = 0;
         lastUpdatedDate = nowDate;
         windowStartDate = null;
-        
+
         // For calendar quotas, set new window start
         if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
           windowStartDate = new Date(this.getWindowStart(quotaDef.type));
@@ -132,16 +136,18 @@ export class QuotaEnforcer {
           // Calculate leak for rolling quotas
           const durationMs = parseDuration(quotaDef.duration);
           if (!durationMs) {
-            logger.warn(`[QuotaEnforcer] Invalid duration '${quotaDef.duration}' for rolling quota ${quotaName}. ` +
-              `Cannot calculate quota leak. Allowing request (fail-open). ` +
-              `Please fix the duration in your config (e.g., '1h', '30m', '1d').`);
+            logger.warn(
+              `[QuotaEnforcer] Invalid duration '${quotaDef.duration}' for rolling quota ${quotaName}. ` +
+                `Cannot calculate quota leak. Allowing request (fail-open). ` +
+                `Please fix the duration in your config (e.g., '1h', '30m', '1d').`
+            );
             return null;
           }
 
           const elapsedMs = nowMs - lastUpdatedDate.getTime();
           const leakRate = quotaDef.limit / durationMs;
           const leaked = elapsedMs * leakRate;
-          
+
           currentUsage = Math.max(0, currentUsage - leaked);
           lastUpdatedDate = nowDate;
         }
@@ -161,7 +167,9 @@ export class QuotaEnforcer {
         const timeToLeakAll = (currentUsage / quotaDef.limit) * durationMs;
         resetsAt = new Date(nowMs + timeToLeakAll);
       } else {
-        logger.warn(`[QuotaEnforcer] Cannot calculate resetsAt for quota ${quotaName}: invalid duration '${quotaDef.duration}'`);
+        logger.warn(
+          `[QuotaEnforcer] Cannot calculate resetsAt for quota ${quotaName}: invalid duration '${quotaDef.duration}'`
+        );
       }
     } else if (quotaDef.type === 'daily') {
       // Reset at next UTC midnight
@@ -199,7 +207,7 @@ export class QuotaEnforcer {
    */
   async recordUsage(keyName: string, usageRecord: UsageRecord): Promise<void> {
     const config = getConfig();
-    
+
     // Get key configuration
     const keyConfig = config.keys?.[keyName];
     if (!keyConfig?.quota) {
@@ -218,11 +226,12 @@ export class QuotaEnforcer {
       cost = 1;
     } else {
       // tokens: sum of input + output
-      cost = (usageRecord.tokensInput || 0) + 
-             (usageRecord.tokensOutput || 0) +
-             (usageRecord.tokensReasoning || 0) +
-             (usageRecord.tokensCached || 0) +
-             (usageRecord.tokensCacheWrite || 0);
+      cost =
+        (usageRecord.tokensInput || 0) +
+        (usageRecord.tokensOutput || 0) +
+        (usageRecord.tokensReasoning || 0) +
+        (usageRecord.tokensCached || 0) +
+        (usageRecord.tokensCacheWrite || 0);
     }
 
     const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
@@ -256,18 +265,22 @@ export class QuotaEnforcer {
       const state = existingState[0];
       const storedLimitType = state.limitType as 'requests' | 'tokens';
       const storedQuotaName = state.quotaName as string;
-      
+
       // Check if quota name or limitType has changed - if so, start fresh
       let newUsage: number;
       if (storedQuotaName !== keyConfig.quota) {
-        logger.debug(`[QuotaEnforcer] Quota name changed for ${keyName} from '${storedQuotaName}' to '${keyConfig.quota}' in recordUsage`);
+        logger.debug(
+          `[QuotaEnforcer] Quota name changed for ${keyName} from '${storedQuotaName}' to '${keyConfig.quota}' in recordUsage`
+        );
         newUsage = cost; // Start fresh with just this request's cost
       } else if (storedLimitType !== quotaDef.limitType) {
-        logger.debug(`[QuotaEnforcer] Quota ${keyConfig.quota} limitType changed from ${storedLimitType} to ${quotaDef.limitType} in recordUsage`);
+        logger.debug(
+          `[QuotaEnforcer] Quota ${keyConfig.quota} limitType changed from ${storedLimitType} to ${quotaDef.limitType} in recordUsage`
+        );
         newUsage = cost; // Start fresh with just this request's cost
       } else {
         newUsage = state.currentUsage + cost;
-        
+
         if (quotaDef.type === 'rolling') {
           // Apply leak since last update
           const durationMs = parseDuration(quotaDef.duration);
@@ -278,9 +291,11 @@ export class QuotaEnforcer {
             const leaked = elapsedMs * leakRate;
             newUsage = Math.max(0, state.currentUsage - leaked) + cost;
           } else {
-            logger.warn(`[QuotaEnforcer] Invalid duration '${quotaDef.duration}' for rolling quota ${keyConfig.quota}. ` +
-              `Recording usage without leak calculation. Usage will accumulate without decay. ` +
-              `Please fix the duration in your config (e.g., '1h', '30m', '1d').`);
+            logger.warn(
+              `[QuotaEnforcer] Invalid duration '${quotaDef.duration}' for rolling quota ${keyConfig.quota}. ` +
+                `Recording usage without leak calculation. Usage will accumulate without decay. ` +
+                `Please fix the duration in your config (e.g., '1h', '30m', '1d').`
+            );
           }
         }
       }
@@ -322,7 +337,7 @@ export class QuotaEnforcer {
    */
   private getWindowStart(type: 'daily' | 'weekly'): number {
     const now = new Date();
-    
+
     if (type === 'daily') {
       // Start of current UTC day
       now.setUTCHours(0, 0, 0, 0);

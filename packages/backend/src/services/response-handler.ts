@@ -1,15 +1,15 @@
-import { FastifyReply, FastifyRequest } from "fastify";
-import { UnifiedChatResponse } from "../types/unified";
-import { Transformer } from "../types/transformer";
-import { UsageRecord } from "../types/usage";
-import { UsageStorageService } from "../services/usage-storage";
-import { logger } from "../utils/logger";
-import { calculateCosts } from "../utils/calculate-costs";
-import { TransformerFactory } from "../services/transformer-factory";
-import { DebugLoggingInspector, UsageInspector } from "./inspectors";
-import { Readable } from "stream";
-import { DebugManager } from "./debug-manager";
-import { estimateKwhUsed } from "./inference-energy";
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { UnifiedChatResponse } from '../types/unified';
+import { Transformer } from '../types/transformer';
+import { UsageRecord } from '../types/usage';
+import { UsageStorageService } from '../services/usage-storage';
+import { logger } from '../utils/logger';
+import { calculateCosts } from '../utils/calculate-costs';
+import { TransformerFactory } from '../services/transformer-factory';
+import { DebugLoggingInspector, UsageInspector } from './inspectors';
+import { Readable } from 'stream';
+import { DebugManager } from './debug-manager';
+import { estimateKwhUsed } from './inference-energy';
 /**
  * handleResponse
  *
@@ -27,16 +27,15 @@ export async function handleResponse(
   usageRecord: Partial<UsageRecord>,
   usageStorage: UsageStorageService,
   startTime: number,
-  apiType: "chat" | "messages" | "gemini" | "responses",
+  apiType: 'chat' | 'messages' | 'gemini' | 'responses',
   shouldEstimateTokens: boolean = false,
   originalRequest?: any
 ) {
   // Populate usage record with metadata from the dispatcher's selection
-  usageRecord.selectedModelName =
-    unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
-  usageRecord.provider = unifiedResponse.plexus?.provider || "unknown";
+  usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
+  usageRecord.provider = unifiedResponse.plexus?.provider || 'unknown';
   usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel || null;
-  
+
   // Set provider info for debug logging filter
   if (usageRecord.provider) {
     DebugManager.getInstance().setProviderForRequest(usageRecord.requestId!, usageRecord.provider);
@@ -53,7 +52,7 @@ export async function handleResponse(
   usageRecord.allAttemptedProviders =
     ((unifiedResponse.plexus as any)?.allAttemptedProviders as string | undefined) ||
     JSON.stringify([
-      `${usageRecord.provider || "unknown"}/${usageRecord.selectedModelName || unifiedResponse.model}`,
+      `${usageRecord.provider || 'unknown'}/${usageRecord.selectedModelName || unifiedResponse.model}`,
     ]);
 
   let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
@@ -64,12 +63,12 @@ export async function handleResponse(
   const pricing = unifiedResponse.plexus?.pricing;
   const providerDiscount = unifiedResponse.plexus?.providerDiscount;
   // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
-  const providerApiType = (unifiedResponse.plexus?.apiType || "chat").toLowerCase();
+  const providerApiType = (unifiedResponse.plexus?.apiType || 'chat').toLowerCase();
 
   // Enable ephemeral debug capture if token estimation is needed
   const debugManager = DebugManager.getInstance();
   const wasDebugEnabled = debugManager.isEnabled();
-  
+
   if (shouldEstimateTokens) {
     debugManager.markEphemeral(usageRecord.requestId!);
     // Temporarily enable debug mode for this request if not already enabled
@@ -86,8 +85,11 @@ export async function handleResponse(
     // TAP THE RAW STREAM for debugging/usage extraction
     // We always capture the stream BEFORE any transformation to enable usage extraction,
     // even with pass-through optimization. Debug mode only controls DB persistence.
-    const rawLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'raw').createInspector(providerApiType);
-    
+    const rawLogInspector = new DebugLoggingInspector(
+      usageRecord.requestId!,
+      'raw'
+    ).createInspector(providerApiType);
+
     const tapStream = new TransformStream({
       transform(chunk, controller) {
         rawLogInspector.write(chunk);
@@ -95,9 +97,9 @@ export async function handleResponse(
       },
       flush() {
         rawLogInspector.end();
-      }
+      },
     });
-    
+
     rawStream = rawStream.pipeThrough(tapStream);
 
     if (unifiedResponse.bypassTransformation) {
@@ -111,8 +113,7 @@ export async function handleResponse(
        * 2. clientTransformer.formatStream: Unified internal chunks -> Client SSE format (e.g. Anthropic)
        */
       // Get the transformer for the outgoing provider's format
-      const providerTransformer =
-        TransformerFactory.getTransformer(providerApiType);
+      const providerTransformer = TransformerFactory.getTransformer(providerApiType);
 
       // Step 1: Raw Provider SSE -> Unified internal objects
       const unifiedStream = providerTransformer.transformStream
@@ -127,7 +128,10 @@ export async function handleResponse(
 
     // TAP THE TRANSFORMED STREAM for debugging
     // This captures what is actually sent to the client
-    const transformedLogInspector = new DebugLoggingInspector(usageRecord.requestId!, 'transformed').createInspector(apiType);
+    const transformedLogInspector = new DebugLoggingInspector(
+      usageRecord.requestId!,
+      'transformed'
+    ).createInspector(apiType);
 
     const transformedTapStream = new TransformStream({
       transform(chunk, controller) {
@@ -136,15 +140,15 @@ export async function handleResponse(
       },
       flush() {
         transformedLogInspector.end();
-      }
+      },
     });
 
     finalClientStream = finalClientStream.pipeThrough(transformedTapStream);
 
     // Standard SSE headers to prevent buffering and timeouts
-    reply.header("Content-Type", "text/event-stream");
-    reply.header("Cache-Control", "no-cache");
-    reply.header("Connection", "keep-alive");
+    reply.header('Content-Type', 'text/event-stream');
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('Connection', 'keep-alive');
 
     /**
      * Build the linear stream pipeline.
@@ -179,7 +183,7 @@ export async function handleResponse(
       });
     }
 
-    usageRecord.responseStatus = "success";
+    usageRecord.responseStatus = 'success';
 
     // Fastify natively supports sending ReadableStream as the response body
     return reply.send(pipeline);
@@ -204,14 +208,7 @@ export async function handleResponse(
     DebugManager.getInstance().flush(usageRecord.requestId!);
 
     // Record the usage.
-    finalizeUsage(
-      usageRecord,
-      unifiedResponse,
-      usageStorage,
-      startTime,
-      pricing,
-      providerDiscount
-    );
+    finalizeUsage(usageRecord, unifiedResponse, usageStorage, startTime, pricing, providerDiscount);
 
     logger.debug(`Outgoing ${apiType} Response`, responseBody);
     return reply.send(responseBody);
@@ -225,12 +222,12 @@ export async function handleResponse(
  * specifically for non-streaming (unary) responses.
  */
 async function finalizeUsage(
-    usageRecord: Partial<UsageRecord>,
-    unifiedResponse: UnifiedChatResponse,
-    usageStorage: UsageStorageService,
-    startTime: number,
-    pricing: any,
-    providerDiscount: any
+  usageRecord: Partial<UsageRecord>,
+  unifiedResponse: UnifiedChatResponse,
+  usageStorage: UsageStorageService,
+  startTime: number,
+  pricing: any,
+  providerDiscount: any
 ) {
   // Capture token usage if available in the response
   if (unifiedResponse.usage) {
@@ -247,7 +244,7 @@ async function finalizeUsage(
 
   // Finalize costs and duration
   calculateCosts(usageRecord, pricing, providerDiscount);
-  usageRecord.responseStatus = "success";
+  usageRecord.responseStatus = 'success';
   usageRecord.durationMs = Date.now() - startTime;
 
   // Populate performance metrics

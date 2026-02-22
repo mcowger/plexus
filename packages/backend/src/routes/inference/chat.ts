@@ -10,106 +10,111 @@ import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware, recordQuotaUsage } from '../../services/quota/quota-middleware';
 
-export async function registerChatRoute(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService, quotaEnforcer?: QuotaEnforcer) {
-    /**
-     * POST /v1/chat/completions
-     * OpenAI Compatible Endpoint.
-     * Translates OpenAI format to internal Unified format, dispatches to target,
-     * and translates the response back to OpenAI format.
-     */
-    fastify.post('/v1/chat/completions', async (request, reply) => {
-        const requestId = crypto.randomUUID();
-        const startTime = Date.now();
-        let usageRecord: Partial<UsageRecord> = {
-            requestId,
-            date: new Date().toISOString(),
-            sourceIp: getClientIp(request),
-            incomingApiType: 'chat',
-            startTime,
-            isStreamed: false,
-            responseStatus: 'pending'
+export async function registerChatRoute(
+  fastify: FastifyInstance,
+  dispatcher: Dispatcher,
+  usageStorage: UsageStorageService,
+  quotaEnforcer?: QuotaEnforcer
+) {
+  /**
+   * POST /v1/chat/completions
+   * OpenAI Compatible Endpoint.
+   * Translates OpenAI format to internal Unified format, dispatches to target,
+   * and translates the response back to OpenAI format.
+   */
+  fastify.post('/v1/chat/completions', async (request, reply) => {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    let usageRecord: Partial<UsageRecord> = {
+      requestId,
+      date: new Date().toISOString(),
+      sourceIp: getClientIp(request),
+      incomingApiType: 'chat',
+      startTime,
+      isStreamed: false,
+      responseStatus: 'pending',
+    };
+
+    try {
+      const body = request.body as any;
+      usageRecord.incomingModelAlias = body.model;
+      // Use the key name identified by the auth middleware, not the raw secret
+      usageRecord.apiKey = (request as any).keyName;
+      // Capture attribution if provided in the API key
+      usageRecord.attribution = (request as any).attribution || null;
+
+      logger.silly('Incoming OpenAI Request', body);
+      const transformer = new OpenAITransformer();
+      const unifiedRequest = await transformer.parseRequest(body);
+      unifiedRequest.incomingApiType = 'chat';
+      unifiedRequest.originalBody = body;
+      unifiedRequest.requestId = requestId;
+      const xAppHeader = Array.isArray(request.headers['x-app'])
+        ? request.headers['x-app'][0]
+        : request.headers['x-app'];
+      if (typeof xAppHeader === 'string' && xAppHeader.trim()) {
+        unifiedRequest.metadata = {
+          ...(unifiedRequest.metadata || {}),
+          clientHeaders: {
+            'x-app': xAppHeader,
+          },
         };
+      }
 
-        try {
-            const body = request.body as any;
-            usageRecord.incomingModelAlias = body.model;
-            // Use the key name identified by the auth middleware, not the raw secret
-            usageRecord.apiKey = (request as any).keyName;
-            // Capture attribution if provided in the API key
-            usageRecord.attribution = (request as any).attribution || null;
+      DebugManager.getInstance().startLog(requestId, body);
 
-            logger.silly('Incoming OpenAI Request', body);
-            const transformer = new OpenAITransformer();
-            const unifiedRequest = await transformer.parseRequest(body);
-            unifiedRequest.incomingApiType = 'chat';
-            unifiedRequest.originalBody = body;
-            unifiedRequest.requestId = requestId;
-            const xAppHeader = Array.isArray(request.headers['x-app'])
-                ? request.headers['x-app'][0]
-                : request.headers['x-app'];
-            if (typeof xAppHeader === 'string' && xAppHeader.trim()) {
-                unifiedRequest.metadata = {
-                    ...(unifiedRequest.metadata || {}),
-                    clientHeaders: {
-                        'x-app': xAppHeader
-                    }
-                };
-            }
+      // Check quota before processing
+      if (quotaEnforcer) {
+        const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+        if (!allowed) return;
+      }
 
-            DebugManager.getInstance().startLog(requestId, body);
+      const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
 
-            // Check quota before processing
-            if (quotaEnforcer) {
-                const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-                if (!allowed) return;
-            }
+      // Determine if token estimation is needed
+      const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
 
-            const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+      // Capture request metadata
+      usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
+      usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
+      usageRecord.parallelToolCallsEnabled = body.parallel_tool_calls ?? null;
 
-            // Determine if token estimation is needed
-            const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
+      const result = await handleResponse(
+        request,
+        reply,
+        unifiedResponse,
+        transformer,
+        usageRecord,
+        usageStorage,
+        startTime,
+        'chat',
+        shouldEstimateTokens,
+        body
+      );
 
-            // Capture request metadata
-            usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
-            usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
-            usageRecord.parallelToolCallsEnabled = body.parallel_tool_calls ?? null;
+      // Record quota usage after request completes
+      if (quotaEnforcer) {
+        await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
+      }
 
-            const result = await handleResponse(
-                request,
-                reply,
-                unifiedResponse,
-                transformer,
-                usageRecord,
-                usageStorage,
-                startTime,
-                'chat',
-                shouldEstimateTokens,
-                body
-            );
+      return result;
+    } catch (e: any) {
+      usageRecord.responseStatus = 'error';
+      usageRecord.durationMs = Date.now() - startTime;
+      usageStorage.saveRequest(usageRecord as UsageRecord);
 
-            // Record quota usage after request completes
-            if (quotaEnforcer) {
-                await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
-            }
+      // Extract routing context if available from enriched error
+      const errorDetails = {
+        apiType: 'chat',
+        ...(e.routingContext || {}),
+      };
 
-            return result;
-        } catch (e: any) {
-            usageRecord.responseStatus = 'error';
-            usageRecord.durationMs = Date.now() - startTime;
-            usageStorage.saveRequest(usageRecord as UsageRecord);
+      usageStorage.saveError(requestId, e, errorDetails);
 
-            // Extract routing context if available from enriched error
-            const errorDetails = {
-                apiType: 'chat',
-                ...(e.routingContext || {})
-            };
-
-            usageStorage.saveError(requestId, e, errorDetails);
-
-            logger.error('Error processing OpenAI request', e);
-            const statusCode = e.routingContext?.statusCode || 500;
-            const errorType = statusCode === 401 ? 'authentication_error' : 'api_error';
-            return reply.code(statusCode).send({ error: { message: e.message, type: errorType } });
-        }
-    });
+      logger.error('Error processing OpenAI request', e);
+      const statusCode = e.routingContext?.statusCode || 500;
+      const errorType = statusCode === 401 ? 'authentication_error' : 'api_error';
+      return reply.code(statusCode).send({ error: { message: e.message, type: errorType } });
+    }
+  });
 }

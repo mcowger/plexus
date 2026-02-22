@@ -1,14 +1,14 @@
-import { UnifiedEmbeddingsRequest, UnifiedEmbeddingsResponse } from "../types/unified";
+import { UnifiedEmbeddingsRequest, UnifiedEmbeddingsResponse } from '../types/unified';
 
 /**
  * EmbeddingsTransformer
- * 
+ *
  * Simple pass-through transformer for embeddings since the API format
  * is standardized across all providers (OpenAI, Voyage, Cohere, Google, etc.)
  */
 export class EmbeddingsTransformer {
-  name = "embeddings";
-  defaultEndpoint = "/embeddings";
+  name = 'embeddings';
+  defaultEndpoint = '/embeddings';
 
   async parseRequest(input: any): Promise<UnifiedEmbeddingsRequest> {
     return {
@@ -33,7 +33,7 @@ export class EmbeddingsTransformer {
 
   async transformResponse(response: any): Promise<UnifiedEmbeddingsResponse> {
     return {
-      object: "list",
+      object: 'list',
       data: response.data,
       model: response.model,
       usage: response.usage,

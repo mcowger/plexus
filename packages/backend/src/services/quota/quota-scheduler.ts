@@ -40,7 +40,9 @@ export class QuotaScheduler {
       try {
         const checker = QuotaCheckerFactory.createChecker(config.type, config);
         this.checkers.set(config.id, checker);
-        logger.info(`Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`);
+        logger.info(
+          `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
+        );
       } catch (error) {
         logger.error(`Failed to register quota checker '${config.id}': ${error}`);
       }
@@ -51,10 +53,12 @@ export class QuotaScheduler {
         const intervalMs = checker.config.intervalMinutes * 60 * 1000;
         const intervalId = setInterval(() => this.runCheckNow(id), intervalMs);
         this.intervals.set(id, intervalId);
-        logger.info(`Scheduled quota checker '${id}' to run every ${checker.config.intervalMinutes} minutes`);
+        logger.info(
+          `Scheduled quota checker '${id}' to run every ${checker.config.intervalMinutes} minutes`
+        );
 
         // Run initial check asynchronously without blocking startup
-        this.runCheckNow(id).catch(error => {
+        this.runCheckNow(id).catch((error) => {
           logger.error(`Initial quota check failed for '${id}': ${error}`);
         });
       } catch (error) {
@@ -134,24 +138,24 @@ export class QuotaScheduler {
     if (result.windows) {
       for (const window of result.windows) {
         try {
-            await db.insert(schema.quotaSnapshots).values({
-              provider: result.provider,
-              checkerId: result.checkerId,
-              groupId: null,
-              windowType: window.windowType,
-              checkedAt,
-              limit: window.limit,
-              used: window.used,
-              remaining: window.remaining,
-              utilizationPercent: window.utilizationPercent,
-              unit: window.unit,
-              resetsAt: toDbTimestampMs(window.resetsAt, dialect),
-              status: window.status ?? null,
-              description: window.description ?? null,
-              success: toDbBoolean(true),
-              errorMessage: null,
-              createdAt,
-            });
+          await db.insert(schema.quotaSnapshots).values({
+            provider: result.provider,
+            checkerId: result.checkerId,
+            groupId: null,
+            windowType: window.windowType,
+            checkedAt,
+            limit: window.limit,
+            used: window.used,
+            remaining: window.remaining,
+            utilizationPercent: window.utilizationPercent,
+            unit: window.unit,
+            resetsAt: toDbTimestampMs(window.resetsAt, dialect),
+            status: window.status ?? null,
+            description: window.description ?? null,
+            success: toDbBoolean(true),
+            errorMessage: null,
+            createdAt,
+          });
         } catch (error) {
           logger.error(`Failed to persist quota window for '${result.checkerId}': ${error}`);
         }
@@ -176,12 +180,14 @@ export class QuotaScheduler {
               resetsAt: toDbTimestampMs(window.resetsAt, dialect),
               status: window.status ?? null,
               description: window.description ?? null,
-               success: toDbBoolean(true),
+              success: toDbBoolean(true),
               errorMessage: null,
               createdAt,
             });
           } catch (error) {
-            logger.error(`Failed to persist quota group '${group.groupId}' for '${result.checkerId}': ${error}`);
+            logger.error(
+              `Failed to persist quota group '${group.groupId}' for '${result.checkerId}': ${error}`
+            );
           }
         }
       }
@@ -195,21 +201,21 @@ export class QuotaScheduler {
   async getLatestQuota(checkerId: string) {
     try {
       const { db, schema } = this.ensureDb();
-      
+
       // Create a timeout promise to prevent indefinite hanging
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Database query timeout')), 15000);
       });
-      
+
       const queryPromise = db
         .select()
         .from(schema.quotaSnapshots)
         .where(eq(schema.quotaSnapshots.checkerId, checkerId))
         .orderBy(desc(schema.quotaSnapshots.checkedAt))
         .limit(100);
-      
-      const results = await Promise.race([queryPromise, timeoutPromise]) as any[];
-      
+
+      const results = (await Promise.race([queryPromise, timeoutPromise])) as any[];
+
       // Get only the most recent snapshot per window type
       const latestByWindowType = new Map<string, any>();
       for (const snapshot of results) {
@@ -218,23 +224,24 @@ export class QuotaScheduler {
           latestByWindowType.set(snapshot.windowType, snapshot);
         }
       }
-      
+
       // Add resetInSeconds calculation and quota estimation
       const now = Date.now();
-      return Array.from(latestByWindowType.values()).map(snapshot => {
+      return Array.from(latestByWindowType.values()).map((snapshot) => {
         const resetsAtMs = toEpochMs(snapshot.resetsAt);
-        const resetInSeconds = resetsAtMs != null ? Math.max(0, Math.floor((resetsAtMs - now) / 1000)) : null;
-        
+        const resetInSeconds =
+          resetsAtMs != null ? Math.max(0, Math.floor((resetsAtMs - now) / 1000)) : null;
+
         // Calculate estimation for this window type
         const estimation = QuotaEstimator.estimateUsageAtReset(
           checkerId,
           snapshot.windowType,
           snapshot.used,
           snapshot.limit,
-            resetsAtMs,
+          resetsAtMs,
           results // Pass all historical data
         );
-        
+
         return {
           ...snapshot,
           resetInSeconds,
@@ -258,7 +265,9 @@ export class QuotaScheduler {
 
       if (since) {
         const dialect = getCurrentDialect();
-        conditions.push(gte(schema.quotaSnapshots.checkedAt, toDbTimestampMs(since, dialect) as any));
+        conditions.push(
+          gte(schema.quotaSnapshots.checkedAt, toDbTimestampMs(since, dialect) as any)
+        );
       }
 
       // Create a timeout promise to prevent indefinite hanging
@@ -292,21 +301,25 @@ export class QuotaScheduler {
 
   async reload(quotaConfigs: QuotaCheckerConfig[]): Promise<void> {
     const existingIds = new Set(this.checkers.keys());
-    const newConfigs = quotaConfigs.filter(c => !existingIds.has(c.id) && c.enabled);
+    const newConfigs = quotaConfigs.filter((c) => !existingIds.has(c.id) && c.enabled);
 
     for (const config of newConfigs) {
       try {
         const checker = QuotaCheckerFactory.createChecker(config.type, config);
         this.checkers.set(config.id, checker);
-        logger.info(`Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`);
+        logger.info(
+          `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
+        );
 
         const intervalMs = checker.config.intervalMinutes * 60 * 1000;
         const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
         this.intervals.set(config.id, intervalId);
-        logger.info(`Scheduled quota checker '${config.id}' to run every ${checker.config.intervalMinutes} minutes`);
+        logger.info(
+          `Scheduled quota checker '${config.id}' to run every ${checker.config.intervalMinutes} minutes`
+        );
 
         // Run initial check asynchronously without blocking
-        this.runCheckNow(config.id).catch(error => {
+        this.runCheckNow(config.id).catch((error) => {
           logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
         });
       } catch (error) {
@@ -314,7 +327,7 @@ export class QuotaScheduler {
       }
     }
 
-    const loadedIds = new Set(quotaConfigs.filter(c => c.enabled).map(c => c.id));
+    const loadedIds = new Set(quotaConfigs.filter((c) => c.enabled).map((c) => c.id));
     for (const id of existingIds) {
       if (!loadedIds.has(id)) {
         const intervalId = this.intervals.get(id);

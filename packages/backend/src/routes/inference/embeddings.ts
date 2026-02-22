@@ -21,7 +21,7 @@ export async function registerEmbeddingsRoute(
   fastify.post('/v1/embeddings', async (request, reply) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
-    
+
     let usageRecord: Partial<UsageRecord> = {
       requestId,
       date: new Date().toISOString(),
@@ -29,7 +29,7 @@ export async function registerEmbeddingsRoute(
       incomingApiType: 'embeddings',
       startTime,
       isStreamed: false,
-      responseStatus: 'pending'
+      responseStatus: 'pending',
     };
 
     try {
@@ -39,7 +39,7 @@ export async function registerEmbeddingsRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       logger.silly('Incoming Embeddings Request', body);
-      
+
       const transformer = new EmbeddingsTransformer();
       const unifiedRequest = await transformer.parseRequest(body);
       unifiedRequest.incomingApiType = 'embeddings';
@@ -69,12 +69,11 @@ export async function registerEmbeddingsRoute(
       await usageStorage.saveRequest(usageRecord as UsageRecord);
 
       const formattedResponse = await transformer.formatResponse(unifiedResponse);
-      
+
       DebugManager.getInstance().addTransformedResponse(requestId, formattedResponse);
       DebugManager.getInstance().flush(requestId);
-      
-      return reply.send(formattedResponse);
 
+      return reply.send(formattedResponse);
     } catch (e: any) {
       usageRecord.responseStatus = 'error';
       usageRecord.durationMs = Date.now() - startTime;
@@ -82,14 +81,14 @@ export async function registerEmbeddingsRoute(
 
       const errorDetails = {
         apiType: 'embeddings',
-        ...(e.routingContext || {})
+        ...(e.routingContext || {}),
       };
 
       usageStorage.saveError(requestId, e, errorDetails);
       logger.error('Error processing embeddings request', e);
-      
-      return reply.code(500).send({ 
-        error: { message: e.message, type: 'api_error' } 
+
+      return reply.code(500).send({
+        error: { message: e.message, type: 'api_error' },
       });
     }
   });

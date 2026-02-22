@@ -1,4 +1,4 @@
-import { encode } from "eventsource-encoder";
+import { encode } from 'eventsource-encoder';
 
 /**
  * Formats unified chunks back into Anthropic's SSE format.
@@ -23,7 +23,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
 
   // State machine
   let nextBlockIndex = 0;
-  let activeBlockType: "text" | "thinking" | "tool_use" | null = null;
+  let activeBlockType: 'text' | 'thinking' | 'tool_use' | null = null;
   let activeBlockIndex: number | null = null;
   let activeToolCallId: string | null = null;
 
@@ -39,7 +39,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
 
       const sendEvent = (event: string, data: any) => {
         safeEnqueue(encode({ event, data: JSON.stringify(data) }));
-    };
+      };
 
       // Accumulate Usage
       if (chunk.usage) {
@@ -49,11 +49,11 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
       // 1. Message Start
       if (!hasSentStart) {
         const messageStart = {
-          type: "message_start",
+          type: 'message_start',
           message: {
-            id: chunk.id || "msg_" + Date.now(),
-            type: "message",
-            role: "assistant",
+            id: chunk.id || 'msg_' + Date.now(),
+            type: 'message',
+            role: 'assistant',
             model: chunk.model,
             content: [],
             stop_reason: null,
@@ -67,48 +67,45 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
             },
           },
         };
-        sendEvent("message_start", messageStart);
+        sendEvent('message_start', messageStart);
         hasSentStart = true;
       }
 
       const closeCurrentBlock = () => {
         if (activeBlockType !== null && activeBlockIndex !== null) {
-          sendEvent("content_block_stop", {
-            type: "content_block_stop",
+          sendEvent('content_block_stop', {
+            type: 'content_block_stop',
             index: activeBlockIndex,
           });
-        activeBlockType = null;
+          activeBlockType = null;
           activeBlockIndex = null;
           activeToolCallId = null;
         }
       };
 
-      const startBlock = (
-       type: "text" | "thinking" | "tool_use",
-        info?: any
-      ) => {
+      const startBlock = (type: 'text' | 'thinking' | 'tool_use', info?: any) => {
         closeCurrentBlock();
 
-    activeBlockIndex = nextBlockIndex++;
+        activeBlockIndex = nextBlockIndex++;
         activeBlockType = type;
-        activeToolCallId = type === "tool_use" ? (info?.id ?? null) : null;
+        activeToolCallId = type === 'tool_use' ? (info?.id ?? null) : null;
 
         let content_block: any;
-        if (type === "text") {
-          content_block = { type: "text", text: "" };
-    } else if (type === "thinking") {
-          content_block = { type: "thinking", thinking: "" };
-      } else if (type === "tool_use") {
+        if (type === 'text') {
+          content_block = { type: 'text', text: '' };
+        } else if (type === 'thinking') {
+          content_block = { type: 'thinking', thinking: '' };
+        } else if (type === 'tool_use') {
           content_block = {
-            type: "tool_use",
-         id: info.id,
+            type: 'tool_use',
+            id: info.id,
             name: info.name,
             input: {},
           };
         }
 
-       sendEvent("content_block_start", {
-          type: "content_block_start",
+        sendEvent('content_block_start', {
+          type: 'content_block_start',
           index: activeBlockIndex,
           content_block,
         });
@@ -117,52 +114,51 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
       if (chunk.delta) {
         // Thinking
         if (chunk.delta.thinking?.content || chunk.delta.reasoning_content) {
-          if (activeBlockType !== "thinking") {
-            startBlock("thinking");
+          if (activeBlockType !== 'thinking') {
+            startBlock('thinking');
           }
-          sendEvent("content_block_delta", {
-            type: "content_block_delta",
+          sendEvent('content_block_delta', {
+            type: 'content_block_delta',
             index: activeBlockIndex,
-         delta: {
-              type: "thinking_delta",
-      thinking:
-                chunk.delta.thinking?.content || chunk.delta.reasoning_content,
+            delta: {
+              type: 'thinking_delta',
+              thinking: chunk.delta.thinking?.content || chunk.delta.reasoning_content,
             },
-       });
+          });
         }
 
         if (chunk.delta.thinking?.signature) {
-       if (activeBlockType !== "thinking") {
-            startBlock("thinking");
+          if (activeBlockType !== 'thinking') {
+            startBlock('thinking');
           }
-          sendEvent("content_block_delta", {
-            type: "content_block_delta",
-          index: activeBlockIndex,
+          sendEvent('content_block_delta', {
+            type: 'content_block_delta',
+            index: activeBlockIndex,
             delta: {
-              type: "signature_delta",
-          signature: chunk.delta.thinking.signature,
+              type: 'signature_delta',
+              signature: chunk.delta.thinking.signature,
             },
           });
         }
 
         // Text
         if (chunk.delta.content) {
-          if (activeBlockType !== "text") {
-           startBlock("text");
+          if (activeBlockType !== 'text') {
+            startBlock('text');
           }
-          sendEvent("content_block_delta", {
-            type: "content_block_delta",
+          sendEvent('content_block_delta', {
+            type: 'content_block_delta',
             index: activeBlockIndex,
-            delta: { type: "text_delta", text: chunk.delta.content },
+            delta: { type: 'text_delta', text: chunk.delta.content },
           });
         }
 
         // Tool Calls
         if (chunk.delta.tool_calls) {
-         for (const tc of chunk.delta.tool_calls) {
+          for (const tc of chunk.delta.tool_calls) {
             const toolCallId = tc.id;
             const shouldStartToolBlock =
-              activeBlockType !== "tool_use" ||
+              activeBlockType !== 'tool_use' ||
               activeBlockIndex === null ||
               (toolCallId !== undefined && toolCallId !== activeToolCallId);
 
@@ -171,28 +167,25 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
                 continue;
               }
 
-              startBlock("tool_use", {
+              startBlock('tool_use', {
                 id: toolCallId,
                 name: tc.function?.name,
               });
             }
 
-          if (tc.function?.arguments) {
-              if (
-                activeBlockType === "tool_use" &&
-            activeBlockIndex !== null
-              ) {
-             sendEvent("content_block_delta", {
-           type: "content_block_delta",
-         index: activeBlockIndex,
-                delta: {
-                type: "input_json_delta",
-          partial_json: tc.function.arguments,
-             },
+            if (tc.function?.arguments) {
+              if (activeBlockType === 'tool_use' && activeBlockIndex !== null) {
+                sendEvent('content_block_delta', {
+                  type: 'content_block_delta',
+                  index: activeBlockIndex,
+                  delta: {
+                    type: 'input_json_delta',
+                    partial_json: tc.function.arguments,
+                  },
                 });
               }
             }
-       }
+          }
         }
       }
 
@@ -201,12 +194,12 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
         closeCurrentBlock();
 
         // Store finish reason but defer sending completion events
-      // to allow subsequent chunks (like usage) to be processed.
+        // to allow subsequent chunks (like usage) to be processed.
         const mapping: Record<string, string> = {
-          stop: "end_turn",
-          length: "max_tokens",
-        tool_calls: "tool_use",
-          content_filter: "stop_sequence",
+          stop: 'end_turn',
+          length: 'max_tokens',
+          tool_calls: 'tool_use',
+          content_filter: 'stop_sequence',
         };
 
         pendingFinishReason = mapping[chunk.finish_reason] || chunk.finish_reason;
@@ -224,16 +217,16 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
         };
 
         if (activeBlockType !== null && activeBlockIndex !== null) {
-        sendEvent("content_block_stop", {
-            type: "content_block_stop",
-      index: activeBlockIndex,
+          sendEvent('content_block_stop', {
+            type: 'content_block_stop',
+            index: activeBlockIndex,
           });
         }
         // Send message_delta with collected usage and stop reason
-        sendEvent("message_delta", {
-          type: "message_delta",
+        sendEvent('message_delta', {
+          type: 'message_delta',
           delta: {
-            stop_reason: pendingFinishReason || "end_turn",
+            stop_reason: pendingFinishReason || 'end_turn',
             stop_sequence: null,
           },
           usage: {
@@ -245,7 +238,7 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
           },
         });
 
-        sendEvent("message_stop", { type: "message_stop" });
+        sendEvent('message_stop', { type: 'message_stop' });
         hasSentFinish = true;
       }
     },

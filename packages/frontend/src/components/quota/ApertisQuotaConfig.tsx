@@ -6,10 +6,7 @@ export interface ApertisQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };

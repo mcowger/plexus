@@ -16,10 +16,9 @@ export const ApertisQuotaDisplay: React.FC<ApertisQuotaDisplayProps> = ({
   if (!result.success) {
     return (
       <div className="px-2 py-2">
-        <div className={clsx(
-          'flex items-center gap-2 text-danger',
-          isCollapsed && 'justify-center'
-        )}>
+        <div
+          className={clsx('flex items-center gap-2 text-danger', isCollapsed && 'justify-center')}
+        >
           <AlertTriangle size={16} />
           {!isCollapsed && <span className="text-xs">Error</span>}
         </div>
@@ -48,9 +47,7 @@ export const ApertisQuotaDisplay: React.FC<ApertisQuotaDisplayProps> = ({
       {balance !== undefined && (
         <div className="flex items-baseline gap-2">
           <span className="text-xs font-semibold text-text-secondary">Balance</span>
-          <span className="text-xs font-semibold text-info ml-auto">
-            {formatCost(balance)}
-          </span>
+          <span className="text-xs font-semibold text-info ml-auto">{formatCost(balance)}</span>
         </div>
       )}
     </div>

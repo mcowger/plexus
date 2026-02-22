@@ -1,4 +1,4 @@
-import { UnifiedTool } from "../../types/unified";
+import { UnifiedTool } from '../../types/unified';
 
 /**
  * Converts Anthropic's tool format to unified format.
@@ -8,7 +8,7 @@ import { UnifiedTool } from "../../types/unified";
  */
 export function convertAnthropicToolsToUnified(tools: any[]): UnifiedTool[] {
   return tools.map((t) => ({
-    type: "function",
+    type: 'function',
     function: {
       name: t.name,
       description: t.description,

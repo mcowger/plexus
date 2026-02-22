@@ -8,17 +8,13 @@ interface ZAIQuotaDisplayProps {
   isCollapsed: boolean;
 }
 
-export const ZAIQuotaDisplay: React.FC<ZAIQuotaDisplayProps> = ({
-  result,
-  isCollapsed,
-}) => {
+export const ZAIQuotaDisplay: React.FC<ZAIQuotaDisplayProps> = ({ result, isCollapsed }) => {
   if (!result.success) {
     return (
       <div className="px-2 py-2">
-        <div className={clsx(
-          "flex items-center gap-2 text-danger",
-          isCollapsed && "justify-center"
-        )}>
+        <div
+          className={clsx('flex items-center gap-2 text-danger', isCollapsed && 'justify-center')}
+        >
           <AlertTriangle size={16} />
           {!isCollapsed && <span className="text-xs">Error</span>}
         </div>
@@ -27,8 +23,8 @@ export const ZAIQuotaDisplay: React.FC<ZAIQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const tokensWindow = windows.find(w => w.windowType === 'five_hour');
-  const mcpWindow = windows.find(w => w.windowType === 'monthly');
+  const tokensWindow = windows.find((w) => w.windowType === 'five_hour');
+  const mcpWindow = windows.find((w) => w.windowType === 'monthly');
   const overallStatus = tokensWindow?.status || 'ok';
 
   const statusColors: Record<QuotaStatus, string> = {

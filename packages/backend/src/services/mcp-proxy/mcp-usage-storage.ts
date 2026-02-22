@@ -61,25 +61,27 @@ export class McpUsageStorageService {
       const mcpRequestUsage = schema.mcpRequestUsage;
       const createdAt = toDbTimestamp(record.created_at, getCurrentDialect()) as string & Date;
 
-      await this.ensureDb().insert(mcpRequestUsage).values({
-        requestId: record.request_id,
-        createdAt,
-        startTime: record.start_time,
-        durationMs: record.duration_ms,
-        serverName: record.server_name,
-        upstreamUrl: record.upstream_url,
-        method: record.method,
-        jsonrpcMethod: record.jsonrpc_method,
-        toolName: record.tool_name,
-        apiKey: record.api_key,
-        attribution: record.attribution,
-        sourceIp: record.source_ip,
-        responseStatus: record.response_status,
-        isStreamed: record.is_streamed ? 1 : 0,
-        hasDebug: record.has_debug ? 1 : 0,
-        errorCode: record.error_code,
-        errorMessage: record.error_message,
-      });
+      await this.ensureDb()
+        .insert(mcpRequestUsage)
+        .values({
+          requestId: record.request_id,
+          createdAt,
+          startTime: record.start_time,
+          durationMs: record.duration_ms,
+          serverName: record.server_name,
+          upstreamUrl: record.upstream_url,
+          method: record.method,
+          jsonrpcMethod: record.jsonrpc_method,
+          toolName: record.tool_name,
+          apiKey: record.api_key,
+          attribution: record.attribution,
+          sourceIp: record.source_ip,
+          responseStatus: record.response_status,
+          isStreamed: record.is_streamed ? 1 : 0,
+          hasDebug: record.has_debug ? 1 : 0,
+          errorCode: record.error_code,
+          errorMessage: record.error_message,
+        });
 
       logger.debug(`MCP usage record saved for request ${record.request_id}`);
     } catch (error) {
@@ -108,12 +110,9 @@ export class McpUsageStorageService {
     }
   }
 
-  async getLogs(options: {
-    limit?: number;
-    offset?: number;
-    serverName?: string;
-    apiKey?: string;
-  } = {}): Promise<{ data: McpRequestUsageRecord[]; total: number }> {
+  async getLogs(
+    options: { limit?: number; offset?: number; serverName?: string; apiKey?: string } = {}
+  ): Promise<{ data: McpRequestUsageRecord[]; total: number }> {
     try {
       const schema = this.getMcpSchema();
       const table = schema.mcpRequestUsage;
@@ -132,7 +131,9 @@ export class McpUsageStorageService {
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const [rows, countRows] = await Promise.all([
-        db.select().from(table)
+        db
+          .select()
+          .from(table)
           .where(whereClause)
           .orderBy(desc(table.startTime))
           .limit(limit)
@@ -173,9 +174,7 @@ export class McpUsageStorageService {
     try {
       const schema = this.getMcpSchema();
       const table = schema.mcpRequestUsage;
-      const result = await this.ensureDb()
-        .delete(table)
-        .where(eq(table.requestId, requestId));
+      const result = await this.ensureDb().delete(table).where(eq(table.requestId, requestId));
       return true;
     } catch (error) {
       logger.error('Failed to delete MCP log', error);

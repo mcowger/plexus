@@ -33,11 +33,13 @@ export interface Transformer {
   // Extract usage information from SSE event data (JSON string)
   // Used by the observer to parse usage data from complete SSE events
   // Returns undefined if no usage data is present in this event
-  extractUsage(eventData: string): { 
-    input_tokens?: number;
-    output_tokens?: number;
-    cached_tokens?: number;
-    cache_creation_tokens?: number;
-    reasoning_tokens?: number;
-  } | undefined;
+  extractUsage(eventData: string):
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        cached_tokens?: number;
+        cache_creation_tokens?: number;
+        reasoning_tokens?: number;
+      }
+    | undefined;
 }

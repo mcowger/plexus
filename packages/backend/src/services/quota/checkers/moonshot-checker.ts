@@ -18,7 +18,10 @@ export class MoonshotQuotaChecker extends QuotaChecker {
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.moonshot.ai/v1/users/me/balance');
+    this.endpoint = this.getOption<string>(
+      'endpoint',
+      'https://api.moonshot.ai/v1/users/me/balance'
+    );
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {
@@ -30,7 +33,7 @@ export class MoonshotQuotaChecker extends QuotaChecker {
       const response = await fetch(this.endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
       });
@@ -42,7 +45,9 @@ export class MoonshotQuotaChecker extends QuotaChecker {
       const data: MoonshotBalanceResponse = await response.json();
 
       if (!data.status || data.code !== 0) {
-        return this.errorResult(new Error(`Moonshot API error: code=${data.code}, scode=${data.scode}`));
+        return this.errorResult(
+          new Error(`Moonshot API error: code=${data.code}, scode=${data.scode}`)
+        );
       }
 
       const { available_balance, voucher_balance, cash_balance } = data.data;

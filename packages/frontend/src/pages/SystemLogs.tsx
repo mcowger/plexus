@@ -16,7 +16,14 @@ export const SystemLogs: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [currentLevel, setCurrentLevel] = useState('info');
   const [startupLevel, setStartupLevel] = useState('info');
-  const [supportedLevels, setSupportedLevels] = useState<string[]>(['error', 'warn', 'info', 'debug', 'verbose', 'silly']);
+  const [supportedLevels, setSupportedLevels] = useState<string[]>([
+    'error',
+    'warn',
+    'info',
+    'debug',
+    'verbose',
+    'silly',
+  ]);
   const [selectedLevel, setSelectedLevel] = useState('info');
   const [isUpdatingLevel, setIsUpdatingLevel] = useState(false);
   const [levelError, setLevelError] = useState<string | null>(null);
@@ -66,9 +73,9 @@ export const SystemLogs: React.FC = () => {
     try {
       const response = await fetch('/v0/system/logs/stream', {
         headers: {
-          'x-admin-key': adminKey
+          'x-admin-key': adminKey,
         },
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -98,12 +105,13 @@ export const SystemLogs: React.FC = () => {
             if (line.startsWith('event: syslog')) {
               isSyslogEvent = true;
             } else if (line.startsWith('event: ping')) {
-                // Ignore ping events
-                isSyslogEvent = false;
+              // Ignore ping events
+              isSyslogEvent = false;
             } else if (line.startsWith('data: ')) {
               eventData = line.slice(6);
-            } else if (line.startsWith('data:')) { // Support no space after colon
-                eventData = line.slice(5);
+            } else if (line.startsWith('data:')) {
+              // Support no space after colon
+              eventData = line.slice(5);
             }
           }
 
@@ -111,7 +119,7 @@ export const SystemLogs: React.FC = () => {
             try {
               const data = JSON.parse(eventData);
               if (!isPausedRef.current) {
-                setLogs(prev => [...prev.slice(-999), data]); // Keep last 1000 logs
+                setLogs((prev) => [...prev.slice(-999), data]); // Keep last 1000 logs
               }
             } catch (e) {
               // Ignore parse errors or keepalives
@@ -120,10 +128,10 @@ export const SystemLogs: React.FC = () => {
         }
       }
     } catch (err: any) {
-        if (err.name !== 'AbortError') {
-            console.error('Log stream error:', err);
-            // Optional: Auto-reconnect after delay?
-        }
+      if (err.name !== 'AbortError') {
+        console.error('Log stream error:', err);
+        // Optional: Auto-reconnect after delay?
+      }
     }
   };
 
@@ -172,17 +180,24 @@ export const SystemLogs: React.FC = () => {
 
   const getLevelClass = (level: string) => {
     switch (level) {
-      case 'error': return 'error';
-      case 'warn': return 'warn';
-      case 'debug': return 'debug';
-      default: return 'info';
+      case 'error':
+        return 'error';
+      case 'warn':
+        return 'warn';
+      case 'debug':
+        return 'debug';
+      default:
+        return 'info';
     }
   };
 
   return (
     <div className="dashboard h-[calc(100vh-64px)] flex flex-col overflow-hidden">
       <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h1
+          className="font-heading text-3xl font-bold text-text m-0 mb-2"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
           <Terminal size={24} />
           System Logs
         </h1>
@@ -200,7 +215,9 @@ export const SystemLogs: React.FC = () => {
               disabled={isUpdatingLevel}
             >
               {supportedLevels.map((level) => (
-                <option key={level} value={level}>{level}</option>
+                <option key={level} value={level}>
+                  {level}
+                </option>
               ))}
             </select>
             <Button
@@ -220,49 +237,59 @@ export const SystemLogs: React.FC = () => {
             >
               Reset
             </Button>
-            <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={() => setIsPaused(!isPaused)}
-                leftIcon={isPaused ? <Play size={14} /> : <Pause size={14} />}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsPaused(!isPaused)}
+              leftIcon={isPaused ? <Play size={14} /> : <Pause size={14} />}
             >
-                {isPaused ? 'Resume' : 'Pause'}
+              {isPaused ? 'Resume' : 'Pause'}
             </Button>
-            <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={clearLogs}
-                leftIcon={<Trash2 size={14} />}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={clearLogs}
+              leftIcon={<Trash2 size={14} />}
             >
-                Clear
+              Clear
             </Button>
           </div>
         </div>
         <div className="px-6 py-2 text-xs text-text-secondary border-b border-border-glass">
-          Current level: <span className="text-text font-semibold">{currentLevel}</span> | Startup default: <span className="text-text font-semibold">{startupLevel}</span> | Runtime changes reset on restart
+          Current level: <span className="text-text font-semibold">{currentLevel}</span> | Startup
+          default: <span className="text-text font-semibold">{startupLevel}</span> | Runtime changes
+          reset on restart
           {levelError && <span className="ml-2 text-danger">({levelError})</span>}
         </div>
-        
+
         <div className="flex-1 bg-[#0f172a] p-3 overflow-y-auto font-mono text-[13px] text-[#e2e8f0] rounded-sm">
-            {logs.length === 0 && (
-                <div className="text-text-muted italic text-center mt-5">Waiting for logs...</div>
-            )}
-            {logs.map((log, i) => (
-                <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">
-                    <span className="text-text-muted mr-2">[{log.timestamp}]</span>
-                    <span className={`font-bold mr-2 ${getLevelClass(log.level)}`}>{log.level.toUpperCase()}:</span>
-                    <span>{log.message}</span>
-                    {Object.keys(log).filter(k => !['level', 'message', 'timestamp'].includes(k)).length > 0 && (
-                        <pre className="text-text-muted text-[11px] ml-8 mt-1">
-                            {JSON.stringify(
-                                Object.fromEntries(Object.entries(log).filter(([k]) => !['level', 'message', 'timestamp'].includes(k))),
-                                null, 2
-                            )}
-                        </pre>
-                    )}
-                </div>
-            ))}
-            <div ref={logsEndRef} />
+          {logs.length === 0 && (
+            <div className="text-text-muted italic text-center mt-5">Waiting for logs...</div>
+          )}
+          {logs.map((log, i) => (
+            <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">
+              <span className="text-text-muted mr-2">[{log.timestamp}]</span>
+              <span className={`font-bold mr-2 ${getLevelClass(log.level)}`}>
+                {log.level.toUpperCase()}:
+              </span>
+              <span>{log.message}</span>
+              {Object.keys(log).filter((k) => !['level', 'message', 'timestamp'].includes(k))
+                .length > 0 && (
+                <pre className="text-text-muted text-[11px] ml-8 mt-1">
+                  {JSON.stringify(
+                    Object.fromEntries(
+                      Object.entries(log).filter(
+                        ([k]) => !['level', 'message', 'timestamp'].includes(k)
+                      )
+                    ),
+                    null,
+                    2
+                  )}
+                </pre>
+              )}
+            </div>
+          ))}
+          <div ref={logsEndRef} />
         </div>
       </div>
     </div>

@@ -8,12 +8,12 @@ export class OAuthErrorHandler {
               `OAuth provider '${provider}' not authenticated. ` +
               `Please run: npx @mariozechner/pi-ai login ${provider}`,
             type: 'authentication_error',
-            code: 'oauth_not_authenticated'
-          }
+            code: 'oauth_not_authenticated',
+          },
         }),
         {
           status: 401,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         }
       );
     }
@@ -26,12 +26,12 @@ export class OAuthErrorHandler {
               `OAuth authentication expired for '${provider}'. ` +
               `Please re-authenticate: npx @mariozechner/pi-ai login ${provider}`,
             type: 'authentication_error',
-            code: 'oauth_token_expired'
-          }
+            code: 'oauth_token_expired',
+          },
         }),
         {
           status: 401,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         }
       );
     }
@@ -41,12 +41,12 @@ export class OAuthErrorHandler {
         error: {
           message: error.message,
           type: 'oauth_error',
-          code: 'unknown'
-        }
+          code: 'unknown',
+        },
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       }
     );
   }

@@ -14,25 +14,30 @@ import { registerSpeechRoute } from './speech';
 import { registerImagesRoute } from './images';
 import { registerResponsesRoute } from './responses';
 
-export async function registerInferenceRoutes(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService, quotaEnforcer?: QuotaEnforcer) {
-    // Public Routes (Excluded from Auth)
-    await registerModelsRoute(fastify);
-    
-    // Protected Routes (v1 and v1beta)
-    fastify.register(async (protectedRoutes) => {
-        const auth = createAuthHook();
-        
-        protectedRoutes.addHook('onRequest', auth.onRequest);
+export async function registerInferenceRoutes(
+  fastify: FastifyInstance,
+  dispatcher: Dispatcher,
+  usageStorage: UsageStorageService,
+  quotaEnforcer?: QuotaEnforcer
+) {
+  // Public Routes (Excluded from Auth)
+  await registerModelsRoute(fastify);
 
-        await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
+  // Protected Routes (v1 and v1beta)
+  fastify.register(async (protectedRoutes) => {
+    const auth = createAuthHook();
 
-        await registerChatRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
-        await registerMessagesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
-        await registerGeminiRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
-        await registerResponsesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
-        await registerEmbeddingsRoute(protectedRoutes, dispatcher, usageStorage);
-        await registerTranscriptionsRoute(protectedRoutes, dispatcher, usageStorage);
-        await registerSpeechRoute(protectedRoutes, dispatcher, usageStorage);
-        await registerImagesRoute(protectedRoutes, dispatcher, usageStorage);
-    });
+    protectedRoutes.addHook('onRequest', auth.onRequest);
+
+    await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
+
+    await registerChatRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+    await registerMessagesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+    await registerGeminiRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+    await registerResponsesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+    await registerEmbeddingsRoute(protectedRoutes, dispatcher, usageStorage);
+    await registerTranscriptionsRoute(protectedRoutes, dispatcher, usageStorage);
+    await registerSpeechRoute(protectedRoutes, dispatcher, usageStorage);
+    await registerImagesRoute(protectedRoutes, dispatcher, usageStorage);
+  });
 }

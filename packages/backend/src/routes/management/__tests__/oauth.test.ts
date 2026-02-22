@@ -8,11 +8,15 @@ import { registerOAuthRoutes } from '../oauth';
 import { OAuthLoginSessionManager } from '../../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
 
-const waitForStatus = async (fastify: ReturnType<typeof Fastify>, sessionId: string, status: string) => {
+const waitForStatus = async (
+  fastify: ReturnType<typeof Fastify>,
+  sessionId: string,
+  status: string
+) => {
   for (let i = 0; i < 50; i += 1) {
     const response = await fastify.inject({
       method: 'GET',
-      url: `/v0/management/oauth/sessions/${sessionId}`
+      url: `/v0/management/oauth/sessions/${sessionId}`,
     });
     const json = response.json() as { data?: { status?: string } };
     if (json.data?.status === status) {
@@ -48,7 +52,7 @@ describe('OAuth management routes', () => {
         return {
           access: 'access-token',
           refresh: 'refresh-token',
-          expires: Date.now() + 60_000
+          expires: Date.now() + 60_000,
         };
       },
       async refreshToken(credentials) {
@@ -56,7 +60,7 @@ describe('OAuth management routes', () => {
       },
       getApiKey(credentials) {
         return credentials.access;
-      }
+      },
     };
 
     manager = new OAuthLoginSessionManager((id) => (id === provider.id ? provider : undefined));
@@ -79,7 +83,7 @@ describe('OAuth management routes', () => {
     const response = await fastify.inject({
       method: 'POST',
       url: '/v0/management/oauth/sessions',
-      payload: { providerId: 'test-provider', accountId }
+      payload: { providerId: 'test-provider', accountId },
     });
     const session = response.json() as { data: { id: string } };
 
@@ -88,7 +92,7 @@ describe('OAuth management routes', () => {
     await fastify.inject({
       method: 'POST',
       url: `/v0/management/oauth/sessions/${session.data.id}/prompt`,
-      payload: { value: 'test-code' }
+      payload: { value: 'test-code' },
     });
 
     await waitForStatus(fastify, session.data.id, 'success');
@@ -109,7 +113,7 @@ describe('OAuth management routes', () => {
     const deleteResponse = await fastify.inject({
       method: 'DELETE',
       url: '/v0/management/oauth/credentials',
-      payload: { providerId: 'test-provider', accountId }
+      payload: { providerId: 'test-provider', accountId },
     });
     expect(deleteResponse.statusCode).toBe(200);
 
@@ -134,7 +138,7 @@ describe('OAuth management routes', () => {
         return {
           access: 'manual-access',
           refresh: 'manual-refresh',
-          expires: Date.now() + 60_000
+          expires: Date.now() + 60_000,
         };
       },
       async refreshToken(credentials) {
@@ -142,18 +146,20 @@ describe('OAuth management routes', () => {
       },
       getApiKey(credentials) {
         return credentials.access;
-      }
+      },
     };
 
     manager.dispose();
-    manager = new OAuthLoginSessionManager((id) => (id === manualProvider.id ? manualProvider : undefined));
+    manager = new OAuthLoginSessionManager((id) =>
+      id === manualProvider.id ? manualProvider : undefined
+    );
     fastify = Fastify();
     await registerOAuthRoutes(fastify, manager);
 
     const response = await fastify.inject({
       method: 'POST',
       url: '/v0/management/oauth/sessions',
-      payload: { providerId: 'manual-provider', accountId }
+      payload: { providerId: 'manual-provider', accountId },
     });
     const session = response.json() as { data: { id: string } };
 
@@ -162,7 +168,7 @@ describe('OAuth management routes', () => {
     await fastify.inject({
       method: 'POST',
       url: `/v0/management/oauth/sessions/${session.data.id}/manual-code`,
-      payload: { value: 'manual-code' }
+      payload: { value: 'manual-code' },
     });
 
     await waitForStatus(fastify, session.data.id, 'success');
@@ -177,21 +183,28 @@ describe('OAuth management routes', () => {
   it('fetches OAuth provider models', async () => {
     const response = await fastify.inject({
       method: 'GET',
-      url: '/v0/management/oauth/models?providerId=anthropic'
+      url: '/v0/management/oauth/models?providerId=anthropic',
     });
 
     expect(response.statusCode).toBe(200);
-    const json = response.json() as { data: Array<{ id: string; name?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }> };
+    const json = response.json() as {
+      data: Array<{
+        id: string;
+        name?: string;
+        context_length?: number;
+        pricing?: { prompt?: string; completion?: string };
+      }>;
+    };
     expect(Array.isArray(json.data)).toBe(true);
     expect(json.data.length).toBeGreaterThan(0);
-    
+
     // Verify the first model has expected structure
     const firstModel = json.data[0];
     expect(firstModel).toBeDefined();
     if (firstModel) {
       expect(firstModel.id).toBeDefined();
       expect(typeof firstModel.id).toBe('string');
-      
+
       // Check optional fields exist if present
       if (firstModel.name) {
         expect(typeof firstModel.name).toBe('string');
@@ -208,7 +221,7 @@ describe('OAuth management routes', () => {
   it('returns 400 for invalid providerId', async () => {
     const response = await fastify.inject({
       method: 'GET',
-      url: '/v0/management/oauth/models?providerId='
+      url: '/v0/management/oauth/models?providerId=',
     });
 
     expect(response.statusCode).toBe(400);
@@ -219,7 +232,7 @@ describe('OAuth management routes', () => {
   it('handles unknown provider gracefully', async () => {
     const response = await fastify.inject({
       method: 'GET',
-      url: '/v0/management/oauth/models?providerId=unknown-provider'
+      url: '/v0/management/oauth/models?providerId=unknown-provider',
     });
 
     // getModels returns empty array for unknown providers instead of throwing

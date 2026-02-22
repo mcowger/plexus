@@ -1,8 +1,13 @@
-import { UnifiedImageGenerationRequest, UnifiedImageGenerationResponse, UnifiedImageEditRequest, UnifiedImageEditResponse } from "../types/unified";
+import {
+  UnifiedImageGenerationRequest,
+  UnifiedImageGenerationResponse,
+  UnifiedImageEditRequest,
+  UnifiedImageEditResponse,
+} from '../types/unified';
 
 export class ImageTransformer {
-  name = "image";
-  defaultEndpoint = "/images/generations";
+  name = 'image';
+  defaultEndpoint = '/images/generations';
 
   async parseGenerationRequest(input: any): Promise<UnifiedImageGenerationRequest> {
     return {
@@ -55,10 +60,11 @@ export class ImageTransformer {
 
     formData.append('model', request.model);
     formData.append('prompt', request.prompt);
-    
+
     if (request.n !== undefined) formData.append('n', request.n.toString());
     if (request.size !== undefined) formData.append('size', request.size);
-    if (request.response_format !== undefined) formData.append('response_format', request.response_format);
+    if (request.response_format !== undefined)
+      formData.append('response_format', request.response_format);
     if (request.quality !== undefined) formData.append('quality', request.quality);
     if (request.user !== undefined) formData.append('user', request.user);
 

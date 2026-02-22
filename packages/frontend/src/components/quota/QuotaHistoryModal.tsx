@@ -25,8 +25,6 @@ interface QuotaHistoryModalProps {
   displayName: string;
 }
 
-
-
 const TIME_RANGE_CONFIG: Record<TimeRange, { label: string; days: number; interval: string }> = {
   '1h': { label: '1 Hour', days: 1 / 24, interval: 'hour' },
   '3h': { label: '3 Hours', days: 3 / 24, interval: 'hour' },
@@ -96,14 +94,14 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
 
   // Colors for different window types
   const WINDOW_COLORS: Record<string, string> = {
-    'five_hour': '#3b82f6',    // blue
-    'toolcalls': '#06b6d4',    // cyan
-    'search': '#8b5cf6',       // violet
-    'daily': '#10b981',        // emerald
-    'weekly': '#a855f7',       // purple
-    'monthly': '#f59e0b',      // amber
-    'subscription': '#ec4899', // pink
-    'custom': '#6b7280',       // gray
+    five_hour: '#3b82f6', // blue
+    toolcalls: '#06b6d4', // cyan
+    search: '#8b5cf6', // violet
+    daily: '#10b981', // emerald
+    weekly: '#a855f7', // purple
+    monthly: '#f59e0b', // amber
+    subscription: '#ec4899', // pink
+    custom: '#6b7280', // gray
   };
 
   // Process history data for the chart - group by window type
@@ -113,10 +111,11 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
     const timeRange: TimeRange = selectedRange;
 
     // Filter to only successful snapshots with valid utilization data
-    const validSnapshots = history.filter((snapshot: QuotaSnapshot) => 
-      snapshot.success && 
-      snapshot.utilizationPercent !== null && 
-      snapshot.utilizationPercent !== undefined
+    const validSnapshots = history.filter(
+      (snapshot: QuotaSnapshot) =>
+        snapshot.success &&
+        snapshot.utilizationPercent !== null &&
+        snapshot.utilizationPercent !== undefined
     );
 
     // Group by window type
@@ -163,8 +162,8 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
 
       // Add utilization for each window type at this timestamp
       for (const [windowType, snapshots] of snapshotsByWindow) {
-        const snapshot = snapshots.find(s => 
-          new Date(s.checkedAt as string).getTime() === timestamp
+        const snapshot = snapshots.find(
+          (s) => new Date(s.checkedAt as string).getTime() === timestamp
         );
         if (snapshot) {
           point[windowType] = snapshot.utilizationPercent ?? null;
@@ -185,7 +184,16 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
     });
 
     // Sort window types by priority
-    const priorityOrder = ['five_hour', 'toolcalls', 'search', 'daily', 'weekly', 'monthly', 'subscription', 'custom'];
+    const priorityOrder = [
+      'five_hour',
+      'toolcalls',
+      'search',
+      'daily',
+      'weekly',
+      'monthly',
+      'subscription',
+      'custom',
+    ];
     const sortedWindowTypes = Array.from(snapshotsByWindow.keys()).sort((a, b) => {
       const aIdx = priorityOrder.indexOf(a);
       const bIdx = priorityOrder.indexOf(b);
@@ -325,27 +333,21 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                   <TrendingDown size={12} />
                   <span>Avg Usage</span>
                 </div>
-                <div className="text-lg font-semibold text-text">
-                  {Math.round(stats.avg)}%
-                </div>
+                <div className="text-lg font-semibold text-text">{Math.round(stats.avg)}%</div>
               </div>
               <div className="bg-bg-subtle rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 text-text-secondary text-xs mb-1">
                   <Activity size={12} />
                   <span>Peak</span>
                 </div>
-                <div className="text-lg font-semibold text-text">
-                  {Math.round(stats.max)}%
-                </div>
+                <div className="text-lg font-semibold text-text">{Math.round(stats.max)}%</div>
               </div>
               <div className="bg-bg-subtle rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 text-text-secondary text-xs mb-1">
                   <Calendar size={12} />
                   <span>Lowest</span>
                 </div>
-                <div className="text-lg font-semibold text-text">
-                  {Math.round(stats.min)}%
-                </div>
+                <div className="text-lg font-semibold text-text">{Math.round(stats.min)}%</div>
               </div>
               <div className="bg-bg-subtle rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 text-text-secondary text-xs mb-1">
@@ -375,9 +377,7 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                 Loading history...
               </div>
             ) : error ? (
-              <div className="flex items-center justify-center h-[300px] text-danger">
-                {error}
-              </div>
+              <div className="flex items-center justify-center h-[300px] text-danger">{error}</div>
             ) : chartData.length === 0 ? (
               <div className="flex items-center justify-center h-[300px] text-text-secondary">
                 No historical data available for this time range
@@ -438,15 +438,19 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                       domain={[0, 100]}
                     />
                     <Tooltip
-                      content={({ active, payload, label }: { 
-                        active?: boolean; 
-                        payload?: ReadonlyArray<{ 
-                          dataKey: string; 
-                          value: number; 
+                      content={({
+                        active,
+                        payload,
+                        label,
+                      }: {
+                        active?: boolean;
+                        payload?: ReadonlyArray<{
+                          dataKey: string;
+                          value: number;
                           color: string;
                           payload: Record<string, unknown>;
-                        }>; 
-                        label?: string | number 
+                        }>;
+                        label?: string | number;
                       }) => {
                         if (active && payload && payload.length) {
                           return (
@@ -470,7 +474,9 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                                           {displayName}:
                                         </span>
                                         <span className="text-xs font-medium text-text">
-                                          {typeof p.value === 'number' ? `${p.value.toFixed(1)}%` : p.value}
+                                          {typeof p.value === 'number'
+                                            ? `${p.value.toFixed(1)}%`
+                                            : p.value}
                                         </span>
                                       </div>
                                     );
@@ -517,7 +523,9 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                         strokeWidth={2}
                         fillOpacity={1}
                         fill={`url(#color${windowType})`}
-                        name={windowType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                        name={windowType
+                          .replace(/_/g, ' ')
+                          .replace(/\b\w/g, (l) => l.toUpperCase())}
                         connectNulls={false}
                       />
                     ))}

@@ -1,4 +1,9 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig, QuotaWindowType } from '../../../types/quota';
+import type {
+  QuotaCheckResult,
+  QuotaWindow,
+  QuotaCheckerConfig,
+  QuotaWindowType,
+} from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 
@@ -47,8 +52,8 @@ export class KimiCodeQuotaChecker extends QuotaChecker {
       const response = await fetch(this.endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
         },
       });
 
@@ -60,15 +65,17 @@ export class KimiCodeQuotaChecker extends QuotaChecker {
       const windows: QuotaWindow[] = [];
 
       if (data.usage) {
-        windows.push(this.createWindow(
-          'custom',
-          Number(data.usage.limit),
-          Number(data.usage.used),
-          Number(data.usage.remaining),
-          'requests',
-          new Date(data.usage.resetTime),
-          'Usage limit',
-        ));
+        windows.push(
+          this.createWindow(
+            'custom',
+            Number(data.usage.limit),
+            Number(data.usage.used),
+            Number(data.usage.remaining),
+            'requests',
+            new Date(data.usage.resetTime),
+            'Usage limit'
+          )
+        );
       }
 
       if (data.limits) {
@@ -78,15 +85,17 @@ export class KimiCodeQuotaChecker extends QuotaChecker {
           const limit = Number(entry.detail.limit);
           const remaining = Number(entry.detail.remaining);
 
-          windows.push(this.createWindow(
-            this.windowTypeFromDuration(entry.window),
-            limit,
-            limit - remaining,
-            remaining,
-            'requests',
-            new Date(entry.detail.resetTime),
-            'Rate limit',
-          ));
+          windows.push(
+            this.createWindow(
+              this.windowTypeFromDuration(entry.window),
+              limit,
+              limit - remaining,
+              remaining,
+              'requests',
+              new Date(entry.detail.resetTime),
+              'Rate limit'
+            )
+          );
         }
       }
 

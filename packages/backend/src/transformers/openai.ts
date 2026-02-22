@@ -1,15 +1,15 @@
-import { Transformer } from "../types/transformer";
-import { UnifiedChatRequest, UnifiedChatResponse } from "../types/unified";
-import { createParser, EventSourceMessage } from "eventsource-parser";
-import { encode } from "eventsource-encoder";
-import { normalizeOpenAIChatUsage } from "../utils/usage-normalizer";
+import { Transformer } from '../types/transformer';
+import { UnifiedChatRequest, UnifiedChatResponse } from '../types/unified';
+import { createParser, EventSourceMessage } from 'eventsource-parser';
+import { encode } from 'eventsource-encoder';
+import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 
 /**
  * OpenAITransformer
  */
 export class OpenAITransformer implements Transformer {
-  name = "chat";
-  defaultEndpoint = "/chat/completions";
+  name = 'chat';
+  defaultEndpoint = '/chat/completions';
 
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
     return {
@@ -40,9 +40,7 @@ export class OpenAITransformer implements Transformer {
     const choice = response.choices?.[0];
     const message = choice?.message;
 
-    const usage = response.usage
-      ? normalizeOpenAIChatUsage(response.usage)
-      : undefined;
+    const usage = response.usage ? normalizeOpenAIChatUsage(response.usage) : undefined;
 
     return {
       id: response.id,
@@ -58,19 +56,19 @@ export class OpenAITransformer implements Transformer {
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
     return {
       id: response.id,
-      object: "chat.completion",
+      object: 'chat.completion',
       created: response.created || Math.floor(Date.now() / 1000),
       model: response.model,
       choices: [
         {
           index: 0,
           message: {
-            role: "assistant",
+            role: 'assistant',
             content: response.content,
             reasoning_content: response.reasoning_content,
             tool_calls: response.tool_calls,
           },
-          finish_reason: response.tool_calls ? "tool_calls" : "stop",
+          finish_reason: response.tool_calls ? 'tool_calls' : 'stop',
         },
       ],
       usage: response.usage
@@ -92,16 +90,14 @@ export class OpenAITransformer implements Transformer {
       async start(controller) {
         const parser = createParser({
           onEvent: (event: EventSourceMessage) => {
-            if (event.data === "[DONE]") return;
+            if (event.data === '[DONE]') return;
 
             try {
               const data = JSON.parse(event.data);
 
               const choice = data.choices?.[0];
 
-              const usage = data.usage
-                ? normalizeOpenAIChatUsage(data.usage)
-                : undefined;
+              const usage = data.usage ? normalizeOpenAIChatUsage(data.usage) : undefined;
 
               const unifiedChunk = {
                 id: data.id,
@@ -114,9 +110,7 @@ export class OpenAITransformer implements Transformer {
                   tool_calls: choice?.delta?.tool_calls,
                 },
                 finish_reason:
-                  choice?.finish_reason ||
-                  data.finish_reason ||
-                  (choice?.delta ? null : "stop"),
+                  choice?.finish_reason || data.finish_reason || (choice?.delta ? null : 'stop'),
                 usage,
               };
 
@@ -152,13 +146,13 @@ export class OpenAITransformer implements Transformer {
           while (true) {
             const { done, value: unifiedChunk } = await reader.read();
             if (done) {
-              controller.enqueue(encoder.encode(encode({ data: "[DONE]" })));
+              controller.enqueue(encoder.encode(encode({ data: '[DONE]' })));
               break;
             }
 
             const openAIChunk = {
-              id: unifiedChunk.id || "chatcmpl-" + Date.now(),
-              object: "chat.completion.chunk",
+              id: unifiedChunk.id || 'chatcmpl-' + Date.now(),
+              object: 'chat.completion.chunk',
               created: unifiedChunk.created || Math.floor(Date.now() / 1000),
               model: unifiedChunk.model,
               choices: [

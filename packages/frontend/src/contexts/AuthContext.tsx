@@ -11,7 +11,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [adminKey, setAdminKey] = useState<string | null>(null);
-  
+
   // Initialize from local storage
   useEffect(() => {
     const storedKey = localStorage.getItem('plexus_admin_key');
@@ -31,12 +31,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      adminKey, 
-      isAuthenticated: !!adminKey, 
-      login, 
-      logout 
-    }}>
+    <AuthContext.Provider
+      value={{
+        adminKey,
+        isAuthenticated: !!adminKey,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

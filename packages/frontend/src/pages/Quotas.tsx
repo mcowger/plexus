@@ -28,27 +28,40 @@ import {
 
 // Checker type categories
 const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'apertis'];
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'kimi-code', 'kimi', 'zai', 'synthetic', 'nanogpt', 'copilot', 'wisdomgate', 'minimax-coding'];
+const RATE_LIMIT_CHECKERS = [
+  'openai-codex',
+  'codex',
+  'claude-code',
+  'claude',
+  'kimi-code',
+  'kimi',
+  'zai',
+  'synthetic',
+  'nanogpt',
+  'copilot',
+  'wisdomgate',
+  'minimax-coding',
+];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
-  'openrouter': 'OpenRouter',
-  'minimax': 'MiniMax',
+  openrouter: 'OpenRouter',
+  minimax: 'MiniMax',
   'minimax-coding': 'MiniMax Coding',
-  'moonshot': 'Moonshot',
-  'naga': 'Naga',
-  'kilo': 'Kilo',
+  moonshot: 'Moonshot',
+  naga: 'Naga',
+  kilo: 'Kilo',
   'openai-codex': 'OpenAI Codex',
-  'codex': 'Codex',
+  codex: 'Codex',
   'claude-code': 'Claude Code',
-  'claude': 'Claude',
-  'zai': 'ZAI',
-  'synthetic': 'Synthetic',
-  'nanogpt': 'NanoGPT',
+  claude: 'Claude',
+  zai: 'ZAI',
+  synthetic: 'Synthetic',
+  nanogpt: 'NanoGPT',
   'kimi-code': 'Kimi Code',
-  'kimi': 'Kimi',
-  'copilot': 'GitHub Copilot',
-  'wisdomgate': 'Wisdom Gate',
+  kimi: 'Kimi',
+  copilot: 'GitHub Copilot',
+  wisdomgate: 'Wisdom Gate',
 };
 
 export const Quotas = () => {
@@ -63,7 +76,7 @@ export const Quotas = () => {
   // Check if a quota is a balance-based checker
   const isBalanceChecker = (quota: QuotaCheckerInfo): boolean => {
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-    return BALANCE_CHECKERS.some(bc => checkerType.includes(bc));
+    return BALANCE_CHECKERS.some((bc) => checkerType.includes(bc));
   };
 
   const fetchQuotas = async () => {
@@ -81,10 +94,10 @@ export const Quotas = () => {
   }, []);
 
   const handleRefresh = async (checkerId: string) => {
-    setRefreshing(prev => new Set(prev).add(checkerId));
+    setRefreshing((prev) => new Set(prev).add(checkerId));
     await api.triggerQuotaCheck(checkerId);
     await fetchQuotas();
-    setRefreshing(prev => {
+    setRefreshing((prev) => {
       const next = new Set(prev);
       next.delete(checkerId);
       return next;
@@ -107,7 +120,7 @@ export const Quotas = () => {
     }
 
     // Get unique window types (in case of duplicates, take the most recent)
-    const windowsByType = new Map<string, typeof quota.latest[0]>();
+    const windowsByType = new Map<string, (typeof quota.latest)[0]>();
     for (const snapshot of quota.latest) {
       const existing = windowsByType.get(snapshot.windowType);
       if (!existing || snapshot.checkedAt > existing.checkedAt) {
@@ -115,7 +128,7 @@ export const Quotas = () => {
       }
     }
 
-    const windows = Array.from(windowsByType.values()).map(snapshot => ({
+    const windows = Array.from(windowsByType.values()).map((snapshot) => ({
       windowType: snapshot.windowType as any,
       windowLabel: snapshot.description || snapshot.windowType,
       limit: snapshot.limit ?? undefined,
@@ -124,12 +137,16 @@ export const Quotas = () => {
       utilizationPercent: snapshot.utilizationPercent ?? 0,
       unit: (snapshot.unit as any) || 'percentage',
       resetsAt: toIsoString(snapshot.resetsAt) ?? undefined,
-      resetInSeconds: snapshot.resetInSeconds !== null && snapshot.resetInSeconds !== undefined ? snapshot.resetInSeconds : undefined,
+      resetInSeconds:
+        snapshot.resetInSeconds !== null && snapshot.resetInSeconds !== undefined
+          ? snapshot.resetInSeconds
+          : undefined,
       status: (snapshot.status as any) || 'ok',
     }));
 
     const firstSnapshot = quota.latest[0];
-    const errorFromSnapshots = quota.latest.find((snapshot) => snapshot.errorMessage)?.errorMessage || undefined;
+    const errorFromSnapshots =
+      quota.latest.find((snapshot) => snapshot.errorMessage)?.errorMessage || undefined;
     return {
       provider: firstSnapshot.provider,
       checkerId: firstSnapshot.checkerId,
@@ -149,10 +166,10 @@ export const Quotas = () => {
     for (const quota of quotas) {
       const checkerType = (quota.checkerType || '').toLowerCase();
       const checkerId = quota.checkerId.toLowerCase();
-      
+
       // Determine the base checker type
       let baseType = checkerType || checkerId;
-      
+
       // Normalize checker type names
       if (baseType.includes('openai-codex') || baseType.includes('codex')) {
         baseType = 'codex';
@@ -194,13 +211,13 @@ export const Quotas = () => {
   // Separate into balance and rate limit categories
   const balanceGroups = useMemo(() => {
     return Object.entries(groupedQuotas)
-      .filter(([type]) => BALANCE_CHECKERS.some(bc => type.includes(bc)))
+      .filter(([type]) => BALANCE_CHECKERS.some((bc) => type.includes(bc)))
       .sort(([a], [b]) => a.localeCompare(b));
   }, [groupedQuotas]);
 
   const rateLimitGroups = useMemo(() => {
     return Object.entries(groupedQuotas)
-      .filter(([type]) => RATE_LIMIT_CHECKERS.some(rc => type.includes(rc)))
+      .filter(([type]) => RATE_LIMIT_CHECKERS.some((rc) => type.includes(rc)))
       .sort(([a], [b]) => a.localeCompare(b));
   }, [groupedQuotas]);
 
@@ -222,11 +239,11 @@ export const Quotas = () => {
   const renderQuotaDisplay = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
     const result = getQuotaResult(quota);
     const checkerIdentifier = (quota.checkerType || quota.checkerId).toLowerCase();
-    
+
     // Add refresh button wrapper
     const wrapper = (children: React.ReactNode) => (
-      <div 
-        key={quota.checkerId} 
+      <div
+        key={quota.checkerId}
         onClick={() => handleCardClick(quota, groupDisplayName)}
         className="bg-bg-card border border-border rounded-lg p-4 relative cursor-pointer hover:border-primary/50 transition-colors"
       >
@@ -240,12 +257,13 @@ export const Quotas = () => {
             }}
             disabled={refreshing.has(quota.checkerId)}
           >
-            <RefreshCw size={14} className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')} />
+            <RefreshCw
+              size={14}
+              className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')}
+            />
           </Button>
         </div>
-        <div className="pr-8">
-          {children}
-        </div>
+        <div className="pr-8">{children}</div>
       </div>
     );
 
@@ -253,7 +271,7 @@ export const Quotas = () => {
     if (checkerIdentifier.includes('synthetic')) {
       return wrapper(<SyntheticQuotaDisplay result={result} isCollapsed={false} />);
     }
-    
+
     if (checkerIdentifier.includes('claude')) {
       return wrapper(<ClaudeCodeQuotaDisplay result={result} isCollapsed={false} />);
     }
@@ -314,22 +332,22 @@ export const Quotas = () => {
   // Render columns for checker types (responsive grid)
   const renderQuotaColumns = (groups: [string, QuotaCheckerInfo[]][]) => {
     return (
-      <div 
-        className="grid gap-4" 
-        style={{ 
+      <div
+        className="grid gap-4"
+        style={{
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
         }}
       >
         {groups.map(([checkerType, quotasList]) => {
           const displayName = CHECKER_DISPLAY_NAMES[checkerType] || checkerType;
-          
+
           return (
             <div key={checkerType} className="flex flex-col gap-3">
               <h3 className="font-heading text-sm font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border pb-2">
                 {displayName}
               </h3>
               <div className="flex flex-col gap-3">
-                {quotasList.map(quota => renderQuotaDisplay(quota, displayName))}
+                {quotasList.map((quota) => renderQuotaDisplay(quota, displayName))}
               </div>
             </div>
           );
@@ -343,13 +361,11 @@ export const Quotas = () => {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Quota Trackers</h1>
-          <p className="text-[15px] text-text-secondary m-0">Monitor provider quotas and rate limits.</p>
+          <p className="text-[15px] text-text-secondary m-0">
+            Monitor provider quotas and rate limits.
+          </p>
         </div>
-        <Button
-          variant="secondary"
-          onClick={fetchQuotas}
-          disabled={loading}
-        >
+        <Button variant="secondary" onClick={fetchQuotas} disabled={loading}>
           <RefreshCw size={16} className={clsx('mr-2', loading && 'animate-spin')} />
           Refresh All
         </Button>

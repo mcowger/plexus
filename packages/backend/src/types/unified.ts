@@ -1,7 +1,7 @@
 // Unified Message Types
 
 export interface TextContent {
-  type: "text";
+  type: 'text';
   text: string;
   cache_control?: {
     type?: string;
@@ -9,7 +9,7 @@ export interface TextContent {
 }
 
 export interface ImageContent {
-  type: "image_url";
+  type: 'image_url';
   image_url: {
     url: string;
   };
@@ -19,11 +19,11 @@ export interface ImageContent {
 export type MessageContent = TextContent | ImageContent;
 
 export interface UnifiedMessage {
-  role: "user" | "assistant" | "system" | "tool";
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string | null | MessageContent[];
   tool_calls?: Array<{
     id: string;
-    type: "function";
+    type: 'function';
     function: {
       name: string;
       arguments: string;
@@ -43,12 +43,12 @@ export interface UnifiedMessage {
 // Unified Tool Types
 
 export interface UnifiedTool {
-  type: "function";
+  type: 'function';
   function: {
     name: string;
     description?: string;
     parameters: {
-      type: "object";
+      type: 'object';
       properties: Record<string, any>;
       required?: string[];
       additionalProperties?: boolean;
@@ -57,7 +57,7 @@ export interface UnifiedTool {
   };
 }
 
-export type ThinkLevel = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 // Unified Request
 
@@ -70,11 +70,11 @@ export interface UnifiedChatRequest {
   stream?: boolean;
   tools?: UnifiedTool[];
   tool_choice?:
-    | "auto"
-    | "none"
-    | "required"
+    | 'auto'
+    | 'none'
+    | 'required'
     | string
-    | { type: "function"; function: { name: string } };
+    | { type: 'function'; function: { name: string } };
   reasoning?: {
     effort?: ThinkLevel;
     max_tokens?: number;
@@ -92,7 +92,7 @@ export interface UnifiedChatRequest {
   };
   parallel_tool_calls?: boolean;
   response_format?: {
-    type: "text" | "json_object" | "json_schema";
+    type: 'text' | 'json_object' | 'json_schema';
     json_schema?: any;
   };
   incomingApiType?: string;
@@ -105,7 +105,7 @@ export interface UnifiedChatRequest {
 // Unified Response
 
 export interface Annotation {
-  type: "url_citation";
+  type: 'url_citation';
   url_citation?: {
     url: string;
     title: string;
@@ -116,12 +116,12 @@ export interface Annotation {
 }
 
 export interface UnifiedUsage {
-    input_tokens: number;
-    output_tokens: number;
-    total_tokens: number;
-    reasoning_tokens: number;
-    cached_tokens: number;
-    cache_creation_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  reasoning_tokens: number;
+  cached_tokens: number;
+  cache_creation_tokens: number;
 }
 
 export interface UnifiedChatResponse {
@@ -130,13 +130,13 @@ export interface UnifiedChatResponse {
   created?: number;
   content: string | null;
   plexus?: {
-      provider?: string;
-      model?: string;
-      apiType?: string;
-      pricing?: any;
-      providerDiscount?: number;
-      canonicalModel?: string;
-      config?: any;
+    provider?: string;
+    model?: string;
+    apiType?: string;
+    pricing?: any;
+    providerDiscount?: number;
+    canonicalModel?: string;
+    config?: any;
   };
   reasoning_content?: string | null;
   thinking?: {
@@ -146,7 +146,7 @@ export interface UnifiedChatResponse {
   usage?: UnifiedUsage;
   tool_calls?: Array<{
     id: string;
-    type: "function";
+    type: 'function';
     function: {
       name: string;
       arguments: string;
@@ -161,29 +161,29 @@ export interface UnifiedChatResponse {
 }
 
 export interface UnifiedChatStreamChunk {
-    id: string;
-    model: string;
-    created: number;
-    delta: {
-        role?: string;
-        content?: string;
-        tool_calls?: Array<{
-            index?: number; // Stream chunks often have index for tool calls
-            id?: string;
-            type?: "function";
-            function?: {
-                name?: string;
-                arguments?: string;
-            }
-        }>;
-        reasoning_content?: string | null;
-        thinking?: {
-            content?: string;
-            signature?: string;
-        };
+  id: string;
+  model: string;
+  created: number;
+  delta: {
+    role?: string;
+    content?: string;
+    tool_calls?: Array<{
+      index?: number; // Stream chunks often have index for tool calls
+      id?: string;
+      type?: 'function';
+      function?: {
+        name?: string;
+        arguments?: string;
+      };
+    }>;
+    reasoning_content?: string | null;
+    thinking?: {
+      content?: string;
+      signature?: string;
     };
-    finish_reason?: string | null;
-    usage?: UnifiedUsage;
+  };
+  finish_reason?: string | null;
+  usage?: UnifiedUsage;
 }
 
 // Unified Embeddings Request
@@ -191,7 +191,7 @@ export interface UnifiedEmbeddingsRequest {
   requestId?: string;
   model: string;
   input: string | string[];
-  encoding_format?: "float" | "base64";
+  encoding_format?: 'float' | 'base64';
   dimensions?: number;
   user?: string;
   incomingApiType?: string;
@@ -201,9 +201,9 @@ export interface UnifiedEmbeddingsRequest {
 
 // Unified Embeddings Response
 export interface UnifiedEmbeddingsResponse {
-  object: "list";
+  object: 'list';
   data: Array<{
-    object: "embedding";
+    object: 'embedding';
     embedding: number[];
     index: number;
   }>;
@@ -231,13 +231,13 @@ export interface UnifiedTranscriptionRequest {
   filename: string;
   mimeType: string;
   model: string;
-  
+
   // Optional parameters
   language?: string;
   prompt?: string;
-  response_format?: 'json' | 'text';  // Only json and text for v1
+  response_format?: 'json' | 'text'; // Only json and text for v1
   temperature?: number;
-  
+
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;

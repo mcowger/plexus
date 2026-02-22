@@ -39,7 +39,7 @@ export class SyntheticQuotaChecker extends QuotaChecker {
       const response = await fetch(this.endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
       });
@@ -52,39 +52,45 @@ export class SyntheticQuotaChecker extends QuotaChecker {
       const windows: QuotaWindow[] = [];
 
       if (data.subscription) {
-        windows.push(this.createWindow(
-          'five_hour',
-          data.subscription.limit,
-          data.subscription.requests,
-          data.subscription.remaining,
-          'requests',
-          data.subscription.renewsAt ? new Date(data.subscription.renewsAt) : undefined,
-          '5-hour request quota'
-        ));
+        windows.push(
+          this.createWindow(
+            'five_hour',
+            data.subscription.limit,
+            data.subscription.requests,
+            data.subscription.remaining,
+            'requests',
+            data.subscription.renewsAt ? new Date(data.subscription.renewsAt) : undefined,
+            '5-hour request quota'
+          )
+        );
       }
 
       if (data.search?.hourly) {
-        windows.push(this.createWindow(
-          'search',
-          data.search.hourly.limit,
-          data.search.hourly.requests,
-          data.search.hourly.remaining,
-          'requests',
-          data.search.hourly.renewsAt ? new Date(data.search.hourly.renewsAt) : undefined,
-          'Search requests (hourly)'
-        ));
+        windows.push(
+          this.createWindow(
+            'search',
+            data.search.hourly.limit,
+            data.search.hourly.requests,
+            data.search.hourly.remaining,
+            'requests',
+            data.search.hourly.renewsAt ? new Date(data.search.hourly.renewsAt) : undefined,
+            'Search requests (hourly)'
+          )
+        );
       }
 
       if (data.freeToolCalls) {
-        windows.push(this.createWindow(
-          'toolcalls',
-          data.freeToolCalls.limit,
-          data.freeToolCalls.requests,
-          data.freeToolCalls.remaining,
-          'requests',
-          data.freeToolCalls.renewsAt ? new Date(data.freeToolCalls.renewsAt) : undefined,
-          'Free tool calls (5-hour)'
-        ));
+        windows.push(
+          this.createWindow(
+            'toolcalls',
+            data.freeToolCalls.limit,
+            data.freeToolCalls.requests,
+            data.freeToolCalls.remaining,
+            'requests',
+            data.freeToolCalls.renewsAt ? new Date(data.freeToolCalls.renewsAt) : undefined,
+            'Free tool calls (5-hour)'
+          )
+        );
       }
 
       return this.successResult(windows);

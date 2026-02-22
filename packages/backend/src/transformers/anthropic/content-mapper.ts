@@ -1,5 +1,5 @@
-import { MessageContent } from "../../types/unified";
-import { formatBase64 } from "../utils";
+import { MessageContent } from '../../types/unified';
+import { formatBase64 } from '../utils';
 
 /**
  * Converts Anthropic's content blocks (text, image) into unified format.
@@ -12,18 +12,18 @@ export function convertAnthropicContent(content: any[]): string | MessageContent
   const parts: MessageContent[] = [];
 
   for (const c of content) {
-    if (c.type === "text") {
+    if (c.type === 'text') {
       parts.push({
-        type: "text",
+        type: 'text',
         text: c.text,
         cache_control: c.cache_control,
       });
-    } else if (c.type === "image" && c.source) {
+    } else if (c.type === 'image' && c.source) {
       parts.push({
-        type: "image_url",
+        type: 'image_url',
         image_url: {
           url:
-            c.source.type === "base64"
+            c.source.type === 'base64'
               ? formatBase64(c.source.data, c.source.media_type)
               : c.source.url,
         },
@@ -32,11 +32,11 @@ export function convertAnthropicContent(content: any[]): string | MessageContent
     }
   }
 
-  if (!parts.length) return "";
+  if (!parts.length) return '';
 
   // Optimization: return plain string for single text block without cache control
   const firstPart = parts[0];
-  if (parts.length === 1 && firstPart?.type === "text" && !firstPart.cache_control) {
+  if (parts.length === 1 && firstPart?.type === 'text' && !firstPart.cache_control) {
     return firstPart.text;
   }
 

@@ -129,9 +129,7 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
   return (
     <div className="flex flex-col gap-2 relative">
       {label && (
-        <label className="font-body text-[13px] font-medium text-text-secondary">
-          {label}
-        </label>
+        <label className="font-body text-[13px] font-medium text-text-secondary">{label}</label>
       )}
       <div className="relative">
         <input
@@ -168,7 +166,7 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
           {suggestions.map((slug, index) => {
             const isSelected = slug === value;
             const isHighlighted = index === selectedIndex;
-            
+
             return (
               <div
                 key={slug}
@@ -193,7 +191,9 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
           ref={suggestionsRef}
           className="absolute top-full left-0 right-0 mt-1 bg-bg-glass border border-border-glass rounded-sm shadow-lg backdrop-blur-md z-50 px-3.5 py-2.5"
         >
-          <span className="font-body text-sm text-text-secondary italic">No models found matching "{inputValue}"</span>
+          <span className="font-body text-sm text-text-secondary italic">
+            No models found matching "{inputValue}"
+          </span>
         </div>
       )}
     </div>

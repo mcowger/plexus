@@ -1,11 +1,11 @@
-import { Transformer } from "../../types/transformer";
-import { UnifiedChatRequest, UnifiedChatResponse } from "../../types/unified";
-import { parseAnthropicRequest } from "./request-parser";
-import { buildAnthropicRequest } from "./request-builder";
-import { transformAnthropicResponse } from "./response-transformer";
-import { formatAnthropicResponse } from "./response-formatter";
-import { transformAnthropicStream } from "./stream-transformer";
-import { formatAnthropicStream } from "./stream-formatter";
+import { Transformer } from '../../types/transformer';
+import { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
+import { parseAnthropicRequest } from './request-parser';
+import { buildAnthropicRequest } from './request-builder';
+import { transformAnthropicResponse } from './response-transformer';
+import { formatAnthropicResponse } from './response-formatter';
+import { transformAnthropicStream } from './stream-transformer';
+import { formatAnthropicStream } from './stream-formatter';
 
 /**
  * AnthropicTransformer
@@ -22,8 +22,8 @@ import { formatAnthropicStream } from "./stream-formatter";
  * all implementation details to focused, testable modules.
  */
 export class AnthropicTransformer implements Transformer {
-  readonly name = "messages";
-  readonly defaultEndpoint = "/messages";
+  readonly name = 'messages';
+  readonly defaultEndpoint = '/messages';
 
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
     return parseAnthropicRequest(input);
@@ -52,12 +52,10 @@ export class AnthropicTransformer implements Transformer {
   /**
    * Extract usage from Anthropic-style event data (already parsed JSON string)
    */
-  extractUsage(
-    dataStr: string
-  ):
+  extractUsage(dataStr: string):
     | {
         input_tokens?: number;
-     output_tokens?: number;
+        output_tokens?: number;
         cached_tokens?: number;
         reasoning_tokens?: number;
       }
@@ -66,7 +64,7 @@ export class AnthropicTransformer implements Transformer {
       const data = JSON.parse(dataStr);
 
       // Anthropic sends usage in message_start and message_delta events
-      if (data.type === "message_start" && data.message?.usage) {
+      if (data.type === 'message_start' && data.message?.usage) {
         return {
           input_tokens: data.message.usage.input_tokens || 0,
           output_tokens: data.message.usage.output_tokens || 0,
@@ -78,9 +76,9 @@ export class AnthropicTransformer implements Transformer {
         };
       }
 
-      if (data.type === "message_delta" && data.usage) {
+      if (data.type === 'message_delta' && data.usage) {
         return {
-     input_tokens: data.usage.input_tokens || 0,
+          input_tokens: data.usage.input_tokens || 0,
           output_tokens: data.usage.output_tokens || 0,
           cached_tokens: data.usage.cache_read_input_tokens || 0,
           reasoning_tokens: data.usage.thinkingTokens || 0,

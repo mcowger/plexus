@@ -7,6 +7,33 @@ Seeking to unify LLM traffic through a centralized, controllable gateway.
 
 ## CRITICAL REQUIREMENTS:   NEVER default to searching types definitions files for libraries.  ALWAYS rely on the tavily and context7 MCP tools to search the web for better documentation. FOLLOWING THIS REQUIREMENT IS CRITICAL.
 
+---
+
+## ⚠️ MANDATORY: Run Biome Formatter Before Every Commit
+
+**All code MUST be formatted with Biome before committing.** Unformatted code will cause CI failures and makes diffs harder to review. This is non-negotiable.
+
+**Run the formatter now — before you commit:**
+
+```bash
+bun run format
+```
+
+Or to check without writing changes (e.g. in CI):
+
+```bash
+bun run format:check
+```
+
+### What Biome does in this project
+- **Formatting only** — linting and import sorting are both disabled.
+- Enforces: 2-space indentation, single quotes, LF line endings, 100-char line width, trailing commas (ES5), semicolons.
+- Ignores: `node_modules/`, `dist/`, `build/`, `*.min.js`, and all generated migration files.
+
+**Never commit without running `bun run format` first.**
+
+---
+
 ## Goal The core objective is to provide a single entry point for various LLM APIs:
 
 - `/v1/chat/completions` (OpenAI style)

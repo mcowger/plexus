@@ -18,9 +18,9 @@ import { ApertisQuotaChecker } from './checkers/apertis-checker';
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
   'claude-code': ClaudeCodeQuotaChecker,
-  'naga': NagaQuotaChecker,
+  naga: NagaQuotaChecker,
   'openai-codex': OpenAICodexQuotaChecker,
-  'nanogpt': NanoGPTQuotaChecker,
+  nanogpt: NanoGPTQuotaChecker,
   zai: ZAIQuotaChecker,
   moonshot: MoonshotQuotaChecker,
   minimax: MiniMaxQuotaChecker,
@@ -34,7 +34,10 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
 };
 
 export class QuotaCheckerFactory {
-  static registerChecker(type: string, checkerClass: new (config: QuotaCheckerConfig) => QuotaChecker): void {
+  static registerChecker(
+    type: string,
+    checkerClass: new (config: QuotaCheckerConfig) => QuotaChecker
+  ): void {
     CHECKER_REGISTRY[type.toLowerCase()] = checkerClass;
   }
 
@@ -43,7 +46,9 @@ export class QuotaCheckerFactory {
     const CheckerClass = CHECKER_REGISTRY[normalizedType];
 
     if (!CheckerClass) {
-      throw new Error(`Unknown quota checker type: '${type}'. Available types: ${Object.keys(CHECKER_REGISTRY).join(', ')}`);
+      throw new Error(
+        `Unknown quota checker type: '${type}'. Available types: ${Object.keys(CHECKER_REGISTRY).join(', ')}`
+      );
     }
 
     return new CheckerClass(config);

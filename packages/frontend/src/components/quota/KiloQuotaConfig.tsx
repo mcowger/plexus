@@ -6,10 +6,7 @@ export interface KiloQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const KiloQuotaConfig: React.FC<KiloQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const KiloQuotaConfig: React.FC<KiloQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };

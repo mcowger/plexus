@@ -19,25 +19,32 @@ import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage';
 
-export async function registerManagementRoutes(fastify: FastifyInstance, usageStorage: UsageStorageService, dispatcher: Dispatcher, quotaScheduler?: QuotaScheduler, mcpUsageStorage?: McpUsageStorageService, quotaEnforcer?: QuotaEnforcer) {
-    await registerConfigRoutes(fastify);
-    await registerUsageRoutes(fastify, usageStorage);
-    await registerCooldownRoutes(fastify);
-    await registerPerformanceRoutes(fastify, usageStorage);
-    await registerDebugRoutes(fastify, usageStorage);
-    await registerErrorRoutes(fastify, usageStorage);
-    await registerSystemLogRoutes(fastify);
-    await registerTestRoutes(fastify, dispatcher);
-    await registerOAuthRoutes(fastify);
-    await registerLoggingRoutes(fastify);
-    if (quotaScheduler) {
-      await registerQuotaRoutes(fastify, quotaScheduler);
-    }
-    if (mcpUsageStorage) {
-      await registerMcpLogRoutes(fastify, mcpUsageStorage);
-    }
-    if (quotaEnforcer) {
-      await registerQuotaEnforcementRoutes(fastify, quotaEnforcer);
-    }
-    await registerUserQuotaRoutes(fastify);
+export async function registerManagementRoutes(
+  fastify: FastifyInstance,
+  usageStorage: UsageStorageService,
+  dispatcher: Dispatcher,
+  quotaScheduler?: QuotaScheduler,
+  mcpUsageStorage?: McpUsageStorageService,
+  quotaEnforcer?: QuotaEnforcer
+) {
+  await registerConfigRoutes(fastify);
+  await registerUsageRoutes(fastify, usageStorage);
+  await registerCooldownRoutes(fastify);
+  await registerPerformanceRoutes(fastify, usageStorage);
+  await registerDebugRoutes(fastify, usageStorage);
+  await registerErrorRoutes(fastify, usageStorage);
+  await registerSystemLogRoutes(fastify);
+  await registerTestRoutes(fastify, dispatcher);
+  await registerOAuthRoutes(fastify);
+  await registerLoggingRoutes(fastify);
+  if (quotaScheduler) {
+    await registerQuotaRoutes(fastify, quotaScheduler);
+  }
+  if (mcpUsageStorage) {
+    await registerMcpLogRoutes(fastify, mcpUsageStorage);
+  }
+  if (quotaEnforcer) {
+    await registerQuotaEnforcementRoutes(fastify, quotaEnforcer);
+  }
+  await registerUserQuotaRoutes(fastify);
 }

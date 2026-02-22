@@ -1,4 +1,9 @@
-import type { QuotaCheckResult, QuotaCheckerConfig, QuotaWindow, QuotaWindowType } from '../../../types/quota';
+import type {
+  QuotaCheckResult,
+  QuotaCheckerConfig,
+  QuotaWindow,
+  QuotaWindowType,
+} from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
 import type { OAuthProvider } from '@mariozechner/pi-ai';
@@ -35,8 +40,14 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://chatgpt.com/backend-api/wham/usage');
-    this.userAgent = this.getOption<string>('userAgent', 'codex_cli_rs/0.101.0 (Debian 13.0.0; x86_64) WindowsTerminal');
+    this.endpoint = this.getOption<string>(
+      'endpoint',
+      'https://chatgpt.com/backend-api/wham/usage'
+    );
+    this.userAgent = this.getOption<string>(
+      'userAgent',
+      'codex_cli_rs/0.101.0 (Debian 13.0.0; x86_64) WindowsTerminal'
+    );
     this.timeoutMs = this.getOption<number>('timeoutMs', 15000);
   }
 
@@ -46,14 +57,16 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
       const accountId = this.extractChatGPTAccountId(accessToken) ?? accountIdFromAuth;
 
       if (!accountId) {
-        logger.warn(`[openai-codex-checker] Unable to extract chatgpt_account_id from token for '${this.id}'. Continuing without Chatgpt-Account-Id header.`);
+        logger.warn(
+          `[openai-codex-checker] Unable to extract chatgpt_account_id from token for '${this.id}'. Continuing without Chatgpt-Account-Id header.`
+        );
       }
 
       const headers: Record<string, string> = {
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'User-Agent': this.userAgent,
-        'Version': '0.101.0',
+        Version: '0.101.0',
       };
 
       if (accountId) {
@@ -63,7 +76,9 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
       const abortController = new AbortController();
       const timeout = setTimeout(() => abortController.abort(), this.timeoutMs);
 
-      logger.silly(`[openai-codex-checker] Requesting usage for '${this.id}' from ${this.endpoint}`);
+      logger.silly(
+        `[openai-codex-checker] Requesting usage for '${this.id}' from ${this.endpoint}`
+      );
 
       const response = await fetch(this.endpoint, {
         method: 'GET',
@@ -73,14 +88,18 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
 
       const bodyText = await response.text();
       if (!response.ok) {
-        return this.errorResult(new Error(`quota request failed with status ${response.status}: ${bodyText}`));
+        return this.errorResult(
+          new Error(`quota request failed with status ${response.status}: ${bodyText}`)
+        );
       }
 
       let data: CodexUsageResponse;
       try {
         data = JSON.parse(bodyText) as CodexUsageResponse;
       } catch (error) {
-        return this.errorResult(new Error(`failed to parse codex usage response: ${String(error)}`));
+        return this.errorResult(
+          new Error(`failed to parse codex usage response: ${String(error)}`)
+        );
       }
 
       if (!data.rate_limit) {
@@ -94,7 +113,9 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
       };
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        return this.errorResult(new Error(`codex usage request timed out after ${this.timeoutMs}ms`));
+        return this.errorResult(
+          new Error(`codex usage request timed out after ${this.timeoutMs}ms`)
+        );
       }
       return this.errorResult(error as Error);
     }
@@ -109,7 +130,8 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
       };
     }
 
-    const provider = this.getOption<string>('oauthProvider', 'openai-codex').trim() || 'openai-codex';
+    const provider =
+      this.getOption<string>('oauthProvider', 'openai-codex').trim() || 'openai-codex';
     const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
 
@@ -123,15 +145,22 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
       oauthApiKey = oauthAccountId
         ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
         : await authManager.getApiKey(provider as OAuthProvider);
-      logger.info(`[openai-codex-checker] Reloaded OAuth auth file and retrieved token for provider '${provider}'.`);
+      logger.info(
+        `[openai-codex-checker] Reloaded OAuth auth file and retrieved token for provider '${provider}'.`
+      );
     }
 
-    const credentials = (oauthAccountId
-      ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
-      : authManager.getCredentials(provider as OAuthProvider)) as Record<string, unknown> | null;
-    const accountId = typeof credentials?.accountId === 'string'
-      ? credentials.accountId.trim()
-      : (typeof credentials?.chatgpt_account_id === 'string' ? credentials.chatgpt_account_id.trim() : '');
+    const credentials = (
+      oauthAccountId
+        ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
+        : authManager.getCredentials(provider as OAuthProvider)
+    ) as Record<string, unknown> | null;
+    const accountId =
+      typeof credentials?.accountId === 'string'
+        ? credentials.accountId.trim()
+        : typeof credentials?.chatgpt_account_id === 'string'
+          ? credentials.chatgpt_account_id.trim()
+          : '';
 
     return {
       accessToken: this.parseAccessTokenFromApiKey(oauthApiKey),
@@ -220,7 +249,17 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
     if (secondary) windows.push(secondary);
 
     if (windows.length === 0) {
-      windows.push(this.createWindow('custom', 100, isExhausted ? 100 : 0, isExhausted ? 0 : 100, 'percentage', undefined, 'OpenAI Codex rate limit usage'));
+      windows.push(
+        this.createWindow(
+          'custom',
+          100,
+          isExhausted ? 100 : 0,
+          isExhausted ? 0 : 100,
+          'percentage',
+          undefined,
+          'OpenAI Codex rate limit usage'
+        )
+      );
     }
 
     return windows;
@@ -239,20 +278,22 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
     const usedPercent = usageWindow.used_percent;
     const used = isExhausted
       ? 100
-      : (typeof usedPercent === 'number' && Number.isFinite(usedPercent)
+      : typeof usedPercent === 'number' && Number.isFinite(usedPercent)
         ? Math.min(Math.max(usedPercent, 0), 100)
-        : 0);
+        : 0;
     const remaining = isExhausted ? 0 : Math.max(0, 100 - used);
 
     const resetAtUnix = usageWindow.reset_at;
-    const resetsAt = typeof resetAtUnix === 'number' && resetAtUnix > 0
-      ? new Date(resetAtUnix * 1000)
-      : undefined;
+    const resetsAt =
+      typeof resetAtUnix === 'number' && resetAtUnix > 0 ? new Date(resetAtUnix * 1000) : undefined;
 
     return this.createWindow(windowType, 100, used, remaining, 'percentage', resetsAt, description);
   }
 
-  private resolveWindowType(limitWindowSeconds: number | undefined, fallback: QuotaWindowType): QuotaWindowType {
+  private resolveWindowType(
+    limitWindowSeconds: number | undefined,
+    fallback: QuotaWindowType
+  ): QuotaWindowType {
     if (limitWindowSeconds === 5 * 60 * 60) return 'five_hour';
     if (limitWindowSeconds === 7 * 24 * 60 * 60) return 'weekly';
     return fallback;

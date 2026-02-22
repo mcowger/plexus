@@ -4,9 +4,11 @@ import { UsageStorageService } from '../../usage-storage';
 import { ModelTarget } from '../../../config';
 
 describe('UsageSelector', () => {
-  const mockGetUsage = mock((filters: any, pagination: any): Promise<any> => Promise.resolve({ data: [], total: 0 }));
+  const mockGetUsage = mock(
+    (filters: any, pagination: any): Promise<any> => Promise.resolve({ data: [], total: 0 })
+  );
   const mockStorage = {
-    getUsage: mockGetUsage
+    getUsage: mockGetUsage,
   } as unknown as UsageStorageService;
 
   const selector = new UsageSelector(mockStorage);
@@ -24,15 +26,15 @@ describe('UsageSelector', () => {
     mockGetUsage.mockImplementation((filters: any, pagination: any) => {
       const provider = filters?.provider;
       if (provider === 'p1') return Promise.resolve({ data: [], total: 100 }); // Most used
-      if (provider === 'p2') return Promise.resolve({ data: [], total: 10 });  // Least used
-      if (provider === 'p3') return Promise.resolve({ data: [], total: 50 });  // Middle
+      if (provider === 'p2') return Promise.resolve({ data: [], total: 10 }); // Least used
+      if (provider === 'p3') return Promise.resolve({ data: [], total: 50 }); // Middle
       return Promise.resolve({ data: [], total: 0 });
     });
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
       { provider: 'p2', model: 'm2' },
-      { provider: 'p3', model: 'm3' }
+      { provider: 'p3', model: 'm3' },
     ];
 
     const selected = await selector.select(targets);
@@ -49,7 +51,7 @@ describe('UsageSelector', () => {
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
-      { provider: 'p2', model: 'm2' }
+      { provider: 'p2', model: 'm2' },
     ];
 
     const selected = await selector.select(targets);
@@ -61,11 +63,10 @@ describe('UsageSelector', () => {
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
-      { provider: 'p2', model: 'm2' }
+      { provider: 'p2', model: 'm2' },
     ];
 
     const selected = await selector.select(targets);
     expect(selected).toEqual(targets[0]!);
   });
-
 });

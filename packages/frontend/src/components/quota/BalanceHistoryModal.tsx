@@ -93,10 +93,9 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
     if (!history.length) return { chartData: [], hasData: false };
 
     // Filter to only successful snapshots with valid remaining balance
-    const validSnapshots = history.filter((snapshot: QuotaSnapshot) =>
-      snapshot.success &&
-      snapshot.remaining !== null &&
-      snapshot.remaining !== undefined
+    const validSnapshots = history.filter(
+      (snapshot: QuotaSnapshot) =>
+        snapshot.success && snapshot.remaining !== null && snapshot.remaining !== undefined
     );
 
     if (!validSnapshots.length) return { chartData: [], hasData: false };
@@ -136,7 +135,7 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
   const stats = useMemo(() => {
     if (!chartData.length) return null;
 
-    const balances = chartData.map(d => d.balance);
+    const balances = chartData.map((d) => d.balance);
     const current = balances[balances.length - 1];
     const min = Math.min(...balances);
     const max = Math.max(...balances);
@@ -230,9 +229,7 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
                   <Wallet size={12} />
                   <span>Current</span>
                 </div>
-                <div className="text-lg font-semibold text-info">
-                  {formatCost(stats.current)}
-                </div>
+                <div className="text-lg font-semibold text-info">{formatCost(stats.current)}</div>
               </div>
               <div className="bg-bg-subtle rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 text-text-secondary text-xs mb-1">
@@ -245,7 +242,8 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
                     stats.change < 0 ? 'text-danger' : 'text-success'
                   )}
                 >
-                  {stats.change < 0 ? '' : '+'}{formatCost(stats.change)}
+                  {stats.change < 0 ? '' : '+'}
+                  {formatCost(stats.change)}
                 </div>
               </div>
               <div className="bg-bg-subtle rounded-lg p-3 border border-border">
@@ -253,18 +251,14 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
                   <Calendar size={12} />
                   <span>High</span>
                 </div>
-                <div className="text-lg font-semibold text-text">
-                  {formatCost(stats.max)}
-                </div>
+                <div className="text-lg font-semibold text-text">{formatCost(stats.max)}</div>
               </div>
               <div className="bg-bg-subtle rounded-lg p-3 border border-border">
                 <div className="flex items-center gap-2 text-text-secondary text-xs mb-1">
                   <Calendar size={12} />
                   <span>Low</span>
                 </div>
-                <div className="text-lg font-semibold text-text">
-                  {formatCost(stats.min)}
-                </div>
+                <div className="text-lg font-semibold text-text">{formatCost(stats.min)}</div>
               </div>
             </div>
           )}
@@ -279,9 +273,7 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
                 Loading history...
               </div>
             ) : error ? (
-              <div className="flex items-center justify-center h-[300px] text-danger">
-                {error}
-              </div>
+              <div className="flex items-center justify-center h-[300px] text-danger">{error}</div>
             ) : !hasData ? (
               <div className="flex items-center justify-center h-[300px] text-text-secondary">
                 No balance history available for this time range
@@ -325,13 +317,17 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
                       domain={['auto', 'auto']}
                     />
                     <Tooltip
-                      content={({ active, payload, label }: {
+                      content={({
+                        active,
+                        payload,
+                        label,
+                      }: {
                         active?: boolean;
                         payload?: ReadonlyArray<{
                           value: number;
                           payload: Record<string, unknown>;
                         }>;
-                        label?: string | number
+                        label?: string | number;
                       }) => {
                         if (active && payload && payload.length) {
                           const balance = payload[0]?.value;

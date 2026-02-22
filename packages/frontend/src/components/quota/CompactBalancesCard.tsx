@@ -23,7 +23,7 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
   };
 
   return (
-    <div 
+    <div
       className="px-2 py-1 space-y-0.5 cursor-pointer hover:bg-bg-hover transition-colors"
       onClick={handleClick}
       role="button"
@@ -37,7 +37,7 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
     >
       {balanceQuotas.map((quota) => {
         const result = getQuotaResult(quota);
-        
+
         // Use the checkerId as the display name (this is the unique provider identifier)
         const displayName = toTitleCase(quota.checkerId);
         const windows = result.windows || [];
@@ -46,9 +46,7 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
 
         return (
           <div key={quota.checkerId} className="flex items-center justify-between min-w-0">
-            <span className="text-xs text-text-secondary truncate">
-              {displayName}:
-            </span>
+            <span className="text-xs text-text-secondary truncate">{displayName}:</span>
             {!result.success ? (
               <span className="text-xs text-danger flex-shrink-0 ml-2">Error</span>
             ) : balance !== undefined ? (

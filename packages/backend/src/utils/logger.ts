@@ -5,8 +5,7 @@ import { EventEmitter } from 'events';
 const { combine, timestamp, printf, colorize, splat, json } = winston.format;
 
 export const SUPPORTED_LOG_LEVELS = ['error', 'warn', 'info', 'debug', 'verbose', 'silly'] as const;
-export type LogLevel = typeof SUPPORTED_LOG_LEVELS[number];
-
+export type LogLevel = (typeof SUPPORTED_LOG_LEVELS)[number];
 
 // Event emitter for streaming logs
 export const logEmitter = new EventEmitter();
@@ -21,11 +20,10 @@ export class StreamTransport extends Transport {
   }
 }
 
-
 // Define custom format for console logging
 const consoleFormat = printf(({ level, message, timestamp, ...metadata }) => {
   let msg = `${timestamp} [${level}]: ${message}`;
-  
+
   // Check if there are metadata/objects to print
   if (Object.keys(metadata).length > 0) {
     // If the metadata contains 'splat' (from util.format style args), handle it?
@@ -70,7 +68,9 @@ export const getCurrentLogLevel = (): LogLevel => currentLogLevel;
 export const setCurrentLogLevel = (level: string): LogLevel => {
   const normalized = normalizeLogLevel(level);
   if (!normalized) {
-    throw new Error(`Invalid log level '${level}'. Supported levels: ${SUPPORTED_LOG_LEVELS.join(', ')}`);
+    throw new Error(
+      `Invalid log level '${level}'. Supported levels: ${SUPPORTED_LOG_LEVELS.join(', ')}`
+    );
   }
 
   currentLogLevel = normalized;
@@ -102,6 +102,6 @@ export const logger = winston.createLogger({
         consoleFormat
       ),
     }),
-    new StreamTransport()
+    new StreamTransport(),
   ],
 });

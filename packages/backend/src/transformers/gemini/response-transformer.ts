@@ -1,4 +1,4 @@
-import { UnifiedChatResponse } from "../../types/unified";
+import { UnifiedChatResponse } from '../../types/unified';
 
 /**
  * Transforms a Gemini API response into unified format.
@@ -9,14 +9,12 @@ import { UnifiedChatResponse } from "../../types/unified";
  * - Handles thought signatures
  * - Normalizes usage metadata
  */
-export async function transformGeminiResponse(
-  response: any
-): Promise<UnifiedChatResponse> {
+export async function transformGeminiResponse(response: any): Promise<UnifiedChatResponse> {
   const candidate = response.candidates?.[0];
   const parts = candidate?.content?.parts || [];
 
-  let content = "";
-  let reasoning_content = "";
+  let content = '';
+  let reasoning_content = '';
   const tool_calls: any[] = [];
   let thoughtSignature: string | undefined;
 
@@ -27,10 +25,8 @@ export async function transformGeminiResponse(
     }
     if (part.functionCall) {
       tool_calls.push({
-        id:
-          part.functionCall.name ||
-          "call_" + Math.random().toString(36).substring(7),
-        type: "function",
+        id: part.functionCall.name || 'call_' + Math.random().toString(36).substring(7),
+        type: 'function',
         function: {
           name: part.functionCall.name,
           arguments: JSON.stringify(part.functionCall.args),
@@ -52,8 +48,8 @@ export async function transformGeminiResponse(
     : undefined;
 
   return {
-    id: response.responseId || "gemini-" + Date.now(),
-    model: response.modelVersion || "gemini-model",
+    id: response.responseId || 'gemini-' + Date.now(),
+    model: response.modelVersion || 'gemini-model',
     content: content || null,
     reasoning_content: reasoning_content || null,
     thinking: thoughtSignature

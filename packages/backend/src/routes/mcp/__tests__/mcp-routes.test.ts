@@ -1,11 +1,11 @@
-import { describe, expect, test, mock, beforeAll, spyOn } from "bun:test";
-import Fastify, { FastifyInstance } from "fastify";
-import { setConfigForTesting } from "../../../config";
-import { registerMcpRoutes } from "../index";
-import { McpUsageStorageService } from "../../../services/mcp-proxy/mcp-usage-storage";
-import * as mcpProxyService from "../../../services/mcp-proxy/mcp-proxy-service";
+import { describe, expect, test, mock, beforeAll, spyOn } from 'bun:test';
+import Fastify, { FastifyInstance } from 'fastify';
+import { setConfigForTesting } from '../../../config';
+import { registerMcpRoutes } from '../index';
+import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
+import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
 
-describe("MCP Routes", () => {
+describe('MCP Routes', () => {
   let fastify: FastifyInstance;
   let mockMcpUsageStorage: McpUsageStorageService;
   let mockProxyMcpRequest: any;
@@ -16,14 +16,14 @@ describe("MCP Routes", () => {
     // Mock MCP usage storage
     mockMcpUsageStorage = {
       saveRequest: mock(),
-      saveDebugLog: mock()
+      saveDebugLog: mock(),
     } as unknown as McpUsageStorageService;
 
     // Mock the proxyMcpRequest function to avoid network calls
     mockProxyMcpRequest = mock(async () => ({
       status: 200,
       headers: { 'content-type': 'application/json' },
-      body: { jsonrpc: "2.0", id: 1, result: {} }
+      body: { jsonrpc: '2.0', id: 1, result: {} },
     }));
 
     // Spy on the module and replace the function
@@ -34,42 +34,46 @@ describe("MCP Routes", () => {
       providers: {},
       models: {},
       keys: {
-        "test-key-1": { secret: "sk-valid-key", comment: "Test Key" }
+        'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
       },
-      adminKey: "admin-secret",
-      failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
+      adminKey: 'admin-secret',
+      failover: {
+        enabled: false,
+        retryableStatusCodes: [429, 500, 502, 503, 504],
+        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+      },
       quotas: [],
       mcpServers: {
-        "test-server": {
-          upstream_url: "http://localhost:3000/mcp",
+        'test-server': {
+          upstream_url: 'http://localhost:3000/mcp',
           enabled: true,
           headers: {
-            "x-upstream-header": "value"
-          }
+            'x-upstream-header': 'value',
+          },
         },
-        "server-with-auth": {
-          upstream_url: "http://localhost:3001/mcp?auth=token123",
+        'server-with-auth': {
+          upstream_url: 'http://localhost:3001/mcp?auth=token123',
           enabled: true,
           headers: {
-            "Authorization": "Bearer upstream-secret"
-          }
+            Authorization: 'Bearer upstream-secret',
+          },
         },
-        "disabled-server": {
-          upstream_url: "http://localhost:3002/mcp",
-          enabled: false
-        }
-      }
+        'disabled-server': {
+          upstream_url: 'http://localhost:3002/mcp',
+          enabled: false,
+        },
+      },
     });
 
     await registerMcpRoutes(fastify, mockMcpUsageStorage);
     await fastify.ready();
   });
 
-  describe("OAuth Discovery Endpoints", () => {
-    test("GET /.well-known/oauth-authorization-server should return OAuth metadata", async () => {
+  describe('OAuth Discovery Endpoints', () => {
+    test('GET /.well-known/oauth-authorization-server should return OAuth metadata', async () => {
       const response = await fastify.inject({
         method: 'GET',
-        url: '/.well-known/oauth-authorization-server'
+        url: '/.well-known/oauth-authorization-server',
       });
 
       expect(response.statusCode).toBe(200);
@@ -80,10 +84,10 @@ describe("MCP Routes", () => {
       expect(body.grant_types_supported).toContain('bearer');
     });
 
-    test("GET /.well-known/oauth-protected-resource should return protected resource metadata", async () => {
+    test('GET /.well-known/oauth-protected-resource should return protected resource metadata', async () => {
       const response = await fastify.inject({
         method: 'GET',
-        url: '/.well-known/oauth-protected-resource'
+        url: '/.well-known/oauth-protected-resource',
       });
 
       expect(response.statusCode).toBe(200);
@@ -92,10 +96,10 @@ describe("MCP Routes", () => {
       expect(body.scopes_supported).toContain('read');
     });
 
-    test("GET /.well-known/openid-configuration should return OIDC config", async () => {
+    test('GET /.well-known/openid-configuration should return OIDC config', async () => {
       const response = await fastify.inject({
         method: 'GET',
-        url: '/.well-known/openid-configuration'
+        url: '/.well-known/openid-configuration',
       });
 
       expect(response.statusCode).toBe(200);
@@ -104,10 +108,10 @@ describe("MCP Routes", () => {
       expect(body.jwks_uri).toBe('/.well-known/jwks.json');
     });
 
-    test("POST /register should return static client registration", async () => {
+    test('POST /register should return static client registration', async () => {
       const response = await fastify.inject({
         method: 'POST',
-        url: '/register'
+        url: '/register',
       });
 
       expect(response.statusCode).toBe(201);
@@ -117,55 +121,55 @@ describe("MCP Routes", () => {
     });
   });
 
-  describe("Authentication", () => {
-    test("should reject request without authorization", async () => {
+  describe('Authentication', () => {
+    test('should reject request without authorization', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/test-server',
         headers: {
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect(response.statusCode).toBe(401);
     });
 
-    test("should reject request with invalid key", async () => {
+    test('should reject request with invalid key', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/test-server',
         headers: {
           authorization: 'Bearer invalid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect(response.statusCode).toBe(401);
     });
 
-    test("should allow request with valid Bearer token", async () => {
+    test('should allow request with valid Bearer token', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/test-server',
         headers: {
           authorization: 'Bearer sk-valid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       // Should either proxy successfully or fail with upstream error
@@ -173,58 +177,58 @@ describe("MCP Routes", () => {
       expect([200, 400, 404, 500, 502, 504]).toContain(response.statusCode);
     });
 
-    test("should allow request with x-api-key header", async () => {
+    test('should allow request with x-api-key header', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/test-server',
         headers: {
           'x-api-key': 'sk-valid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       // Should either proxy successfully or fail with upstream error
       expect([200, 400, 404, 500, 502, 504]).toContain(response.statusCode);
     });
 
-    test("should allow request with key attribution", async () => {
+    test('should allow request with key attribution', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/test-server',
         headers: {
           authorization: 'Bearer sk-valid-key:copilot',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect([200, 400, 404, 500, 502, 504]).toContain(response.statusCode);
     });
   });
 
-  describe("Server Validation", () => {
-    test("should reject invalid server name", async () => {
+  describe('Server Validation', () => {
+    test('should reject invalid server name', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/InvalidServer',
         headers: {
           authorization: 'Bearer sk-valid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect(response.statusCode).toBe(400);
@@ -232,19 +236,19 @@ describe("MCP Routes", () => {
       expect(body.error.message).toContain('Invalid server name');
     });
 
-    test("should reject request to disabled server", async () => {
+    test('should reject request to disabled server', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/disabled-server',
         headers: {
           authorization: 'Bearer sk-valid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect(response.statusCode).toBe(404);
@@ -252,19 +256,19 @@ describe("MCP Routes", () => {
       expect(body.error.message).toContain('not found or disabled');
     });
 
-    test("should reject request to non-existent server", async () => {
+    test('should reject request to non-existent server', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/non-existent',
         headers: {
           authorization: 'Bearer sk-valid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect(response.statusCode).toBe(404);
@@ -273,27 +277,27 @@ describe("MCP Routes", () => {
     });
   });
 
-  describe("HTTP Methods", () => {
-    test("POST /mcp/:name should proxy POST requests", async () => {
+  describe('HTTP Methods', () => {
+    test('POST /mcp/:name should proxy POST requests', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/mcp/test-server',
         headers: {
           authorization: 'Bearer sk-valid-key',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       // Check that usage was recorded
       expect(mockMcpUsageStorage.saveRequest).toHaveBeenCalled();
     });
 
-    test("GET /mcp/:name should proxy GET requests", async () => {
+    test('GET /mcp/:name should proxy GET requests', async () => {
       // Clear previous mock calls
       (mockProxyMcpRequest as any).mockClear();
 
@@ -301,29 +305,29 @@ describe("MCP Routes", () => {
         method: 'GET',
         url: '/mcp/test-server',
         headers: {
-          authorization: 'Bearer sk-valid-key'
-        }
+          authorization: 'Bearer sk-valid-key',
+        },
       });
 
       expect(response.statusCode).toBe(200);
       expect(mockProxyMcpRequest).toHaveBeenCalled();
     });
 
-    test("DELETE /mcp/:name should proxy DELETE requests", async () => {
+    test('DELETE /mcp/:name should proxy DELETE requests', async () => {
       const response = await fastify.inject({
         method: 'DELETE',
         url: '/mcp/test-server',
         headers: {
-          authorization: 'Bearer sk-valid-key'
-        }
+          authorization: 'Bearer sk-valid-key',
+        },
       });
 
       expect([200, 400, 404, 500, 502, 504]).toContain(response.statusCode);
     });
   });
 
-  describe("Usage Recording", () => {
-    test("should record usage on POST requests", async () => {
+  describe('Usage Recording', () => {
+    test('should record usage on POST requests', async () => {
       // Reset mock
       (mockMcpUsageStorage.saveRequest as any).mockClear();
 
@@ -332,13 +336,13 @@ describe("MCP Routes", () => {
         url: '/mcp/test-server',
         headers: {
           authorization: 'Bearer sk-valid-key:myapp',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
         },
         payload: {
-          jsonrpc: "2.0",
-          method: "tools/list",
-          id: 1
-        }
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
       });
 
       expect(mockMcpUsageStorage.saveRequest).toHaveBeenCalled();
@@ -350,7 +354,7 @@ describe("MCP Routes", () => {
       expect(callArgs.attribution).toBe('myapp');
     });
 
-    test("should record usage on GET requests", async () => {
+    test('should record usage on GET requests', async () => {
       (mockMcpUsageStorage.saveRequest as any).mockClear();
       (mockProxyMcpRequest as any).mockClear();
 
@@ -358,8 +362,8 @@ describe("MCP Routes", () => {
         method: 'GET',
         url: '/mcp/test-server',
         headers: {
-          authorization: 'Bearer sk-valid-key'
-        }
+          authorization: 'Bearer sk-valid-key',
+        },
       });
 
       expect(response.statusCode).toBe(200);
@@ -368,15 +372,15 @@ describe("MCP Routes", () => {
       expect(callArgs.method).toBe('GET');
     });
 
-    test("should record usage on DELETE requests", async () => {
+    test('should record usage on DELETE requests', async () => {
       (mockMcpUsageStorage.saveRequest as any).mockClear();
 
       await fastify.inject({
         method: 'DELETE',
         url: '/mcp/test-server',
         headers: {
-          authorization: 'Bearer sk-valid-key'
-        }
+          authorization: 'Bearer sk-valid-key',
+        },
       });
 
       expect(mockMcpUsageStorage.saveRequest).toHaveBeenCalled();

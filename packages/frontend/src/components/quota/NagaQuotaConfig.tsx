@@ -7,10 +7,7 @@ export interface NagaQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const NagaQuotaConfig: React.FC<NagaQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const NagaQuotaConfig: React.FC<NagaQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string | number) => {
     onChange({ ...options, [key]: value });
   };

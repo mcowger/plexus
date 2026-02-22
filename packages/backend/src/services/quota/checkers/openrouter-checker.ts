@@ -26,8 +26,8 @@ export class OpenRouterQuotaChecker extends QuotaChecker {
       const response = await fetch(this.endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
           'Content-Type': 'application/json',
         },
       });

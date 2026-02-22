@@ -19,7 +19,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const toggleSidebar = () => {
-    setIsCollapsed(prev => {
+    setIsCollapsed((prev) => {
       const newState = !prev;
       localStorage.setItem('plexus_sidebar_collapsed', String(newState));
       return newState;

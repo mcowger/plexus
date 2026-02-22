@@ -1,6 +1,6 @@
-import { Content, Part, Tool } from "@google/genai";
-import { UnifiedChatRequest } from "../../types/unified";
-import { convertUnifiedPartsToGemini } from "./part-mapper";
+import { Content, Part, Tool } from '@google/genai';
+import { UnifiedChatRequest } from '../../types/unified';
+import { convertUnifiedPartsToGemini } from './part-mapper';
 
 export interface GenerateContentRequest {
   contents: Content[];
@@ -40,26 +40,23 @@ export async function buildGeminiRequest(
   const tools: Tool[] = [];
 
   for (const msg of request.messages) {
-    let role = "";
+    let role = '';
     const parts: Part[] = [];
 
-    if (msg.role === "system") {
-      role = "user";
+    if (msg.role === 'system') {
+      role = 'user';
       parts.push({
-        text:
-          typeof msg.content === "string"
-            ? msg.content
-            : JSON.stringify(msg.content),
+        text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
       });
-    } else if (msg.role === "user" || msg.role === "assistant") {
-      role = msg.role === "assistant" ? "model" : "user";
+    } else if (msg.role === 'user' || msg.role === 'assistant') {
+      role = msg.role === 'assistant' ? 'model' : 'user';
 
       if (msg.thinking?.content) {
         // @ts-ignore - Signal to Gemini that this is a thought part
         parts.push({ text: msg.thinking.content, thought: true });
       }
 
-      if (typeof msg.content === "string") {
+      if (typeof msg.content === 'string') {
         const part: any = { text: msg.content };
         if (msg.thinking?.signature && !msg.tool_calls) {
           part.thoughtSignature = msg.thinking.signature;
@@ -82,16 +79,13 @@ export async function buildGeminiRequest(
           parts.push(part);
         });
       }
-    } else if (msg.role === "tool") {
-      role = "user";
+    } else if (msg.role === 'tool') {
+      role = 'user';
       parts.push({
         functionResponse: {
-          name: msg.name || msg.tool_call_id || "unknown_tool",
+          name: msg.name || msg.tool_call_id || 'unknown_tool',
           response: {
-            content:
-              typeof msg.content === "string"
-                ? msg.content
-                : JSON.stringify(msg.content),
+            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
           },
         },
       });

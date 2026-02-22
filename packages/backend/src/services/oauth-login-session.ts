@@ -1,5 +1,12 @@
 import { getOAuthProvider, getOAuthProviders } from '@mariozechner/pi-ai';
-import type { OAuthAuthInfo, OAuthCredentials, OAuthLoginCallbacks, OAuthPrompt, OAuthProviderId, OAuthProviderInterface } from '@mariozechner/pi-ai';
+import type {
+  OAuthAuthInfo,
+  OAuthCredentials,
+  OAuthLoginCallbacks,
+  OAuthPrompt,
+  OAuthProviderId,
+  OAuthProviderInterface,
+} from '@mariozechner/pi-ai';
 import { OAuthAuthManager } from './oauth-auth-manager';
 
 export type OAuthSessionStatus =
@@ -117,7 +124,7 @@ export class OAuthLoginSessionManager {
       updatedAt: now,
       abortController,
       completion: Promise.resolve(),
-      expiresAt: now + DEFAULT_SESSION_TTL_MS
+      expiresAt: now + DEFAULT_SESSION_TTL_MS,
     };
 
     session.completion = this.runLogin(provider, session).catch(() => undefined);
@@ -194,7 +201,7 @@ export class OAuthLoginSessionManager {
       progress: [...session.progress],
       error: session.error,
       createdAt: session.createdAt,
-      updatedAt: session.updatedAt
+      updatedAt: session.updatedAt,
     };
   }
 
@@ -202,7 +209,10 @@ export class OAuthLoginSessionManager {
     session.updatedAt = Date.now();
   }
 
-  private async runLogin(provider: OAuthProviderInterface, session: SessionInternal): Promise<void> {
+  private async runLogin(
+    provider: OAuthProviderInterface,
+    session: SessionInternal
+  ): Promise<void> {
     const authManager = OAuthAuthManager.getInstance();
 
     const callbacks: OAuthLoginCallbacks = {
@@ -235,7 +245,7 @@ export class OAuthLoginSessionManager {
         session.rejectManualCode = deferred.reject;
         return deferred.promise;
       },
-      signal: session.abortController.signal
+      signal: session.abortController.signal,
     };
 
     try {

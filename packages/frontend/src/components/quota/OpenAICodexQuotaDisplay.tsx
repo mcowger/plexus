@@ -16,10 +16,9 @@ export const OpenAICodexQuotaDisplay: React.FC<OpenAICodexQuotaDisplayProps> = (
   if (!result.success) {
     return (
       <div className="px-2 py-2">
-        <div className={clsx(
-          'flex items-center gap-2 text-danger',
-          isCollapsed && 'justify-center'
-        )}>
+        <div
+          className={clsx('flex items-center gap-2 text-danger', isCollapsed && 'justify-center')}
+        >
           <AlertTriangle size={16} />
           {!isCollapsed && <span className="text-xs">Error</span>}
         </div>
@@ -84,11 +83,12 @@ export const OpenAICodexQuotaDisplay: React.FC<OpenAICodexQuotaDisplayProps> = (
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
             <span className="text-xs font-semibold text-text-secondary">5h Usage</span>
-            {fiveHourWindow.resetInSeconds !== undefined && fiveHourWindow.resetInSeconds !== null && (
-              <span className="text-[10px] text-text-muted">
-                {formatDuration(fiveHourWindow.resetInSeconds)}
-              </span>
-            )}
+            {fiveHourWindow.resetInSeconds !== undefined &&
+              fiveHourWindow.resetInSeconds !== null && (
+                <span className="text-[10px] text-text-muted">
+                  {formatDuration(fiveHourWindow.resetInSeconds)}
+                </span>
+              )}
           </div>
           <div className="relative h-2">
             <div className="h-2 rounded-md bg-bg-hover overflow-hidden mr-7">
@@ -97,7 +97,9 @@ export const OpenAICodexQuotaDisplay: React.FC<OpenAICodexQuotaDisplayProps> = (
                   'h-full rounded-md transition-all duration-500 ease-out',
                   barColorForStatus(fiveHourWindow.status)
                 )}
-                style={{ width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%` }}
+                style={{
+                  width: `${Math.min(100, Math.max(0, fiveHourWindow.utilizationPercent))}%`,
+                }}
               />
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-purple-400">
@@ -123,14 +125,17 @@ export const OpenAICodexQuotaDisplay: React.FC<OpenAICodexQuotaDisplayProps> = (
                     'absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out',
                     barColorForStatus(weeklyWindow.status, 'bg-emerald-400')
                   )}
-                  style={{ width: `${Math.min(100, Math.max(0, weeklyWindow.utilizationPercent))}%` }}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, weeklyWindow.utilizationPercent))}%`,
+                  }}
                 />
               </div>
             </div>
           )}
           {codeReviewWindow && (
             <span className="text-text-secondary">
-              CR: <span className="text-text">{Math.round(codeReviewWindow.utilizationPercent)}%</span>
+              CR:{' '}
+              <span className="text-text">{Math.round(codeReviewWindow.utilizationPercent)}%</span>
             </span>
           )}
         </div>

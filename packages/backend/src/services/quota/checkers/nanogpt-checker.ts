@@ -29,7 +29,10 @@ export class NanoGPTQuotaChecker extends QuotaChecker {
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://nano-gpt.com/api/subscription/v1/usage');
+    this.endpoint = this.getOption<string>(
+      'endpoint',
+      'https://nano-gpt.com/api/subscription/v1/usage'
+    );
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {
@@ -92,31 +95,37 @@ export class NanoGPTQuotaChecker extends QuotaChecker {
     const windows: QuotaWindow[] = [];
 
     if (data.daily) {
-      windows.push(this.createWindow(
-        'daily',
-        data.limits?.daily,
-        data.daily.used,
-        data.daily.remaining,
-        'requests',
-        typeof data.daily.resetAt === 'number' ? new Date(data.daily.resetAt) : undefined,
-        'NanoGPT daily subscription usage quota'
-      ));
+      windows.push(
+        this.createWindow(
+          'daily',
+          data.limits?.daily,
+          data.daily.used,
+          data.daily.remaining,
+          'requests',
+          typeof data.daily.resetAt === 'number' ? new Date(data.daily.resetAt) : undefined,
+          'NanoGPT daily subscription usage quota'
+        )
+      );
     }
 
     if (data.monthly) {
-      windows.push(this.createWindow(
-        'monthly',
-        data.limits?.monthly,
-        data.monthly.used,
-        data.monthly.remaining,
-        'requests',
-        typeof data.monthly.resetAt === 'number' ? new Date(data.monthly.resetAt) : undefined,
-        'NanoGPT monthly subscription usage quota'
-      ));
+      windows.push(
+        this.createWindow(
+          'monthly',
+          data.limits?.monthly,
+          data.monthly.used,
+          data.monthly.remaining,
+          'requests',
+          typeof data.monthly.resetAt === 'number' ? new Date(data.monthly.resetAt) : undefined,
+          'NanoGPT monthly subscription usage quota'
+        )
+      );
     }
 
     if (windows.length === 0) {
-      return this.errorResult('NanoGPT quota response did not include daily or monthly usage windows');
+      return this.errorResult(
+        'NanoGPT quota response did not include daily or monthly usage windows'
+      );
     }
 
     return {

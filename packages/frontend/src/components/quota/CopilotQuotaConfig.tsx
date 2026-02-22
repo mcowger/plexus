@@ -6,10 +6,7 @@ export interface CopilotQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string | number) => {
     onChange({ ...options, [key]: value });
   };

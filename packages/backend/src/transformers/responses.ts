@@ -1,20 +1,31 @@
-import { Transformer } from "../types/transformer";
-import { UnifiedResponsesRequest, UnifiedResponsesResponse, ResponsesStreamEvent, ResponsesInputItem, ResponsesMessageItem, ResponsesFunctionCallItem, ResponsesFunctionCallOutputItem, ResponsesOutputItem, ResponsesReasoningTextPart, ResponsesSummaryTextPart } from "../types/responses";
-import { UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage } from "../types/unified";
-import { createParser } from "eventsource-parser";
-import { encode } from "eventsource-encoder";
-import { logger } from "../utils/logger";
-import { normalizeOpenAIChatUsage, normalizeOpenAIResponsesUsage } from "../utils/usage-normalizer";
+import { Transformer } from '../types/transformer';
+import {
+  UnifiedResponsesRequest,
+  UnifiedResponsesResponse,
+  ResponsesStreamEvent,
+  ResponsesInputItem,
+  ResponsesMessageItem,
+  ResponsesFunctionCallItem,
+  ResponsesFunctionCallOutputItem,
+  ResponsesOutputItem,
+  ResponsesReasoningTextPart,
+  ResponsesSummaryTextPart,
+} from '../types/responses';
+import { UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage } from '../types/unified';
+import { createParser } from 'eventsource-parser';
+import { encode } from 'eventsource-encoder';
+import { logger } from '../utils/logger';
+import { normalizeOpenAIChatUsage, normalizeOpenAIResponsesUsage } from '../utils/usage-normalizer';
 
 /**
  * ResponsesTransformer
- * 
+ *
  * Implements the OpenAI Responses API format transformer.
  * Handles bidirectional transformation between Responses API and Chat Completions formats.
  */
 export class ResponsesTransformer implements Transformer {
-  name = "responses";
-  defaultEndpoint = "/responses";
+  name = 'responses';
+  defaultEndpoint = '/responses';
 
   /**
    * Parses incoming Responses API request into unified format
@@ -22,10 +33,10 @@ export class ResponsesTransformer implements Transformer {
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
     // Validate required fields
     if (!input.model) {
-      throw new Error("Missing required field: model");
+      throw new Error('Missing required field: model');
     }
     if (!input.input) {
-      throw new Error("Missing required field: input");
+      throw new Error('Missing required field: input');
     }
 
     // Normalize input to array format
@@ -38,7 +49,7 @@ export class ResponsesTransformer implements Transformer {
     if (input.instructions) {
       messages.unshift({
         role: 'system',
-        content: input.instructions
+        content: input.instructions,
       });
     }
 
@@ -59,10 +70,12 @@ export class ResponsesTransformer implements Transformer {
       prompt_cache_key: input.prompt_cache_key,
       text: input.text,
       parallel_tool_calls: input.parallel_tool_calls,
-      response_format: input.text?.format ? {
-        type: input.text.format.type,
-        json_schema: input.text.format.schema
-      } : undefined,
+      response_format: input.text?.format
+        ? {
+            type: input.text.format.type,
+            json_schema: input.text.format.schema,
+          }
+        : undefined,
       metadata: input.metadata,
       incomingApiType: 'responses',
       originalBody: input,
@@ -87,20 +100,20 @@ export class ResponsesTransformer implements Transformer {
         if (typeof msg.content === 'string') {
           content.push({
             type: msg.role === 'user' ? 'input_text' : 'output_text',
-            text: msg.content
+            text: msg.content,
           });
         } else if (Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'text') {
               content.push({
                 type: msg.role === 'user' ? 'input_text' : 'output_text',
-                text: part.text
+                text: part.text,
               });
             } else if (part.type === 'image_url') {
               content.push({
                 type: 'input_image',
                 image_url: part.image_url.url,
-                detail: 'auto'
+                detail: 'auto',
               });
             }
           }
@@ -109,14 +122,14 @@ export class ResponsesTransformer implements Transformer {
         inputItems.push({
           type: 'message',
           role: msg.role,
-          content
+          content,
         });
       } else if (msg.role === 'tool') {
         // Tool result becomes function_call_output item
         inputItems.push({
           type: 'function_call_output',
           call_id: msg.tool_call_id,
-          output: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+          output: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
         });
       }
 
@@ -127,30 +140,32 @@ export class ResponsesTransformer implements Transformer {
             type: 'function_call',
             call_id: tc.id,
             name: tc.function.name,
-            arguments: tc.function.arguments
+            arguments: tc.function.arguments,
           });
         }
       }
     }
 
     // Extract system message for instructions
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const instructions = systemMessage 
-      ? (typeof systemMessage.content === 'string' ? systemMessage.content : JSON.stringify(systemMessage.content))
+    const systemMessage = request.messages.find((m) => m.role === 'system');
+    const instructions = systemMessage
+      ? typeof systemMessage.content === 'string'
+        ? systemMessage.content
+        : JSON.stringify(systemMessage.content)
       : undefined;
 
     // Convert tools to Responses API format
-    const tools = request.tools?.map(tool => ({
+    const tools = request.tools?.map((tool) => ({
       type: 'function',
       name: tool.function.name,
       description: tool.function.description,
-      parameters: tool.function.parameters
+      parameters: tool.function.parameters,
     }));
 
     const payload: any = {
       model: request.model,
       input: inputItems,
-      stream: request.stream
+      stream: request.stream,
     };
 
     if (instructions) {
@@ -186,8 +201,8 @@ export class ResponsesTransformer implements Transformer {
       payload.text = {
         format: {
           type: request.response_format.type,
-          schema: request.response_format.json_schema
-        }
+          schema: request.response_format.json_schema,
+        },
       };
     }
 
@@ -202,29 +217,23 @@ export class ResponsesTransformer implements Transformer {
     // This method handles TWO cases:
     // 1. Converting Chat Completions format to Unified (when routing responses -> chat)
     // 2. Converting Responses API format to Unified (when routing responses -> responses in passthrough)
-    
+
     // Detect which format we received
     if (response.output && response.object === 'response') {
       // Case 2: Responses API format (passthrough mode)
       // Extract usage from Responses API format
-      const usage = response.usage
-        ? normalizeOpenAIResponsesUsage(response.usage)
-        : undefined;
+      const usage = response.usage ? normalizeOpenAIResponsesUsage(response.usage) : undefined;
 
       // Find the first message output item for content
       const messageItem = response.output?.find((item: any) => item.type === 'message');
-      const content = messageItem?.content
-        ?.map((part: any) => part.text)
-        .join('\n') || null;
+      const content = messageItem?.content?.map((part: any) => part.text).join('\n') || null;
 
       // Find reasoning output item
       const reasoningItem = response.output?.find((item: any) => item.type === 'reasoning');
       const reasoningParts = reasoningItem?.content?.length
         ? reasoningItem.content
         : reasoningItem?.summary;
-      const reasoning_content = reasoningParts
-        ?.map((part: any) => part.text)
-        .join('\n') || null;
+      const reasoning_content = reasoningParts?.map((part: any) => part.text).join('\n') || null;
 
       return {
         id: response.id,
@@ -240,9 +249,7 @@ export class ResponsesTransformer implements Transformer {
       const choice = response.choices?.[0];
       const message = choice?.message;
 
-      const usage = response.usage
-        ? normalizeOpenAIChatUsage(response.usage)
-        : undefined;
+      const usage = response.usage ? normalizeOpenAIChatUsage(response.usage) : undefined;
 
       return {
         id: response.id,
@@ -262,7 +269,9 @@ export class ResponsesTransformer implements Transformer {
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
     const outputItems = this.convertChatResponseToOutputItems(response);
     const totalInputTokens = response.usage
-      ? (response.usage.input_tokens || 0) + (response.usage.cached_tokens || 0) + (response.usage.cache_creation_tokens || 0)
+      ? (response.usage.input_tokens || 0) +
+        (response.usage.cached_tokens || 0) +
+        (response.usage.cache_creation_tokens || 0)
       : 0;
 
     return {
@@ -273,17 +282,19 @@ export class ResponsesTransformer implements Transformer {
       status: 'completed',
       model: response.model,
       output: outputItems,
-      usage: response.usage ? {
-        input_tokens: totalInputTokens,
-        input_tokens_details: {
-          cached_tokens: response.usage.cached_tokens || 0
-        },
-        output_tokens: response.usage.output_tokens,
-        output_tokens_details: {
-          reasoning_tokens: response.usage.reasoning_tokens || 0
-        },
-        total_tokens: response.usage.total_tokens
-      } : undefined,
+      usage: response.usage
+        ? {
+            input_tokens: totalInputTokens,
+            input_tokens_details: {
+              cached_tokens: response.usage.cached_tokens || 0,
+            },
+            output_tokens: response.usage.output_tokens,
+            output_tokens_details: {
+              reasoning_tokens: response.usage.reasoning_tokens || 0,
+            },
+            total_tokens: response.usage.total_tokens,
+          }
+        : undefined,
       plexus: response.plexus,
     };
   }
@@ -294,14 +305,18 @@ export class ResponsesTransformer implements Transformer {
   private normalizeInput(input: string | any[]): any[] {
     if (typeof input === 'string') {
       // Convert simple string to message item
-      return [{
-        type: 'message',
-        role: 'user',
-        content: [{
-          type: 'input_text',
-          text: input
-        }]
-      }];
+      return [
+        {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: input,
+            },
+          ],
+        },
+      ];
     }
     return input;
   }
@@ -317,7 +332,7 @@ export class ResponsesTransformer implements Transformer {
         case 'message':
           messages.push({
             role: this.mapInputRole(item.role),
-            content: this.normalizeMessageContent(item.content)
+            content: this.normalizeMessageContent(item.content),
           });
           break;
 
@@ -326,39 +341,40 @@ export class ResponsesTransformer implements Transformer {
           messages.push({
             role: 'assistant',
             content: null,
-            tool_calls: [{
-              id: item.call_id,
-              type: 'function',
-              function: {
-                name: item.name,
-                arguments: item.arguments
-              }
-            }]
+            tool_calls: [
+              {
+                id: item.call_id,
+                type: 'function',
+                function: {
+                  name: item.name,
+                  arguments: item.arguments,
+                },
+              },
+            ],
           });
           break;
 
         case 'function_call_output':
           // Add tool message with result
-          const outputContent = typeof item.output === 'string' 
-            ? item.output 
-            : (item.output?.text || JSON.stringify(item.output));
-          
+          const outputContent =
+            typeof item.output === 'string'
+              ? item.output
+              : item.output?.text || JSON.stringify(item.output);
+
           messages.push({
             role: 'tool',
             tool_call_id: item.call_id,
-            content: outputContent
+            content: outputContent,
           });
           break;
 
         case 'reasoning':
           // Convert reasoning to assistant message (limited support)
           if (item.summary && item.summary.length > 0) {
-            const reasoningText = item.summary
-              .map((part: any) => part.text)
-              .join('\n');
+            const reasoningText = item.summary.map((part: any) => part.text).join('\n');
             messages.push({
               role: 'assistant',
-              content: reasoningText
+              content: reasoningText,
             });
           }
           break;
@@ -366,7 +382,7 @@ export class ResponsesTransformer implements Transformer {
           if (item.role) {
             messages.push({
               role: this.mapInputRole(item.role),
-              content: this.normalizeMessageContent(item.content)
+              content: this.normalizeMessageContent(item.content),
             });
           }
           break;
@@ -411,22 +427,22 @@ export class ResponsesTransformer implements Transformer {
       return parts[0].text;
     }
 
-    return parts.map(part => {
+    return parts.map((part) => {
       switch (part.type) {
         case 'input_text':
         case 'output_text':
         case 'summary_text':
           return { type: 'text', text: part.text };
-        
+
         case 'input_image':
           return {
             type: 'image_url',
             image_url: {
               url: part.image_url,
-              detail: part.detail
-            }
+              detail: part.detail,
+            },
           };
-        
+
         default:
           return part;
       }
@@ -438,15 +454,15 @@ export class ResponsesTransformer implements Transformer {
    */
   private convertToolsForChatCompletions(tools: any[]): any[] {
     return tools
-      .filter(tool => tool.type === 'function')
-      .map(tool => ({
+      .filter((tool) => tool.type === 'function')
+      .map((tool) => ({
         type: 'function',
         function: {
           name: tool.name,
           description: tool.description,
           parameters: tool.parameters,
-          strict: tool.strict
-        }
+          strict: tool.strict,
+        },
       }));
   }
 
@@ -460,7 +476,7 @@ export class ResponsesTransformer implements Transformer {
     if (toolChoice?.type === 'function') {
       return {
         type: 'function',
-        function: { name: toolChoice.name }
+        function: { name: toolChoice.name },
       };
     }
     return 'auto';
@@ -487,7 +503,7 @@ export class ResponsesTransformer implements Transformer {
         id: this.generateItemId('reason'),
         status: 'completed',
         content: contentParts,
-        summary: summaryParts
+        summary: summaryParts,
       });
     }
 
@@ -500,7 +516,7 @@ export class ResponsesTransformer implements Transformer {
           status: 'completed',
           call_id: toolCall.id,
           name: toolCall.function.name,
-          arguments: toolCall.function.arguments
+          arguments: toolCall.function.arguments,
         });
       }
     }
@@ -511,16 +527,17 @@ export class ResponsesTransformer implements Transformer {
       id: this.generateItemId('msg'),
       status: 'completed',
       role: 'assistant',
-      content: [{
-        type: 'output_text',
-        text: response.content || '',
-        annotations: response.annotations || []
-      }]
+      content: [
+        {
+          type: 'output_text',
+          text: response.content || '',
+          annotations: response.annotations || [],
+        },
+      ],
     });
 
     return items;
   }
-
 
   transformStream(stream: ReadableStream): ReadableStream {
     // Converts Responses API SSE stream to Unified chunks
@@ -539,7 +556,7 @@ export class ResponsesTransformer implements Transformer {
 
             try {
               const data = JSON.parse(event.data);
-              
+
               // Extract metadata from response.created event
               if (data.type === 'response.created' && data.response) {
                 responseModel = data.response.model || '';
@@ -550,7 +567,7 @@ export class ResponsesTransformer implements Transformer {
                   model: responseModel,
                   created: data.response.created_at || Math.floor(Date.now() / 1000),
                   delta: { role: 'assistant' },
-                  finish_reason: null
+                  finish_reason: null,
                 });
                 return;
               }
@@ -563,9 +580,9 @@ export class ResponsesTransformer implements Transformer {
                   model: responseModel,
                   created: Math.floor(Date.now() / 1000),
                   delta: {
-                    content: data.delta
+                    content: data.delta,
                   },
-                  finish_reason: null
+                  finish_reason: null,
                 });
               } else if (data.type === 'response.function_call_arguments.delta') {
                 // Tool call arguments delta
@@ -574,33 +591,40 @@ export class ResponsesTransformer implements Transformer {
                   model: responseModel,
                   created: Math.floor(Date.now() / 1000),
                   delta: {
-                    tool_calls: [{
-                      index: 0,
-                      function: {
-                        arguments: data.delta
-                      }
-                    }]
+                    tool_calls: [
+                      {
+                        index: 0,
+                        function: {
+                          arguments: data.delta,
+                        },
+                      },
+                    ],
                   },
-                  finish_reason: null
+                  finish_reason: null,
                 });
-              } else if (data.type === 'response.output_item.added' && data.item?.type === 'function_call') {
+              } else if (
+                data.type === 'response.output_item.added' &&
+                data.item?.type === 'function_call'
+              ) {
                 // Tool call start
                 controller.enqueue({
                   id: responseId,
                   model: responseModel,
                   created: Math.floor(Date.now() / 1000),
                   delta: {
-                    tool_calls: [{
-                      index: 0,
-                      id: data.item.call_id,
-                      type: 'function',
-                      function: {
-                        name: data.item.name,
-                        arguments: ''
-                      }
-                    }]
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: data.item.call_id,
+                        type: 'function',
+                        function: {
+                          name: data.item.name,
+                          arguments: '',
+                        },
+                      },
+                    ],
                   },
-                  finish_reason: null
+                  finish_reason: null,
                 });
               } else if (data.type === 'response.completed') {
                 // Final chunk with usage data and finish reason
@@ -612,13 +636,13 @@ export class ResponsesTransformer implements Transformer {
                   created: Math.floor(Date.now() / 1000),
                   delta: {},
                   finish_reason: 'stop',
-                  usage: normalizedUsage
+                  usage: normalizedUsage,
                 });
               }
             } catch (e) {
               logger.error('Error parsing Responses API streaming chunk', e);
             }
-          }
+          },
         });
 
         const reader = stream.getReader();
@@ -632,7 +656,7 @@ export class ResponsesTransformer implements Transformer {
           reader.releaseLock();
           controller.close();
         }
-      }
+      },
     });
   }
 
@@ -690,8 +714,8 @@ export class ResponsesTransformer implements Transformer {
             event: data.type,
             data: JSON.stringify({
               ...data,
-              sequence_number: sequenceNumber++
-            })
+              sequence_number: sequenceNumber++,
+            }),
           })
         )
       );
@@ -710,8 +734,8 @@ export class ResponsesTransformer implements Transformer {
           created_at: responseCreatedAt,
           status: 'in_progress',
           model: responseModel,
-          output: []
-        }
+          output: [],
+        },
       });
       hasSentCreated = true;
     };
@@ -736,8 +760,8 @@ export class ResponsesTransformer implements Transformer {
           created_at: responseCreatedAt,
           status: 'in_progress',
           model: responseModel,
-          output: []
-        }
+          output: [],
+        },
       });
       hasSentInProgress = true;
     };
@@ -757,8 +781,8 @@ export class ResponsesTransformer implements Transformer {
           type: 'message',
           status: 'in_progress',
           role: 'assistant',
-          content: []
-        }
+          content: [],
+        },
       });
       if (!messagePartAdded) {
         sendEvent(controller, {
@@ -770,8 +794,8 @@ export class ResponsesTransformer implements Transformer {
             type: 'output_text',
             annotations: [],
             logprobs: [],
-            text: ''
-          }
+            text: '',
+          },
         });
         messagePartAdded = true;
       }
@@ -790,8 +814,8 @@ export class ResponsesTransformer implements Transformer {
           type: 'reasoning',
           status: 'in_progress',
           content: [],
-          summary: []
-        }
+          summary: [],
+        },
       });
       reasoningItemSent = true;
     };
@@ -819,8 +843,8 @@ export class ResponsesTransformer implements Transformer {
           status: 'in_progress',
           call_id: callId,
           name: toolCall?.function?.name || toolCall?.name || '',
-          arguments: ''
-        }
+          arguments: '',
+        },
       });
     };
 
@@ -834,18 +858,18 @@ export class ResponsesTransformer implements Transformer {
             ? [
                 {
                   type: 'reasoning_text',
-                  text: reasoningText
-                }
+                  text: reasoningText,
+                },
               ]
             : [],
           summary: reasoningSummaryText
             ? [
                 {
                   type: 'summary_text',
-                  text: reasoningSummaryText
-                }
+                  text: reasoningSummaryText,
+                },
               ]
-            : []
+            : [],
         };
         if (reasoningText) {
           sendEvent(controller, {
@@ -853,7 +877,7 @@ export class ResponsesTransformer implements Transformer {
             output_index: reasoningOutputIndex,
             item_id: reasoningItemId,
             content_index: reasoningContentIndex,
-            text: reasoningText
+            text: reasoningText,
           });
         }
         if (reasoningSummaryText) {
@@ -862,7 +886,7 @@ export class ResponsesTransformer implements Transformer {
             output_index: reasoningOutputIndex,
             item_id: reasoningItemId,
             summary_index: reasoningSummaryIndex,
-            text: reasoningSummaryText
+            text: reasoningSummaryText,
           });
           if (reasoningSummaryPartAdded) {
             sendEvent(controller, {
@@ -872,15 +896,15 @@ export class ResponsesTransformer implements Transformer {
               summary_index: reasoningSummaryIndex,
               part: {
                 type: 'summary_text',
-                text: reasoningSummaryText
-              }
+                text: reasoningSummaryText,
+              },
             });
           }
         }
         sendEvent(controller, {
           type: 'response.output_item.done',
           output_index: reasoningOutputIndex,
-          item: reasoningItem
+          item: reasoningItem,
         });
         outputItemsByIndex.set(reasoningOutputIndex, reasoningItem);
       }
@@ -896,9 +920,9 @@ export class ResponsesTransformer implements Transformer {
               type: 'output_text',
               annotations: [],
               logprobs: [],
-              text: messageText
-            }
-          ]
+              text: messageText,
+            },
+          ],
         };
         sendEvent(controller, {
           type: 'response.output_text.done',
@@ -906,7 +930,7 @@ export class ResponsesTransformer implements Transformer {
           item_id: messageItemId,
           content_index: 0,
           logprobs: [],
-          text: messageText
+          text: messageText,
         });
         sendEvent(controller, {
           type: 'response.content_part.done',
@@ -917,13 +941,13 @@ export class ResponsesTransformer implements Transformer {
             type: 'output_text',
             annotations: [],
             logprobs: [],
-            text: messageText
-          }
+            text: messageText,
+          },
         });
         sendEvent(controller, {
           type: 'response.output_item.done',
           output_index: messageOutputIndex as number,
-          item: messageItem
+          item: messageItem,
         });
         outputItemsByIndex.set(messageOutputIndex as number, messageItem);
       }
@@ -939,12 +963,12 @@ export class ResponsesTransformer implements Transformer {
           status: 'completed',
           call_id: callId,
           name,
-          arguments: args
+          arguments: args,
         };
         sendEvent(controller, {
           type: 'response.output_item.done',
           output_index: outputIndex,
-          item: toolItem
+          item: toolItem,
         });
         outputItemsByIndex.set(outputIndex, toolItem);
       }
@@ -973,18 +997,23 @@ export class ResponsesTransformer implements Transformer {
                   status: 'completed',
                   model: responseModel,
                   output: outputItems,
-              usage: lastUsage ? {
-                input_tokens: (lastUsage.input_tokens || 0) + (lastUsage.cached_tokens || 0) + (lastUsage.cache_creation_tokens || 0),
-                output_tokens: lastUsage.output_tokens,
-                total_tokens: lastUsage.total_tokens,
-                input_tokens_details: {
-                      cached_tokens: lastUsage.cached_tokens || 0
-                    },
-                    output_tokens_details: {
-                      reasoning_tokens: lastUsage.reasoning_tokens || 0
-                    }
-                  } : undefined
-                }
+                  usage: lastUsage
+                    ? {
+                        input_tokens:
+                          (lastUsage.input_tokens || 0) +
+                          (lastUsage.cached_tokens || 0) +
+                          (lastUsage.cache_creation_tokens || 0),
+                        output_tokens: lastUsage.output_tokens,
+                        total_tokens: lastUsage.total_tokens,
+                        input_tokens_details: {
+                          cached_tokens: lastUsage.cached_tokens || 0,
+                        },
+                        output_tokens_details: {
+                          reasoning_tokens: lastUsage.reasoning_tokens || 0,
+                        },
+                      }
+                    : undefined,
+                },
               });
               break;
             }
@@ -998,13 +1027,9 @@ export class ResponsesTransformer implements Transformer {
 
             const delta = unifiedChunk.delta || {};
             const reasoningDelta =
-              typeof delta.reasoning_content === 'string'
-                ? delta.reasoning_content
-                : null;
+              typeof delta.reasoning_content === 'string' ? delta.reasoning_content : null;
             const reasoningSummaryDelta =
-              typeof delta.thinking?.content === 'string'
-                ? delta.thinking.content
-                : null;
+              typeof delta.thinking?.content === 'string' ? delta.thinking.content : null;
 
             if (reasoningDelta && reasoningDelta.length > 0) {
               ensureReasoningItem(controller);
@@ -1014,7 +1039,7 @@ export class ResponsesTransformer implements Transformer {
                 output_index: reasoningOutputIndex as number,
                 item_id: reasoningItemId,
                 content_index: reasoningContentIndex,
-                delta: reasoningDelta
+                delta: reasoningDelta,
               });
             }
 
@@ -1028,8 +1053,8 @@ export class ResponsesTransformer implements Transformer {
                   summary_index: reasoningSummaryIndex,
                   part: {
                     type: 'summary_text',
-                    text: ''
-                  }
+                    text: '',
+                  },
                 });
                 reasoningSummaryPartAdded = true;
               }
@@ -1039,7 +1064,7 @@ export class ResponsesTransformer implements Transformer {
                 output_index: reasoningOutputIndex as number,
                 item_id: reasoningItemId,
                 summary_index: reasoningSummaryIndex,
-                delta: reasoningSummaryDelta
+                delta: reasoningSummaryDelta,
               });
             }
 
@@ -1052,7 +1077,7 @@ export class ResponsesTransformer implements Transformer {
                 item_id: messageItemId,
                 content_index: 0,
                 delta: delta.content,
-                logprobs: []
+                logprobs: [],
               });
             }
 
@@ -1072,7 +1097,7 @@ export class ResponsesTransformer implements Transformer {
                     type: 'response.function_call_arguments.delta',
                     output_index: outputIndex,
                     item_id: itemId,
-                    delta: toolCall.function.arguments
+                    delta: toolCall.function.arguments,
                   });
                 }
               }
@@ -1090,18 +1115,23 @@ export class ResponsesTransformer implements Transformer {
                   status: 'completed',
                   model: responseModel,
                   output: outputItems,
-                  usage: lastUsage ? {
-                    input_tokens: (lastUsage.input_tokens || 0) + (lastUsage.cached_tokens || 0) + (lastUsage.cache_creation_tokens || 0),
-                    output_tokens: lastUsage.output_tokens,
-                    total_tokens: lastUsage.total_tokens,
-                    input_tokens_details: {
-                      cached_tokens: lastUsage.cached_tokens || 0
-                    },
-                    output_tokens_details: {
-                      reasoning_tokens: lastUsage.reasoning_tokens || 0
-                    }
-                  } : undefined
-                }
+                  usage: lastUsage
+                    ? {
+                        input_tokens:
+                          (lastUsage.input_tokens || 0) +
+                          (lastUsage.cached_tokens || 0) +
+                          (lastUsage.cache_creation_tokens || 0),
+                        output_tokens: lastUsage.output_tokens,
+                        total_tokens: lastUsage.total_tokens,
+                        input_tokens_details: {
+                          cached_tokens: lastUsage.cached_tokens || 0,
+                        },
+                        output_tokens_details: {
+                          reasoning_tokens: lastUsage.reasoning_tokens || 0,
+                        },
+                      }
+                    : undefined,
+                },
               });
               break;
             }
@@ -1110,23 +1140,25 @@ export class ResponsesTransformer implements Transformer {
           reader.releaseLock();
           controller.close();
         }
-      }
+      },
     });
   }
 
   /**
    * Extract usage information from SSE event data
    */
-  extractUsage(eventData: string): { 
-    input_tokens?: number;
-    output_tokens?: number;
-    cached_tokens?: number;
-    cache_creation_tokens?: number;
-    reasoning_tokens?: number;
-  } | undefined {
+  extractUsage(eventData: string):
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        cached_tokens?: number;
+        cache_creation_tokens?: number;
+        reasoning_tokens?: number;
+      }
+    | undefined {
     try {
       const event = JSON.parse(eventData);
-      
+
       // For response.completed events
       if (event.type === 'response.completed' && event.response?.usage) {
         const usage = normalizeOpenAIResponsesUsage(event.response.usage);
@@ -1135,10 +1167,10 @@ export class ResponsesTransformer implements Transformer {
           output_tokens: usage.output_tokens,
           cached_tokens: usage.cached_tokens,
           cache_creation_tokens: usage.cache_creation_tokens,
-          reasoning_tokens: usage.reasoning_tokens
+          reasoning_tokens: usage.reasoning_tokens,
         };
       }
-      
+
       return undefined;
     } catch (e) {
       return undefined;

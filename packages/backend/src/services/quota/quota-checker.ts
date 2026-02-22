@@ -5,7 +5,7 @@ import type {
   QuotaUnit,
   QuotaStatus,
   QuotaWindowType,
-  QuotaGroup
+  QuotaGroup,
 } from '../../types/quota';
 
 export abstract class QuotaChecker {
@@ -50,7 +50,9 @@ export abstract class QuotaChecker {
   protected requireOption<T>(key: string): T {
     const value = this.config.options[key] as T | undefined;
     if (value === undefined) {
-      throw new Error(`Required option '${key}' not provided for quota checker '${this.config.id}'`);
+      throw new Error(
+        `Required option '${key}' not provided for quota checker '${this.config.id}'`
+      );
     }
     return value;
   }
@@ -80,17 +82,9 @@ export abstract class QuotaChecker {
     return diff;
   }
 
-  protected successResult(
-    windows: QuotaWindow[]
-  ): QuotaCheckResult;
-  protected successResult(
-    windows: undefined,
-    groups: QuotaGroup[]
-  ): QuotaCheckResult;
-  protected successResult(
-    windows?: QuotaWindow[],
-    groups?: QuotaGroup[]
-  ): QuotaCheckResult {
+  protected successResult(windows: QuotaWindow[]): QuotaCheckResult;
+  protected successResult(windows: undefined, groups: QuotaGroup[]): QuotaCheckResult;
+  protected successResult(windows?: QuotaWindow[], groups?: QuotaGroup[]): QuotaCheckResult {
     const oauthMetadata = this.getOAuthMetadata();
     return {
       provider: this.config.provider,

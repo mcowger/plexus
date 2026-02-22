@@ -26,17 +26,23 @@ export class SelectorFactory {
         return new CostSelector();
       case 'performance':
         if (!this.usageStorage) {
-            throw new Error("UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.");
+          throw new Error(
+            'UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.'
+          );
         }
         return new PerformanceSelector(this.usageStorage);
       case 'latency':
         if (!this.usageStorage) {
-            throw new Error("UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.");
+          throw new Error(
+            'UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.'
+          );
         }
         return new LatencySelector(this.usageStorage);
       case 'usage':
         if (!this.usageStorage) {
-            throw new Error("UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.");
+          throw new Error(
+            'UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.'
+          );
         }
         return new UsageSelector(this.usageStorage);
       default:

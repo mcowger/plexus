@@ -7,13 +7,16 @@ import { QuotaScheduler } from './services/quota/quota-scheduler';
 
 // --- Zod Schemas ---
 
-const DEFAULT_RETRYABLE_STATUS_CODES = Array.from({ length: 500 }, (_, index) => index + 100).filter(
-  (code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 413 && code !== 422
-);
+const DEFAULT_RETRYABLE_STATUS_CODES = Array.from(
+  { length: 500 },
+  (_, index) => index + 100
+).filter((code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 413 && code !== 422);
 
 const FailoverPolicySchema = z.object({
   enabled: z.boolean().default(true),
-  retryableStatusCodes: z.array(z.number().int().min(100).max(599)).default(DEFAULT_RETRYABLE_STATUS_CODES),
+  retryableStatusCodes: z
+    .array(z.number().int().min(100).max(599))
+    .default(DEFAULT_RETRYABLE_STATUS_CODES),
   retryableErrors: z.array(z.string().min(1)).default(['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND']),
 });
 
@@ -22,13 +25,13 @@ const PricingRangeSchema = z.object({
   // There can be multiple ranges defined for different usage levels
   // They are based on the number of input tokens.
   // If the input token count falls within a range, the corresponding pricing applies.
-  // Example: 
-  //   lower_bound: 0, upper_bound: 1000, input_per_m: 0.01, output_per_m: 0.02 
+  // Example:
+  //   lower_bound: 0, upper_bound: 1000, input_per_m: 0.01, output_per_m: 0.02
   //   ## In the above case, if the number of input tokens is between 0 and 1000, the pricing will be 0.01 per million input tokens and 0.02 per million output tokens
   //   lower_bound: 1001, upper_bound: 5000, input_per_m: 0.008, output_per_m: 0.018
   //   ## In the above case, if the number of input tokens is between 1001 and 5000, the pricing will be 0.008 per million input tokens and 0.018 per million output tokens
   //.  # If the upper bound is Infinity, the pricing will apply to all token counts above the lower bound
-  lower_bound: z.number().min(0).default(0), 
+  lower_bound: z.number().min(0).default(0),
   upper_bound: z.number().default(Infinity),
   input_per_m: z.number().min(0),
   output_per_m: z.number().min(0),
@@ -74,12 +77,12 @@ const OAuthProviderSchema = z.enum([
   'openai-codex',
   'github-copilot',
   'google-gemini-cli',
-  'google-antigravity'
+  'google-antigravity',
 ]);
 
 const NagaQuotaCheckerOptionsSchema = z.object({
-  apiKey: z.string().min(1, "Naga provisioning key is required"),
-  max: z.number().positive("Max balance must be a positive number").optional(),
+  apiKey: z.string().min(1, 'Naga provisioning key is required'),
+  max: z.number().positive('Max balance must be a positive number').optional(),
   endpoint: z.string().url().optional(),
 });
 
@@ -109,7 +112,7 @@ const MiniMaxCodingQuotaCheckerOptionsSchema = z.object({
 });
 
 const OpenRouterQuotaCheckerOptionsSchema = z.object({
-  apiKey: z.string().min(1, "OpenRouter management key is required"),
+  apiKey: z.string().min(1, 'OpenRouter management key is required'),
   endpoint: z.string().url().optional(),
 });
 
@@ -258,41 +261,38 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-const ProviderConfigSchema = z.object({
-  display_name: z.string().optional(),
-  api_base_url: z.union([
-    z.string().refine((value) => isValidUrlOrOAuth(value), {
-      message: "api_base_url must be a valid URL or oauth://"
-    }),
-    z.record(z.string())
-  ]),
-  api_key: z.string().optional(),
-  oauth_provider: OAuthProviderSchema.optional(),
-  oauth_account: z.string().min(1).optional(),
-  enabled: z.boolean().default(true).optional(),
-  disable_cooldown: z.boolean().optional().default(false),
-  discount: z.number().min(0).max(1).optional(),
-  models: z.union([
-    z.array(z.string()),
-    z.record(z.string(), ModelProviderConfigSchema)
-  ]).optional(),
-  headers: z.record(z.string()).optional(),
-  extraBody: z.record(z.any()).optional(),
-  estimateTokens: z.boolean().optional().default(false),
-  quota_checker: ProviderQuotaCheckerSchema.optional(),
-})
-  .refine(
-    (data) => !!data.api_key || isOAuthProviderConfig(data),
-    { message: "'api_key' must be specified for provider" }
-  )
-  .refine(
-    (data) => !isOAuthProviderConfig(data) || !!data.oauth_provider,
-    { message: "'oauth_provider' must be specified when using oauth://" }
-  )
-  .refine(
-    (data) => !isOAuthProviderConfig(data) || !!data.oauth_account,
-    { message: "'oauth_account' must be specified when using oauth://" }
-  );
+const ProviderConfigSchema = z
+  .object({
+    display_name: z.string().optional(),
+    api_base_url: z.union([
+      z.string().refine((value) => isValidUrlOrOAuth(value), {
+        message: 'api_base_url must be a valid URL or oauth://',
+      }),
+      z.record(z.string()),
+    ]),
+    api_key: z.string().optional(),
+    oauth_provider: OAuthProviderSchema.optional(),
+    oauth_account: z.string().min(1).optional(),
+    enabled: z.boolean().default(true).optional(),
+    disable_cooldown: z.boolean().optional().default(false),
+    discount: z.number().min(0).max(1).optional(),
+    models: z
+      .union([z.array(z.string()), z.record(z.string(), ModelProviderConfigSchema)])
+      .optional(),
+    headers: z.record(z.string()).optional(),
+    extraBody: z.record(z.any()).optional(),
+    estimateTokens: z.boolean().optional().default(false),
+    quota_checker: ProviderQuotaCheckerSchema.optional(),
+  })
+  .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
+    message: "'api_key' must be specified for provider",
+  })
+  .refine((data) => !isOAuthProviderConfig(data) || !!data.oauth_provider, {
+    message: "'oauth_provider' must be specified when using oauth://",
+  })
+  .refine((data) => !isOAuthProviderConfig(data) || !!data.oauth_account, {
+    message: "'oauth_account' must be specified when using oauth://",
+  });
 
 const ModelTargetSchema = z.object({
   provider: z.string(),
@@ -331,9 +331,7 @@ const StripAdaptiveThinkingBehaviorSchema = z.object({
 });
 
 // Union of all known behavior schemas – extend here for future behaviors
-const ModelBehaviorSchema = z.discriminatedUnion('type', [
-  StripAdaptiveThinkingBehaviorSchema,
-]);
+const ModelBehaviorSchema = z.discriminatedUnion('type', [StripAdaptiveThinkingBehaviorSchema]);
 
 // ─── Model Metadata ──────────────────────
 // Optional reference to an external model catalog entry. When configured,
@@ -387,18 +385,20 @@ const CooldownPolicySchema = z.object({
   maxMinutes: z.number().min(1).default(300),
 });
 
-const RawPlexusConfigSchema = z.object({
-  providers: z.record(z.string(), ProviderConfigSchema),
-  models: z.record(z.string(), ModelConfigSchema),
-  keys: z.record(z.string(), KeyConfigSchema),
-  adminKey: z.string(),
-  failover: FailoverPolicySchema.optional(),
-  cooldown: CooldownPolicySchema.optional(),
-  performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
-  latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
-  mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
-  user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
-}).passthrough();
+const RawPlexusConfigSchema = z
+  .object({
+    providers: z.record(z.string(), ProviderConfigSchema),
+    models: z.record(z.string(), ModelConfigSchema),
+    keys: z.record(z.string(), KeyConfigSchema),
+    adminKey: z.string(),
+    failover: FailoverPolicySchema.optional(),
+    cooldown: CooldownPolicySchema.optional(),
+    performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
+    latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
+    mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
+    user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
+  })
+  .passthrough();
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
 export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
@@ -447,7 +447,7 @@ export function getProviderTypes(provider: ProviderConfig): string[] {
   } else {
     // Record/map format - keys are the supported types
     const urlMap = provider.api_base_url as Record<string, string>;
-    return Object.keys(urlMap).filter(key => {
+    return Object.keys(urlMap).filter((key) => {
       const value = urlMap[key];
       return typeof value === 'string' && value.length > 0;
     });
@@ -468,7 +468,9 @@ function isValidUrlOrOAuth(value: string): boolean {
   }
 }
 
-function isOAuthProviderConfig(provider: { api_base_url: string | Record<string, string> }): boolean {
+function isOAuthProviderConfig(provider: {
+  api_base_url: string | Record<string, string>;
+}): boolean {
   if (typeof provider.api_base_url === 'string') {
     return provider.api_base_url.startsWith('oauth://');
   }
@@ -482,60 +484,69 @@ let currentConfigPath: string | null = null;
 let configWatcher: fs.FSWatcher | null = null;
 
 function logConfigStats(config: PlexusConfig) {
-    const providerCount = Object.keys(config.providers).length;
-    logger.info(`Loaded ${providerCount} Providers:`);
-    Object.entries(config.providers).forEach(([name, provider]) => {
-      let modelCount = 0;
-      if (Array.isArray(provider.models)) {
-        modelCount = provider.models.length;
-      } else if (provider.models) {
-        modelCount = Object.keys(provider.models).length;
-      }
-      logger.info(`  - ${name}: ${modelCount} models`);
+  const providerCount = Object.keys(config.providers).length;
+  logger.info(`Loaded ${providerCount} Providers:`);
+  Object.entries(config.providers).forEach(([name, provider]) => {
+    let modelCount = 0;
+    if (Array.isArray(provider.models)) {
+      modelCount = provider.models.length;
+    } else if (provider.models) {
+      modelCount = Object.keys(provider.models).length;
+    }
+    logger.info(`  - ${name}: ${modelCount} models`);
+  });
+
+  const aliasCount = Object.keys(config.models).length;
+  logger.info(`Loaded ${aliasCount} Model Aliases:`);
+  Object.entries(config.models).forEach(([name, alias]) => {
+    const targetCount = alias.targets.length;
+    let msg = `  - ${name}: ${targetCount} targets`;
+    if (alias.additional_aliases && alias.additional_aliases.length > 0) {
+      msg += ` (aliases: ${alias.additional_aliases.join(', ')})`;
+    }
+    logger.info(msg);
+  });
+
+  if (config.keys) {
+    const keyCount = Object.keys(config.keys).length;
+    logger.info(`Loaded ${keyCount} API Keys:`);
+    Object.keys(config.keys).forEach((keyName) => {
+      logger.info(`  - ${keyName}`);
     });
+  }
 
-    const aliasCount = Object.keys(config.models).length;
-    logger.info(`Loaded ${aliasCount} Model Aliases:`);
-    Object.entries(config.models).forEach(([name, alias]) => {
-      const targetCount = alias.targets.length;
-      let msg = `  - ${name}: ${targetCount} targets`;
-      if (alias.additional_aliases && alias.additional_aliases.length > 0) {
-        msg += ` (aliases: ${alias.additional_aliases.join(', ')})`;
-      }
-      logger.info(msg);
+  if (config.quotas && Array.isArray(config.quotas) && config.quotas.length > 0) {
+    logger.warn(
+      `DEPRECATED: Top-level 'quotas' array is no longer supported. Quota checkers should now be configured per-provider under providers.<name>.quota_checker. The top-level 'quotas' entries will be ignored.`
+    );
+    config.quotas.forEach((quota) => {
+      logger.warn(`  - Ignoring: ${quota.id} (${quota.type})`);
     });
+  }
 
-    if (config.keys) {
-      const keyCount = Object.keys(config.keys).length;
-      logger.info(`Loaded ${keyCount} API Keys:`);
-      Object.keys(config.keys).forEach((keyName) => {
-        logger.info(`  - ${keyName}`);
-      });
-    }
+  if (config.user_quotas && Object.keys(config.user_quotas).length > 0) {
+    const userQuotaCount = Object.keys(config.user_quotas).length;
+    logger.info(`Loaded ${userQuotaCount} User Quota Definitions:`);
+    Object.entries(config.user_quotas).forEach(([name, quota]) => {
+      const quotaWithType = quota as {
+        type: string;
+        limitType: string;
+        limit: number;
+        duration?: string;
+      };
+      logger.info(
+        `  - ${name}: ${quotaWithType.type} ${quotaWithType.limitType} (limit: ${quotaWithType.limit}${quotaWithType.duration ? `, duration: ${quotaWithType.duration}` : ''})`
+      );
+    });
+  }
 
-    if (config.quotas && Array.isArray(config.quotas) && config.quotas.length > 0) {
-      logger.warn(`DEPRECATED: Top-level 'quotas' array is no longer supported. Quota checkers should now be configured per-provider under providers.<name>.quota_checker. The top-level 'quotas' entries will be ignored.`);
-      config.quotas.forEach((quota) => {
-        logger.warn(`  - Ignoring: ${quota.id} (${quota.type})`);
-      });
-    }
-
-    if (config.user_quotas && Object.keys(config.user_quotas).length > 0) {
-      const userQuotaCount = Object.keys(config.user_quotas).length;
-      logger.info(`Loaded ${userQuotaCount} User Quota Definitions:`);
-      Object.entries(config.user_quotas).forEach(([name, quota]) => {
-        const quotaWithType = quota as { type: string; limitType: string; limit: number; duration?: string };
-        logger.info(`  - ${name}: ${quotaWithType.type} ${quotaWithType.limitType} (limit: ${quotaWithType.limit}${quotaWithType.duration ? `, duration: ${quotaWithType.duration}` : ''})`);
-      });
-    }
-
-    if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-      const mcpCount = Object.keys(config.mcpServers).length;
-      logger.info(`Loaded ${mcpCount} MCP Servers:`);
-      Object.entries(config.mcpServers).forEach(([name, server]) => {
-        logger.info(`  - ${name}: ${server.upstream_url} (enabled: ${server.enabled ?? true})`);
-      });
-    }
+  if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+    const mcpCount = Object.keys(config.mcpServers).length;
+    logger.info(`Loaded ${mcpCount} MCP Servers:`);
+    Object.entries(config.mcpServers).forEach(([name, server]) => {
+      logger.info(`  - ${name}: ${server.upstream_url} (enabled: ${server.enabled ?? true})`);
+    });
+  }
 }
 
 export function validateConfig(yamlContent: string): PlexusConfig {
@@ -603,7 +614,7 @@ function migrateOAuthAccounts(parsed: unknown): {
   return {
     parsed,
     migrated: migratedProviders.length > 0,
-    migratedProviders
+    migratedProviders,
   };
 }
 
@@ -628,7 +639,9 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
     }
 
     if (seenIds.has(checkerId)) {
-      throw new Error(`Duplicate quota checker id '${checkerId}' found in provider '${providerId}'`);
+      throw new Error(
+        `Duplicate quota checker id '${checkerId}' found in provider '${providerId}'`
+      );
     }
     seenIds.add(checkerId);
 
@@ -707,7 +720,9 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
           options,
         });
 
-        logger.info(`Added implicit quota checker '${quotaInfo.type}' for provider '${providerId}'`);
+        logger.info(
+          `Added implicit quota checker '${quotaInfo.type}' for provider '${providerId}'`
+        );
       }
     }
   }
@@ -736,35 +751,35 @@ async function parseConfigFile(filePath: string): Promise<PlexusConfig> {
 }
 
 function setupWatcher(filePath: string) {
-    if (configWatcher) return;
-    
-    logger.info(`Watching configuration file: ${filePath}`);
-    let debounceTimer: NodeJS.Timeout | null = null;
+  if (configWatcher) return;
 
-    try {
-        configWatcher = fs.watch(filePath, (eventType) => {
-            if (eventType === 'change') {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                
-                debounceTimer = setTimeout(async () => {
-                    logger.info('Configuration file changed, reloading...');
-                    try {
-                        const newConfig = await parseConfigFile(filePath);
-                        currentConfig = newConfig;
-                        await QuotaScheduler.getInstance().reload(newConfig.quotas);
-                        logger.info('Configuration reloaded successfully');
-                    } catch (error) {
-                        logger.error('Failed to reload configuration', { error });
-                         if (error instanceof z.ZodError) {
-                             logger.error('Validation errors:', error.errors);
-                         }
-                    }
-                }, 100);
+  logger.info(`Watching configuration file: ${filePath}`);
+  let debounceTimer: NodeJS.Timeout | null = null;
+
+  try {
+    configWatcher = fs.watch(filePath, (eventType) => {
+      if (eventType === 'change') {
+        if (debounceTimer) clearTimeout(debounceTimer);
+
+        debounceTimer = setTimeout(async () => {
+          logger.info('Configuration file changed, reloading...');
+          try {
+            const newConfig = await parseConfigFile(filePath);
+            currentConfig = newConfig;
+            await QuotaScheduler.getInstance().reload(newConfig.quotas);
+            logger.info('Configuration reloaded successfully');
+          } catch (error) {
+            logger.error('Failed to reload configuration', { error });
+            if (error instanceof z.ZodError) {
+              logger.error('Validation errors:', error.errors);
             }
-        });
-    } catch (err) {
-        logger.error('Failed to setup config watcher', err);
-    }
+          }
+        }, 100);
+      }
+    });
+  } catch (err) {
+    logger.error('Failed to setup config watcher', err);
+  }
 }
 
 export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
@@ -774,7 +789,7 @@ export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
   const projectRoot = path.resolve(process.cwd(), '../../');
   const defaultPath = path.resolve(projectRoot, 'config/plexus.yaml');
   const finalPath = configPath || process.env.CONFIG_FILE || defaultPath;
-  
+
   logger.info(`Loading configuration from ${finalPath}`);
 
   const file = Bun.file(finalPath);
@@ -787,9 +802,9 @@ export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
     currentConfig = await parseConfigFile(finalPath);
     currentConfigPath = finalPath;
     logger.info('Configuration loaded successfully');
-    
+
     setupWatcher(finalPath);
-    
+
     return currentConfig;
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -800,45 +815,45 @@ export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
 }
 
 export function getConfig(): PlexusConfig {
-    if (!currentConfig) {
-        throw new Error("Configuration not loaded. Call loadConfig() first.");
-    }
-    return currentConfig;
+  if (!currentConfig) {
+    throw new Error('Configuration not loaded. Call loadConfig() first.');
+  }
+  return currentConfig;
 }
 
 export function getConfigPath(): string | null {
-    return currentConfigPath;
+  return currentConfigPath;
 }
 
 export function setConfigForTesting(config: PlexusConfig) {
-    currentConfig = config;
+  currentConfig = config;
 }
 
 export function getDatabaseConfig(): DatabaseConfig | null {
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-        return null;
-    }
-    return { connectionString: databaseUrl };
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return null;
+  }
+  return { connectionString: databaseUrl };
 }
 
 // Valid quota checker types - single source of truth
 export const VALID_QUOTA_CHECKER_TYPES = [
-    'naga',
-    'synthetic',
-    'nanogpt',
-    'zai',
-    'moonshot',
-    'minimax',
-    'minimax-coding',
-    'openrouter',
-    'kilo',
-    'openai-codex',
-    'claude-code',
-    'kimi-code',
-    'copilot',
-    'wisdomgate',
-    'apertis',
+  'naga',
+  'synthetic',
+  'nanogpt',
+  'zai',
+  'moonshot',
+  'minimax',
+  'minimax-coding',
+  'openrouter',
+  'kilo',
+  'openai-codex',
+  'claude-code',
+  'kimi-code',
+  'copilot',
+  'wisdomgate',
+  'apertis',
 ] as const;
 
-export type QuotaCheckerType = typeof VALID_QUOTA_CHECKER_TYPES[number];
+export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

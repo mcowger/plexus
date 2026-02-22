@@ -1,8 +1,8 @@
-import { UnifiedSpeechRequest, UnifiedSpeechResponse } from "../types/unified";
+import { UnifiedSpeechRequest, UnifiedSpeechResponse } from '../types/unified';
 
 export class SpeechTransformer {
-  name = "speech";
-  defaultEndpoint = "/audio/speech";
+  name = 'speech';
+  defaultEndpoint = '/audio/speech';
 
   async parseRequest(input: any): Promise<UnifiedSpeechRequest> {
     return {
@@ -35,7 +35,7 @@ export class SpeechTransformer {
 
     return {
       audio: isStreamed ? undefined : response,
-      stream: isStreamed ? response as unknown as ReadableStream : undefined,
+      stream: isStreamed ? (response as unknown as ReadableStream) : undefined,
       isStreamed,
     };
   }
@@ -49,24 +49,25 @@ export class SpeechTransformer {
 
   getMimeType(response_format?: string): string {
     const formats: Record<string, string> = {
-      'mp3': 'audio/mpeg',
-      'opus': 'audio/opus',
-      'aac': 'audio/aac',
-      'flac': 'audio/flac',
-      'wav': 'audio/wav',
-      'pcm': 'audio/basic',
+      mp3: 'audio/mpeg',
+      opus: 'audio/opus',
+      aac: 'audio/aac',
+      flac: 'audio/flac',
+      wav: 'audio/wav',
+      pcm: 'audio/basic',
     };
     return formats[response_format || 'mp3'] || 'audio/mpeg';
   }
 
-  extractUsage(eventData: string): { input_tokens?: number; output_tokens?: number; total_tokens?: number } | undefined {
+  extractUsage(
+    eventData: string
+  ): { input_tokens?: number; output_tokens?: number; total_tokens?: number } | undefined {
     try {
       const event = JSON.parse(eventData);
       if (event.type === 'speech.audio.done' && event.usage) {
         return event.usage;
       }
-    } catch {
-    }
+    } catch {}
     return undefined;
   }
 }

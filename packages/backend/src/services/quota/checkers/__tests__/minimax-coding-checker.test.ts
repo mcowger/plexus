@@ -3,9 +3,7 @@ import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { MiniMaxCodingQuotaChecker } from '../minimax-coding-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
 
-const makeConfig = (
-  options: Record<string, unknown> = {}
-): QuotaCheckerConfig => ({
+const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig => ({
   id: 'minimax-coding-test',
   provider: 'minimax',
   type: 'minimax-coding',
@@ -17,11 +15,13 @@ const makeConfig = (
   },
 });
 
-const makeSuccessResponse = (overrides: Partial<{
-  current_interval_total_count: number;
-  current_interval_usage_count: number;
-  end_time: number;
-}> = {}) => ({
+const makeSuccessResponse = (
+  overrides: Partial<{
+    current_interval_total_count: number;
+    current_interval_usage_count: number;
+    end_time: number;
+  }> = {}
+) => ({
   model_remains: [
     {
       start_time: 1700000000000,
@@ -81,7 +81,7 @@ describe('MiniMaxCodingQuotaChecker', () => {
       capturedUrl = String(input);
       return new Response(JSON.stringify(makeSuccessResponse()), {
         status: 200,
-     headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
       });
     });
 
@@ -94,14 +94,17 @@ describe('MiniMaxCodingQuotaChecker', () => {
   });
 
   it('maps current_interval_usage_count as remaining and calculates used = limit - remaining', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify(makeSuccessResponse({
-          current_interval_total_count: 1000,
-        current_interval_usage_count: 750, // this is remaining (misleading field name)
-        })),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify(
+            makeSuccessResponse({
+              current_interval_total_count: 1000,
+              current_interval_usage_count: 750, // this is remaining (misleading field name)
+            })
+          ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());
@@ -123,11 +126,12 @@ describe('MiniMaxCodingQuotaChecker', () => {
   it('sets resetsAt from end_time on the first model entry', async () => {
     const endTime = 17000864000;
 
-    setFetchMock(async () =>
-    new Response(
-        JSON.stringify(makeSuccessResponse({ end_time: endTime })),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify(makeSuccessResponse({ end_time: endTime })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());
@@ -139,14 +143,15 @@ describe('MiniMaxCodingQuotaChecker', () => {
   });
 
   it('returns an empty windows array when model_remains is empty', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          model_remains: [],
-          base_resp: { status_code: 0, status_msg: 'success' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model_remains: [],
+            base_resp: { status_code: 0, status_msg: 'success' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());
@@ -157,31 +162,32 @@ describe('MiniMaxCodingQuotaChecker', () => {
   });
 
   it('uses only the first model entry (all models share same quota pool)', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          model_remains: [
-            {
-            start_time: 1700000000,
-              end_time: 1700086400000,
-              remains_time: 86400,
-              current_interval_total_count: 1000,
-            current_interval_usage_count: 800,
-       model_name: 'MiniMax-Text-01',
-            },
-       {
-              start_time: 1700000000000,
-              end_time: 1700086400000,
-          remains_time: 86400,
-              current_interval_total_count: 1000,
-              current_interval_usage_count: 800,
-              model_name: 'MiniMax-Code-01',
-          },
-          ],
-        base_resp: { status_code: 0, status_msg: 'success' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model_remains: [
+              {
+                start_time: 1700000000,
+                end_time: 1700086400000,
+                remains_time: 86400,
+                current_interval_total_count: 1000,
+                current_interval_usage_count: 800,
+                model_name: 'MiniMax-Text-01',
+              },
+              {
+                start_time: 1700000000000,
+                end_time: 1700086400000,
+                remains_time: 86400,
+                current_interval_total_count: 1000,
+                current_interval_usage_count: 800,
+                model_name: 'MiniMax-Code-01',
+              },
+            ],
+            base_resp: { status_code: 0, status_msg: 'success' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());
@@ -194,9 +200,7 @@ describe('MiniMaxCodingQuotaChecker', () => {
   });
 
   it('returns error for non-200 HTTP response', async () => {
-    setFetchMock(async () =>
-      new Response('forbidden', { status: 403, statusText: 'Forbidden' })
-    );
+    setFetchMock(async () => new Response('forbidden', { status: 403, statusText: 'Forbidden' }));
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());
     const result = await checker.checkQuota();
@@ -206,14 +210,15 @@ describe('MiniMaxCodingQuotaChecker', () => {
   });
 
   it('returns error when base_resp.status_code is non-zero', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          model_remains: [],
-          base_resp: { status_code: 1002, status_msg: 'invalid api key' },
-    }),
-     { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model_remains: [],
+            base_resp: { status_code: 1002, status_msg: 'invalid api key' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());
@@ -224,14 +229,15 @@ describe('MiniMaxCodingQuotaChecker', () => {
   });
 
   it('returns error with fallback message when base_resp.status_msg is absent', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          model_remains: [],
-       base_resp: { status_code: 500 },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model_remains: [],
+            base_resp: { status_code: 500 },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new MiniMaxCodingQuotaChecker(makeConfig());

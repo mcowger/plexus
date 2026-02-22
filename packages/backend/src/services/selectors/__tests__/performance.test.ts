@@ -6,9 +6,11 @@ import { ModelTarget, setConfigForTesting, PlexusConfig } from '../../../config'
 describe('PerformanceSelector', () => {
   // Mock usage storage
   // Explicitly type the mock return to allow any array of objects
-  const mockGetProviderPerformance = mock((provider?: string, model?: string): Promise<any[]> => Promise.resolve([]));
+  const mockGetProviderPerformance = mock(
+    (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
+  );
   const mockStorage = {
-    getProviderPerformance: mockGetProviderPerformance
+    getProviderPerformance: mockGetProviderPerformance,
   } as unknown as UsageStorageService;
 
   const selector = new PerformanceSelector(mockStorage);
@@ -28,7 +30,11 @@ describe('PerformanceSelector', () => {
       models: {},
       keys: {},
       adminKey: 'test',
-      failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
+      failover: {
+        enabled: false,
+        retryableStatusCodes: [429, 500, 502, 503, 504],
+        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+      },
       quotas: [],
       performanceExplorationRate: 0,
     };
@@ -44,7 +50,7 @@ describe('PerformanceSelector', () => {
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
       { provider: 'p2', model: 'm2' },
-      { provider: 'p3', model: 'm3' }
+      { provider: 'p3', model: 'm3' },
     ];
 
     const selected = await selector.select(targets);
@@ -60,7 +66,7 @@ describe('PerformanceSelector', () => {
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
-      { provider: 'p2', model: 'm2' }
+      { provider: 'p2', model: 'm2' },
     ];
 
     const selected = await selector.select(targets);
@@ -72,7 +78,7 @@ describe('PerformanceSelector', () => {
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
-      { provider: 'p2', model: 'm2' }
+      { provider: 'p2', model: 'm2' },
     ];
 
     const selected = await selector.select(targets);
@@ -86,7 +92,11 @@ describe('PerformanceSelector', () => {
         models: {},
         keys: {},
         adminKey: 'test',
-        failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
+        failover: {
+          enabled: false,
+          retryableStatusCodes: [429, 500, 502, 503, 504],
+          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+        },
         quotas: [],
         performanceExplorationRate: 0,
       };
@@ -100,7 +110,7 @@ describe('PerformanceSelector', () => {
 
       const targets: ModelTarget[] = [
         { provider: 'p1', model: 'm1' },
-        { provider: 'p2', model: 'm2' }
+        { provider: 'p2', model: 'm2' },
       ];
 
       // Run multiple times to ensure consistency
@@ -116,7 +126,11 @@ describe('PerformanceSelector', () => {
         models: {},
         keys: {},
         adminKey: 'test',
-        failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
+        failover: {
+          enabled: false,
+          retryableStatusCodes: [429, 500, 502, 503, 504],
+          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+        },
         quotas: [],
         performanceExplorationRate: 1,
       };
@@ -132,7 +146,7 @@ describe('PerformanceSelector', () => {
       const targets: ModelTarget[] = [
         { provider: 'p1', model: 'm1' },
         { provider: 'p2', model: 'm2' },
-        { provider: 'p3', model: 'm3' }
+        { provider: 'p3', model: 'm3' },
       ];
 
       // With rate=1, should never select fastest (p1)
@@ -149,7 +163,11 @@ describe('PerformanceSelector', () => {
         models: {},
         keys: {},
         adminKey: 'test',
-        failover: { enabled: false, retryableStatusCodes: [429, 500, 502, 503, 504], retryableErrors: ["ECONNREFUSED", "ETIMEDOUT"] },
+        failover: {
+          enabled: false,
+          retryableStatusCodes: [429, 500, 502, 503, 504],
+          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+        },
         quotas: [],
       };
       setConfigForTesting(config);
@@ -162,7 +180,7 @@ describe('PerformanceSelector', () => {
 
       const targets: ModelTarget[] = [
         { provider: 'p1', model: 'm1' },
-        { provider: 'p2', model: 'm2' }
+        { provider: 'p2', model: 'm2' },
       ];
 
       // Deterministic assertions for default exploration behavior (0.05)

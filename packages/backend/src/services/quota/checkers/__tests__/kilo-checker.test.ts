@@ -3,9 +3,7 @@ import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { KiloQuotaChecker } from '../kilo-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
 
-const makeConfig = (
-  options: Record<string, unknown> = {}
-): QuotaCheckerConfig => ({
+const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig => ({
   id: 'kilo-test',
   provider: 'kilo',
   type: 'kilo',
@@ -81,7 +79,9 @@ describe('KiloQuotaChecker', () => {
   });
 
   it('returns error for non-200 response', async () => {
-    setFetchMock(async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
+    setFetchMock(
+      async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
+    );
 
     const checker = new KiloQuotaChecker(makeConfig());
     const result = await checker.checkQuota();

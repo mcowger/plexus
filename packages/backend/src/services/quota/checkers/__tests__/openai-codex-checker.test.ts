@@ -110,7 +110,9 @@ describe('OpenAICodexQuotaChecker', () => {
 
     setFetchMock(async () => new Response(JSON.stringify({ rate_limit: {} }), { status: 200 }));
 
-    const checker = new OpenAICodexQuotaChecker(makeConfig(JSON.stringify({ access_token: token })));
+    const checker = new OpenAICodexQuotaChecker(
+      makeConfig(JSON.stringify({ access_token: token }))
+    );
     const result = await checker.checkQuota();
 
     expect(result.success).toBe(true);
@@ -160,7 +162,12 @@ describe('OpenAICodexQuotaChecker', () => {
   it('continues without account claim when token payload lacks chatgpt_account_id', async () => {
     const token = makeToken({ sub: 'no-claim' });
 
-    setFetchMock(async () => new Response(JSON.stringify({ rate_limit: { allowed: true, limit_reached: false } }), { status: 200 }));
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({ rate_limit: { allowed: true, limit_reached: false } }), {
+          status: 200,
+        })
+    );
 
     const checker = new OpenAICodexQuotaChecker(makeConfig(token));
     const result = await checker.checkQuota();
@@ -176,7 +183,9 @@ describe('OpenAICodexQuotaChecker', () => {
       },
     });
 
-    setFetchMock(async () => new Response('bad request', { status: 401, statusText: 'Unauthorized' }));
+    setFetchMock(
+      async () => new Response('bad request', { status: 401, statusText: 'Unauthorized' })
+    );
 
     const checker = new OpenAICodexQuotaChecker(makeConfig(token));
     const result = await checker.checkQuota();
@@ -227,7 +236,12 @@ describe('OpenAICodexQuotaChecker', () => {
     const authManager = OAuthAuthManager.getInstance();
     spyOn(authManager, 'getApiKey').mockResolvedValue(token);
 
-    setFetchMock(async () => new Response(JSON.stringify({ rate_limit: { allowed: true, limit_reached: false } }), { status: 200 }));
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({ rate_limit: { allowed: true, limit_reached: false } }), {
+          status: 200,
+        })
+    );
 
     const checker = new OpenAICodexQuotaChecker(makeConfig());
     const result = await checker.checkQuota();

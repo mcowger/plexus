@@ -1,7 +1,7 @@
-import { PassThrough } from "stream";
-import { logger } from "../../utils/logger";
-import { BaseInspector } from "./base";
-import { DebugManager } from "../debug-manager";
+import { PassThrough } from 'stream';
+import { logger } from '../../utils/logger';
+import { BaseInspector } from './base';
+import { DebugManager } from '../debug-manager';
 
 const MAX_DEBUG_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -15,16 +15,17 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   createInspector(providerApiType: string): PassThrough {
-    const inspector = providerApiType === 'oauth'
-      ? new PassThrough({ objectMode: true })
-      : new PassThrough();
+    const inspector =
+      providerApiType === 'oauth' ? new PassThrough({ objectMode: true }) : new PassThrough();
 
     const bodyChunks: string[] = [];
     let totalSize = 0;
     let truncated = false;
 
-    inspector.on("data", (chunk: any) => {
-      logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} received chunk, length: ${chunk.length || chunk.toString().length}: ${chunk.toString()}`);
+    inspector.on('data', (chunk: any) => {
+      logger.silly(
+        `[Inspector:${this.mode}] Request ${this.requestId} received chunk, length: ${chunk.length || chunk.toString().length}: ${chunk.toString()}`
+      );
 
       if (truncated) return;
 
@@ -51,7 +52,9 @@ export class DebugLoggingInspector extends BaseInspector {
       if (newSize > MAX_DEBUG_BUFFER_SIZE) {
         truncated = true;
         bodyChunks.push('\n\n[DEBUG OUTPUT TRUNCATED - Exceeded 10MB limit]');
-        logger.warn(`[Inspector:Debug] Request ${this.requestId} debug output truncated at ${totalSize} bytes`);
+        logger.warn(
+          `[Inspector:Debug] Request ${this.requestId} debug output truncated at ${totalSize} bytes`
+        );
         return;
       }
 
@@ -59,25 +62,27 @@ export class DebugLoggingInspector extends BaseInspector {
       bodyChunks.push(chunkStr);
     });
 
-    inspector.on("end", () => {
+    inspector.on('end', () => {
       const rawBody = bodyChunks.join('');
-      logger.silly(`[Inspector:${this.mode}] Request ${this.requestId} stream ended, captured ${bodyChunks.length} chunks, total size: ${rawBody.length} bytes`);
+      logger.silly(
+        `[Inspector:${this.mode}] Request ${this.requestId} stream ended, captured ${bodyChunks.length} chunks, total size: ${rawBody.length} bytes`
+      );
       try {
         let reconstructed: any = null;
         switch (providerApiType) {
-          case "chat":
+          case 'chat':
             reconstructed = this.reconstructChatCompletions(rawBody);
             break;
-          case "responses":
+          case 'responses':
             reconstructed = this.reconstructResponses(rawBody);
             break;
-          case "messages":
+          case 'messages':
             reconstructed = this.reconstructMessages(rawBody);
             break;
-          case "gemini":
+          case 'gemini':
             reconstructed = this.reconstructGemini(rawBody);
             break;
-          case "oauth":
+          case 'oauth':
             reconstructed = this.reconstructOAuth(rawBody);
             break;
           default:
@@ -85,7 +90,7 @@ export class DebugLoggingInspector extends BaseInspector {
         }
         // Always save to memory for usage extraction/estimation
         this.saveReconstructedResponse(reconstructed);
-        
+
         // Only persist raw data to DB if debug mode is enabled
         if (this.debugManager.isEnabled()) {
           this.saveRawResponse(rawBody);
@@ -103,17 +108,17 @@ export class DebugLoggingInspector extends BaseInspector {
 
   private saveRawResponse(fullBody: string): void {
     if (this.mode === 'raw') {
-        this.debugManager.addRawResponse(this.requestId, fullBody);
+      this.debugManager.addRawResponse(this.requestId, fullBody);
     } else {
-        this.debugManager.addTransformedResponse(this.requestId, fullBody);
+      this.debugManager.addTransformedResponse(this.requestId, fullBody);
     }
   }
 
   private saveReconstructedResponse(snapshot: any): void {
     if (this.mode === 'raw') {
-        this.debugManager.addReconstructedRawResponse(this.requestId, snapshot);
+      this.debugManager.addReconstructedRawResponse(this.requestId, snapshot);
     } else {
-        this.debugManager.addTransformedResponseSnapshot(this.requestId, snapshot);
+      this.debugManager.addTransformedResponseSnapshot(this.requestId, snapshot);
     }
   }
 
@@ -122,9 +127,9 @@ export class DebugLoggingInspector extends BaseInspector {
     let snapshot: any = null;
 
     for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
-      const jsonStr = line.replace(/^data:\s*/, "").trim();
-      if (!jsonStr || jsonStr === "[DONE]") continue;
+      if (!line.startsWith('data:')) continue;
+      const jsonStr = line.replace(/^data:\s*/, '').trim();
+      if (!jsonStr || jsonStr === '[DONE]') continue;
 
       try {
         const chunk = JSON.parse(jsonStr);
@@ -141,9 +146,9 @@ export class DebugLoggingInspector extends BaseInspector {
     let snapshot: any = null;
 
     for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
-      const jsonStr = line.replace(/^data:\s*/, "").trim();
-      if (!jsonStr || jsonStr === "[DONE]") continue;
+      if (!line.startsWith('data:')) continue;
+      const jsonStr = line.replace(/^data:\s*/, '').trim();
+      if (!jsonStr || jsonStr === '[DONE]') continue;
 
       try {
         const event = JSON.parse(jsonStr);
@@ -160,8 +165,8 @@ export class DebugLoggingInspector extends BaseInspector {
     let snapshot: any = null;
 
     for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
-      const jsonStr = line.replace(/^data:\s*/, "").trim();
+      if (!line.startsWith('data:')) continue;
+      const jsonStr = line.replace(/^data:\s*/, '').trim();
       if (!jsonStr) continue;
 
       try {
@@ -179,9 +184,9 @@ export class DebugLoggingInspector extends BaseInspector {
     let snapshot: any = null;
 
     for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
-      const jsonStr = line.replace(/^data:\s*/, "").trim();
-      if (!jsonStr || jsonStr === "[DONE]") continue;
+      if (!line.startsWith('data:')) continue;
+      const jsonStr = line.replace(/^data:\s*/, '').trim();
+      if (!jsonStr || jsonStr === '[DONE]') continue;
 
       try {
         const chunk = JSON.parse(jsonStr);
@@ -200,7 +205,7 @@ export class DebugLoggingInspector extends BaseInspector {
       reasoning_content: '',
       tool_calls: [],
       usage: undefined,
-      finishReason: null
+      finishReason: null,
     };
 
     for (const line of lines) {
@@ -221,7 +226,7 @@ export class DebugLoggingInspector extends BaseInspector {
             snapshot.tool_calls[index] = snapshot.tool_calls[index] || {
               id: '',
               type: 'function',
-              function: { name: '', arguments: '' }
+              function: { name: '', arguments: '' },
             };
             break;
           }
@@ -231,7 +236,7 @@ export class DebugLoggingInspector extends BaseInspector {
             snapshot.tool_calls[index] = snapshot.tool_calls[index] || {
               id: '',
               type: 'function',
-              function: { name: '', arguments: '' }
+              function: { name: '', arguments: '' },
             };
             if (toolCall?.id) snapshot.tool_calls[index].id = toolCall.id;
             if (toolCall?.name) snapshot.tool_calls[index].function.name = toolCall.name;
@@ -245,13 +250,15 @@ export class DebugLoggingInspector extends BaseInspector {
             snapshot.tool_calls[index] = snapshot.tool_calls[index] || {
               id: '',
               type: 'function',
-              function: { name: '', arguments: '' }
+              function: { name: '', arguments: '' },
             };
             snapshot.tool_calls[index].id = event.toolCall?.id || snapshot.tool_calls[index].id;
             snapshot.tool_calls[index].function.name =
               event.toolCall?.name || snapshot.tool_calls[index].function.name;
             if (event.toolCall?.arguments) {
-              snapshot.tool_calls[index].function.arguments = JSON.stringify(event.toolCall.arguments);
+              snapshot.tool_calls[index].function.arguments = JSON.stringify(
+                event.toolCall.arguments
+              );
             }
             break;
           }
@@ -280,7 +287,7 @@ export class DebugLoggingInspector extends BaseInspector {
       total_tokens: usage.totalTokens || 0,
       reasoning_tokens: 0,
       cached_tokens: usage.cacheRead || 0,
-      cache_creation_tokens: usage.cacheWrite || 0
+      cache_creation_tokens: usage.cacheWrite || 0,
     };
   }
 
@@ -306,9 +313,9 @@ export class DebugLoggingInspector extends BaseInspector {
       chunk.candidates.forEach((chunkCand: any, index: number) => {
         // Ensure candidate exists
         if (!acc.candidates[index]) {
-          acc.candidates[index] = { content: { parts: [], role: "model" }, index };
+          acc.candidates[index] = { content: { parts: [], role: 'model' }, index };
         }
-        
+
         const accCand = acc.candidates[index];
 
         // Update finishReason if present
@@ -317,7 +324,7 @@ export class DebugLoggingInspector extends BaseInspector {
         }
 
         if (chunkCand.content && chunkCand.content.parts) {
-          if (!accCand.content) accCand.content = { parts: [], role: "model" };
+          if (!accCand.content) accCand.content = { parts: [], role: 'model' };
           if (!accCand.content.parts) accCand.content.parts = [];
 
           const accParts = accCand.content.parts;
@@ -354,64 +361,64 @@ export class DebugLoggingInspector extends BaseInspector {
    */
   private updateMessagesSnapshot(acc: any, chunk: any): any {
     // 1. Initial State (message_start)
-    if (!acc && chunk.type === "message_start") {
+    if (!acc && chunk.type === 'message_start') {
       acc = { ...chunk.message };
       if (!acc.content) acc.content = [];
       if (!acc.usage) acc.usage = {};
       return acc;
     }
-    
+
     if (!acc) return chunk;
 
     switch (chunk.type) {
-      case "message_start":
+      case 'message_start':
         acc = { ...acc, ...chunk.message };
         if (!acc.content) acc.content = [];
         break;
 
-      case "content_block_start":
+      case 'content_block_start':
         const idx = chunk.index;
         const block = chunk.content_block;
         acc.content[idx] = { ...block };
-        
+
         // Initialize accumulators based on type
-        if (block.type === "tool_use") {
-          acc.content[idx].partial_json = "";
+        if (block.type === 'tool_use') {
+          acc.content[idx].partial_json = '';
           acc.content[idx].input = {};
-        } else if (block.type === "thinking" || block.type === "thought") {
-          const key = block.type === "thinking" ? "thinking" : "thought";
-          acc.content[idx][key] = acc.content[idx][key] || "";
-        } else if (block.type === "text") {
-          acc.content[idx].text = acc.content[idx].text || "";
+        } else if (block.type === 'thinking' || block.type === 'thought') {
+          const key = block.type === 'thinking' ? 'thinking' : 'thought';
+          acc.content[idx][key] = acc.content[idx][key] || '';
+        } else if (block.type === 'text') {
+          acc.content[idx].text = acc.content[idx].text || '';
         }
         break;
 
-      case "content_block_delta":
+      case 'content_block_delta':
         const dIdx = chunk.index;
         const delta = chunk.delta;
-        
+
         if (!acc.content[dIdx]) {
-           // Fallback initialization if start was missed
-           if (delta.type === "input_json_delta") {
-             acc.content[dIdx] = { type: "tool_use", partial_json: "", input: {} };
-           } else if (delta.type === "thinking_delta" || delta.type === "thought_delta") {
-             const type = delta.type === "thinking_delta" ? "thinking" : "thought";
-             acc.content[dIdx] = { type, [type]: "" };
-           } else {
-             acc.content[dIdx] = { type: "text", text: "" };
-           }
+          // Fallback initialization if start was missed
+          if (delta.type === 'input_json_delta') {
+            acc.content[dIdx] = { type: 'tool_use', partial_json: '', input: {} };
+          } else if (delta.type === 'thinking_delta' || delta.type === 'thought_delta') {
+            const type = delta.type === 'thinking_delta' ? 'thinking' : 'thought';
+            acc.content[dIdx] = { type, [type]: '' };
+          } else {
+            acc.content[dIdx] = { type: 'text', text: '' };
+          }
         }
 
         const targetBlock = acc.content[dIdx];
 
-        if (delta.type === "text_delta") {
-          targetBlock.text = (targetBlock.text || "") + delta.text;
-        } else if (delta.type === "thinking_delta") {
-          targetBlock.thinking = (targetBlock.thinking || "") + delta.thinking;
-        } else if (delta.type === "thought_delta") {
-          targetBlock.thought = (targetBlock.thought || "") + delta.thought;
-        } else if (delta.type === "input_json_delta") {
-          targetBlock.partial_json = (targetBlock.partial_json || "") + delta.partial_json;
+        if (delta.type === 'text_delta') {
+          targetBlock.text = (targetBlock.text || '') + delta.text;
+        } else if (delta.type === 'thinking_delta') {
+          targetBlock.thinking = (targetBlock.thinking || '') + delta.thinking;
+        } else if (delta.type === 'thought_delta') {
+          targetBlock.thought = (targetBlock.thought || '') + delta.thought;
+        } else if (delta.type === 'input_json_delta') {
+          targetBlock.partial_json = (targetBlock.partial_json || '') + delta.partial_json;
           try {
             targetBlock.input = JSON.parse(targetBlock.partial_json);
           } catch (e) {
@@ -420,7 +427,7 @@ export class DebugLoggingInspector extends BaseInspector {
         }
         break;
 
-      case "message_delta":
+      case 'message_delta':
         if (chunk.delta) {
           if (chunk.delta.stop_reason) acc.stop_reason = chunk.delta.stop_reason;
           if (chunk.delta.stop_sequence) acc.stop_sequence = chunk.delta.stop_sequence;
@@ -450,7 +457,7 @@ export class DebugLoggingInspector extends BaseInspector {
 
       for (const chunkChoice of chunk.choices) {
         const idx = chunkChoice.index ?? 0;
-        
+
         // Ensure the choice exists in our accumulator
         if (!result.choices[idx]) {
           result.choices[idx] = { index: idx, delta: {} };
@@ -466,29 +473,29 @@ export class DebugLoggingInspector extends BaseInspector {
 
           // B. Text Buffers (Concatenate strings, IGNORE nulls)
           // Includes content, reasoning_content, refusal, etc.
-          ["content", "reasoning_content", "refusal"].forEach(key => {
-            if (typeof delta[key] === "string") {
-              accChoice.delta[key] = (accChoice.delta[key] || "") + delta[key];
+          ['content', 'reasoning_content', 'refusal'].forEach((key) => {
+            if (typeof delta[key] === 'string') {
+              accChoice.delta[key] = (accChoice.delta[key] || '') + delta[key];
             }
           });
 
           // C. Tool Calls (Merged by tool index)
           if (delta.tool_calls) {
             if (!accChoice.delta.tool_calls) accChoice.delta.tool_calls = [];
-            
+
             for (const newTool of delta.tool_calls) {
               const tIdx = newTool.index;
               if (!accChoice.delta.tool_calls[tIdx]) {
-                accChoice.delta.tool_calls[tIdx] = { function: { name: "", arguments: "" } };
+                accChoice.delta.tool_calls[tIdx] = { function: { name: '', arguments: '' } };
               }
 
               const accTool = accChoice.delta.tool_calls[tIdx];
               if (newTool.id) accTool.id = newTool.id;
               if (newTool.type) accTool.type = newTool.type;
               if (newTool.function?.name) accTool.function.name = newTool.function.name;
-              
+
               // Tool Arguments are streamed as string fragments
-              if (typeof newTool.function?.arguments === "string") {
+              if (typeof newTool.function?.arguments === 'string') {
                 accTool.function.arguments += newTool.function.arguments;
               }
             }
@@ -505,7 +512,7 @@ export class DebugLoggingInspector extends BaseInspector {
    */
   private updateResponsesSnapshot(acc: any, event: any): any {
     // Initialize snapshot from response.created event
-    if (!acc && event.type === "response.created") {
+    if (!acc && event.type === 'response.created') {
       acc = { ...event.response };
       if (!acc.output) acc.output = [];
       return acc;
@@ -516,15 +523,15 @@ export class DebugLoggingInspector extends BaseInspector {
     }
 
     switch (event.type) {
-      case "response.created":
-      case "response.in_progress":
+      case 'response.created':
+      case 'response.in_progress':
         // Update top-level response fields
         if (event.response) {
           Object.assign(acc, event.response);
         }
         break;
 
-      case "response.output_item.added":
+      case 'response.output_item.added':
         // Add new output item
         const outputIndex = event.output_index ?? acc.output.length;
         if (event.item) {
@@ -532,36 +539,36 @@ export class DebugLoggingInspector extends BaseInspector {
         }
         break;
 
-      case "response.output_text.delta":
+      case 'response.output_text.delta':
         // Accumulate text deltas
         const textItem = acc.output[event.output_index];
         if (textItem && textItem.content && textItem.content[event.content_index]) {
           if (!textItem.content[event.content_index].text) {
-            textItem.content[event.content_index].text = "";
+            textItem.content[event.content_index].text = '';
           }
           textItem.content[event.content_index].text += event.delta;
         }
         break;
 
-      case "response.function_call_arguments.delta":
+      case 'response.function_call_arguments.delta':
         // Accumulate function call arguments
         const fcItem = acc.output[event.output_index];
-        if (fcItem && fcItem.type === "function_call") {
+        if (fcItem && fcItem.type === 'function_call') {
           if (!fcItem.arguments) {
-            fcItem.arguments = "";
+            fcItem.arguments = '';
           }
           fcItem.arguments += event.delta;
         }
         break;
 
-      case "response.output_item.done":
+      case 'response.output_item.done':
         // Finalize output item
         if (event.item && event.output_index !== undefined) {
           acc.output[event.output_index] = { ...event.item };
         }
         break;
 
-      case "response.completed":
+      case 'response.completed':
         // Final response state
         if (event.response) {
           Object.assign(acc, event.response);

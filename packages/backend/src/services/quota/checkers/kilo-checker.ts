@@ -13,7 +13,8 @@ export class KiloQuotaChecker extends QuotaChecker {
   constructor(config: QuotaCheckerConfig) {
     super(config);
     this.endpoint = this.getOption<string>('endpoint', 'https://api.kilo.ai/api/profile/balance');
-    this.organizationId = this.getOption<string | undefined>('organizationId', undefined)?.trim() || undefined;
+    this.organizationId =
+      this.getOption<string | undefined>('organizationId', undefined)?.trim() || undefined;
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {

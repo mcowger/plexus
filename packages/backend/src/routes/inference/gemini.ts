@@ -10,116 +10,125 @@ import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware, recordQuotaUsage } from '../../services/quota/quota-middleware';
 
-export async function registerGeminiRoute(fastify: FastifyInstance, dispatcher: Dispatcher, usageStorage: UsageStorageService, quotaEnforcer?: QuotaEnforcer) {
-    /**
-     * POST /v1beta/models/:modelWithAction
-     * Gemini Compatible Endpoint.
-     * Supports both unary and streamGenerateContent actions.
-     */
-    fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
-        const requestId = crypto.randomUUID();
-        const startTime = Date.now();
-        let usageRecord: Partial<UsageRecord> = {
-            requestId,
-            date: new Date().toISOString(),
-            sourceIp: getClientIp(request),
-            incomingApiType: 'gemini',
-            startTime,
-            isStreamed: false,
-            responseStatus: 'pending'
+export async function registerGeminiRoute(
+  fastify: FastifyInstance,
+  dispatcher: Dispatcher,
+  usageStorage: UsageStorageService,
+  quotaEnforcer?: QuotaEnforcer
+) {
+  /**
+   * POST /v1beta/models/:modelWithAction
+   * Gemini Compatible Endpoint.
+   * Supports both unary and streamGenerateContent actions.
+   */
+  fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    let usageRecord: Partial<UsageRecord> = {
+      requestId,
+      date: new Date().toISOString(),
+      sourceIp: getClientIp(request),
+      incomingApiType: 'gemini',
+      startTime,
+      isStreamed: false,
+      responseStatus: 'pending',
+    };
+
+    try {
+      const body = request.body as any;
+      const params = request.params as any;
+      const modelWithAction = params.modelWithAction;
+      const modelName = modelWithAction.split(':')[0];
+      usageRecord.incomingModelAlias = modelName;
+
+      const query = request.query as any;
+      // Use the key name identified by the auth middleware, not the raw secret
+      usageRecord.apiKey = (request as any).keyName;
+      // Capture attribution if provided in the API key
+      usageRecord.attribution = (request as any).attribution || null;
+
+      logger.silly('Incoming Gemini Request', body);
+      const transformer = new GeminiTransformer();
+      const unifiedRequest = await transformer.parseRequest({ ...body, model: modelName });
+      unifiedRequest.incomingApiType = 'gemini';
+      unifiedRequest.originalBody = body;
+      unifiedRequest.requestId = requestId;
+      const xAppHeader = Array.isArray(request.headers['x-app'])
+        ? request.headers['x-app'][0]
+        : request.headers['x-app'];
+      if (typeof xAppHeader === 'string' && xAppHeader.trim()) {
+        unifiedRequest.metadata = {
+          ...(unifiedRequest.metadata || {}),
+          clientHeaders: {
+            'x-app': xAppHeader,
+          },
         };
+      }
 
-        try {
-            const body = request.body as any;
-            const params = request.params as any;
-            const modelWithAction = params.modelWithAction;
-            const modelName = modelWithAction.split(':')[0];
-            usageRecord.incomingModelAlias = modelName;
-            
-            const query = request.query as any;
-            // Use the key name identified by the auth middleware, not the raw secret
-            usageRecord.apiKey = (request as any).keyName;
-            // Capture attribution if provided in the API key
-            usageRecord.attribution = (request as any).attribution || null;
+      DebugManager.getInstance().startLog(requestId, body);
 
-            logger.silly('Incoming Gemini Request', body);
-            const transformer = new GeminiTransformer();
-            const unifiedRequest = await transformer.parseRequest({ ...body, model: modelName });
-            unifiedRequest.incomingApiType = 'gemini';
-            unifiedRequest.originalBody = body;
-            unifiedRequest.requestId = requestId;
-            const xAppHeader = Array.isArray(request.headers['x-app'])
-                ? request.headers['x-app'][0]
-                : request.headers['x-app'];
-            if (typeof xAppHeader === 'string' && xAppHeader.trim()) {
-                unifiedRequest.metadata = {
-                    ...(unifiedRequest.metadata || {}),
-                    clientHeaders: {
-                        'x-app': xAppHeader
-                    }
-                };
-            }
+      // Check quota before processing
+      if (quotaEnforcer) {
+        const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+        if (!allowed) return;
+      }
 
-            DebugManager.getInstance().startLog(requestId, body);
+      if (modelWithAction.includes('streamGenerateContent')) {
+        unifiedRequest.stream = true;
+      }
 
-            // Check quota before processing
-            if (quotaEnforcer) {
-                const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-                if (!allowed) return;
-            }
+      const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
 
-            if (modelWithAction.includes('streamGenerateContent')) {
-                unifiedRequest.stream = true;
-            }
+      // Determine if token estimation is needed
+      const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
 
-            const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+      // Capture request metadata
+      usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
+      usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
+      // Gemini doesn't have a direct parallel tool calls setting like OpenAI
+      usageRecord.parallelToolCallsEnabled = null;
 
-            // Determine if token estimation is needed
-            const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
+      const result = await handleResponse(
+        request,
+        reply,
+        unifiedResponse,
+        transformer,
+        usageRecord,
+        usageStorage,
+        startTime,
+        'gemini',
+        shouldEstimateTokens,
+        body
+      );
 
-            // Capture request metadata
-            usageRecord.toolsDefined = unifiedRequest.tools?.length ?? 0;
-            usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
-            // Gemini doesn't have a direct parallel tool calls setting like OpenAI
-            usageRecord.parallelToolCallsEnabled = null;
+      // Record quota usage after request completes
+      if (quotaEnforcer) {
+        await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
+      }
 
-            const result = await handleResponse(
-                request,
-                reply,
-                unifiedResponse,
-                transformer,
-                usageRecord,
-                usageStorage,
-                startTime,
-                'gemini',
-                shouldEstimateTokens,
-                body
-            );
+      return result;
+    } catch (e: any) {
+      usageRecord.responseStatus = 'error';
+      usageRecord.durationMs = Date.now() - startTime;
+      usageStorage.saveRequest(usageRecord as UsageRecord);
 
-            // Record quota usage after request completes
-            if (quotaEnforcer) {
-                await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
-            }
+      // Extract routing context if available from enriched error
+      const errorDetails = {
+        apiType: 'gemini',
+        ...(e.routingContext || {}),
+      };
 
-            return result;
-        } catch (e: any) {
-            usageRecord.responseStatus = 'error';
-            usageRecord.durationMs = Date.now() - startTime;
-            usageStorage.saveRequest(usageRecord as UsageRecord);
+      usageStorage.saveError(requestId, e, errorDetails);
 
-            // Extract routing context if available from enriched error
-            const errorDetails = {
-                apiType: 'gemini',
-                ...(e.routingContext || {})
-            };
-
-            usageStorage.saveError(requestId, e, errorDetails);
-
-            logger.error('Error processing Gemini request', e);
-            const statusCode = e.routingContext?.statusCode || 500;
-            return reply
-                .code(statusCode)
-                .send({ error: { message: e.message, code: statusCode, status: statusCode === 401 ? "UNAUTHENTICATED" : "INTERNAL" } });
-        }
-    });
+      logger.error('Error processing Gemini request', e);
+      const statusCode = e.routingContext?.statusCode || 500;
+      return reply.code(statusCode).send({
+        error: {
+          message: e.message,
+          code: statusCode,
+          status: statusCode === 401 ? 'UNAUTHENTICATED' : 'INTERNAL',
+        },
+      });
+    }
+  });
 }

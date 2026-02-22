@@ -10,7 +10,7 @@
         "attachment": true,
         "reasoning": false,
         "tool_call": true,
-      "temperature": true,
+        "temperature": true,
         "modalities": {
           "input": ["text", "image", "pdf"],
           "output": ["text"]
@@ -25,7 +25,7 @@
         "limit": {
           "context": 200000,
           "output": 8192
-      }
+        }
       },
       "claude-opus-4-20250514": {
         "id": "claude-opus-4-20250514",
@@ -33,7 +33,7 @@
         "family": "claude-opus",
         "attachment": true,
         "reasoning": true,
-     "tool_call": true,
+        "tool_call": true,
         "temperature": true,
         "modalities": {
           "input": ["text", "image"],
@@ -49,7 +49,7 @@
         "limit": {
           "context": 200000,
           "output": 32000
-      }
+        }
       }
     }
   },
@@ -58,21 +58,21 @@
     "name": "OpenAI",
     "models": {
       "gpt-4.1-nano": {
-     "id": "gpt-4.1-nano",
+        "id": "gpt-4.1-nano",
         "name": "GPT-4.1 Nano",
         "family": "gpt-nano",
         "attachment": true,
         "reasoning": false,
         "tool_call": true,
         "temperature": true,
-     "modalities": {
-      "input": ["text", "image"],
+        "modalities": {
+          "input": ["text", "image"],
           "output": ["text"]
         },
         "open_weights": false,
         "cost": {
           "input": 0.1,
-        "output": 0.4
+          "output": 0.4
         },
         "limit": {
           "context": 1000000,

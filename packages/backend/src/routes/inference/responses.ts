@@ -40,7 +40,7 @@ export async function registerResponsesRoute(
       incomingApiType: 'responses',
       startTime,
       isStreamed: false,
-      responseStatus: 'pending'
+      responseStatus: 'pending',
     };
 
     try {
@@ -50,9 +50,9 @@ export async function registerResponsesRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       logger.silly('Incoming Responses API Request', body);
-      
+
       const transformer = new ResponsesTransformer();
-      
+
       // Check for previous_response_id and load context
       if (body.previous_response_id) {
         const previousResponse = await responsesStorage.getResponse(body.previous_response_id);
@@ -62,27 +62,30 @@ export async function registerResponsesRoute(
               message: `Previous response not found: ${body.previous_response_id}`,
               type: 'invalid_request_error',
               code: 'response_not_found',
-              param: 'previous_response_id'
-            }
+              param: 'previous_response_id',
+            },
           });
         }
 
         // Prepend previous output items to input
         const previousItems = JSON.parse(previousResponse.outputItems);
-        const currentInput = Array.isArray(body.input) ? body.input : [{
-          type: 'message',
-          role: 'user',
-          content: [{ type: 'input_text', text: body.input }]
-        }];
+        const currentInput = Array.isArray(body.input)
+          ? body.input
+          : [
+              {
+                type: 'message',
+                role: 'user',
+                content: [{ type: 'input_text', text: body.input }],
+              },
+            ];
         body.input = [...previousItems, ...currentInput];
       }
 
       // Check for conversation and load context
       if (body.conversation) {
-        const conversationId = typeof body.conversation === 'string' 
-          ? body.conversation 
-          : body.conversation.id;
-        
+        const conversationId =
+          typeof body.conversation === 'string' ? body.conversation : body.conversation.id;
+
         const conversation = await responsesStorage.getConversation(conversationId);
         if (!conversation) {
           return reply.code(404).send({
@@ -90,18 +93,22 @@ export async function registerResponsesRoute(
               message: `Conversation not found: ${conversationId}`,
               type: 'invalid_request_error',
               code: 'conversation_not_found',
-              param: 'conversation'
-            }
+              param: 'conversation',
+            },
           });
         }
 
         // Prepend conversation items to input
         const conversationItems = JSON.parse(conversation.items);
-        const currentInput = Array.isArray(body.input) ? body.input : [{
-          type: 'message',
-          role: 'user',
-          content: [{ type: 'input_text', text: body.input }]
-        }];
+        const currentInput = Array.isArray(body.input)
+          ? body.input
+          : [
+              {
+                type: 'message',
+                role: 'user',
+                content: [{ type: 'input_text', text: body.input }],
+              },
+            ];
         body.input = [...conversationItems, ...currentInput];
       }
 
@@ -116,8 +123,8 @@ export async function registerResponsesRoute(
         unifiedRequest.metadata = {
           ...(unifiedRequest.metadata || {}),
           clientHeaders: {
-            'x-app': xAppHeader
-          }
+            'x-app': xAppHeader,
+          },
         };
       }
 
@@ -130,10 +137,10 @@ export async function registerResponsesRoute(
       }
 
       const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
-      
+
       // Determine if token estimation is needed
       const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;
-      
+
       // Capture request metadata
       usageRecord.toolsDefined = body.tools?.length ?? 0;
       // Count messages from the parsed request (normalized from input items)
@@ -166,9 +173,8 @@ export async function registerResponsesRoute(
 
         // Update conversation if specified
         if (body.conversation) {
-          const conversationId = typeof body.conversation === 'string'
-            ? body.conversation
-            : body.conversation.id;
+          const conversationId =
+            typeof body.conversation === 'string' ? body.conversation : body.conversation.id;
 
           await responsesStorage.updateConversation(
             conversationId,
@@ -186,13 +192,13 @@ export async function registerResponsesRoute(
 
       const errorDetails = {
         apiType: 'responses',
-        ...(e.routingContext || {})
+        ...(e.routingContext || {}),
       };
 
       usageStorage.saveError(requestId, e, errorDetails);
 
       logger.error('Error processing Responses API request', e);
-      
+
       const statusCode = e.routingContext?.statusCode || 500;
       return reply.code(statusCode).send({
         error: {
@@ -202,10 +208,10 @@ export async function registerResponsesRoute(
             routing_context: {
               provider: e.routingContext.provider,
               target_model: e.routingContext.targetModel,
-              target_api_type: e.routingContext.targetApiType
-            }
-          })
-        }
+              target_api_type: e.routingContext.targetApiType,
+            },
+          }),
+        },
       });
     }
   });
@@ -214,95 +220,104 @@ export async function registerResponsesRoute(
    * GET /v1/responses/:response_id
    * Retrieves a stored response
    */
-  fastify.get('/v1/responses/:response_id', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { response_id } = request.params as { response_id: string };
+  fastify.get(
+    '/v1/responses/:response_id',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { response_id } = request.params as { response_id: string };
 
-    try {
-      const response = await responsesStorage.getResponse(response_id);
-      
-      if (!response) {
-        return reply.code(404).send({
+      try {
+        const response = await responsesStorage.getResponse(response_id);
+
+        if (!response) {
+          return reply.code(404).send({
+            error: {
+              message: `Response not found: ${response_id}`,
+              type: 'invalid_request_error',
+              code: 'response_not_found',
+            },
+          });
+        }
+
+        return reply.send(responsesStorage.formatStoredResponse(response));
+      } catch (error: any) {
+        logger.error(`Error retrieving response ${response_id}:`, error);
+        return reply.code(500).send({
           error: {
-            message: `Response not found: ${response_id}`,
-            type: 'invalid_request_error',
-            code: 'response_not_found'
-          }
+            message: 'Internal server error',
+            type: 'server_error',
+          },
         });
       }
-
-      return reply.send(responsesStorage.formatStoredResponse(response));
-    } catch (error: any) {
-      logger.error(`Error retrieving response ${response_id}:`, error);
-      return reply.code(500).send({
-        error: {
-          message: 'Internal server error',
-          type: 'server_error'
-        }
-      });
     }
-  });
+  );
 
   /**
    * DELETE /v1/responses/:response_id
    * Deletes a stored response
    */
-  fastify.delete('/v1/responses/:response_id', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { response_id } = request.params as { response_id: string };
+  fastify.delete(
+    '/v1/responses/:response_id',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { response_id } = request.params as { response_id: string };
 
-    try {
-      const deleted = await responsesStorage.deleteResponse(response_id);
-      
-      if (!deleted) {
-        return reply.code(404).send({
+      try {
+        const deleted = await responsesStorage.deleteResponse(response_id);
+
+        if (!deleted) {
+          return reply.code(404).send({
+            error: {
+              message: `Response not found: ${response_id}`,
+              type: 'invalid_request_error',
+              code: 'response_not_found',
+            },
+          });
+        }
+
+        return reply.send({ deleted: true, id: response_id });
+      } catch (error: any) {
+        logger.error(`Error deleting response ${response_id}:`, error);
+        return reply.code(500).send({
           error: {
-            message: `Response not found: ${response_id}`,
-            type: 'invalid_request_error',
-            code: 'response_not_found'
-          }
+            message: 'Internal server error',
+            type: 'server_error',
+          },
         });
       }
-
-      return reply.send({ deleted: true, id: response_id });
-    } catch (error: any) {
-      logger.error(`Error deleting response ${response_id}:`, error);
-      return reply.code(500).send({
-        error: {
-          message: 'Internal server error',
-          type: 'server_error'
-        }
-      });
     }
-  });
+  );
 
   /**
    * GET /v1/conversations/:conversation_id
    * Retrieves a conversation
    */
-  fastify.get('/v1/conversations/:conversation_id', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { conversation_id } = request.params as { conversation_id: string };
+  fastify.get(
+    '/v1/conversations/:conversation_id',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { conversation_id } = request.params as { conversation_id: string };
 
-    try {
-      const conversation = await responsesStorage.getConversation(conversation_id);
-      
-      if (!conversation) {
-        return reply.code(404).send({
+      try {
+        const conversation = await responsesStorage.getConversation(conversation_id);
+
+        if (!conversation) {
+          return reply.code(404).send({
+            error: {
+              message: `Conversation not found: ${conversation_id}`,
+              type: 'invalid_request_error',
+              code: 'conversation_not_found',
+            },
+          });
+        }
+
+        return reply.send(responsesStorage.formatStoredConversation(conversation));
+      } catch (error: any) {
+        logger.error(`Error retrieving conversation ${conversation_id}:`, error);
+        return reply.code(500).send({
           error: {
-            message: `Conversation not found: ${conversation_id}`,
-            type: 'invalid_request_error',
-            code: 'conversation_not_found'
-          }
+            message: 'Internal server error',
+            type: 'server_error',
+          },
         });
       }
-
-      return reply.send(responsesStorage.formatStoredConversation(conversation));
-    } catch (error: any) {
-      logger.error(`Error retrieving conversation ${conversation_id}:`, error);
-      return reply.code(500).send({
-        error: {
-          message: 'Internal server error',
-          type: 'server_error'
-        }
-      });
     }
-  });
+  );
 }

@@ -1,5 +1,5 @@
-import { Part } from "@google/genai";
-import { MessageContent } from "../../types/unified";
+import { Part } from '@google/genai';
+import { MessageContent } from '../../types/unified';
 
 /**
  * Converts Gemini Part objects to unified MessageContent format.
@@ -23,11 +23,11 @@ export function convertGeminiPartsToUnified(
         // @ts-ignore
         onThinking(part.text, part.thoughtSignature);
       } else {
-        contentParts.push({ type: "text", text: part.text });
+        contentParts.push({ type: 'text', text: part.text });
       }
     } else if (part.inlineData) {
       contentParts.push({
-        type: "image_url",
+        type: 'image_url',
         image_url: {
           url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
         },
@@ -35,9 +35,9 @@ export function convertGeminiPartsToUnified(
       });
     } else if (part.fileData) {
       contentParts.push({
-        type: "image_url",
+        type: 'image_url',
         image_url: {
-          url: part.fileData.fileUri || "",
+          url: part.fileData.fileUri || '',
         },
         media_type: part.fileData.mimeType,
       });
@@ -53,22 +53,22 @@ export function convertGeminiPartsToUnified(
 export function convertUnifiedPartsToGemini(content: string | MessageContent[]): Part[] {
   const parts: Part[] = [];
 
-  if (typeof content === "string") {
+  if (typeof content === 'string') {
     parts.push({ text: content });
   } else if (Array.isArray(content)) {
     content.forEach((c) => {
-      if (c.type === "text") {
+      if (c.type === 'text') {
         parts.push({ text: c.text });
-      } else if (c.type === "image_url") {
-        if (c.image_url.url.startsWith("data:")) {
-          const [meta, data] = c.image_url.url.split(",");
+      } else if (c.type === 'image_url') {
+        if (c.image_url.url.startsWith('data:')) {
+          const [meta, data] = c.image_url.url.split(',');
           parts.push({
-            inlineData: { mimeType: "image/jpeg", data: data || "" },
+            inlineData: { mimeType: 'image/jpeg', data: data || '' },
           });
         } else {
           parts.push({
             fileData: {
-              mimeType: c.media_type || "image/jpeg",
+              mimeType: c.media_type || 'image/jpeg',
               fileUri: c.image_url.url,
             },
           });

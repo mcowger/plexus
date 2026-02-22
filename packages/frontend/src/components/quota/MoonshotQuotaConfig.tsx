@@ -6,10 +6,7 @@ export interface MoonshotQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const MoonshotQuotaConfig: React.FC<MoonshotQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const MoonshotQuotaConfig: React.FC<MoonshotQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };

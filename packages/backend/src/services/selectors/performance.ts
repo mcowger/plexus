@@ -27,9 +27,9 @@ export class PerformanceSelector extends Selector {
     // If no performance data exists, we might want to fall back to random or first.
     // For now, let's assume we want to pick the one with highest known performance.
     // If no data for any, we pick random (or first).
-    
+
     // We need to query for each target.
-    // Optimization: we could query all performance stats and filter in memory, 
+    // Optimization: we could query all performance stats and filter in memory,
     // but getProviderPerformance allows filtering by provider/model.
     // Given targets usually small (2-5), individual queries are fine.
 
@@ -37,7 +37,7 @@ export class PerformanceSelector extends Selector {
 
     for (const target of targets) {
       const stats = await this.storage.getProviderPerformance(target.provider, target.model);
-      
+
       let avgTps = 0;
       if (stats && stats.length > 0) {
         // stats[0] contains the aggregated data for this provider/model
@@ -51,25 +51,30 @@ export class PerformanceSelector extends Selector {
     candidates.sort((a, b) => b.tps - a.tps);
 
     if (candidates.length > 0) {
-        const best = candidates[0];
-        if (best) {
-            // If the best has 0 TPS (no data), and others also have 0, 
-            // strictly speaking they are equal. The sort is stable or undefined for equals.
-            // We pick the top one.
+      const best = candidates[0];
+      if (best) {
+        // If the best has 0 TPS (no data), and others also have 0,
+        // strictly speaking they are equal. The sort is stable or undefined for equals.
+        // We pick the top one.
 
-            // Check if we should explore a different provider (randomly choose from non-best targets)
-            if (explorationRate > 0 && Math.random() < explorationRate && candidates.length > 1) {
-                const nonBestCandidates = candidates.slice(1);
-                const randomChoice = nonBestCandidates[Math.floor(Math.random() * nonBestCandidates.length)];
-                if (randomChoice) {
-                    logger.debug(`PerformanceSelector: Exploring - selected ${randomChoice.target.provider}/${randomChoice.target.model} with ${randomChoice.tps.toFixed(2)} TPS (instead of ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS)`);
-                    return randomChoice.target;
-                }
-            }
-
-            logger.debug(`PerformanceSelector: Selected ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS`);
-            return best.target;
+        // Check if we should explore a different provider (randomly choose from non-best targets)
+        if (explorationRate > 0 && Math.random() < explorationRate && candidates.length > 1) {
+          const nonBestCandidates = candidates.slice(1);
+          const randomChoice =
+            nonBestCandidates[Math.floor(Math.random() * nonBestCandidates.length)];
+          if (randomChoice) {
+            logger.debug(
+              `PerformanceSelector: Exploring - selected ${randomChoice.target.provider}/${randomChoice.target.model} with ${randomChoice.tps.toFixed(2)} TPS (instead of ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS)`
+            );
+            return randomChoice.target;
+          }
         }
+
+        logger.debug(
+          `PerformanceSelector: Selected ${best.target.provider}/${best.target.model} with ${best.tps.toFixed(2)} TPS`
+        );
+        return best.target;
+      }
     }
 
     return targets[0] ?? null;

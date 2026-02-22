@@ -24,7 +24,10 @@ export class MiniMaxCodingQuotaChecker extends QuotaChecker {
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://www.minimax.io/v1/api/openplatform/coding_plan/remains');
+    this.endpoint = this.getOption<string>(
+      'endpoint',
+      'https://www.minimax.io/v1/api/openplatform/coding_plan/remains'
+    );
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {
@@ -36,7 +39,7 @@ export class MiniMaxCodingQuotaChecker extends QuotaChecker {
       const response = await fetch(this.endpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
       });
@@ -48,12 +51,14 @@ export class MiniMaxCodingQuotaChecker extends QuotaChecker {
       const data: MiniMaxCodingResponse = await response.json();
 
       if (data.base_resp?.status_code !== 0) {
-        return this.errorResult(new Error(`MiniMax API error: ${data.base_resp?.status_msg || 'unknown error'}`));
+        return this.errorResult(
+          new Error(`MiniMax API error: ${data.base_resp?.status_msg || 'unknown error'}`)
+        );
       }
 
       // All models share the same quota pool - use first entry
       const firstModel = data.model_remains[0];
-    if (!firstModel) {
+      if (!firstModel) {
         return this.successResult([]);
       }
 

@@ -6,7 +6,10 @@ import * as sqliteSchema from '../drizzle/schema/sqlite';
 import { eq } from 'drizzle-orm';
 
 // Test configuration
-const createTestConfig = (userQuotas: Record<string, any> = {}, keys: Record<string, any> = {}): PlexusConfig => ({
+const createTestConfig = (
+  userQuotas: Record<string, any> = {},
+  keys: Record<string, any> = {}
+): PlexusConfig => ({
   providers: {},
   models: {},
   keys,
@@ -28,10 +31,10 @@ describe('QuotaEnforcer', () => {
     // Reset database state
     db = getDatabase();
     await db.delete(sqliteSchema.quotaState);
-    
+
     // Reset config
     setConfigForTesting(createTestConfig());
-    
+
     // Create fresh QuotaEnforcer instance
     quotaEnforcer = new QuotaEnforcer();
   });
@@ -43,10 +46,9 @@ describe('QuotaEnforcer', () => {
 
   describe('checkQuota', () => {
     test('should return null when key has no quota assigned', async () => {
-      setConfigForTesting(createTestConfig(
-        {},
-        { test_key: { secret: 'sk-test', quota: undefined } }
-      ));
+      setConfigForTesting(
+        createTestConfig({}, { test_key: { secret: 'sk-test', quota: undefined } })
+      );
 
       const result = await quotaEnforcer.checkQuota('test_key');
       expect(result).toBeNull();
@@ -58,17 +60,19 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should allow request when rolling quota is under limit', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_rolling: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_rolling: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_rolling' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_rolling' } }
+        )
+      );
 
       const result = await quotaEnforcer.checkQuota('test_key');
       expect(result).not.toBeNull();
@@ -81,17 +85,19 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should deny request when rolling quota is exceeded', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_rolling: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 100,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_rolling: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 100,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_rolling' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_rolling' } }
+        )
+      );
 
       // Record usage that exceeds limit
       await quotaEnforcer.recordUsage('test_key', {
@@ -106,17 +112,19 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should calculate leak correctly for rolling quotas', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_rolling: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_rolling: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_rolling' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_rolling' } }
+        )
+      );
 
       // Record initial usage
       await quotaEnforcer.recordUsage('test_key', {
@@ -132,16 +140,18 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should reset daily quota at UTC midnight', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_daily: {
-            type: 'daily',
-            limitType: 'requests',
-            limit: 100,
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_daily: {
+              type: 'daily',
+              limitType: 'requests',
+              limit: 100,
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_daily' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_daily' } }
+        )
+      );
 
       // Record usage
       await quotaEnforcer.recordUsage('test_key', { tokensInput: 1, tokensOutput: 0 });
@@ -149,47 +159,53 @@ describe('QuotaEnforcer', () => {
       const result = await quotaEnforcer.checkQuota('test_key');
       expect(result).not.toBeNull();
       expect(result!.resetsAt).not.toBeNull();
-      
+
       // Check that resetsAt is at or after midnight UTC
       const now = new Date();
-      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+      const tomorrow = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+      );
       tomorrow.setUTCHours(0, 0, 0, 0);
-      
+
       expect(result!.resetsAt!.getTime()).toBeGreaterThanOrEqual(tomorrow.getTime());
     });
 
     test('should reset weekly quota at UTC Sunday midnight', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_weekly: {
-            type: 'weekly',
-            limitType: 'requests',
-            limit: 1000,
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_weekly: {
+              type: 'weekly',
+              limitType: 'requests',
+              limit: 1000,
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_weekly' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_weekly' } }
+        )
+      );
 
       const result = await quotaEnforcer.checkQuota('test_key');
       expect(result).not.toBeNull();
       expect(result!.resetsAt).not.toBeNull();
-      
+
       // Check that resetsAt is a Sunday
       expect(result!.resetsAt!.getUTCDay()).toBe(0); // Sunday = 0
     });
 
     test('should handle request-based quotas correctly', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_requests: {
-            type: 'rolling',
-            limitType: 'requests',
-            limit: 10,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_requests: {
+              type: 'rolling',
+              limitType: 'requests',
+              limit: 10,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_requests' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_requests' } }
+        )
+      );
 
       // Make 5 requests
       for (let i = 0; i < 5; i++) {
@@ -205,17 +221,19 @@ describe('QuotaEnforcer', () => {
 
   describe('recordUsage', () => {
     test('should record token usage correctly', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       await quotaEnforcer.recordUsage('test_key', {
         tokensInput: 100,
@@ -229,10 +247,7 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should not record usage for key without quota', async () => {
-      setConfigForTesting(createTestConfig(
-        {},
-        { test_key: { secret: 'sk-test' } }
-      ));
+      setConfigForTesting(createTestConfig({}, { test_key: { secret: 'sk-test' } }));
 
       await quotaEnforcer.recordUsage('test_key', {
         tokensInput: 100,
@@ -244,17 +259,19 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should accumulate usage across multiple calls', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       await quotaEnforcer.recordUsage('test_key', { tokensInput: 100 });
       await quotaEnforcer.recordUsage('test_key', { tokensInput: 200 });
@@ -267,17 +284,19 @@ describe('QuotaEnforcer', () => {
 
   describe('clearQuota', () => {
     test('should reset quota usage to zero', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // Record some usage
       await quotaEnforcer.recordUsage('test_key', { tokensInput: 5000 });
@@ -295,27 +314,28 @@ describe('QuotaEnforcer', () => {
 
   describe('edge cases', () => {
     test('should handle missing quota definition gracefully', async () => {
-      setConfigForTesting(createTestConfig(
-        {},
-        { test_key: { secret: 'sk-test', quota: 'nonexistent_quota' } }
-      ));
+      setConfigForTesting(
+        createTestConfig({}, { test_key: { secret: 'sk-test', quota: 'nonexistent_quota' } })
+      );
 
       const result = await quotaEnforcer.checkQuota('test_key');
       expect(result).toBeNull();
     });
 
     test('should handle null/undefined token values', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       await quotaEnforcer.recordUsage('test_key', {
         tokensInput: null as any,
@@ -327,24 +347,28 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should handle concurrent quota checks gracefully', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'requests',
-            limit: 100,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'requests',
+              limit: 100,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // Simulate concurrent checks
-      const promises = Array(10).fill(null).map(() => quotaEnforcer.checkQuota('test_key'));
+      const promises = Array(10)
+        .fill(null)
+        .map(() => quotaEnforcer.checkQuota('test_key'));
       const results = await Promise.all(promises);
 
       // All should succeed and return valid results
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).not.toBeNull();
         expect(result!.allowed).toBe(true);
       });
@@ -352,17 +376,19 @@ describe('QuotaEnforcer', () => {
 
     test('should reset usage when quota type changes from requests to tokens', async () => {
       // Start with requests quota
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'requests',
-            limit: 10,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'requests',
+              limit: 10,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // Make 5 requests
       for (let i = 0; i < 5; i++) {
@@ -374,17 +400,19 @@ describe('QuotaEnforcer', () => {
       expect(result!.limitType).toBe('requests');
 
       // Change quota to tokens with limit of 1000
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 1000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 1000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // Create new enforcer to pick up new config
       quotaEnforcer = new QuotaEnforcer();
@@ -404,17 +432,19 @@ describe('QuotaEnforcer', () => {
 
     test('should reset usage when quota type changes from tokens to requests', async () => {
       // Start with tokens quota
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // Use 5000 tokens
       await quotaEnforcer.recordUsage('test_key', { tokensInput: 3000, tokensOutput: 2000 });
@@ -424,17 +454,19 @@ describe('QuotaEnforcer', () => {
       expect(result!.limitType).toBe('tokens');
 
       // Change quota to requests
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'requests',
-            limit: 100,
-            duration: '1h',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'requests',
+              limit: 100,
+              duration: '1h',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // Create new enforcer to pick up new config
       quotaEnforcer = new QuotaEnforcer();
@@ -447,17 +479,19 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should handle invalid duration gracefully', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: 'invalid_duration_string',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: 'invalid_duration_string',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // First check works (no existing state, no leak calc needed yet)
       let result = await quotaEnforcer.checkQuota('test_key');
@@ -474,17 +508,19 @@ describe('QuotaEnforcer', () => {
     });
 
     test('should handle empty duration string', async () => {
-      setConfigForTesting(createTestConfig(
-        {
-          test_quota: {
-            type: 'rolling',
-            limitType: 'tokens',
-            limit: 10000,
-            duration: '',
+      setConfigForTesting(
+        createTestConfig(
+          {
+            test_quota: {
+              type: 'rolling',
+              limitType: 'tokens',
+              limit: 10000,
+              duration: '',
+            },
           },
-        },
-        { test_key: { secret: 'sk-test', quota: 'test_quota' } }
-      ));
+          { test_key: { secret: 'sk-test', quota: 'test_quota' } }
+        )
+      );
 
       // First check works
       let result = await quotaEnforcer.checkQuota('test_key');

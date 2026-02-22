@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
-import { toBoolean, toDbBoolean, toEpochMs, toIsoString, toDbTimestamp, toDbTimestampMs } from '../normalize';
+import {
+  toBoolean,
+  toDbBoolean,
+  toEpochMs,
+  toIsoString,
+  toDbTimestamp,
+  toDbTimestampMs,
+} from '../normalize';
 
 describe('toBoolean', () => {
   test('handles boolean and numeric values', () => {

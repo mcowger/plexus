@@ -77,7 +77,9 @@ describe('MiniMaxQuotaChecker', () => {
   });
 
   it('returns error for non-200 response', async () => {
-    setFetchMock(async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
+    setFetchMock(
+      async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
+    );
 
     const checker = new MiniMaxQuotaChecker(makeConfig());
     const result = await checker.checkQuota();

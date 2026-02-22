@@ -33,19 +33,26 @@ export class ResponsesStorageService {
     }
 
     // Run initial cleanup
-    this.cleanupOldResponses(ttlDays).catch(err => logger.error('Initial response cleanup failed:', err));
+    this.cleanupOldResponses(ttlDays).catch((err) =>
+      logger.error('Initial response cleanup failed:', err)
+    );
 
     // Schedule periodic cleanup
-    this.cleanupInterval = setInterval(async () => {
-      try {
-        const result = await this.cleanupOldResponses(ttlDays);
-        if (result.deletedResponses > 0) {
-          logger.info(`Scheduled cleanup: deleted ${result.deletedResponses} responses, ${result.deletedItems} items, ${result.deletedConversations} conversations`);
+    this.cleanupInterval = setInterval(
+      async () => {
+        try {
+          const result = await this.cleanupOldResponses(ttlDays);
+          if (result.deletedResponses > 0) {
+            logger.info(
+              `Scheduled cleanup: deleted ${result.deletedResponses} responses, ${result.deletedItems} items, ${result.deletedConversations} conversations`
+            );
+          }
+        } catch (err) {
+          logger.error('Scheduled response cleanup failed:', err);
         }
-      } catch (err) {
-        logger.error('Scheduled response cleanup failed:', err);
-      }
-    }, intervalHours * 60 * 60 * 1000);
+      },
+      intervalHours * 60 * 60 * 1000
+    );
 
     logger.info(`Response cleanup job started (every ${intervalHours}h, TTL ${ttlDays} days)`);
   }
@@ -105,13 +112,16 @@ export class ResponsesStorageService {
         usageCachedTokens: response.usage?.input_tokens_details?.cached_tokens || 0,
         usageTotalTokens: response.usage?.total_tokens || 0,
         previousResponseId: request.previous_response_id || null,
-        conversationId: typeof request.conversation === 'string' 
-          ? request.conversation 
-          : request.conversation?.id || null,
+        conversationId:
+          typeof request.conversation === 'string'
+            ? request.conversation
+            : request.conversation?.id || null,
         store: request.store !== false ? 1 : 0,
         background: request.background ? 1 : 0,
         truncation: request.truncation || 'disabled',
-        incompleteDetails: response.incomplete_details ? JSON.stringify(response.incomplete_details) : null,
+        incompleteDetails: response.incomplete_details
+          ? JSON.stringify(response.incomplete_details)
+          : null,
         error: response.error ? JSON.stringify(response.error) : null,
         safetyIdentifier: request.safety_identifier || null,
         serviceTier: request.service_tier || 'auto',
@@ -136,7 +146,7 @@ export class ResponsesStorageService {
               responseId: response.id,
               itemIndex: i,
               itemType: item.type,
-              itemData: JSON.stringify(item)
+              itemData: JSON.stringify(item),
             });
           }
         }
@@ -174,16 +184,14 @@ export class ResponsesStorageService {
   async deleteResponse(responseId: string): Promise<boolean> {
     try {
       const db = this.ensureDb();
-      
+
       // Delete response items first
       await db
         .delete(this.schema.responseItems)
         .where(eq(this.schema.responseItems.responseId, responseId));
 
       // Delete response
-      await db
-        .delete(this.schema.responses)
-        .where(eq(this.schema.responses.id, responseId));
+      await db.delete(this.schema.responses).where(eq(this.schema.responses.id, responseId));
 
       logger.debug(`Deleted response ${responseId}`);
       return true;
@@ -203,7 +211,7 @@ export class ResponsesStorageService {
   ): Promise<void> {
     try {
       const db = this.ensureDb();
-      
+
       // Check if conversation exists
       const existing = await db
         .select()
@@ -222,7 +230,7 @@ export class ResponsesStorageService {
           updatedAt: now,
           items: JSON.stringify(allItems),
           metadata: null,
-          plexusAccountId: null
+          plexusAccountId: null,
         });
         logger.debug(`Created conversation ${conversationId}`);
       } else {
@@ -234,10 +242,10 @@ export class ResponsesStorageService {
           .update(this.schema.conversations)
           .set({
             updatedAt: now,
-            items: JSON.stringify(updatedItems)
+            items: JSON.stringify(updatedItems),
           })
           .where(eq(this.schema.conversations.id, conversationId));
-        
+
         logger.debug(`Updated conversation ${conversationId}`);
       }
     } catch (error) {
@@ -269,11 +277,13 @@ export class ResponsesStorageService {
    * Deletes responses and their associated items/conversations older than TTL
    * Default TTL: 7 days
    */
-  async cleanupOldResponses(ttlDays: number = 7): Promise<{ deletedResponses: number; deletedItems: number; deletedConversations: number }> {
+  async cleanupOldResponses(
+    ttlDays: number = 7
+  ): Promise<{ deletedResponses: number; deletedItems: number; deletedConversations: number }> {
     try {
       const db = this.ensureDb();
       // Convert to Unix timestamp in seconds (createdAt is stored as integer/bigint in seconds)
-      const cutoffTime = Math.floor(Date.now() / 1000) - (ttlDays * 24 * 60 * 60);
+      const cutoffTime = Math.floor(Date.now() / 1000) - ttlDays * 24 * 60 * 60;
 
       // Find old response IDs
       const oldResponses = await db
@@ -281,7 +291,7 @@ export class ResponsesStorageService {
         .from(this.schema.responses)
         .where(lt(this.schema.responses.createdAt, cutoffTime));
 
-      const responseIds = oldResponses.map(r => r.id);
+      const responseIds = oldResponses.map((r) => r.id);
 
       if (responseIds.length === 0) {
         return { deletedResponses: 0, deletedItems: 0, deletedConversations: 0 };
@@ -293,18 +303,19 @@ export class ResponsesStorageService {
         .where(inArray(this.schema.responseItems.responseId, responseIds));
 
       // Delete responses
-      await db
-        .delete(this.schema.responses)
-        .where(inArray(this.schema.responses.id, responseIds));
+      await db.delete(this.schema.responses).where(inArray(this.schema.responses.id, responseIds));
 
       // Find and delete orphaned conversations (no responses referencing them)
       const conversationIdsToDelete = await db
         .select({ id: this.schema.conversations.id })
         .from(this.schema.conversations)
-        .leftJoin(this.schema.responses, eq(this.schema.responses.conversationId, this.schema.conversations.id))
+        .leftJoin(
+          this.schema.responses,
+          eq(this.schema.responses.conversationId, this.schema.conversations.id)
+        )
         .where(sql`${this.schema.responses.id} IS NULL`);
 
-      const orphanedIds = conversationIdsToDelete.map(c => c.id);
+      const orphanedIds = conversationIdsToDelete.map((c) => c.id);
       let deletedConversations = 0;
       if (orphanedIds.length > 0) {
         await db
@@ -313,8 +324,14 @@ export class ResponsesStorageService {
         deletedConversations = orphanedIds.length;
       }
 
-      logger.info(`Cleanup: deleted ${responseIds.length} responses, ${responseIds.length} items, ${deletedConversations} orphaned conversations`);
-      return { deletedResponses: responseIds.length, deletedItems: responseIds.length, deletedConversations };
+      logger.info(
+        `Cleanup: deleted ${responseIds.length} responses, ${responseIds.length} items, ${deletedConversations} orphaned conversations`
+      );
+      return {
+        deletedResponses: responseIds.length,
+        deletedItems: responseIds.length,
+        deletedConversations,
+      };
     } catch (error) {
       logger.error('Error cleaning up old responses:', error);
       throw error;
@@ -346,13 +363,13 @@ export class ResponsesStorageService {
       usage: {
         input_tokens: row.usageInputTokens,
         input_tokens_details: {
-          cached_tokens: row.usageCachedTokens
+          cached_tokens: row.usageCachedTokens,
         },
         output_tokens: row.usageOutputTokens,
         output_tokens_details: {
-          reasoning_tokens: row.usageReasoningTokens
+          reasoning_tokens: row.usageReasoningTokens,
         },
-        total_tokens: row.usageTotalTokens
+        total_tokens: row.usageTotalTokens,
       },
       previous_response_id: row.previousResponseId,
       conversation: row.conversationId ? { id: row.conversationId } : null,
@@ -370,8 +387,8 @@ export class ResponsesStorageService {
         provider: row.plexusProvider,
         model: row.plexusTargetModel,
         apiType: row.plexusApiType,
-        canonicalModel: row.plexusCanonicalModel
-      }
+        canonicalModel: row.plexusCanonicalModel,
+      },
     };
   }
 
@@ -385,7 +402,7 @@ export class ResponsesStorageService {
       created_at: row.createdAt,
       updated_at: row.updatedAt,
       items: JSON.parse(row.items),
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
     };
   }
 }

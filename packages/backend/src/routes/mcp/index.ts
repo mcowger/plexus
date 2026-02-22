@@ -2,20 +2,23 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import bearerAuth from '@fastify/bearer-auth';
 import { createAuthHook } from '../../utils/auth';
 import { logger } from '../../utils/logger';
-import { 
-  getMcpServerConfig, 
-  validateServerName, 
+import {
+  getMcpServerConfig,
+  validateServerName,
   proxyMcpRequest,
   extractJsonRpcMethod,
   extractToolName,
-  redactSensitiveHeaders
+  redactSensitiveHeaders,
 } from '../../services/mcp-proxy/mcp-proxy-service';
 import { getClientIp } from '../../utils/ip';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 
-export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorage: McpUsageStorageService) {
+export async function registerMcpRoutes(
+  fastify: FastifyInstance,
+  mcpUsageStorage: McpUsageStorageService
+) {
   // OAuth 2.0 Discovery endpoints (public, no auth required)
   // These inform clients that we use Bearer token auth, not OAuth flow
   fastify.get('/.well-known/oauth-authorization-server', async (request, reply) => {
@@ -66,250 +69,287 @@ export async function registerMcpRoutes(fastify: FastifyInstance, mcpUsageStorag
 
   fastify.register(async (protectedRoutes) => {
     const auth = createAuthHook();
-    
+
     protectedRoutes.addHook('onRequest', auth.onRequest);
 
     await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
 
     protectedRoutes.addHook('preHandler', async (request, reply) => {
       const serverName = (request.params as any)?.name;
-      
+
       if (!serverName) {
-        return reply.code(400).send({ error: { message: 'Server name is required', type: 'invalid_request' } });
+        return reply
+          .code(400)
+          .send({ error: { message: 'Server name is required', type: 'invalid_request' } });
       }
 
       if (!validateServerName(serverName)) {
-        return reply.code(400).send({ 
-          error: { 
-            message: 'Invalid server name. Must be slug-safe: [a-z0-9][a-z0-9-_]{1,62}', 
-            type: 'invalid_request' 
-          } 
+        return reply.code(400).send({
+          error: {
+            message: 'Invalid server name. Must be slug-safe: [a-z0-9][a-z0-9-_]{1,62}',
+            type: 'invalid_request',
+          },
         });
       }
 
       const serverConfig = getMcpServerConfig(serverName);
-      
+
       if (!serverConfig) {
-        return reply.code(404).send({ error: { message: `MCP server '${serverName}' not found or disabled`, type: 'not_found' } });
+        return reply.code(404).send({
+          error: {
+            message: `MCP server '${serverName}' not found or disabled`,
+            type: 'not_found',
+          },
+        });
       }
     });
 
-    protectedRoutes.post('/mcp/:name', async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
-      const { name: serverName } = request.params;
-      const startTime = Date.now();
-      const requestId = crypto.randomUUID();
-      const method = 'POST';
-      
-      const keyName = (request as any).keyName;
-      const attribution = (request as any).attribution || null;
-      const sourceIp = getClientIp(request);
-      const clientHeaders = redactSensitiveHeaders(request.headers as Record<string, string>);
-      
-      const body = request.body;
-      const jsonrpcMethod = extractJsonRpcMethod(body);
-      const toolName = extractToolName(body);
-      const isStreamed = false;
+    protectedRoutes.post(
+      '/mcp/:name',
+      async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
+        const { name: serverName } = request.params;
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+        const method = 'POST';
 
-      logger.silly(`[mcp] POST /mcp/${serverName} - requestId: ${requestId}`);
-      logger.silly(`[mcp] Request body: ${JSON.stringify(body)?.substring(0, 500)}`);
+        const keyName = (request as any).keyName;
+        const attribution = (request as any).attribution || null;
+        const sourceIp = getClientIp(request);
+        const clientHeaders = redactSensitiveHeaders(request.headers as Record<string, string>);
 
-      const result = await proxyMcpRequest(
-        serverName,
-        method,
-        request.headers as Record<string, string | string[] | undefined>,
-        body
-      );
+        const body = request.body;
+        const jsonrpcMethod = extractJsonRpcMethod(body);
+        const toolName = extractToolName(body);
+        const isStreamed = false;
 
-      logger.silly(`[mcp] Proxy result status: ${result.status}`);
-      logger.silly(`[mcp] Proxy result body: ${JSON.stringify(result.body)?.substring(0, 500)}`);
-      logger.silly(`[mcp] Proxy result error: ${result.error}`);
-      logger.silly(`[mcp] Proxy result headers: ${JSON.stringify(result.headers)}`);
+        logger.silly(`[mcp] POST /mcp/${serverName} - requestId: ${requestId}`);
+        logger.silly(`[mcp] Request body: ${JSON.stringify(body)?.substring(0, 500)}`);
 
-      const durationMs = Date.now() - startTime;
+        const result = await proxyMcpRequest(
+          serverName,
+          method,
+          request.headers as Record<string, string | string[] | undefined>,
+          body
+        );
 
-      await mcpUsageStorage.saveRequest({
-        request_id: requestId,
-        created_at: new Date().toISOString(),
-        start_time: startTime,
-        duration_ms: durationMs,
-        server_name: serverName,
-        upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
-        method,
-        jsonrpc_method: jsonrpcMethod,
-        tool_name: toolName,
-        api_key: keyName,
-        attribution,
-        source_ip: sourceIp,
-        response_status: result.status,
-        is_streamed: isStreamed,
-        has_debug: false,
-        error_code: result.error ? 'PROXY_ERROR' : null,
-        error_message: result.error || null,
-      });
+        logger.silly(`[mcp] Proxy result status: ${result.status}`);
+        logger.silly(`[mcp] Proxy result body: ${JSON.stringify(result.body)?.substring(0, 500)}`);
+        logger.silly(`[mcp] Proxy result error: ${result.error}`);
+        logger.silly(`[mcp] Proxy result headers: ${JSON.stringify(result.headers)}`);
 
-      if (result.error) {
-        if (result.status === 502) {
-          return reply.code(502).send({ error: { message: result.error, type: 'upstream_error' } });
+        const durationMs = Date.now() - startTime;
+
+        await mcpUsageStorage.saveRequest({
+          request_id: requestId,
+          created_at: new Date().toISOString(),
+          start_time: startTime,
+          duration_ms: durationMs,
+          server_name: serverName,
+          upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
+          method,
+          jsonrpc_method: jsonrpcMethod,
+          tool_name: toolName,
+          api_key: keyName,
+          attribution,
+          source_ip: sourceIp,
+          response_status: result.status,
+          is_streamed: isStreamed,
+          has_debug: false,
+          error_code: result.error ? 'PROXY_ERROR' : null,
+          error_message: result.error || null,
+        });
+
+        if (result.error) {
+          if (result.status === 502) {
+            return reply
+              .code(502)
+              .send({ error: { message: result.error, type: 'upstream_error' } });
+          }
+          if (result.status === 504) {
+            return reply
+              .code(504)
+              .send({ error: { message: result.error, type: 'upstream_timeout' } });
+          }
+          return reply
+            .code(result.status)
+            .send({ error: { message: result.error, type: 'proxy_error' } });
         }
-        if (result.status === 504) {
-          return reply.code(504).send({ error: { message: result.error, type: 'upstream_timeout' } });
+
+        for (const [key, value] of Object.entries(result.headers)) {
+          reply.header(key, value);
         }
-        return reply.code(result.status).send({ error: { message: result.error, type: 'proxy_error' } });
-      }
 
-      for (const [key, value] of Object.entries(result.headers)) {
-        reply.header(key, value);
-      }
-
-      if (result.stream) {
-        logger.silly(`[mcp] Sending streaming response`);
-        reply.header('Content-Type', 'text/event-stream');
-        reply.header('Cache-Control', 'no-cache');
-        reply.header('Connection', 'keep-alive');
-        return reply.send(result.stream);
-      }
-
-      if (result.body !== undefined) {
-        return reply.code(result.status).send(result.body);
-      }
-
-      return reply.code(result.status);
-    });
-
-    protectedRoutes.get('/mcp/:name', async (request: FastifyRequest<{ Params: { name: string }, Querystring: Record<string, string> }>, reply: FastifyReply) => {
-      const { name: serverName } = request.params;
-      const query = request.query as Record<string, string>;
-      const startTime = Date.now();
-      const requestId = crypto.randomUUID();
-      const method = 'GET';
-      
-      const keyName = (request as any).keyName;
-      const attribution = (request as any).attribution || null;
-      const sourceIp = getClientIp(request);
-      const clientHeaders = redactSensitiveHeaders(request.headers as Record<string, string>);
-      const isStreamed = true;
-
-      logger.silly(`[mcp] GET /mcp/${serverName} - requestId: ${requestId}`);
-
-      const result = await proxyMcpRequest(
-        serverName,
-        method,
-        request.headers as Record<string, string | string[] | undefined>,
-        undefined,
-        query
-      );
-
-      const durationMs = Date.now() - startTime;
-
-      await mcpUsageStorage.saveRequest({
-        request_id: requestId,
-        created_at: new Date().toISOString(),
-        start_time: startTime,
-        duration_ms: durationMs,
-        server_name: serverName,
-        upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
-        method,
-        jsonrpc_method: null,
-        tool_name: null,
-        api_key: keyName,
-        attribution,
-        source_ip: sourceIp,
-        response_status: result.status,
-        is_streamed: isStreamed,
-        has_debug: false,
-        error_code: result.error ? 'PROXY_ERROR' : null,
-        error_message: result.error || null,
-      });
-
-      if (result.error) {
-        if (result.status === 502) {
-          return reply.code(502).send({ error: { message: result.error, type: 'upstream_error' } });
+        if (result.stream) {
+          logger.silly(`[mcp] Sending streaming response`);
+          reply.header('Content-Type', 'text/event-stream');
+          reply.header('Cache-Control', 'no-cache');
+          reply.header('Connection', 'keep-alive');
+          return reply.send(result.stream);
         }
-        if (result.status === 504) {
-          return reply.code(504).send({ error: { message: result.error, type: 'upstream_timeout' } });
+
+        if (result.body !== undefined) {
+          return reply.code(result.status).send(result.body);
         }
-        return reply.code(result.status).send({ error: { message: result.error, type: 'proxy_error' } });
+
+        return reply.code(result.status);
       }
+    );
 
-      for (const [key, value] of Object.entries(result.headers)) {
-        reply.header(key, value);
-      }
+    protectedRoutes.get(
+      '/mcp/:name',
+      async (
+        request: FastifyRequest<{ Params: { name: string }; Querystring: Record<string, string> }>,
+        reply: FastifyReply
+      ) => {
+        const { name: serverName } = request.params;
+        const query = request.query as Record<string, string>;
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+        const method = 'GET';
 
-      if (result.stream) {
-        reply.header('Content-Type', 'text/event-stream');
-        reply.header('Cache-Control', 'no-cache');
-        reply.header('Connection', 'keep-alive');
-        return reply.send(result.stream);
-      }
+        const keyName = (request as any).keyName;
+        const attribution = (request as any).attribution || null;
+        const sourceIp = getClientIp(request);
+        const clientHeaders = redactSensitiveHeaders(request.headers as Record<string, string>);
+        const isStreamed = true;
 
-      if (result.body !== undefined) {
-        return reply.code(result.status).send(result.body);
-      }
+        logger.silly(`[mcp] GET /mcp/${serverName} - requestId: ${requestId}`);
 
-      return reply.code(result.status);
-    });
+        const result = await proxyMcpRequest(
+          serverName,
+          method,
+          request.headers as Record<string, string | string[] | undefined>,
+          undefined,
+          query
+        );
 
-    protectedRoutes.delete('/mcp/:name', async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
-      const { name: serverName } = request.params;
-      const startTime = Date.now();
-      const requestId = crypto.randomUUID();
-      const method = 'DELETE';
-      
-      const keyName = (request as any).keyName;
-      const attribution = (request as any).attribution || null;
-      const sourceIp = getClientIp(request);
-      const clientHeaders = redactSensitiveHeaders(request.headers as Record<string, string>);
-      const isStreamed = false;
+        const durationMs = Date.now() - startTime;
 
-      logger.silly(`[mcp] DELETE /mcp/${serverName} - requestId: ${requestId}`);
+        await mcpUsageStorage.saveRequest({
+          request_id: requestId,
+          created_at: new Date().toISOString(),
+          start_time: startTime,
+          duration_ms: durationMs,
+          server_name: serverName,
+          upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
+          method,
+          jsonrpc_method: null,
+          tool_name: null,
+          api_key: keyName,
+          attribution,
+          source_ip: sourceIp,
+          response_status: result.status,
+          is_streamed: isStreamed,
+          has_debug: false,
+          error_code: result.error ? 'PROXY_ERROR' : null,
+          error_message: result.error || null,
+        });
 
-      const result = await proxyMcpRequest(
-        serverName,
-        method,
-        request.headers as Record<string, string | string[] | undefined>
-      );
-
-      const durationMs = Date.now() - startTime;
-
-      await mcpUsageStorage.saveRequest({
-        request_id: requestId,
-        created_at: new Date().toISOString(),
-        start_time: startTime,
-        duration_ms: durationMs,
-        server_name: serverName,
-        upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
-        method,
-        jsonrpc_method: null,
-        tool_name: null,
-        api_key: keyName,
-        attribution,
-        source_ip: sourceIp,
-        response_status: result.status,
-        is_streamed: isStreamed,
-        has_debug: false,
-        error_code: result.error ? 'PROXY_ERROR' : null,
-        error_message: result.error || null,
-      });
-
-      if (result.error) {
-        if (result.status === 502) {
-          return reply.code(502).send({ error: { message: result.error, type: 'upstream_error' } });
+        if (result.error) {
+          if (result.status === 502) {
+            return reply
+              .code(502)
+              .send({ error: { message: result.error, type: 'upstream_error' } });
+          }
+          if (result.status === 504) {
+            return reply
+              .code(504)
+              .send({ error: { message: result.error, type: 'upstream_timeout' } });
+          }
+          return reply
+            .code(result.status)
+            .send({ error: { message: result.error, type: 'proxy_error' } });
         }
-        if (result.status === 504) {
-          return reply.code(504).send({ error: { message: result.error, type: 'upstream_timeout' } });
+
+        for (const [key, value] of Object.entries(result.headers)) {
+          reply.header(key, value);
         }
-        return reply.code(result.status).send({ error: { message: result.error, type: 'proxy_error' } });
-      }
 
-      for (const [key, value] of Object.entries(result.headers)) {
-        reply.header(key, value);
-      }
+        if (result.stream) {
+          reply.header('Content-Type', 'text/event-stream');
+          reply.header('Cache-Control', 'no-cache');
+          reply.header('Connection', 'keep-alive');
+          return reply.send(result.stream);
+        }
 
-      if (result.body !== undefined) {
-        return reply.code(result.status).send(result.body);
-      }
+        if (result.body !== undefined) {
+          return reply.code(result.status).send(result.body);
+        }
 
-      return reply.code(result.status);
-    });
+        return reply.code(result.status);
+      }
+    );
+
+    protectedRoutes.delete(
+      '/mcp/:name',
+      async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
+        const { name: serverName } = request.params;
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+        const method = 'DELETE';
+
+        const keyName = (request as any).keyName;
+        const attribution = (request as any).attribution || null;
+        const sourceIp = getClientIp(request);
+        const clientHeaders = redactSensitiveHeaders(request.headers as Record<string, string>);
+        const isStreamed = false;
+
+        logger.silly(`[mcp] DELETE /mcp/${serverName} - requestId: ${requestId}`);
+
+        const result = await proxyMcpRequest(
+          serverName,
+          method,
+          request.headers as Record<string, string | string[] | undefined>
+        );
+
+        const durationMs = Date.now() - startTime;
+
+        await mcpUsageStorage.saveRequest({
+          request_id: requestId,
+          created_at: new Date().toISOString(),
+          start_time: startTime,
+          duration_ms: durationMs,
+          server_name: serverName,
+          upstream_url: getMcpServerConfig(serverName)?.upstream_url || '',
+          method,
+          jsonrpc_method: null,
+          tool_name: null,
+          api_key: keyName,
+          attribution,
+          source_ip: sourceIp,
+          response_status: result.status,
+          is_streamed: isStreamed,
+          has_debug: false,
+          error_code: result.error ? 'PROXY_ERROR' : null,
+          error_message: result.error || null,
+        });
+
+        if (result.error) {
+          if (result.status === 502) {
+            return reply
+              .code(502)
+              .send({ error: { message: result.error, type: 'upstream_error' } });
+          }
+          if (result.status === 504) {
+            return reply
+              .code(504)
+              .send({ error: { message: result.error, type: 'upstream_timeout' } });
+          }
+          return reply
+            .code(result.status)
+            .send({ error: { message: result.error, type: 'proxy_error' } });
+        }
+
+        for (const [key, value] of Object.entries(result.headers)) {
+          reply.header(key, value);
+        }
+
+        if (result.body !== undefined) {
+          return reply.code(result.status).send(result.body);
+        }
+
+        return reply.code(result.status);
+      }
+    );
   });
 }

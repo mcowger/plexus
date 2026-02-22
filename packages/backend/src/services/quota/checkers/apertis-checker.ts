@@ -30,8 +30,8 @@ export class ApertisQuotaChecker extends QuotaChecker {
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'Cookie': `session=${session}`,
-          'Accept': 'application/json',
+          Cookie: `session=${session}`,
+          Accept: 'application/json',
         },
       });
 

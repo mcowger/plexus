@@ -6,10 +6,7 @@ export interface ZAIQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const ZAIQuotaConfig: React.FC<ZAIQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const ZAIQuotaConfig: React.FC<ZAIQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };

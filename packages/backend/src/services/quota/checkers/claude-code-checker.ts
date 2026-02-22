@@ -22,11 +22,12 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
       const response = await fetch(`${this.endpoint}?beta=true`, {
         method: 'POST',
         headers: {
-          'accept': 'application/json',
-          'anthropic-beta': 'oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15',
+          accept: 'application/json',
+          'anthropic-beta':
+            'oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15',
           'anthropic-dangerous-direct-browser-access': 'true',
           'anthropic-version': '2023-06-01',
-          'authorization': `Bearer ${apiKey}`,
+          authorization: `Bearer ${apiKey}`,
           'content-type': 'application/json',
           'user-agent': 'claude-cli/2.1.25 (external, cli)',
           'x-app': 'cli',
@@ -35,11 +36,17 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
           model: 'claude-haiku-4-5-20251001',
           messages: [{ role: 'user', content: [{ type: 'text', text: 'Are you online' }] }],
           system: [
-            { type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.25.3de; cc_entrypoint=cli;' },
+            {
+              type: 'text',
+              text: 'x-anthropic-billing-header: cc_version=2.1.25.3de; cc_entrypoint=cli;',
+            },
             { type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." },
           ],
           tools: [],
-          metadata: { user_id: 'user_24df69fab27b77f1171d5c7e798a1c2aeeb2c810eefa1bbd17f16b5e7e07ab72_account_b37bb5b5-6c73-4586-94c4-44313833d598_session_133180ba-5432-4ab3-ae69-635409fe17f1' },
+          metadata: {
+            user_id:
+              'user_24df69fab27b77f1171d5c7e798a1c2aeeb2c810eefa1bbd17f16b5e7e07ab72_account_b37bb5b5-6c73-4586-94c4-44313833d598_session_133180ba-5432-4ab3-ae69-635409fe17f1',
+          },
           max_tokens: 5,
           stream: false,
         }),
@@ -61,35 +68,43 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
       const sevenDayUtil = response.headers.get('anthropic-ratelimit-unified-7d-utilization');
       const sevenDayLimit = response.headers.get('anthropic-ratelimit-unified-7d-limit');
 
-      logger.silly(`[claude-code-checker] 5h - limit: ${fiveHourLimit}, reset: ${fiveHourReset}, util: ${fiveHourUtil}`);
-      logger.silly(`[claude-code-checker] 7d - limit: ${sevenDayLimit}, reset: ${sevenDayReset}, util: ${sevenDayUtil}`);
+      logger.silly(
+        `[claude-code-checker] 5h - limit: ${fiveHourLimit}, reset: ${fiveHourReset}, util: ${fiveHourUtil}`
+      );
+      logger.silly(
+        `[claude-code-checker] 7d - limit: ${sevenDayLimit}, reset: ${sevenDayReset}, util: ${sevenDayUtil}`
+      );
 
       const windows: QuotaWindow[] = [];
 
       if (fiveHourReset && fiveHourUtil) {
         const limit = fiveHourLimit ? parseInt(fiveHourLimit) : 100;
-        windows.push(this.createWindow(
-          'five_hour',
-          limit,
-          parseFloat(fiveHourUtil) * 100,
-          undefined,
-          'percentage',
-          new Date(parseInt(fiveHourReset) * 1000),
-          '5-hour request quota'
-        ));
+        windows.push(
+          this.createWindow(
+            'five_hour',
+            limit,
+            parseFloat(fiveHourUtil) * 100,
+            undefined,
+            'percentage',
+            new Date(parseInt(fiveHourReset) * 1000),
+            '5-hour request quota'
+          )
+        );
       }
 
       if (sevenDayReset && sevenDayUtil) {
         const limit = sevenDayLimit ? parseInt(sevenDayLimit) : 100;
-        windows.push(this.createWindow(
-          'weekly',
-          limit,
-          parseFloat(sevenDayUtil) * 100,
-          undefined,
-          'percentage',
-          new Date(parseInt(sevenDayReset) * 1000),
-          'Weekly request quota'
-        ));
+        windows.push(
+          this.createWindow(
+            'weekly',
+            limit,
+            parseFloat(sevenDayUtil) * 100,
+            undefined,
+            'percentage',
+            new Date(parseInt(sevenDayReset) * 1000),
+            'Weekly request quota'
+          )
+        );
       }
 
       logger.silly(`[claude-code-checker] Returning ${windows.length} windows`);
@@ -115,7 +130,9 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
         : await authManager.getApiKey(provider as OAuthProvider);
     } catch {
       authManager.reload();
-      logger.info(`[claude-code-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`);
+      logger.info(
+        `[claude-code-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`
+      );
       return oauthAccountId
         ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
         : await authManager.getApiKey(provider as OAuthProvider);

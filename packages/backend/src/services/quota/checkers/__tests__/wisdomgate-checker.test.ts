@@ -51,9 +51,9 @@ describe('WisdomGateQuotaChecker', () => {
               expiry_time: 1772868308,
               expiry_date: '',
               begin_time: 1770276308,
-              begin_date: ''
-            }
-          ]
+              begin_date: '',
+            },
+          ],
         }),
         {
           status: 200,
@@ -71,7 +71,7 @@ describe('WisdomGateQuotaChecker', () => {
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(result.windows).toHaveLength(1);
-    
+
     const window = result.windows?.[0];
     expect(window?.windowType).toBe('monthly');
     expect(window?.unit).toBe('dollars');
@@ -85,7 +85,9 @@ describe('WisdomGateQuotaChecker', () => {
   });
 
   it('returns error for non-200 response', async () => {
-    setFetchMock(async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' }));
+    setFetchMock(
+      async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
+    );
 
     const checker = new WisdomGateQuotaChecker(makeConfig());
     const result = await checker.checkQuota();
@@ -102,7 +104,7 @@ describe('WisdomGateQuotaChecker', () => {
           total_usage: 44.168262,
           total_available: 23.852028,
           regular_amount: 0.004,
-          package_details: []
+          package_details: [],
         }),
         {
           status: 200,

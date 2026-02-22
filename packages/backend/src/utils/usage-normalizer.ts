@@ -1,6 +1,14 @@
 import { UnifiedUsage } from '../types/unified';
 
-type UsageSubset = Pick<UnifiedUsage, 'input_tokens' | 'output_tokens' | 'total_tokens' | 'reasoning_tokens' | 'cached_tokens' | 'cache_creation_tokens'>;
+type UsageSubset = Pick<
+  UnifiedUsage,
+  | 'input_tokens'
+  | 'output_tokens'
+  | 'total_tokens'
+  | 'reasoning_tokens'
+  | 'cached_tokens'
+  | 'cache_creation_tokens'
+>;
 
 const safeToken = (value: unknown): number => {
   const num = Number(value);
@@ -10,14 +18,15 @@ const safeToken = (value: unknown): number => {
 
 export function normalizeOpenAIChatUsage(usage: any): UsageSubset {
   const promptTokens = safeToken(usage?.prompt_tokens);
-  const cachedTokens = safeToken(usage?.prompt_tokens_details?.cached_tokens ?? usage?.cached_tokens);
+  const cachedTokens = safeToken(
+    usage?.prompt_tokens_details?.cached_tokens ?? usage?.cached_tokens
+  );
   const outputTokens = safeToken(usage?.completion_tokens);
   const reasoningTokens = safeToken(usage?.completion_tokens_details?.reasoning_tokens);
 
   // OpenAI chat prompt_tokens generally includes cached tokens, but guard for edge payloads.
-  const inputTokens = cachedTokens > promptTokens
-    ? promptTokens
-    : Math.max(0, promptTokens - cachedTokens);
+  const inputTokens =
+    cachedTokens > promptTokens ? promptTokens : Math.max(0, promptTokens - cachedTokens);
 
   return {
     input_tokens: inputTokens,
@@ -70,7 +79,9 @@ export function normalizeOAuthUsage(usage: any): UsageSubset {
   return {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
-    total_tokens: safeToken(usage?.totalTokens ?? usage?.total_tokens) || inputTokens + cachedTokens + cacheCreationTokens + outputTokens,
+    total_tokens:
+      safeToken(usage?.totalTokens ?? usage?.total_tokens) ||
+      inputTokens + cachedTokens + cacheCreationTokens + outputTokens,
     reasoning_tokens: safeToken(usage?.reasoning_tokens),
     cached_tokens: cachedTokens,
     cache_creation_tokens: cacheCreationTokens,

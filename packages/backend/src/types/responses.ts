@@ -19,9 +19,9 @@ export interface ResponsesMessageItem extends ResponsesInputItem {
   status?: 'in_progress' | 'completed' | 'incomplete';
 }
 
-export type ResponsesContentPart = 
-  | ResponsesInputTextPart 
-  | ResponsesInputImagePart 
+export type ResponsesContentPart =
+  | ResponsesInputTextPart
+  | ResponsesInputImagePart
   | ResponsesInputAudioPart
   | ResponsesOutputTextPart
   | ResponsesSummaryTextPart
@@ -146,10 +146,10 @@ export interface ResponsesMCPTool {
   require_approval?: 'never' | 'always' | 'once';
 }
 
-export type ResponsesTool = 
-  | ResponsesFunctionTool 
-  | ResponsesWebSearchTool 
-  | ResponsesFileSearchTool 
+export type ResponsesTool =
+  | ResponsesFunctionTool
+  | ResponsesWebSearchTool
+  | ResponsesFileSearchTool
   | ResponsesCodeInterpreterTool
   | ResponsesComputerUseTool
   | ResponsesImageGenerationTool
@@ -165,11 +165,15 @@ export interface UnifiedResponsesRequest {
   input: string | ResponsesInputItem[];
   instructions?: string;
   tools?: ResponsesTool[];
-  tool_choice?: 'none' | 'auto' | 'required' | {
-    mode: 'required' | 'auto';
-    type: string;
-    name: string;
-  };
+  tool_choice?:
+    | 'none'
+    | 'auto'
+    | 'required'
+    | {
+        mode: 'required' | 'auto';
+        type: string;
+        name: string;
+      };
   parallel_tool_calls?: boolean;
   temperature?: number;
   top_p?: number;
@@ -196,10 +200,12 @@ export interface UnifiedResponsesRequest {
   store?: boolean;
   background?: boolean;
   previous_response_id?: string;
-  conversation?: string | {
-    id: string;
-    [key: string]: any;
-  };
+  conversation?:
+    | string
+    | {
+        id: string;
+        [key: string]: any;
+      };
   include?: string[];
   metadata?: Record<string, string>;
   safety_identifier?: string;
@@ -207,7 +213,7 @@ export interface UnifiedResponsesRequest {
   prompt_cache_retention?: string;
   service_tier?: 'auto' | 'default' | 'flex' | 'priority';
   truncation?: 'auto' | 'disabled';
-  
+
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
@@ -268,7 +274,7 @@ export interface UnifiedResponsesResponse {
   prompt_cache_key?: string;
   prompt_cache_retention?: string;
   metadata?: Record<string, string>;
-  
+
   // Plexus metadata
   plexus?: {
     provider?: string;
@@ -279,22 +285,28 @@ export interface UnifiedResponsesResponse {
     canonicalModel?: string;
     config?: any;
   };
-  
+
   // Internal
   rawResponse?: any;
   stream?: ReadableStream;
   bypassTransformation?: boolean;
 }
 
-export type ResponsesOutputItem = 
-  | ResponsesMessageItem 
-  | ResponsesFunctionCallItem 
-  | ResponsesFunctionCallOutputItem 
+export type ResponsesOutputItem =
+  | ResponsesMessageItem
+  | ResponsesFunctionCallItem
+  | ResponsesFunctionCallOutputItem
   | ResponsesReasoningItem
   | ResponsesBuiltInToolCallItem;
 
 export interface ResponsesBuiltInToolCallItem {
-  type: 'web_search_call' | 'file_search_call' | 'code_interpreter_call' | 'computer_call' | 'image_generation_call' | 'mcp_call';
+  type:
+    | 'web_search_call'
+    | 'file_search_call'
+    | 'code_interpreter_call'
+    | 'computer_call'
+    | 'image_generation_call'
+    | 'mcp_call';
   id: string;
   status: 'in_progress' | 'completed' | 'failed';
   [key: string]: any; // Tool-specific fields

@@ -4,7 +4,21 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
-import { Plus, Trash2, Edit2, PlusCircle, MinusCircle, ChevronLeft, ChevronRight, Search, Filter, AlertTriangle, CheckCircle, Zap, ZapOff } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  PlusCircle,
+  MinusCircle,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Filter,
+  AlertTriangle,
+  CheckCircle,
+  Zap,
+  ZapOff,
+} from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
 import { formatMs } from '../lib/format';
@@ -12,7 +26,7 @@ import { formatMs } from '../lib/format';
 const EMPTY_SERVER: McpServer = {
   upstream_url: '',
   enabled: true,
-  headers: {}
+  headers: {},
 };
 
 export const McpPage: React.FC = () => {
@@ -63,7 +77,7 @@ export const McpPage: React.FC = () => {
       const data = await api.getMcpServers();
       setServers(data);
     } catch (e) {
-      console.error("Failed to load MCP servers", e);
+      console.error('Failed to load MCP servers', e);
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +93,7 @@ export const McpPage: React.FC = () => {
       setLogs(res.data);
       setLogsTotal(Number(res.total) || 0);
     } catch (e) {
-      console.error("Failed to load MCP logs", e);
+      console.error('Failed to load MCP logs', e);
     } finally {
       setLogsLoading(false);
     }
@@ -121,12 +135,12 @@ export const McpPage: React.FC = () => {
     setIsDeletingLogs(true);
     try {
       await api.deleteMcpLog(selectedLogId);
-      setLogs(logs.filter(l => l.request_id !== selectedLogId));
-      setLogsTotal(prev => Math.max(0, prev - 1));
+      setLogs(logs.filter((l) => l.request_id !== selectedLogId));
+      setLogsTotal((prev) => Math.max(0, prev - 1));
       setIsSingleDeleteModalOpen(false);
       setSelectedLogId(null);
     } catch (e) {
-      console.error("Failed to delete MCP log", e);
+      console.error('Failed to delete MCP log', e);
     } finally {
       setIsDeletingLogs(false);
     }
@@ -155,15 +169,17 @@ export const McpPage: React.FC = () => {
   const handleSave = async () => {
     const nameToSave = editingServerName || serverNameInput;
     if (!nameToSave || !nameToSave.trim()) {
-      alert("Server Name is required");
+      alert('Server Name is required');
       return;
     }
     if (!editingServerName && !isValidServerName(nameToSave)) {
-      alert("Invalid server name. Use lowercase letters, numbers, hyphens, and underscores (2-63 characters, must start with letter or number)");
+      alert(
+        'Invalid server name. Use lowercase letters, numbers, hyphens, and underscores (2-63 characters, must start with letter or number)'
+      );
       return;
     }
     if (!editingServer.upstream_url || !editingServer.upstream_url.trim()) {
-      alert("Upstream URL is required");
+      alert('Upstream URL is required');
       return;
     }
 
@@ -172,13 +188,13 @@ export const McpPage: React.FC = () => {
       await api.saveMcpServer(nameToSave, {
         upstream_url: editingServer.upstream_url,
         enabled: editingServer.enabled,
-        headers: editingServer.headers
+        headers: editingServer.headers,
       });
       await loadData();
       setIsModalOpen(false);
     } catch (e) {
-      console.error("Save error", e);
-      alert("Failed to save MCP server: " + e);
+      console.error('Save error', e);
+      alert('Failed to save MCP server: ' + e);
     } finally {
       setIsSaving(false);
     }
@@ -192,24 +208,24 @@ export const McpPage: React.FC = () => {
       await api.deleteMcpServer(serverName);
       await loadData();
     } catch (e) {
-      console.error("Delete error", e);
-      alert("Failed to delete MCP server: " + e);
+      console.error('Delete error', e);
+      alert('Failed to delete MCP server: ' + e);
     }
   };
 
   const handleToggleEnabled = async (serverName: string, newState: boolean) => {
     const server = servers[serverName];
     if (!server) return;
-    
+
     try {
       await api.saveMcpServer(serverName, {
         ...server,
-        enabled: newState
+        enabled: newState,
       });
       await loadData();
     } catch (e) {
-      console.error("Toggle error", e);
-      alert("Failed to update MCP server: " + e);
+      console.error('Toggle error', e);
+      alert('Failed to update MCP server: ' + e);
     }
   };
 
@@ -223,8 +239,8 @@ export const McpPage: React.FC = () => {
       ...editingServer,
       headers: {
         ...editingServer.headers,
-        [headerKey.trim()]: headerValue.trim()
-      }
+        [headerKey.trim()]: headerValue.trim(),
+      },
     });
     setHeaderKey('');
     setHeaderValue('');
@@ -235,7 +251,7 @@ export const McpPage: React.FC = () => {
     delete newHeaders[key];
     setEditingServer({
       ...editingServer,
-      headers: newHeaders
+      headers: newHeaders,
     });
   };
 
@@ -263,9 +279,13 @@ export const McpPage: React.FC = () => {
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface flex flex-col gap-6">
       {/* ── Servers Config Card ── */}
-      <Card 
+      <Card
         title="MCP Servers"
-        extra={<Button leftIcon={<Plus size={16}/>} onClick={handleAddNew}>Add MCP Server</Button>}
+        extra={
+          <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
+            Add MCP Server
+          </Button>
+        }
       >
         {serverNames.length === 0 ? (
           <div className="p-4 text-text-secondary text-center">
@@ -276,35 +296,66 @@ export const McpPage: React.FC = () => {
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingLeft: '24px'}}>Name</th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Upstream URL</th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">Headers</th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider" style={{paddingRight: '24px', textAlign: 'right'}}>Actions</th>
+                  <th
+                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ paddingLeft: '24px' }}
+                  >
+                    Name
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Upstream URL
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Headers
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ paddingRight: '24px', textAlign: 'right' }}
+                  >
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {serverNames.map(name => {
+                {serverNames.map((name) => {
                   const server = servers[name];
                   const headerCount = server.headers ? Object.keys(server.headers).length : 0;
                   return (
-                    <tr key={name} onClick={() => handleEdit(name)} style={{cursor: 'pointer'}} className="hover:bg-bg-hover">
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingLeft: '24px'}}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                          <Edit2 size={12} style={{opacity: 0.5}} />
-                          <div style={{fontWeight: 600}}>{name}</div>
+                    <tr
+                      key={name}
+                      onClick={() => handleEdit(name)}
+                      style={{ cursor: 'pointer' }}
+                      className="hover:bg-bg-hover"
+                    >
+                      <td
+                        className="px-4 py-3 text-left border-b border-border-glass text-text"
+                        style={{ paddingLeft: '24px' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Edit2 size={12} style={{ opacity: 0.5 }} />
+                          <div style={{ fontWeight: 600 }}>{name}</div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                        <div style={{maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                        <div
+                          style={{
+                            maxWidth: '400px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {server.upstream_url}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                         <div onClick={(e) => e.stopPropagation()}>
-                          <Switch 
-                            checked={server.enabled !== false} 
-                            onChange={(val) => handleToggleEnabled(name, val)} 
+                          <Switch
+                            checked={server.enabled !== false}
+                            onChange={(val) => handleToggleEnabled(name, val)}
                             size="sm"
                           />
                         </div>
@@ -312,9 +363,22 @@ export const McpPage: React.FC = () => {
                       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                         {headerCount > 0 ? `${headerCount} header(s)` : '-'}
                       </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text" style={{paddingRight: '24px', textAlign: 'right'}}>
-                        <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
-                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDelete(name); }} style={{color: 'var(--color-danger)'}}><Trash2 size={14}/></Button>
+                      <td
+                        className="px-4 py-3 text-left border-b border-border-glass text-text"
+                        style={{ paddingRight: '24px', textAlign: 'right' }}
+                      >
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(name);
+                            }}
+                            style={{ color: 'var(--color-danger)' }}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -333,24 +397,44 @@ export const McpPage: React.FC = () => {
           <form onSubmit={handleLogSearch} className="flex gap-2 justify-between">
             <div className="flex gap-2">
               <div className="relative w-50">
-                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+                <Search
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                />
                 <Input
                   placeholder="Filter by Server..."
                   value={logsFilters.serverName}
-                  onChange={e => setLogsFilters({ ...logsFilters, serverName: e.target.value })}
+                  onChange={(e) => setLogsFilters({ ...logsFilters, serverName: e.target.value })}
                   style={{ paddingLeft: '32px' }}
                 />
               </div>
               <div className="relative w-44">
-                <Filter size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+                <Filter
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                />
                 <Input
                   placeholder="Filter by Key..."
                   value={logsFilters.apiKey}
-                  onChange={e => setLogsFilters({ ...logsFilters, apiKey: e.target.value })}
+                  onChange={(e) => setLogsFilters({ ...logsFilters, apiKey: e.target.value })}
                   style={{ paddingLeft: '32px' }}
                 />
               </div>
-              <Button type="submit" variant="primary">Search</Button>
+              <Button type="submit" variant="primary">
+                Search
+              </Button>
             </div>
             <Button
               onClick={handleDeleteAllLogs}
@@ -369,13 +453,27 @@ export const McpPage: React.FC = () => {
           <table className="w-full border-collapse font-body text-[13px]">
             <thead>
               <tr className="text-center border-b border-border">
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Date</th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Key</th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Server</th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Method</th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">RPC Method</th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Duration</th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  Date
+                </th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  Key
+                </th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  Server
+                </th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  Method
+                </th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  RPC Method
+                </th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  Duration
+                </th>
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  Status
+                </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                   <div className="flex justify-center">
                     <Trash2 size={12} />
@@ -386,11 +484,15 @@ export const McpPage: React.FC = () => {
             <tbody>
               {logsLoading ? (
                 <tr>
-                  <td colSpan={8} className="p-5 text-center">Loading...</td>
+                  <td colSpan={8} className="p-5 text-center">
+                    Loading...
+                  </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-5 text-center text-text-secondary">No MCP logs found</td>
+                  <td colSpan={8} className="p-5 text-center text-text-secondary">
+                    No MCP logs found
+                  </td>
                 </tr>
               ) : (
                 logs.map((log) => (
@@ -401,7 +503,9 @@ export const McpPage: React.FC = () => {
                     {/* Date */}
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="font-medium">{new Date(log.created_at).toLocaleTimeString()}</span>
+                        <span className="font-medium">
+                          {new Date(log.created_at).toLocaleTimeString()}
+                        </span>
                         <span className="text-text-secondary" style={{ fontSize: '0.85em' }}>
                           {new Date(log.created_at).toISOString().split('T')[0]}
                         </span>
@@ -424,7 +528,16 @@ export const McpPage: React.FC = () => {
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                       <div className="flex flex-col">
                         <span className="font-medium">{log.server_name}</span>
-                        <span className="text-text-secondary" style={{ fontSize: '0.85em', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span
+                          className="text-text-secondary"
+                          style={{
+                            fontSize: '0.85em',
+                            maxWidth: '200px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {log.upstream_url}
                         </span>
                       </div>
@@ -433,19 +546,24 @@ export const McpPage: React.FC = () => {
                     {/* HTTP Method */}
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                       <div className="flex flex-col gap-1">
-                        <span className={clsx(
-                          'text-xs font-semibold',
-                          log.method === 'GET' ? 'text-blue-400' :
-                          log.method === 'POST' ? 'text-green-400' :
-                          'text-red-400'
-                        )}>
+                        <span
+                          className={clsx(
+                            'text-xs font-semibold',
+                            log.method === 'GET'
+                              ? 'text-blue-400'
+                              : log.method === 'POST'
+                                ? 'text-green-400'
+                                : 'text-red-400'
+                          )}
+                        >
                           {log.method}
                         </span>
                         <div className="flex items-center gap-1">
-                          {log.is_streamed
-                            ? <Zap size={11} className="text-blue-400" />
-                            : <ZapOff size={11} className="text-gray-400" />
-                          }
+                          {log.is_streamed ? (
+                            <Zap size={11} className="text-blue-400" />
+                          ) : (
+                            <ZapOff size={11} className="text-gray-400" />
+                          )}
                           <span className="text-text-secondary" style={{ fontSize: '0.8em' }}>
                             {log.is_streamed ? 'streamed' : 'buffered'}
                           </span>
@@ -476,22 +594,32 @@ export const McpPage: React.FC = () => {
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
                       <div className="flex flex-col gap-1">
                         {log.error_code ? (
-                          <div className={clsx(
-                            'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                            'text-danger border-danger/30 bg-red-500/15'
-                          )} style={{ width: '52px' }}>
+                          <div
+                            className={clsx(
+                              'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                              'text-danger border-danger/30 bg-red-500/15'
+                            )}
+                            style={{ width: '52px' }}
+                          >
                             <AlertTriangle size={12} />
                             <span className="font-semibold">{log.response_status ?? '?'}</span>
                           </div>
                         ) : (
-                          <div className={clsx(
-                            'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                            log.response_status != null && log.response_status >= 200 && log.response_status < 300
-                              ? 'text-success border-success/30 bg-emerald-500/15'
-                              : 'text-danger border-danger/30 bg-red-500/15'
-                          )} style={{ width: '52px' }}>
+                          <div
+                            className={clsx(
+                              'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                              log.response_status != null &&
+                                log.response_status >= 200 &&
+                                log.response_status < 300
+                                ? 'text-success border-success/30 bg-emerald-500/15'
+                                : 'text-danger border-danger/30 bg-red-500/15'
+                            )}
+                            style={{ width: '52px' }}
+                          >
                             <CheckCircle size={12} />
-                            <span className={clsx('font-semibold', statusColor(log.response_status))}>
+                            <span
+                              className={clsx('font-semibold', statusColor(log.response_status))}
+                            >
                               {log.response_status ?? '?'}
                             </span>
                           </div>
@@ -499,7 +627,14 @@ export const McpPage: React.FC = () => {
                         {log.error_message && (
                           <span
                             className="text-danger"
-                            style={{ fontSize: '0.78em', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
+                            style={{
+                              fontSize: '0.78em',
+                              maxWidth: '160px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'block',
+                            }}
                             title={log.error_message}
                           >
                             {log.error_message}
@@ -555,7 +690,9 @@ export const McpPage: React.FC = () => {
         title={editingServerName ? `Edit ${editingServerName}` : 'Add MCP Server'}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </Button>
             <Button variant="primary" onClick={handleSave} disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -567,11 +704,13 @@ export const McpPage: React.FC = () => {
             <Input
               label="Server Name"
               value={serverNameInput}
-              onChange={(e) => setServerNameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))}
+              onChange={(e) =>
+                setServerNameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))
+              }
               placeholder="my-mcp-server"
             />
           )}
-          
+
           <Input
             label="Upstream URL"
             value={editingServer.upstream_url}
@@ -596,12 +735,7 @@ export const McpPage: React.FC = () => {
                 placeholder="Bearer token..."
               />
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={addHeader}
-              style={{ marginTop: '20px' }}
-            >
+            <Button variant="secondary" size="sm" onClick={addHeader} style={{ marginTop: '20px' }}>
               <PlusCircle size={16} />
             </Button>
           </div>
@@ -612,7 +746,9 @@ export const McpPage: React.FC = () => {
               {Object.entries(editingServer.headers).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2 p-2 bg-bg-hover rounded-md">
                   <span className="flex-1 font-mono text-xs">{key}</span>
-                  <span className="flex-1 font-mono text-xs text-text-secondary truncate">{value}</span>
+                  <span className="flex-1 font-mono text-xs text-text-secondary truncate">
+                    {value}
+                  </span>
                   <button
                     onClick={() => removeHeader(key)}
                     className="p-1 hover:bg-bg-surface rounded"
@@ -633,7 +769,9 @@ export const McpPage: React.FC = () => {
         title="Confirm Deletion"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsDeleteLogsModalOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setIsDeleteLogsModalOpen(false)}>
+              Cancel
+            </Button>
             <Button variant="danger" onClick={confirmDeleteAllLogs} disabled={isDeletingLogs}>
               {isDeletingLogs ? 'Deleting...' : 'Delete Logs'}
             </Button>
@@ -685,7 +823,9 @@ export const McpPage: React.FC = () => {
         title="Confirm Deletion"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
+              Cancel
+            </Button>
             <Button variant="danger" onClick={confirmDeleteSingleLog} disabled={isDeletingLogs}>
               {isDeletingLogs ? 'Deleting...' : 'Delete Log'}
             </Button>

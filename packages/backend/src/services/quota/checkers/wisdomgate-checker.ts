@@ -32,8 +32,8 @@ export class WisdomGateQuotaChecker extends QuotaChecker {
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'Cookie': `session=${sessionCookie}`,
-          'Accept': 'application/json',
+          Cookie: `session=${sessionCookie}`,
+          Accept: 'application/json',
         },
       });
 

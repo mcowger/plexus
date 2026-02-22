@@ -9,13 +9,13 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   return (
     <div className="flex min-h-screen bg-bg-deep">
       <Sidebar />
-      <main className={clsx(
-        "flex-1 min-h-screen p-8 transition-[margin] duration-300",
-        isCollapsed ? "ml-[64px]" : "ml-[200px]"
-      )}>
-        <div className="main-content-inner">
-            {children}
-        </div>
+      <main
+        className={clsx(
+          'flex-1 min-h-screen p-8 transition-[margin] duration-300',
+          isCollapsed ? 'ml-[64px]' : 'ml-[200px]'
+        )}
+      >
+        <div className="main-content-inner">{children}</div>
       </main>
     </div>
   );

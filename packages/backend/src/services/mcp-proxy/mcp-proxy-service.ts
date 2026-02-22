@@ -14,29 +14,20 @@ const HOP_BY_HOP_HEADERS = new Set([
   'upgrade',
 ]);
 
-const SENSITIVE_HEADERS = new Set([
-  'authorization',
-  'cookie',
-  'set-cookie',
-  'x-api-key',
-]);
+const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'set-cookie', 'x-api-key']);
 
-const CLIENT_AUTH_HEADERS = new Set([
-  'authorization',
-  'x-api-key',
-  'proxy-authorization',
-]);
+const CLIENT_AUTH_HEADERS = new Set(['authorization', 'x-api-key', 'proxy-authorization']);
 
 export function getMcpServerConfig(serverName: string): McpServerConfig | null {
   const config = getConfig();
   const mcpServers = config.mcpServers;
-  
+
   if (!mcpServers) {
     return null;
   }
 
   const server = mcpServers[serverName];
-  
+
   if (!server) {
     return null;
   }
@@ -53,16 +44,18 @@ export function validateServerName(name: string): boolean {
   return slugRegex.test(name);
 }
 
-export function filterHopByHopHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string> {
+export function filterHopByHopHeaders(
+  headers: Record<string, string | string[] | undefined>
+): Record<string, string> {
   const filtered: Record<string, string> = {};
-  
+
   for (const [key, value] of Object.entries(headers)) {
     const lowerKey = key.toLowerCase();
-    
+
     if (HOP_BY_HOP_HEADERS.has(lowerKey)) {
       continue;
     }
-    
+
     if (value !== undefined && value !== null) {
       if (Array.isArray(value)) {
         if (value.length > 0 && value[0] !== undefined) {
@@ -73,7 +66,7 @@ export function filterHopByHopHeaders(headers: Record<string, string | string[] 
       }
     }
   }
-  
+
   return filtered;
 }
 
@@ -82,19 +75,19 @@ export function mergeUpstreamHeaders(
   staticHeaders?: Record<string, string>
 ): Record<string, string> {
   const merged: Record<string, string> = { ...clientHeaders };
-  
+
   if (staticHeaders) {
     for (const [key, value] of Object.entries(staticHeaders)) {
       merged[key] = value;
     }
   }
-  
+
   return merged;
 }
 
 export function redactSensitiveHeaders(headers: Record<string, string>): Record<string, string> {
   const redacted: Record<string, string> = {};
-  
+
   for (const [key, value] of Object.entries(headers)) {
     const lowerKey = key.toLowerCase();
     if (SENSITIVE_HEADERS.has(lowerKey)) {
@@ -103,13 +96,13 @@ export function redactSensitiveHeaders(headers: Record<string, string>): Record<
       redacted[key] = value;
     }
   }
-  
+
   return redacted;
 }
 
 export function filterClientAuthHeaders(headers: Record<string, string>): Record<string, string> {
   const filtered: Record<string, string> = {};
-  
+
   for (const [key, value] of Object.entries(headers)) {
     const lowerKey = key.toLowerCase();
     if (!CLIENT_AUTH_HEADERS.has(lowerKey)) {
@@ -118,7 +111,7 @@ export function filterClientAuthHeaders(headers: Record<string, string>): Record
       logger.silly(`[mcp-proxy] Filtering out client auth header: ${key}`);
     }
   }
-  
+
   return filtered;
 }
 
@@ -126,13 +119,13 @@ export function extractJsonRpcMethod(body: unknown): string | null {
   if (!body || typeof body !== 'object') {
     return null;
   }
-  
+
   const rpcBody = body as Record<string, unknown>;
-  
+
   if (typeof rpcBody.method === 'string') {
     return rpcBody.method;
   }
-  
+
   return null;
 }
 
@@ -175,7 +168,7 @@ export async function proxyMcpRequest(
   error?: string;
 }> {
   const serverConfig = getMcpServerConfig(serverName);
-  
+
   if (!serverConfig) {
     return {
       status: 404,
@@ -186,26 +179,26 @@ export async function proxyMcpRequest(
 
   const upstreamUrl = serverConfig.upstream_url;
   const staticHeaders = serverConfig.headers || {};
-  
+
   logger.silly(`[mcp-proxy] Server config: ${JSON.stringify({ upstreamUrl, staticHeaders })}`);
-  
+
   const filteredClientHeaders = filterHopByHopHeaders(clientHeaders);
-  
+
   delete filteredClientHeaders['host'];
-  
+
   // Filter out client auth headers - we don't forward Plexus client credentials to upstream
   // Upstream auth should come from static headers or URL query params only
   const clientAuthFiltered = filterClientAuthHeaders(filteredClientHeaders);
-  
+
   const upstreamHeaders = mergeUpstreamHeaders(clientAuthFiltered, staticHeaders);
-  
+
   logger.silly(`[mcp-proxy] Upstream headers: ${JSON.stringify(upstreamHeaders)}`);
-  
+
   let url = upstreamUrl;
-  
+
   if (query && Object.keys(query).length > 0) {
     const params = new URLSearchParams(query);
-    const separator = upstreamUrl.endsWith('?') ? '' : (upstreamUrl.includes('?') ? '&' : '?');
+    const separator = upstreamUrl.endsWith('?') ? '' : upstreamUrl.includes('?') ? '&' : '?';
     url = `${upstreamUrl}${separator}${params.toString()}`;
   }
 
@@ -259,13 +252,15 @@ export async function proxyMcpRequest(
     }
 
     const responseText = await response.text();
-    
+
     logger.silly(`[mcp-proxy] Response body (raw): ${responseText.substring(0, 500)}`);
-    
+
     let parsedBody: unknown;
     try {
       parsedBody = JSON.parse(responseText);
-      logger.silly(`[mcp-proxy] Response body (parsed): ${JSON.stringify(parsedBody).substring(0, 500)}`);
+      logger.silly(
+        `[mcp-proxy] Response body (parsed): ${JSON.stringify(parsedBody).substring(0, 500)}`
+      );
     } catch {
       parsedBody = responseText;
       logger.silly(`[mcp-proxy] Response body (text): ${responseText.substring(0, 500)}`);
@@ -284,7 +279,7 @@ export async function proxyMcpRequest(
     logger.error(`[mcp-proxy] Error name: ${err.name}`);
     logger.error(`[mcp-proxy] Error message: ${err.message}`);
     logger.error(`[mcp-proxy] Error stack: ${err.stack}`);
-    
+
     if (err.message.includes('ECONNREFUSED') || err.message.includes('connect')) {
       logger.silly(`[mcp-proxy] Connection refused - upstream server not reachable`);
       return {
@@ -293,7 +288,7 @@ export async function proxyMcpRequest(
         error: 'Upstream server unreachable',
       };
     }
-    
+
     if (err.message.includes('timeout') || err.message.includes('ETIMEDOUT')) {
       logger.silly(`[mcp-proxy] Request timed out`);
       return {
@@ -302,11 +297,11 @@ export async function proxyMcpRequest(
         error: 'Upstream server timeout',
       };
     }
-    
+
     if (err.cause) {
       logger.silly(`[mcp-proxy] Error cause: ${JSON.stringify(err.cause)}`);
     }
-    
+
     return {
       status: 500,
       headers: {},

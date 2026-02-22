@@ -9,7 +9,21 @@ import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { UnifiedSpeechRequest } from '../../types/unified';
 
-const VALID_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
+const VALID_VOICES = [
+  'alloy',
+  'ash',
+  'ballad',
+  'coral',
+  'echo',
+  'fable',
+  'onyx',
+  'nova',
+  'sage',
+  'shimmer',
+  'verse',
+  'marin',
+  'cedar',
+];
 const VALID_FORMATS = ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'];
 const VALID_STREAM_FORMATS = ['sse', 'audio'];
 
@@ -34,7 +48,7 @@ export async function registerSpeechRoute(
       incomingApiType: 'speech',
       startTime,
       isStreamed: false,
-      responseStatus: 'pending'
+      responseStatus: 'pending',
     };
 
     try {
@@ -102,7 +116,6 @@ export async function registerSpeechRoute(
       }
 
       return reply.send(unifiedResponse.audio);
-
     } catch (e: any) {
       usageRecord.responseStatus = 'error';
       usageRecord.durationMs = Date.now() - startTime;
@@ -110,14 +123,14 @@ export async function registerSpeechRoute(
 
       const errorDetails = {
         apiType: 'speech',
-        ...(e.routingContext || {})
+        ...(e.routingContext || {}),
       };
 
       usageStorage.saveError(requestId, e, errorDetails);
       logger.error('Error processing speech request', e);
 
       return reply.code(500).send({
-        error: { message: e.message, type: 'api_error' }
+        error: { message: e.message, type: 'api_error' },
       });
     }
   });

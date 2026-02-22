@@ -30,7 +30,7 @@ export async function registerImagesRoute(
       incomingApiType: 'images',
       startTime,
       isStreamed: false,
-      responseStatus: 'pending'
+      responseStatus: 'pending',
     };
 
     try {
@@ -94,7 +94,6 @@ export async function registerImagesRoute(
       }
 
       return reply.send(unifiedResponse);
-
     } catch (e: any) {
       usageRecord.responseStatus = 'error';
       usageRecord.durationMs = Date.now() - startTime;
@@ -102,14 +101,14 @@ export async function registerImagesRoute(
 
       const errorDetails = {
         apiType: 'images',
-        ...(e.routingContext || {})
+        ...(e.routingContext || {}),
       };
 
       usageStorage.saveError(requestId, e, errorDetails);
       logger.error('Error processing image generation request', e);
 
       return reply.code(500).send({
-        error: { message: e.message, type: 'api_error' }
+        error: { message: e.message, type: 'api_error' },
       });
     }
   });
@@ -130,7 +129,7 @@ export async function registerImagesRoute(
       incomingApiType: 'images',
       startTime,
       isStreamed: false,
-      responseStatus: 'pending'
+      responseStatus: 'pending',
     };
 
     try {
@@ -163,13 +162,13 @@ export async function registerImagesRoute(
 
       if (!imageBuffer) {
         return reply.code(400).send({
-          error: { message: 'Missing required field: image', type: 'validation_error' }
+          error: { message: 'Missing required field: image', type: 'validation_error' },
         });
       }
 
       if (!formFields.prompt) {
         return reply.code(400).send({
-          error: { message: 'Missing required field: prompt', type: 'validation_error' }
+          error: { message: 'Missing required field: prompt', type: 'validation_error' },
         });
       }
 
@@ -240,7 +239,6 @@ export async function registerImagesRoute(
       }
 
       return reply.send(unifiedResponse);
-
     } catch (e: any) {
       usageRecord.responseStatus = 'error';
       usageRecord.durationMs = Date.now() - startTime;
@@ -248,14 +246,14 @@ export async function registerImagesRoute(
 
       const errorDetails = {
         apiType: 'images',
-        ...(e.routingContext || {})
+        ...(e.routingContext || {}),
       };
 
       usageStorage.saveError(requestId, e, errorDetails);
       logger.error('Error processing image edit request', e);
 
       return reply.code(500).send({
-        error: { message: e.message, type: 'api_error' }
+        error: { message: e.message, type: 'api_error' },
       });
     }
   });

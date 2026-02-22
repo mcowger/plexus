@@ -3,9 +3,7 @@ import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { KimiCodeQuotaChecker } from '../kimi-code-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
 
-const makeConfig = (
-  options: Record<string, unknown> = {}
-): QuotaCheckerConfig => ({
+const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig => ({
   id: 'kimi-code-test',
   provider: 'kimi',
   type: 'kimi-code',
@@ -17,18 +15,20 @@ const makeConfig = (
   },
 });
 
-const makeSuccessResponse = (overrides: Partial<{
-  usage: {
-    limit: string;
-    used: string;
-    remaining: string;
-    resetTime: string;
-  };
-  limits: Array<{
-    window: { duration: number; timeUnit: string };
-    detail: { limit: string; remaining: string; resetTime: string };
-  }>;
-}> = {}) => ({
+const makeSuccessResponse = (
+  overrides: Partial<{
+    usage: {
+      limit: string;
+      used: string;
+      remaining: string;
+      resetTime: string;
+    };
+    limits: Array<{
+      window: { duration: number; timeUnit: string };
+      detail: { limit: string; remaining: string; resetTime: string };
+    }>;
+  }> = {}
+) => ({
   usage: overrides.usage ?? {
     limit: '1000',
     used: '250',
@@ -69,7 +69,7 @@ describe('KimiCodeQuotaChecker', () => {
       const headers = new Headers(init?.headers);
       capturedAuth = headers.get('Authorization') ?? undefined;
 
-    return new Response(JSON.stringify(makeSuccessResponse()), {
+      return new Response(JSON.stringify(makeSuccessResponse()), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -98,23 +98,26 @@ describe('KimiCodeQuotaChecker', () => {
     );
     await checker.checkQuota();
 
-  expect(capturedUrl).toBe('https://custom.example.com/quota');
+    expect(capturedUrl).toBe('https://custom.example.com/quota');
   });
 
   it('parses usage window correctly (string-encoded numbers)', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify(makeSuccessResponse({
-          usage: {
-          limit: '1000',
-            used: '250',
-            remaining: '750',
-            resetTime: '2024-12-31T00:00:00Z',
-          },
-          limits: [],
-        })),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify(
+            makeSuccessResponse({
+              usage: {
+                limit: '1000',
+                used: '250',
+                remaining: '750',
+                resetTime: '2024-12-31T00:00:00Z',
+              },
+              limits: [],
+            })
+          ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new KimiCodeQuotaChecker(makeConfig());
@@ -136,22 +139,23 @@ describe('KimiCodeQuotaChecker', () => {
   it('parses limits array and creates windows for each entry', async () => {
     const resetTime = '2024-12-31T05:00:00Z';
 
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          limits: [
-            {
-           window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' },
-              detail: { limit: '100', remaining: '80', resetTime },
-            },
-        {
-           window: { duration: 1, timeUnit: 'TIME_UNIT_DAY' },
-              detail: { limit: '500', remaining: '400', resetTime },
-            },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            limits: [
+              {
+                window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' },
+                detail: { limit: '100', remaining: '80', resetTime },
+              },
+              {
+                window: { duration: 1, timeUnit: 'TIME_UNIT_DAY' },
+                detail: { limit: '500', remaining: '400', resetTime },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const checker = new KimiCodeQuotaChecker(makeConfig());
@@ -166,18 +170,19 @@ describe('KimiCodeQuotaChecker', () => {
     expect(w0?.remaining).toBe(80);
     expect(w0?.used).toBe(20); // 100 - 80
 
-  expect(w1?.windowType).toBe('daily');
+    expect(w1?.windowType).toBe('daily');
     expect(w1?.limit).toBe(500);
     expect(w1?.remaining).toBe(400);
     expect(w1?.used).toBe(100); // 500 - 400
   });
 
   it('returns both usage and limits windows when both are present', async () => {
-    setFetchMock(async () =>
-      new Response(JSON.stringify(makeSuccessResponse()), {
-        status: 200,
-     headers: { 'Content-Type': 'application/json' },
-      })
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify(makeSuccessResponse()), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
 
     const checker = new KimiCodeQuotaChecker(makeConfig());
@@ -191,11 +196,12 @@ describe('KimiCodeQuotaChecker', () => {
   });
 
   it('returns empty windows when response has no usage and no limits', async () => {
-    setFetchMock(async () =>
-      new Response(JSON.stringify({}), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
 
     const checker = new KimiCodeQuotaChecker(makeConfig());
@@ -206,19 +212,20 @@ describe('KimiCodeQuotaChecker', () => {
   });
 
   it('skips limit entries that have no detail field', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-      limits: [
-          { window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' } }, // no detail
-            {
-         window: { duration: 1, timeUnit: 'TIME_UNIT_DAY' },
-              detail: { limit: '500', remaining: '400', resetTime: '2024-12-31T00:00:00Z' },
-            },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            limits: [
+              { window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' } }, // no detail
+              {
+                window: { duration: 1, timeUnit: 'TIME_UNIT_DAY' },
+                detail: { limit: '500', remaining: '400', resetTime: '2024-12-31T00:00:00Z' },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     const checker = new KimiCodeQuotaChecker(makeConfig());
     const result = await checker.checkQuota();
@@ -229,8 +236,8 @@ describe('KimiCodeQuotaChecker', () => {
   });
 
   it('returns error for non-200 HTTP response', async () => {
-    setFetchMock(async () =>
-      new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
+    setFetchMock(
+      async () => new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
     );
 
     const checker = new KimiCodeQuotaChecker(makeConfig());
@@ -266,19 +273,23 @@ describe('KimiCodeQuotaChecker', () => {
   });
 
   describe('windowTypeFromDuration', () => {
-    const windowTypeFor = async (duration: number, timeUnit: string): Promise<string | undefined> => {
-      setFetchMock(async () =>
-        new Response(
-          JSON.stringify({
-            limits: [
-              {
-                window: { duration, timeUnit },
-           detail: { limit: '100', remaining: '50', resetTime: '2024-12-31T00:00:00Z' },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-     )
+    const windowTypeFor = async (
+      duration: number,
+      timeUnit: string
+    ): Promise<string | undefined> => {
+      setFetchMock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              limits: [
+                {
+                  window: { duration, timeUnit },
+                  detail: { limit: '100', remaining: '50', resetTime: '2024-12-31T00:00:00Z' },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
 
       const checker = new KimiCodeQuotaChecker(makeConfig());

@@ -14,7 +14,10 @@ function normalizeQuotaSnapshot(snapshot: any) {
   };
 }
 
-export async function registerQuotaRoutes(fastify: FastifyInstance, quotaScheduler: QuotaScheduler) {
+export async function registerQuotaRoutes(
+  fastify: FastifyInstance,
+  quotaScheduler: QuotaScheduler
+) {
   const config = getConfig();
   const quotaConfigs = config.quotas ?? [];
   const quotaConfigById = new Map(quotaConfigs.map((quotaConfig) => [quotaConfig.id, quotaConfig]));
@@ -48,7 +51,12 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
       for (const checkerId of checkerIds) {
         try {
           const latest = await quotaScheduler.getLatestQuota(checkerId);
-          results.push({ checkerId, checkerType: getCheckerType(checkerId), latest, ...getOAuthMetadata(checkerId) });
+          results.push({
+            checkerId,
+            checkerType: getCheckerType(checkerId),
+            latest,
+            ...getOAuthMetadata(checkerId),
+          });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
           results.push({
@@ -102,7 +110,11 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
         }
       }
 
-      const history = await quotaScheduler.getQuotaHistory(checkerId, querystring.windowType, since);
+      const history = await quotaScheduler.getQuotaHistory(
+        checkerId,
+        querystring.windowType,
+        since
+      );
       return {
         checkerId,
         windowType: querystring.windowType,
@@ -110,7 +122,9 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
         history: history.map(normalizeQuotaSnapshot),
       };
     } catch (error) {
-      logger.error(`Failed to get quota history for '${(request.params as any).checkerId}': ${error}`);
+      logger.error(
+        `Failed to get quota history for '${(request.params as any).checkerId}': ${error}`
+      );
       return reply.status(500).send({ error: 'Failed to retrieve quota history' });
     }
   });
@@ -124,7 +138,9 @@ export async function registerQuotaRoutes(fastify: FastifyInstance, quotaSchedul
       }
       return result;
     } catch (error) {
-      logger.error(`Failed to run quota check for '${(request.params as any).checkerId}': ${error}`);
+      logger.error(
+        `Failed to run quota check for '${(request.params as any).checkerId}': ${error}`
+      );
       return reply.status(500).send({ error: 'Failed to run quota check' });
     }
   });

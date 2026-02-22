@@ -1,14 +1,13 @@
+import { test, expect, describe } from 'bun:test';
+import { AnthropicTransformer } from '../anthropic';
 
-import { test, expect, describe } from "bun:test";
-import { AnthropicTransformer } from "../anthropic";
-
-describe("AnthropicTransformer extractUsage", () => {
-  test("should extract input_tokens from message_delta", async () => {
+describe('AnthropicTransformer extractUsage', () => {
+  test('should extract input_tokens from message_delta', async () => {
     const transformer = new AnthropicTransformer();
     const dataStr = JSON.stringify({
-        type: "message_delta",
-        delta: { stop_reason: "end_turn", stop_sequence: null },
-        usage: { input_tokens: 154, output_tokens: 24, cache_read_input_tokens: 0 }
+      type: 'message_delta',
+      delta: { stop_reason: 'end_turn', stop_sequence: null },
+      usage: { input_tokens: 154, output_tokens: 24, cache_read_input_tokens: 0 },
     });
 
     const usage = transformer.extractUsage(dataStr);
@@ -18,11 +17,11 @@ describe("AnthropicTransformer extractUsage", () => {
     expect(usage!.output_tokens).toBe(24);
   });
 
-  test("should extract reasoning_tokens from thinkingTokens in message_delta", async () => {
+  test('should extract reasoning_tokens from thinkingTokens in message_delta', async () => {
     const transformer = new AnthropicTransformer();
     const dataStr = JSON.stringify({
-      type: "message_delta",
-      delta: { stop_reason: "max_tokens", stop_sequence: null },
+      type: 'message_delta',
+      delta: { stop_reason: 'max_tokens', stop_sequence: null },
       usage: {
         input_tokens: 7,
         output_tokens: 325,
@@ -40,16 +39,16 @@ describe("AnthropicTransformer extractUsage", () => {
     expect(usage!.cached_tokens).toBe(0);
   });
 
-  test("should extract reasoning_tokens from thinkingTokens in message_start", async () => {
+  test('should extract reasoning_tokens from thinkingTokens in message_start', async () => {
     const transformer = new AnthropicTransformer();
     const dataStr = JSON.stringify({
-      type: "message_start",
+      type: 'message_start',
       message: {
-        id: "msg_123",
-        type: "message",
-        role: "assistant",
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
         content: [],
-        model: "claude-3-5-sonnet-20241022",
+        model: 'claude-3-5-sonnet-20241022',
         stop_reason: null,
         stop_sequence: null,
         usage: {
@@ -71,11 +70,11 @@ describe("AnthropicTransformer extractUsage", () => {
     expect(usage!.cached_tokens).toBe(50);
   });
 
-  test("should handle missing thinkingTokens", async () => {
+  test('should handle missing thinkingTokens', async () => {
     const transformer = new AnthropicTransformer();
     const dataStr = JSON.stringify({
-      type: "message_delta",
-      delta: { stop_reason: "end_turn", stop_sequence: null },
+      type: 'message_delta',
+      delta: { stop_reason: 'end_turn', stop_sequence: null },
       usage: {
         input_tokens: 15,
         output_tokens: 30,
@@ -92,12 +91,12 @@ describe("AnthropicTransformer extractUsage", () => {
     expect(usage!.cached_tokens).toBe(5);
   });
 
-  test("should return undefined for non-usage events", async () => {
+  test('should return undefined for non-usage events', async () => {
     const transformer = new AnthropicTransformer();
     const dataStr = JSON.stringify({
-      type: "content_block_delta",
+      type: 'content_block_delta',
       index: 0,
-      delta: { type: "text_delta", text: "Hello" },
+      delta: { type: 'text_delta', text: 'Hello' },
     });
 
     const usage = transformer.extractUsage(dataStr);
@@ -105,9 +104,9 @@ describe("AnthropicTransformer extractUsage", () => {
     expect(usage).toBeUndefined();
   });
 
-  test("should handle malformed JSON gracefully", async () => {
+  test('should handle malformed JSON gracefully', async () => {
     const transformer = new AnthropicTransformer();
-    const dataStr = "not valid json";
+    const dataStr = 'not valid json';
 
     const usage = transformer.extractUsage(dataStr);
 

@@ -7,31 +7,35 @@ import { getModels } from '@mariozechner/pi-ai';
 
 const startSessionSchema = z.object({
   providerId: z.string().min(1),
-  accountId: z.string().min(1)
+  accountId: z.string().min(1),
 });
 
 const deleteCredentialsSchema = z.object({
   providerId: z.string().min(1),
-  accountId: z.string().min(1)
+  accountId: z.string().min(1),
 });
 
 const inputSchema = z.object({
-  value: z.string()
+  value: z.string(),
 });
 
 const credentialStatusQuerySchema = z.object({
   providerId: z.string().min(1),
-  accountId: z.string().min(1)
+  accountId: z.string().min(1),
 });
 
 const getModelsQuerySchema = z.object({
-  providerId: z.string().min(1)
+  providerId: z.string().min(1),
 });
 
-const toProviderResponse = (provider: { id: string; name: string; usesCallbackServer?: boolean }) => ({
+const toProviderResponse = (provider: {
+  id: string;
+  name: string;
+  usesCallbackServer?: boolean;
+}) => ({
   id: provider.id,
   name: provider.name,
-  usesCallbackServer: !!provider.usesCallbackServer
+  usesCallbackServer: !!provider.usesCallbackServer,
 });
 
 export async function registerOAuthRoutes(
@@ -56,7 +60,9 @@ export async function registerOAuthRoutes(
       );
       return reply.send({ data: session });
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -82,7 +88,9 @@ export async function registerOAuthRoutes(
   fastify.get('/v0/management/oauth/credentials/status', async (request, reply) => {
     const parsed = credentialStatusQuerySchema.safeParse(request.query);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid query parameters', details: parsed.error.errors });
+      return reply
+        .code(400)
+        .send({ error: 'Invalid query parameters', details: parsed.error.errors });
     }
 
     const authManager = OAuthAuthManager.getInstance();
@@ -114,7 +122,9 @@ export async function registerOAuthRoutes(
       const session = await sessionManager.submitPrompt(sessionId, parsed.data.value);
       return reply.send({ data: session });
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -129,7 +139,9 @@ export async function registerOAuthRoutes(
       const session = await sessionManager.submitManualCode(sessionId, parsed.data.value);
       return reply.send({ data: session });
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -139,30 +151,38 @@ export async function registerOAuthRoutes(
       const session = await sessionManager.cancel(sessionId);
       return reply.send({ data: session });
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
   fastify.get('/v0/management/oauth/models', async (request, reply) => {
     const parsed = getModelsQuerySchema.safeParse(request.query);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid query parameters', details: parsed.error.errors });
+      return reply
+        .code(400)
+        .send({ error: 'Invalid query parameters', details: parsed.error.errors });
     }
 
     try {
       const models = getModels(parsed.data.providerId as any);
-      const modelList = models.map(model => ({
+      const modelList = models.map((model) => ({
         id: model.id,
         name: model.name,
         context_length: model.contextWindow,
-        pricing: model.cost ? {
-          prompt: model.cost.input.toString(),
-          completion: model.cost.output.toString()
-        } : undefined
+        pricing: model.cost
+          ? {
+              prompt: model.cost.input.toString(),
+              completion: model.cost.output.toString(),
+            }
+          : undefined,
       }));
       return reply.send({ data: modelList });
     } catch (error) {
-      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 }

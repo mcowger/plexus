@@ -85,7 +85,7 @@ function applyStripAdaptiveThinking(
   if (thinking && typeof thinking === 'object' && thinking.type === 'adaptive') {
     logger.debug(
       `[model-behaviors] strip_adaptive_thinking: removing thinking.type='adaptive' ` +
-      `for alias '${ctx.canonicalModel}'`
+        `for alias '${ctx.canonicalModel}'`
     );
     const { thinking: _removed, ...rest } = payload;
     return rest;

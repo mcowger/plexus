@@ -81,19 +81,15 @@ adminKey: "admin-secret"
   });
 
   it('rejects minimax quota checker when groupid is missing', () => {
-    expect(() =>
-      validateConfig(
-        makeConfigYaml(`        hertzSession: "session-secret"`)
-      )
-    ).toThrow('"groupid"');
+    expect(() => validateConfig(makeConfigYaml(`        hertzSession: "session-secret"`))).toThrow(
+      '"groupid"'
+    );
   });
 
   it('rejects minimax quota checker when hertzSession is missing', () => {
-    expect(() =>
-      validateConfig(
-        makeConfigYaml(`        groupid: "group-123"`)
-      )
-    ).toThrow('"hertzSession"');
+    expect(() => validateConfig(makeConfigYaml(`        groupid: "group-123"`))).toThrow(
+      '"hertzSession"'
+    );
   });
 
   it('rejects minimax quota checker when required fields are empty strings', () => {

@@ -25,7 +25,7 @@ const CLAUDE_CODE_TOOL_NAMES = [
   'TaskOutput',
   'TodoWrite',
   'WebFetch',
-  'WebSearch'
+  'WebSearch',
 ];
 
 const CLAUDE_CODE_TOOL_SET = new Set(CLAUDE_CODE_TOOL_NAMES.map((name) => name.toLowerCase()));

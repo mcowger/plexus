@@ -6,10 +6,7 @@ export interface NanoGPTQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-export const NanoGPTQuotaConfig: React.FC<NanoGPTQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
+export const NanoGPTQuotaConfig: React.FC<NanoGPTQuotaConfigProps> = ({ options, onChange }) => {
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };

@@ -17,7 +17,7 @@ export const Login: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-        navigate(from, { replace: true });
+      navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);
 
@@ -39,7 +39,7 @@ export const Login: React.FC = () => {
           <h1 className="text-2xl font-bold text-text">Admin Access</h1>
           <p className="text-text-muted">Enter your Admin Key to continue</p>
         </div>
-        
+
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
@@ -65,9 +65,9 @@ export const Login: React.FC = () => {
                 autoFocus
               />
             </div>
-            
+
             {error && <p className="text-danger text-sm">{error}</p>}
-            
+
             <Button type="submit" className="w-full">
               Access Dashboard
             </Button>

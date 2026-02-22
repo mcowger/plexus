@@ -1,14 +1,14 @@
-import { test, expect, describe } from "bun:test";
-import { GeminiTransformer } from "../gemini";
+import { test, expect, describe } from 'bun:test';
+import { GeminiTransformer } from '../gemini';
 
-describe("GeminiTransformer extractUsage", () => {
-  test("should extract reasoning_tokens from thoughtsTokenCount", () => {
+describe('GeminiTransformer extractUsage', () => {
+  test('should extract reasoning_tokens from thoughtsTokenCount', () => {
     const transformer = new GeminiTransformer();
     const dataStr = JSON.stringify({
       candidates: [
         {
-          content: { role: "model", parts: [{ text: "Response" }] },
-          finishReason: "STOP",
+          content: { role: 'model', parts: [{ text: 'Response' }] },
+          finishReason: 'STOP',
         },
       ],
       usageMetadata: {
@@ -29,13 +29,13 @@ describe("GeminiTransformer extractUsage", () => {
     expect(usage!.cached_tokens).toBe(0);
   });
 
-  test("should handle missing thoughtsTokenCount", () => {
+  test('should handle missing thoughtsTokenCount', () => {
     const transformer = new GeminiTransformer();
     const dataStr = JSON.stringify({
       candidates: [
         {
-          content: { role: "model", parts: [{ text: "Response" }] },
-          finishReason: "STOP",
+          content: { role: 'model', parts: [{ text: 'Response' }] },
+          finishReason: 'STOP',
         },
       ],
       usageMetadata: {
@@ -53,13 +53,13 @@ describe("GeminiTransformer extractUsage", () => {
     expect(usage!.reasoning_tokens).toBe(0);
   });
 
-  test("should handle cached tokens", () => {
+  test('should handle cached tokens', () => {
     const transformer = new GeminiTransformer();
     const dataStr = JSON.stringify({
       candidates: [
         {
-          content: { role: "model", parts: [{ text: "Response" }] },
-          finishReason: "STOP",
+          content: { role: 'model', parts: [{ text: 'Response' }] },
+          finishReason: 'STOP',
         },
       ],
       usageMetadata: {
@@ -79,13 +79,13 @@ describe("GeminiTransformer extractUsage", () => {
     expect(usage!.reasoning_tokens).toBe(0);
   });
 
-  test("should return undefined for missing usageMetadata", () => {
+  test('should return undefined for missing usageMetadata', () => {
     const transformer = new GeminiTransformer();
     const dataStr = JSON.stringify({
       candidates: [
         {
-          content: { role: "model", parts: [{ text: "Response" }] },
-          finishReason: "STOP",
+          content: { role: 'model', parts: [{ text: 'Response' }] },
+          finishReason: 'STOP',
         },
       ],
     });
@@ -95,22 +95,22 @@ describe("GeminiTransformer extractUsage", () => {
     expect(usage).toBeUndefined();
   });
 
-  test("should handle malformed JSON gracefully", () => {
+  test('should handle malformed JSON gracefully', () => {
     const transformer = new GeminiTransformer();
-    const dataStr = "not valid json";
+    const dataStr = 'not valid json';
 
     const usage = transformer.extractUsage(dataStr);
 
     expect(usage).toBeUndefined();
   });
 
-  test("should extract all token types together", () => {
+  test('should extract all token types together', () => {
     const transformer = new GeminiTransformer();
     const dataStr = JSON.stringify({
       candidates: [
         {
-          content: { role: "model", parts: [{ text: "Response" }] },
-          finishReason: "STOP",
+          content: { role: 'model', parts: [{ text: 'Response' }] },
+          finishReason: 'STOP',
         },
       ],
       usageMetadata: {

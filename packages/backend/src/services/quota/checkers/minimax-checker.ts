@@ -28,8 +28,8 @@ export class MiniMaxQuotaChecker extends QuotaChecker {
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'Cookie': `HERTZ-SESSION=${hertzSession}`,
-          'Accept': 'application/json',
+          Cookie: `HERTZ-SESSION=${hertzSession}`,
+          Accept: 'application/json',
         },
       });
 
@@ -40,12 +40,16 @@ export class MiniMaxQuotaChecker extends QuotaChecker {
       const data: MiniMaxBalanceResponse = await response.json();
 
       if (data.base_resp?.status_code !== 0) {
-        return this.errorResult(new Error(`MiniMax API error: ${data.base_resp?.status_msg || 'unknown error'}`));
+        return this.errorResult(
+          new Error(`MiniMax API error: ${data.base_resp?.status_msg || 'unknown error'}`)
+        );
       }
 
       const availableAmount = Number.parseFloat(data.available_amount);
       if (!Number.isFinite(availableAmount)) {
-        return this.errorResult(new Error(`Invalid available_amount received: ${data.available_amount}`));
+        return this.errorResult(
+          new Error(`Invalid available_amount received: ${data.available_amount}`)
+        );
       }
 
       const window: QuotaWindow = this.createWindow(
