@@ -303,6 +303,8 @@ export interface UsageRecord {
     finishReason?: string;
     // Retry metadata
     attemptCount?: number;
+    // Energy estimation
+    kwhUsed?: number;
 }
 
 interface BackendResponse<T> {

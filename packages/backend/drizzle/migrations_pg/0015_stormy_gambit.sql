@@ -1,0 +1,1 @@
+ALTER TABLE "request_usage" ADD COLUMN "kwh_used" real;

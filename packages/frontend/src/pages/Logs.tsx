@@ -35,9 +35,18 @@ export const Logs = () => {
 
     const apiLogos: Record<string, string> = {
         'messages': messagesLogo,
-        'antigravity': antigravityLogo,
+      'antigravity': antigravityLogo,
         'chat': chatLogo,
         'gemini': geminiLogo
+    };
+
+    /** Auto-scales kWh → Wh → mWh for human-readable display */
+    const formatEnergy = (kwh: number): string => {
+        const wh = kwh * 1000;
+        if (wh >= 1) return `${wh.toFixed(3)} Wh`;
+        const mwh = wh * 1000;
+        if (mwh >= 0.01) return `${mwh.toFixed(2)} mWh`;
+        return `${(mwh * 1000).toFixed(2)} µWh`;
     };
 
     // Delete Modal State
@@ -524,9 +533,13 @@ export const Logs = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle">
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                {/* Row 1: Messages and Tool calls */}
+                            <td
+                                   className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
+                               title={log.kwhUsed != null && log.kwhUsed > 0 ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${(log.kwhUsed / 0.02).toFixed(2)} toast slices` : undefined}
+                  style={log.kwhUsed != null && log.kwhUsed > 0 ? { cursor: 'help' } : undefined}
+                              >
+                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {/* Row 1: Messages and Tool calls */}
                                                 <div style={{ display: 'flex', gap: '16px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} className="text-blue-400">
                                                         <MessagesSquare size={12} />
