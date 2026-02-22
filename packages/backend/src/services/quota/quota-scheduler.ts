@@ -257,7 +257,8 @@ export class QuotaScheduler {
       }
 
       if (since) {
-        conditions.push(gte(schema.quotaSnapshots.checkedAt, since));
+        const dialect = getCurrentDialect();
+        conditions.push(gte(schema.quotaSnapshots.checkedAt, toDbTimestampMs(since, dialect) as any));
       }
 
       // Create a timeout promise to prevent indefinite hanging
