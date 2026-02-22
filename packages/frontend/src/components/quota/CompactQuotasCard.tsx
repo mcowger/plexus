@@ -12,6 +12,7 @@ import {
   Shield,
   Github,
   Code2,
+  Sparkles,
   AlertTriangle,
 } from 'lucide-react';
 
@@ -40,6 +41,7 @@ const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   if (id.includes('zai')) return 'zai';
   if (id.includes('nanogpt') || id.includes('nano')) return 'nanogpt';
   if (id.includes('naga')) return 'naga';
+  if (id.includes('kimi-code') || id.includes('kimi')) return 'kimi';
   if (id.includes('copilot')) return 'copilot';
   return 'default';
 };
@@ -54,6 +56,7 @@ const getTypeDisplayName = (category: string): string => {
     'nanogpt': 'NanoGPT',
     'naga': 'Naga',
     'minimax-coding': 'MiniMax Coding',
+    'kimi': 'Kimi',
     'copilot': 'Copilot',
   };
   return names[category] || toTitleCase(category);
@@ -69,7 +72,7 @@ const formatCheckerDisplayName = (quota: QuotaCheckerInfo): string => {
   let displayPart = checkerId;
   
   // Remove common type prefixes
-  const prefixes = ['openai-', 'claude-', 'github-', 'copilot-', 'minimax-', 'synthetic-', 'zai-', 'nano-', 'naga-'];
+  const prefixes = ['openai-', 'claude-', 'github-', 'copilot-', 'kimi-', 'minimax-', 'synthetic-', 'zai-', 'nano-', 'naga-'];
   for (const prefix of prefixes) {
     if (displayPart.toLowerCase().startsWith(prefix)) {
       displayPart = displayPart.slice(prefix.length);
@@ -107,6 +110,8 @@ const getCheckerIcon = (category: string) => {
       return <Shield className={iconClass} />;
     case 'minimax-coding':
       return <Code2 className={iconClass} />;
+    case 'kimi':
+      return <Sparkles className={iconClass} />;
     case 'copilot':
       return <Github className={iconClass} />;
     default:
@@ -134,6 +139,8 @@ const getTrackedWindowsForChecker = (category: string, windows: any[]): string[]
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99));
     case 'minimax-coding':
       return ['custom'].filter(t => availableTypes.has(t));
+    case 'kimi':
+      return ['custom', 'five_hour'].filter(t => availableTypes.has(t));
     case 'copilot':
       return ['monthly'].filter(t => availableTypes.has(t));
     default:

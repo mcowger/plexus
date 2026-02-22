@@ -20,6 +20,7 @@ import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig
 import { KiloQuotaConfig } from '../components/quota/KiloQuotaConfig';
 import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig';
 import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
+import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 
 const KNOWN_APIS = ['chat', 'messages', 'gemini', 'embeddings', 'transcriptions', 'speech', 'images', 'responses'];
 
@@ -32,7 +33,7 @@ const OAUTH_PROVIDERS = [
 ];
 
 // Fallback list for UI display until types are fetched from backend
-const QUOTA_CHECKER_TYPES_FALLBACK = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'zai', 'moonshot', 'minimax', 'minimax-coding', 'openrouter', 'kilo', 'wisdomgate', 'apertis', 'copilot'] as const;
+const QUOTA_CHECKER_TYPES_FALLBACK = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'kimi-code', 'zai', 'moonshot', 'minimax', 'minimax-coding', 'openrouter', 'kilo', 'wisdomgate', 'apertis', 'copilot'] as const;
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
@@ -1383,17 +1384,29 @@ export const Providers = () => {
                  </div>
                       )}
 
-                      {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
-                    <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                   <ApertisQuotaConfig
-                         options={editingProvider.quotaChecker?.options || {}}
-                  onChange={(options) => setEditingProvider({
-                         ...editingProvider,
-                              quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
-                        })}
-                      />
-                      </div>
-                )}
+               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kimi-code' && (
+                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                   <KimiCodeQuotaConfig
+                     options={editingProvider.quotaChecker?.options || {}}
+                     onChange={(options) => setEditingProvider({
+                       ...editingProvider,
+                       quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
+                     })}
+                   />
+                 </div>
+               )}
+
+                             {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
+                            <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                           <ApertisQuotaConfig
+                                 options={editingProvider.quotaChecker?.options || {}}
+                          onChange={(options) => setEditingProvider({
+                                 ...editingProvider,
+                                      quotaChecker: { ...editingProvider.quotaChecker, options } as Provider['quotaChecker']
+                                })}
+                        />
+                        </div>
+                  )}
 
                     {quotaValidationError && (
                   <div className="mt-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
