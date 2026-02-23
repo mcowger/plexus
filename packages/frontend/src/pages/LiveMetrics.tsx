@@ -277,7 +277,6 @@ export const LiveMetrics = () => {
             {formatCost(summary.totalCost, 6)}
           </div>
         </div>
-
       </div>
 
       {cooldowns.length > 0 && (
