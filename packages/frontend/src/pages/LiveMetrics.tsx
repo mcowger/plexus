@@ -16,7 +16,14 @@ import {
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { api, type Cooldown, type UsageRecord } from '../lib/api';
+import {
+  api,
+  STAT_LABELS,
+  type Cooldown,
+  type Stat,
+  type TodayMetrics,
+  type UsageRecord,
+} from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTimeAgo, formatTokens } from '../lib/format';
 
 type MinuteBucket = {
@@ -39,7 +46,17 @@ const RECENT_REQUEST_LIMIT = 200;
 const POLL_INTERVAL_OPTIONS = [5000, 10000, 30000] as const;
 
 export const LiveMetrics = () => {
+  const [stats, setStats] = useState<Stat[]>([]);
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
+  const [todayMetrics, setTodayMetrics] = useState<TodayMetrics>({
+    requests: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    cachedTokens: 0,
+    cacheWriteTokens: 0,
+    totalCost: 0,
+  });
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [timeAgo, setTimeAgo] = useState('Just now');
@@ -62,7 +79,9 @@ export const LiveMetrics = () => {
         api.getDashboardData('day'),
         api.getLogs(RECENT_REQUEST_LIMIT, 0),
       ]);
+      setStats(dashboardData.stats);
       setCooldowns(dashboardData.cooldowns);
+      setTodayMetrics(dashboardData.todayMetrics);
       setLogs(logData.data || []);
       setLastUpdated(new Date());
       setIsConnected(true);
@@ -201,6 +220,16 @@ export const LiveMetrics = () => {
   const successRate =
     summary.requestCount > 0 ? (summary.successCount / summary.requestCount) * 100 : 0;
   const isStale = secondsSinceUpdate > Math.ceil((pollIntervalMs * 3) / 1000);
+  const totalRequestsValue =
+    stats.find((stat) => stat.label === STAT_LABELS.REQUESTS)?.value || formatNumber(0, 0);
+  const totalTokensValue =
+    stats.find((stat) => stat.label === STAT_LABELS.TOKENS)?.value || formatTokens(0);
+  const todayTokenTotal =
+    todayMetrics.inputTokens +
+    todayMetrics.outputTokens +
+    todayMetrics.reasoningTokens +
+    todayMetrics.cachedTokens +
+    todayMetrics.cacheWriteTokens;
 
   const providerRows = useMemo(() => {
     const providers = new Map<
@@ -405,6 +434,109 @@ export const LiveMetrics = () => {
         <span className="text-xs text-text-muted">
           {isVisible ? 'Tab active' : 'Tab hidden'} - data refresh resumes on focus.
         </span>
+      </div>
+
+      <div
+        className="mb-6"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '16px',
+        }}
+      >
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Total Requests
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Activity size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">{totalRequestsValue}</div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Total Tokens
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Database size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">{totalTokensValue}</div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Requests Today
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Activity size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">
+            {formatNumber(todayMetrics.requests, 0)}
+          </div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Tokens Today
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Database size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">
+            {formatTokens(todayTokenTotal)}
+          </div>
+          <div className="text-xs text-text-muted space-y-0.5">
+            <div>In: {formatTokens(todayMetrics.inputTokens)}</div>
+            <div>Out: {formatTokens(todayMetrics.outputTokens)}</div>
+            {todayMetrics.reasoningTokens > 0 && (
+              <div>Reasoning: {formatTokens(todayMetrics.reasoningTokens)}</div>
+            )}
+            {todayMetrics.cachedTokens > 0 && (
+              <div>Cached: {formatTokens(todayMetrics.cachedTokens)}</div>
+            )}
+            {todayMetrics.cacheWriteTokens > 0 && (
+              <div>Cache Write: {formatTokens(todayMetrics.cacheWriteTokens)}</div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Cost Today
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Zap size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">
+            {formatCost(todayMetrics.totalCost, 4)}
+          </div>
+        </div>
       </div>
 
       <div
