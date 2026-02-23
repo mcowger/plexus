@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Clock, Database, Signal, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, Zap } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -26,16 +26,27 @@ const LIVE_WINDOW_MINUTES = 5;
 const LIVE_WINDOW_MS = LIVE_WINDOW_MINUTES * 60 * 1000;
 const POLL_INTERVAL_MS = 10000;
 const RECENT_REQUEST_LIMIT = 200;
+const POLL_INTERVAL_OPTIONS = [5000, 10000, 30000] as const;
 
 export const LiveMetrics = () => {
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [timeAgo, setTimeAgo] = useState('Just now');
+  const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pollIntervalMs, setPollIntervalMs] = useState(POLL_INTERVAL_MS);
+  const [isVisible, setIsVisible] = useState<boolean>(() =>
+    typeof document === 'undefined' ? true : document.visibilityState === 'visible'
+  );
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
+    if (!silent) {
+      setIsRefreshing(true);
+    }
+
     try {
       const [dashboardData, logData] = await Promise.all([
         api.getDashboardData('day'),
@@ -49,19 +60,47 @@ export const LiveMetrics = () => {
       setIsConnected(false);
       console.error('Failed to load live metrics data', e);
     } finally {
+      if (!silent) {
+        setIsRefreshing(false);
+      }
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, POLL_INTERVAL_MS);
+    void loadData();
+    if (!isVisible) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void loadData(true);
+    }, pollIntervalMs);
+
     return () => clearInterval(interval);
+  }, [isVisible, pollIntervalMs]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      const visible = document.visibilityState === 'visible';
+      setIsVisible(visible);
+      if (visible) {
+        void loadData(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   useEffect(() => {
     const updateTime = () => {
       const seconds = Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+      setSecondsSinceUpdate(seconds);
       if (seconds < 5) {
         setTimeAgo('Just now');
         return;
@@ -151,6 +190,43 @@ export const LiveMetrics = () => {
 
   const successRate =
     summary.requestCount > 0 ? (summary.successCount / summary.requestCount) * 100 : 0;
+  const isStale = secondsSinceUpdate > Math.ceil((pollIntervalMs * 3) / 1000);
+
+  const providerRows = useMemo(() => {
+    const providers = new Map<
+      string,
+      { requests: number; success: number; totalLatency: number; totalCost: number }
+    >();
+
+    for (const request of liveRequests) {
+      const provider = request.provider || 'unknown';
+      const row = providers.get(provider) || {
+        requests: 0,
+        success: 0,
+        totalLatency: 0,
+        totalCost: 0,
+      };
+
+      row.requests += 1;
+      if ((request.responseStatus || '').toLowerCase() === 'success') {
+        row.success += 1;
+      }
+      row.totalLatency += Number(request.durationMs || 0);
+      row.totalCost += Number(request.costTotal || 0);
+      providers.set(provider, row);
+    }
+
+    return Array.from(providers.entries())
+      .map(([provider, row]) => ({
+        provider,
+        requests: row.requests,
+        successRate: row.requests > 0 ? (row.success / row.requests) * 100 : 0,
+        avgLatency: row.requests > 0 ? row.totalLatency / row.requests : 0,
+        totalCost: row.totalCost,
+      }))
+      .sort((a, b) => b.requests - a.requests)
+      .slice(0, 6);
+  }, [liveRequests]);
 
   const handleClearCooldowns = async () => {
     if (!confirm('Are you sure you want to clear all provider cooldowns?')) {
@@ -191,12 +267,44 @@ export const LiveMetrics = () => {
         </div>
 
         <Badge
-          status={isConnected ? 'connected' : 'warning'}
+          status={isConnected && !isStale ? 'connected' : 'warning'}
           secondaryText={`Window: last ${LIVE_WINDOW_MINUTES}m`}
           style={{ minWidth: '210px' }}
         >
-          {isConnected ? 'Live Polling Active' : 'Live Polling Reconnecting'}
+          {isConnected
+            ? isStale
+              ? 'Live Polling Delayed'
+              : 'Live Polling Active'
+            : 'Live Polling Reconnecting'}
         </Badge>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => void loadData()}
+          isLoading={isRefreshing}
+        >
+          <RefreshCw size={14} />
+          Refresh Now
+        </Button>
+        {POLL_INTERVAL_OPTIONS.map((option) => {
+          const label = `${Math.floor(option / 1000)}s`;
+          return (
+            <Button
+              key={option}
+              size="sm"
+              variant={pollIntervalMs === option ? 'primary' : 'secondary'}
+              onClick={() => setPollIntervalMs(option)}
+            >
+              Poll {label}
+            </Button>
+          );
+        })}
+        <span className="text-xs text-text-muted">
+          {isVisible ? 'Tab active' : 'Tab hidden'} - data refresh resumes on focus.
+        </span>
       </div>
 
       <div
@@ -319,6 +427,40 @@ export const LiveMetrics = () => {
           </Card>
         </div>
       )}
+
+      <div className="mb-4">
+        <Card
+          title="Top Providers (Live Window)"
+          extra={<span className="text-xs text-text-secondary">Top 6 by requests</span>}
+        >
+          {providerRows.length === 0 ? (
+            <div className="text-text-secondary text-sm py-2">
+              No provider activity in the last {LIVE_WINDOW_MINUTES} minutes.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {providerRows.map((row) => (
+                <div
+                  key={row.provider}
+                  className="rounded-md border border-border-glass bg-bg-glass px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm text-text font-medium">{row.provider}</span>
+                    <span className="text-xs text-text-secondary">
+                      {formatNumber(row.requests, 0)} requests
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+                    <span>Success: {row.successRate.toFixed(1)}%</span>
+                    <span>Avg latency: {formatMs(row.avgLatency)}</span>
+                    <span>Cost: {formatCost(row.totalCost, 6)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       <div
         className="grid gap-4 mb-4 flex-col lg:flex-row"
