@@ -24,7 +24,14 @@ import {
   type TodayMetrics,
   type UsageRecord,
 } from '../lib/api';
-import { formatCost, formatMs, formatNumber, formatTimeAgo, formatTokens } from '../lib/format';
+import {
+  formatCost,
+  formatMs,
+  formatNumber,
+  formatTimeAgo,
+  formatTokens,
+  formatTPS,
+} from '../lib/format';
 
 type MinuteBucket = {
   time: string;
@@ -220,6 +227,17 @@ export const LiveMetrics = () => {
   const successRate =
     summary.requestCount > 0 ? (summary.successCount / summary.requestCount) * 100 : 0;
   const isStale = secondsSinceUpdate > Math.ceil((pollIntervalMs * 3) / 1000);
+  const tokensPerMinute = summary.totalTokens / LIVE_WINDOW_MINUTES;
+  const costPerMinute = summary.totalCost / LIVE_WINDOW_MINUTES;
+  const avgLatency = summary.requestCount > 0 ? summary.totalLatency / summary.requestCount : 0;
+  const avgTtft = summary.requestCount > 0 ? summary.totalTtft / summary.requestCount : 0;
+  const throughputSamples = liveRequests
+    .map((request) => Number(request.tokensPerSec || 0))
+    .filter((tps) => Number.isFinite(tps) && tps > 0);
+  const avgThroughput =
+    throughputSamples.length > 0
+      ? throughputSamples.reduce((acc, tps) => acc + tps, 0) / throughputSamples.length
+      : 0;
   const totalRequestsValue =
     stats.find((stat) => stat.label === STAT_LABELS.REQUESTS)?.value || formatNumber(0, 0);
   const totalTokensValue =
@@ -587,7 +605,7 @@ export const LiveMetrics = () => {
         <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
           <div className="flex justify-between items-start">
             <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Tokens ({LIVE_WINDOW_MINUTES}m)
+              Tokens / Min
             </span>
             <div
               className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
@@ -597,14 +615,14 @@ export const LiveMetrics = () => {
             </div>
           </div>
           <div className="font-heading text-3xl font-bold text-text my-1">
-            {formatTokens(summary.totalTokens)}
+            {formatTokens(tokensPerMinute)}
           </div>
         </div>
 
         <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
           <div className="flex justify-between items-start">
             <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Cost ({LIVE_WINDOW_MINUTES}m)
+              Cost / Min
             </span>
             <div
               className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
@@ -614,8 +632,41 @@ export const LiveMetrics = () => {
             </div>
           </div>
           <div className="font-heading text-3xl font-bold text-text my-1">
-            {formatCost(summary.totalCost, 6)}
+            {formatCost(costPerMinute, 6)}
           </div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Avg Latency
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Clock size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">
+            {formatMs(avgLatency)}
+          </div>
+        </div>
+
+        <div className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Avg TTFT / Throughput
+            </span>
+            <div
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+              style={{ background: 'var(--color-bg-hover)' }}
+            >
+              <Signal size={20} />
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-text my-1">{formatMs(avgTtft)}</div>
+          <div className="text-xs text-text-muted mt-1">{formatTPS(avgThroughput)} tok/s</div>
         </div>
       </div>
 
