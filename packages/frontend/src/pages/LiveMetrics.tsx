@@ -114,7 +114,7 @@ export const LiveMetrics = () => {
 
     try {
       const [dashboardData, logData] = await Promise.all([
-        api.getDashboardData('day'),
+        api.getDashboardData('day', false),
         api.getLogs(RECENT_REQUEST_LIMIT, 0),
       ]);
       setStats(dashboardData.stats);
