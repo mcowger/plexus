@@ -94,6 +94,15 @@ export function formatTPS(tps: number): string {
 }
 
 /**
+ * Format a percentage value (e.g., 99.5 -> "99.5%", 100 -> "100%")
+ */
+export function formatPercent(value: number, decimals: number = 1): string {
+  if (value === 0) return '0%';
+  if (value === 100) return '100%';
+  return `${value.toFixed(decimals)}%`;
+}
+
+/**
  * Convert string to Title Case (e.g., "hello-world" -> "Hello World")
  */
 export function toTitleCase(str: string): string {

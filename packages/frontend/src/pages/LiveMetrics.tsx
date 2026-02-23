@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, Zap } from 'lucide-react';
 import {
   AreaChart,
@@ -13,7 +13,14 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { api, type Cooldown, type UsageRecord } from '../lib/api';
-import { formatCost, formatMs, formatNumber, formatTimeAgo, formatTokens } from '../lib/format';
+import {
+  formatCost,
+  formatMs,
+  formatNumber,
+  formatPercent,
+  formatTimeAgo,
+  formatTokens,
+} from '../lib/format';
 
 type MinuteBucket = {
   time: string;
@@ -42,7 +49,7 @@ export const LiveMetrics = () => {
   );
   const [loading, setLoading] = useState(true);
 
-  const loadData = async (silent = false) => {
+  const loadData = useCallback(async (silent = false) => {
     if (!silent) {
       setIsRefreshing(true);
     }
@@ -65,7 +72,7 @@ export const LiveMetrics = () => {
       }
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadData();
@@ -78,7 +85,7 @@ export const LiveMetrics = () => {
     }, pollIntervalMs);
 
     return () => clearInterval(interval);
-  }, [isVisible, pollIntervalMs]);
+  }, [isVisible, pollIntervalMs, loadData]);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -95,7 +102,7 @@ export const LiveMetrics = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -451,7 +458,7 @@ export const LiveMetrics = () => {
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
-                    <span>Success: {row.successRate.toFixed(1)}%</span>
+                    <span>Success: {formatPercent(row.successRate)}</span>
                     <span>Avg latency: {formatMs(row.avgLatency)}</span>
                     <span>Cost: {formatCost(row.totalCost, 6)}</span>
                   </div>
