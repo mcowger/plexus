@@ -148,7 +148,7 @@ export const LiveMetrics = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalCard, setModalCard] = useState<
-    'velocity' | 'provider' | 'model' | 'timeline' | 'requests' | null
+    'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | null
   >(null);
 
   const openModal = (card: typeof modalCard) => {
@@ -661,6 +661,8 @@ export const LiveMetrics = () => {
         return 'Model Pulse (5m)';
       case 'timeline':
         return 'Live Timeline';
+      case 'modelstack':
+        return 'Model Stack + Runtime';
       case 'requests':
         return 'Latest Requests';
       default:
@@ -756,20 +758,74 @@ export const LiveMetrics = () => {
         );
       case 'timeline':
         return (
-          <div className="space-y-6">
-            <div className="h-[40vh]">
+          <div className="h-[60vh]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={minuteSeries} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="liveRequests" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                  </linearGradient>
+                  <linearGradient id="liveTokens" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
+                <YAxis yAxisId="left" stroke="var(--color-text-secondary)" />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--color-text-secondary)" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--color-bg-card)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="requests"
+                  stroke="#3b82f6"
+                  fillOpacity={1}
+                  fill="url(#liveRequests)"
+                  strokeWidth={2}
+                />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="errors"
+                  stroke="#ef4444"
+                  fillOpacity={0.15}
+                  fill="#ef4444"
+                  strokeWidth={1.5}
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="tokens"
+                  stroke="#10b981"
+                  fillOpacity={1}
+                  fill="url(#liveTokens)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case 'modelstack':
+        return (
+          <div className="h-[70vh]">
+            {modelTimeline.series.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-text-secondary">
+                No model stack data in the selected live window.
+              </div>
+            ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={minuteSeries} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="liveRequests" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
-                    </linearGradient>
-                    <linearGradient id="liveTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
-                    </linearGradient>
-                  </defs>
+                <ComposedChart
+                  data={modelTimeline.data}
+                  margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
                   <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
                   <YAxis yAxisId="left" stroke="var(--color-text-secondary)" />
@@ -780,89 +836,53 @@ export const LiveMetrics = () => {
                       border: '1px solid var(--color-border)',
                       borderRadius: '8px',
                     }}
+                    labelStyle={{ color: 'var(--color-text)' }}
+                    formatter={(value, name) => {
+                      const numeric = Number(value || 0);
+                      const label = modelTimeline.seriesLabelMap.get(String(name));
+                      if (label) {
+                        return [formatNumber(numeric, 0), label];
+                      }
+                      if (name === 'avgTtftMs') {
+                        return [formatMs(numeric), 'Avg TTFT'];
+                      }
+                      if (name === 'avgTps') {
+                        return [formatTPS(numeric), 'Avg TPS'];
+                      }
+                      return [formatNumber(numeric, 0), String(name)];
+                    }}
                   />
-                  <Area
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="requests"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#liveRequests)"
-                    strokeWidth={2}
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={(value) => modelTimeline.seriesLabelMap.get(String(value)) || value}
                   />
-                  <Area
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="errors"
-                    stroke="#ef4444"
-                    fillOpacity={0.15}
-                    fill="#ef4444"
-                    strokeWidth={1.5}
-                  />
-                  <Area
+                  {modelTimeline.series.map((series) => (
+                    <Bar
+                      key={series.key}
+                      yAxisId="left"
+                      stackId="model-stack"
+                      dataKey={series.key}
+                      fill={series.color}
+                    />
+                  ))}
+                  <Line
                     yAxisId="right"
                     type="monotone"
-                    dataKey="tokens"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#liveTokens)"
+                    dataKey="avgTtftMs"
+                    stroke="#f59e0b"
                     strokeWidth={2}
+                    dot={false}
                   />
-                </AreaChart>
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="avgTps"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
-            </div>
-            {modelTimeline.series.length > 0 && (
-              <div className="h-[30vh]">
-                <div className="text-sm text-text-secondary mb-2">Model Stack + Runtime</div>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={modelTimeline.data}
-                    margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                    <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
-                    <YAxis yAxisId="left" stroke="var(--color-text-secondary)" />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="var(--color-text-secondary)"
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--color-bg-card)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    {modelTimeline.series.map((series) => (
-                      <Bar
-                        key={series.key}
-                        yAxisId="left"
-                        stackId="model-stack"
-                        dataKey={series.key}
-                        fill={series.color}
-                      />
-                    ))}
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="avgTtftMs"
-                      stroke="#f59e0b"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="avgTps"
-                      stroke="#22c55e"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
             )}
           </div>
         );
@@ -1445,7 +1465,7 @@ export const LiveMetrics = () => {
 
       <div
         className="grid gap-4 mb-4 flex-col lg:flex-row"
-        style={{ gridTemplateColumns: '1.2fr 1fr' }}
+        style={{ gridTemplateColumns: '1fr 1fr' }}
       >
         <Card
           className="min-w-0 hover:shadow-lg hover:border-primary/30 transition-all"
@@ -1455,188 +1475,188 @@ export const LiveMetrics = () => {
           style={{ cursor: 'pointer' }}
         >
           {loading ? (
-            <div className="h-64 flex items-center justify-center text-text-secondary">
+            <div className="h-56 flex items-center justify-center text-text-secondary">
               Loading...
             </div>
           ) : minuteSeries.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-text-secondary">
+            <div className="h-56 flex items-center justify-center text-text-secondary">
               No requests in the last {LIVE_WINDOW_MINUTES} minutes
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={minuteSeries}
-                    margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="liveRequests" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
-                      </linearGradient>
-                      <linearGradient id="liveTokens" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                    <XAxis
-                      dataKey="time"
-                      stroke="var(--color-text-secondary)"
-                      tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                    />
-                    <YAxis
-                      yAxisId="left"
-                      stroke="var(--color-text-secondary)"
-                      tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="var(--color-text-secondary)"
-                      tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--color-bg-card)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '8px',
-                      }}
-                      labelStyle={{ color: 'var(--color-text)' }}
-                      formatter={(value, name) => {
-                        if (name === 'tokens') {
-                          return [formatTokens(Number(value || 0)), 'Tokens'];
-                        }
-                        return [
-                          formatNumber(Number(value || 0), 0),
-                          name === 'requests' ? 'Requests' : 'Errors',
-                        ];
-                      }}
-                    />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="requests"
-                      stroke="#3b82f6"
-                      fillOpacity={1}
-                      fill="url(#liveRequests)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="errors"
-                      stroke="#ef4444"
-                      fillOpacity={0.15}
-                      fill="#ef4444"
-                      strokeWidth={1.5}
-                    />
-                    <Area
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="tokens"
-                      stroke="#10b981"
-                      fillOpacity={1}
-                      fill="url(#liveTokens)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={minuteSeries} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="liveRequests" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    </linearGradient>
+                    <linearGradient id="liveTokens" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis
+                    dataKey="time"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: 'var(--color-text)' }}
+                    formatter={(value, name) => {
+                      if (name === 'tokens') {
+                        return [formatTokens(Number(value || 0)), 'Tokens'];
+                      }
+                      return [
+                        formatNumber(Number(value || 0), 0),
+                        name === 'requests' ? 'Requests' : 'Errors',
+                      ];
+                    }}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="requests"
+                    stroke="#3b82f6"
+                    fillOpacity={1}
+                    fill="url(#liveRequests)"
+                    strokeWidth={2}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="errors"
+                    stroke="#ef4444"
+                    fillOpacity={0.15}
+                    fill="#ef4444"
+                    strokeWidth={1.5}
+                  />
+                  <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="tokens"
+                    stroke="#10b981"
+                    fillOpacity={1}
+                    fill="url(#liveTokens)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
 
-              <div className="rounded-md border border-border-glass bg-bg-glass px-3 pt-3 pb-1">
-                <div className="mb-2 text-xs text-text-secondary">
-                  Model stack + runtime (TTFT and TPS) in the last {LIVE_WINDOW_MINUTES} minutes
-                </div>
-                {modelTimeline.series.length === 0 ? (
-                  <div className="h-40 flex items-center justify-center text-text-secondary text-sm">
-                    No model stack data in the selected live window.
-                  </div>
-                ) : (
-                  <div className="h-40">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart
-                        data={modelTimeline.data}
-                        margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                        <XAxis
-                          dataKey="time"
-                          stroke="var(--color-text-secondary)"
-                          tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                        />
-                        <YAxis
-                          yAxisId="left"
-                          stroke="var(--color-text-secondary)"
-                          tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                          allowDecimals={false}
-                        />
-                        <YAxis
-                          yAxisId="right"
-                          orientation="right"
-                          stroke="var(--color-text-secondary)"
-                          tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-                          tickFormatter={(value) => formatNumber(Number(value || 0), 1)}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'var(--color-bg-card)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '8px',
-                          }}
-                          labelStyle={{ color: 'var(--color-text)' }}
-                          formatter={(value, name) => {
-                            const numeric = Number(value || 0);
-                            const label = modelTimeline.seriesLabelMap.get(String(name));
-                            if (label) {
-                              return [formatNumber(numeric, 0), label];
-                            }
-                            if (name === 'avgTtftMs') {
-                              return [formatMs(numeric), 'Avg TTFT'];
-                            }
-                            if (name === 'avgTps') {
-                              return [formatTPS(numeric), 'Avg TPS'];
-                            }
-                            return [formatNumber(numeric, 0), String(name)];
-                          }}
-                        />
-                        <Legend
-                          wrapperStyle={{ fontSize: 11 }}
-                          formatter={(value) =>
-                            modelTimeline.seriesLabelMap.get(String(value)) || value
-                          }
-                        />
-                        {modelTimeline.series.map((series) => (
-                          <Bar
-                            key={series.key}
-                            yAxisId="left"
-                            stackId="model-stack"
-                            dataKey={series.key}
-                            fill={series.color}
-                          />
-                        ))}
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="avgTtftMs"
-                          stroke="#f59e0b"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="avgTps"
-                          stroke="#22c55e"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
+        <Card
+          className="min-w-0 hover:shadow-lg hover:border-primary/30 transition-all"
+          title="Model Stack"
+          extra={<Clock size={16} className="text-primary" />}
+          onClick={() => openModal('modelstack')}
+          style={{ cursor: 'pointer' }}
+        >
+          {loading ? (
+            <div className="h-56 flex items-center justify-center text-text-secondary">
+              Loading...
+            </div>
+          ) : modelTimeline.series.length === 0 ? (
+            <div className="h-56 flex items-center justify-center text-text-secondary">
+              No model stack data in the last {LIVE_WINDOW_MINUTES} minutes
+            </div>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={modelTimeline.data}
+                  margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis
+                    dataKey="time"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                    tickFormatter={(value) => formatNumber(Number(value || 0), 1)}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: 'var(--color-text)' }}
+                    formatter={(value, name) => {
+                      const numeric = Number(value || 0);
+                      const label = modelTimeline.seriesLabelMap.get(String(name));
+                      if (label) {
+                        return [formatNumber(numeric, 0), label];
+                      }
+                      if (name === 'avgTtftMs') {
+                        return [formatMs(numeric), 'Avg TTFT'];
+                      }
+                      if (name === 'avgTps') {
+                        return [formatTPS(numeric), 'Avg TPS'];
+                      }
+                      return [formatNumber(numeric, 0), String(name)];
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={(value) => modelTimeline.seriesLabelMap.get(String(value)) || value}
+                  />
+                  {modelTimeline.series.map((series) => (
+                    <Bar
+                      key={series.key}
+                      yAxisId="left"
+                      stackId="model-stack"
+                      dataKey={series.key}
+                      fill={series.color}
+                    />
+                  ))}
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="avgTtftMs"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="avgTps"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
           )}
         </Card>
