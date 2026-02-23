@@ -3,7 +3,11 @@ import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, Zap } from
 import {
   AreaChart,
   Area,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,6 +24,12 @@ type MinuteBucket = {
   requests: number;
   errors: number;
   tokens: number;
+};
+
+type PulseRow = {
+  label: string;
+  requests: number;
+  successRate: number;
 };
 
 const LIVE_WINDOW_MINUTES = 5;
@@ -227,6 +237,96 @@ export const LiveMetrics = () => {
       .sort((a, b) => b.requests - a.requests)
       .slice(0, 6);
   }, [liveRequests]);
+
+  const velocitySeries = useMemo(() => {
+    return minuteSeries.map((bucket, index, arr) => {
+      if (index === 0) {
+        return { time: bucket.time, velocity: bucket.requests };
+      }
+
+      const prev = arr[index - 1];
+      return {
+        time: bucket.time,
+        velocity: bucket.requests - prev.requests,
+      };
+    });
+  }, [minuteSeries]);
+
+  const providerPulseRows = useMemo(() => {
+    const rows = new Map<string, { requests: number; success: number }>();
+    for (const request of liveRequests) {
+      const provider = request.provider || 'unknown';
+      const row = rows.get(provider) || { requests: 0, success: 0 };
+      row.requests += 1;
+      if ((request.responseStatus || '').toLowerCase() === 'success') {
+        row.success += 1;
+      }
+      rows.set(provider, row);
+    }
+
+    return Array.from(rows.entries())
+      .map(([label, row]) => ({
+        label,
+        requests: row.requests,
+        successRate: row.requests > 0 ? (row.success / row.requests) * 100 : 0,
+      }))
+      .sort((a, b) => b.requests - a.requests)
+      .slice(0, 8);
+  }, [liveRequests]);
+
+  const modelPulseRows = useMemo(() => {
+    const rows = new Map<string, { requests: number; success: number }>();
+    for (const request of liveRequests) {
+      const model = request.selectedModelName || request.incomingModelAlias || 'unknown';
+      const row = rows.get(model) || { requests: 0, success: 0 };
+      row.requests += 1;
+      if ((request.responseStatus || '').toLowerCase() === 'success') {
+        row.success += 1;
+      }
+      rows.set(model, row);
+    }
+
+    return Array.from(rows.entries())
+      .map(([label, row]) => ({
+        label,
+        requests: row.requests,
+        successRate: row.requests > 0 ? (row.success / row.requests) * 100 : 0,
+      }))
+      .sort((a, b) => b.requests - a.requests)
+      .slice(0, 8);
+  }, [liveRequests]);
+
+  const renderPulseList = (rows: PulseRow[], emptyText: string) => {
+    if (rows.length === 0) {
+      return <div className="text-text-secondary text-sm py-2">{emptyText}</div>;
+    }
+
+    return (
+      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="rounded-md border border-border-glass bg-bg-glass px-3 py-2"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span
+                className="text-sm text-text font-medium truncate max-w-[240px]"
+                title={row.label}
+              >
+                {row.label}
+              </span>
+              <span className="text-xs text-text-secondary">
+                {formatNumber(row.requests, 0)} requests
+              </span>
+            </div>
+            <div className="mt-1 text-xs text-text-secondary">
+              Success: {row.successRate.toFixed(1)}%
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const handleClearCooldowns = async () => {
     if (!confirm('Are you sure you want to clear all provider cooldowns?')) {
@@ -459,6 +559,122 @@ export const LiveMetrics = () => {
               ))}
             </div>
           )}
+        </Card>
+      </div>
+
+      <div
+        className="grid gap-4 mb-4 flex-col lg:flex-row"
+        style={{ gridTemplateColumns: '1fr 1fr' }}
+      >
+        <Card
+          title="Request Velocity (Last 5 Minutes)"
+          extra={<span className="text-xs text-text-secondary">Minute-over-minute delta</span>}
+        >
+          {velocitySeries.length === 0 ? (
+            <div className="h-56 flex items-center justify-center text-text-secondary">
+              No velocity data available
+            </div>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={velocitySeries}
+                  margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis
+                    dataKey="time"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <YAxis
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: 'var(--color-text)' }}
+                    formatter={(value) => [formatNumber(Number(value || 0), 0), 'Velocity']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="velocity"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+
+        <Card
+          title="Provider Pulse (5m)"
+          extra={<span className="text-xs text-text-secondary">Top 8 providers</span>}
+        >
+          {providerPulseRows.length === 0 ? (
+            <div className="h-56 flex items-center justify-center text-text-secondary">
+              No provider traffic in the selected live window.
+            </div>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={providerPulseRows.slice(0, 6)}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis
+                    dataKey="label"
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                    height={56}
+                  />
+                  <YAxis
+                    stroke="var(--color-text-secondary)"
+                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: 'var(--color-text)' }}
+                    formatter={(value) => [formatNumber(Number(value || 0), 0), 'Requests']}
+                  />
+                  <Bar dataKey="requests" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div
+        className="grid gap-4 mb-4 flex-col lg:flex-row"
+        style={{ gridTemplateColumns: '1fr 1fr' }}
+      >
+        <Card
+          title="Provider Pulse Details (5m)"
+          extra={<span className="text-xs text-text-secondary">Requests + success rate</span>}
+        >
+          {renderPulseList(providerPulseRows, 'No provider traffic in the selected live window.')}
+        </Card>
+
+        <Card
+          title="Model Pulse (5m)"
+          extra={<span className="text-xs text-text-secondary">Top 8 models</span>}
+        >
+          {renderPulseList(modelPulseRows, 'No model traffic in the selected live window.')}
         </Card>
       </div>
 
