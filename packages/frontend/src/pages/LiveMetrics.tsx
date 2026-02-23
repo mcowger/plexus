@@ -54,6 +54,34 @@ const POLL_INTERVAL_MS = 10000;
 const RECENT_REQUEST_LIMIT = 200;
 const POLL_INTERVAL_OPTIONS = [5000, 10000, 30000] as const;
 
+const getProviderLabel = (request: UsageRecord): string => {
+  const provider = request.provider?.trim();
+  if (provider) {
+    return provider;
+  }
+
+  const status = (request.responseStatus || '').toLowerCase();
+  if (status && status !== 'success') {
+    return 'Failed Request';
+  }
+
+  return 'Unresolved Provider';
+};
+
+const getModelLabel = (request: UsageRecord): string => {
+  const model = request.selectedModelName?.trim() || request.incomingModelAlias?.trim();
+  if (model) {
+    return model;
+  }
+
+  const status = (request.responseStatus || '').toLowerCase();
+  if (status && status !== 'success') {
+    return 'Failed Before Model Selection';
+  }
+
+  return 'Unresolved Model';
+};
+
 export const LiveMetrics = () => {
   const [stats, setStats] = useState<Stat[]>([]);
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
@@ -277,7 +305,7 @@ export const LiveMetrics = () => {
     >();
 
     for (const request of liveRequests) {
-      const provider = request.provider || 'unknown';
+      const provider = getProviderLabel(request);
       const row = providers.get(provider) || {
         requests: 0,
         success: 0,
@@ -323,7 +351,7 @@ export const LiveMetrics = () => {
   const providerPulseRows = useMemo(() => {
     const rows = new Map<string, { requests: number; success: number }>();
     for (const request of liveRequests) {
-      const provider = request.provider || 'unknown';
+      const provider = getProviderLabel(request);
       const row = rows.get(provider) || { requests: 0, success: 0 };
       row.requests += 1;
       if ((request.responseStatus || '').toLowerCase() === 'success') {
@@ -345,7 +373,7 @@ export const LiveMetrics = () => {
   const modelPulseRows = useMemo(() => {
     const rows = new Map<string, { requests: number; success: number }>();
     for (const request of liveRequests) {
-      const model = request.selectedModelName || request.incomingModelAlias || 'unknown';
+      const model = getModelLabel(request);
       const row = rows.get(model) || { requests: 0, success: 0 };
       row.requests += 1;
       if ((request.responseStatus || '').toLowerCase() === 'success') {
@@ -395,6 +423,20 @@ export const LiveMetrics = () => {
       </div>
     );
   };
+
+  const groupedCooldowns = useMemo(() => {
+    return cooldowns.reduce(
+      (acc, cooldown) => {
+        const key = `${cooldown.provider}:${cooldown.model}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(cooldown);
+        return acc;
+      },
+      {} as Record<string, Cooldown[]>
+    );
+  }, [cooldowns]);
 
   const handleClearCooldowns = async () => {
     if (!confirm('Are you sure you want to clear all provider cooldowns?')) {
@@ -691,25 +733,46 @@ export const LiveMetrics = () => {
         </div>
       </div>
 
-      {cooldowns.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
-          <Card
-            title="Service Alerts"
-            className="alert-card"
-            style={{ borderColor: 'var(--color-warning)' }}
-            extra={
+      <div style={{ marginBottom: '24px' }}>
+        <Card
+          title="Service Alerts"
+          className="alert-card"
+          style={{ borderColor: 'var(--color-warning)' }}
+          extra={
+            cooldowns.length > 0 ? (
               <Button size="sm" variant="secondary" onClick={handleClearCooldowns}>
                 Clear All
               </Button>
-            }
-          >
+            ) : undefined
+          }
+        >
+          {cooldowns.length === 0 ? (
+            <div className="text-text-secondary text-sm py-2">
+              No service alerts in the active cooldown window.
+            </div>
+          ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {cooldowns.map((cooldown) => {
-                const minutes = Math.ceil(cooldown.timeRemainingMs / 60000);
-                const model = cooldown.model || 'all models';
+              {Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
+                const [provider, model] = key.split(':');
+                const hasAccountId = modelCooldowns.some((cooldown) => cooldown.accountId);
+                const maxTime = Math.max(
+                  ...modelCooldowns.map((cooldown) => cooldown.timeRemainingMs)
+                );
+                const minutes = Math.ceil(maxTime / 60000);
+                const modelDisplay = model || 'all models';
+
+                let statusText: string;
+                if (hasAccountId && modelCooldowns.length > 1) {
+                  statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown for up to ${minutes} minutes`;
+                } else if (hasAccountId && modelCooldowns.length === 1) {
+                  statusText = `${modelDisplay} has 1 account on cooldown for ${minutes} minutes`;
+                } else {
+                  statusText = `${modelDisplay} is on cooldown for ${minutes} minutes`;
+                }
+
                 return (
                   <div
-                    key={`${cooldown.provider}:${cooldown.model}:${cooldown.accountId || 'global'}`}
+                    key={key}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -720,17 +783,15 @@ export const LiveMetrics = () => {
                     }}
                   >
                     <AlertTriangle size={16} color="var(--color-warning)" />
-                    <span style={{ fontWeight: 500 }}>{cooldown.provider}</span>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>
-                      {model} is on cooldown for {minutes} minutes
-                    </span>
+                    <span style={{ fontWeight: 500 }}>{provider}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>{statusText}</span>
                   </div>
                 );
               })}
             </div>
-          </Card>
-        </div>
-      )}
+          )}
+        </Card>
+      </div>
 
       <div className="mb-4">
         <Card
@@ -1022,8 +1083,10 @@ export const LiveMetrics = () => {
                   0,
                   Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
                 );
-                const status = request.responseStatus || 'unknown';
+                const status = (request.responseStatus || 'errored').toLowerCase();
                 const isSuccess = status.toLowerCase() === 'success';
+                const providerLabel = getProviderLabel(request);
+                const modelLabel = getModelLabel(request);
                 return (
                   <div
                     key={request.requestId}
@@ -1031,12 +1094,8 @@ export const LiveMetrics = () => {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm text-text font-medium">
-                          {request.provider || 'unknown'}
-                        </span>
-                        <span className="text-xs text-text-secondary">
-                          {request.selectedModelName || request.incomingModelAlias || 'unknown'}
-                        </span>
+                        <span className="text-sm text-text font-medium">{providerLabel}</span>
+                        <span className="text-xs text-text-secondary">{modelLabel}</span>
                         <span
                           className={`text-[11px] px-2 py-0.5 rounded-md ${
                             isSuccess
