@@ -5,7 +5,14 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
-import { formatCost, formatMs, formatTPS } from '../lib/format';
+import {
+  KWH_PER_SLICE,
+  formatCost,
+  formatEnergy,
+  formatMs,
+  formatSlices,
+  formatTPS,
+} from '../lib/format';
 import {
   ChevronLeft,
   ChevronRight,
@@ -70,15 +77,6 @@ export const Logs = () => {
     antigravity: antigravityLogo,
     chat: chatLogo,
     gemini: geminiLogo,
-  };
-
-  /** Auto-scales kWh → Wh → mWh for human-readable display */
-  const formatEnergy = (kwh: number): string => {
-    const wh = kwh * 1000;
-    if (wh >= 1) return `${wh.toFixed(3)} Wh`;
-    const mwh = wh * 1000;
-    if (mwh >= 0.01) return `${mwh.toFixed(2)} mWh`;
-    return `${(mwh * 1000).toFixed(2)} µWh`;
   };
 
   // Delete Modal State
@@ -744,7 +742,7 @@ export const Logs = () => {
                       className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
                       title={
                         log.kwhUsed != null && log.kwhUsed > 0
-                          ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${(log.kwhUsed / 0.02).toFixed(2)} toast slices`
+                          ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${formatSlices(log.kwhUsed / KWH_PER_SLICE)} toast slices`
                           : undefined
                       }
                       style={

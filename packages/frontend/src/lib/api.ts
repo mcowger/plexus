@@ -108,6 +108,7 @@ export interface UsageData {
   outputTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
+  kwhUsed: number;
 }
 
 export interface TodayMetrics {
@@ -117,6 +118,7 @@ export interface TodayMetrics {
   reasoningTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
+  kwhUsed: number;
   totalCost: number;
 }
 
@@ -328,6 +330,7 @@ interface UsageSummarySeriesPoint {
   outputTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
+  kwhUsed: number;
   tokens: number;
 }
 
@@ -337,6 +340,7 @@ interface UsageSummaryResponse {
   stats: {
     totalRequests: number;
     totalTokens: number;
+    totalKwhUsed: number;
     avgDurationMs: number;
   };
   today: TodayMetrics;
@@ -468,6 +472,7 @@ const USAGE_PAGE_FIELDS: UsageRecordField[] = [
   'tokensOutput',
   'tokensCached',
   'tokensCacheWrite',
+  'kwhUsed',
   'incomingModelAlias',
   'provider',
   'apiKey',
@@ -540,6 +545,7 @@ const buildUsageSeries = (
         outputTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
       };
     }
   }
@@ -562,6 +568,7 @@ const buildUsageSeries = (
         outputTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
       };
     }
 
@@ -576,6 +583,7 @@ const buildUsageSeries = (
     grouped[key].outputTokens += outputTokens;
     grouped[key].cachedTokens += cachedTokens;
     grouped[key].cacheWriteTokens += cacheWriteTokens;
+    grouped[key].kwhUsed += record.kwhUsed || 0;
   });
 
   return Object.values(grouped);
@@ -614,6 +622,7 @@ const buildSummarySeries = (summary: UsageSummaryResponse, now: Date): UsageData
       outputTokens,
       cachedTokens,
       cacheWriteTokens,
+      kwhUsed: point?.kwhUsed || 0,
     };
   }
 
@@ -962,6 +971,7 @@ export const api = {
           reasoningTokens: 0,
           cachedTokens: 0,
           cacheWriteTokens: 0,
+          kwhUsed: 0,
           totalCost: 0,
         },
       };
@@ -1002,6 +1012,7 @@ export const api = {
           'tokensReasoning',
           'tokensCached',
           'tokensCacheWrite',
+          'kwhUsed',
           'costTotal',
         ],
         cache: true,
@@ -1014,6 +1025,7 @@ export const api = {
         reasoningTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
         totalCost: 0,
       };
 
@@ -1024,6 +1036,7 @@ export const api = {
         metrics.reasoningTokens += r.tokensReasoning || 0;
         metrics.cachedTokens += r.tokensCached || 0;
         metrics.cacheWriteTokens += r.tokensCacheWrite || 0;
+        metrics.kwhUsed += r.kwhUsed || 0;
         metrics.totalCost += r.costTotal || 0;
       });
 
@@ -1037,6 +1050,7 @@ export const api = {
         reasoningTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
         totalCost: 0,
       };
     }

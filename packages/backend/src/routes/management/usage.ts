@@ -33,6 +33,7 @@ const USAGE_FIELDS = new Set([
   'durationMs',
   'ttftMs',
   'tokensPerSec',
+  'kwhUsed',
   'isStreamed',
   'isPassthrough',
   'responseStatus',
@@ -158,6 +159,7 @@ export async function registerUsageRoutes(
           outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
           cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
+          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
         })
         .from(schema.requestUsage)
         .where(
@@ -176,6 +178,7 @@ export async function registerUsageRoutes(
           outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
           cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
+          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           avgDurationMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
         })
         .from(schema.requestUsage)
@@ -194,6 +197,7 @@ export async function registerUsageRoutes(
           reasoningTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensReasoning}), 0)`,
           cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
+          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           totalCost: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
         })
         .from(schema.requestUsage)
@@ -210,6 +214,7 @@ export async function registerUsageRoutes(
         outputTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
         avgDurationMs: 0,
       };
 
@@ -220,6 +225,7 @@ export async function registerUsageRoutes(
         reasoningTokens: 0,
         cachedTokens: 0,
         cacheWriteTokens: 0,
+        kwhUsed: 0,
         totalCost: 0,
       };
 
@@ -232,6 +238,7 @@ export async function registerUsageRoutes(
           outputTokens: toNumber(row.outputTokens),
           cachedTokens: toNumber(row.cachedTokens),
           cacheWriteTokens: toNumber(row.cacheWriteTokens),
+          kwhUsed: toNumber(row.kwhUsed),
           tokens:
             toNumber(row.inputTokens) +
             toNumber(row.outputTokens) +
@@ -245,6 +252,7 @@ export async function registerUsageRoutes(
             toNumber(statsRow.outputTokens) +
             toNumber(statsRow.cachedTokens) +
             toNumber(statsRow.cacheWriteTokens),
+          totalKwhUsed: toNumber(statsRow.kwhUsed),
           avgDurationMs: toNumber(statsRow.avgDurationMs),
         },
         today: {
@@ -254,6 +262,7 @@ export async function registerUsageRoutes(
           reasoningTokens: toNumber(todayRow.reasoningTokens),
           cachedTokens: toNumber(todayRow.cachedTokens),
           cacheWriteTokens: toNumber(todayRow.cacheWriteTokens),
+          kwhUsed: toNumber(todayRow.kwhUsed),
           totalCost: toNumber(todayRow.totalCost),
         },
       });
