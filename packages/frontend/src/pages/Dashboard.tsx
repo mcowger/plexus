@@ -30,6 +30,7 @@ export const Dashboard = () => {
     reasoningTokens: 0,
     cachedTokens: 0,
     cacheWriteTokens: 0,
+    kwhUsed: 0,
     totalCost: 0,
   });
 

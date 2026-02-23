@@ -189,25 +189,25 @@ describe('estimateKwhUsed', () => {
 
 describe('toastBreadEquivalent', () => {
   test('returns the correct ratio for exactly one toast cycle (0.02 kWh)', () => {
-    // 0.02 kWh is exactly 1 toast cycle (2 slices)
-    expect(toastBreadEquivalent(0.02)).toBe(1);
+    // 0.02 kWh is exactly 1 toaster cycle (2 slices)
+    expect(toastBreadEquivalent(0.02)).toBe(2);
   });
 
   test('returns 0 for 0 kWh', () => {
     expect(toastBreadEquivalent(0)).toBe(0);
   });
 
-  test('returns 0.5 for half a toast cycle', () => {
-    expect(toastBreadEquivalent(0.01)).toBe(0.5);
+  test('returns 1 for half a toast cycle', () => {
+    expect(toastBreadEquivalent(0.01)).toBe(1);
   });
 
-  test('returns 2 for double a toast cycle', () => {
-    expect(toastBreadEquivalent(0.04)).toBe(2);
+  test('returns 4 for double a toast cycle', () => {
+    expect(toastBreadEquivalent(0.04)).toBe(4);
   });
 
   test('rounds to 2 decimal places', () => {
-    // 0.001 kWh / 0.02 kWh = 0.05 exactly — no rounding needed but confirms precision
-    expect(toastBreadEquivalent(0.001)).toBe(0.05);
+    // 0.001 kWh / 0.01 kWh = 0.1 exactly — no rounding needed but confirms precision
+    expect(toastBreadEquivalent(0.001)).toBe(0.1);
   });
 
   test('produces a non-trivial value for a realistic request', () => {

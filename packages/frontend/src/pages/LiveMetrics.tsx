@@ -634,13 +634,11 @@ export const LiveMetrics = () => {
           extra={<span className="text-xs text-text-secondary">Requests + success rate</span>}
         >
           <PulseList
-            rows={providerRows
-              .slice(0, 8)
-              .map((r) => ({
-                label: r.provider,
-                requests: r.requests,
-                successRate: r.successRate,
-              }))}
+            rows={providerRows.slice(0, 8).map((r) => ({
+              label: r.provider,
+              requests: r.requests,
+              successRate: r.successRate,
+            }))}
             emptyText="No provider traffic in the selected live window."
           />
         </Card>

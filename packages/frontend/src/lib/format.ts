@@ -1,5 +1,7 @@
 import humanFormat from 'human-format';
 
+export const KWH_PER_SLICE = 0.01;
+
 /**
  * Format a duration in seconds to human-readable format (e.g., "2h 30m", "45m", "30s", "3mo 2w", "1y 2mo")
  */
@@ -91,6 +93,39 @@ export function formatMs(ms: number): string {
 export function formatTPS(tps: number): string {
   if (tps === 0) return '0';
   return tps.toFixed(1);
+}
+
+/**
+ * Format energy in kWh with human-readable sub-units.
+ */
+export function formatEnergy(kwh: number): string {
+  if (kwh >= 1) return `${kwh.toFixed(3)} kWh`;
+
+  const wh = kwh * 1000;
+  if (wh >= 1) return `${wh.toFixed(3)} Wh`;
+
+  const mwh = wh * 1000;
+  if (mwh >= 0.01) return `${mwh.toFixed(3)} mWh`;
+
+  return `${(mwh * 1000).toFixed(3)} µWh`;
+}
+
+/**
+ * Format a number of toast-slices with appropriate precision.
+ */
+export function formatSlices(slices: number): string {
+  if (slices < 1) return slices.toFixed(2);
+  if (slices < 10) return slices.toFixed(1);
+  return Math.round(slices).toLocaleString();
+}
+
+/**
+ * Format a percentage value (e.g., 99.5 -> "99.5%", 100 -> "100%")
+ */
+export function formatPercent(value: number, decimals: number = 1): string {
+  if (value === 0) return '0%';
+  if (value === 100) return '100%';
+  return `${value.toFixed(decimals)}%`;
 }
 
 /**

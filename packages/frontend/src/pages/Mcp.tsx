@@ -183,12 +183,18 @@ export const McpPage: React.FC = () => {
       return;
     }
 
+    // Auto-commit any pending header entry that hasn't been added via the + button
+    const finalHeaders = { ...editingServer.headers };
+    if (headerKey.trim() && headerValue.trim()) {
+      finalHeaders[headerKey.trim()] = headerValue.trim();
+    }
+
     setIsSaving(true);
     try {
       await api.saveMcpServer(nameToSave, {
         upstream_url: editingServer.upstream_url,
         enabled: editingServer.enabled,
-        headers: editingServer.headers,
+        headers: finalHeaders,
       });
       await loadData();
       setIsModalOpen(false);
