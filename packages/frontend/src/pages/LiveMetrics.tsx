@@ -46,6 +46,8 @@ type PulseRow = {
   successRate: number;
 };
 
+type StreamFilter = 'all' | 'success' | 'error';
+
 const LIVE_WINDOW_MINUTES = 5;
 const LIVE_WINDOW_MS = LIVE_WINDOW_MINUTES * 60 * 1000;
 const POLL_INTERVAL_MS = 10000;
@@ -70,6 +72,7 @@ export const LiveMetrics = () => {
   const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [streamFilter, setStreamFilter] = useState<StreamFilter>('all');
   const [pollIntervalMs, setPollIntervalMs] = useState(POLL_INTERVAL_MS);
   const [isVisible, setIsVisible] = useState<boolean>(() =>
     typeof document === 'undefined' ? true : document.visibilityState === 'visible'
@@ -151,11 +154,29 @@ export const LiveMetrics = () => {
 
   const liveRequests = useMemo(() => {
     const cutoff = Date.now() - LIVE_WINDOW_MS;
-    return logs.filter((request) => {
-      const requestTime = new Date(request.date).getTime();
-      return Number.isFinite(requestTime) && requestTime >= cutoff;
-    });
+    return logs
+      .filter((request) => {
+        const requestTime = new Date(request.date).getTime();
+        return Number.isFinite(requestTime) && requestTime >= cutoff;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [logs]);
+
+  const filteredLiveRequests = useMemo(() => {
+    if (streamFilter === 'all') {
+      return liveRequests;
+    }
+
+    if (streamFilter === 'success') {
+      return liveRequests.filter(
+        (request) => (request.responseStatus || '').toLowerCase() === 'success'
+      );
+    }
+
+    return liveRequests.filter(
+      (request) => (request.responseStatus || '').toLowerCase() !== 'success'
+    );
+  }, [liveRequests, streamFilter]);
 
   const summary = useMemo(() => {
     return liveRequests.reduce(
@@ -961,15 +982,42 @@ export const LiveMetrics = () => {
 
         <Card
           title="Latest Requests"
-          extra={<span className="text-xs text-text-secondary">Latest 20</span>}
+          extra={
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-text-secondary mr-1">Latest 20</span>
+              <Button
+                size="sm"
+                variant={streamFilter === 'all' ? 'primary' : 'secondary'}
+                onClick={() => setStreamFilter('all')}
+              >
+                All
+              </Button>
+              <Button
+                size="sm"
+                variant={streamFilter === 'success' ? 'primary' : 'secondary'}
+                onClick={() => setStreamFilter('success')}
+              >
+                Success
+              </Button>
+              <Button
+                size="sm"
+                variant={streamFilter === 'error' ? 'primary' : 'secondary'}
+                onClick={() => setStreamFilter('error')}
+              >
+                Errors
+              </Button>
+            </div>
+          }
         >
-          {liveRequests.length === 0 ? (
+          {filteredLiveRequests.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-text-secondary">
-              No requests in the last {LIVE_WINDOW_MINUTES} minutes
+              {liveRequests.length === 0
+                ? 'No requests observed yet.'
+                : 'No requests match the current filter.'}
             </div>
           ) : (
             <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-              {liveRequests.slice(0, 20).map((request) => {
+              {filteredLiveRequests.slice(0, 20).map((request) => {
                 const requestTimeSeconds = Math.max(
                   0,
                   Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
@@ -1004,6 +1052,7 @@ export const LiveMetrics = () => {
                       </span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+                      <span>ID: {request.requestId.slice(0, 8)}...</span>
                       <span>
                         Tokens:{' '}
                         {formatTokens(
