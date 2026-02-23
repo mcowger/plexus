@@ -5,7 +5,14 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { api, UsageRecord, formatLargeNumber } from '../lib/api';
-import { KWH_PER_SLICE, formatCost, formatEnergy, formatMs, formatSlices, formatTPS } from '../lib/format';
+import {
+  KWH_PER_SLICE,
+  formatCost,
+  formatEnergy,
+  formatMs,
+  formatSlices,
+  formatTPS,
+} from '../lib/format';
 import {
   ChevronLeft,
   ChevronRight,

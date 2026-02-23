@@ -37,7 +37,7 @@ const buildUnits = (value: number): number[] => {
 };
 
 export function SlicesToasted({ data }: SlicesToastedProps) {
-  const totalKwh = data.reduce((sum, point) => sum + (point.kwhUsed || 0), 0);
+  const totalKwh = data.reduce((sum, point) => sum + (point.kwhUsed ?? 0), 0);
   const totalSlices = totalKwh / KWH_PER_SLICE;
   const useLoaves = totalSlices > SLICE_LAYOUT_THRESHOLD;
 
