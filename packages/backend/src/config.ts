@@ -414,31 +414,39 @@ const ClassifierDimensionWeightsSchema = z
   })
   .strict(); // all 16 required if key is present
 
+const AutoClassifierSchema = z
+  .object({
+    maxTokensForceComplex: z.number().optional(),
+    dimensionWeights: ClassifierDimensionWeightsSchema.optional(),
+    tierBoundaries: z
+      .object({
+        simpleMedium: z.number().optional(),
+        mediumComplex: z.number().optional(),
+        complexReasoning: z.number().optional(),
+      })
+      .optional(),
+    confidenceSteepness: z.number().optional(),
+    ambiguityThreshold: z.number().optional(),
+    ambiguousDefaultTier: z
+      .enum(['HEARTBEAT', 'SIMPLE', 'MEDIUM', 'COMPLEX', 'REASONING'])
+      .optional(),
+    reasoningOverrideMinMatches: z.number().int().optional(),
+    reasoningOverrideMinConfidence: z.number().optional(),
+    reasoningOverrideMinScore: z.number().optional(),
+    architectureOverrideConfidence: z.number().optional(),
+    architectureOverrideMinScore: z.number().optional(),
+  })
+  .optional();
+
 const AutoConfigSchema = z.object({
   enabled: z.boolean().default(true),
   tier_models: AutoTierModelsSchema,
   agentic_boost_threshold: z.number().min(0).max(1).default(0.8),
-  classifier: z
+  classifier: AutoClassifierSchema,
+  options: z
     .object({
-      maxTokensForceComplex: z.number().optional(),
-      dimensionWeights: ClassifierDimensionWeightsSchema.optional(),
-      tierBoundaries: z
-        .object({
-          simpleMedium: z.number().optional(),
-          mediumComplex: z.number().optional(),
-          complexReasoning: z.number().optional(),
-        })
-        .optional(),
-      confidenceSteepness: z.number().optional(),
-      ambiguityThreshold: z.number().optional(),
-      ambiguousDefaultTier: z
-        .enum(['HEARTBEAT', 'SIMPLE', 'MEDIUM', 'COMPLEX', 'REASONING'])
-        .optional(),
-      reasoningOverrideMinMatches: z.number().int().optional(),
-      reasoningOverrideMinConfidence: z.number().optional(),
-      reasoningOverrideMinScore: z.number().optional(),
-      architectureOverrideConfidence: z.number().optional(),
-      architectureOverrideMinScore: z.number().optional(),
+      agentic_boost_threshold: z.number().min(0).max(1).optional(),
+      classifier: AutoClassifierSchema,
     })
     .optional(),
 });

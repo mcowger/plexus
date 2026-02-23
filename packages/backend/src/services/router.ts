@@ -59,7 +59,7 @@ export class Router {
     };
 
     // Build classifier config from YAML overrides
-    const classifierOverrides = autoConfig.classifier ?? {};
+    const classifierOverrides = autoConfig.options?.classifier ?? autoConfig.classifier ?? {};
     const resolvedClassifierConfig = mergeClassifierConfig(classifierOverrides as any);
 
     // Run the classifier
@@ -79,7 +79,8 @@ export class Router {
 
     // Apply agentic boost: if agenticScore > threshold, promote one tier
     let boostedTier = result.tier;
-    const agenticThreshold = autoConfig.agentic_boost_threshold ?? 0.8;
+    const agenticThreshold =
+      autoConfig.options?.agentic_boost_threshold ?? autoConfig.agentic_boost_threshold ?? 0.8;
     if (result.agenticScore > agenticThreshold) {
       const currentRank = TIER_RANK[result.tier];
       const maxRank = TIER_RANK[Tier.REASONING];

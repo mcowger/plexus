@@ -216,4 +216,48 @@ describe('agentic boost in auto routing', () => {
     // (MEDIUM → COMPLEX or COMPLEX → REASONING)
     expect(['cx-model', 'rs-model']).toContain(result.model);
   });
+
+  test('options section threshold overrides legacy auto threshold', async () => {
+    setConfigForTesting(
+      buildAutoConfig({
+        agentic_boost_threshold: 1,
+        options: { agentic_boost_threshold: 0.1 },
+      } as any)
+    );
+
+    const result = await Router.resolve(
+      'auto',
+      undefined,
+      {
+        messages: [
+          {
+            role: 'user',
+            content:
+              'Read the file config.json, check the database settings, then update the connection string and verify it works.',
+          },
+        ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'read_file',
+              description: 'Read a file',
+              parameters: { type: 'object', properties: {} },
+            },
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'write_file',
+              description: 'Write a file',
+              parameters: { type: 'object', properties: {} },
+            },
+          },
+        ],
+      },
+      'test-req-9'
+    );
+
+    expect(['cx-model', 'rs-model']).toContain(result.model);
+  });
 });
