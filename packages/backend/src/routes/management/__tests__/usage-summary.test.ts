@@ -2,14 +2,23 @@ import { beforeEach, afterEach, describe, expect, it } from 'bun:test';
 import Fastify from 'fastify';
 import { registerUsageRoutes } from '../usage';
 import { UsageStorageService } from '../../../services/usage-storage';
-import { getDatabase, getSchema } from '../../../db/client';
+import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../../db/client';
+import { runMigrations } from '../../../db/migrate';
 
 describe('Usage summary route', () => {
   let fastify: ReturnType<typeof Fastify>;
-  const db = getDatabase();
-  const schema = getSchema();
+  let db: ReturnType<typeof getDatabase>;
+  let schema: any;
 
   beforeEach(async () => {
+    await closeDatabase();
+    process.env.DATABASE_URL = 'sqlite://:memory:';
+    initializeDatabase(process.env.DATABASE_URL);
+    await runMigrations();
+
+    db = getDatabase();
+    schema = getSchema();
+
     fastify = Fastify();
     const usageStorage = new UsageStorageService();
     await registerUsageRoutes(fastify, usageStorage);
@@ -18,6 +27,7 @@ describe('Usage summary route', () => {
 
   afterEach(async () => {
     await fastify.close();
+    await closeDatabase();
   });
 
   it('aggregates kwhUsed in summary series buckets', async () => {
