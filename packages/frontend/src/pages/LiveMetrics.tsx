@@ -1282,6 +1282,9 @@ export const LiveMetrics = () => {
         <Card
           title="Top Providers (Live Window)"
           extra={<span className="text-xs text-text-secondary">Top 6 by requests</span>}
+          onClick={() => openModal('provider')}
+          style={{ cursor: 'pointer' }}
+          className="hover:shadow-lg hover:border-primary/30 transition-all"
         >
           {providerRows.length === 0 ? (
             <div className="text-text-secondary text-sm py-2">
