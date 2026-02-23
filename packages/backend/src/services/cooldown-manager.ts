@@ -68,6 +68,15 @@ export class CooldownManager {
     return `${provider}:${model}`;
   }
 
+  private isCooldownDisabledForProvider(provider: string): boolean {
+    try {
+      const config = getConfig();
+      return config.providers?.[provider]?.disable_cooldown === true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Calculate exponential backoff duration using formula:
    * C(n) = min(C_max, C_0 * 2^n)
@@ -106,6 +115,15 @@ export class CooldownManager {
     model: string,
     durationMs?: number
   ): Promise<void> {
+    if (this.isCooldownDisabledForProvider(provider)) {
+      const key = CooldownManager.makeCooldownKey(provider, model);
+      this.cooldowns.delete(key);
+      logger.debug(
+        `Skipping cooldown for provider '${provider}' model '${model}' (disable_cooldown=true)`
+      );
+      return;
+    }
+
     const key = CooldownManager.makeCooldownKey(provider, model);
     const existingEntry = this.cooldowns.get(key);
     const consecutiveFailures = (existingEntry?.consecutiveFailures || 0) + 1;
@@ -232,9 +250,13 @@ export class CooldownManager {
       if (entry.expiry > now) {
         const parts = key.split(':');
         const provider = parts[0];
+        if (!provider || this.isCooldownDisabledForProvider(provider)) {
+          this.cooldowns.delete(key);
+          continue;
+        }
         const model = parts[1] || '';
         results.push({
-          provider: provider || '',
+          provider,
           model,
           expiry: entry.expiry,
           timeRemainingMs: entry.expiry - now,
