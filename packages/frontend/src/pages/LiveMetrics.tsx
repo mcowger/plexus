@@ -54,8 +54,23 @@ const POLL_INTERVAL_MS = 10000;
 const RECENT_REQUEST_LIMIT = 200;
 const POLL_INTERVAL_OPTIONS = [5000, 10000, 30000] as const;
 
+const PLACEHOLDER_LABELS = new Set(['unknown', 'n/a', 'na', 'none', 'null', 'undefined']);
+
+const normalizeTelemetryLabel = (value: string | null | undefined): string => {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (PLACEHOLDER_LABELS.has(normalized.toLowerCase())) {
+    return '';
+  }
+
+  return normalized;
+};
+
 const getProviderLabel = (request: UsageRecord): string => {
-  const provider = request.provider?.trim();
+  const provider = normalizeTelemetryLabel(request.provider);
   if (provider) {
     return provider;
   }
@@ -69,7 +84,9 @@ const getProviderLabel = (request: UsageRecord): string => {
 };
 
 const getModelLabel = (request: UsageRecord): string => {
-  const model = request.selectedModelName?.trim() || request.incomingModelAlias?.trim();
+  const model =
+    normalizeTelemetryLabel(request.selectedModelName) ||
+    normalizeTelemetryLabel(request.incomingModelAlias);
   if (model) {
     return model;
   }
@@ -783,7 +800,9 @@ export const LiveMetrics = () => {
                     }}
                   >
                     <AlertTriangle size={16} color="var(--color-warning)" />
-                    <span style={{ fontWeight: 500 }}>{provider}</span>
+                    <span style={{ fontWeight: 500 }}>
+                      {normalizeTelemetryLabel(provider) || 'Unknown Provider'}
+                    </span>
                     <span style={{ color: 'var(--color-text-secondary)' }}>{statusText}</span>
                   </div>
                 );
