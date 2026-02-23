@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, X, Zap } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -146,6 +146,30 @@ export const LiveMetrics = () => {
     typeof document === 'undefined' ? true : document.visibilityState === 'visible'
   );
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalCard, setModalCard] = useState<
+    'velocity' | 'provider' | 'model' | 'timeline' | 'requests' | null
+  >(null);
+
+  const openModal = (card: typeof modalCard) => {
+    setModalCard(card);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalCard(null);
+  };
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    if (modalOpen) {
+      window.addEventListener('keydown', handleEscape);
+    }
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [modalOpen]);
 
   const loadData = async (silent = false) => {
     if (!silent) {
@@ -588,6 +612,329 @@ export const LiveMetrics = () => {
     }
   };
 
+  const Modal = ({
+    isOpen,
+    onClose,
+    title,
+    children,
+  }: {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+    children: React.ReactNode;
+  }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}
+        onClick={onClose}
+      >
+        <div
+          className="relative w-full max-w-6xl max-h-[90vh] overflow-auto rounded-lg border border-border-glass bg-bg-card p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-text">{title}</h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-bg-hover transition-colors"
+              aria-label="Close modal"
+            >
+              <X size={24} className="text-text-secondary" />
+            </button>
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  };
+
+  const getModalTitle = () => {
+    switch (modalCard) {
+      case 'velocity':
+        return 'Request Velocity (Last 5 Minutes)';
+      case 'provider':
+        return 'Provider Pulse (5m)';
+      case 'model':
+        return 'Model Pulse (5m)';
+      case 'timeline':
+        return 'Live Timeline';
+      case 'requests':
+        return 'Latest Requests';
+      default:
+        return '';
+    }
+  };
+
+  const renderModalContent = () => {
+    switch (modalCard) {
+      case 'velocity':
+        return (
+          <div className="h-[60vh]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={velocitySeries} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
+                <YAxis stroke="var(--color-text-secondary)" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--color-bg-card)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="velocity"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case 'provider':
+        return (
+          <div className="h-[60vh]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={providerPulseRows.slice(0, 8)}
+                margin={{ top: 10, right: 24, left: 0, bottom: 48 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                <XAxis
+                  dataKey="label"
+                  stroke="var(--color-text-secondary)"
+                  angle={-20}
+                  textAnchor="end"
+                  height={56}
+                />
+                <YAxis stroke="var(--color-text-secondary)" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--color-bg-card)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Bar dataKey="requests" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case 'model':
+        return (
+          <div className="h-[60vh]">
+            {modelPulseRows.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-text-secondary">
+                No model traffic in the selected live window.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {modelPulseRows.map((row) => (
+                  <div
+                    key={row.label}
+                    className="rounded-md border border-border-glass bg-bg-glass px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-base text-text font-medium">{row.label}</span>
+                      <span className="text-sm text-text-secondary">
+                        {formatNumber(row.requests, 0)} requests
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm text-text-secondary">
+                      Success: {row.successRate.toFixed(1)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 'timeline':
+        return (
+          <div className="space-y-6">
+            <div className="h-[40vh]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={minuteSeries} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="liveRequests" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    </linearGradient>
+                    <linearGradient id="liveTokens" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
+                  <YAxis yAxisId="left" stroke="var(--color-text-secondary)" />
+                  <YAxis yAxisId="right" orientation="right" stroke="var(--color-text-secondary)" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="requests"
+                    stroke="#3b82f6"
+                    fillOpacity={1}
+                    fill="url(#liveRequests)"
+                    strokeWidth={2}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="errors"
+                    stroke="#ef4444"
+                    fillOpacity={0.15}
+                    fill="#ef4444"
+                    strokeWidth={1.5}
+                  />
+                  <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="tokens"
+                    stroke="#10b981"
+                    fillOpacity={1}
+                    fill="url(#liveTokens)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            {modelTimeline.series.length > 0 && (
+              <div className="h-[30vh]">
+                <div className="text-sm text-text-secondary mb-2">Model Stack + Runtime</div>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={modelTimeline.data}
+                    margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                    <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
+                    <YAxis yAxisId="left" stroke="var(--color-text-secondary)" />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="var(--color-text-secondary)"
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--color-bg-card)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    {modelTimeline.series.map((series) => (
+                      <Bar
+                        key={series.key}
+                        yAxisId="left"
+                        stackId="model-stack"
+                        dataKey={series.key}
+                        fill={series.color}
+                      />
+                    ))}
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="avgTtftMs"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="avgTps"
+                      stroke="#22c55e"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        );
+      case 'requests':
+        return (
+          <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+            {filteredLiveRequests.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-text-secondary">
+                {liveRequests.length === 0
+                  ? 'No requests observed yet.'
+                  : 'No requests match the current filter.'}
+              </div>
+            ) : (
+              filteredLiveRequests.map((request) => {
+                const requestTimeSeconds = Math.max(
+                  0,
+                  Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
+                );
+                const status = (request.responseStatus || 'errored').toLowerCase();
+                const isSuccess = status.toLowerCase() === 'success';
+                const providerLabel = getProviderLabel(request);
+                const modelLabel = getModelLabel(request);
+                return (
+                  <div
+                    key={request.requestId}
+                    className="rounded-md border border-border-glass bg-bg-glass p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base text-text font-medium">{providerLabel}</span>
+                        <span className="text-sm text-text-secondary">{modelLabel}</span>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-md ${
+                            isSuccess
+                              ? 'text-success bg-emerald-500/15 border border-success/25'
+                              : 'text-danger bg-red-500/15 border border-danger/30'
+                          }`}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                      <span className="text-sm text-text-muted">
+                        {formatTimeAgo(requestTimeSeconds)}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
+                      <span>ID: {request.requestId.slice(0, 8)}...</span>
+                      <span>
+                        Tokens:{' '}
+                        {formatTokens(
+                          Number(request.tokensInput || 0) +
+                            Number(request.tokensOutput || 0) +
+                            Number(request.tokensCached || 0) +
+                            Number(request.tokensCacheWrite || 0)
+                        )}
+                      </span>
+                      <span>Cost: {formatCost(Number(request.costTotal || 0), 6)}</span>
+                      <span>Latency: {formatMs(Number(request.durationMs || 0))}</span>
+                      <span>TTFT: {formatMs(Number(request.ttftMs || 0))}</span>
+                      <span>TPS: {formatTPS(Number(request.tokensPerSec || 0))}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
@@ -972,6 +1319,9 @@ export const LiveMetrics = () => {
         <Card
           title="Request Velocity (Last 5 Minutes)"
           extra={<span className="text-xs text-text-secondary">Minute-over-minute delta</span>}
+          onClick={() => openModal('velocity')}
+          style={{ cursor: 'pointer' }}
+          className="hover:shadow-lg hover:border-primary/30 transition-all"
         >
           {velocitySeries.length === 0 ? (
             <div className="h-56 flex items-center justify-center text-text-secondary">
@@ -1019,6 +1369,9 @@ export const LiveMetrics = () => {
         <Card
           title="Provider Pulse (5m)"
           extra={<span className="text-xs text-text-secondary">Top 8 providers</span>}
+          onClick={() => openModal('provider')}
+          style={{ cursor: 'pointer' }}
+          className="hover:shadow-lg hover:border-primary/30 transition-all"
         >
           {providerPulseRows.length === 0 ? (
             <div className="h-56 flex items-center justify-center text-text-secondary">
@@ -1076,6 +1429,9 @@ export const LiveMetrics = () => {
         <Card
           title="Model Pulse (5m)"
           extra={<span className="text-xs text-text-secondary">Top 8 models</span>}
+          onClick={() => openModal('model')}
+          style={{ cursor: 'pointer' }}
+          className="hover:shadow-lg hover:border-primary/30 transition-all"
         >
           {renderPulseList(modelPulseRows, 'No model traffic in the selected live window.')}
         </Card>
@@ -1086,9 +1442,11 @@ export const LiveMetrics = () => {
         style={{ gridTemplateColumns: '1.2fr 1fr' }}
       >
         <Card
-          className="min-w-0"
+          className="min-w-0 hover:shadow-lg hover:border-primary/30 transition-all"
           title="Live Timeline"
           extra={<Clock size={16} className="text-primary" />}
+          onClick={() => openModal('timeline')}
+          style={{ cursor: 'pointer' }}
         >
           {loading ? (
             <div className="h-64 flex items-center justify-center text-text-secondary">
@@ -1279,6 +1637,9 @@ export const LiveMetrics = () => {
 
         <Card
           title="Latest Requests"
+          onClick={() => openModal('requests')}
+          style={{ cursor: 'pointer' }}
+          className="hover:shadow-lg hover:border-primary/30 transition-all"
           extra={
             <div className="flex items-center gap-1">
               <span className="text-xs text-text-secondary mr-1">Latest 20</span>
@@ -1360,6 +1721,7 @@ export const LiveMetrics = () => {
                       <span>Cost: {formatCost(Number(request.costTotal || 0), 6)}</span>
                       <span>Latency: {formatMs(Number(request.durationMs || 0))}</span>
                       <span>TTFT: {formatMs(Number(request.ttftMs || 0))}</span>
+                      <span>TPS: {formatTPS(Number(request.tokensPerSec || 0))}</span>
                     </div>
                   </div>
                 );
@@ -1367,6 +1729,9 @@ export const LiveMetrics = () => {
             </div>
           )}
         </Card>
+        <Modal isOpen={modalOpen} onClose={closeModal} title={getModalTitle()}>
+          {renderModalContent()}
+        </Modal>
       </div>
     </div>
   );
