@@ -66,18 +66,28 @@ export const Config = () => {
       } else {
         const value = Number(nextForm.agenticBoostThreshold);
         if (!Number.isFinite(value) || value < 0 || value > 1) {
-          setAutoOptionsError('Agentic boost threshold must be a number between 0 and 1.');
+          setAutoOptionsError('Agentic boost threshold must be a number from 0 to 1 (inclusive).');
           return;
         }
         parsed.auto.options.agentic_boost_threshold = value;
       }
 
-      const classifierValue = JSON.parse(nextForm.classifierJson || '{}');
-      parsed.auto.options.classifier = classifierValue;
+      if (nextForm.classifierJson.trim() === '') {
+        delete parsed.auto.options.classifier;
+      } else {
+        try {
+          const classifierValue = JSON.parse(nextForm.classifierJson);
+          parsed.auto.options.classifier = classifierValue;
+        } catch {
+          setAutoOptionsError('Classifier must be valid JSON.');
+          return;
+        }
+      }
 
       setConfig(stringify(parsed));
       setAutoOptionsError(null);
-    } catch {
+    } catch (error) {
+      console.error('Failed to update auto-router options from form', error);
       setAutoOptionsError(
         'Unable to apply Auto Router options. Ensure YAML and classifier JSON are valid.'
       );
