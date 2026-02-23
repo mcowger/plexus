@@ -1425,6 +1425,9 @@ export const LiveMetrics = () => {
         <Card
           title="Provider Pulse Details (5m)"
           extra={<span className="text-xs text-text-secondary">Requests + success rate</span>}
+          onClick={() => openModal('provider')}
+          style={{ cursor: 'pointer' }}
+          className="hover:shadow-lg hover:border-primary/30 transition-all"
         >
           {renderPulseList(providerPulseRows, 'No provider traffic in the selected live window.')}
         </Card>
