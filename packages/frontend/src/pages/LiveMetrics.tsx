@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, Zap } from 'lucide-react';
 import {
   AreaChart,
@@ -38,6 +38,37 @@ const POLL_INTERVAL_MS = 10000;
 const RECENT_REQUEST_LIMIT = 200;
 const POLL_INTERVAL_OPTIONS = [5000, 10000, 30000] as const;
 
+const PulseList: React.FC<{ rows: PulseRow[]; emptyText: string }> = ({ rows, emptyText }) => {
+  if (rows.length === 0) {
+    return <div className="text-text-secondary text-sm py-2">{emptyText}</div>;
+  }
+  return (
+    <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+      {rows.map((row) => (
+        <div
+          key={row.label}
+          className="rounded-md border border-border-glass bg-bg-glass px-3 py-2"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span
+              className="text-sm text-text font-medium truncate max-w-[240px]"
+              title={row.label}
+            >
+              {row.label}
+            </span>
+            <span className="text-xs text-text-secondary">
+              {formatNumber(row.requests, 0)} requests
+            </span>
+          </div>
+          <div className="mt-1 text-xs text-text-secondary">
+            Success: {row.successRate.toFixed(1)}%
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const LiveMetrics = () => {
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   const [logs, setLogs] = useState<UsageRecord[]>([]);
@@ -52,7 +83,7 @@ export const LiveMetrics = () => {
   );
   const [loading, setLoading] = useState(true);
 
-  const loadData = async (silent = false) => {
+  const loadData = useCallback(async (silent = false) => {
     if (!silent) {
       setIsRefreshing(true);
     }
@@ -75,7 +106,7 @@ export const LiveMetrics = () => {
       }
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadData();
@@ -88,7 +119,7 @@ export const LiveMetrics = () => {
     }, pollIntervalMs);
 
     return () => clearInterval(interval);
-  }, [isVisible, pollIntervalMs]);
+  }, [isVisible, pollIntervalMs, loadData]);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -105,7 +136,7 @@ export const LiveMetrics = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -235,44 +266,15 @@ export const LiveMetrics = () => {
         totalCost: row.totalCost,
       }))
       .sort((a, b) => b.requests - a.requests)
-      .slice(0, 6);
+      .sort((a, b) => b.requests - a.requests);
   }, [liveRequests]);
 
   const velocitySeries = useMemo(() => {
-    return minuteSeries.map((bucket, index, arr) => {
-      if (index === 0) {
-        return { time: bucket.time, velocity: bucket.requests };
-      }
-
-      const prev = arr[index - 1];
-      return {
-        time: bucket.time,
-        velocity: bucket.requests - prev.requests,
-      };
-    });
+    return minuteSeries.map((bucket) => ({
+      time: bucket.time,
+      velocity: bucket.requests,
+    }));
   }, [minuteSeries]);
-
-  const providerPulseRows = useMemo(() => {
-    const rows = new Map<string, { requests: number; success: number }>();
-    for (const request of liveRequests) {
-      const provider = request.provider || 'unknown';
-      const row = rows.get(provider) || { requests: 0, success: 0 };
-      row.requests += 1;
-      if ((request.responseStatus || '').toLowerCase() === 'success') {
-        row.success += 1;
-      }
-      rows.set(provider, row);
-    }
-
-    return Array.from(rows.entries())
-      .map(([label, row]) => ({
-        label,
-        requests: row.requests,
-        successRate: row.requests > 0 ? (row.success / row.requests) * 100 : 0,
-      }))
-      .sort((a, b) => b.requests - a.requests)
-      .slice(0, 8);
-  }, [liveRequests]);
 
   const modelPulseRows = useMemo(() => {
     const rows = new Map<string, { requests: number; success: number }>();
@@ -295,38 +297,6 @@ export const LiveMetrics = () => {
       .sort((a, b) => b.requests - a.requests)
       .slice(0, 8);
   }, [liveRequests]);
-
-  const renderPulseList = (rows: PulseRow[], emptyText: string) => {
-    if (rows.length === 0) {
-      return <div className="text-text-secondary text-sm py-2">{emptyText}</div>;
-    }
-
-    return (
-      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="rounded-md border border-border-glass bg-bg-glass px-3 py-2"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span
-                className="text-sm text-text font-medium truncate max-w-[240px]"
-                title={row.label}
-              >
-                {row.label}
-              </span>
-              <span className="text-xs text-text-secondary">
-                {formatNumber(row.requests, 0)} requests
-              </span>
-            </div>
-            <div className="mt-1 text-xs text-text-secondary">
-              Success: {row.successRate.toFixed(1)}%
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   const handleClearCooldowns = async () => {
     if (!confirm('Are you sure you want to clear all provider cooldowns?')) {
@@ -562,10 +532,7 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <div
-        className="grid gap-4 mb-4 flex-col lg:flex-row"
-        style={{ gridTemplateColumns: '1fr 1fr' }}
-      >
+      <div className="grid grid-cols-2 gap-4 mb-4 flex-col lg:flex-row">
         <Card
           title="Request Velocity (Last 5 Minutes)"
           extra={<span className="text-xs text-text-secondary">Minute-over-minute delta</span>}
@@ -617,7 +584,7 @@ export const LiveMetrics = () => {
           title="Provider Pulse (5m)"
           extra={<span className="text-xs text-text-secondary">Top 8 providers</span>}
         >
-          {providerPulseRows.length === 0 ? (
+          {providerRows.length === 0 ? (
             <div className="h-56 flex items-center justify-center text-text-secondary">
               No provider traffic in the selected live window.
             </div>
@@ -625,7 +592,9 @@ export const LiveMetrics = () => {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={providerPulseRows.slice(0, 6)}
+                  data={providerRows
+                    .slice(0, 6)
+                    .map((r) => ({ label: r.provider, requests: r.requests }))}
                   margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
@@ -659,22 +628,31 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <div
-        className="grid gap-4 mb-4 flex-col lg:flex-row"
-        style={{ gridTemplateColumns: '1fr 1fr' }}
-      >
+      <div className="grid grid-cols-2 gap-4 mb-4 flex-col lg:flex-row">
         <Card
           title="Provider Pulse Details (5m)"
           extra={<span className="text-xs text-text-secondary">Requests + success rate</span>}
         >
-          {renderPulseList(providerPulseRows, 'No provider traffic in the selected live window.')}
+          <PulseList
+            rows={providerRows
+              .slice(0, 8)
+              .map((r) => ({
+                label: r.provider,
+                requests: r.requests,
+                successRate: r.successRate,
+              }))}
+            emptyText="No provider traffic in the selected live window."
+          />
         </Card>
 
         <Card
           title="Model Pulse (5m)"
           extra={<span className="text-xs text-text-secondary">Top 8 models</span>}
         >
-          {renderPulseList(modelPulseRows, 'No model traffic in the selected live window.')}
+          <PulseList
+            rows={modelPulseRows}
+            emptyText="No model traffic in the selected live window."
+          />
         </Card>
       </div>
 
