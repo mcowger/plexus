@@ -207,6 +207,69 @@ describe('CooldownManager', () => {
       expect(p1?.consecutiveFailures).toBe(2);
       expect(p2?.consecutiveFailures).toBe(1);
     });
+
+    test('does not create cooldown for providers with disable_cooldown=true', async () => {
+      setConfigForTesting({
+        providers: {
+          synthetic_new: {
+            api_base_url: 'https://example.com/v1',
+            api_key: 'test-key',
+            disable_cooldown: true,
+          },
+        },
+        models: {},
+        keys: {},
+        adminKey: 'test',
+        failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+        quotas: [],
+      } as any);
+
+      const cm = CooldownManager.getInstance();
+      await cm.markProviderFailure('synthetic_new', 'test-model');
+
+      const cooldowns = cm.getCooldowns();
+      expect(cooldowns.some((c) => c.provider === 'synthetic_new')).toBe(false);
+    });
+
+    test('filters existing cooldowns when provider switches to disable_cooldown=true', async () => {
+      const cm = CooldownManager.getInstance();
+
+      setConfigForTesting({
+        providers: {
+          synthetic_new: {
+            api_base_url: 'https://example.com/v1',
+            api_key: 'test-key',
+            disable_cooldown: false,
+          },
+        },
+        models: {},
+        keys: {},
+        adminKey: 'test',
+        failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+        quotas: [],
+      } as any);
+
+      await cm.markProviderFailure('synthetic_new', 'test-model');
+      expect(cm.getCooldowns().some((c) => c.provider === 'synthetic_new')).toBe(true);
+
+      setConfigForTesting({
+        providers: {
+          synthetic_new: {
+            api_base_url: 'https://example.com/v1',
+            api_key: 'test-key',
+            disable_cooldown: true,
+          },
+        },
+        models: {},
+        keys: {},
+        adminKey: 'test',
+        failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+        quotas: [],
+      } as any);
+
+      const cooldowns = cm.getCooldowns();
+      expect(cooldowns.some((c) => c.provider === 'synthetic_new')).toBe(false);
+    });
   });
 
   describe('clearCooldown', () => {
