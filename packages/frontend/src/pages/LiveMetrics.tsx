@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Clock, Database, RefreshCw, Signal, X, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Clock, Cpu, Database, RefreshCw, Server, Signal, X, Zap } from 'lucide-react';
+import { AnalyzeButton } from '../components/analytics/AnalyzeButton';
 import {
   AreaChart,
   Area,
@@ -122,6 +123,226 @@ const getModelLabel = (request: UsageRecord): string => {
   return 'Unresolved Model';
 };
 
+/**
+ * =============================================================================
+ * PROVIDER & MODEL STATS COMPONENT
+ * =============================================================================
+ * Purpose: Display per-provider and per-model statistics in the same 5-minute
+ * window as the Latest Requests card. Shows top 5 entities with key metrics.
+ *
+ * Data Source: Uses liveRequests (filtered to 5-minute window)
+ * Display: Two-column layout (Providers | Models) with compact stat rows
+ * =============================================================================
+ */
+
+/**
+ * Aggregated statistics for a single provider or model entity.
+ * This interface defines the shape of our computed metrics for display.
+ */
+interface EntityStats {
+  /** Display name for the entity (provider or model) */
+  name: string;
+  /** Total number of requests for this entity in the window */
+  requests: number;
+  /** Number of failed requests (responseStatus !== 'success') */
+  errors: number;
+  /** Calculated success rate as percentage (0-100) */
+  successRate: number;
+  /** Total tokens (input + output + reasoning + cached) */
+  tokens: number;
+  /** Total cost accumulated by this entity */
+  cost: number;
+  /** Average latency across all requests (ms) */
+  avgLatency: number;
+  /** Average Time To First Token (ms) */
+  avgTtft: number;
+  /** Average Tokens Per Second throughput */
+  avgTps: number;
+}
+
+/**
+ * Aggregate raw request data by entity type (provider or model).
+ * =============================================================================
+ * How it works:
+ *   1. Group all requests by their provider/model key using a Map
+ *   2. For each request, accumulate: count, errors, tokens, cost, latency, ttft, tps
+ *   3. After aggregation, compute derived metrics (success rate, averages)
+ *   4. Sort by request count descending and take top 5
+ *
+ * Why verbose: This is a critical data transformation that powers the stats card.
+ * Showing our work helps future maintainers understand the data flow.
+ *
+ * @param requests - Array of UsageRecord from the 5-minute window
+ * @param entityType - Either 'provider' or 'model' to determine grouping key
+ * @returns Array of EntityStats sorted by request volume (max 5)
+ */
+const aggregateByEntity = (
+  requests: UsageRecord[],
+  entityType: 'provider' | 'model'
+): EntityStats[] => {
+  // -------------------------------------------------------------------------
+  // STEP 1: Group requests by entity using a Map for O(1) lookups
+  // -------------------------------------------------------------------------
+  // We use a Map where:
+  //   - Key: provider name or model name (string)
+  //   - Value: accumulated metrics object
+  //
+  // This approach is more efficient than repeated array.filter() calls
+  // because we only iterate through the requests once.
+  const grouped = new Map<string, {
+    /** Number of requests for this entity */
+    requests: number;
+    /** Number of failed requests */
+    errors: number;
+    /** Sum of all token counts (input + output + reasoning + cached) */
+    tokens: number;
+    /** Total accumulated cost */
+    cost: number;
+    /** Sum of all response durations for averaging */
+    latency: number;
+    /** Sum of all TTFT values for averaging */
+    ttft: number;
+    /** Sum of all TPS values for averaging */
+    tps: number;
+  }>();
+
+  // -------------------------------------------------------------------------
+  // STEP 2: Single pass through all requests to accumulate metrics
+  // -------------------------------------------------------------------------
+  // For each request, we determine the appropriate label (provider/model)
+  // and increment the corresponding accumulator values.
+  requests.forEach((request) => {
+    // Determine the grouping key based on entity type
+    // For providers: use the provider field (or fallback to 'Unknown Provider')
+    // For models: prefer selectedModelName, fall back to incomingModelAlias
+    const key = entityType === 'provider'
+      ? getProviderLabel(request)
+      : getModelLabel(request);
+
+    // Get existing accumulator or create fresh one for new entity
+    const existing = grouped.get(key) || {
+      requests: 0,
+      errors: 0,
+      tokens: 0,
+      cost: 0,
+      latency: 0,
+      ttft: 0,
+      tps: 0,
+    };
+
+    // Increment request count
+    existing.requests++;
+
+    // Track errors: any non-success status counts as an error
+    if (request.responseStatus !== 'success') {
+      existing.errors++;
+    }
+
+    // Accumulate tokens: sum all token types for total volume
+    existing.tokens +=
+      (request.tokensInput || 0) +
+      (request.tokensOutput || 0) +
+      (request.tokensCached || 0) +
+      (request.tokensCacheWrite || 0);
+
+    // Accumulate cost
+    existing.cost += request.costTotal || 0;
+
+    // Accumulate latency metrics for later averaging
+    existing.latency += request.durationMs || 0;
+    existing.ttft += request.ttftMs || 0;
+    existing.tps += request.tokensPerSec || 0;
+
+    // Store the updated accumulator back to the Map
+    grouped.set(key, existing);
+  });
+
+  // -------------------------------------------------------------------------
+  // STEP 3: Compute derived metrics and prepare for display
+  // -------------------------------------------------------------------------
+  // After accumulating raw sums, we calculate averages and rates.
+  // This separates the "collection" phase from "computation" phase.
+  return Array.from(grouped.entries())
+    .map(([name, data]) => {
+      // Calculate success rate: (successful requests / total requests) * 100
+      // If no requests, default to 0% (avoids NaN from division by zero)
+      const successRate = data.requests > 0
+        ? ((data.requests - data.errors) / data.requests) * 100
+        : 0;
+
+      // Return computed EntityStats object with all derived values
+      return {
+        name,
+        requests: data.requests,
+        errors: data.errors,
+        successRate,
+        tokens: data.tokens,
+        cost: data.cost,
+        // Average latency = total latency / request count
+        avgLatency: data.requests > 0 ? data.latency / data.requests : 0,
+        // Average TTFT = total TTFT / request count
+        avgTtft: data.requests > 0 ? data.ttft / data.requests : 0,
+        // Average TPS = total TPS / request count
+        avgTps: data.requests > 0 ? data.tps / data.requests : 0,
+      };
+    })
+    // -------------------------------------------------------------------------
+    // STEP 4: Sort and limit results
+    // -------------------------------------------------------------------------
+    // Primary sort: request count (descending) - most active entities first
+    // This ensures the most relevant data is visible in the limited card space
+    .sort((a, b) => b.requests - a.requests)
+    // Limit to top 5 to fit cleanly in the card UI
+    .slice(0, 5);
+};
+
+/**
+ * Render a compact stat row for a single entity (provider or model).
+ * =============================================================================
+ * Display format:
+ *   [Icon] Entity Name              123 req  [Trend]
+ *   Success: 95.2% | Latency: 1.2s | Cost: $0.05 | TPS: 45.2
+ *
+ * Why inline: This component is tightly coupled to EntityStats and only used
+ * within the ProviderModelStats card. Keeping it inline reduces file count.
+ *
+ * @param entity - The aggregated stats for this entity
+ * @param isModel - Boolean flag to switch icon (Server for provider, Cpu for model)
+ */
+const EntityRow: React.FC<{ entity: EntityStats; isModel?: boolean }> = ({ entity, isModel }) => (
+  <div className="rounded-md border border-border-glass bg-bg-glass/50 px-3 py-2 hover:bg-bg-glass transition-colors">
+    {/* Header row: Icon + name + request count */}
+    <div className="flex items-center justify-between gap-2 mb-1">
+      <div className="flex items-center gap-2 min-w-0">
+        {isModel
+          ? <Cpu size={14} className="text-text-muted flex-shrink-0" />
+          : <Server size={14} className="text-text-muted flex-shrink-0" />
+        }
+        <span className="text-sm text-text font-medium truncate" title={entity.name}>
+          {entity.name.length > 25 ? entity.name.slice(0, 22) + '...' : entity.name}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-xs text-text-secondary">{formatNumber(entity.requests, 0)} req</span>
+      </div>
+    </div>
+
+    {/* Metrics row: Success rate, latency, cost, TPS */}
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
+      <span>Success: {
+        entity.successRate >= 95
+          ? <span className="text-emerald-500 font-medium">{entity.successRate.toFixed(1)}%</span>
+          : entity.successRate >= 80
+            ? <span className="text-amber-500 font-medium">{entity.successRate.toFixed(1)}%</span>
+            : <span className="text-red-500 font-medium">{entity.successRate.toFixed(1)}%</span>
+      }</span>
+      <span>Latency: {formatMs(entity.avgLatency)}</span>
+      <span>Cost: {formatCost(entity.cost, 4)}</span>
+      <span>TPS: {formatNumber(entity.avgTps, 1)}</span>
+    </div>
+  </div>
+);
+
 export const LiveMetrics = () => {
   const [stats, setStats] = useState<Stat[]>([]);
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
@@ -133,6 +354,7 @@ export const LiveMetrics = () => {
     cachedTokens: 0,
     cacheWriteTokens: 0,
     totalCost: 0,
+    kwhUsed: 0,
   });
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -148,7 +370,7 @@ export const LiveMetrics = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalCard, setModalCard] = useState<
-    'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | null
+    'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | 'alerts' | null
   >(null);
 
   const openModal = (card: typeof modalCard) => {
@@ -551,6 +773,32 @@ export const LiveMetrics = () => {
       .sort((a, b) => b.requests - a.requests)
       .slice(0, 8);
   }, [liveRequests]);
+
+  /**
+   * =============================================================================
+   * PROVIDER & MODEL STATS FOR STATS CARD
+   * =============================================================================
+   * Compute aggregated stats using the aggregateByEntity functions.
+   * These power the "Provider & Model Stats" card that shows alongside
+   * the Latest Requests card in the same 5-minute window.
+   * =============================================================================
+   */
+
+  /** Top 5 providers by request count with full metrics */
+  const providerStats = useMemo(
+    () => aggregateByEntity(liveRequests, 'provider'),
+    [liveRequests]
+  );
+
+  /** Top 5 models by request count with full metrics */
+  const modelStats = useMemo(
+    () => aggregateByEntity(liveRequests, 'model'),
+    [liveRequests]
+  );
+
+  /** Count of active providers/models for the badge display */
+  const activeProviderCount = providerStats.filter(p => p.requests > 0).length;
+  const activeModelCount = modelStats.filter(m => m.requests > 0).length;
 
   const renderPulseList = (rows: PulseRow[], emptyText: string) => {
     if (rows.length === 0) {
@@ -1242,11 +1490,14 @@ export const LiveMetrics = () => {
           className="alert-card"
           style={{ borderColor: 'var(--color-warning)' }}
           extra={
-            cooldowns.length > 0 ? (
-              <Button size="sm" variant="secondary" onClick={handleClearCooldowns}>
-                Clear All
-              </Button>
-            ) : undefined
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="alerts" size="sm" onClick={() => openModal('alerts')} />
+              {cooldowns.length > 0 ? (
+                <Button size="sm" variant="secondary" onClick={handleClearCooldowns}>
+                  Clear All
+                </Button>
+              ) : undefined}
+            </div>
           }
         >
           {cooldowns.length === 0 ? (
@@ -1301,7 +1552,12 @@ export const LiveMetrics = () => {
       <div className="mb-4">
         <Card
           title="Top Providers (Live Window)"
-          extra={<span className="text-xs text-text-secondary">Top 6 by requests</span>}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="provider" size="sm" onClick={() => openModal('provider')} />
+              <span className="text-xs text-text-secondary">Top 6 by requests</span>
+            </div>
+          }
           onClick={() => openModal('provider')}
           style={{ cursor: 'pointer' }}
           className="hover:shadow-lg hover:border-primary/30 transition-all"
@@ -1335,13 +1591,15 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <div
-        className="grid gap-4 mb-4 flex-col lg:flex-row"
-        style={{ gridTemplateColumns: '1fr 1fr' }}
-      >
+      <div className="grid gap-4 mb-4 lg:grid-cols-2">
         <Card
           title="Request Velocity (Last 5 Minutes)"
-          extra={<span className="text-xs text-text-secondary">Minute-over-minute delta</span>}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="velocity" size="sm" onClick={() => openModal('velocity')} />
+              <span className="text-xs text-text-secondary">Minute-over-minute delta</span>
+            </div>
+          }
           onClick={() => openModal('velocity')}
           style={{ cursor: 'pointer' }}
           className="hover:shadow-lg hover:border-primary/30 transition-all"
@@ -1391,7 +1649,12 @@ export const LiveMetrics = () => {
 
         <Card
           title="Provider Pulse (5m)"
-          extra={<span className="text-xs text-text-secondary">Top 8 providers</span>}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="provider" size="sm" onClick={() => openModal('provider')} />
+              <span className="text-xs text-text-secondary">Top 8 providers</span>
+            </div>
+          }
           onClick={() => openModal('provider')}
           style={{ cursor: 'pointer' }}
           className="hover:shadow-lg hover:border-primary/30 transition-all"
@@ -1438,13 +1701,15 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <div
-        className="grid gap-4 mb-4 flex-col lg:flex-row"
-        style={{ gridTemplateColumns: '1fr 1fr' }}
-      >
+      <div className="grid gap-4 mb-4 lg:grid-cols-2">
         <Card
           title="Provider Pulse Details (5m)"
-          extra={<span className="text-xs text-text-secondary">Requests + success rate</span>}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="provider" size="sm" onClick={() => openModal('provider')} />
+              <span className="text-xs text-text-secondary">Requests + success rate</span>
+            </div>
+          }
           onClick={() => openModal('provider')}
           style={{ cursor: 'pointer' }}
           className="hover:shadow-lg hover:border-primary/30 transition-all"
@@ -1454,7 +1719,12 @@ export const LiveMetrics = () => {
 
         <Card
           title="Model Pulse (5m)"
-          extra={<span className="text-xs text-text-secondary">Top 8 models</span>}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="model" size="sm" onClick={() => openModal('model')} />
+              <span className="text-xs text-text-secondary">Top 8 models</span>
+            </div>
+          }
           onClick={() => openModal('model')}
           style={{ cursor: 'pointer' }}
           className="hover:shadow-lg hover:border-primary/30 transition-all"
@@ -1463,14 +1733,16 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <div
-        className="grid gap-4 mb-4 flex-col lg:flex-row"
-        style={{ gridTemplateColumns: '1fr 1fr' }}
-      >
+      <div className="grid gap-4 mb-4 lg:grid-cols-2">
         <Card
           className="min-w-0 hover:shadow-lg hover:border-primary/30 transition-all"
           title="Live Timeline"
-          extra={<Clock size={16} className="text-primary" />}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="timeline" size="sm" onClick={() => openModal('timeline')} />
+              <Clock size={16} className="text-primary" />
+            </div>
+          }
           onClick={() => openModal('timeline')}
           style={{ cursor: 'pointer' }}
         >
@@ -1566,7 +1838,12 @@ export const LiveMetrics = () => {
         <Card
           className="min-w-0 hover:shadow-lg hover:border-primary/30 transition-all"
           title="Model Stack"
-          extra={<Clock size={16} className="text-primary" />}
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="modelstack" size="sm" onClick={() => openModal('modelstack')} />
+              <Clock size={16} className="text-primary" />
+            </div>
+          }
           onClick={() => openModal('modelstack')}
           style={{ cursor: 'pointer' }}
         >
@@ -1661,13 +1938,18 @@ export const LiveMetrics = () => {
           )}
         </Card>
 
+      {/* Grid: Latest Requests (left) | Provider & Model Stats (right) */}
+      <div
+        className="grid gap-4 mb-4 lg:grid-cols-2"
+      >
         <Card
           title="Latest Requests"
           onClick={() => openModal('requests')}
           style={{ cursor: 'pointer' }}
           className="hover:shadow-lg hover:border-primary/30 transition-all"
           extra={
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="requests" size="sm" onClick={() => openModal('requests')} />
               <span className="text-xs text-text-secondary mr-1">Latest 20</span>
               <Button
                 size="sm"
@@ -1755,7 +2037,80 @@ export const LiveMetrics = () => {
             </div>
           )}
         </Card>
-        <Modal isOpen={modalOpen} onClose={closeModal} title={getModalTitle()}>
+
+        {/*
+         * =============================================================================
+         * PROVIDER & MODEL STATS CARD
+         * =============================================================================
+         * Displays top 5 providers and top 5 models side-by-side.
+         * Shows request count, success rate, latency, cost, and TPS for each.
+         * Uses the same 5-minute window as Latest Requests for consistency.
+         * =============================================================================
+         */}
+        <Card
+          title="Provider & Model Stats"
+          onClick={() => openModal('provider')}
+          style={{ cursor: 'pointer' }}
+          className="h-full hover:shadow-lg hover:border-primary/30 transition-all"
+          extra={
+            <div className="flex items-center gap-2">
+              <AnalyzeButton cardType="provider" size="sm" onClick={() => openModal('provider')} />
+              <span className="text-xs text-text-secondary">
+                {activeProviderCount} providers, {activeModelCount} models
+              </span>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Providers Column */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-text flex items-center gap-2">
+                <Server size={16} className="text-primary" />
+                Top Providers
+              </h4>
+              {providerStats.length === 0 ? (
+                <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+                  No provider activity in window
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                  {providerStats.map((provider) => (
+                    <EntityRow key={provider.name} entity={provider} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Models Column */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-text flex items-center gap-2">
+                <Cpu size={16} className="text-secondary" />
+                Top Models
+              </h4>
+              {modelStats.length === 0 ? (
+                <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+                  No model activity in window
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                  {modelStats.map((model) => (
+                    <EntityRow key={model.name} entity={model} isModel />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer note about time window */}
+          <div className="mt-4 pt-3 border-t border-border-glass/50">
+            <span className="text-xs text-text-muted">
+              Same {LIVE_WINDOW_MINUTES}-minute window as Latest Requests
+            </span>
+          </div>
+        </Card>
+      </div>
+
+      <Modal isOpen={modalOpen} onClose={closeModal} title={getModalTitle()}>
           {renderModalContent()}
         </Modal>
       </div>
