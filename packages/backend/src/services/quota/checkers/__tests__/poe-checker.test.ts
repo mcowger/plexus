@@ -69,9 +69,7 @@ describe('PoeQuotaChecker', () => {
       });
     });
 
-    const checker = new PoeQuotaChecker(
-      makeConfig({ endpoint: 'https://custom.poe.com/balance' })
-    );
+    const checker = new PoeQuotaChecker(makeConfig({ endpoint: 'https://custom.poe.com/balance' }));
     await checker.checkQuota();
 
     expect(capturedUrl).toBe('https://custom.poe.com/balance');

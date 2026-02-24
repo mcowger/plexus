@@ -1,5 +1,5 @@
 import { parse, stringify } from 'yaml';
-import { formatNumber } from './format';
+import { formatNumber, formatPoints } from './format';
 import { toBoolean, toIsoString } from './normalize';
 import type { QuotaCheckerInfo, QuotaSnapshot, QuotaCheckResult } from '../types/quota';
 
@@ -841,6 +841,7 @@ export interface OAuthCredentialStatus {
 }
 
 export const formatLargeNumber = formatNumber;
+export { formatPoints };
 
 export const STAT_LABELS = {
   REQUESTS: 'Total Requests',
