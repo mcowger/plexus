@@ -237,10 +237,9 @@ export class Dispatcher {
         lastError = error;
 
         // Only mark provider failure for retryable errors
-        // Non-retryable errors (400, 413, 422) should NOT trigger cooldown
+        // Non-retryable errors (413, 422) should NOT trigger cooldown
         const statusCode = error?.routingContext?.statusCode;
-        const isNonRetryableClientError =
-          statusCode === 400 || statusCode === 413 || statusCode === 422;
+        const isNonRetryableClientError = statusCode === 413 || statusCode === 422;
 
         if (!isNonRetryableClientError) {
           CooldownManager.getInstance().markProviderFailure(route.provider, route.model);
@@ -272,12 +271,12 @@ export class Dispatcher {
 
   /**
    * Determines if an error should trigger a provider cooldown.
-   * Non-retryable client errors (400, 413, 422) should NOT trigger cooldown.
+   * Non-retryable client errors (413, 422) should NOT trigger cooldown.
    */
   private shouldTriggerCooldown(error: any): boolean {
     const statusCode = error?.routingContext?.statusCode || error?.status || error?.statusCode;
     // Don't cooldown for non-retryable client errors
-    if (statusCode === 400 || statusCode === 413 || statusCode === 422) {
+    if (statusCode === 413 || statusCode === 422) {
       return false;
     }
     return true;
