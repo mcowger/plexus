@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.17.2 - 2026-02-24
+
+### POE quota checker integration and export utilities
+
+## v0.17.2 Release Notes
+
+### New Features
+- **POE Point Balance Quota Checker**: Added a new quota checker for POE point balance monitoring ([777ad51](https://github.com/mcowger/plexus/commit/777ad51))
+
+### Improvements
+- **Sidebar Integration**: Integrated the POE quota checker into the sidebar for improved visibility ([6621126](https://github.com/mcowger/plexus/commit/6621126))
+- **Export Utilities**: Exported `formatPoints` utility function for external use ([6621126](https://github.com/mcowger/plexus/commit/6621126))
+
+---
+
+The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.17.1 - 2026-02-24
 
 ### Live metrics dashboard with cooldown honor and frontend enhancements
