@@ -924,12 +924,13 @@ export const api = {
   },
 
   getDashboardData: async (
-    range: 'hour' | 'day' | 'week' | 'month' = 'day'
+    range: 'hour' | 'day' | 'week' | 'month' = 'day',
+    cache = true
   ): Promise<DashboardData> => {
     try {
       const now = normalizeNow();
       const [summary, cooldowns, config] = await Promise.all([
-        fetchUsageSummary(range, true),
+        fetchUsageSummary(range, cache),
         api.getCooldowns(),
         fetchConfigCached(),
       ]);
