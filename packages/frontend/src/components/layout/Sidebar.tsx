@@ -468,12 +468,7 @@ export const Sidebar: React.FC = () => {
               <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
               <NavItem to="/mcp" icon={Plug} label="MCP" isCollapsed={isCollapsed} />
               <NavItem to="/config" icon={Settings} label="Config" isCollapsed={isCollapsed} />
-              <NavItem
-                to="/ui/autorouter"
-                icon={Zap}
-                label="Auto Router"
-                isCollapsed={isCollapsed}
-              />
+              <NavItem to="/autorouter" icon={Zap} label="Auto Router" isCollapsed={isCollapsed} />
             </>
           )}
         </div>

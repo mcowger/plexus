@@ -71,7 +71,7 @@ const AppRoutes = () => {
                 <Route path="/models" element={<Models />} />
                 <Route path="/keys" element={<Keys />} />
                 <Route path="/config" element={<Config />} />
-                <Route path="/ui/autorouter" element={<AutoRouter />} />
+                <Route path="/autorouter" element={<AutoRouter />} />
                 <Route path="/system-logs" element={<SystemLogs />} />
                 <Route path="/debug" element={<Debug />} />
                 <Route path="/errors" element={<Errors />} />
