@@ -1,0 +1,14 @@
+{
+	"servers": {
+		"code-index": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"code-index-mcp",
+				"--project-path",
+				"${workspaceFolder}/"
+			]
+		}
+	},
+	"inputs": []
+}
