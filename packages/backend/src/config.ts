@@ -10,7 +10,7 @@ import { QuotaScheduler } from './services/quota/quota-scheduler';
 const DEFAULT_RETRYABLE_STATUS_CODES = Array.from(
   { length: 500 },
   (_, index) => index + 100
-).filter((code) => !(code >= 200 && code <= 299) && code !== 400 && code !== 413 && code !== 422);
+).filter((code) => !(code >= 200 && code <= 299) && code !== 413 && code !== 422);
 
 const FailoverPolicySchema = z.object({
   enabled: z.boolean().default(true),
