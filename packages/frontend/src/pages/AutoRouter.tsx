@@ -33,7 +33,12 @@ export const AutoRouter = () => {
 
       const aliases = new Set<string>();
       if (config.models) {
-        Object.keys(config.models).forEach((alias) => aliases.add(alias));
+        Object.entries(config.models).forEach(([alias, modelConfig]: [string, any]) => {
+          const modelType = modelConfig?.type;
+          if (!modelType || modelType === 'chat' || modelType === 'responses') {
+            aliases.add(alias);
+          }
+        });
       }
       setAllModelAliases(Array.from(aliases).sort());
     } catch (err) {
