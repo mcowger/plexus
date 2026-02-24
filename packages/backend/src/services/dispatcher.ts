@@ -81,6 +81,19 @@ export class Dispatcher {
 
     for (let i = 0; i < targets.length; i++) {
       const route = targets[i]!;
+
+      // Re-check cooldown status before attempting this target
+      // This ensures cooldowns set during the retry loop are respected
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        route.provider,
+        route.model
+      );
+      if (!isHealthy) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
+        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
@@ -1117,6 +1130,18 @@ export class Dispatcher {
 
     for (let i = 0; i < targets.length; i++) {
       const route = targets[i]!;
+
+      // Re-check cooldown status before attempting this target
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        route.provider,
+        route.model
+      );
+      if (!isHealthy) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
+        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
@@ -1251,6 +1276,18 @@ export class Dispatcher {
 
     for (let i = 0; i < targets.length; i++) {
       const route = targets[i]!;
+
+      // Re-check cooldown status before attempting this target
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        route.provider,
+        route.model
+      );
+      if (!isHealthy) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
+        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
@@ -1405,6 +1442,18 @@ export class Dispatcher {
 
     for (let i = 0; i < targets.length; i++) {
       const route = targets[i]!;
+
+      // Re-check cooldown status before attempting this target
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        route.provider,
+        route.model
+      );
+      if (!isHealthy) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
+        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
@@ -1579,6 +1628,18 @@ export class Dispatcher {
 
     for (let i = 0; i < targets.length; i++) {
       const route = targets[i]!;
+
+      // Re-check cooldown status before attempting this target
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        route.provider,
+        route.model
+      );
+      if (!isHealthy) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
+        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
@@ -1715,6 +1776,18 @@ export class Dispatcher {
 
     for (let i = 0; i < targets.length; i++) {
       const route = targets[i]!;
+
+      // Re-check cooldown status before attempting this target
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        route.provider,
+        route.model
+      );
+      if (!isHealthy) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
+        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
