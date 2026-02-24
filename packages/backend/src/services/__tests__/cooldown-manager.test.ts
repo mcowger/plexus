@@ -4,11 +4,13 @@ import { setConfigForTesting } from '../../config';
 
 describe('CooldownManager', () => {
   beforeEach(async () => {
+    CooldownManager.resetInstance();
     await CooldownManager.getInstance().clearCooldown();
   });
 
   afterEach(async () => {
     await CooldownManager.getInstance().clearCooldown();
+    CooldownManager.resetInstance();
   });
 
   describe('exponential backoff', () => {

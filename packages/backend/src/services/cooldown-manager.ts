@@ -59,6 +59,7 @@ export class CooldownManager {
         });
       }
       logger.info(`Loaded ${this.cooldowns.size} active cooldowns from storage`);
+      await this.pruneDisabledProviders();
     } catch (e) {
       logger.error('Failed to load cooldowns from storage', e);
     }
@@ -75,6 +76,41 @@ export class CooldownManager {
     } catch {
       return false;
     }
+  }
+
+  private async pruneDisabledProviders(): Promise<void> {
+    const keysToDelete: string[] = [];
+
+    for (const key of this.cooldowns.keys()) {
+      const provider = key.split(':')[0];
+      if (provider && this.isCooldownDisabledForProvider(provider)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    for (const key of keysToDelete) {
+      this.cooldowns.delete(key);
+    }
+
+    if (keysToDelete.length > 0) {
+      const providers = [...new Set(keysToDelete.map((k) => k.split(':')[0]))];
+      try {
+        const db = this.ensureDb();
+        for (const provider of providers) {
+          await db
+            .delete(this.schema.providerCooldowns)
+            .where(eq(this.schema.providerCooldowns.provider, provider));
+        }
+        logger.debug(`Pruned cooldowns for disable_cooldown providers: ${providers.join(', ')}`);
+      } catch (e) {
+        logger.error('Failed to prune disabled provider cooldowns from DB', e);
+      }
+    }
+  }
+
+  /** For testing only */
+  public static resetInstance(): void {
+    CooldownManager.instance = undefined as any;
   }
 
   /**
@@ -116,8 +152,6 @@ export class CooldownManager {
     durationMs?: number
   ): Promise<void> {
     if (this.isCooldownDisabledForProvider(provider)) {
-      const key = CooldownManager.makeCooldownKey(provider, model);
-      this.cooldowns.delete(key);
       logger.debug(
         `Skipping cooldown for provider '${provider}' model '${model}' (disable_cooldown=true)`
       );
@@ -245,13 +279,19 @@ export class CooldownManager {
     consecutiveFailures: number;
   }[] {
     const now = Date.now();
+    let providerConfig: Record<string, any> = {};
+    try {
+      providerConfig = getConfig().providers ?? {};
+    } catch {
+      // ignore — treat all providers as enabled
+    }
+
     const results = [];
     for (const [key, entry] of this.cooldowns.entries()) {
       if (entry.expiry > now) {
         const parts = key.split(':');
         const provider = parts[0];
-        if (!provider || this.isCooldownDisabledForProvider(provider)) {
-          this.cooldowns.delete(key);
+        if (!provider || providerConfig[provider]?.disable_cooldown === true) {
           continue;
         }
         const model = parts[1] || '';
