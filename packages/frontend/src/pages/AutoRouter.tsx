@@ -4,16 +4,17 @@ import { api } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import {
   AutoRouterSettings,
+  DEFAULT_AUTO_CONFIG,
   type AutoRouterConfig,
 } from '../components/autorouter/AutoRouterSettings';
-import { Save, RotateCcw, Settings, AlertTriangle } from 'lucide-react';
+import { Save, RotateCcw, Settings as SettingsIcon, AlertTriangle } from 'lucide-react';
 
 interface PlexusConfig {
   auto?: AutoRouterConfig;
   [key: string]: any;
 }
 
-export const Settings = () => {
+export const AutoRouter = () => {
   const [configStr, setConfigStr] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [autoConfig, setAutoConfig] = useState<AutoRouterConfig | null>(null);
@@ -24,31 +25,38 @@ export const Settings = () => {
   }> | null>(null);
 
   const loadConfig = useCallback(async () => {
-    const yamlStr = await api.getConfig();
-    setConfigStr(yamlStr);
-    const config = parse(yamlStr) as PlexusConfig;
-    setAutoConfig(config.auto ?? null);
+    try {
+      const yamlStr = await api.getConfig();
+      setConfigStr(yamlStr);
+      const config = parse(yamlStr) as PlexusConfig;
+      setAutoConfig(config.auto ?? DEFAULT_AUTO_CONFIG);
 
-    const aliases = new Set<string>();
-    if (config.models) {
-      Object.keys(config.models).forEach((alias) => aliases.add(alias));
-    }
-    if (config.providers) {
-      Object.values(config.providers).forEach((provider: any) => {
-        if (provider.models) {
-          if (Array.isArray(provider.models)) {
-            provider.models.forEach((m: string) => aliases.add(m));
-          } else {
-            Object.keys(provider.models).forEach((m: string) => aliases.add(m));
+      const aliases = new Set<string>();
+      if (config.models) {
+        Object.keys(config.models).forEach((alias) => aliases.add(alias));
+      }
+      if (config.providers) {
+        Object.values(config.providers).forEach((provider: any) => {
+          if (provider.models) {
+            if (Array.isArray(provider.models)) {
+              provider.models.forEach((m: string) => aliases.add(m));
+            } else {
+              Object.keys(provider.models).forEach((m: string) => aliases.add(m));
+            }
           }
-        }
-      });
+        });
+      }
+      setAllModelAliases(Array.from(aliases).sort());
+    } catch (err) {
+      console.error('Failed to load config:', err);
+      setAutoConfig(DEFAULT_AUTO_CONFIG);
     }
-    setAllModelAliases(Array.from(aliases).sort());
   }, []);
 
   useEffect(() => {
-    loadConfig();
+    loadConfig().catch(() => {
+      setAutoConfig(DEFAULT_AUTO_CONFIG);
+    });
   }, [loadConfig]);
 
   const handleSave = async () => {
@@ -97,8 +105,8 @@ export const Settings = () => {
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
       <div className="mb-8">
         <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2 flex items-center gap-3">
-          <Settings className="text-primary" style={{ width: 32, height: 32 }} />
-          Settings
+          <SettingsIcon className="text-primary" style={{ width: 32, height: 32 }} />
+          Auto Router
         </h1>
         <p className="text-[15px] text-text-secondary m-0">Configure system settings.</p>
       </div>
