@@ -35,17 +35,6 @@ export const AutoRouter = () => {
       if (config.models) {
         Object.keys(config.models).forEach((alias) => aliases.add(alias));
       }
-      if (config.providers) {
-        Object.values(config.providers).forEach((provider: any) => {
-          if (provider.models) {
-            if (Array.isArray(provider.models)) {
-              provider.models.forEach((m: string) => aliases.add(m));
-            } else {
-              Object.keys(provider.models).forEach((m: string) => aliases.add(m));
-            }
-          }
-        });
-      }
       setAllModelAliases(Array.from(aliases).sort());
     } catch (err) {
       console.error('Failed to load config:', err);
