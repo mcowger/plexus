@@ -113,7 +113,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
       }
 
       if (parts.length > 0 || chunk.finish_reason) {
-        const geminiChunk = {
+        const geminiChunk: any = {
           candidates: [
             {
               content: { role: 'model', parts },
@@ -126,10 +126,17 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
                 promptTokenCount: chunk.usage.input_tokens,
                 candidatesTokenCount: chunk.usage.output_tokens,
                 totalTokenCount: chunk.usage.total_tokens,
-                thoughtsTokenCount: chunk.usage.reasoning_tokens,
+                ...(chunk.usage.reasoning_tokens
+                  ? { thoughtsTokenCount: chunk.usage.reasoning_tokens }
+                  : {}),
+                ...(chunk.usage.cached_tokens
+                  ? { cachedContentTokenCount: chunk.usage.cached_tokens }
+                  : {}),
               }
             : undefined,
         };
+        if (chunk.model) geminiChunk.modelVersion = chunk.model;
+        if (chunk.id) geminiChunk.responseId = chunk.id;
         const sseMessage = encode({ data: JSON.stringify(geminiChunk) });
         controller.enqueue(encoder.encode(sseMessage));
       }

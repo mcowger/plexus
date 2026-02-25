@@ -180,15 +180,38 @@ export async function buildGeminiRequest(
     };
   }
 
+  const generationConfig: GenerateContentRequest['generationConfig'] = {
+    maxOutputTokens: request.max_tokens,
+    temperature: request.temperature,
+  };
+
+  // Pass through response format settings
+  if (request.response_format) {
+    if (
+      request.response_format.type === 'json_object' ||
+      request.response_format.type === 'json_schema'
+    ) {
+      generationConfig.responseMimeType = 'application/json';
+      if (request.response_format.json_schema) {
+        generationConfig.responseJsonSchema = request.response_format.json_schema;
+      }
+    }
+  }
+
+  // Pass through thinking config
+  if (request.reasoning) {
+    generationConfig.thinkingConfig = {
+      includeThoughts: request.reasoning.enabled,
+      thinkingBudget: request.reasoning.max_tokens,
+    };
+  }
+
   const req: GenerateContentRequest = {
     contents,
     tools: tools.length > 0 ? tools : undefined,
     systemInstruction: systemInstructionContent,
     toolConfig,
-    generationConfig: {
-      maxOutputTokens: request.max_tokens,
-      temperature: request.temperature,
-    },
+    generationConfig,
   };
 
   return req;

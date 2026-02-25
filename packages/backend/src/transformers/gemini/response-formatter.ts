@@ -40,16 +40,25 @@ export async function formatGeminiResponse(response: UnifiedChatResponse): Promi
   const hasToolCalls = response.tool_calls && response.tool_calls.length > 0;
   const finishReason = hasToolCalls ? 'TOOL_USE' : 'STOP';
 
-  return {
+  const result: any = {
     candidates: [{ content: { role: 'model', parts }, finishReason, index: 0 }],
     usageMetadata: response.usage
       ? {
           promptTokenCount: response.usage.input_tokens,
           candidatesTokenCount: response.usage.output_tokens,
           totalTokenCount: response.usage.total_tokens,
-          thoughtsTokenCount: response.usage.reasoning_tokens,
+          ...(response.usage.reasoning_tokens
+            ? { thoughtsTokenCount: response.usage.reasoning_tokens }
+            : {}),
+          ...(response.usage.cached_tokens
+            ? { cachedContentTokenCount: response.usage.cached_tokens }
+            : {}),
         }
       : undefined,
     modelVersion: response.model,
   };
+
+  if (response.id) result.responseId = response.id;
+
+  return result;
 }
