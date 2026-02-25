@@ -1,4 +1,6 @@
 import { UnifiedChatResponse } from '../../types/unified';
+import { logger } from '../../utils/logger';
+import { isValidThoughtSignature } from './utils';
 
 /**
  * Transforms a Gemini API response into unified format.
@@ -33,7 +35,17 @@ export async function transformGeminiResponse(response: any): Promise<UnifiedCha
         },
       });
     }
-    if (part.thoughtSignature) thoughtSignature = part.thoughtSignature;
+    // Gap 6: Validate thought signatures for base64 format
+    if (part.thoughtSignature) {
+      if (isValidThoughtSignature(part.thoughtSignature)) {
+        thoughtSignature = part.thoughtSignature;
+      } else {
+        logger.warn(
+          `[gemini] Invalid thought signature detected in response, stripping. Signature length: ${part.thoughtSignature.length}`
+        );
+        // Don't assign invalid signature - strip it
+      }
+    }
   });
 
   const usage = response.usageMetadata

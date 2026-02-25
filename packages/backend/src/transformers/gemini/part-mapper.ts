@@ -1,5 +1,7 @@
 import { Part } from '@google/genai';
 import { MessageContent } from '../../types/unified';
+import { logger } from '../../utils/logger';
+import { isValidThoughtSignature } from './utils';
 
 /**
  * Converts Gemini Part objects to unified MessageContent format.

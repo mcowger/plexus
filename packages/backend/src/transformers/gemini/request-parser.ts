@@ -1,6 +1,8 @@
 import { Content } from '@google/genai';
 import { MessageContent, UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
 import { convertGeminiPartsToUnified } from './part-mapper';
+import { logger } from '../../utils/logger';
+import { isValidThoughtSignature } from './utils';
 
 /**
  * Parses a Gemini API request and converts it to unified format.
@@ -128,10 +130,22 @@ export async function parseGeminiRequest(input: any): Promise<UnifiedChatRequest
         };
 
         // Handle thinking/thought parts
+        // Gap 6: Validate thought signatures for base64 format
         const onThinking = (text: string, signature?: string) => {
           if (!message.thinking) message.thinking = { content: '' };
           message.thinking.content += text;
-          if (signature) message.thinking.signature = signature;
+
+          // Validate signature before storing
+          if (signature) {
+            if (isValidThoughtSignature(signature)) {
+              message.thinking.signature = signature;
+            } else {
+              logger.warn(
+                `[gemini] Invalid thought signature detected in request, stripping from message. Signature length: ${signature.length}`
+              );
+              // Don't assign invalid signature - strip it
+            }
+          }
         };
 
         const contentParts = convertGeminiPartsToUnified(content.parts, onThinking);
