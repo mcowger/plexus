@@ -51,3 +51,4 @@ plexus.exe
 sampledata/*.db
 auth.json
 packages/backend/config/
+research_and_plans/
