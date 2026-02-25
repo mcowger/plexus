@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.17.6 - 2026-02-25
+
+### v0.17.6: Enhanced Provider Cooldown Management and Dashboard Consolidation
+
+## Major Features
+
+- **Enhanced Provider Cooldown Management** ([efc7c66](https://github.com/mcowger/plexus/commit/efc7c66)): Added `lastError` field to provider cooldowns for better error tracking and improved cooldown handling logic
+- **Dashboard Consolidation** ([ec544b6](https://github.com/mcowger/plexus/commit/ec544b6)): Merged CollapseViews to consolidate dashboard into a unified tabbed interface
+- **MCP Integration** ([2cac6c4](https://github.com/mcowger/plexus/commit/2cac6c4)): Added MCP support
+
+## Improvements & Fixes
+
+- Improved cooldown management for 400 status responses based on quota errors ([335c2c8](https://github.com/mcowger/plexus/commit/335c2c8))
+- Enhanced provider failure marking during retry attempts ([4eca8ab](https://github.com/mcowger/plexus/commit/4eca8ab))
+- Updated Bun dependency to version 1.3.9 with improved cooldown logic ([63f4039](https://github.com/mcowger/plexus/commit/63f4039))
+- Removed conditional badges for system status in LiveTab component ([2bb7b07](https://github.com/mcowger/plexus/commit/2bb7b07))
+- Formatted mcp.json for consistent indentation and readability ([1fb954e](https://github.com/mcowger/plexus/commit/1fb954e))
+- Streamlined frontend codebase by removing Performance and Usage pages ([56d5bdb](https://github.com/mcowger/plexus/commit/56d5bdb))
+
+---
+
+The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.17.5 - 2026-02-24
 
 ### Quota handling improvements and dispatcher cooldown enhancements
