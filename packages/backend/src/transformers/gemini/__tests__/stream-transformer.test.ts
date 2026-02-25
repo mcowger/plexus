@@ -290,4 +290,79 @@ describe('transformGeminiStream', () => {
     const messageStart = chunks.find((c) => c.event === 'message_start');
     expect(messageStart).toBeDefined();
   });
+
+  test('should detect toolUse finish reason when function calls are present', async () => {
+    const sseData = [
+      // Response with function call and STOP should become toolUse
+      '{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","args":{"city":"San Francisco"}}}]},"finishReason":"STOP","index":0}],"responseId":"resp_123","modelVersion":"gemini-2.0-flash"}',
+    ];
+
+    const inputStream = createSSEStream(sseData);
+    const transformedStream = transformGeminiStream(inputStream);
+    const reader = transformedStream.getReader();
+
+    const chunks: UnifiedChatStreamChunk[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && typeof value === 'object') {
+        chunks.push(value as UnifiedChatStreamChunk);
+      }
+    }
+
+    // Should have tooluse finish_reason (not stop) when function calls present
+    const finishChunk = chunks.find((c) => c.finish_reason !== undefined);
+    expect(finishChunk).toBeDefined();
+    expect(finishChunk?.finish_reason).toBe('tooluse');
+  });
+
+  test('should keep stop finish reason when no function calls', async () => {
+    const sseData = [
+      // Response with text and STOP should stay as stop
+      '{"candidates":[{"content":{"role":"model","parts":[{"text":"Hello world"}]},"finishReason":"STOP","index":0}],"responseId":"resp_123","modelVersion":"gemini-2.0-flash"}',
+    ];
+
+    const inputStream = createSSEStream(sseData);
+    const transformedStream = transformGeminiStream(inputStream);
+    const reader = transformedStream.getReader();
+
+    const chunks: UnifiedChatStreamChunk[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && typeof value === 'object') {
+        chunks.push(value as UnifiedChatStreamChunk);
+      }
+    }
+
+    // Should have stop finish_reason (not tooluse) when no function calls
+    const finishChunk = chunks.find((c) => c.finish_reason !== undefined);
+    expect(finishChunk).toBeDefined();
+    expect(finishChunk?.finish_reason).toBe('stop');
+  });
+
+  test('should handle RECITATION finish reason', async () => {
+    const sseData = [
+      // Response with RECITATION should stay as recitation
+      '{"candidates":[{"content":{"role":"model","parts":[{"text":"Citation text"}]},"finishReason":"RECITATION","index":0}],"responseId":"resp_123","modelVersion":"gemini-2.0-flash"}',
+    ];
+
+    const inputStream = createSSEStream(sseData);
+    const transformedStream = transformGeminiStream(inputStream);
+    const reader = transformedStream.getReader();
+
+    const chunks: UnifiedChatStreamChunk[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && typeof value === 'object') {
+        chunks.push(value as UnifiedChatStreamChunk);
+      }
+    }
+
+    // Should have recitation finish_reason
+    const finishChunk = chunks.find((c) => c.finish_reason !== undefined);
+    expect(finishChunk).toBeDefined();
+    expect(finishChunk?.finish_reason).toBe('recitation');
+  });
 });

@@ -219,11 +219,18 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                 activeBlockType = null;
               }
 
+              // Determine finish reason: if there are function calls, use 'toolUse' instead of 'stop'
+              let finishReason = candidate.finishReason.toLowerCase();
+              const hasFunctionCalls = parts.some((part: any) => part.functionCall);
+              if (hasFunctionCalls && finishReason === 'stop') {
+                finishReason = 'tooluse';
+              }
+
               const chunk = {
                 id: data.responseId,
                 model: data.modelVersion,
                 created: Date.now(),
-                finish_reason: candidate.finishReason.toLowerCase(),
+                finish_reason: finishReason,
                 usage: data.usageMetadata
                   ? {
                       input_tokens: data.usageMetadata.promptTokenCount,
