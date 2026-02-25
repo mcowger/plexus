@@ -22,7 +22,6 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   kilo: 'Kilo',
   poe: 'POE',
   apertis: 'Apertis',
-  wisdomgate: 'Wisdom Gate',
 };
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
@@ -54,7 +53,6 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     else if (checkerType.includes('kilo')) normalizedType = 'kilo';
     else if (checkerType.includes('poe')) normalizedType = 'poe';
     else if (checkerType.includes('apertis')) normalizedType = 'apertis';
-    else if (checkerType.includes('wisdomgate')) normalizedType = 'wisdomgate';
     return CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
   };
 
@@ -81,7 +79,6 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     else if (checkerType.includes('kilo')) normalizedType = 'kilo';
     else if (checkerType.includes('poe')) normalizedType = 'poe';
     else if (checkerType.includes('apertis')) normalizedType = 'apertis';
-    else if (checkerType.includes('wisdomgate')) normalizedType = 'wisdomgate';
 
     const displayName = CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
     const windows = result.windows || [];
