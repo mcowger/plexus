@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, Clock, Cpu, Database, RefreshCw, Server, Signal, X, Zap } from 'lucide-react';
-import { AnalyzeButton } from '../components/analytics/AnalyzeButton';
+import { AnalyzeButton, buildAnalyzeQueryString, type CardType } from '../components/analytics/AnalyzeButton';
+import { DetailedUsage } from './DetailedUsage';
 import {
   AreaChart,
   Area,
@@ -69,6 +70,7 @@ type ModelTimelineBucket = Record<string, string | number> & {
 };
 
 type StreamFilter = 'all' | 'success' | 'error';
+type ModalCard = 'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | 'alerts';
 
 const LIVE_WINDOW_MINUTES = 5;
 const LIVE_WINDOW_MS = LIVE_WINDOW_MINUTES * 60 * 1000;
@@ -369,18 +371,24 @@ export const LiveMetrics = () => {
   );
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalCard, setModalCard] = useState<
-    'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | 'alerts' | null
-  >(null);
+  const [modalCard, setModalCard] = useState<ModalCard | null>(null);
+  const [detailedUsageQuery, setDetailedUsageQuery] = useState<string | null>(null);
 
-  const openModal = (card: typeof modalCard) => {
+  const openModal = (card: ModalCard) => {
     setModalCard(card);
+    setDetailedUsageQuery(null);
+    setModalOpen(true);
+  };
+
+  const openDetailedUsageInModal = (cardType: CardType) => {
+    setDetailedUsageQuery(buildAnalyzeQueryString(cardType));
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setModalCard(null);
+    setDetailedUsageQuery(null);
   };
 
   useEffect(() => {
@@ -864,11 +872,13 @@ export const LiveMetrics = () => {
     isOpen,
     onClose,
     title,
+    headerAction,
     children,
   }: {
     isOpen: boolean;
     onClose: () => void;
     title: string;
+    headerAction?: React.ReactNode;
     children: React.ReactNode;
   }) => {
     if (!isOpen) return null;
@@ -885,13 +895,16 @@ export const LiveMetrics = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-text">{title}</h2>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-bg-hover transition-colors"
-              aria-label="Close modal"
-            >
-              <X size={24} className="text-text-secondary" />
-            </button>
+            <div className="flex items-center gap-2">
+              {headerAction}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg hover:bg-bg-hover transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={24} className="text-text-secondary" />
+              </button>
+            </div>
           </div>
           {children}
         </div>
@@ -900,6 +913,10 @@ export const LiveMetrics = () => {
   };
 
   const getModalTitle = () => {
+    if (detailedUsageQuery) {
+      return 'Detailed Usage';
+    }
+
     switch (modalCard) {
       case 'velocity':
         return 'Request Velocity (Last 5 Minutes)';
@@ -919,6 +936,18 @@ export const LiveMetrics = () => {
   };
 
   const renderModalContent = () => {
+    if (detailedUsageQuery) {
+      return (
+        <div className="h-[75vh] overflow-auto rounded-lg border border-border-glass bg-bg-card">
+          <DetailedUsage
+            embedded
+            initialQueryString={detailedUsageQuery}
+            onBack={() => setDetailedUsageQuery(null)}
+          />
+        </div>
+      );
+    }
+
     switch (modalCard) {
       case 'velocity':
         return (
@@ -1202,6 +1231,18 @@ export const LiveMetrics = () => {
         return null;
     }
   };
+
+  const modalHeaderAction = modalCard ? (
+    detailedUsageQuery ? (
+      <Button size="sm" variant="secondary" onClick={() => setDetailedUsageQuery(null)}>
+        Back to Live Card
+      </Button>
+    ) : (
+      <Button size="sm" variant="primary" onClick={() => openDetailedUsageInModal(modalCard)}>
+        Open Detailed Usage
+      </Button>
+    )
+  ) : null;
 
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
@@ -1940,7 +1981,7 @@ export const LiveMetrics = () => {
 
       {/* Grid: Latest Requests (left) | Provider & Model Stats (right) */}
       <div
-        className="grid gap-4 mb-4 lg:grid-cols-2"
+        className="grid grid-cols-1 gap-4 mb-4"
       >
         <Card
           title="Latest Requests"
@@ -2110,7 +2151,7 @@ export const LiveMetrics = () => {
         </Card>
       </div>
 
-      <Modal isOpen={modalOpen} onClose={closeModal} title={getModalTitle()}>
+      <Modal isOpen={modalOpen} onClose={closeModal} title={getModalTitle()} headerAction={modalHeaderAction}>
           {renderModalContent()}
         </Modal>
       </div>

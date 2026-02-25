@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { Button } from '../ui/Button';
-import { BarChart3, ExternalLink } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 
 /** Supported card types from Live Metrics that can navigate to Detailed Usage */
 export type CardType = 'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | 'alerts';
@@ -43,7 +43,7 @@ interface AnalyzeButtonProps {
   size?: 'sm' | 'md';
   /** Optional additional CSS classes */
   className?: string;
-  /** Optional click handler - if provided, overrides default window.open behavior */
+  /** Optional click handler - if provided, overrides default navigation behavior */
   onClick?: () => void;
 }
 
@@ -51,7 +51,7 @@ interface AnalyzeButtonProps {
  * Build the query string for Detailed Usage based on card type and context.
  * Maps Live Metrics card types to appropriate Detailed Usage configurations.
  */
-const buildQueryString = (cardType: CardType, context?: AnalyzeContext): string => {
+export const buildAnalyzeQueryString = (cardType: CardType, context?: AnalyzeContext): string => {
   const params = new URLSearchParams();
 
   // Default to live (5-minute) window for real-time analysis continuity
@@ -136,7 +136,7 @@ const getAnalyzeLabel = (cardType: CardType): string => {
  * with pre-configured filters matching the card's context.
  *
  * Architecture:
- *   - Opens Detailed Usage in new tab via window.open()
+ *   - Navigates to Detailed Usage in the current tab by default
  *   - Builds query string via buildQueryString helper
  *   - Maintains 5-minute live window continuity by default
  *   - Supports all 6 Live Metrics card types
@@ -151,16 +151,16 @@ export const AnalyzeButton: React.FC<AnalyzeButtonProps> = ({
   /**
    * Handle navigation to Detailed Usage.
    * If onClick is provided, use that (e.g., to open modal).
-   * Otherwise, open Detailed Usage in new tab via window.open().
+   * Otherwise, navigate to Detailed Usage in the current tab.
    */
   const handleAnalyze = () => {
     if (onClick) {
       onClick();
       return;
     }
-    const queryString = buildQueryString(cardType, context);
+    const queryString = buildAnalyzeQueryString(cardType, context);
     const url = `${window.location.origin}/ui/detailed-usage?${queryString}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.location.assign(url);
   };
 
   return (
@@ -172,7 +172,6 @@ export const AnalyzeButton: React.FC<AnalyzeButtonProps> = ({
     >
       <BarChart3 size={size === 'sm' ? 14 : 16} />
       {getAnalyzeLabel(cardType)}
-      <ExternalLink size={size === 'sm' ? 12 : 14} className="ml-1 opacity-70" />
     </Button>
   );
 };
