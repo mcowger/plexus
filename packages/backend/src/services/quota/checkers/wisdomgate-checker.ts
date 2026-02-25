@@ -1,38 +1,29 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
+import type { QuotaCheckResult, QuotaWindow } from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 
-interface WisdomGatePackageDetail {
-  package_id: string;
-  title: string;
-  amount: number;
-  total_amount: number;
-  expiry_time: number;
-  expiry_date: string;
-  begin_time: number;
-  begin_date: string;
-}
-
-interface WisdomGateUsageResponse {
-  object: string;
-  total_usage: number;
-  total_available: number;
-  regular_amount: number;
-  package_details: WisdomGatePackageDetail[];
+interface WisdomGateBalanceResponse {
+  available_balance: number;
+  package_balance: number;
+  cash_balance: number;
+  token_balance: number;
+  is_token_unlimited_quota: boolean;
 }
 
 export class WisdomGateQuotaChecker extends QuotaChecker {
   async checkQuota(): Promise<QuotaCheckResult> {
-    const sessionCookie = this.requireOption<string>('session').trim();
+    const apiKey = this.requireOption<string>('apiKey');
+    const endpoint =
+      this.getOption<string>('endpoint', undefined) ??
+      'https://wisdom-gate.juheapi.com/v1/users/me/balance';
 
     try {
-      const endpoint = 'https://wisdom-gate.juheapi.com/api/dashboard/billing/usage/details';
       logger.silly(`[wisdomgate] Calling ${endpoint}`);
 
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          Cookie: `session=${sessionCookie}`,
+          Authorization: `Bearer ${apiKey}`,
           Accept: 'application/json',
         },
       });
@@ -41,37 +32,16 @@ export class WisdomGateQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
       }
 
-      const data: WisdomGateUsageResponse = await response.json();
-
-      // package_details is empty when Wisdom Gate quota is exceeded.
-      const packageDetail = data.package_details?.[0];
-      let limit = 0;
-      let remaining = 0;
-      let used = 0;
-      let resetsAt: Date | undefined;
-
-      if (packageDetail) {
-        limit = packageDetail.total_amount;
-        remaining = packageDetail.amount;
-        used = limit - remaining;
-        resetsAt = new Date(packageDetail.expiry_time * 1000);
-      } else {
-        // When quota is exceeded, the API returns empty package details; fall back to totals.
-        const totalUsage = data.total_usage ?? 0;
-        const totalAvailable = data.total_available ?? 0;
-        remaining = Math.max(0, totalAvailable);
-        used = totalUsage;
-        limit = Math.max(totalUsage + totalAvailable, totalUsage);
-      }
+      const data: WisdomGateBalanceResponse = await response.json();
 
       const window: QuotaWindow = this.createWindow(
-        'monthly',
-        limit,
-        used,
-        remaining,
+        'subscription',
+        undefined,
+        undefined,
+        data.available_balance,
         'dollars',
-        resetsAt,
-        'Wisdom Gate monthly credits'
+        undefined,
+        'Wisdom Gate account balance'
       );
 
       return this.successResult([window]);

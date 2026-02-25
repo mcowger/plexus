@@ -1,8 +1,8 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { formatDuration, formatCost } from '../../lib/format';
-import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
+import { Wallet, AlertTriangle } from 'lucide-react';
+import { formatCost } from '../../lib/format';
+import type { QuotaCheckResult } from '../../types/quota';
 
 interface WisdomGateQuotaDisplayProps {
   result: QuotaCheckResult;
@@ -27,28 +27,13 @@ export const WisdomGateQuotaDisplay: React.FC<WisdomGateQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const monthlyWindow = windows.find((w) => w.windowType === 'monthly');
-
-  const statusColors: Record<QuotaStatus, string> = {
-    ok: 'bg-success',
-    warning: 'bg-warning',
-    critical: 'bg-danger',
-    exhausted: 'bg-danger',
-  };
-
-  const overallStatus = monthlyWindow?.status || 'ok';
+  const subscriptionWindow = windows.find((w) => w.windowType === 'subscription');
+  const balance = subscriptionWindow?.remaining;
 
   if (isCollapsed) {
     return (
       <div className="px-2 py-2 flex justify-center">
-        {overallStatus === 'ok' ? (
-          <CheckCircle2 size={18} className="text-success" />
-        ) : (
-          <AlertTriangle
-            size={18}
-            className={clsx(overallStatus === 'warning' ? 'text-warning' : 'text-danger')}
-          />
-        )}
+        <Wallet size={18} className="text-info" />
       </div>
     );
   }
@@ -56,47 +41,13 @@ export const WisdomGateQuotaDisplay: React.FC<WisdomGateQuotaDisplayProps> = ({
   return (
     <div className="px-2 py-1 space-y-1">
       <div className="flex items-center gap-2 min-w-0">
-        <CreditCard size={14} className="text-text" />
+        <Wallet size={14} className="text-info" />
         <span className="text-xs font-semibold text-text whitespace-nowrap">Wisdom Gate</span>
       </div>
-
-      {monthlyWindow && (
-        <div className="space-y-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs font-semibold text-text-secondary">Monthly</span>
-            {monthlyWindow.resetInSeconds !== undefined &&
-              monthlyWindow.resetInSeconds !== null && (
-                <span className="text-[10px] text-text-muted">
-                  {formatDuration(monthlyWindow.resetInSeconds)}
-                </span>
-              )}
-          </div>
-
-          <div className="relative h-2">
-            <div className="h-2 rounded-md bg-bg-hover overflow-hidden">
-              <div
-                className={clsx(
-                  'h-full rounded-md transition-all duration-500 ease-out',
-                  statusColors[monthlyWindow.status || 'ok']
-                )}
-                style={{
-                  width: `${Math.min(100, Math.max(0, monthlyWindow.utilizationPercent))}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs text-text-secondary">
-              Remaining:{' '}
-              <span className="font-semibold text-success">
-                {formatCost(monthlyWindow.remaining ?? 0)}
-              </span>
-            </span>
-            <span className="text-[10px] text-text-muted">
-              {formatCost(monthlyWindow.used ?? 0)} / {formatCost(monthlyWindow.limit ?? 0)}
-            </span>
-          </div>
+      {balance !== undefined && (
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-text-secondary">Balance</span>
+          <span className="text-xs font-semibold text-info">{formatCost(balance)}</span>
         </div>
       )}
     </div>

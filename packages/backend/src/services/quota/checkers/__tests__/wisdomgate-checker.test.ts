@@ -3,14 +3,14 @@ import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { WisdomGateQuotaChecker } from '../wisdomgate-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
 
-const makeConfig = (session = 'test_session_cookie_value'): QuotaCheckerConfig => ({
+const makeConfig = (apiKey = 'test_api_key'): QuotaCheckerConfig => ({
   id: 'wisdomgate-test',
   provider: 'wisdomgate',
   type: 'wisdomgate',
   enabled: true,
   intervalMinutes: 30,
   options: {
-    session,
+    apiKey,
   },
 });
 
@@ -27,33 +27,22 @@ describe('WisdomGateQuotaChecker', () => {
     expect(QuotaCheckerFactory.isRegistered('wisdomgate')).toBe(true);
   });
 
-  it('queries usage with session cookie and returns monthly quota with dollars', async () => {
+  it('queries balance with Bearer token and returns subscription quota with dollars', async () => {
     let capturedUrl: string | undefined;
-    let capturedCookie: string | undefined;
+    let capturedAuthorization: string | undefined;
 
     setFetchMock(async (input: RequestInfo | URL, init?: RequestInit) => {
       capturedUrl = String(input);
       const headers = new Headers(init?.headers);
-      capturedCookie = headers.get('Cookie') ?? undefined;
+      capturedAuthorization = headers.get('Authorization') ?? undefined;
 
       return new Response(
         JSON.stringify({
-          object: 'usage_details',
-          total_usage: 44.168262,
-          total_available: 23.852028,
-          regular_amount: 0.004,
-          package_details: [
-            {
-              package_id: 'ejPMUxNjciFxUYSqAkaiI6xalvEZyj9N',
-              title: '',
-              amount: 23.848028,
-              total_amount: 40,
-              expiry_time: 1772868308,
-              expiry_date: '',
-              begin_time: 1770276308,
-              begin_date: '',
-            },
-          ],
+          available_balance: 23.852028,
+          package_balance: 23.848028,
+          cash_balance: 0.004,
+          token_balance: 23.852028,
+          is_token_unlimited_quota: false,
         }),
         {
           status: 200,
@@ -62,26 +51,22 @@ describe('WisdomGateQuotaChecker', () => {
       );
     });
 
-    const checker = new WisdomGateQuotaChecker(makeConfig('test-session-cookie'));
+    const checker = new WisdomGateQuotaChecker(makeConfig('my-api-key'));
     const result = await checker.checkQuota();
 
-    expect(capturedUrl).toBe('https://wisdom-gate.juheapi.com/api/dashboard/billing/usage/details');
-    expect(capturedCookie).toBe('session=test-session-cookie');
+    expect(capturedUrl).toBe('https://wisdom-gate.juheapi.com/v1/users/me/balance');
+    expect(capturedAuthorization).toBe('Bearer my-api-key');
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(result.windows).toHaveLength(1);
 
     const window = result.windows?.[0];
-    expect(window?.windowType).toBe('monthly');
+    expect(window?.windowType).toBe('subscription');
     expect(window?.unit).toBe('dollars');
-    expect(window?.limit).toBe(40);
-    expect(window?.used).toBeCloseTo(40 - 23.848028, 6);
-    expect(window?.remaining).toBe(23.848028);
-    expect(window?.description).toBe('Wisdom Gate monthly credits');
-    expect(window?.resetsAt).toBeInstanceOf(Date);
-    // Unix timestamp 1772868308 * 1000 = Date
-    expect(window?.resetsAt?.getTime()).toBe(1772868308 * 1000);
+    expect(window?.remaining).toBeCloseTo(23.852028, 6);
+    expect(window?.description).toBe('Wisdom Gate account balance');
+    expect(window?.resetsAt).toBeUndefined();
   });
 
   it('returns error for non-200 response', async () => {
@@ -96,40 +81,40 @@ describe('WisdomGateQuotaChecker', () => {
     expect(result.error).toContain('HTTP 401: Unauthorized');
   });
 
-  it('uses totals when package_details is empty', async () => {
-    setFetchMock(async () => {
+  it('uses custom endpoint when provided', async () => {
+    let capturedUrl: string | undefined;
+
+    setFetchMock(async (input: RequestInfo | URL) => {
+      capturedUrl = String(input);
       return new Response(
         JSON.stringify({
-          object: 'usage_details',
-          total_usage: 68.020504,
-          total_available: -0.000214,
-          regular_amount: -0.000214,
-          package_details: [],
+          available_balance: 10,
+          package_balance: 10,
+          cash_balance: 0,
+          token_balance: 10,
+          is_token_unlimited_quota: false,
         }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     });
 
-    const checker = new WisdomGateQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const checker = new WisdomGateQuotaChecker({
+      id: 'wisdomgate-test',
+      provider: 'wisdomgate',
+      type: 'wisdomgate',
+      enabled: true,
+      intervalMinutes: 30,
+      options: {
+        apiKey: 'test-key',
+        endpoint: 'https://custom.endpoint.example.com/v1/users/me/balance',
+      },
+    });
 
-    expect(result.success).toBe(true);
-    expect(result.error).toBeUndefined();
-    expect(result.windows).toHaveLength(1);
-
-    const window = result.windows?.[0];
-    expect(window?.windowType).toBe('monthly');
-    expect(window?.unit).toBe('dollars');
-    expect(window?.used).toBeCloseTo(68.020504, 6);
-    expect(window?.remaining).toBe(0);
-    expect(window?.limit).toBeCloseTo(68.020504, 6);
-    expect(window?.description).toBe('Wisdom Gate monthly credits');
+    await checker.checkQuota();
+    expect(capturedUrl).toBe('https://custom.endpoint.example.com/v1/users/me/balance');
   });
 
-  it('throws error when session option is missing', async () => {
+  it('throws error when apiKey option is missing', async () => {
     const checker = new WisdomGateQuotaChecker({
       id: 'wisdomgate-test',
       provider: 'wisdomgate',
