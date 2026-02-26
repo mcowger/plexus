@@ -31,6 +31,8 @@ describe('Auth Middleware', () => {
       saveRequest: mock(),
       saveError: mock(),
       updatePerformanceMetrics: mock(),
+      emitStarted: mock(),
+      emitUpdated: mock(),
     } as unknown as UsageStorageService;
     // Initialize singletons to avoid errors
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -207,6 +209,8 @@ describe('Key Attribution', () => {
       saveRequest: mock(),
       saveError: mock(),
       updatePerformanceMetrics: mock(),
+      emitStarted: mock(),
+      emitUpdated: mock(),
     } as unknown as UsageStorageService;
 
     // Initialize singletons

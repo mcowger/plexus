@@ -33,6 +33,9 @@ export async function registerTranscriptionsRoute(
       responseStatus: 'pending',
     };
 
+    // Emit 'started' event immediately - this allows frontend to show in-flight requests
+    usageStorage.emitStarted(usageRecord);
+
     try {
       // Extract form fields from request.body
       // @fastify/multipart with attachFieldsToBody puts form fields and file in request.body
@@ -119,6 +122,14 @@ export async function registerTranscriptionsRoute(
       usageRecord.apiKey = (request as any).keyName;
       usageRecord.attribution = (request as any).attribution || null;
 
+      // Emit 'updated' event with parsed request details
+      usageStorage.emitUpdated({
+        requestId,
+        incomingModelAlias: model,
+        apiKey: (request as any).keyName,
+        attribution: (request as any).attribution || null,
+      });
+
       DebugManager.getInstance().startLog(requestId, {
         model,
         filename: fileData.filename,
@@ -132,6 +143,14 @@ export async function registerTranscriptionsRoute(
 
       // Dispatch
       const unifiedResponse = await dispatcher.dispatchTranscription(unifiedRequest);
+
+      // Emit 'updated' event with routing decision details
+      usageStorage.emitUpdated({
+        requestId,
+        provider: unifiedResponse.plexus?.provider,
+        selectedModelName: unifiedResponse.plexus?.model,
+        canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+      });
 
       // Record usage
       usageRecord.provider = unifiedResponse.plexus?.provider;

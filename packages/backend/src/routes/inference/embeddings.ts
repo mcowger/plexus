@@ -32,11 +32,22 @@ export async function registerEmbeddingsRoute(
       responseStatus: 'pending',
     };
 
+    // Emit 'started' event immediately - this allows frontend to show in-flight requests
+    usageStorage.emitStarted(usageRecord);
+
     try {
       const body = request.body as any;
       usageRecord.incomingModelAlias = body.model;
       usageRecord.apiKey = (request as any).keyName;
       usageRecord.attribution = (request as any).attribution || null;
+
+      // Emit 'updated' event with parsed request details
+      usageStorage.emitUpdated({
+        requestId,
+        incomingModelAlias: body.model,
+        apiKey: (request as any).keyName,
+        attribution: (request as any).attribution || null,
+      });
 
       logger.silly('Incoming Embeddings Request', body);
 
@@ -49,6 +60,14 @@ export async function registerEmbeddingsRoute(
       DebugManager.getInstance().startLog(requestId, body);
 
       const unifiedResponse = await dispatcher.dispatchEmbeddings(unifiedRequest);
+
+      // Emit 'updated' event with routing decision details
+      usageStorage.emitUpdated({
+        requestId,
+        provider: unifiedResponse.plexus?.provider,
+        selectedModelName: unifiedResponse.plexus?.model,
+        canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+      });
 
       // Record usage
       usageRecord.provider = unifiedResponse.plexus?.provider;

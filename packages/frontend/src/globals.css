@@ -124,3 +124,17 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+@keyframes slideIn {
+  from {
+    background-color: rgba(245, 158, 11, 0.25);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+/* Utility class for new log row animation */
+@utility animate-slide-in {
+  animation: slideIn 1.5s ease-out forwards;
+}

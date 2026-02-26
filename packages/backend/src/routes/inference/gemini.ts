@@ -34,6 +34,9 @@ export async function registerGeminiRoute(
       responseStatus: 'pending',
     };
 
+    // Emit 'started' event immediately - this allows frontend to show in-flight requests
+    usageStorage.emitStarted(usageRecord);
+
     try {
       const body = request.body as any;
       const params = request.params as any;
@@ -46,6 +49,14 @@ export async function registerGeminiRoute(
       usageRecord.apiKey = (request as any).keyName;
       // Capture attribution if provided in the API key
       usageRecord.attribution = (request as any).attribution || null;
+
+      // Emit 'updated' event with parsed request details
+      usageStorage.emitUpdated({
+        requestId,
+        incomingModelAlias: modelName,
+        apiKey: (request as any).keyName,
+        attribution: (request as any).attribution || null,
+      });
 
       logger.silly('Incoming Gemini Request', body);
       const transformer = new GeminiTransformer();
@@ -81,6 +92,14 @@ export async function registerGeminiRoute(
       }
 
       const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+
+      // Emit 'updated' event with routing decision details
+      usageStorage.emitUpdated({
+        requestId,
+        provider: unifiedResponse.plexus?.provider,
+        selectedModelName: unifiedResponse.plexus?.model,
+        canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+      });
 
       // Determine if token estimation is needed
       const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;

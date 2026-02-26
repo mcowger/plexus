@@ -43,11 +43,22 @@ export async function registerResponsesRoute(
       responseStatus: 'pending',
     };
 
+    // Emit 'started' event immediately - this allows frontend to show in-flight requests
+    usageStorage.emitStarted(usageRecord);
+
     try {
       const body = request.body as any;
       usageRecord.incomingModelAlias = body.model;
       usageRecord.apiKey = (request as any).keyName;
       usageRecord.attribution = (request as any).attribution || null;
+
+      // Emit 'updated' event with parsed request details
+      usageStorage.emitUpdated({
+        requestId,
+        incomingModelAlias: body.model,
+        apiKey: (request as any).keyName,
+        attribution: (request as any).attribution || null,
+      });
 
       logger.silly('Incoming Responses API Request', body);
 
@@ -137,6 +148,14 @@ export async function registerResponsesRoute(
       }
 
       const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+
+      // Emit 'updated' event with routing decision details
+      usageStorage.emitUpdated({
+        requestId,
+        provider: unifiedResponse.plexus?.provider,
+        selectedModelName: unifiedResponse.plexus?.model,
+        canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+      });
 
       // Determine if token estimation is needed
       const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;

@@ -45,6 +45,7 @@ import {
   ShieldCheck,
   RotateCcw,
   PencilLine,
+  Plane,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
@@ -193,20 +194,18 @@ export const Logs = () => {
           for (const block of lines) {
             const blockLines = block.split('\n');
             let eventData = '';
-            let isLogEvent = false;
+            let eventType = '';
 
             for (const line of blockLines) {
-              if (line.startsWith('event: log')) {
-                isLogEvent = true;
-              } else if (line.startsWith('event: ping')) {
-                // Ignore ping events
-                isLogEvent = false;
+              if (line.startsWith('event: ')) {
+                eventType = line.slice(7);
               } else if (line.startsWith('data: ')) {
                 eventData = line.slice(6);
               }
             }
 
-            if (isLogEvent && eventData) {
+            // Handle different event types: started, updated, completed
+            if ((eventType === 'started' || eventType === 'updated' || eventType === 'completed') && eventData) {
               try {
                 const newLog = JSON.parse(eventData);
                 const currentFilters = filtersRef.current;
@@ -230,7 +229,14 @@ export const Logs = () => {
 
                 if (matches) {
                   setLogs((prev) => {
-                    if (prev.some((l) => l.requestId === newLog.requestId)) return prev;
+                    const existingIndex = prev.findIndex((l) => l.requestId === newLog.requestId);
+                    if (existingIndex >= 0) {
+                      // Merge update into existing record (supports progressive updates)
+                      const updated = [...prev];
+                      updated[existingIndex] = { ...updated[existingIndex], ...newLog };
+                      return updated;
+                    }
+                    // New record - add to the top
                     const updated = [newLog, ...prev];
                     if (updated.length > limit) return updated.slice(0, limit);
                     return updated;
@@ -394,8 +400,15 @@ export const Logs = () => {
                     key={log.requestId}
                     className={clsx(
                       'group border-b border-border-glass hover:bg-bg-hover',
-                      log.requestId === newestLogId && 'animate-pulse-fade'
+                      log.requestId === newestLogId && 'animate-slide-in'
                     )}
+                    style={{
+                      height: '86px',
+                      backgroundColor:
+                        log.responseStatus === 'pending'
+                          ? 'rgba(234, 179, 8, 0.08)'
+                          : undefined,
+                    }}
                   >
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -874,13 +887,19 @@ export const Logs = () => {
                               'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
                               log.responseStatus === 'success'
                                 ? 'text-success border-success/30 bg-emerald-500/15'
+                                : log.responseStatus === 'pending'
+                                ? 'text-warning border-warning/30 bg-yellow-500/15'
                                 : 'text-danger border-danger/30 bg-red-500/15'
                             )}
                             style={{ width: '52px' }}
                           >
-                            <span style={{ fontWeight: 600 }}>
-                              {log.responseStatus === 'success' ? '✓' : '✗'}
-                            </span>
+                            {log.responseStatus === 'success' ? (
+                              <span style={{ fontWeight: 600 }}>✓</span>
+                            ) : log.responseStatus === 'pending' ? (
+                              <Plane size={12} className="animate-pulse" />
+                            ) : (
+                              <span style={{ fontWeight: 600 }}>✗</span>
+                            )}
                           </div>
                         )}
                       </div>

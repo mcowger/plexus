@@ -306,21 +306,34 @@ export async function registerUsageRoutes(
       'Access-Control-Allow-Origin': '*',
     });
 
-    const listener = async (record: any) => {
+    // Helper to send events to the client
+    const sendEvent = (eventType: string, record: any) => {
       if (reply.raw.destroyed) return;
       reply.raw.write(
         encode({
           data: JSON.stringify(record),
-          event: 'log',
+          event: eventType,
           id: String(Date.now()),
         })
       );
     };
 
-    usageStorage.on('created', listener);
+    // Listen for all event types: started, updated, and completed
+    const startedListener = (record: any) => sendEvent('started', record);
+    const updatedListener = (record: any) => sendEvent('updated', record);
+    const completedListener = (record: any) => sendEvent('completed', record);
+
+    usageStorage.on('started', startedListener);
+    usageStorage.on('updated', updatedListener);
+    usageStorage.on('completed', completedListener);
+    // Also listen for 'created' for backward compatibility
+    usageStorage.on('created', completedListener);
 
     request.raw.on('close', () => {
-      usageStorage.off('created', listener);
+      usageStorage.off('started', startedListener);
+      usageStorage.off('updated', updatedListener);
+      usageStorage.off('completed', completedListener);
+      usageStorage.off('created', completedListener);
     });
 
     // Keep connection alive with periodic pings
