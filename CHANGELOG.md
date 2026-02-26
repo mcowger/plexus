@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.17.7 - 2026-02-26
+
+### v0.17.7: JSON Schema Normalization, Enhanced Gemini Support, and Authentication Updates
+
+## Main Features
+
+### JSON Schema Normalization and OpenAI Enhancements
+- Added JSON Schema normalization utility to improve OpenAI request transformation ([d690ec4](https://github.com/mcowger/plexus/commit/d690ec4))
+
+### Gemini Provider Improvements
+- Enhanced Gemini request and response handling with improved configuration and metadata support ([161e033](https://github.com/mcowger/plexus/commit/161e033))
+- Updated Gemini stream transformer and response formatter to handle `toolUse` finish reason ([7402edc](https://github.com/mcowger/plexus/commit/7402edc))
+- Enhanced Gemini stream transformer with block lifecycle event handling and comprehensive test coverage ([904ade8](https://github.com/mcowger/plexus/commit/904ade8))
+
+### Authentication Updates
+- Replaced WisdomGate cookie authentication with Bearer token authentication and added new balance endpoint ([a27aab2](https://github.com/mcowger/plexus/commit/a27aab2))
+
+## Additional Changes
+
+- Implemented thought signature validation and sanitization utilities ([0c4ce92](https://github.com/mcowger/plexus/commit/0c4ce92))
+- Enhanced Dispatcher error handling and cooldown management ([a27aab2](https://github.com/mcowger/plexus/commit/a27aab2))
+- Updated `.gitignore` to include `research_and_plans` directory and removed obsolete Gemini documentation files ([e469228](https://github.com/mcowger/plexus/commit/e469228))
+
+---
+
+The Docker image for this release has been updated and is available at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.17.6 - 2026-02-25
 
 ### v0.17.6: Enhanced Provider Cooldown Management and Dashboard Consolidation
