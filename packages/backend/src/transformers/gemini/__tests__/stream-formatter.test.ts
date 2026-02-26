@@ -85,4 +85,44 @@ describe('formatGeminiStream', () => {
     expect(usageEvent.data.usage.cost_details.upstream_inference_cost).toBe(0.001);
     expect(usageEvent.data.usage.completion_tokens_details.reasoning_tokens).toBe(10);
   });
+
+  test('should format usage correctly even if event is missing but usage is present', async () => {
+    const unifiedChunks: UnifiedChatStreamChunk[] = [
+      {
+        id: 'resp_123',
+        model: 'gemini-3-flash-preview',
+        created: Date.now(),
+        delta: {},
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          total_tokens: 150,
+          reasoning_tokens: 10,
+          cached_tokens: 20,
+          cache_creation_tokens: 0,
+          upstream_inference_cost: 0.001,
+          upstream_inference_prompt_cost: 0.0004,
+          upstream_inference_completions_cost: 0.0006
+        } as any
+      }
+    ];
+
+    const inputStream = new ReadableStream({
+      start(controller) {
+        for (const chunk of unifiedChunks) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      }
+    });
+
+    const formattedStream = formatGeminiStream(inputStream);
+    const sseChunks = await readSSEChunks(formattedStream);
+
+    expect(sseChunks.length).toBe(1);
+    const usageChunk = sseChunks[0];
+    expect(usageChunk.data.usageMetadata).toBeDefined();
+    expect(usageChunk.data.usageMetadata.promptTokenCount).toBe(100);
+    expect(usageChunk.data.usageMetadata.candidatesTokenCount).toBe(50);
+  });
 });

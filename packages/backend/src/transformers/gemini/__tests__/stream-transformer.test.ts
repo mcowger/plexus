@@ -365,4 +365,29 @@ describe('transformGeminiStream', () => {
     expect(finishChunk).toBeDefined();
     expect(finishChunk?.finish_reason).toBe('recitation');
   });
+
+  test('should handle usage-only chunk (no candidate)', async () => {
+    const sseData = [
+      '{"usageMetadata":{"promptTokenCount":123,"candidatesTokenCount":456,"totalTokenCount":579},"responseId":"resp_123","modelVersion":"gemini-1.5-flash"}',
+    ];
+
+    const inputStream = createSSEStream(sseData);
+    const transformedStream = transformGeminiStream(inputStream);
+    const reader = transformedStream.getReader();
+
+    const chunks: UnifiedChatStreamChunk[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && typeof value === 'object') {
+        chunks.push(value as UnifiedChatStreamChunk);
+      }
+    }
+
+    // Should have usage event
+    const usageEvent = chunks.find((c) => c.event === 'usage');
+    expect(usageEvent).toBeDefined();
+    expect(usageEvent?.usage?.input_tokens).toBe(123);
+    expect(usageEvent?.usage?.output_tokens).toBe(456);
+  });
 });

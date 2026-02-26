@@ -148,7 +148,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
         });
       }
 
-      if (parts.length > 0 || chunk.finish_reason) {
+      if (parts.length > 0 || chunk.finish_reason || chunk.usage) {
         const geminiChunk: any = {
           candidates: [
             {
