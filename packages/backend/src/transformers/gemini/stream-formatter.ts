@@ -78,7 +78,29 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
           eventData.type = 'message_end';
         } else if (eventName === 'usage') {
           eventData.type = 'usage';
-          eventData.usage = chunk.usage;
+          eventData.usage = chunk.usage
+            ? {
+                prompt_tokens: chunk.usage.input_tokens,
+                completion_tokens: chunk.usage.output_tokens,
+                total_tokens: chunk.usage.total_tokens,
+                prompt_tokens_details: {
+                  cached_tokens: chunk.usage.cached_tokens || 0,
+                  cache_write_tokens: 0,
+                  audio_tokens: 0,
+                  video_tokens: 0,
+                },
+                cost_details: {
+                  upstream_inference_cost: chunk.usage.upstream_inference_cost || 0,
+                  upstream_inference_prompt_cost: chunk.usage.upstream_inference_prompt_cost || 0,
+                  upstream_inference_completions_cost:
+                    chunk.usage.upstream_inference_completions_cost || 0,
+                },
+                completion_tokens_details: {
+                  reasoning_tokens: chunk.usage.reasoning_tokens || 0,
+                  image_tokens: 0,
+                },
+              }
+            : undefined;
         } else if (eventName === 'done') {
           eventData.type = 'done';
         }

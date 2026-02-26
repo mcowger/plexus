@@ -19,6 +19,7 @@ import {
   Clock,
   Zap,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   BookOpen,
   X,
@@ -82,6 +83,10 @@ export const Models = () => {
       { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
     >
   >({});
+
+  // Drag and Drop State
+  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -281,6 +286,16 @@ export const Models = () => {
     setEditingAlias({ ...editingAlias, targets: newTargets });
   };
 
+  const moveTarget = (index: number, direction: 'up' | 'down') => {
+    const newTargets = [...editingAlias.targets];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newTargets.length) return;
+
+    const [movedItem] = newTargets.splice(index, 1);
+    newTargets.splice(newIndex, 0, movedItem);
+    setEditingAlias({ ...editingAlias, targets: newTargets });
+  };
+
   const addTarget = () => {
     setEditingAlias({
       ...editingAlias,
@@ -446,16 +461,28 @@ export const Models = () => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
+    setDragSourceIndex(index);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
     e.preventDefault();
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
 
     if (dragIndex === dropIndex) return;
 
@@ -1285,94 +1312,179 @@ export const Models = () => {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {editingAlias.targets.map((target, idx) => (
-                <div
-                  key={idx}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, idx)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, idx)}
-                  style={{
-                    display: 'flex',
-                    gap: '6px',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    backgroundColor: 'var(--color-bg-subtle)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--color-border-glass)',
-                    cursor: 'grab',
-                  }}
-                  onDragStartCapture={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.opacity = '0.5';
-                    (e.currentTarget as HTMLDivElement).style.cursor = 'grabbing';
-                  }}
-                  onDragEndCapture={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.opacity = '1';
-                    (e.currentTarget as HTMLDivElement).style.cursor = 'grab';
-                  }}
-                >
+              {editingAlias.targets.map((target, idx) => {
+                const isDragging = dragSourceIndex === idx;
+                const isDragOver = dragOverIndex === idx && !isDragging;
+
+                return (
                   <div
+                    key={idx}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, idx)}
                     style={{
-                      cursor: 'grab',
-                      color: 'var(--color-text-secondary)',
                       display: 'flex',
+                      gap: '6px',
                       alignItems: 'center',
+                      padding: '4px 8px',
+                      backgroundColor: isDragging
+                        ? 'transparent'
+                        : isDragOver
+                          ? 'rgba(245, 158, 11, 0.05)'
+                          : 'var(--color-bg-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: isDragging
+                        ? '1px dashed var(--color-border-glass)'
+                        : isDragOver
+                          ? '2px solid var(--color-primary)'
+                          : '1px solid var(--color-border-glass)',
+                      cursor: 'grab',
+                      opacity: isDragging ? 0.4 : 1,
+                      transform: isDragOver ? 'translateY(2px)' : 'none',
+                      transition: 'all 0.2s ease',
+                      position: 'relative',
+                    }}
+                    onDragStartCapture={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.cursor = 'grabbing';
+                    }}
+                    onDragEndCapture={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.cursor = 'grab';
                     }}
                   >
-                    <GripVertical size={16} />
-                  </div>
-                  <div style={{ flex: '0 0 120px', maxWidth: '120px' }}>
-                    <select
-                      className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                      style={{ padding: '4px 8px', height: '28px' }}
-                      value={target.provider}
-                      onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
+                    {isDragOver && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: dragSourceIndex !== null && dragSourceIndex < idx ? 'auto' : -2,
+                          bottom: dragSourceIndex !== null && dragSourceIndex > idx ? 'auto' : -2,
+                          left: 0,
+                          right: 0,
+                          height: '2px',
+                          backgroundColor: 'var(--color-primary)',
+                          zIndex: 20,
+                        }}
+                      />
+                    )}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        color: 'var(--color-text-secondary)',
+                        opacity: 0.8,
+                        marginRight: '4px',
+                        visibility: isDragging ? 'hidden' : 'visible',
+                      }}
                     >
-                      <option value="">Select Provider...</option>
-                      {providers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <select
-                      className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                      style={{ padding: '4px 8px', height: '28px' }}
-                      value={target.model}
-                      onChange={(e) => updateTarget(idx, 'model', e.target.value)}
-                      disabled={!target.provider}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveTarget(idx, 'up');
+                        }}
+                        disabled={idx === 0}
+                        className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '4px',
+                          cursor: idx === 0 ? 'default' : 'pointer',
+                        }}
+                        title="Move Up"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveTarget(idx, 'down');
+                        }}
+                        disabled={idx === editingAlias.targets.length - 1}
+                        className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '4px',
+                          cursor: idx === editingAlias.targets.length - 1 ? 'default' : 'pointer',
+                        }}
+                        title="Move Down"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        cursor: 'grab',
+                        color: 'var(--color-text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        visibility: isDragging ? 'hidden' : 'visible',
+                      }}
                     >
-                      <option value="">Select Model...</option>
-                      {availableModels
-                        .filter((m) => m.providerId === target.provider)
-                        .map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
+                      <GripVertical size={16} />
+                    </div>
+                    <div
+                      style={{
+                        flex: '0 0 120px',
+                        maxWidth: '120px',
+                        visibility: isDragging ? 'hidden' : 'visible',
+                      }}
+                    >
+                      <select
+                        className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                        style={{ padding: '4px 8px', height: '28px' }}
+                        value={target.provider}
+                        onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
+                      >
+                        <option value="">Select Provider...</option>
+                        {providers.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
                           </option>
                         ))}
-                    </select>
+                      </select>
+                    </div>
+                    <div style={{ flex: 1, visibility: isDragging ? 'hidden' : 'visible' }}>
+                      <select
+                        className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                        style={{ padding: '4px 8px', height: '28px' }}
+                        value={target.model}
+                        onChange={(e) => updateTarget(idx, 'model', e.target.value)}
+                        disabled={!target.provider}
+                      >
+                        <option value="">Select Model...</option>
+                        {availableModels
+                          .filter((m) => m.providerId === target.provider)
+                          .map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
+                      <Switch
+                        checked={target.enabled !== false}
+                        onChange={(val) => updateTarget(idx, 'enabled', val)}
+                        size="sm"
+                      />
+                    </div>
+                    <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeTarget(idx)}
+                        style={{ color: 'var(--color-danger)', padding: '4px', minHeight: 'auto' }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <Switch
-                      checked={target.enabled !== false}
-                      onChange={(val) => updateTarget(idx, 'enabled', val)}
-                      size="sm"
-                    />
-                  </div>
-                  <div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeTarget(idx)}
-                      style={{ color: 'var(--color-danger)', padding: '4px', minHeight: 'auto' }}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
