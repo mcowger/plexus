@@ -11,12 +11,33 @@ import { convertUnifiedToolsToAnthropic } from './tool-mapper';
  * - Message merging (consecutive messages with same role)
  */
 export async function buildAnthropicRequest(request: UnifiedChatRequest): Promise<any> {
-  let system: string | undefined;
+  let system: string | { type: string; text: string; cache_control?: unknown }[] | undefined;
   const messages: any[] = [];
 
   for (const msg of request.messages) {
     if (msg.role === 'system') {
-      system = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      if (typeof msg.content === 'string') {
+        system = msg.content;
+      } else if (Array.isArray(msg.content)) {
+        // Filter out Claude Code-specific billing header blocks. These are only valid
+        // for the pi-ai OAuth Claude Code path and must not be forwarded via the
+        // translation path to upstream messages endpoints.
+        const filteredBlocks = msg.content.filter(
+          (block: any) =>
+            !(
+              block.type === 'text' &&
+              typeof block.text === 'string' &&
+              block.text.trimStart().startsWith('x-anthropic-billing-header:')
+            )
+        );
+        if (filteredBlocks.length > 0) {
+          system = filteredBlocks.map((block: any) => ({
+            type: block.type as string,
+            text: block.text as string,
+            ...(block.cache_control !== undefined ? { cache_control: block.cache_control } : {}),
+          }));
+        }
+      }
     } else if (msg.role === 'user' || msg.role === 'assistant') {
       const content: any[] = [];
 
