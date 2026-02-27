@@ -286,6 +286,7 @@ export function piAiMessageToUnified(
         thinkingContent = (thinkingContent || '') + block.thinking;
       } else if (block.type === 'toolCall') {
         const { callId } = parseToolCallIds((block as any).id);
+        const thoughtSignature = (block as any).thoughtSignature;
         toolCalls.push({
           id: callId || block.id,
           type: 'function',
@@ -293,6 +294,7 @@ export function piAiMessageToUnified(
             name: stripProxyPrefix(block.name) || block.name,
             arguments: JSON.stringify(block.arguments),
           },
+          ...(thoughtSignature ? { thinking: { signature: thoughtSignature } } : {}),
         });
       }
     }
@@ -363,6 +365,8 @@ export function piAiEventToChunk(
       const toolCall = event.partial?.content?.[event.contentIndex];
       if (toolCall && toolCall.type === 'toolCall') {
         const { callId } = parseToolCallIds((toolCall as any).id);
+        const thoughtSignature = (toolCall as any).thoughtSignature;
+
         return {
           ...baseChunk,
           delta: {
@@ -377,6 +381,13 @@ export function piAiEventToChunk(
                 },
               },
             ],
+            ...(thoughtSignature
+              ? {
+                  thinking: {
+                    signature: thoughtSignature,
+                  },
+                }
+              : {}),
           },
         };
       }

@@ -29,9 +29,15 @@ export async function formatGeminiResponse(response: UnifiedChatResponse): Promi
           args: JSON.parse(tc.function.arguments),
         },
       };
-      if (index === 0 && response.thinking?.signature && !response.reasoning_content) {
+
+      // Check for signature in the tool call itself (preferred) or fall back to global thinking signature
+      const sig = (tc as any).thinking?.signature || (tc as any).thought_signature;
+      if (sig) {
+        part.thoughtSignature = sig;
+      } else if (index === 0 && response.thinking?.signature && !response.reasoning_content) {
         part.thoughtSignature = response.thinking.signature;
       }
+
       parts.push(part);
     });
   }

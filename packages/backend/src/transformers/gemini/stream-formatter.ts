@@ -139,12 +139,20 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
             parsedArgs = rawArgs;
           }
 
-          parts.push({
+          const functionCallPart: any = {
             functionCall: {
               name: tc.function.name,
               args: parsedArgs,
             },
-          });
+          };
+
+          // Check for signature in the tool call itself (preferred) or fall back to global thinking signature in the chunk
+          const sig = tc.thinking?.signature || tc.thought_signature || chunk.delta?.thinking?.signature || chunk.delta?.thought_signature;
+          if (sig) {
+            functionCallPart.thoughtSignature = sig;
+          }
+
+          parts.push(functionCallPart);
         });
       }
 

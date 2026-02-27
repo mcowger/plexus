@@ -38,6 +38,7 @@ export interface UnifiedMessage {
     content: string;
     signature?: string;
   };
+  thought_signature?: string; // New field for direct mapping
 }
 
 // Unified Tool Types
@@ -160,6 +161,7 @@ export interface UnifiedChatResponse {
     content: string;
     signature?: string;
   };
+  thought_signature?: string; // New field for direct mapping
   usage?: UnifiedUsage;
   tool_calls?: Array<{
     id: string;
@@ -214,6 +216,7 @@ export interface UnifiedChatStreamChunk {
         name?: string;
         arguments?: string;
       };
+      thought_signature?: string; // New field for direct mapping
     }>;
     reasoning_content?: string | null;
     thinking?: {
