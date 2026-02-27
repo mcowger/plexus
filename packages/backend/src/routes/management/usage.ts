@@ -350,4 +350,34 @@ export async function registerUsageRoutes(
       }
     }
   });
+
+  fastify.get('/v0/management/concurrency', async (_request, reply) => {
+    try {
+      const db = usageStorage.getDb();
+      const schema = getSchema();
+
+      // Query currently in-flight requests (started but not yet completed)
+      // duration_ms IS NULL indicates request is still active
+      const results = await db
+        .select({
+          provider: schema.requestUsage.provider,
+          model: schema.requestUsage.canonicalModelName,
+          count: sql<number>`count(*)`,
+          timestamp: sql<number>`${Date.now()}`,
+        })
+        .from(schema.requestUsage)
+        .where(
+          and(
+            sql`${schema.requestUsage.durationMs} IS NULL`,
+            // Only include requests started in last hour (avoid stale data)
+            gte(schema.requestUsage.startTime, Date.now() - 60 * 60 * 1000)
+          )
+        )
+        .groupBy(schema.requestUsage.provider, schema.requestUsage.canonicalModelName);
+
+      return reply.send({ data: results });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
 }
