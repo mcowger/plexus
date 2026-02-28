@@ -26,6 +26,7 @@ import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig
 import { KiloQuotaConfig } from '../components/quota/KiloQuotaConfig';
 import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig';
 import { GeminiCliQuotaConfig } from '../components/quota/GeminiCliQuotaConfig';
+import { AntigravityQuotaConfig } from '../components/quota/AntigravityQuotaConfig';
 import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
 import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
@@ -68,6 +69,7 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'poe',
   'copilot',
   'gemini-cli',
+  'antigravity',
 ] as const;
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -76,6 +78,7 @@ const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null =
   if (oauthProvider === 'anthropic' || oauthProvider === 'claude-code') return 'claude-code';
   if (oauthProvider === 'github-copilot') return 'copilot';
   if (oauthProvider === 'google-gemini-cli') return 'gemini-cli';
+  if (oauthProvider === 'google-antigravity') return 'antigravity';
   return null;
 };
 
@@ -1737,6 +1740,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <ApertisQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'antigravity' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <AntigravityQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({

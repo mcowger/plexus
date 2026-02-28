@@ -23,6 +23,7 @@ import {
   KimiCodeQuotaDisplay,
   PoeQuotaDisplay,
   GeminiCliQuotaDisplay,
+  AntigravityQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
@@ -45,6 +46,7 @@ const RATE_LIMIT_CHECKERS = [
   'minimax-coding',
   'gemini-cli',
   'gemini',
+  'antigravity',
 ];
 
 // Checker display names
@@ -68,6 +70,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   copilot: 'GitHub Copilot',
   wisdomgate: 'Wisdom Gate',
   'gemini-cli': 'Gemini CLI',
+  antigravity: 'Antigravity',
 };
 
 export const Quotas = () => {
@@ -207,6 +210,8 @@ export const Quotas = () => {
         baseType = 'wisdomgate';
       } else if (baseType.includes('gemini-cli') || baseType.includes('gemini')) {
         baseType = 'gemini-cli';
+      } else if (baseType.includes('antigravity')) {
+        baseType = 'antigravity';
       }
 
       if (!groups[baseType]) {
@@ -340,6 +345,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('gemini-cli') || checkerIdentifier.includes('gemini')) {
       return wrapper(<GeminiCliQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('antigravity')) {
+      return wrapper(<AntigravityQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     // Fallback: generic display

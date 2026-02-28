@@ -16,6 +16,7 @@ import { WisdomGateQuotaChecker } from './checkers/wisdomgate-checker';
 import { ApertisQuotaChecker } from './checkers/apertis-checker';
 import { PoeQuotaChecker } from './checkers/poe-checker';
 import { GeminiCliQuotaChecker } from './checkers/gemini-cli-checker';
+import { AntigravityQuotaChecker } from './checkers/antigravity-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
@@ -35,6 +36,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   apertis: ApertisQuotaChecker,
   poe: PoeQuotaChecker,
   'gemini-cli': GeminiCliQuotaChecker,
+  antigravity: AntigravityQuotaChecker,
 };
 
 export class QuotaCheckerFactory {

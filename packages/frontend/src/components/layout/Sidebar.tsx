@@ -258,6 +258,7 @@ export const Sidebar: React.FC = () => {
     'wisdomgate',
     'minimax-coding',
     'gemini-cli',
+    'antigravity',
   ];
   const rateLimitQuotas = quotas.filter((quota) => {
     const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();

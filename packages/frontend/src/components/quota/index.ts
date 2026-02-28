@@ -30,6 +30,8 @@ export { PoeQuotaDisplay } from './PoeQuotaDisplay';
 export { PoeQuotaConfig } from './PoeQuotaConfig';
 export { GeminiCliQuotaDisplay } from './GeminiCliQuotaDisplay';
 export { GeminiCliQuotaConfig } from './GeminiCliQuotaConfig';
+export { AntigravityQuotaDisplay } from './AntigravityQuotaDisplay';
+export { AntigravityQuotaConfig } from './AntigravityQuotaConfig';
 export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';

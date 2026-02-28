@@ -155,6 +155,10 @@ const GeminiCliQuotaCheckerOptionsSchema = z.object({
   clientMetadata: z.string().trim().min(1).optional(),
 });
 
+const AntigravityQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const ApertisQuotaCheckerOptionsSchema = z.object({
   session: z.string().trim().min(1, 'Apertis session cookie is required'),
   endpoint: z.string().url().optional(),
@@ -283,6 +287,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: GeminiCliQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('antigravity'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: AntigravityQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 
@@ -708,6 +719,7 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
     'claude-code': { type: 'claude-code', intervalMinutes: 5 },
     'github-copilot': { type: 'copilot', intervalMinutes: 5 },
     'google-gemini-cli': { type: 'gemini-cli', intervalMinutes: 5 },
+    'google-antigravity': { type: 'antigravity', intervalMinutes: 5 },
   };
 
   for (const [providerId, providerConfig] of Object.entries(config.providers)) {
