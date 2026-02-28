@@ -2,21 +2,19 @@
 
 ## Goal
 
-Move all runtime configuration data from `plexus.yaml` and `auth.json` into database tables, eliminating the need for these files except for bootstrapping settings (`adminKey`). On first launch with an empty database, automatically import from existing YAML/JSON files if present.
+Move all runtime configuration data from `plexus.yaml` and `auth.json` into database tables, eliminating the need for these files entirely. `adminKey`, `DATABASE_URL`, and `PORT` become environment variables only. On first launch with an empty database, automatically import from existing YAML/JSON files if present.
 
 ---
 
-## What Stays in plexus.yaml (Minimal Bootstrap Config)
+## What Is Removed (No More Config Files)
 
-Only true server-level settings that must be known **before** the database is available:
+`plexus.yaml` and `auth.json` are fully eliminated. All configuration is database-driven. Bootstrap settings are provided via environment variables:
 
-```yaml
-adminKey: "change-me-to-a-secure-admin-password"
-# Optional overrides (env vars preferred):
-# DATABASE_URL: "sqlite://config/usage.sqlite"
-# AUTH_JSON: "./auth.json"
-# PORT: 4000
-```
+| Env Var | Description | Default |
+|---|---|---|
+| `ADMIN_KEY` | Admin key for management API | *(required)* |
+| `DATABASE_URL` | DB connection string | `sqlite://config/usage.sqlite` |
+| `PORT` | Server port | `4000` |
 
 Everything else moves to the database.
 
@@ -30,53 +28,58 @@ Everything else moves to the database.
 | `plexus.yaml → models` | Model aliases (targets, selector, priority, advanced, metadata) | `model_aliases` + `model_alias_targets` |
 | `plexus.yaml → keys` | API keys (secret, comment, quota) | `api_keys` |
 | `plexus.yaml → user_quotas` | User quota definitions (type, limitType, limit, duration) | `user_quota_definitions` |
-| `plexus.yaml → failover` | Failover policy (enabled, retryableStatusCodes, retryableErrors) | `settings` (key-value) |
-| `plexus.yaml → cooldown` | Cooldown policy (initialMinutes, maxMinutes) | `settings` (key-value) |
+| `plexus.yaml → failover` | Failover policy (enabled, retryableStatusCodes, retryableErrors) | `system_settings` (key-value) |
+| `plexus.yaml → cooldown` | Cooldown policy (initialMinutes, maxMinutes) | `system_settings` (key-value) |
 | `plexus.yaml → mcp_servers` | MCP server configs (upstream_url, enabled, headers) | `mcp_servers` |
-| `plexus.yaml → performanceExplorationRate` | Exploration rates | `settings` (key-value) |
-| `plexus.yaml → latencyExplorationRate` | Exploration rates | `settings` (key-value) |
+| `plexus.yaml → performanceExplorationRate` | Exploration rates | `system_settings` (key-value) |
+| `plexus.yaml → latencyExplorationRate` | Exploration rates | `system_settings` (key-value) |
 | `auth.json` | OAuth credentials (access, refresh, expires per provider/account) | `oauth_credentials` |
 
 ---
 
 ## Phase 1: Database Schema (New Tables)
 
-All schemas must be created for **both SQLite and PostgreSQL** dialects per project conventions.
+All schemas must be created for **both SQLite and PostgreSQL** dialects per project conventions. All tables use integer surrogate PKs (better for joins and consistency). Enum-valued text columns use PostgreSQL native `CREATE TYPE ... AS ENUM` and SQLite `CHECK` constraints. All JSON columns use `jsonb` (supported in SQLite ≥ 3.38 and natively in PostgreSQL). All timestamps use `bigint` (milliseconds since epoch) matching existing project conventions.
 
 ### 1.1 `providers` table
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
-| `id` | text PK | text PK | Provider slug (e.g. "openai", "anthropic-oauth") |
+| `id` | integer PK AUTOINCREMENT | serial PK | Surrogate key |
+| `slug` | text UNIQUE NOT NULL | text UNIQUE NOT NULL | Provider identifier (e.g. "openai") |
 | `display_name` | text | text | Optional friendly name |
-| `api_base_url` | text (JSON) | jsonb | String URL or `{"chat":"...","messages":"..."}` |
-| `api_key` | text | text | Encrypted at rest (or plaintext like current) |
-| `oauth_provider` | text | text | Nullable: 'anthropic', 'openai-codex', etc. |
-| `oauth_account` | text | text | Nullable: account ID within auth.json |
+| `api_base_url` | jsonb | jsonb | String URL or `{"chat":"...","messages":"..."}` |
+| `api_key` | text | text | Bearer token or "oauth" |
+| `oauth_provider_type` | text CHECK(enum) | oauth_provider_type ENUM | Nullable: 'anthropic', 'openai-codex', 'github-copilot', 'google-gemini-cli', 'google-antigravity' |
+| `oauth_credential_id` | integer FK → oauth_credentials.id | integer FK | Nullable, references the oauth_credentials row |
 | `enabled` | integer | boolean | Default true |
 | `disable_cooldown` | integer | boolean | Default false |
 | `discount` | real | real | Nullable, 0-1 |
 | `estimate_tokens` | integer | boolean | Default false |
-| `headers` | text (JSON) | jsonb | Nullable, custom HTTP headers |
-| `extra_body` | text (JSON) | jsonb | Nullable, extra body params |
-| `quota_checker_type` | text | text | Nullable |
-| `quota_checker_id` | text | text | Nullable, custom checker ID |
+| `headers` | jsonb | jsonb | Nullable, custom HTTP headers |
+| `extra_body` | jsonb | jsonb | Nullable, extra body params |
+| `quota_checker_type` | text CHECK(enum) | quota_checker_type ENUM | Nullable |
+| `quota_checker_id` | text | text | Nullable, custom checker ID override |
 | `quota_checker_enabled` | integer | boolean | Default true |
 | `quota_checker_interval` | integer | integer | Default 30 (minutes) |
-| `quota_checker_options` | text (JSON) | jsonb | Nullable |
-| `created_at` | integer (timestamp_ms) | timestamp | |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `quota_checker_options` | jsonb | jsonb | Nullable |
+| `created_at` | bigint | bigint | Epoch milliseconds |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
+
+**Enum values for `oauth_provider_type`:** `anthropic`, `openai-codex`, `github-copilot`, `google-gemini-cli`, `google-antigravity`
+
+**Enum values for `quota_checker_type`:** `naga`, `synthetic`, `nanogpt`, `zai`, `moonshot`, `minimax`, `minimax-coding`, `openrouter`, `kilo`, `openai-codex`, `claude-code`, `kimi-code`, `copilot`, `wisdomgate`, `apertis`, `poe`
 
 ### 1.2 `provider_models` table
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
 | `id` | integer PK AUTOINCREMENT | serial PK | |
-| `provider_id` | text FK → providers.id | text FK | ON DELETE CASCADE |
+| `provider_id` | integer FK → providers.id | integer FK | ON DELETE CASCADE |
 | `model_name` | text | text | Model slug |
-| `pricing_config` | text (JSON) | jsonb | Nullable, full pricing object |
-| `model_type` | text | text | Nullable: 'chat', 'embeddings', etc. |
-| `access_via` | text (JSON) | jsonb | Nullable, array of API types |
+| `pricing_config` | jsonb | jsonb | Nullable, full pricing object |
+| `model_type` | text CHECK(enum) | model_type ENUM | Nullable: 'chat', 'embeddings', 'transcriptions', 'speech', 'image', 'responses' |
+| `access_via` | jsonb | jsonb | Nullable, array of API type strings |
 | `sort_order` | integer | integer | Preserve ordering |
 
 **Unique constraint:** `(provider_id, model_name)`
@@ -85,71 +88,75 @@ All schemas must be created for **both SQLite and PostgreSQL** dialects per proj
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
-| `id` | text PK | text PK | Alias name (e.g. "smart-model") |
-| `selector` | text | text | Nullable: 'random', 'in_order', 'cost', etc. |
-| `priority` | text | text | Default 'selector' |
-| `alias_type` | text | text | Nullable: 'chat', 'embeddings', etc. |
-| `additional_aliases` | text (JSON) | jsonb | Nullable, array of strings |
-| `advanced` | text (JSON) | jsonb | Nullable, array of behavior objects |
-| `metadata_source` | text | text | Nullable: 'openrouter', 'models.dev', 'catwalk' |
+| `id` | integer PK AUTOINCREMENT | serial PK | Surrogate key |
+| `slug` | text UNIQUE NOT NULL | text UNIQUE NOT NULL | Alias name (e.g. "smart-model") |
+| `selector` | text CHECK(enum) | selector_strategy ENUM | Nullable: 'random', 'in_order', 'cost', 'latency', 'usage', 'performance' |
+| `priority` | text CHECK(enum) | alias_priority ENUM | Default 'selector': 'selector', 'api_match' |
+| `model_type` | text CHECK(enum) | model_type ENUM | Nullable: 'chat', 'embeddings', 'transcriptions', 'speech', 'image', 'responses' |
+| `additional_aliases` | jsonb | jsonb | Nullable, array of strings |
+| `advanced` | jsonb | jsonb | Nullable, array of behavior objects |
+| `metadata_source` | text CHECK(enum) | metadata_source ENUM | Nullable: 'openrouter', 'models.dev', 'catwalk' |
 | `metadata_source_path` | text | text | Nullable |
-| `created_at` | integer (timestamp_ms) | timestamp | |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `created_at` | bigint | bigint | Epoch milliseconds |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
 
 ### 1.4 `model_alias_targets` table
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
 | `id` | integer PK AUTOINCREMENT | serial PK | |
-| `alias_id` | text FK → model_aliases.id | text FK | ON DELETE CASCADE |
-| `provider_id` | text | text | Provider slug (soft reference) |
+| `alias_id` | integer FK → model_aliases.id | integer FK | ON DELETE CASCADE |
+| `provider_slug` | text | text | Provider slug (soft reference, not FK, allows referencing disabled/missing providers) |
 | `model_name` | text | text | Model slug on that provider |
 | `enabled` | integer | boolean | Default true |
 | `sort_order` | integer | integer | Preserve target ordering |
 
-**Unique constraint:** `(alias_id, provider_id, model_name)`
+**Unique constraint:** `(alias_id, provider_slug, model_name)`
 
 ### 1.5 `api_keys` table
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
-| `name` | text PK | text PK | Key alias (e.g. "my-app-key") |
-| `secret` | text UNIQUE | text UNIQUE | The actual bearer token |
+| `id` | integer PK AUTOINCREMENT | serial PK | |
+| `name` | text UNIQUE NOT NULL | text UNIQUE NOT NULL | Key alias (e.g. "my-app-key") |
+| `secret` | text UNIQUE NOT NULL | text UNIQUE NOT NULL | The actual bearer token |
 | `comment` | text | text | Nullable |
-| `quota_name` | text | text | Nullable, references user_quota_definitions.name |
-| `created_at` | integer (timestamp_ms) | timestamp | |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `quota_name` | text | text | Nullable, soft FK → user_quota_definitions.name |
+| `created_at` | bigint | bigint | Epoch milliseconds |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
 
 ### 1.6 `user_quota_definitions` table
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
-| `name` | text PK | text PK | Quota name (e.g. "premium-plan") |
-| `quota_type` | text | text | 'rolling', 'daily', 'weekly' |
-| `limit_type` | text | text | 'requests' or 'tokens' |
+| `id` | integer PK AUTOINCREMENT | serial PK | |
+| `name` | text UNIQUE NOT NULL | text UNIQUE NOT NULL | Quota name (e.g. "premium-plan") |
+| `quota_type` | text CHECK(enum) | quota_type ENUM | 'rolling', 'daily', 'weekly' |
+| `limit_type` | text CHECK(enum) | limit_type ENUM | 'requests', 'tokens' |
 | `limit_value` | integer | integer | |
 | `duration` | text | text | Nullable, required for rolling (e.g. "1h") |
-| `created_at` | integer (timestamp_ms) | timestamp | |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `created_at` | bigint | bigint | Epoch milliseconds |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
 
 ### 1.7 `mcp_servers` table
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
-| `name` | text PK | text PK | Server slug |
+| `id` | integer PK AUTOINCREMENT | serial PK | |
+| `name` | text UNIQUE NOT NULL | text UNIQUE NOT NULL | Server slug |
 | `upstream_url` | text | text | |
 | `enabled` | integer | boolean | Default true |
-| `headers` | text (JSON) | jsonb | Nullable |
-| `created_at` | integer (timestamp_ms) | timestamp | |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `headers` | jsonb | jsonb | Nullable |
+| `created_at` | bigint | bigint | Epoch milliseconds |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
 
-### 1.8 `settings` table (key-value for policies and rates)
+### 1.8 `system_settings` table (key-value for policies and rates)
 
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
 | `key` | text PK | text PK | e.g. 'failover.enabled', 'cooldown.initialMinutes' |
-| `value` | text (JSON) | jsonb | Serialized value |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `value` | jsonb | jsonb | Serialized value |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
 
 Settings keys:
 - `failover.enabled`, `failover.retryableStatusCodes`, `failover.retryableErrors`
@@ -161,15 +168,15 @@ Settings keys:
 | Column | SQLite Type | PG Type | Notes |
 |---|---|---|---|
 | `id` | integer PK AUTOINCREMENT | serial PK | |
-| `oauth_provider` | text | text | e.g. 'anthropic', 'openai-codex' |
+| `oauth_provider_type` | text CHECK(enum) | oauth_provider_type ENUM | e.g. 'anthropic', 'openai-codex' |
 | `account_id` | text | text | e.g. 'work', 'personal' |
 | `access_token` | text | text | |
 | `refresh_token` | text | text | |
-| `expires_at` | integer | bigint | Epoch seconds |
-| `created_at` | integer (timestamp_ms) | timestamp | |
-| `updated_at` | integer (timestamp_ms) | timestamp | |
+| `expires_at` | bigint | bigint | Epoch seconds |
+| `created_at` | bigint | bigint | Epoch milliseconds |
+| `updated_at` | bigint | bigint | Epoch milliseconds |
 
-**Unique constraint:** `(oauth_provider, account_id)`
+**Unique constraint:** `(oauth_provider_type, account_id)`
 
 ---
 
@@ -179,20 +186,20 @@ Settings keys:
 
 New file: `packages/backend/src/db/config-repository.ts`
 
-A single class that encapsulates all config CRUD against the database. Methods grouped by entity:
+A single class that encapsulates all config CRUD against the database using **Drizzle ORM** exclusively (no raw SQL). Methods grouped by entity:
 
 **Providers:**
 - `getAllProviders(): Promise<ProviderConfig[]>`
-- `getProvider(id: string): Promise<ProviderConfig | null>`
-- `saveProvider(id: string, config: ProviderConfig): Promise<void>`
-- `deleteProvider(id: string, cascade: boolean): Promise<void>`
-- `getProviderModels(providerId: string): Promise<ProviderModelConfig[]>`
+- `getProvider(slug: string): Promise<ProviderConfig | null>`
+- `saveProvider(slug: string, config: ProviderConfig): Promise<void>`
+- `deleteProvider(slug: string, cascade: boolean): Promise<void>`
+- `getProviderModels(providerSlug: string): Promise<ProviderModelConfig[]>`
 
 **Model Aliases:**
 - `getAllAliases(): Promise<Record<string, ModelConfig>>`
-- `getAlias(id: string): Promise<ModelConfig | null>`
-- `saveAlias(id: string, config: ModelConfig): Promise<void>`
-- `deleteAlias(id: string): Promise<void>`
+- `getAlias(slug: string): Promise<ModelConfig | null>`
+- `saveAlias(slug: string, config: ModelConfig): Promise<void>`
+- `deleteAlias(slug: string): Promise<void>`
 - `deleteAllAliases(): Promise<number>`
 
 **API Keys:**
@@ -218,10 +225,10 @@ A single class that encapsulates all config CRUD against the database. Methods g
 - `getCooldownPolicy(): Promise<CooldownPolicy>`
 
 **OAuth Credentials:**
-- `getOAuthCredentials(provider: string, accountId?: string): Promise<OAuthCredentials | null>`
-- `setOAuthCredentials(provider: string, accountId: string, creds: OAuthCredentials): Promise<void>`
-- `deleteOAuthCredentials(provider: string, accountId: string): Promise<void>`
-- `getAllOAuthProviders(): Promise<{provider: string, accountId: string}[]>`
+- `getOAuthCredentials(providerType: string, accountId?: string): Promise<OAuthCredentials | null>`
+- `setOAuthCredentials(providerType: string, accountId: string, creds: OAuthCredentials): Promise<void>`
+- `deleteOAuthCredentials(providerType: string, accountId: string): Promise<void>`
+- `getAllOAuthProviders(): Promise<{providerType: string, accountId: string}[]>`
 
 ### 2.2 `ConfigService` — In-memory cache + DB sync
 
@@ -247,20 +254,20 @@ class ConfigService {
   getConfig(): PlexusConfig;
 
   // CRUD operations that update both DB and cache
-  async saveProvider(id: string, config: ProviderConfig): Promise<void>;
-  async deleteProvider(id: string, cascade: boolean): Promise<void>;
-  async saveAlias(id: string, config: ModelConfig): Promise<void>;
-  async deleteAlias(id: string): Promise<void>;
+  async saveProvider(slug: string, config: ProviderConfig): Promise<void>;
+  async deleteProvider(slug: string, cascade: boolean): Promise<void>;
+  async saveAlias(slug: string, config: ModelConfig): Promise<void>;
+  async deleteAlias(slug: string): Promise<void>;
   async saveKey(name: string, config: KeyConfig): Promise<void>;
   async deleteKey(name: string): Promise<void>;
   // ... etc for all entities
 
-  // Import from YAML (used during bootstrap)
+  // Import from YAML (used during bootstrap only)
   async importFromYaml(yamlContent: string): Promise<void>;
   async importFromAuthJson(jsonContent: string): Promise<void>;
 
-  // Export to YAML (for backup/debugging)
-  async exportToYaml(): Promise<string>;
+  // Export DB contents as JSON for backup
+  async exportConfig(): Promise<PlexusConfigExport>;
 }
 ```
 
@@ -286,65 +293,59 @@ In `index.ts` startup sequence, **after** database initialization and migrations
 ```
 1. Check if providers table is empty (first launch indicator)
 2. If empty AND plexus.yaml exists:
-   a. Parse and validate plexus.yaml
-   b. Import all providers, models, aliases, keys, user_quotas, mcp_servers, settings
+   a. Parse and validate plexus.yaml (Zod schema)
+   b. Import all providers, models, aliases, keys, user_quotas, mcp_servers, settings via Drizzle ORM
    c. Log: "Imported configuration from plexus.yaml into database"
 3. If empty AND auth.json exists:
    a. Parse auth.json
-   b. Import all OAuth credentials
+   b. Import all OAuth credentials via Drizzle ORM
    c. Log: "Imported OAuth credentials from auth.json into database"
 4. If NOT empty:
    a. Load config from database (normal path)
    b. Log: "Loaded configuration from database"
 ```
 
-### 3.2 Import Mapping
+Note: No sentinel value is added to plexus.yaml — the import check is purely based on whether the DB tables are empty, making it safe and idempotent.
 
-YAML → DB mapping for each section:
+### 3.2 Import Mapping (via Drizzle ORM)
 
 **Providers:**
 ```
-providers.<id> → INSERT INTO providers (id, display_name, api_base_url, ...)
-providers.<id>.models (if array) → INSERT INTO provider_models (provider_id, model_name, sort_order)
-providers.<id>.models (if map) → INSERT INTO provider_models (provider_id, model_name, pricing_config, ...)
-providers.<id>.quota_checker → UPDATE providers SET quota_checker_type, quota_checker_options, ...
+providers.<slug> → db.insert(providers).values({ slug, displayName, apiBaseUrl, ... })
+providers.<slug>.models (array) → db.insert(providerModels).values([{ providerId, modelName, sortOrder }])
+providers.<slug>.models (map) → db.insert(providerModels).values([{ providerId, modelName, pricingConfig, modelType, accessVia }])
+providers.<slug>.quota_checker → included in providers insert (quotaCheckerType, quotaCheckerOptions, ...)
 ```
 
 **Model Aliases:**
 ```
-models.<id> → INSERT INTO model_aliases (id, selector, priority, ...)
-models.<id>.targets[] → INSERT INTO model_alias_targets (alias_id, provider_id, model_name, enabled, sort_order)
-models.<id>.additional_aliases → UPDATE model_aliases SET additional_aliases = JSON(...)
-models.<id>.advanced → UPDATE model_aliases SET advanced = JSON(...)
-models.<id>.metadata → UPDATE model_aliases SET metadata_source, metadata_source_path
+models.<slug> → db.insert(modelAliases).values({ slug, selector, priority, modelType, ... })
+models.<slug>.targets[] → db.insert(modelAliasTargets).values([{ aliasId, providerSlug, modelName, enabled, sortOrder }])
 ```
 
 **Keys:**
 ```
-keys.<name> → INSERT INTO api_keys (name, secret, comment, quota_name)
+keys.<name> → db.insert(apiKeys).values({ name, secret, comment, quotaName })
 ```
 
 **User Quotas:**
 ```
-user_quotas.<name> → INSERT INTO user_quota_definitions (name, quota_type, limit_type, limit_value, duration)
+user_quotas.<name> → db.insert(userQuotaDefinitions).values({ name, quotaType, limitType, limitValue, duration })
 ```
 
 **MCP Servers:**
 ```
-mcp_servers.<name> → INSERT INTO mcp_servers (name, upstream_url, enabled, headers)
+mcp_servers.<name> → db.insert(mcpServers).values({ name, upstreamUrl, enabled, headers })
 ```
 
 **Settings/Policies:**
 ```
-failover.enabled → INSERT INTO settings (key='failover.enabled', value=JSON(true))
-failover.retryableStatusCodes → INSERT INTO settings (key='failover.retryableStatusCodes', value=JSON([...]))
-cooldown.initialMinutes → INSERT INTO settings (key='cooldown.initialMinutes', value=JSON(2))
-performanceExplorationRate → INSERT INTO settings (key='performanceExplorationRate', value=JSON(0.05))
+failover, cooldown, rates → db.insert(systemSettings).values([{ key, value }])
 ```
 
 **OAuth (from auth.json):**
 ```
-<provider>.accounts.<accountId> → INSERT INTO oauth_credentials (oauth_provider, account_id, access_token, refresh_token, expires_at)
+<provider>.accounts.<accountId> → db.insert(oauthCredentials).values({ oauthProviderType, accountId, accessToken, refreshToken, expiresAt })
 ```
 
 ---
@@ -353,50 +354,44 @@ performanceExplorationRate → INSERT INTO settings (key='performanceExploration
 
 ### 4.1 Files That Need Changes
 
-The following files currently call `getConfig()` and will continue working via the shim, but routes that **write** config need updating:
-
 | File | Change Required |
 |---|---|
-| `config.ts` | Refactor: `getConfig()` delegates to ConfigService, remove YAML loading/watching for runtime data, keep minimal bootstrap (adminKey) |
-| `routes/management/config.ts` | **Major rewrite**: Replace YAML read/write with ConfigService CRUD calls. Keep GET/POST for backward compat but route through DB. Add export-to-yaml endpoint. |
-| `routes/management/user-quotas.ts` | Update: Use ConfigRepository for user_quota_definitions table instead of YAML write-back |
-| `utils/auth.ts` | Update: `getKeyBySecret()` via ConfigRepository for key lookup (can remain using `getConfig()` shim initially) |
-| `services/oauth-auth-manager.ts` | **Major rewrite**: Store/retrieve OAuth credentials from `oauth_credentials` table instead of auth.json file |
-| `services/quota/quota-scheduler.ts` | Minor: Already receives `quotas` array — no change needed if `getConfig().quotas` still works |
-| `services/quota/quota-enforcer.ts` | Minor: Already reads user_quotas from config — works via shim |
+| `config.ts` | Refactor: `getConfig()` delegates to ConfigService; remove all YAML file loading, watching, and `adminKey` handling (now from `ADMIN_KEY` env var) |
+| `routes/management/config.ts` | **Major rewrite**: Remove YAML file read/write entirely; all operations go through ConfigService CRUD |
+| `routes/management/user-quotas.ts` | Update: Use ConfigRepository for user_quota_definitions table |
+| `utils/auth.ts` | Minor: Works via `getConfig()` shim initially |
+| `services/oauth-auth-manager.ts` | **Major rewrite**: Store/retrieve OAuth credentials from `oauth_credentials` table; remove all auth.json file I/O |
+| `services/quota/quota-scheduler.ts` | No change: Receives `quotas` array via `getConfig()` shim |
+| `services/quota/quota-enforcer.ts` | No change: Uses `getConfig()` shim |
 | `services/router.ts` | No change: Uses `getConfig()` shim |
 | `services/dispatcher.ts` | No change: Uses `getConfig()` shim |
 | `services/cooldown-manager.ts` | No change: Uses `getConfig()` shim |
 | `services/selectors/*.ts` | No change: Uses `getConfig()` shim |
 | `routes/inference/models.ts` | No change: Uses `getConfig()` shim |
-| `index.ts` | Update: Add import logic, initialize ConfigService |
+| `index.ts` | Update: Remove `loadConfig()`, add ConfigService initialization + auto-import logic; read `ADMIN_KEY` from env |
 
 ### 4.2 Management API Changes
 
-The management API endpoints need to shift from YAML manipulation to direct DB operations:
-
-**Config Routes (config.ts):**
-- `GET /v0/management/config` → Returns generated YAML from DB (for backward compat / editor UI)
-- `POST /v0/management/config` → Parses YAML, writes all entities to DB, refreshes cache
-- `DELETE /v0/management/models/:aliasId` → `ConfigService.deleteAlias(id)`
+**Config Routes (config.ts) — rewritten:**
+- `DELETE /v0/management/models/:aliasId` → `ConfigService.deleteAlias(slug)`
 - `DELETE /v0/management/models` → `ConfigService.deleteAllAliases()`
-- `DELETE /v0/management/providers/:providerId` → `ConfigService.deleteProvider(id, cascade)`
+- `DELETE /v0/management/providers/:providerId` → `ConfigService.deleteProvider(slug, cascade)`
 - MCP CRUD → `ConfigService.saveMcpServer()` / `deleteMcpServer()`
 
-**New Endpoints (optional, for granular API):**
+**New Granular Endpoints:**
 - `GET /v0/management/providers` → List all providers from DB
-- `GET /v0/management/providers/:id` → Single provider
-- `POST /v0/management/providers/:id` → Create/update provider
+- `GET /v0/management/providers/:slug` → Single provider
+- `POST /v0/management/providers/:slug` → Create/update provider
 - `GET /v0/management/aliases` → List all aliases from DB
-- `POST /v0/management/aliases/:id` → Create/update alias
+- `POST /v0/management/aliases/:slug` → Create/update alias
 - `GET /v0/management/keys` → List all keys from DB
 - `POST /v0/management/keys/:name` → Create/update key
 - `DELETE /v0/management/keys/:name` → Delete key
-- `GET /v0/management/settings` → Get all settings
-- `PATCH /v0/management/settings` → Update settings
+- `GET /v0/management/system-settings` → Get all system settings
+- `PATCH /v0/management/system-settings` → Update system settings
 
 **Export Endpoint:**
-- `GET /v0/management/config/export` → Generate full plexus.yaml from DB state (for backup)
+- `GET /v0/management/config/export` → Returns full DB contents as structured JSON (providers, aliases, keys, quotas, settings, mcp_servers)
 
 ---
 
@@ -404,38 +399,29 @@ The management API endpoints need to shift from YAML manipulation to direct DB o
 
 ### 5.1 Frontend API Layer (`lib/api.ts`)
 
-The frontend currently does a lot of "fetch YAML → parse → extract section → modify → stringify → POST back" for every operation. This is fragile and will be replaced with direct JSON API calls.
+Replace all "fetch YAML → parse → modify → stringify → POST back" patterns with direct JSON API calls.
 
-**Changes:**
-
-| Current Method | Current Behavior | New Behavior |
-|---|---|---|
-| `getProviders()` | Fetches YAML, parses, extracts providers | `GET /v0/management/providers` → JSON |
-| `saveProvider()` | Fetches YAML, merges, POSTs YAML | `POST /v0/management/providers/:id` → JSON |
-| `deleteProvider()` | Already uses dedicated endpoint | No change needed |
-| `getAliases()` | Fetches YAML, parses, extracts models | `GET /v0/management/aliases` → JSON |
-| `saveAlias()` | Fetches YAML, merges, POSTs YAML | `POST /v0/management/aliases/:id` → JSON |
-| `getKeys()` | Fetches YAML, parses, extracts keys | `GET /v0/management/keys` → JSON |
-| `saveKey()` | Fetches YAML, merges, POSTs YAML | `POST /v0/management/keys/:name` → JSON |
-| `deleteKey()` | Fetches YAML, merges, POSTs YAML | `DELETE /v0/management/keys/:name` |
-| `getModels()` | Fetches YAML, extracts provider models | `GET /v0/management/providers` → extract from response |
-| `getConfig()` | Fetches raw YAML | Keep: `GET /v0/management/config` (still returns YAML for editor) |
-| `saveConfig()` | POSTs raw YAML | Keep: `POST /v0/management/config` (bulk import from YAML editor) |
-| `getMcpServers()` | Already uses dedicated endpoint | No change needed |
-| `saveMcpServer()` | Already uses dedicated endpoint | No change needed |
-| `deleteMcpServer()` | Already uses dedicated endpoint | No change needed |
-| `getUserQuotas()` | Already uses dedicated endpoint | No change needed |
-| `saveUserQuota()` | Already uses dedicated endpoint | No change needed |
-| `deleteUserQuota()` | Already uses dedicated endpoint | No change needed |
+| Current Method | New Behavior |
+|---|---|
+| `getProviders()` | `GET /v0/management/providers` → JSON |
+| `saveProvider()` | `POST /v0/management/providers/:slug` → JSON |
+| `deleteProvider()` | Already dedicated endpoint — no change |
+| `getAliases()` | `GET /v0/management/aliases` → JSON |
+| `saveAlias()` | `POST /v0/management/aliases/:slug` → JSON |
+| `getKeys()` | `GET /v0/management/keys` → JSON |
+| `saveKey()` | `POST /v0/management/keys/:name` → JSON |
+| `deleteKey()` | `DELETE /v0/management/keys/:name` |
+| `getModels()` | `GET /v0/management/providers` → extract provider models from response |
+| `getConfig()` | **Removed** (no YAML config endpoint) |
+| `saveConfig()` | **Removed** (no YAML config endpoint) |
+| `getMcpServers()` | Already dedicated endpoint — no change |
+| `getUserQuotas()` | Already dedicated endpoint — no change |
+| `saveUserQuota()` | Already dedicated endpoint — no change |
+| `deleteUserQuota()` | Already dedicated endpoint — no change |
 
 ### 5.2 Config Editor Page
 
-The YAML config editor page (`Config.tsx`) will remain functional. It will:
-1. `GET /v0/management/config` → Returns YAML generated from DB
-2. User edits YAML
-3. `POST /v0/management/config` → Backend parses YAML, writes to DB, returns validated YAML
-
-This provides a familiar "raw config editing" experience while the DB is the source of truth.
+The YAML config editor page (`Config.tsx`) is **removed**. Configuration is managed exclusively through the purpose-built UI pages (Providers, Models, Keys, Quotas, MCP Servers, Settings).
 
 ---
 
@@ -443,14 +429,13 @@ This provides a familiar "raw config editing" experience while the DB is the sou
 
 ### 6.1 Current State
 - `OAuthAuthManager` reads/writes `auth.json` directly
-- Supports auto-migration from legacy flat format
 - Used at startup and during OAuth token refresh
 
 ### 6.2 New State
-- `OAuthAuthManager` reads/writes `oauth_credentials` table via `ConfigRepository`
-- On first launch, imports from `auth.json` if table is empty
+- `OAuthAuthManager` reads/writes `oauth_credentials` table via `ConfigRepository` using Drizzle ORM
+- On first launch, imports from `auth.json` if the `oauth_credentials` table is empty
 - Token refresh writes updates back to DB
-- `auth.json` becomes optional (only needed for initial import or manual credential injection)
+- `auth.json` is fully removed after migration
 
 ---
 
@@ -458,83 +443,69 @@ This provides a familiar "raw config editing" experience while the DB is the sou
 
 Currently, `config.ts` watches `plexus.yaml` for changes and hot-reloads. Since the DB is now the source of truth:
 
-1. Remove `fs.watch()` on `plexus.yaml`
-2. The in-memory cache in `ConfigService` is updated immediately on any write operation
-3. For multi-instance deployments, a polling mechanism or DB change notification could be added later (not in scope for initial migration)
+1. Remove `fs.watch()` on `plexus.yaml` entirely
+2. The in-memory cache in `ConfigService` is updated immediately on any write operation (no polling needed for single-instance deployments)
 
 ---
 
 ## Implementation Order
 
 ### Step 1: Schema + Migrations
-- Create all Drizzle schema files for both SQLite and PostgreSQL
-- Generate migrations via `drizzle-kit generate`
+- Create all Drizzle schema files for both SQLite and PostgreSQL (enums, jsonb, bigint timestamps, integer PKs)
+- Generate migrations via `drizzle-kit generate` for both dialects
 - Verify migrations apply cleanly
 
 ### Step 2: ConfigRepository
-- Implement the DB abstraction layer
+- Implement the DB abstraction layer using Drizzle ORM throughout
 - Unit test CRUD operations
 
 ### Step 3: ConfigService + Import
 - Implement the in-memory cached service
-- Implement YAML import logic
+- Implement YAML import logic (Drizzle ORM inserts, wrapped in transactions)
 - Implement `getConfig()` shim
 - Test import from example plexus.yaml
 
 ### Step 4: Update Startup Flow
-- Modify `index.ts` to use ConfigService
-- Add auto-import logic
+- Modify `index.ts`: remove `loadConfig()`, add ConfigService initialization + auto-import
+- Read `ADMIN_KEY` from `process.env.ADMIN_KEY`
 - Test fresh start (import) and subsequent start (load from DB)
 
 ### Step 5: Update Management Routes
 - Rewrite `config.ts` routes to use ConfigService
 - Add new granular REST endpoints
-- Keep backward-compatible YAML endpoints
+- Remove YAML GET/POST endpoints
 
 ### Step 6: Update OAuth Manager
-- Migrate OAuthAuthManager to use DB
-- Add auth.json import logic
+- Migrate `OAuthAuthManager` to use `oauth_credentials` table via Drizzle ORM
+- Add auth.json import logic for first-launch
 - Test OAuth flows
 
 ### Step 7: Update Frontend
-- Replace YAML-fetch-parse-modify-save patterns with direct JSON API calls
+- Remove YAML-fetch-parse-modify-save patterns; replace with JSON API calls
+- Remove Config editor page (`Config.tsx`)
 - Test all CRUD flows from UI
 
 ### Step 8: Cleanup
 - Remove YAML file watcher
-- Mark `plexus.yaml` sections (other than adminKey) as deprecated
+- Delete `config/plexus.example.yaml` or convert to documentation-only
+- Remove all `auth.json` references
 - Update documentation
-- Add config export/backup endpoint
 
 ---
 
-## Migration Safety
+## Data Integrity
 
-### Backward Compatibility
-- **plexus.yaml still works** for initial import — zero migration effort for existing users
-- **Config editor** still shows/accepts YAML — familiar UX preserved
-- **getConfig() API unchanged** — all internal consumers work without modification
-- **Auto-import is idempotent** — only runs when DB is empty
-
-### Rollback Strategy
-- Export from DB to YAML at any time via `/v0/management/config/export`
-- Can revert to YAML-based config by reverting the code and using the exported YAML
-- Database tables are additive (no existing tables modified)
-
-### Data Integrity
 - Foreign keys with CASCADE deletes for provider→models and alias→targets
-- Unique constraints prevent duplicates
+- Unique constraints on slugs/names prevent duplicates
+- Enum constraints validated at DB layer (CHECK in SQLite, native ENUM in PostgreSQL)
 - JSON columns validated at application layer (Zod schemas preserved)
 - Transactions for multi-table writes (e.g., importing a full config)
+- All DB operations via Drizzle ORM — no raw SQL
 
 ---
 
 ## Open Questions / Decisions Needed
 
-1. **Encryption for API keys/secrets in DB?** Currently plaintext in YAML. Could add AES encryption keyed off adminKey, but adds complexity. Recommend: same as current (plaintext) for v1, encrypt in a follow-up.
+1. **Encryption for API keys/secrets in DB?** Currently plaintext in YAML. Could add AES encryption keyed off `ADMIN_KEY`, but adds complexity. Recommend: same as current (plaintext) for v1, encrypt in a follow-up.
 
-2. **Config versioning/audit trail?** Could add a `config_changelog` table to track who changed what. Recommend: defer to follow-up.
-
-3. **Multi-instance cache invalidation?** If running multiple Plexus instances against the same DB, cache may go stale. Recommend: add a `config_version` counter in settings table that instances poll, or use DB LISTEN/NOTIFY for PostgreSQL. Defer to follow-up.
-
-4. **Should the YAML config editor be kept long-term?** It's useful for bulk editing but bypasses granular API. Recommend: keep it as a "power user" feature.
+2. **Config versioning/audit trail?** Could add a `config_changelog` table. Recommend: defer to follow-up.
