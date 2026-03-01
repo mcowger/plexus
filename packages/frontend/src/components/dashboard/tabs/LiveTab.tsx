@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Clock, Info, RefreshCw, Signal, X } from 'lucide-react';
 
@@ -32,34 +31,34 @@ import { AlertTriangle, Clock, Info, RefreshCw, Signal, X } from 'lucide-react';
  *   `detailedUsageQuery` state). Both share the same Modal shell.
  */
 
-// 
+//
 // IMPORTS -- React core
-// 
+//
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-// 
+//
 // IMPORTS -- Drag-and-Drop (@dnd-kit)
-// 
+//
 import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
 
-// 
+//
 // IMPORTS -- Icons (lucide-react)
-// 
+//
 import { AlertTriangle, Clock, Cpu, Info, RefreshCw, Server, Signal, X } from 'lucide-react';
 
-// 
+//
 // IMPORTS -- UI components (internal)
-// 
+//
 import { SortableCard } from '../../ui/SortableCard';
 import { useCardPositions } from '../../../hooks/useCardPositions';
 import type { CardId } from '../../../types/card';
 import { AnalyzeButton, buildQueryString, type CardType } from '../../analytics/AnalyzeButton';
 import { DetailedUsage } from '../../../pages/DetailedUsage';
 
-// 
+//
 // IMPORTS -- Charts (recharts)
-// 
+//
 
 import {
   AreaChart,
@@ -77,15 +76,15 @@ import {
   YAxis,
 } from 'recharts';
 
-// 
+//
 // IMPORTS -- Shared UI primitives
-// 
+//
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 
-// 
+//
 // IMPORTS -- API layer and types
-// 
+//
 import {
   api,
   STAT_LABELS,
@@ -96,9 +95,9 @@ import {
   type ConcurrencyData,
 } from '../../../lib/api';
 
-// 
+//
 // IMPORTS -- Formatting utilities
-// 
+//
 import {
   formatCost,
   formatMs,
@@ -108,9 +107,9 @@ import {
   formatTPS,
 } from '../../../lib/format';
 
-// 
+//
 // LOCAL TYPES
-// 
+//
 
 /**
  * A single minute-resolution bucket for the timeline area chart.
@@ -126,8 +125,6 @@ type MinuteBucket = {
   /** Sum of all token types (input + output + cached + cache-write) */
   tokens: number;
 };
-
-
 
 /**
  * Metadata for one series line in the model-stack composed chart.
@@ -179,15 +176,14 @@ interface LiveTabProps {
   onPollIntervalChange: (interval: number) => void;
 }
 
-// 
+//
 // CONSTANTS
-// 
+//
 
 /** Rolling window size for the "live" view -- all charts and summaries use this */
 const LIVE_WINDOW_MINUTES = 5;
 /** Pre-computed millisecond equivalent of LIVE_WINDOW_MINUTES for date filtering */
 const LIVE_WINDOW_MS = LIVE_WINDOW_MINUTES * 60 * 1000;
-
 
 /** Maximum number of recent requests fetched from the API per poll cycle */
 
@@ -205,9 +201,9 @@ const MODEL_TIMELINE_COLORS = ['#3b82f6', '#14b8a6', '#8b5cf6', '#f59e0b', '#ef4
  */
 const PLACEHOLDER_LABELS = new Set(['unknown', 'n/a', 'na', 'none', 'null', 'undefined']);
 
-// 
+//
 // LABEL NORMALISATION HELPERS
-// 
+//
 
 /**
  * Strips whitespace and filters out placeholder telemetry labels.
@@ -268,9 +264,9 @@ const getModelLabel = (request: UsageRecord): string => {
   return 'Unresolved Model';
 };
 
-// 
+//
 // MODULE-LEVEL COMPONENTS AND HELPERS
-// 
+//
 
 /**
  * Aggregated statistics for a single entity (provider or model).
@@ -436,6 +432,7 @@ interface CooldownRowProps {
   consecutiveFailures?: number;
   lastError?: string;
   expiryStr: string;
+  onClear: () => void;
 }
 
 const CooldownRow: React.FC<CooldownRowProps> = ({
@@ -445,6 +442,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
   consecutiveFailures,
   lastError,
   expiryStr,
+  onClear,
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -465,7 +463,17 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
       <span className="text-xs text-text-muted truncate">
         {modelDisplay} — {minutes}m
       </span>
-      <div className="relative ml-auto shrink-0" ref={ref}>
+      <div className="relative ml-auto shrink-0 flex items-center gap-2" ref={ref}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+          className="text-text-muted hover:text-danger transition-colors"
+          title="Clear this cooldown"
+        >
+          <X size={13} />
+        </button>
         <button
           onClick={() => setOpen((v) => !v)}
           className="text-text-muted hover:text-text transition-colors"
@@ -507,9 +515,9 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
   );
 };
 
-// 
+//
 // MAIN COMPONENT
-// 
+//
 
 /**
  * LiveTab -- the primary component for the "Live Metrics" dashboard tab.
@@ -546,7 +554,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
   // ---------------------------------------------------------------------------
   /** Timestamp of the last successful data fetch -- used for the "stale" indicator */
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-
 
   /** Elapsed seconds since lastUpdated -- updated every 10s for the staleness badge */
 
@@ -1280,8 +1287,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
       .slice(0, 8);
   }, [liveRequests]);
 
-
-
   /** Groups cooldowns by "provider:model" key so multiple cooldowns for the same pair are merged */
 
   const groupedCooldowns = useMemo(() => {
@@ -1322,9 +1327,20 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
     }
   };
 
-  // 
+  /** Clears a specific provider/model cooldown */
+  const handleClearSingleCooldown = async (provider: string, model?: string) => {
+    try {
+      await api.clearCooldown(provider, model);
+      await loadData();
+    } catch (e) {
+      alert('Failed to clear cooldown');
+      console.error('Failed to clear cooldown', e);
+    }
+  };
+
+  //
   // MODAL COMPONENT (inline)
-  // 
+  //
 
   /**
    * Full-screen modal overlay. Defined inline because it accesses component
@@ -1370,9 +1386,9 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
     );
   };
 
-  // 
+  //
   // MODAL TITLE RESOLVER
-  // 
+  //
 
   /**
    * Returns the title string for the modal header. When detailedUsageQuery is
@@ -1384,30 +1400,30 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
       return 'Detailed Usage';
     }
     switch (modalCard) {
-      case 'velocity':    // Minute-over-minute request rate changes
+      case 'velocity': // Minute-over-minute request rate changes
         return 'Request Velocity (Last 5 Minutes)';
-      case 'provider':    // Bar chart of top providers by request count
+      case 'provider': // Bar chart of top providers by request count
         return 'Provider Pulse (5m)';
-      case 'model':       // Bar chart of top models by request count
+      case 'model': // Bar chart of top models by request count
         return 'Model Pulse (5m)';
-      case 'timeline':    // Area chart of requests/errors/tokens over time
+      case 'timeline': // Area chart of requests/errors/tokens over time
         return 'Live Timeline';
-      case 'modelstack':  // Stacked bar of model usage with TTFT/TPS overlay
+      case 'modelstack': // Stacked bar of model usage with TTFT/TPS overlay
         return 'Model Stack + Runtime';
-      case 'requests':    // Scrollable list of recent individual requests
+      case 'requests': // Scrollable list of recent individual requests
         return 'Latest Requests';
       case 'concurrency': // Active in-flight request counts per provider
         return 'Concurrency';
-      case 'stats':       // Two-column provider/model statistics with EntityRow
+      case 'stats': // Two-column provider/model statistics with EntityRow
         return 'Provider & Model Stats';
       default:
         return '';
     }
   };
 
-  // 
+  //
   // MODAL CONTENT RENDERER
-  // 
+  //
 
   /**
    * Renders the expanded modal view for the currently selected card.
@@ -1812,9 +1828,9 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
     }
   };
 
-  // 
+  //
   // DRAGGABLE CARD FACTORY
-  // 
+  //
 
   /**
    * Card factory for the drag-and-drop grid. Given a cardId, renders the
@@ -1976,6 +1992,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
                             consecutiveFailures={representative.consecutiveFailures}
                             lastError={representative.lastError}
                             expiryStr={new Date(representative.expiry).toLocaleString()}
+                            onClear={() => handleClearSingleCooldown(provider, model)}
                           />
                         );
                       })}
@@ -2594,9 +2611,13 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content: concurrencyLoading ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary text-sm">Loading concurrency data...</div>
+                <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
+                  Loading concurrency data...
+                </div>
               ) : concurrencyData.length === 0 ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary text-sm">No active concurrent requests.</div>
+                <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
+                  No active concurrent requests.
+                </div>
               ) : (
                 <div className="h-56 space-y-3 overflow-y-auto">
                   <div className="flex items-center justify-between">
@@ -2694,9 +2715,9 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
     }
   };
 
-  // 
+  //
   // JSX RETURN -- Page Layout
-  // 
+  //
 
   /**
    * The component layout is structured in three major vertical sections:

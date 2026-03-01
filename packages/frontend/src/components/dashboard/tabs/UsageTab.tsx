@@ -416,17 +416,17 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
         {/* ------------------------------------------------------------------ */}
 
         {/*
-          * Concurrency by Provider -- Stacked Area Chart
-          *
-          * Visualizes concurrent in-flight requests over time, broken down by
-          * LLM provider (e.g. "openai", "anthropic"). Each provider gets its
-          * own colored area, and all areas share `stackId="providers"` so they
-          * stack on top of each other, making the total height at any x-tick
-          * equal to the aggregate concurrency across all providers.
-          *
-          * The x-axis uses the pre-formatted `label` field ("HH:MM") rather
-          * than raw timestamps to keep tick labels compact.
-          */}
+         * Concurrency by Provider -- Stacked Area Chart
+         *
+         * Visualizes concurrent in-flight requests over time, broken down by
+         * LLM provider (e.g. "openai", "anthropic"). Each provider gets its
+         * own colored area, and all areas share `stackId="providers"` so they
+         * stack on top of each other, making the total height at any x-tick
+         * equal to the aggregate concurrency across all providers.
+         *
+         * The x-axis uses the pre-formatted `label` field ("HH:MM") rather
+         * than raw timestamps to keep tick labels compact.
+         */}
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Concurrency by Provider">
           <div style={{ height: 300, marginTop: '12px' }}>
             {concurrencyByProviderTimeline.length === 0 ? (
@@ -469,18 +469,18 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
         </Card>
 
         {/*
-          * Concurrency by Model -- Stacked Bar Chart
-          *
-          * Visualizes concurrent in-flight requests over time, broken down by
-          * model name (limited to the top 8 by total request count -- see
-          * `modelKeys`). A bar chart is used (instead of an area chart) to
-          * make it easier to read discrete per-timestamp values when many
-          * models are present.
-          *
-          * Bars share `stackId="models"` so they stack vertically, with the
-          * highest-traffic model at the bottom of the stack (matching the
-          * sort order from `modelKeys`).
-          */}
+         * Concurrency by Model -- Stacked Bar Chart
+         *
+         * Visualizes concurrent in-flight requests over time, broken down by
+         * model name (limited to the top 8 by total request count -- see
+         * `modelKeys`). A bar chart is used (instead of an area chart) to
+         * make it easier to read discrete per-timestamp values when many
+         * models are present.
+         *
+         * Bars share `stackId="models"` so they stack vertically, with the
+         * highest-traffic model at the bottom of the stack (matching the
+         * sort order from `modelKeys`).
+         */}
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Concurrency by Model">
           <div style={{ height: 300, marginTop: '12px' }}>
             {concurrencyByModelTimeline.length === 0 ? (
