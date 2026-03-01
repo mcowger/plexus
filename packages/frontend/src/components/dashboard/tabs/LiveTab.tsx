@@ -641,7 +641,18 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
    * Memoised with an empty dependency array because the card roster is static.
    */
   const cardIds = useMemo<CardId[]>(
-    () => ['concurrency', 'velocity', 'provider', 'model', 'stats', 'timeline', 'modelstack', 'requests'],
+    () => [
+      'metrics',
+      'alerts',
+      'concurrency',
+      'velocity',
+      'provider',
+      'model',
+      'stats',
+      'timeline',
+      'modelstack',
+      'requests',
+    ],
     []
   );
 
@@ -1825,6 +1836,181 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
    */
   const renderDraggableCard = (cardId: CardId, index: number, isOverlay = false) => {
     switch (cardId) {
+      // metrics: Combined overview and live window stats
+      case 'metrics':
+        return (
+          <SortableCard
+            key={'sortable-' + cardId}
+            card={{
+              id: cardId,
+              title: 'Metrics',
+              extra: (
+                <div className="flex items-center gap-2">
+                  <Signal size={15} className="text-info" />
+                  <span className="text-[11px] text-text-muted">Overview & Live Stats</span>
+                </div>
+              ),
+              onClick: () => openModal('stats'),
+              style: { cursor: 'pointer' },
+              className: 'hover:shadow-lg hover:border-primary/30 transition-all',
+              content: (
+                <div className="h-56 grid grid-cols-2 divide-x divide-border overflow-hidden">
+                  {/* Overview column */}
+                  <div className="divide-y divide-border">
+                    <div className="px-3 py-1.5 bg-bg-subtle/50">
+                      <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
+                        Overview
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Total Requests</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {totalRequestsValue}
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Total Tokens</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {totalTokensValue}
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Requests Today</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {formatNumber(todayMetrics.requests, 0)}
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Cost Today</span>
+                      <span className="text-sm font-semibold text-info tabular-nums">
+                        {formatCost(todayMetrics.totalCost, 4)}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Live Window column */}
+                  <div className="divide-y divide-border">
+                    <div className="px-3 py-1.5 bg-bg-subtle/50">
+                      <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
+                        Live ({LIVE_WINDOW_MINUTES}m)
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Requests</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {formatNumber(summary.requestCount, 0)}
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Success Rate</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {successRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Tokens / Min</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {formatTokens(tokensPerMinute)}
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-xs text-text-muted">Avg Latency</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {formatMs(avgLatency)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ),
+            }}
+            index={index}
+            isOverlay={isOverlay}
+          />
+        );
+      // alerts: Active provider cooldowns and top provider activity
+      case 'alerts':
+        return (
+          <SortableCard
+            key={'sortable-' + cardId}
+            card={{
+              id: cardId,
+              title: 'Alerts & Providers',
+              extra: (
+                <div className="flex items-center gap-2">
+                  <AlertTriangle
+                    size={15}
+                    className={cooldowns.length > 0 ? 'text-warning' : 'text-text-muted'}
+                  />
+                  {cooldowns.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClearCooldowns();
+                      }}
+                      className="text-[11px] text-warning hover:text-warning/80 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+              ),
+              onClick: () => openModal('stats'),
+              style: { cursor: 'pointer' },
+              className: 'hover:shadow-lg hover:border-primary/30 transition-all',
+              content: (
+                <div className="h-56 flex flex-col overflow-hidden">
+                  {cooldowns.length > 0 && (
+                    <div className="divide-y divide-border border-b border-warning/30 bg-warning/5 max-h-[120px] overflow-y-auto">
+                      {Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
+                        const [provider, model] = key.split(':');
+                        const maxTime = Math.max(...modelCooldowns.map((c) => c.timeRemainingMs));
+                        const representative = modelCooldowns.reduce((a, b) =>
+                          a.timeRemainingMs >= b.timeRemainingMs ? a : b
+                        );
+                        const minutes = Math.ceil(maxTime / 60000);
+                        return (
+                          <CooldownRow
+                            key={key}
+                            provider={normalizeTelemetryLabel(provider) || 'Unknown'}
+                            modelDisplay={model || 'all models'}
+                            minutes={minutes}
+                            consecutiveFailures={representative.consecutiveFailures}
+                            lastError={representative.lastError}
+                            expiryStr={new Date(representative.expiry).toLocaleString()}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="flex-1 divide-y divide-border overflow-y-auto">
+                    {providerRows.length === 0 ? (
+                      <div className="px-3 py-3 text-xs text-text-muted">
+                        No provider activity in the last {LIVE_WINDOW_MINUTES} minutes.
+                      </div>
+                    ) : (
+                      providerRows.map((row) => (
+                        <div key={row.provider} className="px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-text">{row.provider}</span>
+                            <span className="text-xs text-text-muted tabular-nums">
+                              {formatNumber(row.requests, 0)} req
+                            </span>
+                          </div>
+                          <div className="flex gap-3 mt-0.5 text-[11px] text-text-muted">
+                            <span>{row.successRate.toFixed(1)}% ok</span>
+                            <span>{formatMs(row.avgLatency)}</span>
+                            <span className="text-info">{formatCost(row.totalCost, 6)}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ),
+            }}
+            index={index}
+            isOverlay={isOverlay}
+          />
+        );
       // velocity: LineChart showing minute-over-minute request rate changes
       // (the delta between consecutive minute buckets)
       case 'velocity':
@@ -2581,201 +2767,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
         <span className="text-xs text-text-muted">
           {isVisible ? 'Tab active' : 'Tab hidden'} - data refresh resumes on focus.
         </span>
-      </div>
-
-      <div className="mb-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Combined metrics card — half width */}
-        <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
-          <div className="px-4 py-2.5 bg-bg-subtle border-b border-border flex items-center gap-2">
-            <Signal size={15} className="text-info" />
-            <h3 className="font-heading text-sm font-semibold text-text">Metrics</h3>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-border">
-            {/* Overview column */}
-            <div className="divide-y divide-border">
-              <div className="px-3 py-1.5 bg-bg-subtle/50">
-                <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
-                  Overview
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Total Requests</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
-                  {totalRequestsValue}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Total Tokens</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
-                  {totalTokensValue}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Requests Today</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
-                  {formatNumber(todayMetrics.requests, 0)}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between gap-2">
-                <span className="text-xs text-text-muted shrink-0">Tokens Today</span>
-                <div className="text-right">
-                  <span className="text-sm font-semibold text-text tabular-nums">
-                    {formatTokens(todayTokenTotal)}
-                  </span>
-                  <div className="text-[11px] text-text-muted">
-                    {[
-                      'In: ' + formatTokens(todayMetrics.inputTokens),
-                      'Out: ' + formatTokens(todayMetrics.outputTokens),
-                      todayMetrics.reasoningTokens > 0
-                        ? 'Reasoning: ' + formatTokens(todayMetrics.reasoningTokens)
-                        : null,
-                      todayMetrics.cachedTokens > 0
-                        ? 'Cached: ' + formatTokens(todayMetrics.cachedTokens)
-                        : null,
-                      todayMetrics.cacheWriteTokens > 0
-                        ? 'Cache Write: ' + formatTokens(todayMetrics.cacheWriteTokens)
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' • ')}
-                  </div>
-                </div>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Cost Today</span>
-                <span className="text-sm font-semibold text-info tabular-nums">
-                  {formatCost(todayMetrics.totalCost, 4)}
-                </span>
-              </div>
-            </div>
-            {/* Live Window column */}
-            <div className="divide-y divide-border">
-              <div className="px-3 py-1.5 bg-bg-subtle/50">
-                <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
-                  Live ({LIVE_WINDOW_MINUTES}m)
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Requests</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
-                  {formatNumber(summary.requestCount, 0)}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Success Rate</span>
-                <div className="text-right">
-                  <span className="text-sm font-semibold text-text tabular-nums">
-                    {successRate.toFixed(1)}%
-                  </span>
-                  <div className="text-[11px] text-text-muted">
-                    {summary.successCount} ok / {summary.errorCount} err
-                  </div>
-                </div>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Tokens / Min</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
-                  {formatTokens(tokensPerMinute)}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Cost / Min</span>
-                <span className="text-sm font-semibold text-info tabular-nums">
-                  {formatCost(costPerMinute, 6)}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">Avg Latency</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
-                  {formatMs(avgLatency)}
-                </span>
-              </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs text-text-muted">TTFT / Throughput</span>
-                <div className="text-right">
-                  <span className="text-sm font-semibold text-text tabular-nums">
-                    {formatMs(avgTtft)}
-                  </span>
-                  <div className="text-[11px] text-text-muted">
-                    {formatTPS(avgThroughput)} tok/s
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Service Alerts + Top Providers combined card — half width */}
-        <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
-          <div className="px-4 py-2.5 bg-bg-subtle border-b border-border flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle
-                size={15}
-                className={cooldowns.length > 0 ? 'text-warning' : 'text-text-muted'}
-              />
-              <h3 className="font-heading text-sm font-semibold text-text">
-                Alerts &amp; Providers
-              </h3>
-            </div>
-            {cooldowns.length > 0 && (
-              <button
-                onClick={handleClearCooldowns}
-                className="text-[11px] text-warning hover:text-warning/80 transition-colors"
-              >
-                Clear All
-              </button>
-            )}
-          </div>
-          {cooldowns.length > 0 && (
-            <div className="divide-y divide-border border-b border-warning/30">
-              {Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
-                const [provider, model] = key.split(':');
-                const maxTime = Math.max(...modelCooldowns.map((c) => c.timeRemainingMs));
-                const representative = modelCooldowns.reduce((a, b) =>
-                  a.timeRemainingMs >= b.timeRemainingMs ? a : b
-                );
-                const minutes = Math.ceil(maxTime / 60000);
-                const modelDisplay = model || 'all models';
-                const expiryDate = new Date(representative.expiry);
-                const expiryStr = expiryDate.toLocaleString();
-                return (
-                  <CooldownRow
-                    key={key}
-                    provider={normalizeTelemetryLabel(provider) || 'Unknown'}
-                    modelDisplay={modelDisplay}
-                    minutes={minutes}
-                    consecutiveFailures={representative.consecutiveFailures}
-                    lastError={representative.lastError}
-                    expiryStr={expiryStr}
-                  />
-                );
-              })}
-            </div>
-          )}
-          <div className="divide-y divide-border">
-            {providerRows.length === 0 ? (
-              <div className="px-3 py-3 text-xs text-text-muted">
-                No provider activity in the last {LIVE_WINDOW_MINUTES} minutes.
-              </div>
-            ) : (
-              providerRows.map((row) => (
-                <div key={row.provider} className="px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-text">{row.provider}</span>
-                    <span className="text-xs text-text-muted tabular-nums">
-                      {formatNumber(row.requests, 0)} req
-                    </span>
-                  </div>
-                  <div className="flex gap-3 mt-0.5 text-[11px] text-text-muted">
-                    <span>{row.successRate.toFixed(1)}% ok</span>
-                    <span>{formatMs(row.avgLatency)}</span>
-                    <span className="text-info">{formatCost(row.totalCost, 6)}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
 
       {/*
