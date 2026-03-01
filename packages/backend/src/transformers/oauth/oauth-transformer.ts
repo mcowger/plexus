@@ -105,22 +105,81 @@ export class OAuthTransformer implements Transformer {
   }
 
   async transformRequest(request: UnifiedChatRequest): Promise<any> {
-    const context = unifiedToContext(request);
+    const oauthProvider = (request.metadata as any)?.plexus_metadata?.oauthProvider;
+
+    // Resolve the pi-ai model's `api` field so that replayed assistant messages
+    // carry the correct api value.  pi-ai's transformMessages checks provider+api+model
+    // and strips thoughtSignatures when any field doesn't match.
+    let modelApi: string | undefined;
+    let modelSupportsReasoning = false;
+    if (oauthProvider && request.model) {
+      try {
+        const piModel = this.getPiAiModel(oauthProvider as any, request.model);
+        modelApi = piModel.api;
+        modelSupportsReasoning = !!(piModel as any).reasoning;
+      } catch {
+        // Model lookup can fail for unknown providers/models; fall back gracefully
+      }
+    }
+
+    const context = unifiedToContext(request, oauthProvider, request.model, modelApi);
     const options: Record<string, any> = {};
     const clientHeaders = (request.metadata as any)?.plexus_metadata?.clientHeaders;
     if (clientHeaders && typeof clientHeaders === 'object') {
       options.clientHeaders = clientHeaders;
     }
 
-    if (request.reasoning?.effort) {
-      // pi-ai uses `reasoning` (not `reasoningEffort`) for ThinkingLevel
-      options.reasoning = request.reasoning.effort;
+    // Determine the desired thinking effort level
+    let thinkingEffort: string | undefined;
+    if (request.reasoning?.enabled || request.reasoning?.effort) {
+      thinkingEffort = request.reasoning.effort ?? 'high';
+    } else if (modelSupportsReasoning) {
+      // Client didn't request reasoning (e.g. Copilot doesn't send thinking params),
+      // but the model supports it — enable it at high effort by default so the model
+      // reasons correctly and produces schema-compliant tool call arguments.
+      logger.debug(
+        `${this.name}: Model supports reasoning but client did not request it; defaulting to 'high'`
+      );
+      thinkingEffort = 'high';
+    }
+
+    if (thinkingEffort) {
+      // pi-ai's stream() function expects `options.thinking` (GoogleGeminiCliOptions),
+      // NOT `options.reasoning` (which is only used by streamSimple).
+      // For Gemini 3 models, we must set `thinking.level`; for older models, `thinking.budgetTokens`.
+      const isGemini3 = request.model?.includes('3-pro') || request.model?.includes('3-flash');
+      if (isGemini3) {
+        const levelMap: Record<string, string> = {
+          minimal: 'MINIMAL',
+          low: 'LOW',
+          medium: 'MEDIUM',
+          high: 'HIGH',
+        };
+        options.thinking = {
+          enabled: true,
+          level: levelMap[thinkingEffort] ?? 'HIGH',
+        };
+      } else {
+        // Gemini 2.x models use budgetTokens
+        const budgetMap: Record<string, number> = {
+          minimal: 1024,
+          low: 2048,
+          medium: 8192,
+          high: 16384,
+        };
+        options.thinking = {
+          enabled: true,
+          budgetTokens: budgetMap[thinkingEffort] ?? 16384,
+        };
+      }
+      // Also set reasoning for streamSimple compatibility
+      options.reasoning = thinkingEffort;
     }
     if (request.reasoning?.max_tokens !== undefined) {
-      // pi-ai uses thinkingBudgets to set per-level token budgets;
-      // apply the budget to whichever level is active (or 'high' as default)
-      const level = request.reasoning.effort ?? 'high';
-      options.thinkingBudgets = { [level]: request.reasoning.max_tokens };
+      // Override thinking budget with explicit max_tokens if provided
+      if (options.thinking) {
+        options.thinking.budgetTokens = request.reasoning.max_tokens;
+      }
     }
     if (request.reasoning?.summary) {
       options.reasoningSummary = request.reasoning.summary;
@@ -343,6 +402,12 @@ export class OAuthTransformer implements Transformer {
         strippedParameters,
       });
     }
+
+    // Log the actual HTTP payload pi-ai sends so we can verify tool schemas
+    requestOptions.onPayload = (payload: any) => {
+      const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+      logger.info(`${this.name}: FULL-OUTGOING-PAYLOAD ${payloadStr}`);
+    };
 
     logger.info(
       `${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", accountId: "${accountId}" }`

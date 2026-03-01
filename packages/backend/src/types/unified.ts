@@ -28,6 +28,7 @@ export interface UnifiedMessage {
       name: string;
       arguments: string;
     };
+    thought_signature?: string;
   }>;
   tool_call_id?: string;
   name?: string; // Often used in 'tool' role messages or 'user' name

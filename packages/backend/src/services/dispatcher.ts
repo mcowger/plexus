@@ -902,6 +902,21 @@ export class Dispatcher {
 
       bypassTransformation = true;
     } else {
+      // Inject OAuth provider into metadata so transformers can set provider/model
+      // on assistant messages for thought-signature replay (required by Gemini 3).
+      const oauthProvider = route.config.oauth_provider || route.provider;
+      if (oauthProvider) {
+        request = {
+          ...request,
+          metadata: {
+            ...(request.metadata || {}),
+            plexus_metadata: {
+              ...((request.metadata as any)?.plexus_metadata || {}),
+              oauthProvider,
+            },
+          },
+        };
+      }
       providerPayload = await transformer.transformRequest(request);
     }
 
