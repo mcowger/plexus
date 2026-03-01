@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.17.12 - 2026-03-01
+
+### Plexus v0.17.12: Copilot Integration Maintenance
+
+## v0.17.12
+
+This release addresses functional issues discovered in the Copilot subsystem to ensure improved reliability.
+
+### Bug Fixes and Minor Changes
+- Resolved logic errors and stability issues within the Copilot integration ([ff94b20](https://github.com/mcowger/plexus/commit/ff94b20))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.17.11 - 2026-03-01
 
 ### v0.17.11: Enhanced Copilot Quota Metrics and Fallback Logic
