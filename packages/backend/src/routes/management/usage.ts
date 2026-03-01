@@ -350,4 +350,98 @@ export async function registerUsageRoutes(
       }
     }
   });
+
+  /**
+   * GET /v0/management/concurrency
+   *
+   * Returns concurrency data: the number of active (in-flight) requests per provider
+   * and model, bucketed into 1-minute time intervals. This is used by the frontend
+   * "Concurrency" card on the Live Metrics dashboard to visualize how many simultaneous
+   * requests are being processed by each provider over time.
+   *
+   * "Concurrency" in this context means the count of requests whose startTime falls
+   * within the same 1-minute bucket. This is an approximation of true concurrency --
+   * since requests have varying durations, two requests in the same minute bucket were
+   * likely in-flight at overlapping times. For a more precise overlap calculation, we
+   * would need to compare (startTime, startTime + durationMs) intervals, but bucketing
+   * is far more efficient for charting purposes.
+   *
+   * Query parameters:
+   *   - timeRange: 'hour' | 'day' | 'week' | 'month' (default: 'hour')
+   *     Controls how far back in time to look for request data.
+   *
+   * SQL approach:
+   *   1. Calculate a time window based on the requested range (e.g., last 1 hour).
+   *   2. Floor each request's startTime to the nearest minute (60000ms bucket).
+   *      This uses dialect-specific SQL: CAST/integer division for SQLite,
+   *      FLOOR with double precision cast for PostgreSQL.
+   *   3. GROUP BY (provider, canonicalModelName, minuteBucket) and COUNT(*)
+   *      to get the number of requests per provider+model per minute.
+   *   4. ORDER BY the bucket timestamp for chronological charting.
+   *
+   * Response shape:
+   *   {
+   *     data: Array<{
+   *       provider: string;       // e.g., "anthropic", "openai"
+   *       model: string;          // canonical model name, e.g., "claude-sonnet-4-20250514"
+   *       count: number;          // number of requests in this minute bucket
+   *       timestamp: number;      // start of the minute bucket (epoch ms, floored to 60000)
+   *     }>
+   *   }
+   */
+  fastify.get('/v0/management/concurrency', async (request, reply) => {
+    const query = request.query as any;
+    const timeRange = query.timeRange || 'hour'; // hour, day, week, month
+
+    // Calculate the time window: how far back from "now" we should query.
+    // Each range maps to a duration in milliseconds.
+    const now = Date.now();
+    const ranges = {
+      hour: 60 * 60 * 1000,
+      day: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000,
+      month: 30 * 24 * 60 * 60 * 1000,
+    };
+    const windowMs = ranges[timeRange as keyof typeof ranges] || ranges.hour;
+    const startTime = now - windowMs;
+
+    try {
+      const db = usageStorage.getDb();
+      const schema = getSchema();
+      const dialect = getCurrentDialect();
+
+      // Floor each request's startTime to the nearest 1-minute boundary (60000ms).
+      // This creates uniform time buckets for grouping. The SQL expression differs
+      // between SQLite (integer division) and PostgreSQL (FLOOR with float cast)
+      // because of type system differences between the two dialects.
+      const bucketSql =
+        dialect === 'sqlite'
+          ? sql<number>`(CAST(${schema.requestUsage.startTime} AS INTEGER) / 60000) * 60000`
+          : sql<number>`(FLOOR(${schema.requestUsage.startTime}::double precision / 60000) * 60000)`;
+
+      // Query: count requests per (provider, model, minute-bucket) within the time window.
+      // Each resulting row represents "N requests hit provider X with model Y during minute Z",
+      // which the frontend renders as a concurrency chart (stacked area or grouped bars).
+      const results = await db
+        .select({
+          provider: schema.requestUsage.provider,
+          model: schema.requestUsage.canonicalModelName,
+          count: sql<number>`count(*)`,
+          timestamp: bucketSql,
+        })
+        .from(schema.requestUsage)
+        .where(
+          and(
+            gte(schema.requestUsage.startTime, startTime),
+            lte(schema.requestUsage.startTime, now)
+          )
+        )
+        .groupBy(schema.requestUsage.provider, schema.requestUsage.canonicalModelName, bucketSql)
+        .orderBy(bucketSql);
+
+      return reply.send({ data: results });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
 }
