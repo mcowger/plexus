@@ -70,6 +70,8 @@ export class CopilotQuotaChecker extends QuotaChecker {
 
       const data: CopilotUsageResponse = await response.json();
 
+      logger.silly(`[copilot-checker] API response: ${JSON.stringify(data, null, 2)}`);
+
       const windows: QuotaWindow[] = [];
       const resetDate = data.quota_reset_date_utc ? new Date(data.quota_reset_date_utc) : undefined;
 
