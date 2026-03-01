@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.17.15 - 2026-03-01
+
+### v0.17.15: Enhanced Live Dashboard Cooldown Management and UI Formatting
+
+## v0.17.15
+
+### New Features
+
+- **Live Dashboard Granular Controls**: Added individual buttons to clear cooldowns for specific components, allowing for more precise state management in the live interface.
+
+### Minor Changes
+
+- **Dashboard UI Refactoring**: Improved formatting and layout consistency of various dashboard components. [[c791d3c](https://github.com/mcowger/plexus/commit/c791d3c)]
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.17.14 - 2026-03-01
 
 ### v0.17.14: Analytics Drill-downs, Concurrency Management, and DND Card Reordering
