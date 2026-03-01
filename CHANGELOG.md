@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.17.10 - 2026-03-01
+
+### v0.17.10: Enhanced Reasoning Options, Gemini 3 Integration, and Antigravity Quota Management
+
+## Main Features
+
+*   **Cross-Model Reasoning Support**: Implemented `buildThinkingOptions` to enable enhanced reasoning capabilities across supported models. ([f89107f](https://github.com/mcowger/plexus/commit/f89107f))
+*   **Antigravity Quota Monitoring**: Introduced a new Antigravity quota checker with support for multi-model displays and improved component architecture. ([adf8a00](https://github.com/mcowger/plexus/commit/adf8a00), [6575b92](https://github.com/mcowger/plexus/commit/6575b92))
+*   **Gemini 3 Integration**: Enhanced message handling protocols specifically for Gemini 3 models. ([92d210e](https://github.com/mcowger/plexus/commit/92d210e))
+
+## Minor Changes and Bug Fixes
+
+*   **stream-formatter**: Fixed an issue to ensure non-empty parts arrays for model content streams. ([aba0851](https://github.com/mcowger/plexus/commit/aba0851))
+*   **Quota Handling**: Improved handling of multiple windows and enhanced logging within Antigravity quota components. ([5d52f6e](https://github.com/mcowger/plexus/commit/5d52f6e))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.17.9 - 2026-02-28
 
 ### v0.17.9: Quota Checker Enhancements and Codebase Refactoring
