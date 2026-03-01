@@ -39,6 +39,8 @@
  * enum-to-string conversion.
  */
 export type CardId =
+  | 'metrics'
+  | 'alerts'
   | 'velocity'
   | 'provider'
   | 'model'
@@ -90,6 +92,8 @@ export type CardLayout = CardPosition[];
  *    never hides a card that should be visible.
  */
 export const DEFAULT_CARD_ORDER: CardId[] = [
+  'metrics',
+  'alerts',
   'concurrency',
   'velocity',
   'provider',
