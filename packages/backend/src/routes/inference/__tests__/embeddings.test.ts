@@ -74,6 +74,7 @@ describe('Embeddings Endpoint', () => {
           api_key: 'sk-test',
           api_base_url: 'https://api.openai.com/v1',
           estimateTokens: false,
+          disable_cooldown: false,
           models: {
             'text-embedding-3-small': {
               pricing: { source: 'simple', input: 0.00002, output: 0 },

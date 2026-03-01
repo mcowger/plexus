@@ -25,8 +25,8 @@ export function convertAnthropicToolsToUnified(tools: any[]): UnifiedTool[] {
  */
 export function convertUnifiedToolsToAnthropic(tools: UnifiedTool[]): any[] {
   return tools.map((t) => ({
-    name: t.function.name,
-    description: t.function.description,
-    input_schema: t.function.parameters,
+    name: t.function?.name ?? '',
+    description: t.function?.description ?? '',
+    input_schema: t.function?.parameters ?? {},
   }));
 }

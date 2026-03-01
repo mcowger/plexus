@@ -157,9 +157,9 @@ export class ResponsesTransformer implements Transformer {
     // Convert tools to Responses API format
     const tools = request.tools?.map((tool) => ({
       type: 'function',
-      name: tool.function.name,
-      description: tool.function.description,
-      parameters: tool.function.parameters,
+      name: tool.function?.name ?? '',
+      description: tool.function?.description ?? '',
+      parameters: tool.function?.parameters ?? {},
     }));
 
     const payload: any = {

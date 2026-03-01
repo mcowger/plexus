@@ -114,6 +114,7 @@ describe('Transcriptions Endpoint', () => {
           api_key: 'sk-test',
           api_base_url: 'https://api.openai.com/v1',
           estimateTokens: false,
+          disable_cooldown: false,
           models: {
             'whisper-1': {
               type: 'transcriptions',
