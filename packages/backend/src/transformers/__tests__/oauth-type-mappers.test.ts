@@ -180,3 +180,124 @@ describe('unifiedToolToPiAi — nested schema preservation', () => {
     expect(params.additionalProperties).toBe(false);
   });
 });
+
+/**
+ * Regression test for thinking-block ordering in assistant message history.
+ *
+ * Bug: When an assistant message contained both a thinking block and tool_use
+ * blocks, unifiedMessageToAssistantMessage placed the thinking block AFTER
+ * the toolCall blocks. Anthropic's API requires thinking to come BEFORE
+ * tool_use in the content array, otherwise it returns:
+ *   400 "tool_use ids were found without tool_result blocks immediately after"
+ *
+ * Fix: Move the thinking block push to the top of the content array.
+ */
+describe('unifiedToContext — thinking block ordering (regression)', () => {
+  test('thinking block appears before toolCall blocks in assistant messages', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-sonnet-4-6',
+      messages: [
+        { role: 'user', content: 'What is the weather in Paris?' },
+        {
+          role: 'assistant',
+          content: '',
+          thinking: {
+            content: 'I need to call the weather tool to get this information.',
+            signature: 'EqoBCkgIARgCIkDrealSignatureHere==',
+          },
+          tool_calls: [
+            {
+              id: 'toolu_bdrk_013JTDbmRhmyrKxhKR9Q2e1y',
+              type: 'function',
+              function: {
+                name: 'get_weather',
+                arguments: '{"location":"Paris"}',
+              },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          tool_call_id: 'toolu_bdrk_013JTDbmRhmyrKxhKR9Q2e1y',
+          name: 'get_weather',
+          content: 'Sunny, 22°C',
+        },
+        { role: 'user', content: 'Thanks, what about London?' },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+
+    // Find the assistant message (index 1 after user message at index 0)
+    const assistantMsg = context.messages[1] as any;
+    expect(assistantMsg.role).toBe('assistant');
+
+    const contentTypes = (assistantMsg.content as any[]).map((b: any) => b.type);
+
+    // thinking MUST appear in the content array
+    expect(contentTypes).toContain('thinking');
+    // toolCall MUST appear in the content array
+    expect(contentTypes).toContain('toolCall');
+    // thinking MUST come before toolCall (Anthropic API requirement)
+    expect(contentTypes.indexOf('thinking')).toBeLessThan(contentTypes.indexOf('toolCall'));
+  });
+
+  test('thinking block content and signature are preserved', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-sonnet-4-6',
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: '',
+          thinking: {
+            content: 'Let me think about this.',
+            signature: 'EqoBCkgIARgCIkDrealSignatureHere==',
+          },
+          tool_calls: [
+            {
+              id: 'toolu_01XYZ',
+              type: 'function',
+              function: { name: 'some_tool', arguments: '{}' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    const thinkingBlock = (assistantMsg.content as any[]).find((b: any) => b.type === 'thinking');
+
+    expect(thinkingBlock).toBeDefined();
+    expect(thinkingBlock.thinking).toBe('Let me think about this.');
+    expect(thinkingBlock.thinkingSignature).toBe('EqoBCkgIARgCIkDrealSignatureHere==');
+  });
+
+  test('assistant message without thinking still produces correct toolCall-only content', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-sonnet-4-6',
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            {
+              id: 'toolu_01ABC',
+              type: 'function',
+              function: { name: 'some_tool', arguments: '{"x":1}' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    const contentTypes = (assistantMsg.content as any[]).map((b: any) => b.type);
+
+    expect(contentTypes).not.toContain('thinking');
+    expect(contentTypes).toContain('toolCall');
+  });
+});

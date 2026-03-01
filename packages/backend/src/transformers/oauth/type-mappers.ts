@@ -132,6 +132,15 @@ function unifiedMessageToAssistantMessage(
 ): AssistantMessage {
   const content: any[] = [];
 
+  // Thinking must come before tool_use blocks (Anthropic API requirement)
+  if (msg.thinking) {
+    content.push({
+      type: 'thinking',
+      thinking: msg.thinking.content,
+      thinkingSignature: msg.thinking.signature,
+    } as any);
+  }
+
   if (typeof msg.content === 'string' && msg.content) {
     content.push({ type: 'text', text: msg.content });
   } else if (Array.isArray(msg.content)) {
@@ -155,14 +164,6 @@ function unifiedMessageToAssistantMessage(
       }
       content.push(block);
     }
-  }
-
-  if (msg.thinking) {
-    content.push({
-      type: 'thinking',
-      thinking: msg.thinking.content,
-      thinkingSignature: msg.thinking.signature,
-    } as any);
   }
 
   return {
