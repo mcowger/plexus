@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.18.0 - 2026-03-02
+
+### v0.18.0: Vision Descriptor Service and Image Processing Integration
+
+### Main Features
+
+* **Vision Descriptor Service**: Introduced a dedicated service for vision descriptors along with unit tests to support image processing workflows. ([96496c2](https://github.com/mcowger/plexus/commit/96496c2))
+
+### Smaller Changes
+
+* `d96b5a1`: Documentation update providing details for the Vision Fallthrough feature in README and CONFIGURATION. ([d96b5a1](https://github.com/mcowger/plexus/commit/d96b5a1))
+* `96496c2`: Added vision descriptor service and related tests for image processing. ([96496c2](https://github.com/mcowger/plexus/commit/96496c2))
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.17.15 - 2026-03-01
 
 ### v0.17.15: Enhanced Live Dashboard Cooldown Management and UI Formatting
