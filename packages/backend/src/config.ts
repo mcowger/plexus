@@ -4,6 +4,7 @@ import yaml from 'yaml';
 import path from 'path';
 import { logger } from './utils/logger';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
+import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 
 // --- Zod Schemas ---
 
@@ -386,6 +387,7 @@ const ModelConfigSchema = z.object({
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
+  use_image_fallthrough: z.boolean().default(false).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
   metadata: ModelMetadataSchema.optional(),
@@ -421,6 +423,11 @@ const CooldownPolicySchema = z.object({
   maxMinutes: z.number().min(1).default(300),
 });
 
+const VisionFallthroughConfigSchema = z.object({
+  descriptor_model: z.string().min(1),
+  default_prompt: z.string().default(DEFAULT_VISION_DESCRIPTION_PROMPT),
+});
+
 const RawPlexusConfigSchema = z
   .object({
     providers: z.record(z.string(), ProviderConfigSchema),
@@ -429,6 +436,7 @@ const RawPlexusConfigSchema = z
     adminKey: z.string(),
     failover: FailoverPolicySchema.optional(),
     cooldown: CooldownPolicySchema.optional(),
+    vision_fallthrough: VisionFallthroughConfigSchema.optional(),
     performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),

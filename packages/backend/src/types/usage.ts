@@ -44,6 +44,9 @@ export interface UsageRecord {
   // Response metadata
   toolCallsCount?: number | null;
   finishReason?: string | null;
+  // Vision Fallthrough metadata
+  isVisionFallthrough?: boolean;
+  isDescriptorRequest?: boolean;
   // Energy estimation
   kwhUsed?: number | null;
 }

@@ -19,6 +19,12 @@ const createTestConfig = (
     retryableStatusCodes: [500, 502, 503, 504],
     retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'],
   },
+  cooldown: {
+    initialMinutes: 2,
+    maxMinutes: 300,
+  },
+  performanceExplorationRate: 0.05,
+  latencyExplorationRate: 0.05,
   quotas: [],
   user_quotas: userQuotas,
 });

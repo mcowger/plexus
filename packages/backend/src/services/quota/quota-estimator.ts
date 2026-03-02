@@ -48,9 +48,6 @@ export class QuotaEstimator {
       .sort((a, b) => b.checkedAt - a.checkedAt); // Ensure DESC order
 
     if (relevantHistory.length < 2) {
-      logger.debug(
-        `[QuotaEstimator] Not enough history for ${checkerId}:${windowType} (${relevantHistory.length} snapshots)`
-      );
       return null;
     }
 
@@ -61,9 +58,6 @@ export class QuotaEstimator {
     const recentHistory = relevantHistory.filter((s) => s.checkedAt >= lookbackStart);
 
     if (recentHistory.length < 2) {
-      logger.debug(
-        `[QuotaEstimator] Not enough recent history for ${checkerId}:${windowType} (${recentHistory.length} snapshots in last ${lookbackMs}ms)`
-      );
       return null;
     }
 
@@ -72,9 +66,6 @@ export class QuotaEstimator {
     const usageRate = this.calculateUsageRate(recentHistory);
 
     if (usageRate === null || usageRate <= 0) {
-      logger.debug(
-        `[QuotaEstimator] Invalid usage rate for ${checkerId}:${windowType}: ${usageRate}`
-      );
       return null;
     }
 
@@ -100,16 +91,6 @@ export class QuotaEstimator {
     const projectionBasedOnMinutes = oldestSnapshotUsed
       ? Math.round((now - oldestSnapshotUsed.checkedAt) / 60_000)
       : 0;
-
-    logger.debug(
-      `[QuotaEstimator] ${checkerId}:${windowType} - ` +
-        `current=${currentUsed.toFixed(1)}, ` +
-        `rate=${(usageRate * 3600_000).toFixed(2)}/hr, ` +
-        `projected=${projectedUsedAtReset.toFixed(1)} ` +
-        `(${projectedUtilizationPercent.toFixed(1)}%), ` +
-        `willExceed=${willExceed}, ` +
-        `basedOn=${projectionBasedOnMinutes}min`
-    );
 
     return {
       projectedUsedAtReset,

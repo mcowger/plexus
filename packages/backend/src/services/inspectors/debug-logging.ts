@@ -123,6 +123,18 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   private reconstructChatCompletions(fullBody: string): any {
+    const trimmed = fullBody.trim();
+    if (!trimmed) return null;
+
+    // Try parsing as a single JSON object (non-streaming)
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        // Not a single JSON object, continue to stream parsing
+      }
+    }
+
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
 
@@ -142,6 +154,18 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   private reconstructResponses(fullBody: string): any {
+    const trimmed = fullBody.trim();
+    if (!trimmed) return null;
+
+    // Try parsing as a single JSON object (non-streaming)
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        // Not a single JSON object, continue to stream parsing
+      }
+    }
+
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
 
@@ -161,6 +185,18 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   private reconstructMessages(fullBody: string): any {
+    const trimmed = fullBody.trim();
+    if (!trimmed) return null;
+
+    // Try parsing as a single JSON object (non-streaming)
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        // Not a single JSON object, continue to stream parsing
+      }
+    }
+
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
 
@@ -180,6 +216,18 @@ export class DebugLoggingInspector extends BaseInspector {
   }
 
   private reconstructGemini(fullBody: string): any {
+    const trimmed = fullBody.trim();
+    if (!trimmed) return null;
+
+    // Try parsing as a single JSON object (non-streaming)
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        // Not a single JSON object, continue to stream parsing
+      }
+    }
+
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
 

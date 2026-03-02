@@ -51,6 +51,9 @@ export async function transformGeminiResponse(response: any): Promise<UnifiedCha
 
   const usage = response.usageMetadata ? normalizeGeminiUsage(response.usageMetadata) : undefined;
 
+  const rawFinishReason = candidate?.finishReason?.toLowerCase() || null;
+  const finishReason = tool_calls.length > 0 && rawFinishReason === 'stop' ? 'tool_calls' : rawFinishReason;
+
   return {
     id: response.responseId || 'gemini-' + Date.now(),
     model: response.modelVersion || 'gemini-model',
@@ -60,6 +63,7 @@ export async function transformGeminiResponse(response: any): Promise<UnifiedCha
       ? { content: reasoning_content, signature: thoughtSignature }
       : undefined,
     tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
+    finishReason,
     usage,
   };
 }

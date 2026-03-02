@@ -46,6 +46,8 @@ import {
   RotateCcw,
   PencilLine,
   Plane,
+  Eye,
+  ScanSearch,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
@@ -539,6 +541,38 @@ export const Logs = () => {
                             )}
                           </div>
                         </div>
+
+                        {/* Vision Fallthrough icons */}
+                        {(log.isVisionFallthrough || log.isDescriptorRequest) && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                              marginTop: '2px',
+                            }}
+                          >
+                            <div
+                              style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
+                            >
+                              {log.isVisionFallthrough && (
+                                <div title="Vision Fallthrough (Images converted to text)">
+                                  <ScanSearch size={12} className="text-amber-500" />
+                                </div>
+                              )}
+                            </div>
+                            <span style={{ width: '14px' }}></span>
+                            <div
+                              style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
+                            >
+                              {log.isDescriptorRequest && (
+                                <div title="Descriptor Request (Generated image description)">
+                                  <Eye size={12} className="text-blue-500" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">

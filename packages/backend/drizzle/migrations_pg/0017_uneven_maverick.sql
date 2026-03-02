@@ -1,0 +1,2 @@
+ALTER TABLE "request_usage" ADD COLUMN "is_vision_fallthrough" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "request_usage" ADD COLUMN "is_descriptor_request" integer DEFAULT 0 NOT NULL;

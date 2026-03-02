@@ -261,6 +261,7 @@ export interface Alias {
   targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
   advanced?: AliasBehavior[];
   metadata?: AliasMetadata;
+  use_image_fallthrough?: boolean;
 }
 
 export interface InferenceError {
@@ -337,6 +338,9 @@ export interface UsageRecord {
   finishReason?: string;
   // Retry metadata
   attemptCount?: number;
+  // Vision Fallthrough metadata
+  isVisionFallthrough?: boolean;
+  isDescriptorRequest?: boolean;
   // Energy estimation
   kwhUsed?: number;
 }
@@ -1496,6 +1500,28 @@ export const api = {
     await api.saveConfig(newYaml);
   },
 
+  getVisionFallthroughConfig: async (): Promise<{
+    descriptor_model?: string;
+    default_prompt?: string;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/vision-fallthrough`);
+    if (!res.ok) throw new Error('Failed to fetch vision fallthrough config');
+    return res.json();
+  },
+
+  updateVisionFallthroughConfig: async (updates: {
+    descriptor_model?: string;
+    default_prompt?: string;
+  }): Promise<any> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/vision-fallthrough`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update vision fallthrough config');
+    return res.json();
+  },
+
   deleteProvider: async (
     providerId: string,
     cascade?: boolean
@@ -1566,6 +1592,7 @@ export const api = {
       selector: alias.selector,
       priority: alias.priority || 'selector',
       additional_aliases: alias.aliases,
+      use_image_fallthrough: alias.use_image_fallthrough || false,
       ...(alias.type && { type: alias.type }),
       ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
       ...(alias.metadata && { metadata: alias.metadata }),
@@ -1661,6 +1688,7 @@ export const api = {
             selector: val.selector,
             priority: val.priority,
             type: val.type,
+            use_image_fallthrough: val.use_image_fallthrough || false,
             advanced: val.advanced || [],
             targets,
             metadata: val.metadata,

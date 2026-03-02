@@ -59,6 +59,7 @@ export async function transformAnthropicResponse(response: any): Promise<Unified
     content: text || null,
     reasoning_content: reasoning || null,
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+    finishReason: response.stop_reason || null,
     usage: {
       input_tokens: inputTokens,
       output_tokens: realOutputTokens,

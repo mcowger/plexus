@@ -101,6 +101,7 @@ export class OpenAITransformer implements Transformer {
       reasoning_content: message?.reasoning_content || null,
       tool_calls: message?.tool_calls,
       usage,
+      finishReason: choice?.finish_reason || null,
     };
   }
 

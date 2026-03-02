@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { api, Alias, AliasMetadata, AliasBehavior, Provider, Model } from '../lib/api';
 import { useModels } from '../hooks/useModels';
@@ -21,6 +21,8 @@ import {
   X,
   CheckCircle,
   GripVertical,
+  Save,
+  Eye,
 } from 'lucide-react';
 
 export const Models = () => {
@@ -82,6 +84,37 @@ export const Models = () => {
   // Drag and Drop State
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Global Descriptor State
+  const [globalDescriptorModel, setGlobalDescriptorModel] = useState('');
+  const [isSavingDescriptor, setIsSavingDescriptor] = useState(false);
+
+  useEffect(() => {
+    const fetchVFConfig = async () => {
+      try {
+        const config = await api.getVisionFallthroughConfig();
+        if (config?.descriptor_model) {
+          setGlobalDescriptorModel(config.descriptor_model);
+        }
+      } catch (e) {
+        console.error('Failed to load VF config', e);
+      }
+    };
+    fetchVFConfig();
+  }, []);
+
+  const handleSaveDescriptor = async () => {
+    setIsSavingDescriptor(true);
+    try {
+      await api.updateVisionFallthroughConfig({
+        descriptor_model: globalDescriptorModel,
+      });
+    } catch (e) {
+      console.error('Failed to save descriptor model', e);
+    } finally {
+      setIsSavingDescriptor(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!editingAlias.id) return;
@@ -347,7 +380,41 @@ export const Models = () => {
     <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
       <div className="mb-6">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 className="font-heading text-3xl font-bold text-text m-0">Models</h1>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <h1 className="font-heading text-3xl font-bold text-text m-0">Models</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-bg-glass border border-border-glass">
+                <Eye size={14} className="text-text-secondary" />
+                <span className="text-xs font-medium text-text-secondary">
+                  Vision Fall Through Model:
+                </span>
+                <select
+                  className="bg-transparent border-none text-xs text-text outline-none focus:ring-0 cursor-pointer"
+                  value={globalDescriptorModel}
+                  onChange={(e) => setGlobalDescriptorModel(e.target.value)}
+                >
+                  <option value="">(None)</option>
+                  {aliases.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.id}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleSaveDescriptor}
+                  disabled={isSavingDescriptor}
+                  className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+                  title="Save descriptor model"
+                >
+                  {isSavingDescriptor ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ position: 'relative', width: '280px' }}>
               <Search
@@ -585,6 +652,23 @@ export const Models = () => {
                     <Switch
                       checked={getBehavior('strip_adaptive_thinking')}
                       onChange={(val) => setBehavior('strip_adaptive_thinking', val)}
+                      size="sm"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1">
+                    <div>
+                      <span className="font-body text-[13px] text-text">Vision Fallthrough</span>
+                      <p className="font-body text-[11px] text-text-muted mt-0.5">
+                        If the request contains images and the target model is text-only, use the
+                        descriptor model to convert images to text.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editingAlias.use_image_fallthrough || false}
+                      onChange={(val) =>
+                        setEditingAlias({ ...editingAlias, use_image_fallthrough: val })
+                      }
                       size="sm"
                     />
                   </div>

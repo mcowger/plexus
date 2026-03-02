@@ -47,6 +47,9 @@ export const requestUsage = pgTable(
     // Response metadata
     toolCallsCount: integer('tool_calls_count'),
     finishReason: text('finish_reason'),
+    // Vision Fallthrough metadata
+    isVisionFallthrough: integer('is_vision_fallthrough').notNull().default(0),
+    isDescriptorRequest: integer('is_descriptor_request').notNull().default(0),
     // Energy estimation
     kwhUsed: real('kwh_used'),
   },

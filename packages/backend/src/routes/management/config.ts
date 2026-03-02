@@ -26,10 +26,14 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const body = request.body as string;
-      let configStr = body;
-      if (typeof body !== 'string') {
-        configStr = JSON.stringify(body);
+      const body = request.body as any;
+      let configStr: string;
+
+      if (typeof body === 'string') {
+        configStr = body;
+      } else {
+        // If the body is an object (JSON), stringify it as YAML for the file
+        configStr = yaml.stringify(body);
       }
 
       try {
@@ -45,9 +49,51 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       logger.info(`Configuration updated via API at ${configPath}`);
       await loadConfig(configPath);
 
-      return reply.code(200).header('Content-Type', 'application/x-yaml').send(configStr);
+      reply.header('Content-Type', 'application/x-yaml');
+      return reply.code(200).send(configStr);
     } catch (e: any) {
       logger.error('Failed to update config', e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.get('/v0/management/config/vision-fallthrough', async (request, reply) => {
+    const configPath = getConfigPath();
+    if (!configPath) return reply.code(500).send({ error: 'Config path not found' });
+
+    try {
+      const file = Bun.file(configPath);
+      const content = await file.text();
+      const parsed = yaml.parse(content);
+      return reply.send(parsed.vision_fallthrough || {});
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.patch('/v0/management/config/vision-fallthrough', async (request, reply) => {
+    const configPath = getConfigPath();
+    if (!configPath) return reply.code(500).send({ error: 'Config path not found' });
+
+    try {
+      const updates = request.body as any;
+      const file = Bun.file(configPath);
+      const content = await file.text();
+      const parsed = yaml.parse(content);
+
+      parsed.vision_fallthrough = {
+        ...(parsed.vision_fallthrough || {}),
+        ...updates,
+      };
+
+      const updatedYaml = yaml.stringify(parsed);
+      validateConfig(updatedYaml);
+      await Bun.write(configPath, updatedYaml);
+      await loadConfig(configPath);
+
+      return reply.send(parsed.vision_fallthrough);
+    } catch (e: any) {
+      logger.error('Failed to patch vision-fallthrough config', e);
       return reply.code(500).send({ error: e.message });
     }
   });
