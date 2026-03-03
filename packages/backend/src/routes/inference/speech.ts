@@ -52,7 +52,7 @@ export async function registerSpeechRoute(
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
-    await usageStorage.emitStarted(usageRecord);
+    usageStorage.emitStartedAsync(usageRecord);
 
     try {
       const body = request.body as any;
@@ -62,7 +62,7 @@ export async function registerSpeechRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       // Emit 'updated' event with parsed request details
-      await usageStorage.emitUpdated({
+      usageStorage.emitUpdatedAsync({
         requestId,
         incomingModelAlias: body.model,
         apiKey: (request as any).keyName,
@@ -99,7 +99,7 @@ export async function registerSpeechRoute(
       const unifiedResponse = await dispatcher.dispatchSpeech(unifiedRequest);
 
       // Emit 'updated' event with routing decision details
-      await usageStorage.emitUpdated({
+      usageStorage.emitUpdatedAsync({
         requestId,
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,

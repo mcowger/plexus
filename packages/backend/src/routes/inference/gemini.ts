@@ -35,7 +35,7 @@ export async function registerGeminiRoute(
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
-    await usageStorage.emitStarted(usageRecord);
+    usageStorage.emitStartedAsync(usageRecord);
 
     try {
       const body = request.body as any;
@@ -51,7 +51,7 @@ export async function registerGeminiRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       // Emit 'updated' event with parsed request details
-      await usageStorage.emitUpdated({
+      usageStorage.emitUpdatedAsync({
         requestId,
         incomingModelAlias: modelName,
         apiKey: (request as any).keyName,
@@ -94,7 +94,7 @@ export async function registerGeminiRoute(
       const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
 
       // Emit 'updated' event with routing decision details
-      await usageStorage.emitUpdated({
+      usageStorage.emitUpdatedAsync({
         requestId,
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,

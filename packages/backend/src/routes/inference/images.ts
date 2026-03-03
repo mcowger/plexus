@@ -34,7 +34,7 @@ export async function registerImagesRoute(
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
-    await usageStorage.emitStarted(usageRecord);
+    usageStorage.emitStartedAsync(usageRecord);
 
     try {
       const body = request.body as any;
@@ -44,7 +44,7 @@ export async function registerImagesRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       // Emit 'updated' event with parsed request details
-      await usageStorage.emitUpdated({
+      usageStorage.emitUpdatedAsync({
         requestId,
         incomingModelAlias: body.model,
         apiKey: (request as any).keyName,
@@ -80,7 +80,7 @@ export async function registerImagesRoute(
       const unifiedResponse = await dispatcher.dispatchImageGenerations(unifiedRequest);
 
       // Emit 'updated' event with routing decision details
-      await usageStorage.emitUpdated({
+      usageStorage.emitUpdatedAsync({
         requestId,
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,
@@ -152,6 +152,8 @@ export async function registerImagesRoute(
       responseStatus: 'pending',
     };
 
+    usageStorage.emitStartedAsync(usageRecord);
+
     try {
       // Parse multipart/form-data
       const parts = request.parts();
@@ -196,6 +198,13 @@ export async function registerImagesRoute(
       usageRecord.apiKey = (request as any).keyName;
       usageRecord.attribution = (request as any).attribution || null;
 
+      usageStorage.emitUpdatedAsync({
+        requestId,
+        incomingModelAlias: formFields.model,
+        apiKey: (request as any).keyName,
+        attribution: (request as any).attribution || null,
+      });
+
       logger.silly('Incoming Image Edit Request', {
         model: formFields.model,
         prompt: formFields.prompt?.substring(0, 100),
@@ -232,6 +241,13 @@ export async function registerImagesRoute(
       });
 
       const unifiedResponse = await dispatcher.dispatchImageEdits(unifiedRequest);
+
+      usageStorage.emitUpdatedAsync({
+        requestId,
+        provider: unifiedResponse.plexus?.provider,
+        selectedModelName: unifiedResponse.plexus?.model,
+        canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+      });
 
       usageRecord.provider = unifiedResponse.plexus?.provider;
       usageRecord.selectedModelName = unifiedResponse.plexus?.model;

@@ -28,6 +28,7 @@ export class UsageStorageService extends EventEmitter {
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: any = null;
   private readonly defaultPerformanceRetentionLimit = 100;
+  private telemetryQueue: Promise<void> = Promise.resolve();
 
   constructor(connectionString?: string) {
     super();
@@ -113,6 +114,24 @@ export class UsageStorageService extends EventEmitter {
     } catch (error) {
       logger.error('Failed to save usage record', error);
     }
+  }
+
+  emitStartedAsync(record: Partial<UsageRecord>): void {
+    this.enqueueTelemetryTask(() => this.emitStarted(record));
+  }
+
+  emitUpdatedAsync(record: Partial<UsageRecord>): void {
+    this.enqueueTelemetryTask(() => this.emitUpdated(record));
+  }
+
+  private enqueueTelemetryTask(task: () => Promise<void>): void {
+    this.telemetryQueue = this.telemetryQueue
+      .then(async () => {
+        await task();
+      })
+      .catch((error) => {
+        logger.error('Telemetry queue task failed', error);
+      });
   }
 
   /**
@@ -631,6 +650,39 @@ export class UsageStorageService extends EventEmitter {
     } catch (error) {
       logger.error(`Failed to update performance metrics for ${provider}:${model}`, error);
     }
+  }
+
+  async recordSuccessfulAttempt(
+    provider: string,
+    model: string,
+    canonicalModelName: string | null,
+    requestId: string,
+    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean }
+  ) {
+    if (metadata) {
+      try {
+        await this.ensureDb()
+          .update(this.schema.requestUsage)
+          .set({
+            isVisionFallthrough: metadata.isVisionFallthrough ? 1 : 0,
+            isDescriptorRequest: metadata.isDescriptorRequest ? 1 : 0,
+          })
+          .where(eq(this.schema.requestUsage.requestId, requestId));
+      } catch (error) {
+        logger.error('Failed to update vision fallthrough metadata', error);
+      }
+    }
+
+    await this.updatePerformanceMetrics(
+      provider,
+      model,
+      canonicalModelName,
+      null,
+      null,
+      0,
+      requestId,
+      true
+    );
   }
 
   async recordFailedAttempt(

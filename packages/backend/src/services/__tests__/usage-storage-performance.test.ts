@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { UsageStorageService } from '../usage-storage';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
@@ -289,5 +289,29 @@ describe('UsageStorageService performance metrics', () => {
     expect(rows[0]?.success_count).toBe(1);
     expect(rows[0]?.failure_count).toBe(1);
     expect(rows[0]?.sample_count).toBe(2);
+  });
+
+  it('emitStartedAsync and emitUpdatedAsync are non-blocking and preserve task order', async () => {
+    const storage = new UsageStorageService();
+    const calls: string[] = [];
+
+    spyOn(storage, 'emitStarted').mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      calls.push('started');
+    });
+
+    spyOn(storage, 'emitUpdated').mockImplementation(async () => {
+      calls.push('updated');
+    });
+
+    const t0 = Date.now();
+    storage.emitStartedAsync({ requestId: 'async-1' });
+    storage.emitUpdatedAsync({ requestId: 'async-1' });
+    const elapsed = Date.now() - t0;
+
+    expect(elapsed).toBeLessThan(20);
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(calls).toEqual(['started', 'updated']);
   });
 });
