@@ -124,7 +124,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
     api.getUsageByModel(timeRange).then(setModelData);
     api.getUsageByProvider(timeRange).then(setProviderData);
     api.getUsageByKey(timeRange).then(setKeyData);
-    api.getConcurrencyData(timeRange).then(setConcurrencyData);
+    api.getConcurrencyData(timeRange, 'timeline').then(setConcurrencyData);
   }, [timeRange]);
 
   // ---------------------------------------------------------------------------

@@ -111,6 +111,7 @@ export async function registerSpeechRoute(
       usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel;
       usageRecord.outgoingApiType = unifiedResponse.plexus?.apiType;
       usageRecord.isPassthrough = true;
+      usageRecord.isStreamed = !!unifiedResponse.stream;
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.responseStatus = 'success';
 
