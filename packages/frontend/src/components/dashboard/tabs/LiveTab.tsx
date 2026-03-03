@@ -389,9 +389,9 @@ const EntityRow: React.FC<{ entity: EntityStats; isModel?: boolean }> = ({ entit
     <div className="flex items-center justify-between gap-2 mb-1">
       <div className="flex items-center gap-2 min-w-0">
         {isModel ? (
-          <Cpu size={14} className="text-text-muted flex-shrink-0" />
+          <Cpu size={14} className="text-text-muted shrink-0" />
         ) : (
-          <Server size={14} className="text-text-muted flex-shrink-0" />
+          <Server size={14} className="text-text-muted shrink-0" />
         )}
         <span className="text-sm text-text font-medium truncate" title={entity.name}>
           {entity.name.length > 25 ? entity.name.slice(0, 22) + '...' : entity.name}
@@ -2004,7 +2004,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
               content: (
                 <div className="h-56 flex flex-col overflow-hidden">
                   {cooldowns.length > 0 && (
-                    <div className="divide-y divide-border border-b border-warning/30 bg-warning/5 max-h-[120px] overflow-y-auto">
+                    <div className="divide-y divide-border border-b border-warning/30 bg-warning/5 max-h-30 overflow-y-auto">
                       {Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
                         const [provider, model] = key.split(':');
                         const maxTime = Math.max(...modelCooldowns.map((c) => c.timeRemainingMs));
@@ -2720,7 +2720,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
                         No provider activity in window
                       </div>
                     ) : (
-                      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
                         {providerStats.map((provider) => (
                           <EntityRow key={provider.name} entity={provider} />
                         ))}
@@ -2737,7 +2737,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
                         No model activity in window
                       </div>
                     ) : (
-                      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
                         {modelStats.map((model) => (
                           <EntityRow key={model.name} entity={model} isModel />
                         ))}
