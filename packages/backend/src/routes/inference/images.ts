@@ -34,7 +34,7 @@ export async function registerImagesRoute(
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
-    usageStorage.emitStarted(usageRecord);
+    await usageStorage.emitStarted(usageRecord);
 
     try {
       const body = request.body as any;
@@ -44,7 +44,7 @@ export async function registerImagesRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       // Emit 'updated' event with parsed request details
-      usageStorage.emitUpdated({
+      await usageStorage.emitUpdated({
         requestId,
         incomingModelAlias: body.model,
         apiKey: (request as any).keyName,
@@ -80,7 +80,7 @@ export async function registerImagesRoute(
       const unifiedResponse = await dispatcher.dispatchImageGenerations(unifiedRequest);
 
       // Emit 'updated' event with routing decision details
-      usageStorage.emitUpdated({
+      await usageStorage.emitUpdated({
         requestId,
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,

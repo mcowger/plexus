@@ -2487,11 +2487,12 @@ export const api = {
    * @returns Array of {@link ConcurrencyData} entries, or an empty array on error
    */
   getConcurrencyData: async (
-    timeRange: 'hour' | 'day' | 'week' | 'month' = 'hour'
+    timeRange: 'hour' | 'day' | 'week' | 'month' = 'hour',
+    mode: 'live' | 'timeline' = 'live'
   ): Promise<ConcurrencyData[]> => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE}/v0/management/concurrency?timeRange=${timeRange}`
+        `${API_BASE}/v0/management/concurrency?timeRange=${timeRange}&mode=${mode}`
       );
       if (!res.ok) throw new Error('Failed to fetch concurrency data');
       const data = (await res.json()) as { data: ConcurrencyData[] };

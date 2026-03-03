@@ -86,16 +86,24 @@ export class UsageStorageService extends EventEmitter {
             : 0
           : record.isDescriptorRequest;
 
+      // Prepare values for insert/update
+      const values = {
+        ...record,
+        isStreamed: isStreamedValue,
+        isPassthrough: isPassthroughValue,
+        parallelToolCallsEnabled: parallelToolCallsValue,
+        isVisionFallthrough: isVisionFallthroughValue,
+        isDescriptorRequest: isDescriptorRequestValue,
+        createdAt: record.createdAt || Date.now(),
+      };
+
+      // Use upsert: insert new record or update existing one based on requestId
       await this.ensureDb()
         .insert(this.schema.requestUsage)
-        .values({
-          ...record,
-          isStreamed: isStreamedValue,
-          isPassthrough: isPassthroughValue,
-          parallelToolCallsEnabled: parallelToolCallsValue,
-          isVisionFallthrough: isVisionFallthroughValue,
-          isDescriptorRequest: isDescriptorRequestValue,
-          createdAt: record.createdAt || Date.now(),
+        .values(values)
+        .onConflictDoUpdate({
+          target: this.schema.requestUsage.requestId,
+          set: values,
         });
 
       logger.debug(`Usage record saved for request ${record.requestId}`);
@@ -108,11 +116,38 @@ export class UsageStorageService extends EventEmitter {
   }
 
   /**
-   * Emit a 'started' event when a request arrives.
+   * Emit a 'started' event when a request arrives and insert a pending record to DB.
    * This allows the frontend to show in-flight requests immediately.
-   * No database write is performed - only emits an event.
+   * The record is inserted with durationMs=null to indicate it's still in-flight.
    */
-  emitStarted(record: Partial<UsageRecord>): void {
+  async emitStarted(record: Partial<UsageRecord>): Promise<void> {
+    try {
+      // Insert pending record with durationMs=null to indicate in-flight status
+      await this.ensureDb()
+        .insert(this.schema.requestUsage)
+        .values({
+          requestId: record.requestId!,
+          date: record.date || new Date().toISOString(),
+          sourceIp: record.sourceIp || null,
+          apiKey: record.apiKey || null,
+          attribution: record.attribution || null,
+          incomingApiType: record.incomingApiType || null,
+          provider: record.provider || null,
+          incomingModelAlias: record.incomingModelAlias || null,
+          canonicalModelName: record.canonicalModelName || null,
+          selectedModelName: record.selectedModelName || null,
+          outgoingApiType: record.outgoingApiType || null,
+          startTime: record.startTime || Date.now(),
+          durationMs: null, // null indicates pending/in-flight
+          responseStatus: 'pending',
+          isStreamed: record.isStreamed ? 1 : 0,
+          isPassthrough: record.isPassthrough ? 1 : 0,
+          createdAt: Date.now(),
+        });
+    } catch (error) {
+      logger.error('Failed to insert pending usage record', error);
+    }
+
     const eventData = {
       ...record,
       responseStatus: 'pending',
@@ -122,10 +157,29 @@ export class UsageStorageService extends EventEmitter {
 
   /**
    * Emit an 'updated' event with partial data as more information becomes available.
-   * This allows the frontend to progressively fill in log details.
-   * No database write is performed - only emits an event.
+   * Also updates the pending DB record with provider/model info so the concurrency
+   * endpoint can group in-flight requests by provider.
    */
-  emitUpdated(record: Partial<UsageRecord>): void {
+  async emitUpdated(record: Partial<UsageRecord>): Promise<void> {
+    // Update the pending record in DB if we have provider/model info
+    if (record.requestId && (record.provider || record.canonicalModelName)) {
+      try {
+        const updateSet: Record<string, unknown> = {};
+        if (record.provider) updateSet.provider = record.provider;
+        if (record.canonicalModelName) updateSet.canonicalModelName = record.canonicalModelName;
+        if (record.selectedModelName) updateSet.selectedModelName = record.selectedModelName;
+        if (record.incomingModelAlias) updateSet.incomingModelAlias = record.incomingModelAlias;
+        if (record.apiKey) updateSet.apiKey = record.apiKey;
+        if (record.attribution !== undefined) updateSet.attribution = record.attribution;
+
+        await this.ensureDb()
+          .update(this.schema.requestUsage)
+          .set(updateSet)
+          .where(eq(this.schema.requestUsage.requestId, record.requestId));
+      } catch (error) {
+        logger.error('Failed to update pending usage record', error);
+      }
+    }
     this.emit('updated', record);
   }
 
@@ -577,57 +631,6 @@ export class UsageStorageService extends EventEmitter {
     } catch (error) {
       logger.error(`Failed to update performance metrics for ${provider}:${model}`, error);
     }
-  }
-
-  async recordFailedAttempt(
-    provider: string,
-    model: string,
-    canonicalModelName: string | null,
-    requestId: string
-  ) {
-    await this.updatePerformanceMetrics(
-      provider,
-      model,
-      canonicalModelName,
-      null,
-      null,
-      0,
-      requestId,
-      false
-    );
-  }
-
-  async recordSuccessfulAttempt(
-    provider: string,
-    model: string,
-    canonicalModelName: string | null,
-    requestId: string,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean }
-  ) {
-    if (metadata) {
-      try {
-        await this.ensureDb()
-          .update(this.schema.requestUsage)
-          .set({
-            isVisionFallthrough: metadata.isVisionFallthrough ? 1 : 0,
-            isDescriptorRequest: metadata.isDescriptorRequest ? 1 : 0,
-          })
-          .where(eq(this.schema.requestUsage.requestId, requestId));
-      } catch (error) {
-        logger.error('Failed to update vision fallthrough metadata', error);
-      }
-    }
-
-    await this.updatePerformanceMetrics(
-      provider,
-      model,
-      canonicalModelName,
-      null,
-      null,
-      0,
-      requestId,
-      true
-    );
   }
 
   async recordFailedAttempt(

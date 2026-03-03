@@ -34,7 +34,7 @@ export async function registerTranscriptionsRoute(
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
-    usageStorage.emitStarted(usageRecord);
+    await usageStorage.emitStarted(usageRecord);
 
     try {
       // Extract form fields from request.body
@@ -123,7 +123,7 @@ export async function registerTranscriptionsRoute(
       usageRecord.attribution = (request as any).attribution || null;
 
       // Emit 'updated' event with parsed request details
-      usageStorage.emitUpdated({
+      await usageStorage.emitUpdated({
         requestId,
         incomingModelAlias: model,
         apiKey: (request as any).keyName,
@@ -145,7 +145,7 @@ export async function registerTranscriptionsRoute(
       const unifiedResponse = await dispatcher.dispatchTranscription(unifiedRequest);
 
       // Emit 'updated' event with routing decision details
-      usageStorage.emitUpdated({
+      await usageStorage.emitUpdated({
         requestId,
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,

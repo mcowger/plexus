@@ -1,6 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Clock, Info, RefreshCw, Signal, X } from 'lucide-react';
-
 /**
  * @file LiveTab.tsx
  *
@@ -621,6 +618,8 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
   // ---------------------------------------------------------------------------
   /** Array of in-flight request counts per provider, fetched every 10 seconds */
   const [concurrencyData, setConcurrencyData] = useState<ConcurrencyData[]>([]);
+  /** Rolling history of concurrency snapshots for the stacked area chart (max 30 points = 5 min at 10s interval) */
+  const [concurrencyHistory, setConcurrencyHistory] = useState<Record<string, unknown>[]>([]);
   /** Loading flag for the concurrency endpoint */
   const [concurrencyLoading, setConcurrencyLoading] = useState(false);
 
@@ -837,8 +836,19 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
       setConcurrencyLoading(true);
     }
     try {
-      const data = await api.getConcurrencyData('hour');
+      const data = await api.getConcurrencyData('hour', 'live');
       setConcurrencyData(data);
+      // Build history point for stacked area chart
+      const point: Record<string, unknown> = { time: new Date().toLocaleTimeString() };
+      for (const item of data) {
+        const label = item.provider || 'unknown';
+        point[label] = Number(item.count || 0);
+      }
+      setConcurrencyHistory((prev) => {
+        const next = [...prev, point];
+        // Keep last 30 data points (5 minutes at 10s intervals)
+        return next.length > 30 ? next.slice(-30) : next;
+      });
     } catch (e) {
       console.error('Failed to fetch concurrency data', e);
     } finally {
@@ -1173,17 +1183,28 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
     return concurrencyData.reduce((acc, item) => acc + Number(item.count || 0), 0);
   }, [concurrencyData]);
 
-  /** Top 5 providers by in-flight request count, for the concurrency card */
-  const topConcurrencyProviders = useMemo(() => {
-    const providerCounts = new Map<string, number>();
-    for (const item of concurrencyData) {
-      const current = providerCounts.get(item.provider) || 0;
-      providerCounts.set(item.provider, current + Number(item.count || 0));
+  /** Unique provider names seen across all concurrency history snapshots, for chart lines */
+  const concurrencyProviders = useMemo(() => {
+    const providers = new Set<string>();
+    for (const point of concurrencyHistory) {
+      for (const key of Object.keys(point)) {
+        if (key !== 'time') providers.add(key);
+      }
     }
-    return Array.from(providerCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-  }, [concurrencyData]);
+    return Array.from(providers).sort();
+  }, [concurrencyHistory]);
+
+  /** Colour palette for concurrency provider lines */
+  const CONCURRENCY_COLORS = [
+    '#3b82f6',
+    '#14b8a6',
+    '#8b5cf6',
+    '#f59e0b',
+    '#ef4444',
+    '#ec4899',
+    '#06b6d4',
+    '#84cc16',
+  ];
 
   /** Top 6 providers with request count, success rate, avg latency, and cost -- for the alerts panel */
   const providerRows = useMemo(() => {
@@ -1741,44 +1762,52 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
             )}
           </div>
         );
-      // Expanded concurrency: total count + per-provider breakdown of in-flight requests
+      // Expanded concurrency: stacked area chart of in-flight requests over time
       case 'concurrency':
         return (
-          <div className="h-[60vh] overflow-y-auto">
-            {concurrencyLoading ? (
+          <div className="h-[60vh]">
+            {concurrencyHistory.length === 0 ? (
               <div className="flex items-center justify-center h-full text-text-secondary">
-                Loading concurrency data...
-              </div>
-            ) : concurrencyData.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-text-secondary">
-                No active concurrent requests.
+                Collecting concurrency data...
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-bg-subtle rounded-lg">
-                  <span className="text-sm text-text-muted">Total Concurrent Requests</span>
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between p-4 bg-bg-subtle rounded-lg mb-4">
+                  <span className="text-sm text-text-muted">Current In-Flight</span>
                   <span className="text-2xl font-semibold text-text tabular-nums">
                     {formatNumber(totalConcurrentRequests, 0)}
                   </span>
                 </div>
-                {topConcurrencyProviders.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      By Provider
-                    </span>
-                    {topConcurrencyProviders.map(([provider, count]) => (
-                      <div
-                        key={provider}
-                        className="flex items-center justify-between p-3 bg-bg-subtle/50 rounded-lg"
-                      >
-                        <span className="text-sm text-text">{provider}</span>
-                        <span className="text-sm font-semibold text-text tabular-nums">
-                          {formatNumber(count, 0)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={concurrencyHistory}
+                      margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                      <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
+                      <YAxis stroke="var(--color-text-secondary)" allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'var(--color-bg-card)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      {concurrencyProviders.map((provider, idx) => (
+                        <Area
+                          key={provider}
+                          type="monotone"
+                          dataKey={provider}
+                          stackId="1"
+                          stroke={CONCURRENCY_COLORS[idx % CONCURRENCY_COLORS.length]}
+                          fill={CONCURRENCY_COLORS[idx % CONCURRENCY_COLORS.length]}
+                          fillOpacity={0.6}
+                        />
+                      ))}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
           </div>
@@ -2610,41 +2639,53 @@ export const LiveTab: React.FC<LiveTabProps> = ({ pollInterval, onPollIntervalCh
               onClick: () => openModal('concurrency'),
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
-              content: concurrencyLoading ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
-                  Loading concurrency data...
-                </div>
-              ) : concurrencyData.length === 0 ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
-                  No active concurrent requests.
-                </div>
-              ) : (
-                <div className="h-56 space-y-3 overflow-y-auto">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-muted">Total Concurrent Requests</span>
-                    <span className="text-lg font-semibold text-text tabular-nums">
-                      {formatNumber(totalConcurrentRequests, 0)}
-                    </span>
+              content:
+                concurrencyLoading && concurrencyHistory.length === 0 ? (
+                  <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
+                    Loading concurrency data...
                   </div>
-                  {topConcurrencyProviders.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
-                        Top Providers
+                ) : concurrencyHistory.length === 0 ? (
+                  <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
+                    Collecting concurrency data...
+                  </div>
+                ) : (
+                  <div className="h-56">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-text-muted">In-Flight by Provider</span>
+                      <span className="text-sm font-semibold text-text tabular-nums">
+                        {formatNumber(totalConcurrentRequests, 0)}
                       </span>
-                      <div className="space-y-1">
-                        {topConcurrencyProviders.map(([provider, count]) => (
-                          <div key={provider} className="flex items-center justify-between">
-                            <span className="text-sm text-text">{provider}</span>
-                            <span className="text-sm text-text-muted tabular-nums">
-                              {formatNumber(count, 0)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
                     </div>
-                  )}
-                </div>
-              ),
+                    <ResponsiveContainer width="100%" height="85%">
+                      <AreaChart
+                        data={concurrencyHistory}
+                        margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                        <XAxis dataKey="time" stroke="var(--color-text-secondary)" />
+                        <YAxis stroke="var(--color-text-secondary)" allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'var(--color-bg-card)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '8px',
+                          }}
+                        />
+                        {concurrencyProviders.map((provider, idx) => (
+                          <Area
+                            key={provider}
+                            type="monotone"
+                            dataKey={provider}
+                            stackId="1"
+                            stroke={CONCURRENCY_COLORS[idx % CONCURRENCY_COLORS.length]}
+                            fill={CONCURRENCY_COLORS[idx % CONCURRENCY_COLORS.length]}
+                            fillOpacity={0.6}
+                          />
+                        ))}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                ),
             }}
             index={index}
             isOverlay={isOverlay}
