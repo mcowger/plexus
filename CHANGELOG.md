@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.18.1 - 2026-03-04
+
+### In-flight Request Tracking and Concurrency Optimizations
+
+## Major Features
+
+- **Live in-flight request tracking**: Added real-time tracking of in-flight requests with visual monitoring capabilities ([15fdb70](https://github.com/mcowger/plexus/commit/15fdb70), [707fb9a](https://github.com/mcowger/plexus/commit/707fb9a)). UsageTab now displays concurrent request metrics using stacked area charts for improved observability.
+
+- **GitHub Copilot gpt-5.x temperature optimization**: Added temperature stripping for gpt-5.x models on GitHub Copilot ([388b160](https://github.com/mcowger/plexus/commit/388b160)).
+
+## Fixes & Improvements
+
+- **OpenAI compatibility**: Fixed tool call index adjustment in transformer for OpenAI compatibility ([223756e](https://github.com/mcowger/plexus/commit/223756e)).
+
+- **Performance optimizations**: Moved inference save writes off the hot path to reduce latency ([75eb7c0](https://github.com/mcowger/plexus/commit/75eb7c0)). Made option-2 emits non-blocking again ([6f8d551](https://github.com/mcowger/plexus/commit/6f8d551)).
+
+- **Concurrency fixes**: Corrected timeline mode usage in UsageTab and fixed speech stream flag ([3d652c8](https://github.com/mcowger/plexus/commit/3d652c8)).
+
+- **Frontend improvements**: Fixed Tailwind CSS class warnings ([a77f3e0](https://github.com/mcowger/plexus/commit/a77f3e0)).
+
+- **Code formatting**: Applied Biome formatting ([32ac0a2](https://github.com/mcowger/plexus/commit/32ac0a2)).
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.18.0 - 2026-03-02
 
 ### v0.18.0: Vision Descriptor Service and Image Processing Integration
