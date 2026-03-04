@@ -1,18 +1,14 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import yaml from 'yaml';
 import { logger } from '../../utils/logger';
-import {
-  getConfigPath,
-  validateConfig,
-  loadConfig,
-  getConfig,
-  QuotaDefinition,
-} from '../../config';
+import { getConfig, QuotaDefinition } from '../../config';
+import { ConfigService } from '../../services/config-service';
 
 /**
  * Register API endpoints for user quota management.
  */
 export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
+  const configService = ConfigService.getInstance();
+
   /**
    * GET /v0/management/user-quotas
    * List all user quota definitions.
@@ -21,9 +17,7 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
     '/v0/management/user-quotas',
     async (_request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const config = getConfig();
-        const quotas = config.user_quotas || {};
-
+        const quotas = await configService.getRepository().getAllUserQuotas();
         return reply.send(quotas);
       } catch (error: any) {
         logger.error('[UserQuota] Error listing quotas:', error);
@@ -46,8 +40,7 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { name } = request.params as { name: string };
-        const config = getConfig();
-        const quotas = config.user_quotas || {};
+        const quotas = await configService.getRepository().getAllUserQuotas();
 
         const quota = quotas[name];
         if (!quota) {
@@ -79,11 +72,6 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/v0/management/user-quotas/:name',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const configPath = getConfigPath();
-      if (!configPath) {
-        return reply.code(500).send({ error: 'Configuration path not determined' });
-      }
-
       try {
         const { name } = request.params as { name: string };
         const body = request.body as QuotaDefinition;
@@ -137,38 +125,8 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
           });
         }
 
-        const file = Bun.file(configPath);
-        if (!(await file.exists())) {
-          return reply.code(404).send({ error: 'Configuration file not found' });
-        }
-
-        const configContent = await file.text();
-        const parsed = (yaml.parse(configContent) as any) || {};
-
-        if (!parsed.user_quotas) {
-          parsed.user_quotas = {};
-        }
-
-        // Create or update quota
-        parsed.user_quotas[name] = body;
-
-        const updatedConfig = yaml.stringify(parsed);
-
-        // Validate before saving
-        try {
-          validateConfig(updatedConfig);
-        } catch (e) {
-          return reply.code(400).send({
-            error: {
-              message: 'Configuration validation failed',
-              type: 'validation_error',
-            },
-          });
-        }
-
-        await Bun.write(configPath, updatedConfig);
-        logger.info(`[UserQuota] Quota '${name}' saved via API at ${configPath}`);
-        await loadConfig(configPath);
+        await configService.saveUserQuota(name, body);
+        logger.info(`[UserQuota] Quota '${name}' saved via API`);
 
         return reply.send({
           success: true,
@@ -194,24 +152,14 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
   fastify.patch(
     '/v0/management/user-quotas/:name',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const configPath = getConfigPath();
-      if (!configPath) {
-        return reply.code(500).send({ error: 'Configuration path not determined' });
-      }
-
       try {
         const { name } = request.params as { name: string };
         const updates = request.body as Partial<QuotaDefinition>;
 
-        const file = Bun.file(configPath);
-        if (!(await file.exists())) {
-          return reply.code(404).send({ error: 'Configuration file not found' });
-        }
+        const quotas = await configService.getRepository().getAllUserQuotas();
+        const existing = quotas[name];
 
-        const configContent = await file.text();
-        const parsed = (yaml.parse(configContent) as any) || {};
-
-        if (!parsed.user_quotas || !parsed.user_quotas[name]) {
+        if (!existing) {
           return reply.code(404).send({
             error: {
               message: `Quota not found: ${name}`,
@@ -220,32 +168,14 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Merge existing with updates
-        const existing = parsed.user_quotas[name];
-        parsed.user_quotas[name] = { ...existing, ...updates };
-
-        const updatedConfig = yaml.stringify(parsed);
-
-        // Validate before saving
-        try {
-          validateConfig(updatedConfig);
-        } catch (e) {
-          return reply.code(400).send({
-            error: {
-              message: 'Configuration validation failed',
-              type: 'validation_error',
-            },
-          });
-        }
-
-        await Bun.write(configPath, updatedConfig);
-        logger.info(`[UserQuota] Quota '${name}' updated via API at ${configPath}`);
-        await loadConfig(configPath);
+        const merged = { ...existing, ...updates } as QuotaDefinition;
+        await configService.saveUserQuota(name, merged);
+        logger.info(`[UserQuota] Quota '${name}' updated via API`);
 
         return reply.send({
           success: true,
           name,
-          quota: parsed.user_quotas[name],
+          quota: merged,
         });
       } catch (e: any) {
         logger.error(`[UserQuota] Failed to update quota`, e);
@@ -266,23 +196,11 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
   fastify.delete(
     '/v0/management/user-quotas/:name',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const configPath = getConfigPath();
-      if (!configPath) {
-        return reply.code(500).send({ error: 'Configuration path not determined' });
-      }
-
       try {
         const { name } = request.params as { name: string };
 
-        const file = Bun.file(configPath);
-        if (!(await file.exists())) {
-          return reply.code(404).send({ error: 'Configuration file not found' });
-        }
-
-        const configContent = await file.text();
-        const parsed = (yaml.parse(configContent) as any) || {};
-
-        if (!parsed.user_quotas || !parsed.user_quotas[name]) {
+        const quotas = await configService.getRepository().getAllUserQuotas();
+        if (!quotas[name]) {
           return reply.code(404).send({
             error: {
               message: `Quota not found: ${name}`,
@@ -292,9 +210,9 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
         }
 
         // Check if any keys are using this quota
-        const keys = parsed.keys || {};
+        const keys = await configService.getRepository().getAllKeys();
         const keysUsingQuota = Object.entries(keys)
-          .filter(([, keyConfig]: [string, any]) => keyConfig.quota === name)
+          .filter(([, keyConfig]) => keyConfig.quota === name)
           .map(([keyName]) => keyName);
 
         if (keysUsingQuota.length > 0) {
@@ -306,14 +224,8 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
           });
         }
 
-        delete parsed.user_quotas[name];
-
-        const updatedConfig = yaml.stringify(parsed);
-        validateConfig(updatedConfig);
-
-        await Bun.write(configPath, updatedConfig);
-        logger.info(`[UserQuota] Quota '${name}' deleted via API at ${configPath}`);
-        await loadConfig(configPath);
+        await configService.deleteUserQuota(name);
+        logger.info(`[UserQuota] Quota '${name}' deleted via API`);
 
         return reply.send({
           success: true,

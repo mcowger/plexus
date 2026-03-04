@@ -1,136 +1,123 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
-import yaml from 'yaml';
 import { logger } from '../../utils/logger';
-import { getConfigPath, validateConfig, loadConfig, VALID_QUOTA_CHECKER_TYPES } from '../../config';
+import { VALID_QUOTA_CHECKER_TYPES } from '../../config';
+import { ConfigService } from '../../services/config-service';
 
 export async function registerConfigRoutes(fastify: FastifyInstance) {
-  fastify.get('/v0/management/config', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(404).send({ error: 'Configuration file path not found' });
-    }
-    const file = Bun.file(configPath);
-    if (!(await file.exists())) {
-      return reply.code(404).send({ error: 'Configuration file not found' });
-    }
-    const configContent = await file.text();
-    reply.header('Content-Type', 'application/x-yaml');
-    return reply.send(configContent);
-  });
+  const configService = ConfigService.getInstance();
 
-  fastify.post('/v0/management/config', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
-    }
+  // ─── Config Export ────────────────────────────────────────────────
 
+  fastify.get('/v0/management/config', async (_request, reply) => {
     try {
-      const body = request.body as any;
-      let configStr: string;
-
-      if (typeof body === 'string') {
-        configStr = body;
-      } else {
-        // If the body is an object (JSON), stringify it as YAML for the file
-        configStr = yaml.stringify(body);
-      }
-
-      try {
-        validateConfig(configStr);
-      } catch (e) {
-        if (e instanceof z.ZodError) {
-          return reply.code(400).send({ error: 'Validation failed', details: e.errors });
-        }
-        return reply.code(400).send({ error: 'Invalid YAML or Schema', details: String(e) });
-      }
-
-      await Bun.write(configPath, configStr);
-      logger.info(`Configuration updated via API at ${configPath}`);
-      await loadConfig(configPath);
-
-      reply.header('Content-Type', 'application/x-yaml');
-      return reply.code(200).send(configStr);
-    } catch (e: any) {
-      logger.error('Failed to update config', e);
-      return reply.code(500).send({ error: e.message });
-    }
-  });
-
-  fastify.get('/v0/management/config/vision-fallthrough', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) return reply.code(500).send({ error: 'Config path not found' });
-
-    try {
-      const file = Bun.file(configPath);
-      const content = await file.text();
-      const parsed = yaml.parse(content);
-      return reply.send(parsed.vision_fallthrough || {});
+      const config = configService.getConfig();
+      return reply.send(config);
     } catch (e: any) {
       return reply.code(500).send({ error: e.message });
     }
   });
 
-  fastify.patch('/v0/management/config/vision-fallthrough', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) return reply.code(500).send({ error: 'Config path not found' });
+  fastify.get('/v0/management/config/export', async (_request, reply) => {
+    try {
+      const exported = await configService.exportConfig();
+      return reply.send(exported);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  // ─── Providers ────────────────────────────────────────────────────
+
+  fastify.get('/v0/management/providers', async (_request, reply) => {
+    try {
+      const providers = await configService.getRepository().getAllProviders();
+      return reply.send(providers);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.get('/v0/management/providers/:slug', async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    try {
+      const provider = await configService.getRepository().getProvider(slug);
+      if (!provider) {
+        return reply.code(404).send({ error: `Provider '${slug}' not found` });
+      }
+      return reply.send(provider);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.post('/v0/management/providers/:slug', async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    const body = request.body as any;
+
+    if (!body || !body.api_base_url) {
+      return reply.code(400).send({ error: 'api_base_url is required' });
+    }
 
     try {
-      const updates = request.body as any;
-      const file = Bun.file(configPath);
-      const content = await file.text();
-      const parsed = yaml.parse(content);
-
-      parsed.vision_fallthrough = {
-        ...(parsed.vision_fallthrough || {}),
-        ...updates,
-      };
-
-      const updatedYaml = yaml.stringify(parsed);
-      validateConfig(updatedYaml);
-      await Bun.write(configPath, updatedYaml);
-      await loadConfig(configPath);
-
-      return reply.send(parsed.vision_fallthrough);
+      await configService.saveProvider(slug, body);
+      logger.info(`Provider '${slug}' saved via API`);
+      return reply.send({ success: true, slug });
     } catch (e: any) {
-      logger.error('Failed to patch vision-fallthrough config', e);
+      logger.error(`Failed to save provider '${slug}'`, e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.delete('/v0/management/providers/:providerId', async (request, reply) => {
+    const { providerId } = request.params as { providerId: string };
+    const query = request.query as { cascade?: string };
+    const cascade = query.cascade === 'true';
+
+    try {
+      await configService.deleteProvider(providerId, cascade);
+      logger.info(`Provider '${providerId}' deleted via API${cascade ? ' (cascade)' : ''}`);
+      return reply.send({ success: true, provider: providerId });
+    } catch (e: any) {
+      logger.error(`Failed to delete provider '${providerId}'`, e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  // ─── Model Aliases ────────────────────────────────────────────────
+
+  fastify.get('/v0/management/aliases', async (_request, reply) => {
+    try {
+      const aliases = await configService.getRepository().getAllAliases();
+      return reply.send(aliases);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.post('/v0/management/aliases/:slug', async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    const body = request.body as any;
+
+    if (!body || !body.targets || !Array.isArray(body.targets)) {
+      return reply.code(400).send({ error: 'targets array is required' });
+    }
+
+    try {
+      await configService.saveAlias(slug, body);
+      logger.info(`Model alias '${slug}' saved via API`);
+      return reply.send({ success: true, slug });
+    } catch (e: any) {
+      logger.error(`Failed to save model alias '${slug}'`, e);
       return reply.code(500).send({ error: e.message });
     }
   });
 
   fastify.delete('/v0/management/models/:aliasId', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
-    }
-
-    const params = request.params as { aliasId: string };
-    const aliasId = params.aliasId;
+    const { aliasId } = request.params as { aliasId: string };
 
     try {
-      const file = Bun.file(configPath);
-      if (!(await file.exists())) {
-        return reply.code(404).send({ error: 'Configuration file not found' });
-      }
-
-      const configContent = await file.text();
-      const parsed = (yaml.parse(configContent) as any) || {};
-      const models = parsed.models || {};
-
-      if (!models[aliasId]) {
-        return reply.code(404).send({ error: `Model alias '${aliasId}' not found` });
-      }
-
-      delete models[aliasId];
-      parsed.models = models;
-
-      const updatedConfig = yaml.stringify(parsed);
-      validateConfig(updatedConfig);
-
-      await Bun.write(configPath, updatedConfig);
-      logger.info(`Model alias '${aliasId}' deleted via API at ${configPath}`);
-      await loadConfig(configPath);
-
+      await configService.deleteAlias(aliasId);
+      logger.info(`Model alias '${aliasId}' deleted via API`);
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error(`Failed to delete model alias '${aliasId}'`, e);
@@ -139,30 +126,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
   });
 
   fastify.delete('/v0/management/models', async (_request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
-    }
-
     try {
-      const file = Bun.file(configPath);
-      if (!(await file.exists())) {
-        return reply.code(404).send({ error: 'Configuration file not found' });
-      }
-
-      const configContent = await file.text();
-      const parsed = (yaml.parse(configContent) as any) || {};
-      const deletedCount = Object.keys(parsed.models || {}).length;
-
-      parsed.models = {};
-
-      const updatedConfig = yaml.stringify(parsed);
-      validateConfig(updatedConfig);
-
-      await Bun.write(configPath, updatedConfig);
-      logger.info(`Deleted all model aliases (${deletedCount}) via API at ${configPath}`);
-      await loadConfig(configPath);
-
+      const deletedCount = await configService.deleteAllAliases();
+      logger.info(`Deleted all model aliases (${deletedCount}) via API`);
       return reply.send({ success: true, deletedCount });
     } catch (e: any) {
       logger.error('Failed to delete all model aliases', e);
@@ -170,109 +136,111 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/v0/management/providers/:providerId', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
-    }
+  // ─── API Keys ─────────────────────────────────────────────────────
 
-    const params = request.params as { providerId: string };
-    const providerId = params.providerId;
-    const query = request.query as { cascade?: string };
-    const cascade = query.cascade === 'true';
-
+  fastify.get('/v0/management/keys', async (_request, reply) => {
     try {
-      const file = Bun.file(configPath);
-      if (!(await file.exists())) {
-        return reply.code(404).send({ error: 'Configuration file not found' });
-      }
-
-      const configContent = await file.text();
-      const parsed = (yaml.parse(configContent) as any) || {};
-      const providers = parsed.providers || {};
-
-      if (!providers[providerId]) {
-        return reply.code(404).send({ error: `Provider '${providerId}' not found` });
-      }
-
-      delete providers[providerId];
-      parsed.providers = providers;
-
-      let removedTargets = 0;
-      const affectedAliases: string[] = [];
-
-      if (cascade) {
-        const models = parsed.models || {};
-        for (const [aliasId, alias] of Object.entries(models)) {
-          const aliasObj = alias as any;
-          if (aliasObj.targets && Array.isArray(aliasObj.targets)) {
-            const originalLength = aliasObj.targets.length;
-            aliasObj.targets = aliasObj.targets.filter(
-              (target: any) => target.provider !== providerId
-            );
-            const targetsRemoved = originalLength - aliasObj.targets.length;
-            if (targetsRemoved > 0) {
-              removedTargets += targetsRemoved;
-              affectedAliases.push(aliasId);
-            }
-          }
-        }
-        parsed.models = models;
-      }
-
-      const updatedConfig = yaml.stringify(parsed);
-      validateConfig(updatedConfig);
-
-      await Bun.write(configPath, updatedConfig);
-      logger.info(
-        `Provider '${providerId}' deleted via API at ${configPath}${cascade ? ' (cascade)' : ''}`
-      );
-      await loadConfig(configPath);
-
-      return reply.send({
-        success: true,
-        provider: providerId,
-        removedTargets: cascade ? removedTargets : undefined,
-        affectedAliases: cascade ? affectedAliases : undefined,
-      });
+      const keys = await configService.getRepository().getAllKeys();
+      return reply.send(keys);
     } catch (e: any) {
-      logger.error(`Failed to delete provider '${providerId}'`, e);
       return reply.code(500).send({ error: e.message });
     }
   });
 
-  // MCP Server Management
-  fastify.get('/v0/management/mcp-servers', async (_request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
+  fastify.post('/v0/management/keys/:name', async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const body = request.body as any;
+
+    if (!body || !body.secret) {
+      return reply.code(400).send({ error: 'secret is required' });
     }
 
     try {
-      const file = Bun.file(configPath);
-      if (!(await file.exists())) {
-        return reply.code(404).send({ error: 'Configuration file not found' });
-      }
-
-      const configContent = await file.text();
-      const parsed = (yaml.parse(configContent) as any) || {};
-      const mcpServers = parsed.mcp_servers || {};
-
-      return reply.send(mcpServers);
+      await configService.saveKey(name, body);
+      logger.info(`API key '${name}' saved via API`);
+      return reply.send({ success: true, name });
     } catch (e: any) {
-      logger.error('Failed to get MCP servers', e);
+      logger.error(`Failed to save API key '${name}'`, e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.delete('/v0/management/keys/:name', async (request, reply) => {
+    const { name } = request.params as { name: string };
+
+    try {
+      await configService.deleteKey(name);
+      logger.info(`API key '${name}' deleted via API`);
+      return reply.send({ success: true });
+    } catch (e: any) {
+      logger.error(`Failed to delete API key '${name}'`, e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  // ─── System Settings ──────────────────────────────────────────────
+
+  fastify.get('/v0/management/system-settings', async (_request, reply) => {
+    try {
+      const settings = await configService.getAllSettings();
+      return reply.send(settings);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.patch('/v0/management/system-settings', async (request, reply) => {
+    const body = request.body as Record<string, unknown>;
+
+    try {
+      for (const [key, value] of Object.entries(body)) {
+        await configService.setSetting(key, value);
+      }
+      logger.info('System settings updated via API');
+      return reply.send({ success: true });
+    } catch (e: any) {
+      logger.error('Failed to update system settings', e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  // ─── Vision Fallthrough ───────────────────────────────────────────
+
+  fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {
+    try {
+      const vf = await configService.getSetting('vision_fallthrough', {});
+      return reply.send(vf);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  fastify.patch('/v0/management/config/vision-fallthrough', async (request, reply) => {
+    try {
+      const updates = request.body as any;
+      const current = await configService.getSetting<any>('vision_fallthrough', {});
+      const merged = { ...current, ...updates };
+      await configService.setSetting('vision_fallthrough', merged);
+      return reply.send(merged);
+    } catch (e: any) {
+      logger.error('Failed to patch vision-fallthrough config', e);
+      return reply.code(500).send({ error: e.message });
+    }
+  });
+
+  // ─── MCP Servers ──────────────────────────────────────────────────
+
+  fastify.get('/v0/management/mcp-servers', async (_request, reply) => {
+    try {
+      const servers = await configService.getRepository().getAllMcpServers();
+      return reply.send(servers);
+    } catch (e: any) {
       return reply.code(500).send({ error: e.message });
     }
   });
 
   fastify.post('/v0/management/mcp-servers/:serverName', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
-    }
-
-    const params = request.params as { serverName: string };
-    const serverName = params.serverName;
+    const { serverName } = request.params as { serverName: string };
     const body = request.body as {
       upstream_url?: string;
       enabled?: boolean;
@@ -283,7 +251,6 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: 'upstream_url is required' });
     }
 
-    // Validate server name (slug pattern)
     if (!/^[a-z0-9][a-z0-9-_]{1,62}$/.test(serverName)) {
       return reply.code(400).send({
         error:
@@ -292,32 +259,13 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const file = Bun.file(configPath);
-      if (!(await file.exists())) {
-        return reply.code(404).send({ error: 'Configuration file not found' });
-      }
-
-      const configContent = await file.text();
-      const parsed = (yaml.parse(configContent) as any) || {};
-
-      if (!parsed.mcp_servers) {
-        parsed.mcp_servers = {};
-      }
-
-      parsed.mcp_servers[serverName] = {
+      await configService.saveMcpServer(serverName, {
         upstream_url: body.upstream_url,
         enabled: body.enabled !== false,
-        headers: body.headers || {},
-      };
-
-      const updatedConfig = yaml.stringify(parsed);
-      validateConfig(updatedConfig);
-
-      await Bun.write(configPath, updatedConfig);
-      logger.info(`MCP server '${serverName}' saved via API at ${configPath}`);
-      await loadConfig(configPath);
-
-      return reply.send({ success: true, name: serverName, ...parsed.mcp_servers[serverName] });
+        ...(body.headers ? { headers: body.headers } : {}),
+      });
+      logger.info(`MCP server '${serverName}' saved via API`);
+      return reply.send({ success: true, name: serverName });
     } catch (e: any) {
       logger.error(`Failed to save MCP server '${serverName}'`, e);
       return reply.code(500).send({ error: e.message });
@@ -325,38 +273,11 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
   });
 
   fastify.delete('/v0/management/mcp-servers/:serverName', async (request, reply) => {
-    const configPath = getConfigPath();
-    if (!configPath) {
-      return reply.code(500).send({ error: 'Configuration path not determined' });
-    }
-
-    const params = request.params as { serverName: string };
-    const serverName = params.serverName;
+    const { serverName } = request.params as { serverName: string };
 
     try {
-      const file = Bun.file(configPath);
-      if (!(await file.exists())) {
-        return reply.code(404).send({ error: 'Configuration file not found' });
-      }
-
-      const configContent = await file.text();
-      const parsed = (yaml.parse(configContent) as any) || {};
-      const mcpServers = parsed.mcp_servers || {};
-
-      if (!mcpServers[serverName]) {
-        return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
-      }
-
-      delete mcpServers[serverName];
-      parsed.mcp_servers = mcpServers;
-
-      const updatedConfig = yaml.stringify(parsed);
-      validateConfig(updatedConfig);
-
-      await Bun.write(configPath, updatedConfig);
-      logger.info(`MCP server '${serverName}' deleted via API at ${configPath}`);
-      await loadConfig(configPath);
-
+      await configService.deleteMcpServer(serverName);
+      logger.info(`MCP server '${serverName}' deleted via API`);
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error(`Failed to delete MCP server '${serverName}'`, e);
@@ -364,7 +285,8 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Quota checker types endpoint - single source of truth
+  // ─── Quota Checker Types ──────────────────────────────────────────
+
   fastify.get('/v0/management/quota-checker-types', async (_request, reply) => {
     return reply.send({
       types: VALID_QUOTA_CHECKER_TYPES,
