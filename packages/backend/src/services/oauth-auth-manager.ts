@@ -1,87 +1,20 @@
-import fs from 'fs';
-import { getAuthJsonPath } from '../config';
 import { logger } from '../utils/logger';
 import {
   getOAuthApiKey,
   type OAuthProvider,
   type OAuthCredentials,
 } from '@mariozechner/pi-ai/oauth';
+import { ConfigService } from './config-service';
 
 const LEGACY_ACCOUNT_ID = 'legacy';
 
-type ProviderCredentialsRecord = {
-  accounts: Record<string, OAuthCredentials>;
-};
-
-type AuthRecord = Record<string, ProviderCredentialsRecord>;
-
-const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const normalizeCredentials = (credentials: unknown): OAuthCredentials | null => {
-  if (!isObjectRecord(credentials)) return null;
-  return { type: 'oauth', ...credentials } as unknown as OAuthCredentials;
-};
-
-const normalizeAuthData = (raw: unknown): { data: AuthRecord; migrated: boolean } => {
-  if (!isObjectRecord(raw)) {
-    return { data: {}, migrated: false };
-  }
-
-  const normalized: AuthRecord = {};
-  let migrated = false;
-
-  for (const [provider, providerValue] of Object.entries(raw)) {
-    if (!isObjectRecord(providerValue)) {
-      migrated = true;
-      continue;
-    }
-
-    const accounts = providerValue.accounts;
-    if (isObjectRecord(accounts)) {
-      const normalizedAccounts: Record<string, OAuthCredentials> = {};
-      for (const [accountId, accountCredentials] of Object.entries(accounts)) {
-        const normalizedCredentials = normalizeCredentials(accountCredentials);
-        if (!normalizedCredentials) {
-          migrated = true;
-          continue;
-        }
-        normalizedAccounts[accountId] = normalizedCredentials;
-      }
-
-      if (Object.keys(normalizedAccounts).length > 0) {
-        normalized[provider] = { accounts: normalizedAccounts };
-      } else {
-        migrated = true;
-      }
-      continue;
-    }
-
-    const legacyCredentials = normalizeCredentials(providerValue);
-    if (!legacyCredentials) {
-      migrated = true;
-      continue;
-    }
-
-    migrated = true;
-    normalized[provider] = {
-      accounts: {
-        [LEGACY_ACCOUNT_ID]: legacyCredentials,
-      },
-    };
-  }
-
-  return { data: normalized, migrated };
-};
-
 export class OAuthAuthManager {
   private static instance: OAuthAuthManager;
-  private authData: AuthRecord = {};
-  private authFilePath: string;
+  // In-memory cache for fast lookups
+  private authData: Record<string, { accounts: Record<string, OAuthCredentials> }> = {};
 
   private constructor() {
-    this.authFilePath = getAuthJsonPath();
-    this.loadAuthFile();
+    this.loadFromDatabase();
   }
 
   static getInstance(): OAuthAuthManager {
@@ -95,35 +28,62 @@ export class OAuthAuthManager {
     this.instance = undefined as unknown as OAuthAuthManager;
   }
 
-  private loadAuthFile(): void {
+  private loadFromDatabase(): void {
     try {
-      if (fs.existsSync(this.authFilePath)) {
-        const content = fs.readFileSync(this.authFilePath, 'utf-8');
-        const parsed = JSON.parse(content) as unknown;
-        const { data, migrated } = normalizeAuthData(parsed);
-        this.authData = data;
-        logger.info(`OAuth: Loaded credentials from ${this.authFilePath}`);
-        if (migrated) {
-          logger.info('OAuth: Migrated auth.json to multi-account schema');
-          this.saveAuthFile();
-        }
-      } else {
-        logger.warn(
-          `OAuth: No auth.json found at ${this.authFilePath}. OAuth providers will not be available.`
-        );
-      }
+      // Load synchronously isn't possible with async DB, so we load lazily on first use
+      // The in-memory cache will be populated asynchronously
+      this.loadFromDatabaseAsync().catch((error) => {
+        logger.error('OAuth: Failed to load credentials from database:', error);
+      });
     } catch (error: any) {
-      logger.error(`OAuth: Failed to load ${this.authFilePath}:`, error);
-      throw new Error(`Failed to load OAuth credentials: ${error?.message || error}`);
+      logger.error('OAuth: Failed to initialize:', error);
     }
   }
 
-  private saveAuthFile(): void {
+  private async loadFromDatabaseAsync(): Promise<void> {
     try {
-      fs.writeFileSync(this.authFilePath, JSON.stringify(this.authData, null, 2), 'utf-8');
-      logger.debug(`OAuth: Saved updated credentials to ${this.authFilePath}`);
-    } catch (error) {
-      logger.error(`OAuth: Failed to save ${this.authFilePath}:`, error);
+      const configService = ConfigService.getInstance();
+      const providers = await configService.getAllOAuthProviders();
+
+      this.authData = {};
+
+      for (const { providerType, accountId } of providers) {
+        const creds = await configService.getOAuthCredentials(providerType, accountId);
+        if (creds) {
+          if (!this.authData[providerType]) {
+            this.authData[providerType] = { accounts: {} };
+          }
+          this.authData[providerType].accounts[accountId] = {
+            type: 'oauth',
+            access: creds.accessToken,
+            refresh: creds.refreshToken,
+            expires: creds.expiresAt,
+          } as OAuthCredentials;
+        }
+      }
+
+      const totalAccounts = Object.values(this.authData).reduce(
+        (sum, p) => sum + Object.keys(p.accounts).length,
+        0
+      );
+      if (totalAccounts > 0) {
+        logger.info(`OAuth: Loaded ${totalAccounts} credential(s) from database`);
+      }
+    } catch (error: any) {
+      logger.error('OAuth: Failed to load from database:', error);
+    }
+  }
+
+  private async saveToDatabase(provider: OAuthProvider, accountId: string, credentials: OAuthCredentials): Promise<void> {
+    try {
+      const configService = ConfigService.getInstance();
+      await configService.setOAuthCredentials(provider, accountId, {
+        accessToken: credentials.access,
+        refreshToken: credentials.refresh,
+        expiresAt: credentials.expires,
+      });
+    } catch (error: any) {
+      logger.error('OAuth: Failed to save credentials to database:', error);
     }
   }
 
@@ -164,7 +124,8 @@ export class OAuthAuthManager {
       ...credentials,
     } as OAuthCredentials;
 
-    this.saveAuthFile();
+    // Save to database asynchronously
+    this.saveToDatabase(provider, accountId, credentials);
   }
 
   async getApiKey(provider: OAuthProvider, accountId?: string | null): Promise<string> {
@@ -206,7 +167,8 @@ export class OAuthAuthManager {
         type: 'oauth',
         ...result.newCredentials,
       } as OAuthCredentials;
-      this.saveAuthFile();
+      // Save refreshed credentials to database
+      this.saveToDatabase(provider, resolvedAccountId, result.newCredentials);
     }
 
     return result.apiKey;
@@ -244,11 +206,17 @@ export class OAuthAuthManager {
       delete this.authData[provider];
     }
 
-    this.saveAuthFile();
+    // Delete from database asynchronously
+    ConfigService.getInstance()
+      .deleteOAuthCredentials(provider, accountId)
+      .catch((error) => {
+        logger.error('OAuth: Failed to delete credentials from database:', error);
+      });
+
     return true;
   }
 
-  reload(): void {
-    this.loadAuthFile();
+  async reload(): Promise<void> {
+    await this.loadFromDatabaseAsync();
   }
 }
