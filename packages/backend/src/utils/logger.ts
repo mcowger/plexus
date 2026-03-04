@@ -29,7 +29,22 @@ const consoleFormat = printf(({ level, message, timestamp, ...metadata }) => {
     // If the metadata contains 'splat' (from util.format style args), handle it?
     // Winston's splat format puts extra args into metadata.
     // We want to pretty print them.
-    msg += ` ${JSON.stringify(metadata, null, 2)}`;
+
+    // Handle Error objects specially - JSON.stringify on Error produces unwanted results
+    const sanitizedMetadata: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(metadata)) {
+      if (value instanceof Error) {
+        sanitizedMetadata[key] = {
+          name: value.name,
+          message: value.message,
+          stack: value.stack,
+        };
+      } else {
+        sanitizedMetadata[key] = value;
+      }
+    }
+
+    msg += ` ${JSON.stringify(sanitizedMetadata, null, 2)}`;
   }
   return msg;
 });
