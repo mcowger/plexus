@@ -861,8 +861,17 @@ export async function loadConfig(configPath?: string): Promise<PlexusConfig> {
 }
 
 export function getConfig(): PlexusConfig {
+  // Try ConfigService first (database-backed config)
+  try {
+    const { ConfigService } = require('./services/config-service');
+    const instance = ConfigService.getInstance();
+    return instance.getConfig();
+  } catch {
+    // Fall back to file-based config
+  }
+
   if (!currentConfig) {
-    throw new Error('Configuration not loaded. Call loadConfig() first.');
+    throw new Error('Configuration not loaded. Call loadConfig() or initialize ConfigService first.');
   }
   return currentConfig;
 }
