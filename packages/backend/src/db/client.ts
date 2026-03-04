@@ -90,6 +90,15 @@ export function initializeDatabase(connectionString?: string) {
       inferenceErrors,
       providerPerformance,
       quotaState,
+      providers: providersTable,
+      providerModels,
+      modelAliases,
+      modelAliasTargets,
+      apiKeys,
+      userQuotaDefinitions,
+      mcpServers,
+      systemSettings,
+      oauthCredentials,
     } = sqliteSchema;
 
     currentSchema = sqliteSchema;
@@ -101,6 +110,15 @@ export function initializeDatabase(connectionString?: string) {
         inferenceErrors,
         providerPerformance,
         quotaState,
+        providers: providersTable,
+        providerModels,
+        modelAliases,
+        modelAliasTargets,
+        apiKeys,
+        userQuotaDefinitions,
+        mcpServers,
+        systemSettings,
+        oauthCredentials,
       },
       logger: createDrizzleLogger(),
     });
@@ -126,6 +144,15 @@ export function initializeDatabase(connectionString?: string) {
       inferenceErrors,
       providerPerformance,
       quotaState,
+      providers: providersTable,
+      providerModels,
+      modelAliases,
+      modelAliasTargets,
+      apiKeys,
+      userQuotaDefinitions,
+      mcpServers,
+      systemSettings,
+      oauthCredentials,
     } = pgSchema;
 
     currentSchema = pgSchema;
@@ -137,6 +164,15 @@ export function initializeDatabase(connectionString?: string) {
         inferenceErrors,
         providerPerformance,
         quotaState,
+        providers: providersTable,
+        providerModels,
+        modelAliases,
+        modelAliasTargets,
+        apiKeys,
+        userQuotaDefinitions,
+        mcpServers,
+        systemSettings,
+        oauthCredentials,
       },
       logger: createDrizzleLogger(),
     });

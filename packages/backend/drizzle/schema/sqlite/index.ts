@@ -8,3 +8,14 @@ export * from './quota-snapshots';
 export * from './responses';
 export * from './mcp';
 export * from './quota-state';
+// Config tables
+export * from './providers';
+export * from './provider-models';
+export * from './model-aliases';
+export * from './model-alias-targets';
+export * from './api-keys';
+export * from './user-quota-definitions';
+export * from './mcp-servers';
+export * from './system-settings';
+export * from './oauth-credentials';
+export * from './config-relations';
