@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.18.3 - 2026-03-06
+
+### v0.18.3: Copilot/Codex Model Filtering and OAuth Subpath Migration
+
+## New Features
+
+* **LLM Filter Rules**: Introduced new filtering capabilities specifically for GitHub Copilot and OpenAI Codex models. ([1dbbbc5](https://github.com/mcowger/plexus/commit/1dbbbc5))
+
+## Bug Fixes & Improvements
+
+* **OAuth Refactoring**: Updated `pi-ai` OAuth logic to support new subpath exports, ensuring compatibility with updated dependency structures. ([1fd5bc6](https://github.com/mcowger/plexus/commit/1fd5bc6))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.18.2 - 2026-03-06
 
 ### v0.18.2: API Alias Filtering and Stream Formatting Fixes
