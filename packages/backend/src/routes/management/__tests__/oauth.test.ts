@@ -3,7 +3,7 @@ import Fastify from 'fastify';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import type { OAuthProviderInterface } from '@mariozechner/pi-ai';
+import type { OAuthProviderInterface } from '@mariozechner/pi-ai/oauth';
 import { registerOAuthRoutes } from '../oauth';
 import { OAuthLoginSessionManager } from '../../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';

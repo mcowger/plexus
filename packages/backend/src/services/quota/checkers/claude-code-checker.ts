@@ -2,7 +2,7 @@ import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../..
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
-import type { OAuthProvider } from '@mariozechner/pi-ai';
+import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
 
 export class ClaudeCodeQuotaChecker extends QuotaChecker {
   private endpoint: string;

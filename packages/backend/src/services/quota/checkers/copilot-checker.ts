@@ -2,7 +2,7 @@ import type { QuotaCheckResult, QuotaCheckerConfig, QuotaWindow } from '../../..
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
-import type { OAuthProvider } from '@mariozechner/pi-ai';
+import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
 
 interface CopilotUsageResponse {
   quota_reset_date_utc?: string;

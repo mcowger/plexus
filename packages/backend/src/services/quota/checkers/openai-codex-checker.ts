@@ -6,7 +6,7 @@ import type {
 } from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
-import type { OAuthProvider } from '@mariozechner/pi-ai';
+import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
 import { logger } from '../../../utils/logger';
 
 interface OAuthCredentialsBlob {

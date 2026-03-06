@@ -1,7 +1,11 @@
 import fs from 'fs';
 import { getAuthJsonPath } from '../config';
 import { logger } from '../utils/logger';
-import { getOAuthApiKey, type OAuthProvider, type OAuthCredentials } from '@mariozechner/pi-ai';
+import {
+  getOAuthApiKey,
+  type OAuthProvider,
+  type OAuthCredentials,
+} from '@mariozechner/pi-ai/oauth';
 
 const LEGACY_ACCOUNT_ID = 'legacy';
 
