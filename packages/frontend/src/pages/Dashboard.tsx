@@ -66,7 +66,9 @@ export const Dashboard = () => {
             pollInterval={pollInterval}
             onPollIntervalChange={setPollInterval}
             liveWindowPeriod={liveWindowPeriod}
-            onLiveWindowPeriodChange={(period: number) => setLiveWindowPeriod(period as LiveWindowPeriod)}
+            onLiveWindowPeriodChange={(period: number) =>
+              setLiveWindowPeriod(period as LiveWindowPeriod)
+            }
           />
         )}
         {activeTab === 'usage' && (
