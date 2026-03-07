@@ -1024,44 +1024,68 @@ export class Dispatcher {
   ): Promise<
     { ok: true; stream: ReadableStream<any> } | { ok: false; error: Error; streamStarted: boolean }
   > {
-    // Wait for the first event with no timeout. The pi-ai SDK retries HTTP 429s
-    // internally with exponential backoff (1 s, 2 s, 4 s …), so a quota-exhausted
-    // account can take up to ~9 s before it closes the stream with zero events.
-    // Using a short timeout caused the probe to declare "ok" too early, passing
-    // an empty stream to the client with no chance for the dispatcher to retry
-    // a different account/provider.  Waiting for the first real event means:
-    //   - Empty stream (quota exhausted) → first.done === true → ok: false → dispatcher retries
-    //   - Error event → ok: false → dispatcher retries
-    //   - Real event → replay it and stream the rest → ok: true
+    // Pi-ai streams begin with bookkeeping events (type 'start', 'text_start',
+    // 'thinking_start', etc.) that carry no content and precede any error events.
+    // If we declare ok:true on the first such event, a 429 error arriving as the
+    // SECOND event will be seen after the HTTP response is already committed —
+    // too late to retry.  Instead, buffer bookkeeping events and keep reading
+    // until we see either:
+    //   - An error event  → ok:false → dispatcher retries
+    //   - Empty stream    → ok:false → dispatcher retries (quota exhausted)
+    //   - A content event → ok:true  → replay all buffered events + rest of stream
+    const BOOKKEEPING_TYPES = new Set([
+      'start',
+      'text_start',
+      'text_end',
+      'thinking_start',
+      'thinking_end',
+      'toolcall_start',
+      'toolcall_end',
+    ]);
+
     const reader = stream.getReader();
+    const buffered: any[] = [];
 
     try {
-      const first = await reader.read();
+      while (true) {
+        const { value, done } = await reader.read();
 
-      if (first.done) {
-        // Stream closed without emitting any events — quota exhausted.
-        reader.releaseLock();
-        return {
-          ok: false,
-          error: new Error('OAuth provider returned empty stream (quota exhausted)'),
-          streamStarted: false,
-        };
+        if (done) {
+          // Stream closed — quota exhausted (no events) or provider gave up.
+          reader.releaseLock();
+          return {
+            ok: false,
+            error: new Error('OAuth provider returned empty stream (quota exhausted)'),
+            streamStarted: false,
+          };
+        }
+
+        if (value?.type === 'error' || value?.reason === 'error') {
+          reader.releaseLock();
+          return {
+            ok: false,
+            error: this.buildOAuthStreamEventError(value),
+            streamStarted: false,
+          };
+        }
+
+        buffered.push(value);
+
+        // If this event is not pure bookkeeping, the stream is healthy.
+        // Replay all buffered events then continue from the reader.
+        if (!BOOKKEEPING_TYPES.has(value?.type)) {
+          break;
+        }
       }
 
-      if (first.value?.type === 'error' || first.value?.reason === 'error') {
-        reader.releaseLock();
-        return {
-          ok: false,
-          error: this.buildOAuthStreamEventError(first.value),
-          streamStarted: false,
-        };
-      }
-
-      // First real event received — replay it then stream the rest.
+      // Stream is healthy — replay buffered events then stream the rest.
       // The replay stream takes ownership of the reader; do NOT releaseLock here.
+      const snapshot = buffered.slice();
       const replay = new ReadableStream<any>({
         start(controller) {
-          controller.enqueue(first.value);
+          for (const ev of snapshot) {
+            controller.enqueue(ev);
+          }
         },
         async pull(controller) {
           try {
@@ -1227,6 +1251,15 @@ export class Dispatcher {
               dispatcher.markOAuthProviderFailure(route, wrappedError).catch((e) => {
                 logger.error('OAuth: Failed to mark provider failure from stream error', e);
               });
+
+              // Do NOT forward the raw provider error event to the client.
+              // Close the stream cleanly so the client gets a proper termination
+              // rather than raw provider JSON leaking through as completion content.
+              // We cannot use controller.error() here because the HTTP response is
+              // already committed (message_start was already sent), and erroring an
+              // in-flight ReadableStream causes unhandled promise rejections downstream.
+              controller.close();
+              return;
             }
 
             eventsEmitted++;
@@ -1642,7 +1675,9 @@ export class Dispatcher {
       lower.includes('no credits') ||
       lower.includes('topup') ||
       lower.includes('top up') ||
-      lower.includes('top_up')
+      lower.includes('top_up') ||
+      lower.includes('rate limit') ||
+      lower.includes('rate_limit')
     );
   }
 
