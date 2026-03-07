@@ -185,7 +185,7 @@ describe('Dispatcher Failover', () => {
 
   test('malformed upstream JSON records raw body in failure context', async () => {
     setConfigForTesting(makeConfig({ targetCount: 1 }));
-    const invalidJson = '{"broken": '; 
+    const invalidJson = '{"broken": ';
     fetchMock.mockImplementation(
       async () =>
         new Response(invalidJson, {
