@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.18.6 - 2026-03-07
+
+### v0.18.6: OAuth Probe Bookkeeping Buffer Fix
+
+## Bug Fixes
+
+- **OAuth Probe Reliability**: Fixed an issue where the OAuth probe could declare a stream healthy before bookkeeping events were properly buffered. This ensures accurate health status reporting during OAuth flows.
+  - Fix implemented in [cfa8674](https://github.com/mcowger/plexus/commit/cfa8674)
+  - Test coverage added in [fa1d29a](https://github.com/mcowger/plexus/commit/fa1d29a)
+
+## Infrastructure
+
+- The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.18.5 - 2026-03-07
 
 ### v0.18.5: Enhanced Dispatcher Resilience and UI Interaction Logic
