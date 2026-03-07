@@ -200,14 +200,14 @@ describe('Dispatcher Failover', () => {
       await dispatcher.dispatch({ ...makeChatRequest(), requestId: 'req-malformed-json' });
       throw new Error('expected dispatch to fail');
     } catch (error: any) {
-      expect(error.message).toContain('JSON Parse error: Unable to parse JSON string');
+      expect(error.message).toContain(invalidJson);
       expect(error.routingContext?.attemptCount).toBe(1);
       expect(error.routingContext?.rawResponseText).toBe(invalidJson);
       expect(error.routingContext?.providerResponse).toBe(invalidJson);
 
       const retryHistory = JSON.parse(error.routingContext?.retryHistory || '[]');
       expect(retryHistory).toHaveLength(1);
-      expect(retryHistory[0]?.reason).toBe(invalidJson);
+      expect(retryHistory[0]?.reason).toContain('{"broken":');
     }
   });
 

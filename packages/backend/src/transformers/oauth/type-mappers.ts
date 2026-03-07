@@ -153,11 +153,17 @@ function unifiedMessageToAssistantMessage(
 
   if (msg.tool_calls && msg.tool_calls.length > 0) {
     for (const toolCall of msg.tool_calls) {
+      let parsedArguments: any;
+      try {
+        parsedArguments = JSON.parse(toolCall.function.arguments);
+      } catch {
+        parsedArguments = { _raw: toolCall.function.arguments };
+      }
       const block: any = {
         type: 'toolCall',
         id: toolCall.id,
         name: toolCall.function.name,
-        arguments: JSON.parse(toolCall.function.arguments),
+        arguments: parsedArguments,
       };
       if (toolCall.thought_signature) {
         block.thoughtSignature = toolCall.thought_signature;

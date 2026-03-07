@@ -301,3 +301,138 @@ describe('unifiedToContext — thinking block ordering (regression)', () => {
     expect(contentTypes).toContain('toolCall');
   });
 });
+
+/**
+ * Regression tests for non-JSON tool call arguments in message history.
+ *
+ * Bug: When an assistant message in history contained a tool_call whose
+ * `arguments` field was not valid JSON (e.g. raw patch text from an
+ * `apply_patch` tool), `unifiedMessageToAssistantMessage` called
+ * `JSON.parse(toolCall.function.arguments)` unconditionally and threw
+ * "JSON Parse error: Unable to parse JSON string", aborting the entire
+ * request transformation before it could reach the OAuth provider.
+ *
+ * Fix: Wrap the JSON.parse in a try/catch and fall back to
+ * `{ _raw: arguments }` so the message is preserved and the request
+ * can proceed.
+ */
+describe('unifiedToContext — non-JSON tool call arguments (regression)', () => {
+  test('raw patch text in tool call arguments does not throw', () => {
+    const request: UnifiedChatRequest = {
+      model: 'gpt-5.4',
+      messages: [
+        { role: 'user', content: 'fix my code' },
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            {
+              id: 'call_abc123',
+              type: 'function',
+              function: {
+                name: 'apply_patch',
+                // Raw patch text — not JSON
+                arguments:
+                  '*** Begin Patch\n*** Update File: src/foo.ts\n-old line\n+new line\n*** End Patch',
+              },
+            },
+          ],
+        },
+        { role: 'user', content: 'did it work?' },
+      ],
+    };
+
+    expect(() => unifiedToContext(request)).not.toThrow();
+  });
+
+  test('non-JSON arguments are wrapped in { _raw } and passed through', () => {
+    const rawPatch = '*** Begin Patch\n-old\n+new\n*** End Patch';
+    const request: UnifiedChatRequest = {
+      model: 'gpt-5.4',
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            {
+              id: 'call_xyz',
+              type: 'function',
+              function: { name: 'apply_patch', arguments: rawPatch },
+            },
+          ],
+        },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    const toolCallBlock = (assistantMsg.content as any[]).find((b: any) => b.type === 'toolCall');
+
+    expect(toolCallBlock).toBeDefined();
+    expect(toolCallBlock.arguments).toEqual({ _raw: rawPatch });
+  });
+
+  test('valid JSON arguments are still parsed normally', () => {
+    const request: UnifiedChatRequest = {
+      model: 'gpt-5.4',
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            {
+              id: 'call_ok',
+              type: 'function',
+              function: { name: 'some_tool', arguments: '{"key":"value","num":42}' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    const toolCallBlock = (assistantMsg.content as any[]).find((b: any) => b.type === 'toolCall');
+
+    expect(toolCallBlock.arguments).toEqual({ key: 'value', num: 42 });
+  });
+
+  test('multiple tool calls — bad arguments in one do not break others', () => {
+    const request: UnifiedChatRequest = {
+      model: 'gpt-5.4',
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            {
+              id: 'call_good',
+              type: 'function',
+              function: { name: 'good_tool', arguments: '{"x":1}' },
+            },
+            {
+              id: 'call_bad',
+              type: 'function',
+              function: { name: 'apply_patch', arguments: 'not json at all' },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(() => unifiedToContext(request)).not.toThrow();
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    const blocks = assistantMsg.content as any[];
+
+    const goodBlock = blocks.find((b: any) => b.name === 'good_tool');
+    const badBlock = blocks.find((b: any) => b.name === 'apply_patch');
+
+    expect(goodBlock.arguments).toEqual({ x: 1 });
+    expect(badBlock.arguments).toEqual({ _raw: 'not json at all' });
+  });
+});

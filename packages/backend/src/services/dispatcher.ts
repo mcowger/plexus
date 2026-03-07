@@ -44,8 +44,98 @@ interface ParseFailureContext {
   contentType?: string | null;
 }
 
+interface RetryHistoryLikeEntry {
+  reason?: unknown;
+}
+
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
+
+  private extractFailureReason(value: unknown): string | undefined {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return this.extractFailureReason(parsed) || trimmed;
+        } catch {
+          return trimmed;
+        }
+      }
+
+      return trimmed;
+    }
+
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+
+    const record = value as Record<string, unknown>;
+    const nestedError =
+      record.error && typeof record.error === 'object'
+        ? (record.error as Record<string, unknown>)
+        : undefined;
+    const nestedRoutingContext =
+      record.routingContext && typeof record.routingContext === 'object'
+        ? (record.routingContext as Record<string, unknown>)
+        : undefined;
+
+    const directCandidates = [
+      record.errorMessage,
+      nestedError?.errorMessage,
+      record.message,
+      nestedError?.message,
+      record.providerResponse,
+      record.rawResponseText,
+      nestedRoutingContext?.providerResponse,
+      nestedRoutingContext?.rawResponseText,
+    ];
+
+    for (const candidate of directCandidates) {
+      const extracted = this.extractFailureReason(candidate);
+      if (extracted) {
+        return extracted;
+      }
+    }
+
+    if (typeof record.retryHistory === 'string') {
+      try {
+        const parsed = JSON.parse(record.retryHistory) as RetryHistoryLikeEntry[];
+        for (let index = parsed.length - 1; index >= 0; index--) {
+          const extracted = this.extractFailureReason(parsed[index]?.reason);
+          if (extracted) {
+            return extracted;
+          }
+        }
+      } catch {
+        // Ignore malformed retry history strings.
+      }
+    }
+
+    return undefined;
+  }
+
+  private formatFailureReason(error: any, includeStatusCode = false): string {
+    const extracted =
+      this.extractFailureReason(error?.routingContext?.providerResponse) ||
+      this.extractFailureReason(error?.routingContext?.rawResponseText) ||
+      this.extractFailureReason(error?.piAiResponse) ||
+      this.extractFailureReason(error) ||
+      error?.message ||
+      'Unknown provider error';
+
+    const statusCode = error?.routingContext?.statusCode ?? error?.status ?? error?.statusCode;
+
+    if (includeStatusCode && typeof statusCode === 'number') {
+      return `HTTP ${statusCode}: ${extracted}`.slice(0, 500);
+    }
+
+    return String(extracted).slice(0, 500);
+  }
 
   private async recordAttemptMetric(
     route: RouteResult,
@@ -305,12 +395,7 @@ export class Dispatcher {
                   route.provider,
                   route.model,
                   undefined,
-                  e?.routingContext?.providerResponse
-                    ? `HTTP ${e.routingContext.statusCode}: ${e.routingContext.providerResponse}`.slice(
-                        0,
-                        500
-                      )
-                    : e.message
+                  this.formatFailureReason(e, true)
                 );
               }
               logger.warn(
@@ -348,7 +433,7 @@ export class Dispatcher {
                 route.provider,
                 route.model,
                 undefined,
-                error.message
+                this.formatFailureReason(error)
               );
               logger.warn(
                 `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
@@ -422,7 +507,7 @@ export class Dispatcher {
             route.provider,
             route.model,
             undefined,
-            error.message
+            this.formatFailureReason(error)
           );
         }
         await this.recordAttemptMetric(route, currentRequest.requestId, false, {
@@ -671,11 +756,7 @@ export class Dispatcher {
     retryable?: boolean
   ): void {
     const statusCode = error?.routingContext?.statusCode ?? error?.status ?? error?.statusCode;
-    const providerResponse =
-      error?.routingContext?.providerResponse ?? error?.routingContext?.rawResponseText;
-    const reason = providerResponse
-      ? String(providerResponse).slice(0, 500)
-      : error?.message || 'Unknown provider error';
+    const reason = this.formatFailureReason(error);
 
     retryHistory.push({
       index: retryHistory.length + 1,
@@ -733,7 +814,9 @@ export class Dispatcher {
         });
       }
 
-      const error = new Error('JSON Parse error: Unable to parse JSON string') as any;
+      const error = new Error(
+        responseText || 'JSON Parse error: Unable to parse JSON string'
+      ) as any;
       error.cause = cause;
       error.routingContext = {
         provider: route?.provider,
@@ -911,6 +994,121 @@ export class Dispatcher {
     return !!input && typeof input.getReader === 'function';
   }
 
+  private normalizeOAuthStream(result: any): ReadableStream<any> {
+    if (this.isReadableStream(result)) {
+      return result;
+    }
+
+    if (this.isAsyncIterable(result)) {
+      return this.streamFromAsyncIterable(result);
+    }
+
+    throw new Error('OAuth provider returned an unsupported stream type');
+  }
+
+  private buildOAuthStreamEventError(event: any): Error {
+    const message =
+      event?.error?.errorMessage ||
+      event?.errorMessage ||
+      event?.error?.message ||
+      event?.message ||
+      'OAuth provider error';
+
+    const error = new Error(message) as Error & { piAiResponse?: unknown };
+    error.piAiResponse = event;
+    return error;
+  }
+
+  private async probeOAuthStreamStart(
+    stream: ReadableStream<any>
+  ): Promise<
+    { ok: true; stream: ReadableStream<any> } | { ok: false; error: Error; streamStarted: boolean }
+  > {
+    const reader = stream.getReader();
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<{ timeout: true }>((resolve) => {
+      timeoutId = setTimeout(() => resolve({ timeout: true }), 100);
+    });
+
+    try {
+      const readResult = await Promise.race([reader.read(), timeoutPromise]);
+
+      if ((readResult as any).timeout) {
+        const passthrough = new ReadableStream<any>({
+          async pull(controller) {
+            try {
+              const next = await reader.read();
+              if (next.done) {
+                controller.close();
+              } else {
+                controller.enqueue(next.value);
+              }
+            } catch (error) {
+              controller.error(error);
+            }
+          },
+          cancel(reason) {
+            return reader.cancel(reason);
+          },
+        });
+
+        return { ok: true, stream: passthrough };
+      }
+
+      const first = readResult as ReadableStreamReadResult<any>;
+      if (first.done) {
+        return {
+          ok: true,
+          stream: new ReadableStream<any>({
+            start(controller) {
+              controller.close();
+            },
+          }),
+        };
+      }
+
+      if (first.value?.type === 'error' || first.value?.reason === 'error') {
+        return {
+          ok: false,
+          error: this.buildOAuthStreamEventError(first.value),
+          streamStarted: false,
+        };
+      }
+
+      const replay = new ReadableStream<any>({
+        start(controller) {
+          controller.enqueue(first.value);
+        },
+        async pull(controller) {
+          try {
+            const next = await reader.read();
+            if (next.done) {
+              controller.close();
+            } else {
+              controller.enqueue(next.value);
+            }
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+        cancel(reason) {
+          return reader.cancel(reason);
+        },
+      });
+
+      return { ok: true, stream: replay };
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+        streamStarted: false,
+      };
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   private describeStreamResult(result: any): Record<string, any> {
     return {
       isPromise: !!result && typeof result.then === 'function',
@@ -1005,21 +1203,19 @@ export class Dispatcher {
       );
 
       if (request.stream) {
-        let rawStream: ReadableStream<any>;
+        const rawStream = this.normalizeOAuthStream(result);
+        const streamProbe = await this.probeOAuthStreamStart(rawStream);
 
-        if (this.isReadableStream(result)) {
-          rawStream = result;
-        } else if (this.isAsyncIterable(result)) {
-          rawStream = this.streamFromAsyncIterable(result);
-        } else {
-          throw new Error('OAuth provider returned an unsupported stream type');
+        if (!streamProbe.ok) {
+          throw streamProbe.error;
         }
+
         logger.debug('OAuth: Normalized stream result', this.describeStreamResult(result));
         const streamResponse: UnifiedChatResponse = {
           id: 'stream-' + Date.now(),
           model: request.model,
           content: null,
-          stream: rawStream,
+          stream: streamProbe.stream,
           bypassTransformation: false,
         };
 
@@ -1055,8 +1251,10 @@ export class Dispatcher {
   }
 
   private wrapOAuthError(error: Error, route: RouteResult, targetApiType: string): Error {
-    const providerResponse = this.stringifyOAuthProviderResponse((error as any)?.piAiResponse);
+    const rawProviderResponse = this.stringifyOAuthProviderResponse((error as any)?.piAiResponse);
     const message = error?.message || 'OAuth provider error';
+    const providerResponse =
+      this.extractFailureReason((error as any)?.piAiResponse) || rawProviderResponse;
     const errorText = providerResponse || message;
     const isQuotaError = this.isQuotaExhaustedError(errorText);
     let statusCode = (error as any)?.status || (error as any)?.statusCode;
@@ -1091,6 +1289,8 @@ export class Dispatcher {
         : undefined;
 
     const enriched = new Error(message) as any;
+    enriched.status = statusCode;
+    enriched.statusCode = statusCode;
     enriched.routingContext = {
       provider: route.provider,
       oauthProvider: route.config.oauth_provider || route.provider,
@@ -1099,6 +1299,7 @@ export class Dispatcher {
       targetApiType,
       statusCode,
       providerResponse,
+      rawProviderResponse,
       cooldownTriggered,
       cooldownDuration,
     };
@@ -1158,12 +1359,7 @@ export class Dispatcher {
       return;
     }
 
-    const failureReason = oauthError?.routingContext?.providerResponse
-      ? `HTTP ${oauthError.routingContext.statusCode}: ${oauthError.routingContext.providerResponse}`.slice(
-          0,
-          500
-        )
-      : oauthError.message;
+    const failureReason = this.formatFailureReason(oauthError, true);
 
     await CooldownManager.getInstance().markProviderFailure(
       route.provider,
@@ -1659,12 +1855,7 @@ export class Dispatcher {
                   route.provider,
                   route.model,
                   undefined,
-                  e?.routingContext?.providerResponse
-                    ? `HTTP ${e.routingContext.statusCode}: ${e.routingContext.providerResponse}`.slice(
-                        0,
-                        500
-                      )
-                    : e.message
+                  this.formatFailureReason(e, true)
                 );
               }
               logger.warn(
@@ -1715,7 +1906,7 @@ export class Dispatcher {
             route.provider,
             route.model,
             undefined,
-            error.message
+            this.formatFailureReason(error)
           );
         }
         await this.recordAttemptMetric(route, request.requestId, false);
@@ -1858,12 +2049,7 @@ export class Dispatcher {
                   route.provider,
                   route.model,
                   undefined,
-                  e?.routingContext?.providerResponse
-                    ? `HTTP ${e.routingContext.statusCode}: ${e.routingContext.providerResponse}`.slice(
-                        0,
-                        500
-                      )
-                    : e.message
+                  this.formatFailureReason(e, true)
                 );
               }
               logger.warn(
@@ -1921,7 +2107,7 @@ export class Dispatcher {
             route.provider,
             route.model,
             undefined,
-            error.message
+            this.formatFailureReason(error)
           );
         }
         await this.recordAttemptMetric(route, request.requestId, false);
@@ -2063,12 +2249,7 @@ export class Dispatcher {
                   route.provider,
                   route.model,
                   undefined,
-                  e?.routingContext?.providerResponse
-                    ? `HTTP ${e.routingContext.statusCode}: ${e.routingContext.providerResponse}`.slice(
-                        0,
-                        500
-                      )
-                    : e.message
+                  this.formatFailureReason(e, true)
                 );
               }
               logger.warn(
@@ -2160,7 +2341,7 @@ export class Dispatcher {
             route.provider,
             route.model,
             undefined,
-            error.message
+            this.formatFailureReason(error)
           );
         }
         await this.recordAttemptMetric(route, request.requestId, false);
@@ -2302,12 +2483,7 @@ export class Dispatcher {
                   route.provider,
                   route.model,
                   undefined,
-                  e?.routingContext?.providerResponse
-                    ? `HTTP ${e.routingContext.statusCode}: ${e.routingContext.providerResponse}`.slice(
-                        0,
-                        500
-                      )
-                    : e.message
+                  this.formatFailureReason(e, true)
                 );
               }
               logger.warn(
@@ -2357,7 +2533,7 @@ export class Dispatcher {
             route.provider,
             route.model,
             undefined,
-            error.message
+            this.formatFailureReason(error)
           );
         }
         await this.recordAttemptMetric(route, request.requestId, false);
@@ -2497,12 +2673,7 @@ export class Dispatcher {
                   route.provider,
                   route.model,
                   undefined,
-                  e?.routingContext?.providerResponse
-                    ? `HTTP ${e.routingContext.statusCode}: ${e.routingContext.providerResponse}`.slice(
-                        0,
-                        500
-                      )
-                    : e.message
+                  this.formatFailureReason(e, true)
                 );
               }
               logger.warn(
@@ -2552,7 +2723,7 @@ export class Dispatcher {
             route.provider,
             route.model,
             undefined,
-            error.message
+            this.formatFailureReason(error)
           );
         }
         await this.recordAttemptMetric(route, request.requestId, false);
