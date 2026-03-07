@@ -192,9 +192,6 @@ interface LiveTabProps {
 // CONSTANTS
 //
 
-/** Maximum number of recent requests fetched from the API per poll cycle */
-
-const RECENT_REQUEST_LIMIT = 200;
 /** Available polling intervals shown as toggle buttons in the toolbar */
 const POLL_INTERVAL_OPTIONS = [5000, 10000, 30000] as const;
 /** Maximum number of distinct models shown in the model-stack chart */
@@ -876,7 +873,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
     try {
       const [dashboardData, logData] = await Promise.all([
         api.getDashboardData('day', false),
-        api.getLogs(RECENT_REQUEST_LIMIT, 0),
+        api.getLogs(fetchLimit, 0),
       ]);
       setStats(dashboardData.stats);
       setCooldowns(dashboardData.cooldowns);
@@ -949,6 +946,22 @@ export const LiveTab: React.FC<LiveTabProps> = ({
 
     return () => clearInterval(interval);
   }, [isVisible, pollIntervalMs]);
+
+  /**
+   * Calculate optimal fetch limit based on window size to prevent performance issues.
+   * For short windows, fetch more detailed data. For long windows, limit the data.
+   */
+  const fetchLimit = useMemo(() => {
+    if (liveWindowMinutes <= 30) {
+      return 500; // 30 minutes or less: fetch up to 500 records
+    } else if (liveWindowMinutes <= 24 * 60) {
+      return 200; // Up to 24 hours: fetch 200 records
+    } else if (liveWindowMinutes <= 7 * 24 * 60) {
+      return 100; // Up to 7 days: fetch 100 records
+    } else {
+      return 50; // More than 7 days: fetch only 50 records
+    }
+  }, [liveWindowMinutes]);
 
   /**
    * Concurrency data polling loop. Runs independently from the main data
@@ -1077,21 +1090,67 @@ export const LiveTab: React.FC<LiveTabProps> = ({
    * Buckets liveRequests into per-minute time slots for the timeline area chart.
    * Pre-creates empty buckets for every minute in the window to ensure the chart
    * always shows the full window range, even if some minutes have zero traffic.
+   *
+   * For windows > 1 hour, buckets are aggregated to prevent performance issues:
+   * - <= 30 minutes: 1-minute buckets
+   * - <= 24 hours: 5-minute buckets
+   * - <= 7 days: 1-hour buckets
+   * - > 7 days: 6-hour buckets
    */
   const minuteSeries = useMemo(() => {
     const buckets = new Map<string, MinuteBucket>();
     const now = Date.now();
 
-    for (let i = liveWindowMinutes - 1; i >= 0; i--) {
-      const bucketDate = new Date(now - i * 60000);
-      const key = bucketDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Determine bucket size based on window
+    const useMinuteBuckets = liveWindowMinutes <= 30;
+    const use5MinuteBuckets = liveWindowMinutes <= 24 * 60;
+    const useHourlyBuckets = liveWindowMinutes <= 7 * 24 * 60;
+
+    // Calculate bucket count and size
+    let bucketCount: number;
+    let bucketSizeMs: number;
+
+    if (useMinuteBuckets) {
+      bucketCount = liveWindowMinutes;
+      bucketSizeMs = 60000; // 1 minute
+    } else if (use5MinuteBuckets) {
+      bucketCount = Math.ceil(liveWindowMinutes / 5);
+      bucketSizeMs = 300000; // 5 minutes
+    } else if (useHourlyBuckets) {
+      bucketCount = Math.ceil(liveWindowMinutes / 60);
+      bucketSizeMs = 3600000; // 1 hour
+    } else {
+      bucketCount = Math.ceil(liveWindowMinutes / (60 * 6));
+      bucketSizeMs = 21600000; // 6 hours
+    }
+
+    // Limit maximum buckets to prevent rendering issues
+    const MAX_BUCKETS = 100;
+    if (bucketCount > MAX_BUCKETS) {
+      bucketCount = MAX_BUCKETS;
+      bucketSizeMs = Math.ceil(liveWindowMs / MAX_BUCKETS);
+    }
+
+    // Create empty buckets
+    for (let i = bucketCount - 1; i >= 0; i--) {
+      const bucketDate = new Date(now - i * bucketSizeMs);
+      const key = bucketDate.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: useMinuteBuckets || use5MinuteBuckets ? '2-digit' : undefined,
+        hour12: false,
+      });
       buckets.set(key, { time: key, requests: 0, errors: 0, tokens: 0 });
     }
 
+    // Assign requests to buckets based on bucket size
     for (const request of liveRequests) {
-      const key = new Date(request.date).toLocaleTimeString([], {
+      const requestTime = new Date(request.date).getTime();
+      const bucketIndex = Math.floor((now - requestTime) / bucketSizeMs);
+      const bucketDate = new Date(now - bucketIndex * bucketSizeMs);
+      const key = bucketDate.toLocaleTimeString([], {
         hour: '2-digit',
-        minute: '2-digit',
+        minute: useMinuteBuckets || use5MinuteBuckets ? '2-digit' : undefined,
+        hour12: false,
       });
       const bucket = buckets.get(key);
       if (!bucket) {
@@ -1143,9 +1202,41 @@ export const LiveTab: React.FC<LiveTabProps> = ({
     const buckets = new Map<string, ModelTimelineBucket>();
     const now = Date.now();
 
-    for (let i = liveWindowMinutes - 1; i >= 0; i--) {
-      const bucketDate = new Date(now - i * 60000);
-      const key = bucketDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Use same bucketing strategy as minuteSeries
+    const useMinuteBuckets = liveWindowMinutes <= 30;
+    const use5MinuteBuckets = liveWindowMinutes <= 24 * 60;
+    const useHourlyBuckets = liveWindowMinutes <= 7 * 24 * 60;
+
+    let bucketCount: number;
+    let bucketSizeMs: number;
+
+    if (useMinuteBuckets) {
+      bucketCount = liveWindowMinutes;
+      bucketSizeMs = 60000;
+    } else if (use5MinuteBuckets) {
+      bucketCount = Math.ceil(liveWindowMinutes / 5);
+      bucketSizeMs = 300000;
+    } else if (useHourlyBuckets) {
+      bucketCount = Math.ceil(liveWindowMinutes / 60);
+      bucketSizeMs = 3600000;
+    } else {
+      bucketCount = Math.ceil(liveWindowMinutes / (60 * 6));
+      bucketSizeMs = 21600000;
+    }
+
+    const MAX_BUCKETS = 100;
+    if (bucketCount > MAX_BUCKETS) {
+      bucketCount = MAX_BUCKETS;
+      bucketSizeMs = Math.ceil(liveWindowMs / MAX_BUCKETS);
+    }
+
+    for (let i = bucketCount - 1; i >= 0; i--) {
+      const bucketDate = new Date(now - i * bucketSizeMs);
+      const key = bucketDate.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: useMinuteBuckets || use5MinuteBuckets ? '2-digit' : undefined,
+        hour12: false,
+      });
       const bucket: ModelTimelineBucket = {
         time: key,
         requests: 0,
@@ -1165,10 +1256,15 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       buckets.set(key, bucket);
     }
 
+    // Assign requests to buckets based on bucket size
     for (const request of liveRequests) {
-      const key = new Date(request.date).toLocaleTimeString([], {
+      const requestTime = new Date(request.date).getTime();
+      const bucketIndex = Math.floor((now - requestTime) / bucketSizeMs);
+      const bucketDate = new Date(now - bucketIndex * bucketSizeMs);
+      const key = bucketDate.toLocaleTimeString([], {
         hour: '2-digit',
-        minute: '2-digit',
+        minute: useMinuteBuckets || use5MinuteBuckets ? '2-digit' : undefined,
+        hour12: false,
       });
       const bucket = buckets.get(key);
       if (!bucket) {
