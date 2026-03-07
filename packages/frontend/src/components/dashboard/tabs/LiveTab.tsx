@@ -32,6 +32,7 @@
 // IMPORTS -- React core
 //
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 //
 // IMPORTS -- Drag-and-Drop (@dnd-kit)
@@ -443,15 +444,43 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const infoButtonRef = useRef<HTMLButtonElement>(null);
+  const [popoverStyle, setPopoverStyle] = useState<{ top: number; right: number } | null>(null);
+
+  const updatePopoverPosition = useCallback(() => {
+    const button = infoButtonRef.current;
+    if (!button) {
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const popoverWidth = 288;
+    const gutter = 12;
+    const right = Math.max(gutter, viewportWidth - rect.right);
+    const clampedRight = Math.min(right, Math.max(gutter, viewportWidth - popoverWidth - gutter));
+
+    setPopoverStyle({
+      top: rect.bottom + 8,
+      right: clampedRight,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    updatePopoverPosition();
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+    window.addEventListener('resize', updatePopoverPosition);
+    window.addEventListener('scroll', updatePopoverPosition, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('resize', updatePopoverPosition);
+      window.removeEventListener('scroll', updatePopoverPosition, true);
+    };
+  }, [open, updatePopoverPosition]);
 
   return (
     <div
@@ -475,6 +504,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
           <X size={13} />
         </button>
         <button
+          ref={infoButtonRef}
           onClick={(e) => {
             e.stopPropagation();
             setOpen((v) => !v);
@@ -484,36 +514,43 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
         >
           <Info size={13} />
         </button>
-        {open && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="absolute right-0 top-5 z-50 w-72 rounded-md border border-border shadow-lg p-3 text-xs space-y-2"
-            style={{ backgroundColor: 'rgb(15, 23, 42)' }}
-          >
-            <div className="flex items-center gap-1.5 font-semibold text-warning">
-              <AlertTriangle size={12} />
-              Cooldown Details
-            </div>
-            {lastError && (
-              <div>
-                <span className="text-text-muted font-medium">Error:</span>
-                <p className="mt-0.5 text-text wrap-break-word whitespace-pre-wrap font-mono text-[11px] bg-bg-hover rounded p-1.5 max-h-32 overflow-y-auto">
-                  {lastError}
-                </p>
-              </div>
-            )}
-            {consecutiveFailures !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">Consecutive failures</span>
-                <span className="font-semibold text-danger">{consecutiveFailures}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-text-muted">Expires at</span>
-              <span className="font-semibold text-text">{expiryStr}</span>
-            </div>
-          </div>
-        )}
+        {open && popoverStyle && typeof document !== 'undefined'
+          ? createPortal(
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="fixed z-100 w-72 rounded-md border border-border shadow-lg p-3 text-xs space-y-2"
+                style={{
+                  backgroundColor: 'rgb(15, 23, 42)',
+                  top: popoverStyle.top,
+                  right: popoverStyle.right,
+                }}
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-warning">
+                  <AlertTriangle size={12} />
+                  Cooldown Details
+                </div>
+                {lastError && (
+                  <div>
+                    <span className="text-text-muted font-medium">Error:</span>
+                    <p className="mt-0.5 text-text wrap-break-word whitespace-pre-wrap font-mono text-[11px] bg-bg-hover rounded p-1.5 max-h-32 overflow-y-auto">
+                      {lastError}
+                    </p>
+                  </div>
+                )}
+                {consecutiveFailures !== undefined && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-text-muted">Consecutive failures</span>
+                    <span className="font-semibold text-danger">{consecutiveFailures}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-3">
+                  <span className="text-text-muted">Expires at</span>
+                  <span className="font-semibold text-text text-right">{expiryStr}</span>
+                </div>
+              </div>,
+              document.body
+            )
+          : null}
       </div>
     </div>
   );
