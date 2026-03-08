@@ -521,4 +521,116 @@ export class RequestShaper {
     return this.targets.size;
   }
 
+
+  /**
+   * Acquire a permit for the given provider/model.
+   * Main API for dispatcher integration.
+   *
+   * - If budget available: consume immediately, return immediate result
+   * - If budget exhausted and queue not full: enqueue, return promise
+   * - If queue full: reject immediately with QueueFullError
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns Promise resolving to QueueResult
+   * @throws QueueFullError if queue is full
+   */
+  async acquirePermit(provider: string, model: string, alias?: string): Promise<QueueResult> {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+
+    // Not shaped = no queueing needed, return immediate
+    if (!target) {
+      return { type: 'immediate' };
+    }
+
+    // Refill budget if needed before checking
+    this.refillBudgetIfNeeded(key);
+
+    // Budget available: consume and return immediately
+    if (target.currentBudget > 0) {
+      target.currentBudget--;
+      this.persistToPersistence(target).catch((error) => {
+        logger.debug(`[RequestShaper] Failed to persist budget change: ${error}`);
+      });
+      return { type: 'immediate' };
+    }
+
+    // Budget exhausted: try to queue
+    const queueDepth = target.queueDepth ?? 10;
+    if (target.queue.length >= queueDepth) {
+      target.dropCount++;
+      logger.debug(`[RequestShaper] Dropped request for ${key} because queue is full`);
+      throw new QueueFullError(provider, model, queueDepth);
+    }
+
+    // Create waiter entry
+    const now = Date.now();
+    const waiter: QueueWaiter = {
+      id: `${key}:${now}:${Math.random().toString(36).slice(2, 9)}`,
+      enqueueTime: now,
+      timeoutAt: now + target.queueTimeoutMs,
+      resolve: () => {},
+      reject: () => {},
+    };
+
+    // Create promise that resolves when admitted or times out
+    const promise = new Promise<QueueResult>((resolve, reject) => {
+      waiter.resolve = resolve;
+      waiter.reject = reject;
+    });
+
+    // Add to queue
+    target.queue.push(waiter);
+    target.currentQueueDepth = target.queue.length;
+
+    logger.debug(
+      `[RequestShaper] Queued request ${waiter.id} for ${key} (queue depth: ${target.queue.length})`
+    );
+
+    return promise;
+  }
+
+  /**
+   * Release a permit back to the budget.
+   * Called after request completes (success or failure).
+   *
+   * - Increments currentBudget (capped at maxBudget)
+   * - If queue has waiters: dequeue next and resolve its promise
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   */
+  releasePermit(provider: string, model: string, alias?: string): void {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+
+    // Not shaped = no-op
+    if (!target) {
+      return;
+    }
+
+    // Increment budget (capped at maxBudget)
+    target.currentBudget = Math.min(target.maxBudget, target.currentBudget + 1);
+
+    // If queue has waiters, admit the next one (FIFO)
+    this.admitNextIfAvailable(key);
+  }
+
+  /**
+   * Get current queue depth for a provider/model.
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns Current queue size (0 if not shaped)
+   */
+  getQueueDepth(provider: string, model: string, alias?: string): number {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+    if (!target) {
+      return 0;
+    }
+    return target.queue.length;
+  }
+
 }
