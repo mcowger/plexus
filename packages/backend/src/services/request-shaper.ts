@@ -350,4 +350,175 @@ export class RequestShaper {
   }
 
 
+  /**
+   * Get status for a specific provider/model.
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns Status or null if not shaped
+   */
+  getStatus(provider: string, model: string, alias?: string): ShaperTargetStatus | null {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+    if (!target) {
+      return null;
+    }
+    this.refillBudgetIfNeeded(key);
+    return this.toStatus(target);
+  }
+
+  /**
+   * Get status for all shaped targets.
+   */
+  getAllStatus(): ShaperStatus {
+    const targets: ShaperTargetStatus[] = [];
+    for (const [key, target] of this.targets.entries()) {
+      this.refillBudgetIfNeeded(key);
+      targets.push(this.toStatus(target));
+    }
+    return {
+      totalTargets: targets.length,
+      targets,
+    };
+  }
+
+  /**
+   * Check if a provider/model is being shaped.
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   */
+  isShaped(provider: string, model: string, alias?: string): boolean {
+    const key = this.resolveLookupKey(provider, model, alias);
+    return this.targets.has(key);
+  }
+
+  /**
+   * Check if a request can be dispatched now (budget available).
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns true if budget is available
+   */
+  canDispatchNow(provider: string, model: string, alias?: string): boolean {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+    if (!target) {
+      return true; // Not shaped = always allow
+    }
+
+    this.refillBudgetIfNeeded(key);
+    return target.currentBudget > 0;
+  }
+
+  /**
+   * Attempt to consume 1 permit from the budget.
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns true if permit was consumed, false if no budget available
+   */
+  consumeBudget(provider: string, model: string, alias?: string): boolean {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+    if (!target) {
+      return true; // Not shaped = always allow (no-op)
+    }
+
+    this.refillBudgetIfNeeded(key);
+
+    if (target.currentBudget > 0) {
+      target.currentBudget--;
+      this.persistToPersistence(target).catch((error) => {
+        logger.debug(`[RequestShaper] Failed to persist budget change: ${error}`);
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Get remaining budget (permits available now).
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns Current available permits (0 if not shaped)
+   */
+  getRemainingBudget(provider: string, model: string, alias?: string): number {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+    if (!target) {
+      return 0; // Not shaped = no budget tracking
+    }
+
+    this.refillBudgetIfNeeded(key);
+    return target.currentBudget;
+  }
+
+  /**
+   * Calculate milliseconds until next permit is available.
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns Milliseconds to wait (0 if budget available now)
+   */
+  getWaitTimeMs(provider: string, model: string, alias?: string): number {
+    const key = this.resolveLookupKey(provider, model, alias);
+    const target = this.targets.get(key);
+    if (!target) {
+      return 0; // Not shaped = no wait
+    }
+
+    const now = Date.now();
+    this.refillBudgetIfNeeded(key, now);
+
+    // If budget is available now, no wait needed
+    if (target.currentBudget > 0) {
+      return 0;
+    }
+
+    // Calculate time until next permit is available
+    const msPerPermit = 60000 / target.requestsPerMinute;
+    const timeSinceLastRefill = now - target.lastRefillAt;
+    const timeUntilNext = msPerPermit - (timeSinceLastRefill % msPerPermit);
+
+    return Math.ceil(timeUntilNext);
+  }
+
+  /**
+   * Lazily refill budget based on elapsed time since last refill.
+   * Uses token bucket algorithm with lazy refill on access.
+   *
+   * @param key - Shaper key (provider:model)
+   * @param now - Optional timestamp for testing (defaults to Date.now())
+   */
+  refillBudgetIfNeeded(key: string, now?: number): void {
+    const target = this.targets.get(key);
+    if (!target) {
+      return;
+    }
+
+    const currentTime = now ?? Date.now();
+    const elapsedMs = currentTime - target.lastRefillAt;
+
+    // Calculate how many tokens to add based on elapsed time
+    // Refill rate: rpm tokens per 60 seconds = 1 token per (60000 / rpm) ms
+    const msPerPermit = 60000 / target.requestsPerMinute;
+    const tokensToAdd = Math.floor(elapsedMs / msPerPermit);
+
+    if (tokensToAdd > 0) {
+      target.currentBudget = Math.min(target.maxBudget, target.currentBudget + tokensToAdd);
+      // Update lastRefillAt to reflect only the time consumed for whole tokens
+      target.lastRefillAt = target.lastRefillAt + tokensToAdd * msPerPermit;
+    }
+  }
+
+  /**
+   * Get the total count of shaped targets.
+   */
+  getShapedCount(): number {
+    return this.targets.size;
+  }
+
 }
