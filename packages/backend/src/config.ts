@@ -901,6 +901,8 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'wisdomgate',
   'apertis',
   'poe',
+  'gemini-cli',
+  'antigravity',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];
