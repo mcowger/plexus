@@ -182,6 +182,19 @@ export interface ProviderPerformanceData {
   last_updated: number;
 }
 
+export interface RateLimitConfig {
+  requestsPerMinute?: number;
+  queueDepth?: number;
+  queueTimeoutMs?: number;
+}
+
+export interface ProviderModelConfig {
+  pricing?: Record<string, any>;
+  access_via?: string[];
+  type?: 'chat' | 'responses' | 'embeddings' | 'transcriptions' | 'speech' | 'image';
+  rateLimit?: RateLimitConfig;
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -196,7 +209,8 @@ export interface Provider {
   discount?: number;
   headers?: Record<string, string>;
   extraBody?: Record<string, any>;
-  models?: string[] | Record<string, any>;
+  models?: string[] | Record<string, ProviderModelConfig>;
+  rateLimit?: RateLimitConfig;
   quotaChecker?: {
     type?: string;
     enabled: boolean;
@@ -244,6 +258,119 @@ export interface Model {
   providerId: string;
   pricingSource?: string;
   type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
+  rateLimit?: RateLimitConfig;
+}
+
+export interface ShaperRateLimitStatus {
+  provider: string;
+  model: string;
+  queueDepth: number;
+  currentBudget: number;
+  requestsPerMinute: number;
+  oldestWaitMs: number | null;
+  waitersCount: number;
+  timeoutCount: number;
+  dropCount: number;
+}
+
+export interface ShaperRateLimitSummary {
+  activeLimiters: number;
+  totalQueueDepth: number;
+  totalWaitersCount: number;
+  oldestWaitMs: number | null;
+  totalTimeoutCount: number;
+  totalDropCount: number;
+}
+
+export interface ShaperRateLimitsResponse {
+  rateLimits: ShaperRateLimitStatus[];
+  summary: ShaperRateLimitSummary;
+  timestamp: string;
+}
+
+function normalizeRateLimitConfig(rateLimit?: any): RateLimitConfig | undefined {
+  if (!rateLimit || typeof rateLimit !== 'object') return undefined;
+
+  return {
+    requestsPerMinute:
+      typeof rateLimit.requests_per_minute === 'number' ? rateLimit.requests_per_minute : undefined,
+    queueDepth: typeof rateLimit.queue_depth === 'number' ? rateLimit.queue_depth : undefined,
+    queueTimeoutMs:
+      typeof rateLimit.queue_timeout_ms === 'number' ? rateLimit.queue_timeout_ms : undefined,
+  };
+}
+
+function serializeRateLimitConfig(rateLimit?: RateLimitConfig): Record<string, number> | undefined {
+  if (!rateLimit) return undefined;
+
+  const serialized: Record<string, number> = {};
+
+  if (
+    typeof rateLimit.requestsPerMinute === 'number' &&
+    Number.isFinite(rateLimit.requestsPerMinute)
+  ) {
+    serialized.requests_per_minute = rateLimit.requestsPerMinute;
+  }
+  if (typeof rateLimit.queueDepth === 'number' && Number.isFinite(rateLimit.queueDepth)) {
+    serialized.queue_depth = rateLimit.queueDepth;
+  }
+  if (typeof rateLimit.queueTimeoutMs === 'number' && Number.isFinite(rateLimit.queueTimeoutMs)) {
+    serialized.queue_timeout_ms = rateLimit.queueTimeoutMs;
+  }
+
+  return Object.keys(serialized).length > 0 ? serialized : undefined;
+}
+
+function normalizeProviderModels(
+  models?: string[] | Record<string, any>
+): Record<string, ProviderModelConfig> | undefined {
+  if (!models) return undefined;
+
+  if (Array.isArray(models)) {
+    return models.reduce(
+      (acc, modelName) => {
+        acc[modelName] = {};
+        return acc;
+      },
+      {} as Record<string, ProviderModelConfig>
+    );
+  }
+
+  return Object.fromEntries(
+    Object.entries(models).map(([modelName, modelConfig]) => [
+      modelName,
+      {
+        ...modelConfig,
+        rateLimit: normalizeRateLimitConfig(modelConfig?.rate_limit),
+      },
+    ])
+  );
+}
+
+function serializeProviderModels(
+  models?: string[] | Record<string, ProviderModelConfig>
+): Record<string, any> | undefined {
+  if (!models) return undefined;
+
+  if (Array.isArray(models)) {
+    return models.reduce(
+      (acc, modelName) => {
+        acc[modelName] = {};
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+  }
+
+  return Object.fromEntries(
+    Object.entries(models).map(([modelName, modelConfig]) => [
+      modelName,
+      {
+        ...modelConfig,
+        rate_limit: serializeRateLimitConfig(modelConfig?.rateLimit),
+      },
+    ])
+  );
 }
 
 // ─── Alias advanced behaviors ────────────────────────────────
@@ -636,7 +763,9 @@ const formatBucketLabel = (range: 'hour' | 'day' | 'week' | 'month', date: Date)
 };
 
 const buildSummarySeries = (summary: UsageSummaryResponse, now: Date): UsageData[] => {
-  const { buckets, step } = getUsageRangeConfig(summary.range, now);
+  const normalizedRange: 'hour' | 'day' | 'week' | 'month' =
+    summary.range === 'custom' ? 'day' : summary.range;
+  const { buckets, step } = getUsageRangeConfig(normalizedRange, now);
   const grouped: Record<string, UsageData> = {};
   const stepMs = step;
   const alignedNowMs = Math.floor(now.getTime() / stepMs) * stepMs;
@@ -646,7 +775,7 @@ const buildSummarySeries = (summary: UsageSummaryResponse, now: Date): UsageData
   for (let i = 0; i <= buckets; i++) {
     const bucketStartMs = startMs + i * stepMs;
     const bucketDate = new Date(bucketStartMs);
-    const label = formatBucketLabel(summary.range, bucketDate);
+    const label = formatBucketLabel(normalizedRange, bucketDate);
     const point = byBucket.get(bucketStartMs);
     const inputTokens = point?.inputTokens || 0;
     const outputTokens = point?.outputTokens || 0;
@@ -803,6 +932,11 @@ interface PlexusConfig {
       discount?: number;
       headers?: Record<string, string>;
       extraBody?: Record<string, any>;
+      rate_limit?: {
+        requests_per_minute?: number;
+        queue_depth?: number;
+        queue_timeout_ms?: number;
+      };
       quota_checker?: {
         type?: string;
         enabled?: boolean;
@@ -1505,17 +1639,7 @@ export const api = {
       if (!config.providers) return [];
 
       return Object.entries(config.providers).map(([key, val]) => {
-        // Normalize models array format to object format
-        let normalizedModels = val.models;
-        if (Array.isArray(val.models)) {
-          normalizedModels = val.models.reduce(
-            (acc, modelName) => {
-              acc[modelName] = {};
-              return acc;
-            },
-            {} as Record<string, any>
-          );
-        }
+        const normalizedModels = normalizeProviderModels(val.models);
 
         // Infer type from api_base_url if not explicitly provided
         const inferredTypes = val.type || inferProviderTypes(val.api_base_url);
@@ -1535,6 +1659,7 @@ export const api = {
           headers: val.headers,
           extraBody: val.extraBody,
           models: normalizedModels,
+          rateLimit: normalizeRateLimitConfig(val.rate_limit),
           quotaChecker: normalizeProviderQuotaChecker(val.quota_checker),
         };
       });
@@ -1579,7 +1704,8 @@ export const api = {
         disable_cooldown: p.disableCooldown === true ? true : undefined,
         headers: p.headers,
         extraBody: p.extraBody,
-        models: p.models,
+        models: serializeProviderModels(p.models),
+        rate_limit: serializeRateLimitConfig(p.rateLimit),
         quota_checker: p.quotaChecker?.type
           ? {
               type: p.quotaChecker.type,
@@ -1633,7 +1759,8 @@ export const api = {
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,
-      models: provider.models,
+      models: serializeProviderModels(provider.models),
+      rate_limit: serializeRateLimitConfig(provider.rateLimit),
       enabled: provider.enabled,
       quota_checker: provider.quotaChecker?.type
         ? {
@@ -1782,6 +1909,7 @@ export const api = {
                   providerId: pKey,
                   pricingSource: mVal.pricing?.source,
                   type: mVal.type,
+                  rateLimit: normalizeRateLimitConfig(mVal.rate_limit),
                 });
               });
             }
@@ -1849,6 +1977,17 @@ export const api = {
       console.error('API Error getAliases', e);
       return [];
     }
+  },
+
+  getRateLimits: async (): Promise<ShaperRateLimitsResponse> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/rate-limits`);
+    if (!res.ok) throw new Error('Failed to fetch request shaper status');
+
+    const data = (await res.json()) as ShaperRateLimitsResponse;
+    return {
+      ...data,
+      timestamp: toIsoString(data.timestamp) ?? new Date(0).toISOString(),
+    };
   },
 
   getDebugLogs: async (

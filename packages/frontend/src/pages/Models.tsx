@@ -2,12 +2,14 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { api, Alias, AliasMetadata, AliasBehavior, Provider, Model } from '../lib/api';
 import { useModels } from '../hooks/useModels';
+import { formatDuration } from '../lib/format';
 import { AliasTableRow } from '../components/models/AliasTableRow';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
+import { Tooltip } from '../components/ui/Tooltip';
 import {
   Search,
   Plus,
@@ -23,6 +25,7 @@ import {
   GripVertical,
   Save,
   Eye,
+  Info,
 } from 'lucide-react';
 
 export const Models = () => {
@@ -188,6 +191,34 @@ export const Models = () => {
     const newTargets = [...editingAlias.targets];
     newTargets.splice(index, 1);
     setEditingAlias({ ...editingAlias, targets: newTargets });
+  };
+
+  const describeTrafficLimit = (providerId: string, modelId: string) => {
+    const provider = providers.find((entry) => entry.id === providerId);
+    if (!provider || !modelId || !provider.models || Array.isArray(provider.models)) return null;
+
+    const modelConfig = provider.models[modelId];
+    const effectiveRateLimit = modelConfig?.rateLimit ?? provider.rateLimit;
+    if (!effectiveRateLimit?.requestsPerMinute) return null;
+
+    const parts = [`${effectiveRateLimit.requestsPerMinute} request(s) each minute`];
+
+    if (effectiveRateLimit.queueDepth) {
+      parts.push(`${effectiveRateLimit.queueDepth} can wait in line`);
+    }
+
+    if (effectiveRateLimit.queueTimeoutMs) {
+      parts.push(
+        `waiting up to ${formatDuration(Math.round(effectiveRateLimit.queueTimeoutMs / 1000))}`
+      );
+    }
+
+    return {
+      source: modelConfig?.rateLimit
+        ? 'This target has its own traffic limit.'
+        : 'This target uses the provider default traffic limit.',
+      summary: parts.join(' - '),
+    };
   };
 
   const handleOpenAutoAdd = () => {
@@ -934,6 +965,7 @@ export const Models = () => {
               {editingAlias.targets.map((target, idx) => {
                 const isDragging = dragSourceIndex === idx;
                 const isDragOver = dragOverIndex === idx && !isDragging;
+                const trafficLimit = describeTrafficLimit(target.provider, target.model);
 
                 return (
                   <div
@@ -945,9 +977,10 @@ export const Models = () => {
                     onDrop={(e) => handleDrop(e, idx)}
                     style={{
                       display: 'flex',
+                      flexDirection: 'column',
                       gap: '6px',
-                      alignItems: 'center',
-                      padding: '4px 8px',
+                      alignItems: 'stretch',
+                      padding: '6px 8px',
                       backgroundColor: isDragging
                         ? 'transparent'
                         : isDragOver
@@ -986,121 +1019,151 @@ export const Models = () => {
                         }}
                       />
                     )}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        color: 'var(--color-text-secondary)',
-                        opacity: 0.8,
-                        marginRight: '4px',
-                        visibility: isDragging ? 'hidden' : 'visible',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveTarget(idx, 'up');
-                        }}
-                        disabled={idx === 0}
-                        className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <div
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px',
-                          cursor: idx === 0 ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: 'var(--color-text-secondary)',
+                          opacity: 0.8,
+                          marginRight: '4px',
+                          visibility: isDragging ? 'hidden' : 'visible',
                         }}
-                        title="Move Up"
                       >
-                        <ChevronUp size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveTarget(idx, 'down');
-                        }}
-                        disabled={idx === editingAlias.targets.length - 1}
-                        className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveTarget(idx, 'up');
+                          }}
+                          disabled={idx === 0}
+                          className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: idx === 0 ? 'default' : 'pointer',
+                          }}
+                          title="Move Up"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveTarget(idx, 'down');
+                          }}
+                          disabled={idx === editingAlias.targets.length - 1}
+                          className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: idx === editingAlias.targets.length - 1 ? 'default' : 'pointer',
+                          }}
+                          title="Move Down"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
+                      <div
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px',
-                          cursor: idx === editingAlias.targets.length - 1 ? 'default' : 'pointer',
+                          cursor: 'grab',
+                          color: 'var(--color-text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          visibility: isDragging ? 'hidden' : 'visible',
                         }}
-                        title="Move Down"
                       >
-                        <ChevronDown size={16} />
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        cursor: 'grab',
-                        color: 'var(--color-text-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        visibility: isDragging ? 'hidden' : 'visible',
-                      }}
-                    >
-                      <GripVertical size={16} />
-                    </div>
-                    <div
-                      style={{
-                        flex: '0 0 120px',
-                        maxWidth: '120px',
-                        visibility: isDragging ? 'hidden' : 'visible',
-                      }}
-                    >
-                      <select
-                        className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                        style={{ padding: '4px 8px', height: '28px' }}
-                        value={target.provider}
-                        onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
+                        <GripVertical size={16} />
+                      </div>
+                      <div
+                        style={{
+                          flex: '0 0 120px',
+                          maxWidth: '120px',
+                          visibility: isDragging ? 'hidden' : 'visible',
+                        }}
                       >
-                        <option value="">Select Provider...</option>
-                        {providers.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ flex: 1, visibility: isDragging ? 'hidden' : 'visible' }}>
-                      <select
-                        className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                        style={{ padding: '4px 8px', height: '28px' }}
-                        value={target.model}
-                        onChange={(e) => updateTarget(idx, 'model', e.target.value)}
-                        disabled={!target.provider}
-                      >
-                        <option value="">Select Model...</option>
-                        {availableModels
-                          .filter((m) => m.providerId === target.provider)
-                          .map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name}
+                        <select
+                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                          style={{ padding: '4px 8px', height: '28px' }}
+                          value={target.provider}
+                          onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
+                        >
+                          <option value="">Select Provider...</option>
+                          {providers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
                             </option>
                           ))}
-                      </select>
+                        </select>
+                      </div>
+                      <div style={{ flex: 1, visibility: isDragging ? 'hidden' : 'visible' }}>
+                        <select
+                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                          style={{ padding: '4px 8px', height: '28px' }}
+                          value={target.model}
+                          onChange={(e) => updateTarget(idx, 'model', e.target.value)}
+                          disabled={!target.provider}
+                        >
+                          <option value="">Select Model...</option>
+                          {availableModels
+                            .filter((m) => m.providerId === target.provider)
+                            .map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
+                        <Switch
+                          checked={target.enabled !== false}
+                          onChange={(val) => updateTarget(idx, 'enabled', val)}
+                          size="sm"
+                        />
+                      </div>
+                      <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeTarget(idx)}
+                          style={{
+                            color: 'var(--color-danger)',
+                            padding: '4px',
+                            minHeight: 'auto',
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
                     </div>
-                    <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
-                      <Switch
-                        checked={target.enabled !== false}
-                        onChange={(val) => updateTarget(idx, 'enabled', val)}
-                        size="sm"
-                      />
-                    </div>
-                    <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeTarget(idx)}
-                        style={{ color: 'var(--color-danger)', padding: '4px', minHeight: 'auto' }}
+                    {trafficLimit && !isDragging && (
+                      <div
+                        className="font-body text-[11px] text-text-secondary"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          paddingLeft: '68px',
+                        }}
                       >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
+                        <Tooltip content={trafficLimit.source} position="bottom">
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              color: 'var(--color-primary)',
+                            }}
+                          >
+                            <Info size={12} />
+                          </span>
+                        </Tooltip>
+                        <span>Traffic limit: {trafficLimit.summary}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

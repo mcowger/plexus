@@ -3,6 +3,7 @@ import {
   api,
   Provider,
   OAuthSession,
+  RateLimitConfig,
   initQuotaCheckerTypes,
   getQuotaCheckerTypes,
 } from '../lib/api';
@@ -150,6 +151,24 @@ const EMPTY_PROVIDER: Provider = {
   headers: {},
   extraBody: {},
   models: {},
+};
+
+const updateRateLimitField = (
+  current: RateLimitConfig | undefined,
+  field: keyof RateLimitConfig,
+  rawValue: string,
+  multiplier: number = 1
+): RateLimitConfig | undefined => {
+  const next = { ...(current || {}) };
+
+  if (rawValue.trim() === '') {
+    delete next[field];
+  } else {
+    const parsed = Math.max(1, parseInt(rawValue, 10) || 1) * multiplier;
+    next[field] = parsed;
+  }
+
+  return Object.keys(next).length > 0 ? next : undefined;
 };
 
 interface FetchedModel {
@@ -749,6 +768,25 @@ export const Providers = () => {
   const updateModelConfig = (modelId: string, updates: any) => {
     const models = { ...(editingProvider.models as Record<string, any>) };
     models[modelId] = { ...models[modelId], ...updates };
+    setEditingProvider({ ...editingProvider, models });
+  };
+
+  const updateProviderRateLimit = (field: keyof RateLimitConfig, value: string) => {
+    setEditingProvider({
+      ...editingProvider,
+      rateLimit: updateRateLimitField(editingProvider.rateLimit, field, value),
+    });
+  };
+
+  const updateModelRateLimit = (modelId: string, field: keyof RateLimitConfig, value: string) => {
+    const models = { ...(editingProvider.models as Record<string, any>) };
+    const currentModel = models[modelId] || {};
+
+    models[modelId] = {
+      ...currentModel,
+      rateLimit: updateRateLimitField(currentModel.rateLimit, field, value),
+    };
+
     setEditingProvider({ ...editingProvider, models });
   };
 
@@ -1436,6 +1474,59 @@ export const Providers = () => {
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
+              <label className="font-body text-[13px] font-medium text-text-secondary">
+                Traffic Limits (Provider Defaults)
+              </label>
+              <div className="text-[11px] text-text-secondary italic mt-1">
+                Use these only for slower providers. Plexus will spread requests over time instead
+                of sending too many at once. Model-specific settings below win when both are set.
+              </div>
+              <div className="grid gap-3 grid-cols-3 mt-3">
+                <Input
+                  label="Requests allowed each minute"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="leave blank for none"
+                  value={editingProvider.rateLimit?.requestsPerMinute ?? ''}
+                  onChange={(e) => updateProviderRateLimit('requestsPerMinute', e.target.value)}
+                />
+                <Input
+                  label="How many can wait in line"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="leave blank for default"
+                  value={editingProvider.rateLimit?.queueDepth ?? ''}
+                  onChange={(e) => updateProviderRateLimit('queueDepth', e.target.value)}
+                />
+                <Input
+                  label="How long one can wait in line (seconds)"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="30"
+                  value={
+                    editingProvider.rateLimit?.queueTimeoutMs
+                      ? Math.round(editingProvider.rateLimit.queueTimeoutMs / 1000)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    setEditingProvider({
+                      ...editingProvider,
+                      rateLimit: updateRateLimitField(
+                        editingProvider.rateLimit,
+                        'queueTimeoutMs',
+                        e.target.value,
+                        1000
+                      ),
+                    })
+                  }
+                />
+              </div>
             </div>
 
             {/* Right: Quota Checker */}
@@ -2297,6 +2388,71 @@ export const Providers = () => {
                                   <option value="defined">Ranges (Complex)</option>
                                   <option value="per_request">Per Request (Flat Fee)</option>
                                 </select>
+                              </div>
+                              <div
+                                className="grid gap-4 grid-cols-3"
+                                style={{
+                                  background: 'var(--color-bg-subtle)',
+                                  padding: '12px',
+                                  borderRadius: 'var(--radius-sm)',
+                                }}
+                              >
+                                <Input
+                                  label="Requests allowed each minute"
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  placeholder={
+                                    editingProvider.rateLimit?.requestsPerMinute
+                                      ? 'uses provider default'
+                                      : 'leave blank for none'
+                                  }
+                                  value={mCfg.rateLimit?.requestsPerMinute ?? ''}
+                                  onChange={(e) =>
+                                    updateModelRateLimit(mId, 'requestsPerMinute', e.target.value)
+                                  }
+                                />
+                                <Input
+                                  label="How many can wait in line"
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  placeholder={
+                                    editingProvider.rateLimit?.queueDepth
+                                      ? 'uses provider default'
+                                      : 'leave blank for default'
+                                  }
+                                  value={mCfg.rateLimit?.queueDepth ?? ''}
+                                  onChange={(e) =>
+                                    updateModelRateLimit(mId, 'queueDepth', e.target.value)
+                                  }
+                                />
+                                <Input
+                                  label="How long one can wait in line (seconds)"
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  placeholder={
+                                    editingProvider.rateLimit?.queueTimeoutMs
+                                      ? 'uses provider default'
+                                      : '30'
+                                  }
+                                  value={
+                                    mCfg.rateLimit?.queueTimeoutMs
+                                      ? Math.round(mCfg.rateLimit.queueTimeoutMs / 1000)
+                                      : ''
+                                  }
+                                  onChange={(e) =>
+                                    updateModelConfig(mId, {
+                                      rateLimit: updateRateLimitField(
+                                        mCfg.rateLimit,
+                                        'queueTimeoutMs',
+                                        e.target.value,
+                                        1000
+                                      ),
+                                    })
+                                  }
+                                />
                               </div>
                               {mCfg.type !== 'embeddings' &&
                                 mCfg.type !== 'transcriptions' &&
