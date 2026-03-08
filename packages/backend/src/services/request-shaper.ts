@@ -159,4 +159,195 @@ export class RequestShaper {
     return RequestShaper.instance;
   }
 
+  /**
+   * Initialize the shaper service from configuration.
+   * Must be called after database and config are ready.
+   *
+   * @param config - The loaded Plexus configuration
+   */
+  async initialize(config: PlexusConfig): Promise<void> {
+    if (this.initialized) {
+      logger.warn('[RequestShaper] Already initialized, skipping');
+      return;
+    }
+
+    logger.info('[RequestShaper] Initializing...');
+
+    // Store runtime config for defaults
+    this.runtimeConfig = config.shaper;
+
+    // Discover shaped targets from provider configurations
+    const shapedTargets = this.discoverShapedTargets(config);
+
+    if (shapedTargets.length === 0) {
+      logger.info('[RequestShaper] No providers with rate_limit configured, service is no-op');
+      this.initialized = true;
+      return;
+    }
+
+    // Initialize each target (optionally hydrating from persistence)
+    for (const target of shapedTargets) {
+      await this.initializeTarget(target);
+    }
+
+    // Start cleanup timer for stale queue entries
+    this.startCleanupTimer();
+
+    this.initialized = true;
+    logger.info(`[RequestShaper] Initialized with ${this.targets.size} shaped target(s)`);
+  }
+
+  /**
+   * Reload configuration, safely adding/removing shaped targets.
+   * Called during config file hot-reload.
+   *
+   * @param config - The updated Plexus configuration
+   */
+  async reload(config: PlexusConfig): Promise<void> {
+    if (!this.initialized) {
+      logger.warn('[RequestShaper] Reload called before initialization');
+      return;
+    }
+
+    logger.info('[RequestShaper] Reloading configuration...');
+
+    // Update runtime config
+    this.runtimeConfig = config.shaper;
+
+    // Discover new target set
+    const newTargets = this.discoverShapedTargets(config);
+    const newKeys = new Set(newTargets.map((t) => this.makeKey(t.provider, t.model, t.alias)));
+    const existingKeys = new Set(this.targets.keys());
+
+    // Remove targets that are no longer configured
+    for (const key of existingKeys) {
+      if (!newKeys.has(key)) {
+        // Reject any pending queue entries before removing
+        const target = this.targets.get(key);
+        if (target) {
+          this.clearQueue(target, 'Target removed during reload');
+        }
+        this.targets.delete(key);
+        logger.info(`[RequestShaper] Removed target ${key}`);
+      }
+    }
+
+    // Add new targets and update existing ones
+    for (const target of newTargets) {
+      const key = this.makeKey(target.provider, target.model, target.alias);
+      if (!this.targets.has(key)) {
+        await this.initializeTarget(target);
+        logger.info(`[RequestShaper] Added target ${key}`);
+        continue;
+      }
+
+      const existing = this.targets.get(key);
+      if (!existing) {
+        continue;
+      }
+
+      existing.requestsPerMinute = target.requestsPerMinute;
+      existing.queueDepth = target.queueDepth;
+      existing.queueTimeoutMs = target.queueTimeoutMs;
+      existing.scope = target.scope;
+      existing.isExplicit = target.isExplicit;
+      existing.maxBudget = target.requestsPerMinute;
+      existing.currentBudget = Math.min(existing.currentBudget, existing.maxBudget);
+    }
+
+    // If we went from no targets to some targets, start cleanup timer
+    if (this.targets.size > 0 && !this.cleanupInterval) {
+      this.startCleanupTimer();
+    }
+
+    // If we now have no targets, stop cleanup timer
+    if (this.targets.size === 0 && this.cleanupInterval) {
+      this.stopCleanupTimer();
+    }
+
+    logger.info(`[RequestShaper] Reload complete: ${this.targets.size} active target(s)`);
+  }
+
+  /**
+   * Stop the shaper service and clean up all state.
+   * Called during graceful shutdown.
+   */
+  stop(): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    logger.info('[RequestShaper] Stopping...');
+
+    // Stop cleanup timer
+    this.stopCleanupTimer();
+
+    // Clear all in-memory state (reject pending queue entries)
+    for (const target of this.targets.values()) {
+      this.clearQueue(target, 'Service stopped');
+    }
+    this.targets.clear();
+    this.initialized = false;
+    this.runtimeConfig = null;
+
+    logger.info('[RequestShaper] Stopped and state cleared');
+  }
+
+
+  /**
+   * Get number of queued waiters for a provider/model.
+   * Alias for getQueueDepth for clarity.
+   *
+   * @param provider - Provider identifier
+   * @param model - Model identifier
+   * @returns Number of queued requests (0 if not shaped)
+   */
+  getQueueWaiters(provider: string, model: string, alias?: string): number {
+    return this.getQueueDepth(provider, model, alias);
+  }
+
+  /**
+   * Clean up expired requests from all queues.
+   * Called periodically by the cleanup timer.
+   * Removes timed-out entries and resolves them with timeout result.
+   */
+  cleanupExpiredRequests(): void {
+    const now = Date.now();
+
+    for (const [key, target] of this.targets.entries()) {
+      if (target.queue.length === 0) {
+        continue;
+      }
+
+      const expiredWaiters: QueueWaiter[] = [];
+      const remainingWaiters: QueueWaiter[] = [];
+
+      for (const waiter of target.queue) {
+        if (waiter.timeoutAt <= now) {
+          expiredWaiters.push(waiter);
+        } else {
+          remainingWaiters.push(waiter);
+        }
+      }
+
+      // Update queue with remaining waiters
+      target.queue = remainingWaiters;
+      target.currentQueueDepth = remainingWaiters.length;
+      target.timeoutCount += expiredWaiters.length;
+
+      // Resolve expired waiters with timeout result
+      for (const waiter of expiredWaiters) {
+        logger.debug(`[RequestShaper] Request ${waiter.id} timed out`);
+        waiter.resolve({ type: 'timeout' });
+      }
+
+      if (expiredWaiters.length > 0) {
+        logger.debug(
+          `[RequestShaper] Cleaned up ${expiredWaiters.length} expired requests from ${key}`
+        );
+      }
+    }
+  }
+
+
 }
