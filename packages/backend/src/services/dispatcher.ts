@@ -19,6 +19,7 @@ import { RouteResult } from './router';
 import { DebugManager } from './debug-manager';
 import { UsageStorageService } from './usage-storage';
 import { CooldownParserRegistry } from './cooldown-parsers';
+import { RequestShaper, QueueFullError } from './request-shaper';
 import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
 import { getModels } from '@mariozechner/pi-ai';
