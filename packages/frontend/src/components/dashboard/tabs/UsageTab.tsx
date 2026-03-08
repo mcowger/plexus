@@ -33,6 +33,7 @@ import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { SlicesToasted } from '../../SlicesToasted';
 import { TimeRangeSelector } from '../TimeRangeSelector';
+import type { CustomDateRange } from '../../../lib/date';
 import {
   AreaChart,
   Area,
@@ -50,7 +51,7 @@ import {
 } from 'recharts';
 
 /** Supported time windows for all usage and concurrency queries. */
-type TimeRange = 'hour' | 'day' | 'week' | 'month';
+type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
 
 /**
  * Props accepted by the {@link UsageTab} component.
@@ -59,10 +60,14 @@ type TimeRange = 'hour' | 'day' | 'week' | 'month';
  *                              data-fetching calls (usage **and** concurrency).
  * @property onTimeRangeChange - Callback invoked when the user selects a
  *                              different time range from the `TimeRangeSelector`.
+ * @property customDateRange  - Optional custom date range when timeRange is 'custom'
+ * @property onCustomDateRangeChange - Callback when custom date range changes
  */
 interface UsageTabProps {
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
+  customDateRange?: CustomDateRange | null;
+  onCustomDateRangeChange?: (range: CustomDateRange | null) => void;
 }
 
 /**
@@ -80,7 +85,12 @@ interface UsageTabProps {
  *    Model") are inserted into the existing responsive grid layout between the
  *    "Requests over Time" card and the "Token Usage" card.
  */
-export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange }) => {
+export const UsageTab: React.FC<UsageTabProps> = ({
+  timeRange,
+  onTimeRangeChange,
+  customDateRange,
+  onCustomDateRangeChange,
+}) => {
   // ---------------------------------------------------------------------------
   // State -- pre-existing usage data
   // ---------------------------------------------------------------------------
@@ -94,10 +104,11 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
   // ---------------------------------------------------------------------------
   /**
    * Raw concurrency records fetched from the management API.
-   * Each record is a flat (provider, model, count, timestamp) tuple.
-   * The downstream `useMemo` hooks pivot this into timeline-friendly structures.
+   * Separate arrays for provider and model groupings to avoid Cartesian explosion.
+   * Each record is a (provider, count, timestamp) or (model, count, timestamp) tuple.
    */
-  const [concurrencyData, setConcurrencyData] = useState<ConcurrencyData[]>([]);
+  const [concurrencyByProvider, setConcurrencyByProvider] = useState<ConcurrencyData[]>([]);
+  const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -120,12 +131,27 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
    * WebSocket strategy should be added here.
    */
   useEffect(() => {
-    api.getUsageData(timeRange).then(setData);
-    api.getUsageByModel(timeRange).then(setModelData);
-    api.getUsageByProvider(timeRange).then(setProviderData);
-    api.getUsageByKey(timeRange).then(setKeyData);
-    api.getConcurrencyData(timeRange, 'timeline').then(setConcurrencyData);
-  }, [timeRange]);
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+
+    if (timeRange === 'custom' && customDateRange) {
+      startDate = customDateRange.start.toISOString();
+      endDate = customDateRange.end.toISOString();
+    }
+
+    // Use summary endpoint for time-series data (much more efficient)
+    api.getSummaryData(timeRange, true, startDate, endDate).then(setData);
+    api.getUsageByModel(timeRange, true, startDate, endDate).then(setModelData);
+    api.getUsageByProvider(timeRange, true, startDate, endDate).then(setProviderData);
+    api.getUsageByKey(timeRange, true, startDate, endDate).then(setKeyData);
+    // Make two separate calls for provider and model concurrency data
+    api
+      .getConcurrencyData(timeRange, 'timeline', 'provider', startDate, endDate)
+      .then(setConcurrencyByProvider);
+    api
+      .getConcurrencyData(timeRange, 'timeline', 'model', startDate, endDate)
+      .then(setConcurrencyByModel);
+  }, [timeRange, customDateRange]);
 
   // ---------------------------------------------------------------------------
   // Shared chart palette
@@ -161,11 +187,11 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
    */
   const providerKeys = useMemo(() => {
     const providers = new Set<string>();
-    for (const item of concurrencyData) {
+    for (const item of concurrencyByProvider) {
       providers.add(item.provider || 'unknown');
     }
     return Array.from(providers);
-  }, [concurrencyData]);
+  }, [concurrencyByProvider]);
 
   /**
    * Top-8 model names ranked by total concurrent-request count across all
@@ -181,7 +207,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
    */
   const modelKeys = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const item of concurrencyData) {
+    for (const item of concurrencyByModel) {
       const model = item.model || 'unknown';
       totals.set(model, (totals.get(model) || 0) + item.count);
     }
@@ -189,7 +215,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
       .map(([model]) => model);
-  }, [concurrencyData]);
+  }, [concurrencyByModel]);
 
   /**
    * Pivots flat `ConcurrencyData[]` into a timeline array suitable for
@@ -215,10 +241,10 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
    * left-to-right in time order.
    */
   const concurrencyByProviderTimeline = useMemo(() => {
-    if (!concurrencyData.length) return [] as Array<Record<string, number | string>>;
+    if (!concurrencyByProvider.length) return [] as Array<Record<string, number | string>>;
 
     const grouped = new Map<number, Record<string, number | string>>();
-    for (const item of concurrencyData) {
+    for (const item of concurrencyByProvider) {
       const ts = item.timestamp;
       const provider = item.provider || 'unknown';
       if (!grouped.has(ts)) {
@@ -234,7 +260,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
     return Array.from(grouped.values()).sort(
       (a, b) => (a.timestamp as number) - (b.timestamp as number)
     );
-  }, [concurrencyData]);
+  }, [concurrencyByProvider]);
 
   /**
    * Pivots flat `ConcurrencyData[]` into a timeline array suitable for
@@ -254,12 +280,12 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
    * ```
    */
   const concurrencyByModelTimeline = useMemo(() => {
-    if (!concurrencyData.length || !modelKeys.length)
+    if (!concurrencyByModel.length || !modelKeys.length)
       return [] as Array<Record<string, number | string>>;
 
     const allowedModels = new Set(modelKeys);
     const grouped = new Map<number, Record<string, number | string>>();
-    for (const item of concurrencyData) {
+    for (const item of concurrencyByModel) {
       const model = item.model || 'unknown';
       if (!allowedModels.has(model)) continue;
       const ts = item.timestamp;
@@ -277,7 +303,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({ timeRange, onTimeRangeChange
     return Array.from(grouped.values()).sort(
       (a, b) => (a.timestamp as number) - (b.timestamp as number)
     );
-  }, [concurrencyData, modelKeys]);
+  }, [concurrencyByModel, modelKeys]);
 
   // ---------------------------------------------------------------------------
   // Pie chart helper (pre-existing)

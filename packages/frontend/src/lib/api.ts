@@ -362,7 +362,7 @@ interface UsageSummarySeriesPoint {
 }
 
 interface UsageSummaryResponse {
-  range: 'hour' | 'day' | 'week' | 'month';
+  range: 'hour' | 'day' | 'week' | 'month' | 'custom';
   series: UsageSummarySeriesPoint[];
   stats: {
     totalRequests: number;
@@ -713,8 +713,21 @@ const fetchUsageRecords = async <T extends UsageRecordField>(
   return (await res.json()) as BackendResponse<Pick<UsageRecord, T>[]>;
 };
 
-const fetchUsageSummary = async (range: 'hour' | 'day' | 'week' | 'month', cache = true) => {
-  const queryString = `range=${range}`;
+const fetchUsageSummary = async (
+  range: 'hour' | 'day' | 'week' | 'month' | 'custom',
+  cache = true,
+  startDate?: string,
+  endDate?: string
+) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', range);
+
+  if (range === 'custom' && startDate && endDate) {
+    searchParams.set('startDate', startDate);
+    searchParams.set('endDate', endDate);
+  }
+
+  const queryString = searchParams.toString();
   const url = `${API_BASE}/v0/management/usage/summary?${queryString}`;
 
   if (cache) {
@@ -952,13 +965,15 @@ export const api = {
   },
 
   getDashboardData: async (
-    range: 'hour' | 'day' | 'week' | 'month' = 'day',
-    cache = true
+    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'day',
+    cache = true,
+    startDate?: string,
+    endDate?: string
   ): Promise<DashboardData> => {
     try {
       const now = normalizeNow();
       const [summary, cooldowns, config] = await Promise.all([
-        fetchUsageSummary(range, cache),
+        fetchUsageSummary(range, cache, startDate, endDate),
         api.getCooldowns(),
         fetchConfigCached(),
       ]);
@@ -1007,18 +1022,73 @@ export const api = {
     }
   },
 
-  getUsageData: async (range: 'hour' | 'day' | 'week' | 'month' = 'week'): Promise<UsageData[]> => {
+  /**
+   * Fetch pre-aggregated summary data from the backend.
+   * This is much more efficient than getUsageData for time-series views.
+   */
+  getSummaryData: async (
+    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
+    cache = true,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> => {
+    try {
+      const summaryResponse = await fetchUsageSummary(range, cache, startDate, endDate);
+      const series = summaryResponse.series || [];
+
+      // Hard limit to prevent memory issues
+      const limitedSeries = series.length > 100 ? series.slice(0, 100) : series;
+
+      // Return raw data with minimal transformation
+      return limitedSeries.map((point) => ({
+        timestamp: String(point.bucketStartMs),
+        requests: point.requests,
+        tokens: point.tokens,
+        inputTokens: point.inputTokens,
+        outputTokens: point.outputTokens,
+        cachedTokens: point.cachedTokens,
+        cacheWriteTokens: point.cacheWriteTokens,
+        kwhUsed: point.kwhUsed,
+      }));
+    } catch (e) {
+      console.error('API Error getSummaryData', e);
+      return [];
+    }
+  },
+
+  getUsageData: async (
+    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
+    cache = true,
+    startDate?: string,
+    endDate?: string
+  ): Promise<UsageData[]> => {
     try {
       const now = normalizeNow();
-      const { startDate } = getUsageRangeConfig(range, now);
+
+      let queryStartDate: Date;
+      let queryEndDate: Date;
+
+      if (range === 'custom' && startDate && endDate) {
+        queryStartDate = new Date(startDate);
+        queryEndDate = new Date(endDate);
+      } else {
+        const { startDate: configStart } = getUsageRangeConfig(
+          range as 'hour' | 'day' | 'week' | 'month',
+          now
+        );
+        queryStartDate = configStart;
+        queryEndDate = now;
+      }
+
       const usageResponse = await fetchUsageRecords({
         limit: 5000,
-        startDate: startDate.toISOString(),
+        startDate: queryStartDate.toISOString(),
+        endDate: queryEndDate.toISOString(),
         fields: USAGE_PAGE_FIELDS,
-        cache: true,
+        cache,
       });
 
-      return buildUsageSeries(usageResponse.data || [], range, now);
+      return buildUsageSeries(usageResponse.data || [], range === 'custom' ? 'day' : range, now);
     } catch (e) {
       console.error('API Error getUsageData', e);
       return [];
@@ -1086,16 +1156,35 @@ export const api = {
   },
 
   getUsageByModel: async (
-    range: 'hour' | 'day' | 'week' | 'month' = 'week'
+    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
+    cache = true,
+    startDate?: string,
+    endDate?: string
   ): Promise<PieChartDataPoint[]> => {
     try {
       const now = normalizeNow();
-      const { startDate } = getUsageRangeConfig(range, now);
+
+      let queryStartDate: Date;
+      let queryEndDate: Date;
+
+      if (range === 'custom' && startDate && endDate) {
+        queryStartDate = new Date(startDate);
+        queryEndDate = new Date(endDate);
+      } else {
+        const { startDate: configStart } = getUsageRangeConfig(
+          range as 'hour' | 'day' | 'week' | 'month',
+          now
+        );
+        queryStartDate = configStart;
+        queryEndDate = now;
+      }
+
       const usageResponse = await fetchUsageRecords({
         limit: 5000,
-        startDate: startDate.toISOString(),
+        startDate: queryStartDate.toISOString(),
+        endDate: queryEndDate.toISOString(),
         fields: USAGE_PAGE_FIELDS,
-        cache: true,
+        cache,
       });
 
       const records = usageResponse.data || [];
@@ -1123,16 +1212,35 @@ export const api = {
   },
 
   getUsageByProvider: async (
-    range: 'hour' | 'day' | 'week' | 'month' = 'week'
+    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
+    cache = true,
+    startDate?: string,
+    endDate?: string
   ): Promise<PieChartDataPoint[]> => {
     try {
       const now = normalizeNow();
-      const { startDate } = getUsageRangeConfig(range, now);
+
+      let queryStartDate: Date;
+      let queryEndDate: Date;
+
+      if (range === 'custom' && startDate && endDate) {
+        queryStartDate = new Date(startDate);
+        queryEndDate = new Date(endDate);
+      } else {
+        const { startDate: configStart } = getUsageRangeConfig(
+          range as 'hour' | 'day' | 'week' | 'month',
+          now
+        );
+        queryStartDate = configStart;
+        queryEndDate = now;
+      }
+
       const usageResponse = await fetchUsageRecords({
         limit: 5000,
-        startDate: startDate.toISOString(),
+        startDate: queryStartDate.toISOString(),
+        endDate: queryEndDate.toISOString(),
         fields: USAGE_PAGE_FIELDS,
-        cache: true,
+        cache,
       });
 
       const records = usageResponse.data || [];
@@ -1160,16 +1268,35 @@ export const api = {
   },
 
   getUsageByKey: async (
-    range: 'hour' | 'day' | 'week' | 'month' = 'week'
+    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
+    cache = true,
+    startDate?: string,
+    endDate?: string
   ): Promise<PieChartDataPoint[]> => {
     try {
       const now = normalizeNow();
-      const { startDate } = getUsageRangeConfig(range, now);
+
+      let queryStartDate: Date;
+      let queryEndDate: Date;
+
+      if (range === 'custom' && startDate && endDate) {
+        queryStartDate = new Date(startDate);
+        queryEndDate = new Date(endDate);
+      } else {
+        const { startDate: configStart } = getUsageRangeConfig(
+          range as 'hour' | 'day' | 'week' | 'month',
+          now
+        );
+        queryStartDate = configStart;
+        queryEndDate = now;
+      }
+
       const usageResponse = await fetchUsageRecords({
         limit: 5000,
-        startDate: startDate.toISOString(),
+        startDate: queryStartDate.toISOString(),
+        endDate: queryEndDate.toISOString(),
         fields: USAGE_PAGE_FIELDS,
-        cache: true,
+        cache,
       });
 
       const records = usageResponse.data || [];
@@ -2486,24 +2613,36 @@ export const api = {
   /**
    * Fetches concurrency data from the backend.
    *
-   * Calls GET /v0/management/concurrency with mode and timeRange query parameters.
+   * Calls GET /v0/management/concurrency with mode, timeRange, and groupBy query parameters.
    * - mode='live': returns current in-flight snapshots.
-   * - mode='timeline': returns 1-minute bucketed historical counts.
+   * - mode='timeline': returns bucketed historical counts.
    *
    * On failure, logs the error and returns an empty array so the UI degrades
    * gracefully (shows an empty chart rather than crashing).
    *
    * @param timeRange - How far back to look: 'hour' (default), 'day', 'week', or 'month'
+   * @param groupBy - Dimension to group by: 'provider' (default) or 'model'
    * @returns Array of {@link ConcurrencyData} entries, or an empty array on error
    */
   getConcurrencyData: async (
-    timeRange: 'hour' | 'day' | 'week' | 'month' = 'hour',
-    mode: 'live' | 'timeline' = 'live'
+    timeRange: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'hour',
+    mode: 'live' | 'timeline' = 'live',
+    groupBy: 'provider' | 'model' = 'provider',
+    startDate?: string,
+    endDate?: string
   ): Promise<ConcurrencyData[]> => {
     try {
-      const res = await fetchWithAuth(
-        `${API_BASE}/v0/management/concurrency?timeRange=${timeRange}&mode=${mode}`
-      );
+      const params = new URLSearchParams();
+      params.set('timeRange', timeRange);
+      params.set('mode', mode);
+      params.set('groupBy', groupBy);
+
+      if (timeRange === 'custom' && startDate && endDate) {
+        params.set('startDate', startDate);
+        params.set('endDate', endDate);
+      }
+
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/concurrency?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch concurrency data');
       const data = (await res.json()) as { data: ConcurrencyData[] };
       return data.data || [];

@@ -102,36 +102,99 @@ export async function registerUsageRoutes(
   fastify.get('/v0/management/usage/summary', async (request, reply) => {
     const query = request.query as any;
     const range = query.range || 'day';
-    if (!['hour', 'day', 'week', 'month'].includes(range)) {
+    const startDateStr = query.startDate;
+    const endDateStr = query.endDate;
+
+    // Validate custom date range if provided
+    if (range === 'custom') {
+      if (!startDateStr || !endDateStr) {
+        return reply
+          .code(400)
+          .send({ error: 'startDate and endDate are required for custom range' });
+      }
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return reply.code(400).send({ error: 'Invalid date format' });
+      }
+      if (endDate < startDate) {
+        return reply.code(400).send({ error: 'endDate must be after startDate' });
+      }
+    } else if (!['hour', 'day', 'week', 'month'].includes(range)) {
       return reply.code(400).send({ error: 'Invalid range' });
     }
 
     const now = new Date();
     now.setSeconds(0, 0);
-    const rangeStart = new Date(now);
+    let rangeStart = new Date(now);
+    let rangeEnd = new Date(now);
+
+    if (range === 'custom' && startDateStr && endDateStr) {
+      rangeStart = new Date(startDateStr);
+      rangeEnd = new Date(endDateStr);
+    } else {
+      switch (range as 'hour' | 'day' | 'week' | 'month') {
+        case 'hour':
+          rangeStart.setHours(rangeStart.getHours() - 1);
+          break;
+        case 'day':
+          rangeStart.setHours(rangeStart.getHours() - 24);
+          break;
+        case 'week':
+          rangeStart.setDate(rangeStart.getDate() - 7);
+          break;
+        case 'month':
+          rangeStart.setDate(rangeStart.getDate() - 30);
+          break;
+      }
+    }
+
     const statsStart = new Date(now);
     statsStart.setDate(statsStart.getDate() - 7);
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
     let stepSeconds = 60;
-    switch (range) {
-      case 'hour':
-        rangeStart.setHours(rangeStart.getHours() - 1);
-        stepSeconds = 60;
-        break;
-      case 'day':
-        rangeStart.setHours(rangeStart.getHours() - 24);
-        stepSeconds = 60 * 60;
-        break;
-      case 'week':
-        rangeStart.setDate(rangeStart.getDate() - 7);
-        stepSeconds = 60 * 60 * 24;
-        break;
-      case 'month':
-        rangeStart.setDate(rangeStart.getDate() - 30);
-        stepSeconds = 60 * 60 * 24;
-        break;
+    if (range === 'custom') {
+      // Calculate appropriate step based on range duration (adaptive bucketing)
+      const durationMs = rangeEnd.getTime() - rangeStart.getTime();
+      const durationMinutes = durationMs / (1000 * 60);
+      const durationSeconds = durationMs / 1000;
+
+      // Adaptive bucketing thresholds (matching frontend LiveTab)
+      const useMinuteBuckets = durationMinutes <= 30;
+      const use5MinuteBuckets = durationMinutes <= 24 * 60;
+      const useHourlyBuckets = durationMinutes <= 7 * 24 * 60;
+
+      if (useMinuteBuckets) {
+        stepSeconds = 60; // 1-minute buckets
+      } else if (use5MinuteBuckets) {
+        stepSeconds = 300; // 5-minute buckets
+      } else if (useHourlyBuckets) {
+        stepSeconds = 3600; // 1-hour buckets
+      } else {
+        stepSeconds = 21600; // 6-hour buckets for very long ranges
+      }
+
+      // Ensure maximum 100 buckets to prevent performance issues
+      const maxBuckets = 100;
+      const calculatedBuckets = Math.ceil(durationSeconds / stepSeconds);
+      if (calculatedBuckets > maxBuckets) {
+        stepSeconds = Math.ceil(durationSeconds / maxBuckets);
+      }
+    } else {
+      switch (range) {
+        case 'hour':
+          stepSeconds = 60;
+          break;
+        case 'day':
+          stepSeconds = 60 * 60;
+          break;
+        case 'week':
+        case 'month':
+          stepSeconds = 60 * 60 * 24;
+          break;
+      }
     }
 
     const db = usageStorage.getDb();
@@ -140,6 +203,7 @@ export async function registerUsageRoutes(
     const stepMs = stepSeconds * 1000;
     const nowMs = now.getTime();
     const rangeStartMs = rangeStart.getTime();
+    const rangeEndMs = rangeEnd.getTime();
     const statsStartMs = statsStart.getTime();
     const todayStartMs = todayStart.getTime();
 
@@ -167,7 +231,7 @@ export async function registerUsageRoutes(
         .where(
           and(
             gte(schema.requestUsage.startTime, rangeStartMs),
-            lte(schema.requestUsage.startTime, nowMs)
+            lte(schema.requestUsage.startTime, rangeEndMs)
           )
         )
         .groupBy(bucketStartMs)
@@ -364,6 +428,7 @@ export async function registerUsageRoutes(
    * Query parameters:
    *   - mode: 'live' | 'timeline' (default: 'live')
    *   - timeRange: 'hour' | 'day' | 'week' | 'month' (default: 'hour', timeline mode only)
+   *   - groupBy: 'provider' | 'model' (default: 'provider', timeline mode only)
    */
   fastify.get('/v0/management/concurrency', async (request, reply) => {
     const query = request.query as any;
@@ -377,40 +442,98 @@ export async function registerUsageRoutes(
       if (mode === 'timeline') {
         // Timeline mode: bucketed request counts over time for Usage Analytics charts
         const timeRange = query.timeRange || 'hour';
+        const groupBy = query.groupBy || 'provider'; // 'provider' or 'model'
+        const startDateStr = query.startDate;
+        const endDateStr = query.endDate;
         const now = Date.now();
-        const ranges: Record<string, number> = {
-          hour: 60 * 60 * 1000,
-          day: 24 * 60 * 60 * 1000,
-          week: 7 * 24 * 60 * 60 * 1000,
-          month: 30 * 24 * 60 * 60 * 1000,
-        };
-        const windowMs = ranges[timeRange] ?? ranges.hour ?? 60 * 60 * 1000;
-        const startTime = now - windowMs;
 
+        let startTime: number;
+        let endTime: number = now;
+
+        if (timeRange === 'custom' && startDateStr && endDateStr) {
+          const startDate = new Date(startDateStr);
+          const endDate = new Date(endDateStr);
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            startTime = startDate.getTime();
+            endTime = endDate.getTime();
+          } else {
+            return reply.code(400).send({ error: 'Invalid date format' });
+          }
+        } else {
+          const ranges: Record<string, number> = {
+            hour: 60 * 60 * 1000,
+            day: 24 * 60 * 60 * 1000,
+            week: 7 * 24 * 60 * 60 * 1000,
+            month: 30 * 24 * 60 * 60 * 1000,
+          };
+          const windowMs = ranges[timeRange] ?? ranges.hour ?? 60 * 60 * 1000;
+          startTime = now - windowMs;
+        }
+
+        // Adaptive bucketing based on duration (prevent millions of rows for long ranges)
+        const durationMs = endTime - startTime;
+        const durationMinutes = durationMs / (1000 * 60);
+
+        // Use same adaptive thresholds as summary endpoint
+        const useMinuteBuckets = durationMinutes <= 30;
+        const use5MinuteBuckets = durationMinutes <= 24 * 60;
+        const useHourlyBuckets = durationMinutes <= 7 * 24 * 60;
+
+        let bucketSizeMs: number;
+        if (useMinuteBuckets) {
+          bucketSizeMs = 60000; // 1 minute
+        } else if (use5MinuteBuckets) {
+          bucketSizeMs = 300000; // 5 minutes
+        } else if (useHourlyBuckets) {
+          bucketSizeMs = 3600000; // 1 hour
+        } else {
+          bucketSizeMs = 21600000; // 6 hours
+        }
+
+        // Ensure maximum 100 buckets
+        const maxBuckets = 100;
+        const calculatedBuckets = Math.ceil(durationMs / bucketSizeMs);
+        if (calculatedBuckets > maxBuckets) {
+          bucketSizeMs = Math.ceil(durationMs / maxBuckets);
+        }
+
+        const bucketSizeMsLiteral = sql.raw(String(bucketSizeMs));
         const bucketSql =
           dialect === 'sqlite'
-            ? sql<number>`(CAST(${schema.requestUsage.startTime} AS INTEGER) / 60000) * 60000`
-            : sql<number>`(FLOOR(${schema.requestUsage.startTime}::double precision / 60000) * 60000)`;
+            ? sql<number>`(CAST(${schema.requestUsage.startTime} AS INTEGER) / ${bucketSizeMsLiteral}) * ${bucketSizeMsLiteral}`
+            : sql<number>`(FLOOR(${schema.requestUsage.startTime}::double precision / ${bucketSizeMsLiteral}) * ${bucketSizeMsLiteral})`;
+
+        // Group by either provider or model (not both) to prevent Cartesian explosion
+        const groupField =
+          groupBy === 'model'
+            ? schema.requestUsage.canonicalModelName
+            : schema.requestUsage.provider;
 
         const results = await db
           .select({
-            provider: schema.requestUsage.provider,
-            model: schema.requestUsage.canonicalModelName,
-            count: sql<number>`count(*)`,
             timestamp: bucketSql,
+            key: groupField,
+            count: sql<number>`count(*)`,
           })
           .from(schema.requestUsage)
           .where(
             and(
-              isNotNull(schema.requestUsage.provider),
+              isNotNull(groupField),
               gte(schema.requestUsage.startTime, startTime),
-              lte(schema.requestUsage.startTime, now)
+              lte(schema.requestUsage.startTime, endTime)
             )
           )
-          .groupBy(schema.requestUsage.provider, schema.requestUsage.canonicalModelName, bucketSql)
+          .groupBy(groupField, bucketSql)
           .orderBy(bucketSql);
 
-        return reply.send({ data: results });
+        // Map 'key' back to 'provider' or 'model' for frontend compatibility
+        const mappedResults = results.map((row) => ({
+          timestamp: row.timestamp,
+          [groupBy]: row.key,
+          count: row.count,
+        }));
+
+        return reply.send({ data: mappedResults });
       }
 
       // Live mode (default): currently in-flight requests for Live Metrics card

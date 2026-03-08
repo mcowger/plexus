@@ -7,6 +7,8 @@ Seeking to unify LLM traffic through a centralized, controllable gateway.
 
 ## CRITICAL REQUIREMENTS:   NEVER default to searching types definitions files for libraries.  ALWAYS rely on the tavily and context7 MCP tools to search the web for better documentation. FOLLOWING THIS REQUIREMENT IS CRITICAL.
 
+## NEVER produce implementation or summary documents unless specifically requested.
+
 ---
 
 ## ⚠️ MANDATORY: Run Biome Formatter Before Every Commit

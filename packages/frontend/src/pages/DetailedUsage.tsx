@@ -66,8 +66,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { TimeRangeSelector } from '../components/dashboard/TimeRangeSelector';
 import { api, type UsageRecord } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
+import type { CustomDateRange } from '../lib/date';
+import { parseISODate, formatISODate } from '../lib/date';
 import {
   Activity,
   BarChart3,
@@ -105,7 +108,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Time window for data fetching. 'live' = 5-minute rolling window. */
-type TimeRange = 'live' | 'hour' | 'day' | 'week' | 'month';
+type TimeRange = 'live' | 'hour' | 'day' | 'week' | 'month' | 'custom';
 
 /** Chart visualization type. 'composed' overlays bars + lines for multi-metric views. */
 type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'composed';
@@ -307,6 +310,8 @@ const parsePresetFromQuery = (
   groupBy: GroupBy;
   viewMode: ViewMode;
   selectedMetrics: string[];
+  customStartDate?: string;
+  customEndDate?: string;
 } => {
   const params = new URLSearchParams(query);
 
@@ -316,12 +321,16 @@ const parsePresetFromQuery = (
   const viewMode = params.get('viewMode');
   const metrics = params.get('metrics');
   const metric = params.get('metric');
+  const startDate = params.get('startDate');
+  const endDate = params.get('endDate');
 
   const parsedMetrics = (
     metrics ? metrics.split(',') : metric ? [metric] : ['requests', 'tokens', 'cost']
   )
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
+
+  const isCustomRange = range === 'custom' && startDate && endDate;
 
   return {
     timeRange: ALLOWED_TIME_RANGES.includes(range as TimeRange) ? (range as TimeRange) : 'day',
@@ -331,6 +340,8 @@ const parsePresetFromQuery = (
     groupBy: ALLOWED_GROUP_BY.includes(groupBy as GroupBy) ? (groupBy as GroupBy) : 'time',
     viewMode: ALLOWED_VIEW_MODES.includes(viewMode as ViewMode) ? (viewMode as ViewMode) : 'chart',
     selectedMetrics: parsedMetrics.length > 0 ? parsedMetrics : ['requests', 'tokens', 'cost'],
+    customStartDate: isCustomRange ? startDate : undefined,
+    customEndDate: isCustomRange ? endDate : undefined,
   };
 };
 
@@ -343,30 +354,106 @@ const parsePresetFromQuery = (
  *   - day: truncate to the nearest hour
  *   - week/month: truncate to the nearest day
  *
+ * For custom ranges, uses adaptive bucketing to prevent performance issues:
+ *   - <= 30 minutes: 1-minute buckets
+ *   - <= 24 hours: 5-minute buckets
+ *   - <= 7 days: 1-hour buckets
+ *   - > 7 days: 6-hour buckets
+ *   - Maximum 100 buckets to ensure smooth rendering
+ *
  * @param range - The selected time range
+ * @param customRange - Optional custom date range
  * @returns Object with `minutes` (window size) and `bucketFn` (date truncation)
  */
-const getRangeConfig = (range: TimeRange): { minutes: number; bucketFn: (d: Date) => void } => {
+const getRangeConfig = (
+  range: TimeRange,
+  customRange?: CustomDateRange | null
+): { minutes: number; bucketFn: (timestampMs: number) => number } => {
+  if (range === 'custom' && customRange) {
+    const durationMs = customRange.end.getTime() - customRange.start.getTime();
+    const durationMinutes = durationMs / 60000;
+
+    // Adaptive bucketing based on duration (same as LiveTab)
+    const useMinuteBuckets = durationMinutes <= 30;
+    const use5MinuteBuckets = durationMinutes <= 24 * 60;
+    const useHourlyBuckets = durationMinutes <= 7 * 24 * 60;
+
+    let bucketSizeMinutes: number;
+    if (useMinuteBuckets) {
+      bucketSizeMinutes = 1;
+    } else if (use5MinuteBuckets) {
+      bucketSizeMinutes = 5;
+    } else if (useHourlyBuckets) {
+      bucketSizeMinutes = 60;
+    } else {
+      bucketSizeMinutes = 360; // 6 hours
+    }
+
+    // Ensure maximum 100 buckets
+    const maxBuckets = 100;
+    const calculatedBuckets = Math.ceil(durationMinutes / bucketSizeMinutes);
+    if (calculatedBuckets > maxBuckets) {
+      bucketSizeMinutes = Math.ceil(durationMinutes / maxBuckets);
+    }
+
+    return {
+      minutes: durationMinutes,
+      bucketFn: (timestampMs: number) => {
+        // Efficient bucketing without creating Date objects
+        const bucketMs = bucketSizeMinutes * 60000;
+        return Math.floor(timestampMs / bucketMs) * bucketMs;
+      },
+    };
+  }
+
   switch (range) {
     case 'live':
-      return { minutes: LIVE_WINDOW_MINUTES, bucketFn: (d) => d.setSeconds(0, 0) };
+      return {
+        minutes: LIVE_WINDOW_MINUTES,
+        bucketFn: (ts) => Math.floor(ts / 60000) * 60000,
+      };
     case 'hour':
-      return { minutes: 60, bucketFn: (d) => d.setSeconds(0, 0) };
+      return {
+        minutes: 60,
+        bucketFn: (ts) => Math.floor(ts / 60000) * 60000,
+      };
     case 'day':
-      return { minutes: 1440, bucketFn: (d) => d.setMinutes(0, 0, 0) };
+      return {
+        minutes: 1440,
+        bucketFn: (ts) => Math.floor(ts / 3600000) * 3600000,
+      };
     case 'week':
-      return { minutes: 10080, bucketFn: (d) => d.setHours(0, 0, 0, 0) };
     case 'month':
-      return { minutes: 43200, bucketFn: (d) => d.setHours(0, 0, 0, 0) };
+      return {
+        minutes: range === 'week' ? 10080 : 43200,
+        bucketFn: (ts) => {
+          const d = new Date(ts);
+          d.setHours(0, 0, 0, 0);
+          return d.getTime();
+        },
+      };
   }
 };
 
 /**
  * Format a time bucket timestamp into a human-readable X-axis label.
  * Short ranges (live, hour, day) show time-of-day; longer ranges show date.
+ * For custom ranges, format based on the duration (time for short, date for long).
  */
-const formatBucketLabel = (range: TimeRange, ms: number) => {
+const formatBucketLabel = (range: TimeRange, ms: number, customRange?: CustomDateRange | null) => {
   const d = new Date(ms);
+
+  // For custom ranges, determine format based on duration
+  if (range === 'custom' && customRange) {
+    const durationMinutes = (customRange.end.getTime() - customRange.start.getTime()) / 60000;
+    if (durationMinutes <= 24 * 60) {
+      // Show time for ranges <= 24 hours
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    // Show date for longer ranges
+    return d.toLocaleDateString();
+  }
+
   return range === 'live' || range === 'hour' || range === 'day'
     ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : d.toLocaleDateString();
@@ -415,10 +502,9 @@ const aggregateByTime = (records: UsageRecord[], range: TimeRange): AggregatedPo
   >();
 
   records.forEach((r) => {
-    const d = new Date(r.date);
-    if (Number.isNaN(d.getTime())) return;
-    bucketFn(d);
-    const ms = d.getTime();
+    const timestampMs = new Date(r.date).getTime();
+    if (Number.isNaN(timestampMs)) return;
+    const ms = bucketFn(timestampMs);
     const ex = grouped.get(ms) || {
       requests: 0,
       errors: 0,
@@ -447,7 +533,7 @@ const aggregateByTime = (records: UsageRecord[], range: TimeRange): AggregatedPo
   const data = Array.from(grouped.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([ms, v]) => ({
-      name: formatBucketLabel(range, ms),
+      name: formatBucketLabel(range, ms, timeRange === 'custom' ? customDateRange : null),
       requests: v.requests,
       errors: v.errors,
       tokens: v.tokens,
@@ -784,12 +870,21 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   // and data fetching react to state changes automatically.
   // ---------------------------------------------------------------------------
 
-  /** Raw usage records fetched from the API. */
+  /** Raw usage records fetched from the API (used for categorical grouping). */
   const [records, setRecords] = useState<UsageRecord[]>([]);
   /** Whether a data fetch is currently in progress (shows loading spinner on Refresh button). */
   const [loading, setLoading] = useState(false);
   /** Selected time window -- controls how far back data is fetched and bucket granularity. */
   const [timeRange, setTimeRange] = useState<TimeRange>(preset.timeRange);
+  /** Custom date range when timeRange is 'custom' */
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange | null>(
+    preset.customStartDate && preset.customEndDate
+      ? {
+          start: parseISODate(preset.customStartDate)!,
+          end: parseISODate(preset.customEndDate)!,
+        }
+      : null
+  );
   /** Selected chart visualization type. */
   const [chartType, setChartType] = useState<ChartType>(preset.chartType);
   /** Selected grouping dimension. Changing this switches between time-series and categorical views. */
@@ -812,54 +907,112 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
     setGroupBy(preset.groupBy);
     setViewMode(preset.viewMode);
     setSelectedMetrics(preset.selectedMetrics);
+    if (preset.customStartDate && preset.customEndDate) {
+      setCustomDateRange({
+        start: parseISODate(preset.customStartDate)!,
+        end: parseISODate(preset.customEndDate)!,
+      });
+    } else {
+      setCustomDateRange(null);
+    }
   }, [preset]);
 
   /**
    * Fetch usage data from the API for the currently selected time range.
    *
-   * Calculates the start date by subtracting the range's minute count from now,
-   * then requests up to 5000 log records starting from that date. The callback
-   * is memoized on `timeRange` so it re-creates when the user changes the
-   * time window, which also resets the auto-refresh interval (see below).
+   * For time-series views (groupBy='time'), uses the backend summary endpoint
+   * which returns pre-aggregated data, significantly reducing memory usage.
+   *
+   * For categorical views (groupBy!='time'), fetches raw records for client-side aggregation.
+   *
+   * The callback is memoized on `timeRange` and `customDateRange` so it re-creates
+   * when the user changes the time window, which also resets the auto-refresh interval.
    */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { minutes } = getRangeConfig(timeRange);
-      const startDate = new Date(Date.now() - minutes * 60000);
+      let startDate: string | undefined;
+      let endDate: string | undefined;
 
-      const logsResponse = await api.getLogs(5000, 0, { startDate: startDate.toISOString() });
+      if (timeRange === 'custom' && customDateRange) {
+        startDate = customDateRange.start.toISOString();
+        endDate = customDateRange.end.toISOString();
+      }
 
-      setRecords(logsResponse.data || []);
+      // Use backend summary endpoint for time-series views (much more efficient)
+      if (groupBy === 'time') {
+        const summaryData = await api.getSummaryData(timeRange, true, startDate, endDate);
+        // Limit to max 100 points to prevent memory issues
+        const limitedData = summaryData.slice(0, 100);
+        setRecords(limitedData as any);
+      } else {
+        // For categorical views, fetch raw records with strict limits
+        const logsResponse = await api.getLogs(100, 0, { startDate, endDate });
+        setRecords(logsResponse.data || []);
+      }
+
       setLastUpdated(new Date());
     } catch (e) {
       console.error('Failed to load usage data', e);
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, customDateRange, groupBy, api]);
 
   /**
    * Auto-refresh mechanism: fetch data immediately on mount and whenever
    * loadData changes (i.e., when timeRange changes), then set up a 30-second
-   * polling interval for live data updates. The interval is cleaned up on
-   * unmount or when loadData changes to prevent stale timers.
+   * polling interval for live data updates.
+   *
+   * Auto-refresh is DISABLED for custom date ranges since they represent
+   * historical data that doesn't need live updates.
+   *
+   * The interval is cleaned up on unmount or when loadData changes to prevent stale timers.
    */
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 30000);
+
+    // Only auto-refresh for preset ranges (historical custom ranges don't need updates)
+    if (timeRange === 'custom') {
+      return;
+    }
+
+    // Adaptive refresh interval based on time range
+    const { minutes } = getRangeConfig(timeRange);
+    const refreshInterval = minutes <= 60 ? 30000 : 60000; // 30s for <=1h, 60s for longer
+
+    const interval = setInterval(loadData, refreshInterval);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [loadData, timeRange]);
 
   /**
    * Derived aggregated data: re-computed whenever raw records, groupBy dimension,
-   * or timeRange changes. Routes to time-series aggregation (buckets) when
-   * groupBy='time', or categorical aggregation (provider/model/status groups) otherwise.
+   * or timeRange changes.
+   *
+   * For time-series views (groupBy='time'), uses pre-aggregated summary data from backend.
+   * For categorical views, aggregates raw records client-side.
    */
   const aggregatedData = useMemo(() => {
-    if (groupBy === 'time') return aggregateByTime(records, timeRange);
+    if (groupBy === 'time') {
+      // Use pre-aggregated summary data - minimize object creation
+      const isCustom = timeRange === 'custom';
+      const customRange = isCustom ? customDateRange : null;
+
+      return records.map((r: any) => ({
+        name: formatBucketLabel(timeRange, r.date, customRange),
+        requests: r.requests || 1,
+        errors: 0,
+        tokens: r.tokens || 0,
+        cost: 0,
+        duration: 0,
+        ttft: 0,
+        tps: 0,
+        successRate: 100,
+      }));
+    }
+    // For categorical views, aggregate raw records
     return aggregateByGroup(records, groupBy);
-  }, [records, groupBy, timeRange]);
+  }, [records, groupBy, timeRange, customDateRange]);
 
   /**
    * Summary statistics computed from all raw records in the current time window.
@@ -918,7 +1071,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       className={
         embedded
           ? 'h-full p-2 bg-bg-card'
-          : 'min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface'
+          : 'min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface'
       }
     >
       {/* -------------------------------------------------------------------
@@ -1001,18 +1154,18 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           {/* --- Time Range Selector --- */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-text-muted uppercase">Time Range</span>
-            <div className="flex gap-2">
-              {(['live', 'hour', 'day', 'week', 'month'] as TimeRange[]).map((r) => (
-                <Button
-                  key={r}
-                  size="sm"
-                  variant={timeRange === r ? 'primary' : 'secondary'}
-                  onClick={() => setTimeRange(r)}
-                >
-                  {r === 'live' ? '5m' : r.charAt(0).toUpperCase() + r.slice(1)}
-                </Button>
-              ))}
-            </div>
+            <TimeRangeSelector
+              value={timeRange}
+              onChange={(range) => {
+                setTimeRange(range);
+                if (range !== 'custom') {
+                  setCustomDateRange(null);
+                }
+              }}
+              customRange={customDateRange}
+              onCustomRangeChange={setCustomDateRange}
+              options={['live', 'hour', 'day', 'week', 'month', 'custom']}
+            />
           </div>
 
           {/* --- Group By Selector --- */}
@@ -1139,7 +1292,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           title="Raw Request Log"
           extra={<span className="text-xs text-text-secondary">{records.length} requests</span>}
         >
-          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+          <div className="overflow-x-auto max-h-125 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-card">
                 <tr className="text-left border-b border-border-glass text-text-secondary">
