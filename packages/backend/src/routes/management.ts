@@ -16,6 +16,7 @@ import { registerUserQuotaRoutes } from './management/user-quotas';
 import { registerOAuthRoutes } from './management/oauth';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { registerLoggingRoutes } from './management/logging';
+import { registerRateLimitRoutes } from './management/rate-limits';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -59,7 +60,6 @@ export async function registerManagementRoutes(
   // scoped inside this plugin so the v1 bearer-auth routes are unaffected.
   fastify.register(async (protected_) => {
     protected_.addHook('preHandler', adminKeyAuth);
-
     await registerConfigRoutes(protected_);
     await registerUsageRoutes(protected_, usageStorage);
     await registerCooldownRoutes(protected_);
@@ -80,5 +80,6 @@ export async function registerManagementRoutes(
       await registerQuotaEnforcementRoutes(protected_, quotaEnforcer);
     }
     await registerUserQuotaRoutes(protected_);
+    await registerRateLimitRoutes(protected_);
   });
 }
