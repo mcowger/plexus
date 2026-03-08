@@ -4,7 +4,7 @@ import yaml from 'yaml';
 import path from 'path';
 import { logger } from './utils/logger';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
-import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
+import { RequestShaper } from './services/request-shaper';
 
 // --- Zod Schemas ---
 
@@ -19,6 +19,22 @@ const FailoverPolicySchema = z.object({
     .array(z.number().int().min(100).max(599))
     .default(DEFAULT_RETRYABLE_STATUS_CODES),
   retryableErrors: z.array(z.string().min(1)).default(['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND']),
+});
+
+const RateLimitConfigSchema = z.object({
+  requests_per_minute: z.number().min(1).optional(),
+  queue_depth: z.number().min(1).optional(),
+  queue_timeout_ms: z.number().min(1).optional(),
+});
+
+const DEFAULT_SHAPER_QUEUE_TIMEOUT_MS = 30_000;
+const DEFAULT_SHAPER_CLEANUP_INTERVAL_MS = 60_000;
+const DEFAULT_SHAPER_DEFAULT_RPM = 60;
+
+const ShaperRuntimeConfigSchema = z.object({
+  queueTimeoutMs: z.number().int().min(1),
+  cleanupIntervalMs: z.number().int().min(1),
+  defaultRpm: z.number().int().min(1),
 });
 
 const PricingRangeSchema = z.object({
@@ -71,6 +87,7 @@ const ModelProviderConfigSchema = z.object({
   }),
   access_via: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  rate_limit: RateLimitConfigSchema.optional(),
 });
 
 const OAuthProviderSchema = z.enum([
@@ -146,18 +163,7 @@ const CopilotQuotaCheckerOptionsSchema = z.object({
 });
 
 const WisdomGateQuotaCheckerOptionsSchema = z.object({
-  endpoint: z.string().url().optional(),
-});
-
-const GeminiCliQuotaCheckerOptionsSchema = z.object({
-  endpoint: z.string().url().optional(),
-  userAgent: z.string().trim().min(1).optional(),
-  googApiClient: z.string().trim().min(1).optional(),
-  clientMetadata: z.string().trim().min(1).optional(),
-});
-
-const AntigravityQuotaCheckerOptionsSchema = z.object({
-  endpoint: z.string().url().optional(),
+  session: z.string().trim().min(1, 'Wisdom Gate session cookie is required'),
 });
 
 const ApertisQuotaCheckerOptionsSchema = z.object({
@@ -259,7 +265,7 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
-    options: WisdomGateQuotaCheckerOptionsSchema.optional().default({}),
+    options: WisdomGateQuotaCheckerOptionsSchema,
   }),
   z.object({
     type: z.literal('apertis'),
@@ -281,20 +287,6 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: PoeQuotaCheckerOptionsSchema.optional().default({}),
-  }),
-  z.object({
-    type: z.literal('gemini-cli'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
-    options: GeminiCliQuotaCheckerOptionsSchema.optional().default({}),
-  }),
-  z.object({
-    type: z.literal('antigravity'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
-    options: AntigravityQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 
@@ -319,6 +311,7 @@ const ProviderConfigSchema = z
     headers: z.record(z.string()).optional(),
     extraBody: z.record(z.any()).optional(),
     estimateTokens: z.boolean().optional().default(false),
+    rate_limit: RateLimitConfigSchema.optional(),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
@@ -387,7 +380,6 @@ const ModelConfigSchema = z.object({
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
-  use_image_fallthrough: z.boolean().default(false).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
   metadata: ModelMetadataSchema.optional(),
@@ -423,11 +415,6 @@ const CooldownPolicySchema = z.object({
   maxMinutes: z.number().min(1).default(300),
 });
 
-const VisionFallthroughConfigSchema = z.object({
-  descriptor_model: z.string().min(1),
-  default_prompt: z.string().default(DEFAULT_VISION_DESCRIPTION_PROMPT),
-});
-
 const RawPlexusConfigSchema = z
   .object({
     providers: z.record(z.string(), ProviderConfigSchema),
@@ -436,7 +423,6 @@ const RawPlexusConfigSchema = z
     adminKey: z.string(),
     failover: FailoverPolicySchema.optional(),
     cooldown: CooldownPolicySchema.optional(),
-    vision_fallthrough: VisionFallthroughConfigSchema.optional(),
     performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
@@ -446,11 +432,13 @@ const RawPlexusConfigSchema = z
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
 export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
+export type ShaperRuntimeConfig = z.infer<typeof ShaperRuntimeConfigSchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
   cooldown?: CooldownPolicy;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
+  shaper: ShaperRuntimeConfig;
 };
 export type DatabaseConfig = {
   connectionString: string;
@@ -601,13 +589,106 @@ export function validateConfig(yamlContent: string): PlexusConfig {
 }
 
 function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
+  const shaper = getShaperRuntimeConfig();
+
   return {
     ...config,
+    providers: hydrateProviderRateLimits(config.providers, shaper),
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
     cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
     quotas: buildProviderQuotaConfigs(config),
     mcpServers: config.mcp_servers,
+    shaper,
   };
+}
+
+function parsePositiveIntEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    logger.warn(`Ignoring invalid ${name} value '${rawValue}', using ${fallback}`);
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function getShaperRuntimeConfig(): ShaperRuntimeConfig {
+  return ShaperRuntimeConfigSchema.parse({
+    queueTimeoutMs: parsePositiveIntEnv(
+      'PLEXUS_SHAPER_QUEUE_TIMEOUT_MS',
+      DEFAULT_SHAPER_QUEUE_TIMEOUT_MS
+    ),
+    cleanupIntervalMs: parsePositiveIntEnv(
+      'PLEXUS_SHAPER_CLEANUP_INTERVAL_MS',
+      DEFAULT_SHAPER_CLEANUP_INTERVAL_MS
+    ),
+    defaultRpm: parsePositiveIntEnv('PLEXUS_SHAPER_DEFAULT_RPM', DEFAULT_SHAPER_DEFAULT_RPM),
+  });
+}
+
+function hydrateProviderRateLimits(
+  providers: z.infer<typeof RawPlexusConfigSchema>['providers'],
+  shaper: ShaperRuntimeConfig
+): z.infer<typeof RawPlexusConfigSchema>['providers'] {
+  const hydrateRateLimit = (rateLimit?: {
+    requests_per_minute?: number;
+    queue_depth?: number;
+    queue_timeout_ms?: number;
+  }) => {
+    if (!rateLimit) {
+      return undefined;
+    }
+
+    return {
+      ...rateLimit,
+      requests_per_minute: rateLimit.requests_per_minute ?? shaper.defaultRpm,
+      queue_timeout_ms: rateLimit.queue_timeout_ms ?? shaper.queueTimeoutMs,
+    };
+  };
+
+  return Object.fromEntries(
+    Object.entries(providers).map(([providerId, providerConfig]) => {
+      const hydratedProviderRateLimit = hydrateRateLimit(providerConfig.rate_limit);
+
+      if (!providerConfig.models || Array.isArray(providerConfig.models)) {
+        if (!hydratedProviderRateLimit) {
+          return [providerId, providerConfig];
+        }
+
+        return [
+          providerId,
+          {
+            ...providerConfig,
+            rate_limit: hydratedProviderRateLimit,
+          },
+        ];
+      }
+
+      const hydratedModels = Object.fromEntries(
+        Object.entries(providerConfig.models).map(([modelId, modelConfig]) => [
+          modelId,
+          {
+            ...modelConfig,
+            rate_limit: hydrateRateLimit(modelConfig.rate_limit),
+          },
+        ])
+      );
+
+      return [
+        providerId,
+        {
+          ...providerConfig,
+          models: hydratedModels,
+          rate_limit: hydratedProviderRateLimit,
+        },
+      ];
+    })
+  );
 }
 
 function migrateOAuthAccounts(parsed: unknown): {
@@ -726,8 +807,6 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
     'openai-codex': { type: 'openai-codex', intervalMinutes: 5 },
     'claude-code': { type: 'claude-code', intervalMinutes: 5 },
     'github-copilot': { type: 'copilot', intervalMinutes: 5 },
-    'google-gemini-cli': { type: 'gemini-cli', intervalMinutes: 5 },
-    'google-antigravity': { type: 'antigravity', intervalMinutes: 5 },
   };
 
   for (const [providerId, providerConfig] of Object.entries(config.providers)) {
@@ -813,6 +892,7 @@ function setupWatcher(filePath: string) {
             const newConfig = await parseConfigFile(filePath);
             currentConfig = newConfig;
             await QuotaScheduler.getInstance().reload(newConfig.quotas);
+            await RequestShaper.getInstance().reload(newConfig);
             logger.info('Configuration reloaded successfully');
           } catch (error) {
             logger.error('Failed to reload configuration', { error });
