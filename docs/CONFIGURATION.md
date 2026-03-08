@@ -161,6 +161,34 @@ This section defines the upstream AI providers that Plexus will route requests t
 
 - **`disable_cooldown`**: (Optional, default: `false`) When `true`, this provider is never placed on cooldown regardless of errors. See [Disabling Cooldowns Per Provider](#disabling-cooldowns-per-provider).
 
+- **`rate_limit`**: (Optional) Enables the low-RPM request shaper for this provider. Use it when a provider needs proactive pacing before upstream 429s occur.
+
+  ```yaml
+  providers:
+    openai_direct:
+      api_base_url: https://api.openai.com/v1
+      api_key: your_openai_key
+      rate_limit:
+        requests_per_minute: 10
+        queue_depth: 5
+        queue_timeout_ms: 30000
+      models:
+        gpt-4o-mini: {}
+  ```
+
+  Supported fields:
+
+  - `requests_per_minute`: Maximum request budget replenished each minute.
+  - `queue_depth`: Maximum number of requests that may wait internally for budget.
+  - `queue_timeout_ms`: Maximum time a queued request may wait before timing out.
+
+  The Admin UI exposes these in two places:
+
+  1. **Providers** -> provider editor -> **Request Shaper Defaults** for provider-wide settings.
+  2. **Providers** -> model mapping editor -> **Model RPM Override / Model Queue Depth / Model Queue Timeout** for per-model overrides.
+
+  Live runtime state is visible in **Quotas** -> **Request Shaper**.
+
 ---
 
 ### Vision Fallthrough
@@ -173,6 +201,44 @@ Vision Fallthrough (Image-to-Text preprocessing) is most easily configured via t
 While these can be set in `plexus.yaml` (`vision_fallthrough.descriptor_model` and `models.<alias>.use_image_fallthrough`), using the UI is the recommended approach for rapid testing and configuration.
 
 #### Model Pricing Sources
+
+#### Per-Model Rate Limit Overrides
+
+Provider-level `rate_limit` applies to every model on that provider unless a model entry overrides it.
+
+```yaml
+providers:
+  synthetic:
+    api_base_url: https://api.synthetic.new/openai/v1
+    api_key: your-synthetic-key
+    rate_limit:
+      requests_per_minute: 8
+      queue_depth: 3
+      queue_timeout_ms: 20000
+    models:
+      fast-shared-model:
+        pricing:
+          source: simple
+          input: 1.0
+          output: 2.0
+      slow-special-model:
+        rate_limit:
+          requests_per_minute: 2
+          queue_depth: 1
+          queue_timeout_ms: 45000
+        pricing:
+          source: simple
+          input: 3.0
+          output: 6.0
+```
+
+In that example:
+
+- `fast-shared-model` inherits the provider default of 8 RPM.
+- `slow-special-model` overrides the provider default and shapes traffic at 2 RPM.
+- Models without any `rate_limit` block keep inheriting the provider default.
+
+If neither the provider nor the model defines `rate_limit`, the request shaper does nothing for that target.
 
 Each model entry can include a `pricing` block. Four sources are supported:
 

@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
-import { api } from '../lib/api';
+import { api, ShaperRateLimitStatus, ShaperRateLimitsResponse } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { RefreshCw, Cpu } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../types/quota';
 import { toBoolean, toIsoString } from '../lib/normalize';
+import { formatMs } from '../lib/format';
 import {
   SyntheticQuotaDisplay,
   ClaudeCodeQuotaDisplay,
@@ -75,7 +76,9 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
 
 export const Quotas = () => {
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [shaperState, setShaperState] = useState<ShaperRateLimitsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingShaper, setLoadingShaper] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [selectedQuota, setSelectedQuota] = useState<QuotaCheckerInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,10 +98,25 @@ export const Quotas = () => {
     setLoading(false);
   };
 
+  const fetchShaper = async () => {
+    setLoadingShaper(true);
+    try {
+      const data = await api.getRateLimits();
+      setShaperState(data);
+    } finally {
+      setLoadingShaper(false);
+    }
+  };
+
+  const refreshAll = async () => {
+    await Promise.all([fetchQuotas(), fetchShaper()]);
+  };
+
   useEffect(() => {
-    fetchQuotas();
-    // Refresh quotas every 30 seconds
-    const interval = setInterval(fetchQuotas, 30000);
+    void refreshAll();
+    const interval = setInterval(() => {
+      void refreshAll();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -254,6 +272,84 @@ export const Quotas = () => {
     setIsBalanceModal(false);
   };
 
+  const shaperTargets = useMemo(() => {
+    return [...(shaperState?.rateLimits || [])].sort((a, b) => {
+      const providerCompare = a.provider.localeCompare(b.provider);
+      if (providerCompare !== 0) return providerCompare;
+      return a.model.localeCompare(b.model);
+    });
+  }, [shaperState]);
+
+  const renderShaperCard = (target: ShaperRateLimitStatus) => {
+    const isBackedUp = target.queueDepth > 0 || target.waitersCount > 0;
+    const isDropping = target.dropCount > 0 || target.timeoutCount > 0;
+
+    return (
+      <div
+        key={`${target.provider}:${target.model}`}
+        className={clsx(
+          'border rounded-lg p-4 transition-colors',
+          isDropping
+            ? 'border-danger/50 bg-danger/5'
+            : isBackedUp
+              ? 'border-primary/40 bg-primary/5'
+              : 'border-border bg-bg-card'
+        )}
+      >
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="font-heading text-sm font-semibold text-text">{target.provider}</div>
+            <div className="text-xs text-text-secondary break-all">{target.model}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">
+              Allowed Each Minute
+            </div>
+            <div className="font-heading text-lg text-text">{target.requestsPerMinute}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">
+              Available Right Now
+            </div>
+            <div className="font-semibold text-text">{target.currentBudget}</div>
+          </div>
+          <div className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">
+              Waiting In Line
+            </div>
+            <div className="font-semibold text-text">{target.waitersCount}</div>
+          </div>
+          <div className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">Longest Wait</div>
+            <div className="font-semibold text-text">
+              {target.oldestWaitMs === null ? 'none' : formatMs(target.oldestWaitMs)}
+            </div>
+          </div>
+          <div className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">
+              Line Full Rejections
+            </div>
+            <div className="font-semibold text-text">{target.dropCount}</div>
+          </div>
+          <div className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">
+              Waited Too Long
+            </div>
+            <div className="font-semibold text-text">{target.timeoutCount}</div>
+          </div>
+          <div className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-muted">
+              Line Size Now
+            </div>
+            <div className="font-semibold text-text">{target.queueDepth}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render the appropriate quota display component based on checker type
   const renderQuotaDisplay = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
     const result = getQuotaResult(quota);
@@ -393,31 +489,97 @@ export const Quotas = () => {
         <div>
           <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Quota Trackers</h1>
           <p className="text-[15px] text-text-secondary m-0">
-            Monitor provider quotas and rate limits.
+            Monitor provider quotas and live request shaper state.
           </p>
         </div>
-        <Button variant="secondary" onClick={fetchQuotas} disabled={loading}>
-          <RefreshCw size={16} className={clsx('mr-2', loading && 'animate-spin')} />
+        <Button
+          variant="secondary"
+          onClick={() => void refreshAll()}
+          disabled={loading || loadingShaper}
+        >
+          <RefreshCw
+            size={16}
+            className={clsx('mr-2', (loading || loadingShaper) && 'animate-spin')}
+          />
           Refresh All
         </Button>
       </div>
 
-      {loading && quotas.length === 0 ? (
+      {loading && loadingShaper && quotas.length === 0 && !shaperState ? (
         <div className="flex items-center justify-center h-64">
           <RefreshCw size={24} className="animate-spin text-primary mr-2" />
-          <span className="text-text-secondary">Loading quotas...</span>
+          <span className="text-text-secondary">Loading shaper and quota data...</span>
         </div>
-      ) : quotas.length === 0 ? (
-        <Card>
-          <div className="text-center py-12">
-            <p className="text-text-secondary">No quota checkers configured</p>
-            <p className="text-text-muted text-sm mt-2">
-              Configure quota checkers in your provider settings to monitor usage.
-            </p>
-          </div>
-        </Card>
       ) : (
         <div className="space-y-8">
+          <section>
+            <div className="flex items-center gap-2 mb-6 pb-2 border-b border-border">
+              <Cpu size={20} className="text-primary" />
+              <h2 className="font-heading text-xl font-semibold text-text">Traffic Limits</h2>
+            </div>
+            <p className="text-sm text-text-secondary mb-4">
+              Each card is one provider and one model. If a provider has limits on two models, you
+              will see two cards.
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-4 mb-4">
+              <Card>
+                <div className="text-[11px] uppercase tracking-wider text-text-muted mb-1">
+                  Active Limited Paths
+                </div>
+                <div className="font-heading text-2xl text-text">
+                  {shaperState?.summary.activeLimiters ?? 0}
+                </div>
+              </Card>
+              <Card>
+                <div className="text-[11px] uppercase tracking-wider text-text-muted mb-1">
+                  Total Waiting In Line
+                </div>
+                <div className="font-heading text-2xl text-text">
+                  {shaperState?.summary.totalQueueDepth ?? 0}
+                </div>
+              </Card>
+              <Card>
+                <div className="text-[11px] uppercase tracking-wider text-text-muted mb-1">
+                  Requests Still Waiting
+                </div>
+                <div className="font-heading text-2xl text-text">
+                  {shaperState?.summary.totalWaitersCount ?? 0}
+                </div>
+              </Card>
+              <Card>
+                <div className="text-[11px] uppercase tracking-wider text-text-muted mb-1">
+                  Longest Wait Right Now
+                </div>
+                <div className="font-heading text-2xl text-text">
+                  {shaperState?.summary.oldestWaitMs === null ||
+                  shaperState?.summary.oldestWaitMs === undefined
+                    ? 'none'
+                    : formatMs(shaperState.summary.oldestWaitMs)}
+                </div>
+              </Card>
+            </div>
+
+            {shaperTargets.length === 0 ? (
+              <Card>
+                <div className="text-center py-10">
+                  <p className="text-text-secondary">No active traffic-limited targets yet</p>
+                  <p className="text-text-muted text-sm mt-2">
+                    Add provider or model traffic limits in Providers to surface slow-path state
+                    here.
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              <div
+                className="grid gap-4"
+                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}
+              >
+                {shaperTargets.map((target) => renderShaperCard(target))}
+              </div>
+            )}
+          </section>
+
           {/* Combined Balances Card */}
           {balanceGroups.length > 0 && (
             <section>
@@ -439,6 +601,18 @@ export const Quotas = () => {
               </div>
               {renderQuotaColumns(rateLimitGroups)}
             </section>
+          )}
+
+          {quotas.length === 0 && (
+            <Card>
+              <div className="text-center py-12">
+                <p className="text-text-secondary">No quota checkers configured</p>
+                <p className="text-text-muted text-sm mt-2">
+                  Configure quota checkers in your provider settings to monitor provider account
+                  usage.
+                </p>
+              </div>
+            </Card>
           )}
         </div>
       )}
