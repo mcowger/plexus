@@ -26,6 +26,14 @@ const BASE_CONFIG = {
 // Admin key is now read from process.env.ADMIN_KEY
 const originalAdminKey = process.env.ADMIN_KEY;
 
+afterAll(() => {
+  if (originalAdminKey === undefined) {
+    delete process.env.ADMIN_KEY;
+  } else {
+    process.env.ADMIN_KEY = originalAdminKey;
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Shared minimal mocks
 // ---------------------------------------------------------------------------

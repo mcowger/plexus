@@ -13,7 +13,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const config = configService.getConfig();
       return reply.send(config);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -22,7 +22,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const exported = await configService.exportConfig();
       return reply.send(exported);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -33,7 +33,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const providers = await configService.getRepository().getAllProviders();
       return reply.send(providers);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -46,7 +46,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       }
       return reply.send(provider);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -64,7 +64,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, slug });
     } catch (e: any) {
       logger.error(`Failed to save provider '${slug}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -79,7 +79,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, provider: providerId });
     } catch (e: any) {
       logger.error(`Failed to delete provider '${providerId}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -90,7 +90,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const aliases = await configService.getRepository().getAllAliases();
       return reply.send(aliases);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -108,7 +108,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, slug });
     } catch (e: any) {
       logger.error(`Failed to save model alias '${slug}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -121,7 +121,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error(`Failed to delete model alias '${aliasId}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -132,7 +132,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, deletedCount });
     } catch (e: any) {
       logger.error('Failed to delete all model aliases', e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -143,7 +143,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const keys = await configService.getRepository().getAllKeys();
       return reply.send(keys);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -161,7 +161,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, name });
     } catch (e: any) {
       logger.error(`Failed to save API key '${name}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -174,7 +174,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error(`Failed to delete API key '${name}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -185,22 +185,23 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const settings = await configService.getAllSettings();
       return reply.send(settings);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
   fastify.patch('/v0/management/system-settings', async (request, reply) => {
-    const body = request.body as Record<string, unknown>;
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
 
     try {
-      for (const [key, value] of Object.entries(body)) {
-        await configService.setSetting(key, value);
-      }
+      await configService.setSettingsBulk(body);
       logger.info('System settings updated via API');
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error('Failed to update system settings', e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -211,20 +212,23 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const vf = await configService.getSetting('vision_fallthrough', {});
       return reply.send(vf);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
   fastify.patch('/v0/management/config/vision-fallthrough', async (request, reply) => {
     try {
-      const updates = request.body as any;
+      const updates = request.body as Record<string, unknown> | null;
+      if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+        return reply.code(400).send({ error: 'Object body is required' });
+      }
       const current = await configService.getSetting<any>('vision_fallthrough', {});
       const merged = { ...current, ...updates };
       await configService.setSetting('vision_fallthrough', merged);
       return reply.send(merged);
     } catch (e: any) {
       logger.error('Failed to patch vision-fallthrough config', e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -235,7 +239,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       const servers = await configService.getRepository().getAllMcpServers();
       return reply.send(servers);
     } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -268,7 +272,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, name: serverName });
     } catch (e: any) {
       logger.error(`Failed to save MCP server '${serverName}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
@@ -281,7 +285,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error(`Failed to delete MCP server '${serverName}'`, e);
-      return reply.code(500).send({ error: e.message });
+      return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 

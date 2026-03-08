@@ -10,7 +10,9 @@ export const providers = sqliteTable(
     apiBaseUrl: text('api_base_url'), // JSON: string URL or {"chat":"...","messages":"..."}
     apiKey: text('api_key'),
     oauthProviderType: text('oauth_provider_type'), // 'anthropic' | 'openai-codex' | 'github-copilot' | 'google-gemini-cli' | 'google-antigravity'
-    oauthCredentialId: integer('oauth_credential_id').references(() => oauthCredentials.id, { onDelete: 'set null' }),
+    oauthCredentialId: integer('oauth_credential_id').references(() => oauthCredentials.id, {
+      onDelete: 'set null',
+    }),
     enabled: integer('enabled').notNull().default(1),
     disableCooldown: integer('disable_cooldown').notNull().default(0),
     discount: real('discount'),

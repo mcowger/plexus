@@ -709,7 +709,12 @@ export function getConfig(): PlexusConfig {
   } catch (e: any) {
     // Only fall back for module-load or not-initialized scenarios
     // Rethrow operational errors (DB failures, etc.)
-    if (e instanceof Error && e.message && !e.message.includes('not loaded') && !e.message.includes('Cannot find module')) {
+    if (
+      e instanceof Error &&
+      e.message &&
+      !e.message.includes('not loaded') &&
+      !e.message.includes('Cannot find module')
+    ) {
       throw e;
     }
   }

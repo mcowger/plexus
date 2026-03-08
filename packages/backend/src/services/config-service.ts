@@ -150,6 +150,11 @@ export class ConfigService {
     await this.rebuildCache();
   }
 
+  async setSettingsBulk(entries: Record<string, unknown>): Promise<void> {
+    await this.repo.setSettingsBulk(entries);
+    await this.rebuildCache();
+  }
+
   async getSetting<T>(key: string, defaultValue: T): Promise<T> {
     return this.repo.getSetting(key, defaultValue);
   }
@@ -185,6 +190,7 @@ export class ConfigService {
 
   async clearAllData(): Promise<void> {
     await this.repo.clearAllData();
+    this.cache = null;
   }
 
   // ─── Import from YAML/JSON ──────────────────────────────────────

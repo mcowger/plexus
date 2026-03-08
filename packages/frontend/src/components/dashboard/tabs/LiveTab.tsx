@@ -451,6 +451,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const infoButtonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [popoverStyle, setPopoverStyle] = useState<{ top: number; right: number } | null>(null);
 
   const updatePopoverPosition = useCallback(() => {
@@ -475,7 +476,14 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        ref.current &&
+        !ref.current.contains(target) &&
+        !(popoverRef.current && popoverRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
     };
     updatePopoverPosition();
     document.addEventListener('mousedown', handler);
@@ -523,6 +531,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
         {open && popoverStyle && typeof document !== 'undefined'
           ? createPortal(
               <div
+                ref={popoverRef}
                 onClick={(e) => e.stopPropagation()}
                 className="fixed z-100 w-72 rounded-md border border-border shadow-lg p-3 text-xs space-y-2"
                 style={{

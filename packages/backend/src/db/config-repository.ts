@@ -268,7 +268,14 @@ export class ConfigRepository {
 
   async getProviderModels(
     providerSlug: string
-  ): Promise<Array<{ modelName: string; pricingConfig: unknown; modelType: string | null; accessVia: string[] | null }>> {
+  ): Promise<
+    Array<{
+      modelName: string;
+      pricingConfig: unknown;
+      modelType: string | null;
+      accessVia: string[] | null;
+    }>
+  > {
     const schema = this.schema();
     const provider = await this.db()
       .select()
@@ -321,9 +328,7 @@ export class ConfigRepository {
         enabled: toBool(row.quotaCheckerEnabled),
         intervalMinutes: row.quotaCheckerInterval,
         ...(row.quotaCheckerId ? { id: row.quotaCheckerId } : {}),
-        ...(row.quotaCheckerOptions
-          ? { options: parseJson(row.quotaCheckerOptions) }
-          : {}),
+        ...(row.quotaCheckerOptions ? { options: parseJson(row.quotaCheckerOptions) } : {}),
       };
     }
 
@@ -543,14 +548,16 @@ export class ConfigRepository {
         })
         .where(eq(schema.apiKeys.name, name));
     } else {
-      await this.db().insert(schema.apiKeys).values({
-        name,
-        secret: config.secret,
-        comment: config.comment ?? null,
-        quotaName: config.quota ?? null,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
+      await this.db()
+        .insert(schema.apiKeys)
+        .values({
+          name,
+          secret: config.secret,
+          comment: config.comment ?? null,
+          quotaName: config.quota ?? null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
     }
   }
 
@@ -600,15 +607,17 @@ export class ConfigRepository {
         })
         .where(eq(schema.userQuotaDefinitions.name, name));
     } else {
-      await this.db().insert(schema.userQuotaDefinitions).values({
-        name,
-        quotaType: quota.type,
-        limitType: quota.limitType,
-        limitValue: quota.limit,
-        duration: 'duration' in quota ? quota.duration : null,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
+      await this.db()
+        .insert(schema.userQuotaDefinitions)
+        .values({
+          name,
+          quotaType: quota.type,
+          limitType: quota.limitType,
+          limitValue: quota.limit,
+          duration: 'duration' in quota ? quota.duration : null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
     }
   }
 
@@ -630,7 +639,9 @@ export class ConfigRepository {
       result[row.name] = {
         upstream_url: row.upstreamUrl,
         enabled: toBool(row.enabled),
-        ...(row.headers ? { headers: parseJson<Record<string, string>>(row.headers) ?? undefined } : {}),
+        ...(row.headers
+          ? { headers: parseJson<Record<string, string>>(row.headers) ?? undefined }
+          : {}),
       };
     }
 
@@ -658,14 +669,16 @@ export class ConfigRepository {
         })
         .where(eq(schema.mcpServers.name, name));
     } else {
-      await this.db().insert(schema.mcpServers).values({
-        name,
-        upstreamUrl: config.upstream_url,
-        enabled: fromBool(config.enabled !== false),
-        headers: config.headers ? toJson(config.headers) : null,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
+      await this.db()
+        .insert(schema.mcpServers)
+        .values({
+          name,
+          upstreamUrl: config.upstream_url,
+          enabled: fromBool(config.enabled !== false),
+          headers: config.headers ? toJson(config.headers) : null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
     }
   }
 
@@ -706,12 +719,42 @@ export class ConfigRepository {
         .set({ value: toJson(value), updatedAt: timestamp })
         .where(eq(schema.systemSettings.key, key));
     } else {
-      await this.db().insert(schema.systemSettings).values({
-        key,
-        value: toJson(value),
-        updatedAt: timestamp,
-      });
+      await this.db()
+        .insert(schema.systemSettings)
+        .values({
+          key,
+          value: toJson(value),
+          updatedAt: timestamp,
+        });
     }
+  }
+
+  async setSettingsBulk(entries: Record<string, unknown>): Promise<void> {
+    const schema = this.schema();
+    const timestamp = now();
+
+    await this.db().transaction(async (tx) => {
+      for (const [key, value] of Object.entries(entries)) {
+        const existing = await tx
+          .select()
+          .from(schema.systemSettings)
+          .where(eq(schema.systemSettings.key, key))
+          .limit(1);
+
+        if (existing.length > 0) {
+          await tx
+            .update(schema.systemSettings)
+            .set({ value: toJson(value), updatedAt: timestamp })
+            .where(eq(schema.systemSettings.key, key));
+        } else {
+          await tx.insert(schema.systemSettings).values({
+            key,
+            value: toJson(value),
+            updatedAt: timestamp,
+          });
+        }
+      }
+    });
   }
 
   async getAllSettings(): Promise<Record<string, unknown>> {

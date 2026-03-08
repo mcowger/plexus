@@ -37,16 +37,15 @@ export class OAuthAuthManager {
     try {
       const configService = ConfigService.getInstance();
       const providers = await configService.getAllOAuthProviders();
-
-      this.authData = {};
+      const newAuthData: Record<string, { accounts: Record<string, OAuthCredentials> }> = {};
 
       for (const { providerType, accountId } of providers) {
         const creds = await configService.getOAuthCredentials(providerType, accountId);
         if (creds) {
-          if (!this.authData[providerType]) {
-            this.authData[providerType] = { accounts: {} };
+          if (!newAuthData[providerType]) {
+            newAuthData[providerType] = { accounts: {} };
           }
-          this.authData[providerType].accounts[accountId] = {
+          newAuthData[providerType].accounts[accountId] = {
             type: 'oauth',
             access: creds.accessToken,
             refresh: creds.refreshToken,
@@ -55,7 +54,9 @@ export class OAuthAuthManager {
         }
       }
 
-      const totalAccounts = Object.values(this.authData).reduce(
+      this.authData = newAuthData;
+
+      const totalAccounts = Object.values(newAuthData).reduce(
         (sum, p) => sum + Object.keys(p.accounts).length,
         0
       );
@@ -64,10 +65,15 @@ export class OAuthAuthManager {
       }
     } catch (error: any) {
       logger.error('OAuth: Failed to load from database:', error);
+      throw error;
     }
   }
 
-  private async saveToDatabase(provider: OAuthProvider, accountId: string, credentials: OAuthCredentials): Promise<void> {
+  private async saveToDatabase(
+    provider: OAuthProvider,
+    accountId: string,
+    credentials: OAuthCredentials
+  ): Promise<void> {
     try {
       const configService = ConfigService.getInstance();
       await configService.setOAuthCredentials(provider, accountId, {
@@ -103,7 +109,11 @@ export class OAuthAuthManager {
     return null;
   }
 
-  async setCredentials(provider: OAuthProvider, accountId: string, credentials: OAuthCredentials): Promise<void> {
+  async setCredentials(
+    provider: OAuthProvider,
+    accountId: string,
+    credentials: OAuthCredentials
+  ): Promise<void> {
     if (!accountId?.trim()) {
       throw new Error('OAuth: accountId is required to store credentials');
     }
@@ -183,7 +193,7 @@ export class OAuthAuthManager {
     return !!providerRecord && Object.keys(providerRecord.accounts).length > 0;
   }
 
-  deleteCredentials(provider: OAuthProvider, accountId: string): boolean {
+  async deleteCredentials(provider: OAuthProvider, accountId: string): Promise<boolean> {
     if (!accountId?.trim()) {
       return false;
     }
@@ -193,17 +203,12 @@ export class OAuthAuthManager {
       return false;
     }
 
+    await ConfigService.getInstance().deleteOAuthCredentials(provider, accountId);
+
     delete providerRecord.accounts[accountId];
     if (Object.keys(providerRecord.accounts).length === 0) {
       delete this.authData[provider];
     }
-
-    // Delete from database asynchronously
-    ConfigService.getInstance()
-      .deleteOAuthCredentials(provider, accountId)
-      .catch((error) => {
-        logger.error('OAuth: Failed to delete credentials from database:', error);
-      });
 
     return true;
   }

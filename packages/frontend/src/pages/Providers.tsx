@@ -2778,10 +2778,13 @@ export const Providers = () => {
                                         step="0.000001"
                                         value={range.cache_write_per_m || 0}
                                         onChange={(e) => {
+                                          const nextValue = Number(e.target.value);
                                           const newRanges = [...mCfg.pricing.range];
                                           newRanges[idx] = {
                                             ...range,
-                                            cache_write_per_m: parseFloat(e.target.value),
+                                            cache_write_per_m: Number.isFinite(nextValue)
+                                              ? nextValue
+                                              : 0,
                                           };
                                           updateModelConfig(mId, {
                                             pricing: { ...mCfg.pricing, range: newRanges },

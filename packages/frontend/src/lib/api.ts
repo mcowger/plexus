@@ -414,10 +414,7 @@ const summaryRequestCache = new Map<
 >();
 
 const CONFIG_CACHE_TTL_MS = 20000;
-const configRequestCache = new Map<
-  string,
-  { expiresAt: number; promise: Promise<any> }
->();
+const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<any> }>();
 
 // Cache for quota checker types fetched from backend
 let quotaCheckerTypesCache: Set<string> | null = null;
@@ -1398,7 +1395,10 @@ export const api = {
     try {
       const res = await fetchWithAuth(`${API_BASE}/v0/management/keys`);
       if (!res.ok) throw new Error('Failed to fetch keys');
-      const keys = (await res.json()) as Record<string, { secret: string; comment?: string; quota?: string }>;
+      const keys = (await res.json()) as Record<
+        string,
+        { secret: string; comment?: string; quota?: string }
+      >;
 
       return Object.entries(keys).map(([key, val]) => ({
         key,
@@ -2243,7 +2243,6 @@ export const api = {
     };
     return json.data || [];
   },
-
 
   getMcpServers: async (): Promise<
     Record<string, { upstream_url: string; enabled: boolean; headers?: Record<string, string> }>

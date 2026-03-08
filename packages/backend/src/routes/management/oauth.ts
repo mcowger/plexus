@@ -73,10 +73,17 @@ export async function registerOAuthRoutes(
     }
 
     const authManager = OAuthAuthManager.getInstance();
-    const deleted = authManager.deleteCredentials(
-      parsed.data.providerId as OAuthProvider,
-      parsed.data.accountId
-    );
+    let deleted = false;
+    try {
+      deleted = await authManager.deleteCredentials(
+        parsed.data.providerId as OAuthProvider,
+        parsed.data.accountId
+      );
+    } catch (error) {
+      return reply
+        .code(500)
+        .send({ error: error instanceof Error ? error.message : String(error) });
+    }
 
     if (!deleted) {
       return reply.code(404).send({ error: 'OAuth credentials not found' });

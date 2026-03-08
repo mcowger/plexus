@@ -198,7 +198,10 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
           });
         }
 
-        if (merged.type === 'rolling' && (!merged.duration || typeof merged.duration !== 'string')) {
+        if (
+          merged.type === 'rolling' &&
+          (!merged.duration || typeof merged.duration !== 'string')
+        ) {
           return reply.code(400).send({
             error: {
               message: 'Rolling quotas require a duration field (e.g., "1h", "30m", "1d")',

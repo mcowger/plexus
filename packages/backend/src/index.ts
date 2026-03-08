@@ -36,7 +36,9 @@ import { runMigrations } from './db/migrate';
 
 // --- Required Environment Variables ---
 if (!process.env.ADMIN_KEY) {
-  logger.error('ADMIN_KEY environment variable is required. Set it to a secure password for admin access.');
+  logger.error(
+    'ADMIN_KEY environment variable is required. Set it to a secure password for admin access.'
+  );
   process.exit(1);
 }
 
@@ -108,12 +110,14 @@ try {
     // Import from plexus.yaml if it exists
     // Try CONFIG_FILE env var first, then check common locations
     const configLocations = [
-      path.resolve(__dirname, '../../../config/plexus.yaml'),  // from packages/backend/src or dist
-      path.resolve(__dirname, '../../config/plexus.yaml'),     // alternate depth
-      path.resolve(process.cwd(), 'config/plexus.yaml'),       // from repo root
+      path.resolve(__dirname, '../../../config/plexus.yaml'), // from packages/backend/src or dist
+      path.resolve(__dirname, '../../config/plexus.yaml'), // alternate depth
+      path.resolve(process.cwd(), 'config/plexus.yaml'), // from repo root
       path.resolve(process.cwd(), '../../config/plexus.yaml'), // from packages/backend
     ];
-    const configPath = process.env.CONFIG_FILE || configLocations.find(p => fs.existsSync(p));
+    const configPath = [process.env.CONFIG_FILE, ...configLocations].find(
+      (p): p is string => Boolean(p) && fs.existsSync(p)
+    );
 
     try {
       if (configPath && fs.existsSync(configPath)) {
@@ -132,7 +136,10 @@ try {
         logger.info(`Imported OAuth credentials from ${authJsonPath} into database`);
       }
     } catch (importError) {
-      logger.error('Failed to import config — clearing partial data for clean retry on next launch', importError);
+      logger.error(
+        'Failed to import config — clearing partial data for clean retry on next launch',
+        importError
+      );
       await configService.clearAllData();
       throw importError;
     }
