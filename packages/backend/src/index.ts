@@ -235,7 +235,7 @@ fastify.setNotFoundHandler((request, reply) => {
 });
 
 const port = parseInt(process.env.PORT || '4000');
-const host = '0.0.0.0';
+const host = process.env.HOST || '0.0.0.0';
 
 /**
  * start
