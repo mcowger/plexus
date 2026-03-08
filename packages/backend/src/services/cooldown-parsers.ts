@@ -56,39 +56,6 @@ export class AntigravityCooldownParser implements CooldownParser {
 }
 
 /**
- * Parser for OpenAI Codex usage limit messages emitted by pi-ai.
- * Handles patterns like:
- * - "Try again in ~9725 min"
- * - "Try again in 45 minutes"
- * - "Try again in 2h"
- */
-export class OpenAICodexCooldownParser implements CooldownParser {
-  parseCooldownDuration(errorText: string): number | null {
-    try {
-      const minutesMatch = errorText.match(/try again in\s*~?(\d+)\s*(?:m|min|mins?|minutes?)/i);
-      if (minutesMatch?.[1]) {
-        const minutes = parseInt(minutesMatch[1], 10);
-        return minutes * 60 * 1000;
-      }
-
-      const hoursMatch = errorText.match(/try again in\s*~?(\d+)\s*(?:h|hr|hrs?|hours?)/i);
-      if (hoursMatch?.[1]) {
-        const hours = parseInt(hoursMatch[1], 10);
-        return hours * 60 * 60 * 1000;
-      }
-
-      logger.debug(
-        `Unable to parse OpenAI Codex cooldown duration from: ${errorText.substring(0, 100)}`
-      );
-      return null;
-    } catch (e) {
-      logger.error('Error parsing OpenAI Codex cooldown duration', e);
-      return null;
-    }
-  }
-}
-
-/**
  * Registry for provider-specific cooldown parsers.
  * Maps provider type to parser implementation.
  */
@@ -99,7 +66,6 @@ export class CooldownParserRegistry {
     // Register built-in parsers
     CooldownParserRegistry.register('gemini', new AntigravityCooldownParser());
     CooldownParserRegistry.register('antigravity', new AntigravityCooldownParser());
-    CooldownParserRegistry.register('openai-codex', new OpenAICodexCooldownParser());
   }
 
   /**
@@ -136,4 +102,47 @@ export class CooldownParserRegistry {
     }
     return parser.parseCooldownDuration(errorText);
   }
+}
+
+/**
+ * Parses standard HTTP Retry-After header values.
+ * Supports two formats per RFC 7231:
+ * - Retry-After: <seconds> (integer)
+ * - Retry-After: <http-date> (e.g., 'Wed, 21 Oct 2015 07:28:00 GMT')
+ * @param headerValue The Retry-After header value
+ * @returns Cooldown duration in milliseconds, or null if unable to parse
+ */
+export function parseRetryAfterHeader(headerValue: string | null | undefined): number | null {
+  if (!headerValue) {
+    return null;
+  }
+
+  const trimmed = headerValue.trim();
+
+  // Try parsing as seconds (integer)
+  const secondsMatch = trimmed.match(/^\d+$/);
+  if (secondsMatch) {
+    const seconds = parseInt(trimmed, 10);
+    if (!isNaN(seconds) && seconds >= 0) {
+      logger.debug(`Parsed Retry-After as seconds: ${seconds}s`);
+      return seconds * 1000;
+    }
+  }
+
+  // Try parsing as HTTP-date
+  const date = new Date(trimmed);
+  if (!isNaN(date.getTime())) {
+    const now = Date.now();
+    const diff = date.getTime() - now;
+    if (diff > 0) {
+      logger.debug(`Parsed Retry-After as HTTP-date: ${date.toISOString()}`);
+      return diff;
+    }
+    // If the date is in the past, treat as 0 (retry immediately)
+    logger.debug('Retry-After HTTP-date is in the past, using 0ms');
+    return 0;
+  }
+
+  logger.debug(`Unable to parse Retry-After header: ${trimmed.substring(0, 50)}`);
+  return null;
 }

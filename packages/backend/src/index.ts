@@ -13,6 +13,7 @@ import { PricingManager } from './services/pricing-manager';
 import { ModelMetadataManager } from './services/model-metadata-manager';
 import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
+import { RequestShaper } from './services/request-shaper';
 import { ResponsesStorageService } from './services/responses-storage';
 import { OAuthAuthManager } from './services/oauth-auth-manager';
 import { requestLogger } from './middleware/log';
@@ -61,6 +62,7 @@ const dispatcher = new Dispatcher();
 const usageStorage = new UsageStorageService();
 const mcpUsageStorage = new McpUsageStorageService();
 const quotaScheduler = QuotaScheduler.getInstance();
+const requestShaper = RequestShaper.getInstance();
 
 // Initialize singletons with storage dependencies
 dispatcher.setUsageStorage(usageStorage);
@@ -110,6 +112,15 @@ try {
   }
 } catch (e) {
   logger.error('Failed to initialize quota checkers', e);
+  logger.error('Failed to initialize quota checkers', e);
+}
+
+// Initialize request shaper for low-RPM providers (requires DB and config to be ready)
+try {
+  const config = getConfig();
+  await requestShaper.initialize(config);
+} catch (e) {
+  logger.error('Failed to initialize request shaper', e);
 }
 
 // Initialize user quota enforcer (requires DB to be ready)
@@ -248,6 +259,7 @@ const start = async () => {
 
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
+      requestShaper.stop();
       quotaScheduler.stop();
       await fastify.close();
       const { closeDatabase } = await import('./db/client');
