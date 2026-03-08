@@ -27,6 +27,15 @@ import { ModelMetadataManager } from './model-metadata-manager';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../utils/constants';
 import { UsageRecord } from '../types/usage';
 import { calculateCosts } from '../utils/calculate-costs';
+import { RequestShaper, QueueFullError } from './request-shaper';
+import { getConfig, getProviderTypes } from '../config';
+import { applyModelBehaviors } from './model-behaviors';
+import { getModels } from '@mariozechner/pi-ai';
+import { VisionDescriptorService } from './vision-descriptor-service';
+import { ModelMetadataManager } from './model-metadata-manager';
+import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../utils/constants';
+import { UsageRecord } from '../types/usage';
+import { calculateCosts } from '../utils/calculate-costs';
 
 interface RetryAttemptRecord {
   index: number;
@@ -50,6 +59,43 @@ interface RetryHistoryLikeEntry {
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
+
+  /**
+   * Acquire permit from RequestShaper for provider/model.
+   * Returns null on success, error on failure (queue full, etc).
+   */
+  private async acquireShaperPermit(
+    provider: string,
+    model: string,
+    alias?: string
+  ): Promise<Error | null> {
+    const shaper = RequestShaper.getInstance();
+    if (!shaper.isShaped(provider, model, alias)) {
+      return null; // Not shaped = no permit needed
+    }
+
+    try {
+      const result = await shaper.acquirePermit(provider, model, alias);
+      if (result.type === 'timeout') {
+        return new Error(`Queue timeout for ${provider}:${model}${alias ? ` (${alias})` : ''}`);
+      }
+      return null; // Success (immediate or queued)
+    } catch (error) {
+      if (error instanceof QueueFullError) {
+        return error;
+      }
+      return error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  /**
+   * Release permit back to RequestShaper.
+   * Always called after request completes (success, error, or retry).
+   */
+  private releaseShaperPermit(provider: string, model: string, alias?: string): void {
+    const shaper = RequestShaper.getInstance();
+    shaper.releasePermit(provider, model, alias);
+  }
 
   private extractFailureReason(value: unknown): string | undefined {
     if (typeof value === 'string') {
@@ -266,7 +312,15 @@ export class Dispatcher {
         );
         continue;
       }
+      }
 
+      // Acquire permit from RequestShaper
+      const shaperError = await this.acquireShaperPermit(route.provider, route.model);
+      if (shaperError) {
+        logger.warn(shaperError.message);
+        lastError = shaperError;
+        continue;
+      }
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
       try {
@@ -530,7 +584,15 @@ export class Dispatcher {
         }
 
         throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
-      }
+      throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+    } finally {
+      // ALWAYS release permit
+      this.releaseShaperPermit(route.provider, route.model, route.canonicalModel);
+    }
+  }
+
+  throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+}
     }
 
     throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
@@ -1924,6 +1986,15 @@ export class Dispatcher {
           'embeddings'
         );
         continue;
+        continue;
+      }
+
+      // Acquire permit from RequestShaper
+      const shaperError = await this.acquireShaperPermit(route.provider, route.model);
+      if (shaperError) {
+        logger.warn(shaperError.message);
+        lastError = shaperError;
+        continue;
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
@@ -2062,7 +2133,21 @@ export class Dispatcher {
         }
 
         throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
-      }
+      throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+    } finally {
+      // ALWAYS release permit
+      this.releaseShaperPermit(route.provider, route.model, route.canonicalModel);
+    }
+  }
+
+  throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+}
+
+/**
+ * Dispatches audio transcription requests
+ * Handles multipart/form-data file uploads to OpenAI-compatible transcription endpoints
+ */
+async dispatchTranscription(
     }
 
     throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
@@ -2110,6 +2195,15 @@ export class Dispatcher {
           `Provider ${route.provider}/${route.model} is on cooldown`,
           'transcriptions'
         );
+        continue;
+        continue;
+      }
+
+      // Acquire permit from RequestShaper
+      const shaperError = await this.acquireShaperPermit(route.provider, route.model);
+      if (shaperError) {
+        logger.warn(shaperError.message);
+        lastError = shaperError;
         continue;
       }
 
@@ -2263,7 +2357,20 @@ export class Dispatcher {
         }
 
         throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
-      }
+      throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+    } finally {
+      // ALWAYS release permit
+      this.releaseShaperPermit(route.provider, route.model, route.canonicalModel);
+    }
+  }
+
+  throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+}
+
+/**
+ * Dispatches text-to-speech requests
+ * Handles JSON body requests to OpenAI-compatible speech endpoints
+ * Supports both binary audio responses and SSE streaming
     }
 
     throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
@@ -2310,6 +2417,15 @@ export class Dispatcher {
           `Provider ${route.provider}/${route.model} is on cooldown`,
           'speech'
         );
+        continue;
+        continue;
+      }
+
+      // Acquire permit from RequestShaper
+      const shaperError = await this.acquireShaperPermit(route.provider, route.model);
+      if (shaperError) {
+        logger.warn(shaperError.message);
+        lastError = shaperError;
         continue;
       }
 
