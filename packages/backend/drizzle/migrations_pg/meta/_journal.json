@@ -117,22 +117,8 @@
     {
       "idx": 16,
       "version": "7",
-      "when": 1771982126915,
-      "tag": "0016_sleepy_the_hand",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1772404194268,
-      "tag": "0017_uneven_maverick",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1772857531689,
-      "tag": "0018_tough_sir_ram",
+      "when": 1772926809959,
+      "tag": "0016_faulty_magma",
       "breakpoints": true
     }
   ]

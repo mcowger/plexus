@@ -8,6 +8,7 @@ export * from './sqlite/quota-snapshots';
 export * from './sqlite/responses';
 export * from './sqlite/mcp';
 export * from './sqlite/quota-state';
+export * from './sqlite/provider-rate-limits';
 export {
   requestUsageRelations,
   debugLogsRelations,
@@ -31,3 +32,4 @@ export {
   mcpDebugLogs as pgMcpDebugLogs,
 } from './postgres/mcp';
 export { quotaState as pgQuotaState } from './postgres/quota-state';
+export { providerRateLimits as pgProviderRateLimits } from './postgres/provider-rate-limits';

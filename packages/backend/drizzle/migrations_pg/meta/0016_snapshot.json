@@ -1,5 +1,5 @@
 {
-  "id": "82982dda-0d37-459c-88d0-4da86114cb6f",
+  "id": "254b6e44-2639-4216-b4bc-a4bd20a99be0",
   "prevId": "37a61b83-47a6-4d7c-bee6-816d65764ab3",
   "version": "7",
   "dialect": "postgresql",
@@ -367,12 +367,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -1650,6 +1644,80 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.provider_rate_limits": {
+      "name": "provider_rate_limits",
+      "schema": "",
+      "columns": {
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_budget": {
+          "name": "current_budget",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_refill_at": {
+          "name": "last_refill_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "queue_depth": {
+          "name": "queue_depth",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_rate_limits_last_refill": {
+          "name": "idx_rate_limits_last_refill",
+          "columns": [
+            {
+              "expression": "last_refill_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "provider_rate_limits_provider_model_pk": {
+          "name": "provider_rate_limits_provider_model_pk",
+          "columns": [
+            "provider",
+            "model"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

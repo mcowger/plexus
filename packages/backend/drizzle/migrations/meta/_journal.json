@@ -117,22 +117,8 @@
     {
       "idx": 16,
       "version": "6",
-      "when": 1771981769509,
-      "tag": "0016_superb_sally_floyd",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "6",
-      "when": 1772404194032,
-      "tag": "0017_cooing_rawhide_kid",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "6",
-      "when": 1772857531462,
-      "tag": "0018_giant_red_hulk",
+      "when": 1772926712799,
+      "tag": "0016_hard_vulcan",
       "breakpoints": true
     }
   ]

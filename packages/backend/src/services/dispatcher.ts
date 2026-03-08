@@ -18,7 +18,7 @@ import { CooldownManager } from './cooldown-manager';
 import { RouteResult } from './router';
 import { DebugManager } from './debug-manager';
 import { UsageStorageService } from './usage-storage';
-import { CooldownParserRegistry } from './cooldown-parsers';
+import { CooldownParserRegistry, parseRetryAfterHeader } from './cooldown-parsers';
 import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
 import { getModels } from '@mariozechner/pi-ai';
@@ -394,7 +394,7 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderFailure(
                   route.provider,
                   route.model,
-                  undefined,
+                  e?.routingContext?.cooldownDuration,
                   this.formatFailureReason(e, true)
                 );
               }
@@ -1435,7 +1435,7 @@ export class Dispatcher {
       providerResponse,
       rawProviderResponse,
       cooldownTriggered,
-      cooldownDuration,
+      cooldownDuration: cooldownDuration,
     };
 
     return enriched;
@@ -1714,17 +1714,26 @@ export class Dispatcher {
       response.status === 422 ||
       (response.status === 400 && !isQuota400);
 
-    if (!isCallerError) {
-      let cooldownDuration: number | undefined;
+    let cooldownDuration: number | undefined;
 
+    if (!isCallerError) {
       // For 429 errors, try to parse provider-specific cooldown duration
       if (response.status === 429) {
-        // Get provider type for parser lookup
-        cooldownDuration = this.parseCooldownDurationForProvider(
-          this.resolveCooldownProviderType(route),
-          errorText,
-          'HTTP'
-        );
+        const retryAfterDuration = parseRetryAfterHeader(response.headers.get('retry-after'));
+
+        if (retryAfterDuration !== null) {
+          cooldownDuration = retryAfterDuration;
+          logger.info(
+            `HTTP: Parsed cooldown duration from Retry-After header: ${cooldownDuration}ms (${cooldownDuration / 1000}s)`
+          );
+        } else {
+          // Get provider type for parser lookup
+          cooldownDuration = this.parseCooldownDurationForProvider(
+            this.resolveCooldownProviderType(route),
+            errorText,
+            'HTTP'
+          );
+        }
       }
 
       // Mark provider+model as failed with optional duration
@@ -1747,6 +1756,7 @@ export class Dispatcher {
       headers: this.sanitizeHeaders(headers || {}),
       statusCode: response.status,
       providerResponse: errorText,
+      cooldownDuration,
       cooldownTriggered: !isCallerError,
     };
 
@@ -1990,7 +2000,7 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderFailure(
                   route.provider,
                   route.model,
-                  undefined,
+                  e?.routingContext?.cooldownDuration,
                   this.formatFailureReason(e, true)
                 );
               }
@@ -2184,7 +2194,7 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderFailure(
                   route.provider,
                   route.model,
-                  undefined,
+                  e?.routingContext?.cooldownDuration,
                   this.formatFailureReason(e, true)
                 );
               }
@@ -2384,7 +2394,7 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderFailure(
                   route.provider,
                   route.model,
-                  undefined,
+                  e?.routingContext?.cooldownDuration,
                   this.formatFailureReason(e, true)
                 );
               }
@@ -2618,7 +2628,7 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderFailure(
                   route.provider,
                   route.model,
-                  undefined,
+                  e?.routingContext?.cooldownDuration,
                   this.formatFailureReason(e, true)
                 );
               }
@@ -2808,7 +2818,7 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderFailure(
                   route.provider,
                   route.model,
-                  undefined,
+                  e?.routingContext?.cooldownDuration,
                   this.formatFailureReason(e, true)
                 );
               }

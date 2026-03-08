@@ -21,6 +21,22 @@ const FailoverPolicySchema = z.object({
   retryableErrors: z.array(z.string().min(1)).default(['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND']),
 });
 
+const RateLimitConfigSchema = z.object({
+  requests_per_minute: z.number().min(1).optional(),
+  queue_depth: z.number().min(1).optional(),
+  queue_timeout_ms: z.number().min(1).optional(),
+});
+
+const DEFAULT_SHAPER_QUEUE_TIMEOUT_MS = 30_000;
+const DEFAULT_SHAPER_CLEANUP_INTERVAL_MS = 60_000;
+const DEFAULT_SHAPER_DEFAULT_RPM = 60;
+
+const ShaperRuntimeConfigSchema = z.object({
+  queueTimeoutMs: z.number().int().min(1),
+  cleanupIntervalMs: z.number().int().min(1),
+  defaultRpm: z.number().int().min(1),
+});
+
 const PricingRangeSchema = z.object({
   // This strategy is used to define a range of pricing for a model
   // There can be multiple ranges defined for different usage levels
@@ -71,6 +87,7 @@ const ModelProviderConfigSchema = z.object({
   }),
   access_via: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  rate_limit: RateLimitConfigSchema.optional(),
 });
 
 const OAuthProviderSchema = z.enum([
@@ -319,6 +336,7 @@ const ProviderConfigSchema = z
     headers: z.record(z.string()).optional(),
     extraBody: z.record(z.any()).optional(),
     estimateTokens: z.boolean().optional().default(false),
+    rate_limit: RateLimitConfigSchema.optional(),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
@@ -389,6 +407,7 @@ const ModelConfigSchema = z.object({
   additional_aliases: z.array(z.string()).optional(),
   use_image_fallthrough: z.boolean().default(false).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  rate_limit: RateLimitConfigSchema.optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
   metadata: ModelMetadataSchema.optional(),
 });
@@ -446,11 +465,13 @@ const RawPlexusConfigSchema = z
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
 export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
+export type ShaperRuntimeConfig = z.infer<typeof ShaperRuntimeConfigSchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
   cooldown?: CooldownPolicy;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
+  shaper?: ShaperRuntimeConfig;
 };
 export type DatabaseConfig = {
   connectionString: string;
@@ -601,12 +622,127 @@ export function validateConfig(yamlContent: string): PlexusConfig {
 }
 
 function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
+  const shaper = getShaperRuntimeConfig();
+
   return {
     ...config,
+    providers: hydrateProviderRateLimits(config.providers, shaper),
+    models: hydrateAliasRateLimits(config.models, shaper),
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
     cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
     quotas: buildProviderQuotaConfigs(config),
     mcpServers: config.mcp_servers,
+    shaper,
+  };
+}
+
+function parsePositiveIntEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    logger.warn(`Ignoring invalid ${name} value '${rawValue}', using ${fallback}`);
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function getShaperRuntimeConfig(): ShaperRuntimeConfig {
+  return ShaperRuntimeConfigSchema.parse({
+    queueTimeoutMs: parsePositiveIntEnv(
+      'PLEXUS_SHAPER_QUEUE_TIMEOUT_MS',
+      DEFAULT_SHAPER_QUEUE_TIMEOUT_MS
+    ),
+    cleanupIntervalMs: parsePositiveIntEnv(
+      'PLEXUS_SHAPER_CLEANUP_INTERVAL_MS',
+      DEFAULT_SHAPER_CLEANUP_INTERVAL_MS
+    ),
+    defaultRpm: parsePositiveIntEnv('PLEXUS_SHAPER_DEFAULT_RPM', DEFAULT_SHAPER_DEFAULT_RPM),
+  });
+}
+
+function hydrateProviderRateLimits(
+  providers: z.infer<typeof RawPlexusConfigSchema>['providers'],
+  shaper: ShaperRuntimeConfig
+): z.infer<typeof RawPlexusConfigSchema>['providers'] {
+  const hydrateRateLimit = createRateLimitHydrator(shaper);
+
+  return Object.fromEntries(
+    Object.entries(providers).map(([providerId, providerConfig]) => {
+      const hydratedProviderRateLimit = hydrateRateLimit(providerConfig.rate_limit);
+
+      if (!providerConfig.models || Array.isArray(providerConfig.models)) {
+        if (!hydratedProviderRateLimit) {
+          return [providerId, providerConfig];
+        }
+
+        return [
+          providerId,
+          {
+            ...providerConfig,
+            rate_limit: hydratedProviderRateLimit,
+          },
+        ];
+      }
+
+      const hydratedModels = Object.fromEntries(
+        Object.entries(providerConfig.models).map(([modelId, modelConfig]) => [
+          modelId,
+          {
+            ...modelConfig,
+            rate_limit: hydrateRateLimit(modelConfig.rate_limit),
+          },
+        ])
+      );
+
+      return [
+        providerId,
+        {
+          ...providerConfig,
+          models: hydratedModels,
+          rate_limit: hydratedProviderRateLimit,
+        },
+      ];
+    })
+  );
+}
+
+function hydrateAliasRateLimits(
+  models: z.infer<typeof RawPlexusConfigSchema>['models'],
+  shaper: ShaperRuntimeConfig
+): z.infer<typeof RawPlexusConfigSchema>['models'] {
+  const hydrateRateLimit = createRateLimitHydrator(shaper);
+
+  return Object.fromEntries(
+    Object.entries(models).map(([aliasId, aliasConfig]) => [
+      aliasId,
+      {
+        ...aliasConfig,
+        rate_limit: hydrateRateLimit(aliasConfig.rate_limit),
+      },
+    ])
+  );
+}
+
+function createRateLimitHydrator(shaper: ShaperRuntimeConfig) {
+  return (rateLimit?: {
+    requests_per_minute?: number;
+    queue_depth?: number;
+    queue_timeout_ms?: number;
+  }) => {
+    if (!rateLimit) {
+      return undefined;
+    }
+
+    return {
+      ...rateLimit,
+      requests_per_minute: rateLimit.requests_per_minute ?? shaper.defaultRpm,
+      queue_timeout_ms: rateLimit.queue_timeout_ms ?? shaper.queueTimeoutMs,
+    };
   };
 }
 
