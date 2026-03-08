@@ -633,4 +633,438 @@ export class RequestShaper {
     return target.queue.length;
   }
 
+  // ============================================================================
+  // Private Implementation
+  // ============================================================================
+
+  /**
+   * Admit the next waiter in queue if budget is available.
+   * Called after releasePermit or during cleanup.
+   *
+   * @param key - Shaper key (provider:model)
+   */
+  private admitNextIfAvailable(key: string): void {
+    const target = this.targets.get(key);
+    if (!target || target.queue.length === 0) {
+      return;
+    }
+
+    // No budget available
+    if (target.currentBudget <= 0) {
+      return;
+    }
+
+    // Dequeue next waiter (FIFO)
+    const waiter = target.queue.shift();
+    if (!waiter) {
+      return;
+    }
+
+    target.currentQueueDepth = target.queue.length;
+
+    // Consume budget for the admitted request
+    target.currentBudget--;
+
+    // Calculate wait time
+    const waitTimeMs = Date.now() - waiter.enqueueTime;
+
+    logger.debug(`[RequestShaper] Admitted queued request ${waiter.id} after ${waitTimeMs}ms`);
+
+    // Resolve with queued result
+    waiter.resolve({ type: 'queued', waitTimeMs });
+  }
+
+  /**
+   * Clear all queue entries for a target.
+   * Used during reload or stop to clean up pending requests.
+   *
+   * @param target - The target to clear
+   * @param _reason - Reason for clearing the queue (unused, for logging)
+   */
+  private clearQueue(target: ShaperTarget, _reason: string): void {
+    for (const waiter of target.queue) {
+      // Resolve with timeout result (consistent with queue timeout behavior)
+      waiter.resolve({ type: 'timeout' });
+    }
+    target.queue = [];
+    target.currentQueueDepth = 0;
+  }
+
+  /**
+   * Discover all provider/model combinations with rate_limit config.
+   */
+  private discoverShapedTargets(config: PlexusConfig): Array<{
+    provider: string;
+    model: string;
+    alias?: string;
+    scope: 'provider' | 'model' | 'alias';
+    isExplicit: boolean;
+    requestsPerMinute: number;
+    queueDepth?: number;
+    queueTimeoutMs: number;
+  }> {
+    const targets: ReturnType<typeof this.discoverShapedTargets> = [];
+    const seenKeys = new Set<string>();
+
+    const pushTarget = (target: (typeof targets)[number]) => {
+      const key = this.makeKey(target.provider, target.model, target.alias);
+      if (seenKeys.has(key)) {
+        return;
+      }
+      seenKeys.add(key);
+      targets.push(target);
+    };
+
+    for (const [providerId, providerConfig] of Object.entries(config.providers)) {
+      const providerRateLimit = providerConfig.rate_limit;
+      const modelsConfig = providerConfig.models;
+
+      if (!providerRateLimit && (!modelsConfig || Array.isArray(modelsConfig))) {
+        continue;
+      }
+
+      if (!modelsConfig || Array.isArray(modelsConfig)) {
+        if (!providerRateLimit) {
+          continue;
+        }
+
+        const models = this.extractProviderModels(providerConfig);
+
+        for (const model of models) {
+          pushTarget({
+            provider: providerId,
+            model,
+            scope: 'provider',
+            isExplicit: false,
+            requestsPerMinute:
+              providerRateLimit.requests_per_minute ?? this.runtimeConfig?.defaultRpm ?? 60,
+            queueDepth: providerRateLimit.queue_depth,
+            queueTimeoutMs:
+              providerRateLimit.queue_timeout_ms ?? this.runtimeConfig?.queueTimeoutMs ?? 30000,
+          });
+        }
+
+        continue;
+      }
+
+      for (const [model, modelConfig] of Object.entries(modelsConfig)) {
+        const effectiveRateLimit = modelConfig.rate_limit ?? providerRateLimit;
+        if (!effectiveRateLimit) {
+          continue;
+        }
+
+        pushTarget({
+          provider: providerId,
+          model,
+          scope: modelConfig.rate_limit ? 'model' : 'provider',
+          isExplicit: !!modelConfig.rate_limit,
+          requestsPerMinute:
+            effectiveRateLimit.requests_per_minute ?? this.runtimeConfig?.defaultRpm ?? 60,
+          queueDepth: effectiveRateLimit.queue_depth,
+          queueTimeoutMs:
+            effectiveRateLimit.queue_timeout_ms ?? this.runtimeConfig?.queueTimeoutMs ?? 30000,
+        });
+      }
+    }
+
+    for (const [aliasId, aliasConfig] of Object.entries(config.models)) {
+      const aliasRateLimit = aliasConfig.rate_limit;
+      if (!aliasRateLimit) {
+        continue;
+      }
+
+      for (const target of aliasConfig.targets) {
+        if (target.enabled === false) {
+          continue;
+        }
+
+        const providerConfig = config.providers[target.provider];
+        if (!providerConfig || providerConfig.enabled === false) {
+          continue;
+        }
+
+        pushTarget({
+          provider: target.provider,
+          model: target.model,
+          alias: aliasId,
+          scope: 'alias',
+          isExplicit: true,
+          requestsPerMinute:
+            aliasRateLimit.requests_per_minute ?? this.runtimeConfig?.defaultRpm ?? 60,
+          queueDepth: aliasRateLimit.queue_depth,
+          queueTimeoutMs:
+            aliasRateLimit.queue_timeout_ms ?? this.runtimeConfig?.queueTimeoutMs ?? 30000,
+        });
+      }
+    }
+
+    return targets;
+  }
+
+  /**
+   * Extract model names from provider configuration.
+   */
+  private extractProviderModels(providerConfig: ProviderConfig): string[] {
+    if (!providerConfig.models) {
+      return ['default'];
+    }
+
+    if (Array.isArray(providerConfig.models)) {
+      return providerConfig.models;
+    }
+
+    // Handle record form (model name -> config)
+    return Object.keys(providerConfig.models);
+  }
+
+  /**
+   * Initialize a single target, optionally hydrating from DB.
+   */
+  private async initializeTarget(target: {
+    provider: string;
+    model: string;
+    alias?: string;
+    scope: 'provider' | 'model' | 'alias';
+    isExplicit: boolean;
+    requestsPerMinute: number;
+    queueDepth?: number;
+    queueTimeoutMs: number;
+  }): Promise<void> {
+    const key = this.makeKey(target.provider, target.model, target.alias);
+
+    // Try to hydrate from persistence (best effort - can fail gracefully)
+    let currentBudget = target.requestsPerMinute;
+    let lastRefillAt = Date.now();
+
+    if (!target.alias) {
+      try {
+        const persisted = await this.loadFromPersistence(target.provider, target.model);
+        if (persisted) {
+          currentBudget = Math.max(0, Math.min(persisted.currentBudget, target.requestsPerMinute));
+          lastRefillAt = persisted.lastRefillAt;
+          logger.debug(`[RequestShaper] Hydrated ${key} from persistence`);
+        }
+      } catch (error) {
+        // Persistence failure is not fatal - proceed with fresh state
+        logger.debug(`[RequestShaper] No persistence for ${key}, starting fresh`);
+      }
+    }
+
+    const shaperTarget: ShaperTarget = {
+      provider: target.provider,
+      model: target.model,
+      alias: target.alias,
+      scope: target.scope,
+      isExplicit: target.isExplicit,
+      requestsPerMinute: target.requestsPerMinute,
+      queueDepth: target.queueDepth,
+      queueTimeoutMs: target.queueTimeoutMs,
+      maxBudget: target.requestsPerMinute,
+      currentBudget,
+      lastRefillAt,
+      currentQueueDepth: 0,
+      queue: [],
+      timeoutCount: 0,
+      dropCount: 0,
+    };
+
+    this.targets.set(key, shaperTarget);
+  }
+
+  /**
+   * Load budget state from provider_rate_limits table.
+   */
+  private async loadFromPersistence(
+    provider: string,
+    model: string
+  ): Promise<{ currentBudget: number; lastRefillAt: number } | null> {
+    try {
+      const db = getDatabase();
+      const schema = getSchema();
+
+      const result = await db
+        .select()
+        .from(schema.providerRateLimits)
+        .where(
+          and(
+            eq(schema.providerRateLimits.provider, provider),
+            eq(schema.providerRateLimits.model, model)
+          )
+        )
+        .limit(1);
+
+      if (result.length === 0) {
+        return null;
+      }
+
+      const row = result[0];
+      if (!row) {
+        return null;
+      }
+
+      return {
+        currentBudget: row.currentBudget,
+        lastRefillAt: row.lastRefillAt,
+      };
+    } catch (error) {
+      // DB may not be available during early init - return null to use defaults
+      return null;
+    }
+  }
+
+  /**
+   * Persist budget state to provider_rate_limits table.
+   * Called periodically or on shutdown.
+   */
+  private async persistToPersistence(target: ShaperTarget): Promise<void> {
+    if (target.alias) {
+      return;
+    }
+
+    try {
+      const db = getDatabase();
+      const schema = getSchema();
+      const dialect = getCurrentDialect();
+      const now = Date.now();
+
+      await db
+        .insert(schema.providerRateLimits)
+        .values({
+          provider: target.provider,
+          model: target.model,
+          currentBudget: target.currentBudget,
+          lastRefillAt: target.lastRefillAt,
+          queueDepth: target.currentQueueDepth,
+          createdAt: toDbTimestampMs(now, dialect) as number,
+        })
+        .onConflictDoUpdate({
+          target: [schema.providerRateLimits.provider, schema.providerRateLimits.model],
+          set: {
+            currentBudget: target.currentBudget,
+            lastRefillAt: target.lastRefillAt,
+            queueDepth: target.currentQueueDepth,
+          },
+        });
+    } catch (error) {
+      // Persistence failure is not fatal
+      logger.debug(
+        `[RequestShaper] Failed to persist state for ${target.provider}:${target.model}: ${error}`
+      );
+    }
+  }
+
+  /**
+   * Start the cleanup timer for stale queue entries.
+   */
+  private startCleanupTimer(): void {
+    if (this.cleanupInterval) {
+      return;
+    }
+
+    const intervalMs = this.runtimeConfig?.cleanupIntervalMs ?? 60000;
+    this.cleanupInterval = setInterval(() => {
+      this.runCleanup();
+    }, intervalMs);
+
+    logger.debug(`[RequestShaper] Started cleanup timer (${intervalMs}ms)`);
+  }
+
+  /**
+   * Stop the cleanup timer.
+   */
+  private stopCleanupTimer(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      logger.debug('[RequestShaper] Stopped cleanup timer');
+    }
+  }
+
+  /**
+   * Run cleanup of stale queue entries.
+   * Runs periodic queue cleanup and persists the current budget state.
+   */
+  private runCleanup(): void {
+    // Clean up expired queue entries
+    this.cleanupExpiredRequests();
+
+    // Persist current state
+    this.persistAllState().catch((error) => {
+      logger.debug(`[RequestShaper] Cleanup persistence failed: ${error}`);
+    });
+  }
+
+  /**
+   * Persist state for all targets.
+   */
+  private async persistAllState(): Promise<void> {
+    for (const target of this.targets.values()) {
+      await this.persistToPersistence(target);
+    }
+  }
+
+  /**
+   * Create a unique key from provider and model.
+   */
+  private makeKey(provider: string, model: string, alias?: string): ShaperKey {
+    return alias ? `${provider}:${model}:${alias}` : `${provider}:${model}`;
+  }
+
+  /**
+   * Alias-specific shapers override the shared provider:model limiter for that alias only.
+   * If no alias target exists, requests fall back to the shared limiter automatically.
+   */
+  private resolveLookupKey(provider: string, model: string, alias?: string): ShaperKey {
+    if (alias) {
+      const aliasKey = this.makeKey(provider, model, alias);
+      if (this.targets.has(aliasKey)) {
+        return aliasKey;
+      }
+    }
+
+    return this.makeKey(provider, model);
+  }
+
+  /**
+   * Convert internal target to public status.
+   */
+  private toStatus(target: ShaperTarget): ShaperTargetStatus {
+    return {
+      provider: target.provider,
+      model: target.model,
+      ...(target.alias ? { alias: target.alias } : {}),
+      scope: target.scope,
+      isExplicit: target.isExplicit,
+      requestsPerMinute: target.requestsPerMinute,
+      queueDepth: target.queueDepth,
+      queueTimeoutMs: target.queueTimeoutMs,
+      maxBudget: target.maxBudget,
+      currentBudget: target.currentBudget,
+      lastRefillAt: target.lastRefillAt,
+      currentQueueDepth: target.currentQueueDepth,
+      queueWaiters: target.queue.length,
+      oldestWaitMs: this.getOldestWaitMs(target),
+      timeoutCount: target.timeoutCount,
+      dropCount: target.dropCount,
+    };
+  }
+
+  private getOldestWaitMs(target: ShaperTarget): number | null {
+    const oldestWaiter = target.queue[0];
+    if (!oldestWaiter) {
+      return null;
+    }
+
+    return Math.max(0, Date.now() - oldestWaiter.enqueueTime);
+  }
+
+  /**
+   * Reset the singleton instance (for testing only).
+   */
+  static resetInstance(): void {
+    if (RequestShaper.instance) {
+      RequestShaper.instance.stop();
+      RequestShaper.instance = null;
+    }
+  }
 }
