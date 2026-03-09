@@ -79,7 +79,7 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
       return reply.send({ success: true, provider: providerId });
     } catch (e: any) {
       logger.error(`Failed to delete provider '${providerId}'`, e);
-      return reply.code(500).send({ error: 'Internal server error' });
+      return reply.code(500).send({ error: e.message || 'Internal server error' });
     }
   });
 

@@ -243,26 +243,15 @@ export class ConfigRepository {
     const schema = this.schema();
 
     if (cascade) {
+      // Explicitly delete model_alias_targets referencing this provider (keyed by slug, not FK)
+      await this.db()
+        .delete(schema.modelAliasTargets)
+        .where(eq(schema.modelAliasTargets.providerSlug, slug));
       // FK cascade handles provider_models deletion automatically
       await this.db().delete(schema.providers).where(eq(schema.providers.slug, slug));
     } else {
-      // Delete provider only if it has no models
-      const provider = await this.db()
-        .select()
-        .from(schema.providers)
-        .where(eq(schema.providers.slug, slug))
-        .limit(1);
-      if (provider.length > 0) {
-        const models = await this.db()
-          .select()
-          .from(schema.providerModels)
-          .where(eq(schema.providerModels.providerId, provider[0]!.id))
-          .limit(1);
-        if (models.length > 0) {
-          throw new Error(`Provider '${slug}' has models. Use cascade=true to delete.`);
-        }
-        await this.db().delete(schema.providers).where(eq(schema.providers.id, provider[0]!.id));
-      }
+      // Delete provider and its provider_models, but retain model_alias_targets
+      await this.db().delete(schema.providers).where(eq(schema.providers.slug, slug));
     }
   }
 
