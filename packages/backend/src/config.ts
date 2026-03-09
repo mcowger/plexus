@@ -707,12 +707,12 @@ export function getConfig(): PlexusConfig {
     const instance = ConfigService.getInstance();
     return instance.getConfig();
   } catch (e: any) {
-    // Only fall back for module-load or not-initialized scenarios
-    // Rethrow operational errors (DB failures, etc.)
+    // Fall back for module-load, not-initialized, or test scenarios
     if (
       e instanceof Error &&
       e.message &&
       !e.message.includes('not loaded') &&
+      !e.message.includes('not initialized') &&
       !e.message.includes('Cannot find module')
     ) {
       throw e;
@@ -727,6 +727,14 @@ export function getConfig(): PlexusConfig {
 
 export function setConfigForTesting(config: PlexusConfig) {
   currentConfig = config;
+  // Also prime the ConfigService cache so code that calls ConfigService directly works in tests
+  try {
+    const { ConfigService } = require('./services/config-service');
+    const instance = ConfigService.getInstance();
+    (instance as any).cache = config;
+  } catch {
+    // ConfigService may not be available in all test environments
+  }
 }
 
 export function getDatabaseConfig(): DatabaseConfig | null {

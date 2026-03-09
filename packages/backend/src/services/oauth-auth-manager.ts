@@ -64,6 +64,12 @@ export class OAuthAuthManager {
         logger.info(`OAuth: Loaded ${totalAccounts} credential(s) from database`);
       }
     } catch (error: any) {
+      // If the oauth_credentials table doesn't exist yet (e.g. pre-migration or test environment),
+      // treat as empty — don't crash startup.
+      if (error?.message?.includes('no such table')) {
+        logger.debug('OAuth: oauth_credentials table not yet available, starting with empty state');
+        return;
+      }
       logger.error('OAuth: Failed to load from database:', error);
       throw error;
     }
@@ -203,7 +209,13 @@ export class OAuthAuthManager {
       return false;
     }
 
-    await ConfigService.getInstance().deleteOAuthCredentials(provider, accountId);
+    try {
+      await ConfigService.getInstance().deleteOAuthCredentials(provider, accountId);
+    } catch (error: any) {
+      if (!error?.message?.includes('no such table')) {
+        throw error;
+      }
+    }
 
     delete providerRecord.accounts[accountId];
     if (Object.keys(providerRecord.accounts).length === 0) {
