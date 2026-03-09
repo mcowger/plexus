@@ -58,6 +58,8 @@ describe('Auth Middleware', () => {
         messages: [],
       },
     });
+    if (response.statusCode !== 200)
+      console.error('[AUTH TEST] valid bearer got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
 
     const saveRequestCalls = (mockUsageStorage.saveRequest as any).mock.calls;
@@ -78,6 +80,8 @@ describe('Auth Middleware', () => {
         messages: [],
       },
     });
+    if (response.statusCode !== 200)
+      console.error('[AUTH TEST] x-api-key got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
   });
 
@@ -94,6 +98,8 @@ describe('Auth Middleware', () => {
         messages: [],
       },
     });
+    if (response.statusCode !== 200)
+      console.error('[AUTH TEST] x-goog-api-key got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
   });
 
@@ -111,6 +117,8 @@ describe('Auth Middleware', () => {
         contents: [],
       },
     });
+    if (response.statusCode !== 200)
+      console.error('[AUTH TEST] gemini key query got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
   });
 
@@ -174,8 +182,22 @@ describe('Key Attribution', () => {
 
   beforeAll(async () => {
     fastify = Fastify();
-    const mockDispatcher = { dispatch: mock(async () => ({ id: '123', model: 'gpt-4', created: 123, content: 'test', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } })) } as unknown as Dispatcher;
-    mockUsageStorage = { saveRequest: mock(), saveError: mock(), updatePerformanceMetrics: mock(), emitStartedAsync: mock(), emitUpdatedAsync: mock() } as unknown as UsageStorageService;
+    const mockDispatcher = {
+      dispatch: mock(async () => ({
+        id: '123',
+        model: 'gpt-4',
+        created: 123,
+        content: 'test',
+        usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 },
+      })),
+    } as unknown as Dispatcher;
+    mockUsageStorage = {
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
+    } as unknown as UsageStorageService;
     DebugManager.getInstance().setStorage(mockUsageStorage);
     SelectorFactory.setUsageStorage(mockUsageStorage);
     setConfigForTesting(createTestConfig());
@@ -190,6 +212,8 @@ describe('Key Attribution', () => {
       headers: { authorization: 'Bearer sk-valid-key:copilot', 'content-type': 'application/json' },
       payload: { model: 'gpt-4', messages: [] },
     });
+    if (response.statusCode !== 200)
+      console.error('[ATTR TEST] attribution parse got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     expect((mockUsageStorage.saveRequest as any).mock.calls[0][0].apiKey).toBe('test-key-1');
     expect((mockUsageStorage.saveRequest as any).mock.calls[0][0].attribution).toBe('copilot');
@@ -202,6 +226,8 @@ describe('Key Attribution', () => {
       headers: { authorization: 'Bearer sk-valid-key:CoPilot', 'content-type': 'application/json' },
       payload: { model: 'gpt-4', messages: [] },
     });
+    if (response.statusCode !== 200)
+      console.error('[ATTR TEST] attribution lowercase got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     expect((mockUsageStorage.saveRequest as any).mock.calls[1][0].attribution).toBe('copilot');
   });
@@ -210,11 +236,18 @@ describe('Key Attribution', () => {
     const response = await fastify.inject({
       method: 'POST',
       url: '/v1/chat/completions',
-      headers: { authorization: 'Bearer sk-valid-key:copilot:dev:v1', 'content-type': 'application/json' },
+      headers: {
+        authorization: 'Bearer sk-valid-key:copilot:dev:v1',
+        'content-type': 'application/json',
+      },
       payload: { model: 'gpt-4', messages: [] },
     });
+    if (response.statusCode !== 200)
+      console.error('[ATTR TEST] multi-colon got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
-    expect((mockUsageStorage.saveRequest as any).mock.calls[2][0].attribution).toBe('copilot:dev:v1');
+    expect((mockUsageStorage.saveRequest as any).mock.calls[2][0].attribution).toBe(
+      'copilot:dev:v1'
+    );
   });
 
   it('should set attribution to null when not provided', async () => {
@@ -224,13 +257,25 @@ describe('Key Attribution', () => {
       headers: { authorization: 'Bearer sk-valid-key', 'content-type': 'application/json' },
       payload: { model: 'gpt-4', messages: [] },
     });
+    if (response.statusCode !== 200)
+      console.error('[ATTR TEST] no attribution got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     expect((mockUsageStorage.saveRequest as any).mock.calls[3][0].attribution).toBe(null);
   });
 
   it('should authenticate different attributions with same secret', async () => {
-    await fastify.inject({ method: 'POST', url: '/v1/chat/completions', headers: { authorization: 'Bearer sk-valid-key:copilot', 'content-type': 'application/json' }, payload: { model: 'gpt-4', messages: [] } });
-    await fastify.inject({ method: 'POST', url: '/v1/chat/completions', headers: { authorization: 'Bearer sk-valid-key:claude', 'content-type': 'application/json' }, payload: { model: 'gpt-4', messages: [] } });
+    await fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: { authorization: 'Bearer sk-valid-key:copilot', 'content-type': 'application/json' },
+      payload: { model: 'gpt-4', messages: [] },
+    });
+    await fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: { authorization: 'Bearer sk-valid-key:claude', 'content-type': 'application/json' },
+      payload: { model: 'gpt-4', messages: [] },
+    });
     const calls = (mockUsageStorage.saveRequest as any).mock.calls;
     expect(calls[4][0].attribution).toBe('copilot');
     expect(calls[5][0].attribution).toBe('claude');

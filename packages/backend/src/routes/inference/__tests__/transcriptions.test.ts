@@ -109,27 +109,29 @@ describe('Transcriptions Endpoint', () => {
     SelectorFactory.setUsageStorage(mockUsageStorage);
 
     // Set config with transcription models
-    setConfigForTesting(createTestConfig({
-      providers: {
-        openai: {
-          api_key: 'sk-test',
-          api_base_url: 'https://api.openai.com/v1',
-          enabled: true,
-          models: {
-            'whisper-1': {
-              pricing: { source: 'simple', input: 0.006, output: 0 },
+    setConfigForTesting(
+      createTestConfig({
+        providers: {
+          openai: {
+            api_key: 'sk-test',
+            api_base_url: 'https://api.openai.com/v1',
+            enabled: true,
+            models: {
+              'whisper-1': {
+                pricing: { source: 'simple', input: 0.006, output: 0 },
+              },
             },
           },
         },
-      },
-      models: {
-        'transcription-model': {
-          type: 'transcriptions',
-          priority: 'selector',
-          targets: [{ provider: 'openai', model: 'whisper-1' }],
+        models: {
+          'transcription-model': {
+            type: 'transcriptions',
+            priority: 'selector',
+            targets: [{ provider: 'openai', model: 'whisper-1' }],
+          },
         },
-      },
-    }));
+      })
+    );
 
     await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
     await fastify.ready();
@@ -153,6 +155,8 @@ describe('Transcriptions Endpoint', () => {
       payload,
     });
 
+    if (response.statusCode !== 200)
+      console.error('[TRANSCRIPTION TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body).toHaveProperty('text');
@@ -178,6 +182,8 @@ describe('Transcriptions Endpoint', () => {
       payload,
     });
 
+    if (response.statusCode !== 200)
+      console.error('[TRANSCRIPTION TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/plain');
     expect(response.body).toBe('This is a test transcription.');
@@ -207,6 +213,8 @@ describe('Transcriptions Endpoint', () => {
       payload,
     });
 
+    if (response.statusCode !== 200)
+      console.error('[TRANSCRIPTION TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body).toHaveProperty('text');

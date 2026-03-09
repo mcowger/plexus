@@ -54,6 +54,10 @@ describe('VisionDescriptorService Detailed Verification', () => {
 
     const result = await VisionDescriptorService.process(request, 'desc-model');
 
+    console.error(
+      '[VISION TEST] result.messages[0]?.content:',
+      JSON.stringify(result.messages[0]?.content)
+    );
     expect(VisionDescriptorService.hasImages(result.messages)).toBe(false);
     expect(result.messages[0]?.content).toHaveLength(1);
     const firstContent = (result.messages[0]?.content as any)[0] as TextContent;

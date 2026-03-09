@@ -69,22 +69,24 @@ describe('Embeddings Endpoint', () => {
     SelectorFactory.setUsageStorage(mockUsageStorage);
 
     // Set config with embeddings models
-    setConfigForTesting(createTestConfig({
-      providers: {
-        openai: {
-          api_key: 'sk-test',
-          api_base_url: 'https://api.openai.com/v1',
-          enabled: true,
-          estimateTokens: false,
-          disable_cooldown: false,
-          models: {
-            'text-embedding-3-small': {
-              pricing: { source: 'simple', input: 0.00002, output: 0 },
+    setConfigForTesting(
+      createTestConfig({
+        providers: {
+          openai: {
+            api_key: 'sk-test',
+            api_base_url: 'https://api.openai.com/v1',
+            enabled: true,
+            estimateTokens: false,
+            disable_cooldown: false,
+            models: {
+              'text-embedding-3-small': {
+                pricing: { source: 'simple', input: 0.00002, output: 0 },
+              },
             },
           },
         },
-      },
-    }));
+      })
+    );
 
     await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
     await fastify.ready();
@@ -104,6 +106,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.object).toBe('list');
@@ -146,6 +150,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.data).toHaveLength(3);
@@ -169,6 +175,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
   });
 
@@ -187,6 +195,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
   });
 
@@ -204,6 +214,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
 
     const saveRequestCalls = (mockUsageStorage.saveRequest as any).mock.calls;
@@ -263,6 +275,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
   });
 
@@ -280,6 +294,8 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
+    if (response.statusCode !== 200)
+      console.error('[EMBED TEST] got', response.statusCode, response.body);
     expect(response.statusCode).toBe(200);
 
     const saveRequestCalls = (mockUsageStorage.saveRequest as any).mock.calls;
