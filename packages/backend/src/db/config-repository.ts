@@ -19,7 +19,9 @@ function parseJson<T>(value: unknown): T | null {
     try {
       return JSON.parse(value) as T;
     } catch {
-      return null;
+      // PG jsonb auto-deserializes plain strings (e.g. "oauth://...") before
+      // they reach us, so the value is already the correct T — return it as-is.
+      return value as unknown as T;
     }
   }
   return null;
