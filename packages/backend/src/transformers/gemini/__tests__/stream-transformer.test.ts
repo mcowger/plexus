@@ -291,9 +291,9 @@ describe('transformGeminiStream', () => {
     expect(messageStart).toBeDefined();
   });
 
-  test('should detect toolUse finish reason when function calls are present', async () => {
+  test('should emit tool_calls finish reason when function calls are present', async () => {
     const sseData = [
-      // Response with function call and STOP should become toolUse
+      // Response with function call and STOP should become tool_calls
       '{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","args":{"city":"San Francisco"}}}]},"finishReason":"STOP","index":0}],"responseId":"resp_123","modelVersion":"gemini-2.0-flash"}',
     ];
 
@@ -310,10 +310,37 @@ describe('transformGeminiStream', () => {
       }
     }
 
-    // Should have tooluse finish_reason (not stop) when function calls present
+    // Should have tool_calls finish_reason (not stop) when function calls present
     const finishChunk = chunks.find((c) => c.finish_reason !== undefined);
     expect(finishChunk).toBeDefined();
-    expect(finishChunk?.finish_reason).toBe('tooluse');
+    expect(finishChunk?.finish_reason).toBe('tool_calls');
+  });
+
+  test('should keep tool_calls finish reason across trailing empty text stop chunk', async () => {
+    const sseData = [
+      '{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"search_web","args":{"query":"top news headlines today"},"id":"zq87ju01"},"thoughtSignature":"EjQKMgG+Pvb7ME8szPqAOVlwQJYFaO1QyD5KDab+zM9yFbEAeuWVq+pKsOwk3Q9g/kTjh0El"}],"role":"model"},"index":0}],"usageMetadata":{"promptTokenCount":1385,"candidatesTokenCount":19,"totalTokenCount":1404,"promptTokensDetails":[{"modality":"TEXT","tokenCount":1385}]},"modelVersion":"gemini-3.1-flash-lite-preview","responseId":"QdKxaevHCemM_PUPgefn8A8"}',
+      '{"candidates":[{"content":{"parts":[{"text":""}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":1385,"candidatesTokenCount":19,"totalTokenCount":1404,"promptTokensDetails":[{"modality":"TEXT","tokenCount":1385}]},"modelVersion":"gemini-3.1-flash-lite-preview","responseId":"QdKxaevHCemM_PUPgefn8A8"}',
+    ];
+
+    const inputStream = createSSEStream(sseData);
+    const transformedStream = transformGeminiStream(inputStream);
+    const reader = transformedStream.getReader();
+
+    const chunks: UnifiedChatStreamChunk[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && typeof value === 'object') {
+        chunks.push(value as UnifiedChatStreamChunk);
+      }
+    }
+
+    const toolcallDelta = chunks.find((c) => c.event === 'toolcall_delta');
+    expect(toolcallDelta?.delta?.tool_calls?.[0]?.function?.name).toBe('search_web');
+
+    const finishChunk = chunks.findLast((c) => c.finish_reason !== undefined);
+    expect(finishChunk).toBeDefined();
+    expect(finishChunk?.finish_reason).toBe('tool_calls');
   });
 
   test('should keep stop finish reason when no function calls', async () => {
