@@ -18,12 +18,12 @@ export async function registerQuotaRoutes(
   fastify: FastifyInstance,
   quotaScheduler: QuotaScheduler
 ) {
-  const config = getConfig();
-  const quotaConfigs = config.quotas ?? [];
-  const quotaConfigById = new Map(quotaConfigs.map((quotaConfig) => [quotaConfig.id, quotaConfig]));
+  // Look up quota config from the current config at call time so that config reloads
+  // (triggered when users save provider settings via the UI) are always reflected.
+  const getQuotaConfig = (checkerId: string) => getConfig().quotas?.find((q) => q.id === checkerId);
 
   const getOAuthMetadata = (checkerId: string) => {
-    const quotaConfig = quotaConfigById.get(checkerId);
+    const quotaConfig = getQuotaConfig(checkerId);
     if (!quotaConfig) {
       return {} as { oauthAccountId?: string; oauthProvider?: string };
     }
@@ -38,8 +38,7 @@ export async function registerQuotaRoutes(
   };
 
   const getCheckerType = (checkerId: string): string | undefined => {
-    const quotaConfig = quotaConfigById.get(checkerId);
-    return quotaConfig?.type;
+    return getQuotaConfig(checkerId)?.type;
   };
 
   fastify.get('/v0/management/quotas', async (request, reply) => {
