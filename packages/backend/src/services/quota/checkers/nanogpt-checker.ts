@@ -1,5 +1,6 @@
 import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
+import { logger } from '../../../utils/logger';
 
 interface NanoGPTUsageWindow {
   used?: number;
@@ -10,16 +11,27 @@ interface NanoGPTUsageWindow {
 
 interface NanoGPTQuotaResponse {
   active?: boolean;
+  provider?: string;
+  providerStatus?: string;
+  providerStatusRaw?: string;
+  stripeSubscriptionId?: string;
+  cancellationReason?: string | null;
+  canceledAt?: string | null;
+  endedAt?: string | null;
+  cancelAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
   limits?: {
-    daily?: number;
-    monthly?: number;
+    weeklyInputTokens?: number | null;
+    dailyInputTokens?: number | null;
+    dailyImages?: number | null;
   };
-  enforceDailyLimit?: boolean;
-  daily?: NanoGPTUsageWindow;
-  monthly?: NanoGPTUsageWindow;
+  allowOverage?: boolean;
   period?: {
     currentPeriodEnd?: string;
   };
+  dailyImages?: NanoGPTUsageWindow | null;
+  dailyInputTokens?: NanoGPTUsageWindow | null;
+  weeklyInputTokens?: NanoGPTUsageWindow | null;
   state?: 'active' | 'grace' | 'inactive';
   graceUntil?: string | null;
 }
@@ -92,42 +104,85 @@ export class NanoGPTQuotaChecker extends QuotaChecker {
   }
 
   private buildSuccessResult(data: NanoGPTQuotaResponse): QuotaCheckResult {
+    logger.debug(
+      `[nanogpt] subscription state=${data.state ?? 'unknown'} active=${data.active} ` +
+        `hasWeeklyTokens=${!!data.weeklyInputTokens} hasDailyTokens=${!!data.dailyInputTokens} ` +
+        `hasDailyImages=${!!data.dailyImages} allowOverage=${data.allowOverage} ` +
+        `graceUntil=${data.graceUntil ?? 'none'}`
+    );
+
+    // Account is inactive — no subscription at all
+    if (data.active === false && data.state === 'inactive') {
+      return this.errorResult(
+        'NanoGPT subscription is inactive. No quota windows are available for this account.'
+      );
+    }
+
+    // Account is in grace period — log a note but continue
+    if (data.state === 'grace') {
+      const graceNote = data.graceUntil ? ` Grace access ends at ${data.graceUntil}.` : '';
+      logger.debug(`[nanogpt] Account is in grace period.${graceNote}`);
+    }
+
     const windows: QuotaWindow[] = [];
 
-    if (data.daily) {
+    if (data.weeklyInputTokens) {
       windows.push(
         this.createWindow(
-          'daily',
-          data.limits?.daily,
-          data.daily.used,
-          data.daily.remaining,
-          'requests',
-          typeof data.daily.resetAt === 'number' ? new Date(data.daily.resetAt) : undefined,
-          'NanoGPT daily subscription usage quota'
+          'weekly',
+          data.limits?.weeklyInputTokens ?? undefined,
+          data.weeklyInputTokens.used,
+          data.weeklyInputTokens.remaining,
+          'tokens',
+          typeof data.weeklyInputTokens.resetAt === 'number'
+            ? new Date(data.weeklyInputTokens.resetAt)
+            : undefined,
+          'NanoGPT weekly input token quota'
         )
       );
     }
 
-    if (data.monthly) {
+    if (data.dailyInputTokens) {
       windows.push(
         this.createWindow(
-          'monthly',
-          data.limits?.monthly,
-          data.monthly.used,
-          data.monthly.remaining,
+          'daily',
+          data.limits?.dailyInputTokens ?? undefined,
+          data.dailyInputTokens.used,
+          data.dailyInputTokens.remaining,
+          'tokens',
+          typeof data.dailyInputTokens.resetAt === 'number'
+            ? new Date(data.dailyInputTokens.resetAt)
+            : undefined,
+          'NanoGPT daily input token quota'
+        )
+      );
+    }
+
+    if (data.dailyImages) {
+      windows.push(
+        this.createWindow(
+          'daily',
+          data.limits?.dailyImages ?? undefined,
+          data.dailyImages.used,
+          data.dailyImages.remaining,
           'requests',
-          typeof data.monthly.resetAt === 'number' ? new Date(data.monthly.resetAt) : undefined,
-          'NanoGPT monthly subscription usage quota'
+          typeof data.dailyImages.resetAt === 'number'
+            ? new Date(data.dailyImages.resetAt)
+            : undefined,
+          'NanoGPT daily image generation quota'
         )
       );
     }
 
     if (windows.length === 0) {
       return this.errorResult(
-        'NanoGPT quota response did not include daily or monthly usage windows'
+        `NanoGPT quota response (state=${data.state ?? 'unknown'}, active=${data.active}) ` +
+          'did not include any usage windows (weeklyInputTokens, dailyInputTokens, dailyImages). ' +
+          'This account may not have an active subscription.'
       );
     }
 
+    logger.debug(`[nanogpt] Returning ${windows.length} window(s)`);
     return {
       ...this.successResult(windows),
       rawResponse: data,
