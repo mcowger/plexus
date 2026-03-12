@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { getConfig } from '../config';
+import { getConfig, VALID_QUOTA_CHECKER_TYPES } from '../config';
 import { logger } from '../utils/logger';
 import { UsageStorageService } from '../services/usage-storage';
 import { registerConfigRoutes } from './management/config';
@@ -54,6 +54,15 @@ export async function registerManagementRoutes(
       return reply.send({ ok: true });
     }
   );
+
+  // Public endpoint - no auth required; the Providers page fetches this before
+  // the user has entered an admin key, so it must not be inside the protected scope.
+  fastify.get('/v0/management/quota-checker-types', async (_request, reply) => {
+    return reply.send({
+      types: VALID_QUOTA_CHECKER_TYPES,
+      count: VALID_QUOTA_CHECKER_TYPES.length,
+    });
+  });
 
   // All other management routes are protected by the same admin key hook,
   // scoped inside this plugin so the v1 bearer-auth routes are unaffected.
