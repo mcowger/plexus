@@ -153,6 +153,8 @@ describe('transformGeminiStream', () => {
     const toolcallDelta = chunks.find((c) => c.event === 'toolcall_delta');
     expect(toolcallDelta).toBeDefined();
     expect(toolcallDelta?.delta?.tool_calls).toBeDefined();
+    expect(toolcallDelta?.delta?.tool_calls?.[0]?.index).toBe(0);
+    expect(toolcallDelta?.delta?.tool_calls?.[0]?.id).toBe('call_1');
     expect(toolcallDelta?.delta?.tool_calls?.[0]?.function?.name).toBe('get_weather');
 
     // Should have toolcall_end event
@@ -336,6 +338,8 @@ describe('transformGeminiStream', () => {
     }
 
     const toolcallDelta = chunks.find((c) => c.event === 'toolcall_delta');
+    expect(toolcallDelta?.delta?.tool_calls?.[0]?.index).toBe(0);
+    expect(toolcallDelta?.delta?.tool_calls?.[0]?.id).toBe('zq87ju01');
     expect(toolcallDelta?.delta?.tool_calls?.[0]?.function?.name).toBe('search_web');
 
     const finishChunk = chunks.findLast((c) => c.finish_reason !== undefined);

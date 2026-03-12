@@ -25,6 +25,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
   let activeBlockType: 'text' | 'thinking' | 'toolcall' | null = null;
   let hasSentMessageStart = false;
   let messageHasFunctionCalls = false;
+  let streamedToolCallCount = 0;
 
   const transformer = new TransformStream({
     start(controller) {
@@ -57,6 +58,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
             logger.silly(`Gemini Transformer: Enqueueing unified chunk (done)`, doneEvent);
             controller.enqueue(doneEvent);
             messageHasFunctionCalls = false;
+            streamedToolCallCount = 0;
             return;
           }
 
@@ -106,6 +108,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
               controller.enqueue(msgStartEvent);
               hasSentMessageStart = true;
               messageHasFunctionCalls = false;
+              streamedToolCallCount = 0;
             }
 
             for (const part of parts) {
@@ -168,6 +171,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
               // Handle tool/function calls
               if (part.functionCall) {
                 messageHasFunctionCalls = true;
+                const toolCallIndex = streamedToolCallCount++;
                 // Close previous block if any
                 if (activeBlockType) {
                   const endEvent = {
@@ -210,7 +214,8 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                     role: 'assistant',
                     tool_calls: [
                       {
-                        id: part.functionCall.name,
+                        index: toolCallIndex,
+                        id: part.functionCall.id || `call_${toolCallIndex + 1}`,
                         type: 'function',
                         function: {
                           name: part.functionCall.name,
@@ -276,6 +281,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
               logger.silly(`Gemini Transformer: Enqueueing unified chunk (finish)`, chunk);
               controller.enqueue(chunk);
               messageHasFunctionCalls = false;
+              streamedToolCallCount = 0;
             }
           } catch (e) {
             logger.error('Error parsing Gemini stream chunk', e);
