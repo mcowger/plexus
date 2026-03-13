@@ -517,7 +517,7 @@ function mapStopReason(reason: string): string {
     case 'length':
       return 'length';
     case 'toolUse':
-      return 'stop';
+      return 'tool_calls';
     case 'error':
       return 'error';
     case 'aborted':
