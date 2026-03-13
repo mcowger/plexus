@@ -100,19 +100,20 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
         }
 
         // Validate required fields
-        if (!body.type || !['rolling', 'daily', 'weekly'].includes(body.type)) {
+        if (!body.type || !['rolling', 'daily', 'weekly', 'monthly'].includes(body.type)) {
           return reply.code(400).send({
             error: {
-              message: 'Invalid or missing quota type. Must be one of: rolling, daily, weekly',
+              message:
+                'Invalid or missing quota type. Must be one of: rolling, daily, weekly, monthly',
               type: 'invalid_request_error',
             },
           });
         }
 
-        if (!body.limitType || !['requests', 'tokens'].includes(body.limitType)) {
+        if (!body.limitType || !['requests', 'tokens', 'cost'].includes(body.limitType)) {
           return reply.code(400).send({
             error: {
-              message: 'Invalid or missing limitType. Must be one of: requests, tokens',
+              message: 'Invalid or missing limitType. Must be one of: requests, tokens, cost',
               type: 'invalid_request_error',
             },
           });

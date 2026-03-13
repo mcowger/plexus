@@ -827,8 +827,8 @@ export interface KeyConfig {
 }
 
 export interface UserQuota {
-  type: 'rolling' | 'daily' | 'weekly';
-  limitType: 'requests' | 'tokens';
+  type: 'rolling' | 'daily' | 'weekly' | 'monthly';
+  limitType: 'requests' | 'tokens' | 'cost';
   limit: number;
   duration?: string; // Required for rolling type
 }

@@ -16,7 +16,7 @@ import {
   AlertCircle,
   BarChart3,
 } from 'lucide-react';
-import { formatNumber } from '../lib/format';
+import { formatNumber, formatCost } from '../lib/format';
 
 const EMPTY_KEY: KeyConfig = {
   key: '',
@@ -410,8 +410,9 @@ export const Keys = () => {
                               }}
                             />
                             <span style={{ fontSize: '12px' }}>
-                              {formatNumber(status.current_usage)} /{' '}
-                              {formatNumber(status.limit || 0)}
+                              {quotas[key.quota || '']?.limitType === 'cost'
+                                ? `${formatCost(status.current_usage, 5)} / ${formatCost(status.limit || 0, 5)}`
+                                : `${formatNumber(status.current_usage)} / ${formatNumber(status.limit || 0)}`}
                             </span>
                             <button
                               className="bg-transparent border-0 text-text-muted p-1 rounded-sm cursor-pointer hover:text-primary"
@@ -527,7 +528,9 @@ export const Keys = () => {
                       </td>
                       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                         <span className="font-mono text-xs">
-                          {formatNumber(quota.limit)} {quota.limitType}
+                          {quota.limitType === 'cost'
+                            ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
+                            : `${formatNumber(quota.limit)} ${quota.limitType}`}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
@@ -658,7 +661,11 @@ export const Keys = () => {
               <option value="">&lt;None&gt;</option>
               {Object.entries(quotas).map(([name, quota]) => (
                 <option key={name} value={name}>
-                  {name} ({quota.type}, {quota.limit} {quota.limitType})
+                  {name} ({quota.type},{' '}
+                  {quota.limitType === 'cost'
+                    ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
+                    : `${quota.limit} ${quota.limitType}`}
+                  )
                 </option>
               ))}
             </select>
@@ -718,11 +725,13 @@ export const Keys = () => {
               <option value="rolling">Rolling Window</option>
               <option value="daily">Daily (UTC)</option>
               <option value="weekly">Weekly (UTC)</option>
+              <option value="monthly">Monthly (UTC)</option>
             </select>
             <p className="text-xs text-text-muted">
               {editingQuota.type === 'rolling' && 'Limits usage over a sliding time window'}
               {editingQuota.type === 'daily' && 'Resets at midnight UTC each day'}
               {editingQuota.type === 'weekly' && 'Resets at midnight UTC on Monday'}
+              {editingQuota.type === 'monthly' && 'Resets at midnight UTC on the 1st of each month'}
             </p>
           </div>
 
@@ -756,6 +765,7 @@ export const Keys = () => {
             >
               <option value="requests">Requests</option>
               <option value="tokens">Tokens</option>
+              <option value="cost">Cost ($)</option>
             </select>
           </div>
 
@@ -769,7 +779,10 @@ export const Keys = () => {
               }
               placeholder="1000"
             />
-            <p className="text-xs text-text-muted">Maximum {editingQuota.limitType} allowed</p>
+            <p className="text-xs text-text-muted">
+              Maximum {editingQuota.limitType === 'cost' ? 'cost ($)' : editingQuota.limitType}{' '}
+              allowed
+            </p>
           </div>
         </div>
       </Modal>
@@ -820,8 +833,9 @@ export const Keys = () => {
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-text-secondary">Usage</span>
                   <span className="font-medium text-text">
-                    {formatNumber(selectedQuotaStatus.current_usage)} /{' '}
-                    {formatNumber(selectedQuotaStatus.limit || 0)}
+                    {quotas[selectedQuotaStatus.quota_name || '']?.limitType === 'cost'
+                      ? `${formatCost(selectedQuotaStatus.current_usage, 5)} / ${formatCost(selectedQuotaStatus.limit || 0, 5)}`
+                      : `${formatNumber(selectedQuotaStatus.current_usage)} / ${formatNumber(selectedQuotaStatus.limit || 0)}`}
                   </span>
                 </div>
                 <div className="h-2 bg-bg-hover rounded-full overflow-hidden">
@@ -842,7 +856,9 @@ export const Keys = () => {
                   <p className="text-xs text-text-secondary mb-1">Remaining</p>
                   <p className="font-mono text-lg text-text">
                     {selectedQuotaStatus.remaining !== null
-                      ? formatNumber(selectedQuotaStatus.remaining)
+                      ? quotas[selectedQuotaStatus.quota_name || '']?.limitType === 'cost'
+                        ? formatCost(selectedQuotaStatus.remaining, 5)
+                        : formatNumber(selectedQuotaStatus.remaining)
                       : '-'}
                   </p>
                 </div>
