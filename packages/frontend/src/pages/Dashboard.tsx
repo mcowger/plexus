@@ -38,9 +38,9 @@ export const Dashboard = () => {
   }, [activeTab]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-border-glass bg-bg-card/40 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex gap-0 px-4">
+    <div className="flex flex-col h-full w-full">
+      <div className="border-b border-border-glass bg-bg-card/40 backdrop-blur-sm sticky top-0 z-10 w-full">
+        <div className="flex gap-0 px-4 w-full">
           {TABS.map((tab) => {
             const isActive = tab.id === activeTab;
             return (
@@ -62,7 +62,7 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto w-full">
         {activeTab === 'live' && (
           <LiveTab
             pollInterval={pollInterval}
