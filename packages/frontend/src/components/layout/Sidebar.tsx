@@ -272,7 +272,7 @@ export const Sidebar: React.FC = () => {
     <aside
       className={clsx(
         'h-screen fixed left-0 top-0 bg-bg-surface flex flex-col overflow-y-auto overflow-x-hidden z-50 transition-all duration-300 border-r border-border',
-        isCollapsed ? 'w-[64px]' : 'w-[200px]'
+        isCollapsed ? 'w-[64px]' : 'w-[clamp(64px,15vw,200px)]'
       )}
     >
       <div className="px-5 py-3 border-b border-border flex items-center justify-between">
