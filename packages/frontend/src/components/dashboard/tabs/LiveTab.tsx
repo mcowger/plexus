@@ -3027,7 +3027,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
         onDragCancel={handleDragCancel}
       >
         <SortableContext items={orderedCardIds}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-5 xl:gap-6 mb-4">
             {orderedCardIds.map((cardId, index) => (
               <div key={cardId}>{renderDraggableCard(cardId, index)}</div>
             ))}

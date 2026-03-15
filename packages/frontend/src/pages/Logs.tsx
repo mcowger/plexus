@@ -397,8 +397,8 @@ export const Logs = () => {
           </form>
         </div>
 
-        <div className="overflow-x-auto -mx-3 px-3">
-          <table className="w-full border-collapse font-body text-[13px]">
+        <div className="overflow-x-auto lg:overflow-x-visible -mx-3 px-3">
+          <table className="min-w-full border-collapse font-body text-[13px]">
             <thead>
               <tr className="text-center border-b border-border">
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
@@ -414,16 +414,10 @@ export const Logs = () => {
                   Model
                 </th>
                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                <th
-                  className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                  style={{ width: '125px' }}
-                >
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-w-[100px] max-w-[200px]">
                   Tokens
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                  style={{ minWidth: '70px' }}
-                >
+                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-w-[60px]">
                   Cost
                 </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
@@ -503,7 +497,7 @@ export const Logs = () => {
                       </div>
                     </td>
                     <td
-                      className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+                      className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap max-w-[150px] truncate"
                       title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
                       style={{ cursor: 'help' }}
                     >
@@ -617,7 +611,7 @@ export const Logs = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap max-w-[200px] truncate">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div className="group/model flex items-center gap-1">
                           <span>{log.incomingModelAlias || '-'}</span>
