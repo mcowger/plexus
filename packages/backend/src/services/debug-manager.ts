@@ -187,7 +187,9 @@ export class DebugManager {
       }
 
       logger.debug(`[DebugManager] Flushing debug log for ${requestId}`);
-      this.storage.saveDebugLog(log);
+      if (typeof this.storage.saveDebugLog === 'function') {
+        this.storage.saveDebugLog(log);
+      }
       this.pendingLogs.delete(requestId);
     }
   }
