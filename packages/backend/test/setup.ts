@@ -102,3 +102,33 @@ setConfigForTesting(validateConfig(testConfig));
 // Initialize database with the test config
 initializeDatabase(testDbUrl);
 await runMigrations();
+
+// Pre-initialize DebugManager with a fully-mocked storage so that any test
+// which calls DebugManager.getInstance() before setting their own storage gets
+// a safe no-op implementation, preventing "saveDebugLog is not a function"
+// errors when tests from different files run in the same worker process.
+const { DebugManager } = await import('../src/services/debug-manager');
+DebugManager.getInstance().setStorage({
+  saveRequest: mock(),
+  saveError: mock(),
+  saveDebugLog: mock(),
+  updatePerformanceMetrics: mock(),
+  emitStartedAsync: mock(),
+  emitUpdatedAsync: mock(),
+  emitStarted: mock(),
+  emitUpdated: mock(),
+  getDebugLogs: mock(async () => []),
+  getDebugLog: mock(async () => null),
+  deleteDebugLog: mock(async () => false),
+  deleteAllDebugLogs: mock(async () => false),
+  getErrors: mock(async () => []),
+  deleteError: mock(async () => false),
+  deleteAllErrors: mock(async () => false),
+  getUsage: mock(async () => ({ data: [], total: 0 })),
+  deleteUsageLog: mock(async () => false),
+  deleteAllUsageLogs: mock(async () => false),
+  deletePerformanceByModel: mock(async () => false),
+  recordSuccessfulAttempt: mock(),
+  recordFailedAttempt: mock(),
+  getProviderPerformance: mock(async () => []),
+} as any);
