@@ -726,11 +726,11 @@ export function getConfig(): PlexusConfig {
 
 export function setConfigForTesting(config: PlexusConfig) {
   currentConfig = config;
-  // Also prime the ConfigService cache so code that calls ConfigService directly works in tests
+  // Reset ConfigService so getConfig() falls through to currentConfig.
+  // This prevents a stale or DB-loaded cache from shadowing the test config.
   try {
     const { ConfigService } = require('./services/config-service');
-    const instance = ConfigService.getInstance();
-    (instance as any).cache = config;
+    ConfigService.resetInstance();
   } catch {
     // ConfigService may not be available in all test environments
   }
