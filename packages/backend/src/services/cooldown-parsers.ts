@@ -20,7 +20,18 @@ export interface CooldownParser {
 export class CooldownParserRegistry {
   private static parsers = new Map<string, CooldownParser>();
 
-  static {}
+  static {
+    // Built-in parser for openai-codex / pi.ai usage limit messages.
+    // Matches patterns like "Try again in ~9725 min." or "Try again in ~45 min".
+    CooldownParserRegistry.register('openai-codex', {
+      parseCooldownDuration(errorText: string): number | null {
+        const match = /try again in ~(\d+)\s*min/i.exec(errorText);
+        if (!match || !match[1]) return null;
+        const minutes = parseInt(match[1], 10);
+        return Number.isFinite(minutes) && minutes > 0 ? minutes * 60 * 1000 : null;
+      },
+    });
+  }
 
   /**
    * Register a cooldown parser for a specific provider type.
