@@ -1,0 +1,113 @@
+name: Beta Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Beta version label (e.g. v0.19.0-beta.1). Leave blank to use beta-<sha>.'
+        required: false
+        default: ''
+
+jobs:
+  build-and-release:
+    name: Build and Beta Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=beta-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install backend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/backend
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/frontend
+
+      - name: Run tests
+        run: bun test --verbose --workers=1
+        working-directory: ./packages/backend
+
+      - name: Compile binaries
+        env:
+          APP_VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          bun run compile:linux
+          bun run compile:macos
+          bun run compile:windows
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:beta
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.tag }}
+
+      - name: Create GitHub pre-release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: 'Beta: ${{ steps.version.outputs.tag }}'
+          files: |
+            plexus-linux
+            plexus-macos
+            plexus.exe
+          draft: false
+          prerelease: true
+          body: |
+            ## Beta Release — Config-to-Database
+
+            > **This is a pre-release.** Configuration is now stored in the database rather than `plexus.yaml`.
+            > Migrating from a previous release requires reading the upgrade notes carefully.
+
+            **Branch:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}`
+            **Version:** `${{ steps.version.outputs.tag }}`
+
+            ### Docker
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:beta
+            # or pin to this exact build:
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}
+            ```
+
+            ### Binary downloads
+
+            Platform binaries are attached below.
