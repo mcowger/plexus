@@ -265,6 +265,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     options: ApertisQuotaCheckerOptionsSchema,
   }),
   z.object({
+    type: z.literal('apertis-coding-plan'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ApertisQuotaCheckerOptionsSchema,
+  }),
+  z.object({
     type: z.literal('minimax-coding'),
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
