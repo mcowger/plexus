@@ -28,6 +28,7 @@ import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig
 import { GeminiCliQuotaConfig } from '../components/quota/GeminiCliQuotaConfig';
 import { AntigravityQuotaConfig } from '../components/quota/AntigravityQuotaConfig';
 import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
+import { ApertisCodingPlanQuotaConfig } from '../components/quota/ApertisCodingPlanQuotaConfig';
 import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
 
@@ -930,77 +931,79 @@ export const Providers = () => {
               </tr>
             </thead>
             <tbody>
-              {providers.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => handleEdit(p)}
-                  style={{ cursor: 'pointer' }}
-                  className="hover:bg-bg-hover"
-                >
-                  <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
-                    style={{ paddingLeft: '24px' }}
+              {[...providers]
+                .sort((a, b) => a.id.localeCompare(b.id))
+                .map((p) => (
+                  <tr
+                    key={p.id}
+                    onClick={() => handleEdit(p)}
+                    style={{ cursor: 'pointer' }}
+                    className="hover:bg-bg-hover"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Edit2 size={12} style={{ opacity: 0.5 }} />
-                      <div style={{ fontWeight: 600 }}>{p.id}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        ( {p.name} )
+                    <td
+                      className="px-4 py-3 text-left border-b border-border-glass text-text"
+                      style={{ paddingLeft: '24px' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Edit2 size={12} style={{ opacity: 0.5 }} />
+                        <div style={{ fontWeight: 600 }}>{p.id}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          ( {p.name} )
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        checked={p.enabled !== false}
-                        onChange={(val) => handleToggleEnabled(p, val)}
-                        size="sm"
-                      />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {(Array.isArray(p.type) ? p.type : [p.type]).map((t) => (
-                        <Badge
-                          key={t}
-                          status="connected"
-                          style={{ ...getApiBadgeStyle(t), fontSize: '10px', padding: '2px 8px' }}
-                          className="[&_.connection-dot]:hidden"
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={p.enabled !== false}
+                          onChange={(val) => handleToggleEnabled(p, val)}
+                          size="sm"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {(Array.isArray(p.type) ? p.type : [p.type]).map((t) => (
+                          <Badge
+                            key={t}
+                            status="connected"
+                            style={{ ...getApiBadgeStyle(t), fontSize: '10px', padding: '2px 8px' }}
+                            className="[&_.connection-dot]:hidden"
+                          >
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      {p.models
+                        ? Array.isArray(p.models)
+                          ? p.models.length
+                          : typeof p.models === 'object'
+                            ? Object.keys(p.models).length
+                            : 0
+                        : 0}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-left border-b border-border-glass text-text"
+                      style={{ paddingRight: '24px', textAlign: 'right' }}
+                    >
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteModal(p);
+                          }}
+                          style={{ color: 'var(--color-danger)' }}
                         >
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                    {p.models
-                      ? Array.isArray(p.models)
-                        ? p.models.length
-                        : typeof p.models === 'object'
-                          ? Object.keys(p.models).length
-                          : 0
-                      : 0}
-                  </td>
-                  <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
-                    style={{ paddingRight: '24px', textAlign: 'right' }}
-                  >
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteModal(p);
-                        }}
-                        style={{ color: 'var(--color-danger)' }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -1740,6 +1743,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <ApertisQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis-coding-plan' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <ApertisCodingPlanQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({
@@ -2778,10 +2798,13 @@ export const Providers = () => {
                                         step="0.000001"
                                         value={range.cache_write_per_m || 0}
                                         onChange={(e) => {
+                                          const nextValue = Number(e.target.value);
                                           const newRanges = [...mCfg.pricing.range];
                                           newRanges[idx] = {
                                             ...range,
-                                            cache_write_per_m: parseFloat(e.target.value),
+                                            cache_write_per_m: Number.isFinite(nextValue)
+                                              ? nextValue
+                                              : 0,
                                           };
                                           updateModelConfig(mId, {
                                             pricing: { ...mCfg.pricing, range: newRanges },

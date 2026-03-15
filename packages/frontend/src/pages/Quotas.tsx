@@ -24,6 +24,7 @@ import {
   PoeQuotaDisplay,
   GeminiCliQuotaDisplay,
   AntigravityQuotaDisplay,
+  ApertisCodingPlanQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
@@ -44,6 +45,7 @@ const RATE_LIMIT_CHECKERS = [
   'copilot',
   'wisdomgate',
   'minimax-coding',
+  'apertis-coding-plan',
   'gemini-cli',
   'gemini',
   'antigravity',
@@ -71,6 +73,8 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   wisdomgate: 'Wisdom Gate',
   'gemini-cli': 'Gemini CLI',
   antigravity: 'Antigravity',
+  apertis: 'Apertis',
+  'apertis-coding-plan': 'Apertis Coding',
 };
 
 export const Quotas = () => {
@@ -349,6 +353,10 @@ export const Quotas = () => {
 
     if (checkerIdentifier.includes('gemini-cli') || checkerIdentifier.includes('gemini')) {
       return wrapper(<GeminiCliQuotaDisplay result={result} isCollapsed={false} />);
+    }
+
+    if (checkerIdentifier.includes('apertis-coding-plan')) {
+      return wrapper(<ApertisCodingPlanQuotaDisplay result={result} isCollapsed={false} />);
     }
 
     if (checkerIdentifier.includes('antigravity')) {

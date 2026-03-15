@@ -50,7 +50,6 @@ function makeConfig(options?: { failoverEnabled?: boolean; targetCount?: number 
       },
     },
     keys: {},
-    adminKey: 'secret',
     failover: {
       enabled: failoverEnabled,
       retryableStatusCodes: [500, 502, 503, 504, 429],

@@ -260,6 +260,7 @@ export const Sidebar: React.FC = () => {
     'copilot',
     'wisdomgate',
     'minimax-coding',
+    'apertis-coding-plan',
     'gemini-cli',
     'antigravity',
   ];

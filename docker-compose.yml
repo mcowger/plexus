@@ -9,8 +9,10 @@ services:
       - "4000:4000"
     volumes:
       - ./config:/app/config
-      # - ./data:/app/data
+      - ./data:/app/data
     environment:
+      - ADMIN_KEY=${ADMIN_KEY:?ADMIN_KEY is required}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/plexus.db}
       - LOG_LEVEL=info
-      - DATA_DIR=/app/config
+      - DATA_DIR=/app/data
       - CONFIG_FILE=/app/config/plexus.yaml

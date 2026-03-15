@@ -26,6 +26,8 @@ export { WisdomGateQuotaDisplay } from './WisdomGateQuotaDisplay';
 export { WisdomGateQuotaConfig } from './WisdomGateQuotaConfig';
 export { ApertisQuotaDisplay } from './ApertisQuotaDisplay';
 export { ApertisQuotaConfig } from './ApertisQuotaConfig';
+export { ApertisCodingPlanQuotaDisplay } from './ApertisCodingPlanQuotaDisplay';
+export { ApertisCodingPlanQuotaConfig } from './ApertisCodingPlanQuotaConfig';
 export { PoeQuotaDisplay } from './PoeQuotaDisplay';
 export { PoeQuotaConfig } from './PoeQuotaConfig';
 export { GeminiCliQuotaDisplay } from './GeminiCliQuotaDisplay';

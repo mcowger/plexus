@@ -43,9 +43,9 @@ describe('Logging management routes', () => {
     expect(json.ephemeral).toBe(true);
   });
 
-  it('updates logging level via POST', async () => {
+  it('updates logging level via PUT', async () => {
     const response = await fastify.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/v0/management/logging/level',
       payload: { level: 'debug' },
     });
@@ -58,7 +58,7 @@ describe('Logging management routes', () => {
 
   it('rejects invalid logging levels', async () => {
     const response = await fastify.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/v0/management/logging/level',
       payload: { level: 'trace' },
     });

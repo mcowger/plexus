@@ -53,8 +53,9 @@
 #
 ###############################################################################
 
-# [REQUIRED] Admin Key for Dashboard and Management API Access
-adminKey: "change-me-to-a-secure-admin-password"
+# NOTE: Admin key is now configured via the ADMIN_KEY environment variable.
+# The server will refuse to start if ADMIN_KEY is not set.
+# Example: ADMIN_KEY="change-me-to-a-secure-admin-password" bun run dev
 
 # Optional: Global failover policy for multi-target model aliases
 # - enabled: Master switch for internal retry/failover behavior

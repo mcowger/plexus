@@ -46,8 +46,10 @@ COPY --from=builder /app/packages/frontend/dist /app/frontend/dist
 # Environment variables
 ENV LOG_LEVEL=info
 ENV DATA_DIR=/app/data
+ENV DATABASE_URL=sqlite:///app/data/plexus.db
 ENV CONFIG_FILE=/app/config/plexus.yaml
 ENV DRIZZLE_MIGRATIONS_PATH=/app/backend/packages/backend/drizzle/migrations_pg
+# ADMIN_KEY must be provided at runtime (no default for security)
 
 # Run the application
 CMD ["./plexus"]

@@ -57,7 +57,6 @@ function makeConfig() {
       },
     },
     keys: {},
-    adminKey: 'secret',
     failover: {
       enabled: true,
       retryableStatusCodes: [400, 402, 500, 502, 503, 504, 429],

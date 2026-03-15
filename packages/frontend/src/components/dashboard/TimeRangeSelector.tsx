@@ -6,12 +6,11 @@ import {
   formatDateRange,
   isValidDateRange,
   parseISODate,
-  formatISODate,
   type DateRangePreset,
   type CustomDateRange,
 } from '../../lib/date';
 
-type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
+export type TimeRange = 'live' | 'hour' | 'day' | 'week' | 'month' | 'custom';
 
 interface TimeRangeSelectorProps {
   value: TimeRange;
@@ -61,16 +60,16 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
   // Initialize date inputs when custom range changes
   useEffect(() => {
     if (customRange && value === 'custom') {
-      setStartDate(customRange.start.toISOString().slice(0, 16));
-      setEndDate(customRange.end.toISOString().slice(0, 16));
+      setStartDate(formatDateTimeLocal(customRange.start));
+      setEndDate(formatDateTimeLocal(customRange.end));
       setError(null);
     }
   }, [customRange, value]);
 
   const handlePresetSelect = (preset: DateRangePreset) => {
     const range = getPresetRange(preset);
-    setStartDate(range.start.toISOString().slice(0, 16));
-    setEndDate(range.end.toISOString().slice(0, 16));
+    setStartDate(formatDateTimeLocal(range.start));
+    setEndDate(formatDateTimeLocal(range.end));
     onCustomRangeChange?.(range);
     setShowPresetDropdown(false);
     setError(null);
@@ -114,7 +113,8 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
   };
 
   const formatDateTimeLocal = (date: Date): string => {
-    return date.toISOString().slice(0, 16);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
   };
 
   return (

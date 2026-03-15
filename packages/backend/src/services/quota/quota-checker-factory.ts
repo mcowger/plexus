@@ -14,6 +14,7 @@ import { KimiCodeQuotaChecker } from './checkers/kimi-code-checker';
 import { CopilotQuotaChecker } from './checkers/copilot-checker';
 import { WisdomGateQuotaChecker } from './checkers/wisdomgate-checker';
 import { ApertisQuotaChecker } from './checkers/apertis-checker';
+import { ApertisCodingPlanQuotaChecker } from './checkers/apertis-coding-plan-checker';
 import { PoeQuotaChecker } from './checkers/poe-checker';
 import { GeminiCliQuotaChecker } from './checkers/gemini-cli-checker';
 import { AntigravityQuotaChecker } from './checkers/antigravity-checker';
@@ -34,6 +35,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   copilot: CopilotQuotaChecker,
   wisdomgate: WisdomGateQuotaChecker,
   apertis: ApertisQuotaChecker,
+  'apertis-coding-plan': ApertisCodingPlanQuotaChecker,
   poe: PoeQuotaChecker,
   'gemini-cli': GeminiCliQuotaChecker,
   antigravity: AntigravityQuotaChecker,

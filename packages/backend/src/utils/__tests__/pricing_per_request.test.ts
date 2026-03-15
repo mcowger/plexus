@@ -286,7 +286,6 @@ describe('handleResponse - per_request pricing', () => {
 
 describe('config schema - per_request pricing', () => {
   const baseConfig = `
-adminKey: test-key
 providers:
   test-provider:
     api_base_url: https://api.example.com/v1/chat/completions

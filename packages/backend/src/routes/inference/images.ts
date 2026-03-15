@@ -98,6 +98,9 @@ export async function registerImagesRoute(
       const pricing = unifiedResponse.plexus?.pricing;
       const providerDiscount = unifiedResponse.plexus?.providerDiscount;
       calculateCosts(usageRecord, pricing, providerDiscount);
+      usageRecord.attemptCount = (unifiedResponse.plexus as any)?.attemptCount || 1;
+      usageRecord.retryHistory =
+        ((unifiedResponse.plexus as any)?.retryHistory as string | undefined) || null;
 
       usageStorage.saveRequest(usageRecord as UsageRecord);
 
@@ -262,6 +265,9 @@ export async function registerImagesRoute(
       const pricing = unifiedResponse.plexus?.pricing;
       const providerDiscount = unifiedResponse.plexus?.providerDiscount;
       calculateCosts(usageRecord, pricing, providerDiscount);
+      usageRecord.attemptCount = (unifiedResponse.plexus as any)?.attemptCount || 1;
+      usageRecord.retryHistory =
+        ((unifiedResponse.plexus as any)?.retryHistory as string | undefined) || null;
 
       usageStorage.saveRequest(usageRecord as UsageRecord);
 

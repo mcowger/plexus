@@ -39,6 +39,7 @@ const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   if (id.includes('claude-code') || id.includes('claude')) return 'claude';
   if (id.includes('openai-codex') || id.includes('codex')) return 'codex';
   if (id.includes('minimax-coding')) return 'minimax-coding';
+  if (id.includes('apertis-coding-plan')) return 'apertis-coding-plan';
   if (id.includes('zai')) return 'zai';
   if (id.includes('nanogpt') || id.includes('nano')) return 'nanogpt';
   if (id.includes('naga')) return 'naga';
@@ -59,6 +60,7 @@ const getTypeDisplayName = (category: string): string => {
     nanogpt: 'NanoGPT',
     naga: 'Naga',
     'minimax-coding': 'MiniMax Coding',
+    'apertis-coding-plan': 'Apertis Coding',
     kimi: 'Kimi',
     copilot: 'Copilot',
     'gemini-cli': 'Gemini CLI',
@@ -128,6 +130,8 @@ const getCheckerIcon = (category: string) => {
       return <Shield className={iconClass} />;
     case 'minimax-coding':
       return <Code2 className={iconClass} />;
+    case 'apertis-coding-plan':
+      return <Code2 className={iconClass} />;
     case 'kimi':
       return <Sparkles className={iconClass} />;
     case 'copilot':
@@ -161,6 +165,8 @@ const getTrackedWindowsForChecker = (category: string, windows: any[]): string[]
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99));
     case 'minimax-coding':
       return ['custom'].filter((t) => availableTypes.has(t));
+    case 'apertis-coding-plan':
+      return ['monthly'].filter((t) => availableTypes.has(t));
     case 'kimi':
       return ['custom', 'five_hour'].filter((t) => availableTypes.has(t));
     case 'copilot':

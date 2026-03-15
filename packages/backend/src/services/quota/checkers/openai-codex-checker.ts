@@ -135,6 +135,18 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
     const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
 
+    const rawCreds = (
+      oauthAccountId
+        ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
+        : authManager.getCredentials(provider as OAuthProvider)
+    ) as Record<string, unknown> | null;
+    logger.debug(
+      `[openai-codex-checker] resolveApiKey for '${this.id}' — ` +
+        `refresh=${rawCreds?.refresh ? `present(${String(rawCreds.refresh).length} chars)` : 'MISSING'}, ` +
+        `access=${rawCreds?.access ? `present(${String(rawCreds.access).length} chars)` : 'MISSING'}, ` +
+        `expires=${rawCreds?.expires} (${rawCreds?.expires && Number(rawCreds.expires) > Date.now() ? 'valid' : 'EXPIRED or missing'})`
+    );
+
     let oauthApiKey: string;
     try {
       oauthApiKey = oauthAccountId

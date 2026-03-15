@@ -12,7 +12,6 @@ providers:
 ${quotaCheckerOptionsYaml}
 models: {}
 keys: {}
-adminKey: "admin-secret"
 `;
 
 describe('config quota checker validation', () => {
@@ -28,7 +27,6 @@ providers:
       type: openai-codex
 models: {}
 keys: {}
-adminKey: "admin-secret"
 `);
 
     expect(config.quotas).toHaveLength(1);
@@ -51,7 +49,6 @@ providers:
       type: claude-code
 models: {}
 keys: {}
-adminKey: "admin-secret"
 `);
 
     expect(config.quotas).toHaveLength(1);
@@ -114,7 +111,6 @@ providers:
         organizationId: "org-123"
 models: {}
 keys: {}
-adminKey: "admin-secret"
 `);
 
     expect(config.quotas).toHaveLength(1);

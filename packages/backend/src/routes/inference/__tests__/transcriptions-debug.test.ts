@@ -118,7 +118,6 @@ describe('Transcriptions Debug Logging', () => {
       keys: {
         'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
       },
-      adminKey: 'admin-secret',
       failover: {
         enabled: false,
         retryableStatusCodes: [429, 500, 502, 503, 504],

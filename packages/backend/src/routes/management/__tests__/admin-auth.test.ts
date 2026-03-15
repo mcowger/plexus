@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import Fastify, { FastifyInstance } from 'fastify';
 import { mock } from 'bun:test';
 import { setConfigForTesting } from '../../../config';
@@ -15,7 +15,6 @@ const BASE_CONFIG = {
   keys: {
     'test-key': { secret: 'sk-test-secret', comment: 'Test Key' },
   },
-  adminKey: 'correct-admin-key',
   failover: {
     enabled: false,
     retryableStatusCodes: [429, 500, 502, 503, 504],
@@ -23,6 +22,17 @@ const BASE_CONFIG = {
   },
   quotas: [],
 };
+
+// Admin key is now read from process.env.ADMIN_KEY
+const originalAdminKey = process.env.ADMIN_KEY;
+
+afterAll(() => {
+  if (originalAdminKey === undefined) {
+    delete process.env.ADMIN_KEY;
+  } else {
+    process.env.ADMIN_KEY = originalAdminKey;
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Shared minimal mocks
@@ -58,6 +68,7 @@ describe('GET /v0/management/auth/verify', () => {
   let fastify: FastifyInstance;
 
   beforeAll(async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
     const { mockUsageStorage, mockDispatcher } = makeMockDeps();
@@ -73,7 +84,7 @@ describe('GET /v0/management/auth/verify', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true });
+    expect(res.json() as unknown).toEqual({ ok: true });
   });
 
   it('returns 401 when an incorrect admin key is provided', async () => {
@@ -128,6 +139,7 @@ describe('Management route protection', () => {
   let fastify: FastifyInstance;
 
   beforeAll(async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
     const { mockUsageStorage, mockDispatcher } = makeMockDeps();
@@ -185,14 +197,15 @@ describe('Management route protection', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Suite: Admin key change is reflected immediately
+// Suite: Admin key change via env var is reflected immediately
 // ---------------------------------------------------------------------------
 
-describe('Admin key config hot-reload', () => {
+describe('Admin key env var change', () => {
   let fastify: FastifyInstance;
 
   beforeAll(async () => {
-    setConfigForTesting({ ...BASE_CONFIG, adminKey: 'original-key' });
+    process.env.ADMIN_KEY = 'original-key';
+    setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
     const { mockUsageStorage, mockDispatcher } = makeMockDeps();
     await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
@@ -208,8 +221,8 @@ describe('Admin key config hot-reload', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('rejects the old key and accepts new key after config update', async () => {
-    setConfigForTesting({ ...BASE_CONFIG, adminKey: 'rotated-key' });
+  it('rejects the old key and accepts new key after env var update', async () => {
+    process.env.ADMIN_KEY = 'rotated-key';
 
     const oldKeyRes = await fastify.inject({
       method: 'GET',
@@ -235,6 +248,7 @@ describe('v1 inference routes are unaffected by admin key auth', () => {
   let fastify: FastifyInstance;
 
   beforeAll(async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
     const { mockUsageStorage, mockDispatcher } = makeMockDeps();

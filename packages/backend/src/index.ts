@@ -3,8 +3,10 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
+import fs from 'fs';
 import { logger } from './utils/logger';
-import { loadConfig, getConfig } from './config';
+import { getConfig } from './config';
+import { ConfigService } from './services/config-service';
 import { Dispatcher } from './services/dispatcher';
 import { UsageStorageService } from './services/usage-storage';
 import { CooldownManager } from './services/cooldown-manager';
@@ -31,6 +33,20 @@ import { runMigrations } from './db/migrate';
  * This server acts as a unified gateway for various LLM providers,
  * handling request transformation, load balancing, and usage tracking.
  */
+
+// --- Required Environment Variables ---
+if (!process.env.ADMIN_KEY) {
+  logger.error(
+    'ADMIN_KEY environment variable is required. Set it to a secure password for admin access.'
+  );
+  process.exit(1);
+}
+
+if (!process.env.DATABASE_URL) {
+  const dataDir = process.env.DATA_DIR || '/app/data';
+  process.env.DATABASE_URL = `sqlite://${dataDir}/plexus.db`;
+  logger.info(`DATABASE_URL not set, defaulting to ${process.env.DATABASE_URL}`);
+}
 
 const fastify = Fastify({
   logger: false, // We use a custom winston-based logger
@@ -73,12 +89,73 @@ if (process.env.DEBUG === 'true') {
   logger.info('Debug mode auto-enabled via DEBUG=true environment variable');
 }
 
-// Bootstrap configuration and pricing data
+// --- Database Initialization ---
+// Database must be initialized BEFORE config loading (config is now DB-backed)
 try {
-  await loadConfig();
+  initializeDatabase();
+  await runMigrations();
+} catch (e) {
+  logger.error('Failed to initialize database or run migrations', e);
+  process.exit(1);
+}
+
+// --- Configuration Initialization ---
+// Use ConfigService (database-backed) with auto-import from YAML on first launch
+try {
+  const configService = ConfigService.getInstance();
+
+  if (await configService.isFirstLaunch()) {
+    logger.info('First launch detected — checking for existing config files to import');
+
+    // Import from plexus.yaml if it exists
+    // Try CONFIG_FILE env var first, then check common locations
+    const configLocations = [
+      path.resolve(__dirname, '../../../config/plexus.yaml'), // from packages/backend/src or dist
+      path.resolve(__dirname, '../../config/plexus.yaml'), // alternate depth
+      path.resolve(process.cwd(), 'config/plexus.yaml'), // from repo root
+      path.resolve(process.cwd(), '../../config/plexus.yaml'), // from packages/backend
+    ];
+    const configPath = [process.env.CONFIG_FILE, ...configLocations].find(
+      (p): p is string => typeof p === 'string' && fs.existsSync(p)
+    );
+
+    try {
+      if (configPath && fs.existsSync(configPath)) {
+        const yamlContent = fs.readFileSync(configPath, 'utf-8');
+        await configService.importFromYaml(yamlContent);
+        logger.info(`Imported configuration from ${configPath} into database`);
+      } else {
+        logger.info('No plexus.yaml found — starting with empty configuration');
+      }
+
+      // Import from auth.json if it exists
+      const authJsonPath = process.env.AUTH_JSON || './auth.json';
+      if (fs.existsSync(authJsonPath)) {
+        const authContent = fs.readFileSync(authJsonPath, 'utf-8');
+        await configService.importFromAuthJson(authContent);
+        logger.info(`Imported OAuth credentials from ${authJsonPath} into database`);
+      }
+
+      // Mark bootstrap as complete so a future restart (even with an empty
+      // providers table) does not re-import from the YAML file.
+      await configService.getRepository().markBootstrapped();
+      logger.info('Bootstrap complete — marked database as bootstrapped');
+    } catch (importError) {
+      logger.error(
+        'Failed to import config — clearing partial data for clean retry on next launch',
+        importError
+      );
+      await configService.clearAllData();
+      throw importError;
+    }
+  }
+
+  await configService.initialize();
+  logger.info('Configuration loaded from database');
+
   // Eagerly initialize OAuth auth manager so auth.json schema migration
   // runs during startup (instead of waiting for first OAuth request).
-  OAuthAuthManager.getInstance();
+  await OAuthAuthManager.getInstance().initialize();
   await PricingManager.getInstance().loadPricing();
   // Load model metadata from all configured sources (non-fatal on failure)
   ModelMetadataManager.getInstance()
@@ -91,15 +168,11 @@ try {
   process.exit(1);
 }
 
-// --- Database Initialization ---
-// Initialize database before quota checkers (which need DB access)
+// Load cooldowns from storage (requires DB to be ready)
 try {
-  initializeDatabase();
-  await runMigrations();
   await CooldownManager.getInstance().loadFromStorage();
 } catch (e) {
-  logger.error('Failed to initialize database or run migrations', e);
-  process.exit(1);
+  logger.error('Failed to load cooldowns from storage', e);
 }
 
 // Initialize quota checkers (requires DB to be ready)
@@ -259,7 +332,7 @@ const start = async () => {
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (err) {
-    fastify.log.error(err);
+    logger.error('Fatal error during server startup', err);
     process.exit(1);
   }
 };
