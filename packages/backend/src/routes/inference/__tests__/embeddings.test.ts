@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 import Fastify, { FastifyInstance } from 'fastify';
 import { setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
@@ -7,6 +7,37 @@ import { UsageStorageService } from '../../../services/usage-storage';
 import { mock } from 'bun:test';
 import { DebugManager } from '../../../services/debug-manager';
 import { SelectorFactory } from '../../../services/selectors/factory';
+
+const EMBEDDINGS_TEST_CONFIG = {
+  providers: {
+    openai: {
+      api_key: 'sk-test',
+      api_base_url: 'https://api.openai.com/v1',
+      estimateTokens: false,
+      disable_cooldown: false,
+      models: {
+        'text-embedding-3-small': {
+          pricing: { source: 'simple' as const, input: 0.00002, output: 0 },
+        },
+      },
+    },
+  },
+  models: {
+    'embeddings-small': {
+      priority: 'selector' as const,
+      targets: [{ provider: 'openai', model: 'text-embedding-3-small' }],
+    },
+  },
+  keys: {
+    'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
+  },
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+};
 
 describe('Embeddings Endpoint', () => {
   let fastify: FastifyInstance;
@@ -68,39 +99,15 @@ describe('Embeddings Endpoint', () => {
     SelectorFactory.setUsageStorage(mockUsageStorage);
 
     // Set config with embeddings models
-    setConfigForTesting({
-      providers: {
-        openai: {
-          api_key: 'sk-test',
-          api_base_url: 'https://api.openai.com/v1',
-          estimateTokens: false,
-          disable_cooldown: false,
-          models: {
-            'text-embedding-3-small': {
-              pricing: { source: 'simple', input: 0.00002, output: 0 },
-            },
-          },
-        },
-      },
-      models: {
-        'embeddings-small': {
-          priority: 'selector',
-          targets: [{ provider: 'openai', model: 'text-embedding-3-small' }],
-        },
-      },
-      keys: {
-        'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
-      },
-      failover: {
-        enabled: false,
-        retryableStatusCodes: [429, 500, 502, 503, 504],
-        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
-      },
-      quotas: [],
-    });
+    setConfigForTesting(EMBEDDINGS_TEST_CONFIG);
 
     await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
     await fastify.ready();
+  });
+
+  // Re-pin config before each test to guard against cross-file config pollution in CI
+  beforeEach(() => {
+    setConfigForTesting(EMBEDDINGS_TEST_CONFIG);
   });
 
   it('should accept embeddings request with single text input', async () => {
