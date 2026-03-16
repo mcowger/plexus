@@ -67,6 +67,7 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'kilo',
   'wisdomgate',
   'apertis',
+  'apertis-coding-plan',
   'poe',
   'copilot',
   'gemini-cli',
