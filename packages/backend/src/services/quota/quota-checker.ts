@@ -31,6 +31,9 @@ export abstract class QuotaChecker {
     return this.config.intervalMinutes;
   }
 
+  /** Whether this checker tracks a prepaid account balance or a time-windowed rate limit. */
+  abstract readonly category: 'balance' | 'rate-limit';
+
   abstract checkQuota(): Promise<QuotaCheckResult>;
 
   protected getOAuthMetadata(): { oauthAccountId?: string; oauthProvider?: string } {

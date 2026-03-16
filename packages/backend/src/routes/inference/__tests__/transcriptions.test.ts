@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import Fastify, { FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
-import { createTestConfig } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatcher';
@@ -39,12 +38,48 @@ function createMultipartPayload(
   };
 }
 
+const TRANSCRIPTIONS_TEST_CONFIG = {
+  providers: {
+    openai: {
+      api_key: 'sk-test',
+      api_base_url: 'https://api.openai.com/v1',
+      estimateTokens: false,
+      disable_cooldown: false,
+      models: {
+        'whisper-1': {
+          type: 'transcriptions' as const,
+          pricing: { source: 'simple' as const, input: 0.006, output: 0 },
+        },
+      },
+    },
+  },
+  models: {
+    'transcription-model': {
+      type: 'transcriptions' as const,
+      priority: 'selector' as const,
+      targets: [{ provider: 'openai', model: 'whisper-1' }],
+    },
+  },
+  keys: {
+    'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
+  },
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+};
+
 describe('Transcriptions Endpoint', () => {
   let fastify: FastifyInstance;
   let mockUsageStorage: UsageStorageService;
   let mockDispatcher: Dispatcher;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    // Set config first so it's available when routes register
+    setConfigForTesting(TRANSCRIPTIONS_TEST_CONFIG);
+
     fastify = Fastify({
       bodyLimit: 30 * 1024 * 1024, // 30MB
     });
@@ -57,7 +92,6 @@ describe('Transcriptions Endpoint', () => {
       attachFieldsToBody: true,
     });
 
-    // Mock dispatcher with transcriptions support
     mockDispatcher = {
       dispatch: mock(async () => ({
         id: '123',
@@ -105,37 +139,15 @@ describe('Transcriptions Endpoint', () => {
       emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
-    // Initialize singletons
     DebugManager.getInstance().setStorage(mockUsageStorage);
     SelectorFactory.setUsageStorage(mockUsageStorage);
 
-    // Set config with transcription models
-    setConfigForTesting(
-      createTestConfig({
-        providers: {
-          openai: {
-            api_key: 'sk-test',
-            api_base_url: 'https://api.openai.com/v1',
-            enabled: true,
-            models: {
-              'whisper-1': {
-                pricing: { source: 'simple', input: 0.006, output: 0 },
-              },
-            },
-          },
-        },
-        models: {
-          'transcription-model': {
-            type: 'transcriptions',
-            priority: 'selector',
-            targets: [{ provider: 'openai', model: 'whisper-1' }],
-          },
-        },
-      })
-    );
-
     await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
     await fastify.ready();
+  });
+
+  afterEach(async () => {
+    await fastify.close();
   });
 
   it('should accept transcription request with audio file (JSON format)', async () => {
@@ -156,7 +168,7 @@ describe('Transcriptions Endpoint', () => {
       payload,
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body).toHaveProperty('text');
     expect(body.text).toBe('This is a test transcription.');
@@ -181,7 +193,7 @@ describe('Transcriptions Endpoint', () => {
       payload,
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/plain');
     expect(response.body).toBe('This is a test transcription.');
   });
@@ -210,7 +222,7 @@ describe('Transcriptions Endpoint', () => {
       payload,
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body).toHaveProperty('text');
 

@@ -306,6 +306,8 @@ export interface UnifiedTranscriptionResponse {
     providerDiscount?: number;
     canonicalModel?: string;
     config?: any;
+    attemptCount?: number;
+    retryHistory?: any;
   };
 
   rawResponse?: any;

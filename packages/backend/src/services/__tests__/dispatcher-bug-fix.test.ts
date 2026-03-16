@@ -63,7 +63,6 @@ describe('Dispatcher Bug Fixes', () => {
         },
       },
       keys: {},
-      adminKey: 'secret',
     };
 
     setConfigForTesting(mockConfig as any);
@@ -107,7 +106,6 @@ describe('Dispatcher Bug Fixes', () => {
         },
       },
       keys: {},
-      adminKey: 'secret',
     };
 
     setConfigForTesting(mockConfig as any);

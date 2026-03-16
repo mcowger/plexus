@@ -26,6 +26,7 @@ interface OAuthUsageResponse {
 }
 
 export class ClaudeCodeQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

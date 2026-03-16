@@ -37,6 +37,7 @@ interface NanoGPTQuotaResponse {
 }
 
 export class NanoGPTQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

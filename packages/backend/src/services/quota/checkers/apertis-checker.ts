@@ -20,6 +20,7 @@ const APERTIS_DEFAULT_ENDPOINT = 'https://api.stima.tech/api/user/self';
 const QUOTA_DIVISOR = 1000000;
 
 export class ApertisQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   async checkQuota(): Promise<QuotaCheckResult> {
     const session = this.requireOption<string>('session').trim();
     const endpoint = this.getOption<string>('endpoint', APERTIS_DEFAULT_ENDPOINT);

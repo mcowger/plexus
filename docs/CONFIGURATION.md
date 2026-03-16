@@ -1,16 +1,51 @@
 # Configuration
 
-Plexus is configured via a `config/plexus.yaml` file. This file defines your providers, model routing logic, and global settings.
+Plexus is configured via environment variables and a `config/plexus.yaml` file. Environment variables control server-level settings, while the YAML file (or database) defines your providers, model routing logic, and global settings.
+
+## Required Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ADMIN_KEY` | **Required.** Password for admin dashboard and management API access. The server will refuse to start if not set. | _(none)_ |
+| `DATABASE_URL` | Database connection string. Supports `sqlite://` and `postgres://` URIs. | `sqlite://<DATA_DIR>/plexus.db` |
+| `DATA_DIR` | Directory for data files (used as default location for SQLite database). | `./data` |
+| `CONFIG_FILE` | Path to `plexus.yaml` for initial import on first launch. | Auto-detected |
+| `LOG_LEVEL` | Logging level (`error`, `warn`, `info`, `debug`, `silly`). | `info` |
+| `PORT` | Port to listen on. | `4000` |
+| `HOST` | Host to bind to. | `0.0.0.0` |
+
+### Quick Start
+
+```bash
+# Minimal setup with SQLite (database auto-created in ./data/)
+ADMIN_KEY="my-secret-password" bun run dev
+
+# With PostgreSQL
+ADMIN_KEY="my-secret-password" DATABASE_URL="postgres://user:pass@localhost:5432/plexus" bun run dev
+```
+
+### Docker
+
+```bash
+docker run -e ADMIN_KEY="my-secret-password" -v ./data:/app/data -p 4000:4000 plexus:latest
+```
+
+Or with docker-compose, create a `.env` file:
+
+```env
+ADMIN_KEY=my-secret-password
+# DATABASE_URL=postgres://user:pass@localhost:5432/plexus  # optional, defaults to SQLite
+```
+
+Then run `docker compose up`.
 
 ## Configuration File (`plexus.yaml`)
 
-The configuration file is YAML-based and sits at the heart of how Plexus routes and transforms requests.
+The configuration file is YAML-based and sits at the heart of how Plexus routes and transforms requests. On first launch, Plexus imports it into the database. After that, configuration is managed via the Admin UI or Management API.
 
 ### Example Configuration
 
 ```yaml
-adminKey: "change-me-to-a-secure-password"
-
 providers:
   openai_direct:
     api_base_url: https://api.openai.com/v1
@@ -93,15 +128,11 @@ keys:
 
 ## Configuration Sections
 
-### `adminKey` (Required)
+### `ADMIN_KEY` (Environment Variable — Required)
 
-This global setting secures the Admin Dashboard and Management APIs (`/v0/*`). The server will refuse to start if it is missing. It cannot be changed via the UI — only in `plexus.yaml`.
+The `ADMIN_KEY` environment variable secures the Admin Dashboard and Management APIs (`/v0/*`). The server will refuse to start if it is not set.
 
-```yaml
-adminKey: "my-super-secret-admin-password"
-```
-
-The `adminKey` is used in two ways:
+It is used in two ways:
 
 1. **Dashboard Access**: Users are prompted for this key when opening the web interface.
 2. **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.

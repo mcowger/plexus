@@ -374,7 +374,11 @@ export const Models = () => {
     setEditingAlias({ ...editingAlias, targets: newTargets });
   };
 
-  const filteredAliases = aliases.filter((a) => a.id.toLowerCase().includes(search.toLowerCase()));
+  const sortedAliases = [...aliases].sort((a, b) => a.id.localeCompare(b.id));
+
+  const filteredAliases = sortedAliases.filter((a) =>
+    a.id.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
@@ -394,7 +398,7 @@ export const Models = () => {
                   onChange={(e) => setGlobalDescriptorModel(e.target.value)}
                 >
                   <option value="">(None)</option>
-                  {aliases.map((a) => (
+                  {sortedAliases.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.id}
                     </option>

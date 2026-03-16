@@ -21,6 +21,7 @@ interface ZAIQuotaLimitResponse {
 }
 
 export class ZAIQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

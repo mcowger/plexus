@@ -41,6 +41,10 @@ export async function registerQuotaRoutes(
     return getQuotaConfig(checkerId)?.type;
   };
 
+  const getCheckerCategory = (checkerId: string): 'balance' | 'rate-limit' | undefined => {
+    return quotaScheduler.getCheckerCategory(checkerId);
+  };
+
   fastify.get('/v0/management/quotas', async (request, reply) => {
     try {
       const checkerIds = quotaScheduler.getCheckerIds();
@@ -53,6 +57,7 @@ export async function registerQuotaRoutes(
           results.push({
             checkerId,
             checkerType: getCheckerType(checkerId),
+            checkerCategory: getCheckerCategory(checkerId),
             latest,
             ...getOAuthMetadata(checkerId),
           });
@@ -61,6 +66,7 @@ export async function registerQuotaRoutes(
           results.push({
             checkerId,
             checkerType: getCheckerType(checkerId),
+            checkerCategory: getCheckerCategory(checkerId),
             latest: [],
             error: error instanceof Error ? error.message : 'Unknown error',
             ...getOAuthMetadata(checkerId),
@@ -85,6 +91,7 @@ export async function registerQuotaRoutes(
       return {
         checkerId,
         checkerType: getCheckerType(checkerId),
+        checkerCategory: getCheckerCategory(checkerId),
         latest: latest.map(normalizeQuotaSnapshot),
         ...getOAuthMetadata(checkerId),
       };

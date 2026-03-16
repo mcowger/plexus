@@ -36,6 +36,7 @@ interface KimiUsageResponse {
 }
 
 export class KimiCodeQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

@@ -1,4 +1,3 @@
-import { parse, stringify } from 'yaml';
 import { formatNumber, formatPoints } from './format';
 import { toBoolean, toIsoString } from './normalize';
 import type { QuotaCheckerInfo, QuotaSnapshot, QuotaCheckResult } from '../types/quota';
@@ -415,10 +414,7 @@ const summaryRequestCache = new Map<
 >();
 
 const CONFIG_CACHE_TTL_MS = 20000;
-const configRequestCache = new Map<
-  string,
-  { expiresAt: number; promise: Promise<PlexusConfig | null> }
->();
+const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<any> }>();
 
 // Cache for quota checker types fetched from backend
 let quotaCheckerTypesCache: Set<string> | null = null;
@@ -441,6 +437,7 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'kilo',
   'wisdomgate',
   'apertis',
+  'apertis-coding-plan',
   'copilot',
   'poe',
   'gemini-cli',
@@ -457,7 +454,7 @@ async function fetchQuotaCheckerTypes(): Promise<Set<string>> {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/v0/management/quota-checker-types`);
+    const response = await fetchWithAuth(`${API_BASE}/v0/management/quota-checker-types`);
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data.types)) {
@@ -526,7 +523,7 @@ const normalizeNow = (): Date => {
   return now;
 };
 
-const getUsageRangeConfig = (range: 'hour' | 'day' | 'week' | 'month', now: Date) => {
+const getUsageRangeConfig = (range: 'hour' | 'day' | 'week' | 'month' | 'custom', now: Date) => {
   const startDate = new Date(now);
   let bucketFormat: (d: Date) => string;
   let buckets = 0;
@@ -631,7 +628,7 @@ const buildUsageSeries = (
   return Object.values(grouped);
 };
 
-const formatBucketLabel = (range: 'hour' | 'day' | 'week' | 'month', date: Date) => {
+const formatBucketLabel = (range: 'hour' | 'day' | 'week' | 'month' | 'custom', date: Date) => {
   if (range === 'hour' || range === 'day') {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -767,7 +764,7 @@ const fetchUsageSummary = async (
   return (await res.json()) as UsageSummaryResponse;
 };
 
-const fetchConfigCached = async (): Promise<PlexusConfig | null> => {
+const fetchConfigCached = async (): Promise<any> => {
   const cached = configRequestCache.get('config');
   if (cached && cached.expiresAt > Date.now()) {
     return cached.promise;
@@ -776,48 +773,13 @@ const fetchConfigCached = async (): Promise<PlexusConfig | null> => {
   const promise = (async () => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config`);
     if (!res.ok) throw new Error('Failed to fetch config');
-    const configText = await res.text();
-    try {
-      return parse(configText) as PlexusConfig;
-    } catch {
-      return null;
-    }
+    return await res.json();
   })();
 
   configRequestCache.set('config', { expiresAt: Date.now() + CONFIG_CACHE_TTL_MS, promise });
   promise.catch(() => configRequestCache.delete('config'));
   return promise;
 };
-
-interface PlexusConfig {
-  providers: Record<
-    string,
-    {
-      type?: string | string[]; // Optional for backward compatibility, but will be inferred from api_base_url
-      api_key?: string;
-      oauth_provider?: string;
-      oauth_account?: string;
-      api_base_url?: string | Record<string, string>;
-      display_name?: string;
-      models?: string[] | Record<string, any>;
-      enabled?: boolean; // Custom field we might want to preserve if we could
-      disable_cooldown?: boolean;
-      estimateTokens?: boolean;
-      discount?: number;
-      headers?: Record<string, string>;
-      extraBody?: Record<string, any>;
-      quota_checker?: {
-        type?: string;
-        enabled?: boolean;
-        intervalMinutes?: number;
-        options?: Record<string, unknown>;
-      };
-    }
-  >;
-  models?: Record<string, any>;
-  keys?: Record<string, KeyConfig>;
-  quotas?: QuotaConfig[];
-}
 
 export interface KeyConfig {
   key: string; // The user-facing alias/name for the key (e.g. 'my-app')
@@ -1407,25 +1369,16 @@ export const api = {
     return (await res.json()) as BackendResponse<UsageRecord[]>;
   },
 
-  getConfig: async (): Promise<string> => {
+  getConfig: async (): Promise<any> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config`);
     if (!res.ok) throw new Error('Failed to fetch config');
-    return await res.text();
+    return await res.json();
   },
 
-  saveConfig: async (config: string): Promise<void> => {
-    const res = await fetchWithAuth(`${API_BASE}/v0/management/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/yaml' }, // or application/x-yaml
-      body: config,
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      const error = new Error(err.error || 'Failed to save config');
-      (error as any).details = err.details;
-      (error as any).status = res.status;
-      throw error;
-    }
+  getConfigExport: async (): Promise<any> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/export`);
+    if (!res.ok) throw new Error('Failed to fetch config export');
+    return await res.json();
   },
 
   restart: async (): Promise<{ success: boolean; message: string }> => {
@@ -1441,11 +1394,14 @@ export const api = {
 
   getKeys: async (): Promise<KeyConfig[]> => {
     try {
-      const yamlStr = await api.getConfig();
-      const config = parse(yamlStr) as PlexusConfig;
-      if (!config.keys) return [];
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/keys`);
+      if (!res.ok) throw new Error('Failed to fetch keys');
+      const keys = (await res.json()) as Record<
+        string,
+        { secret: string; comment?: string; quota?: string }
+      >;
 
-      return Object.entries(config.keys).map(([key, val]) => ({
+      return Object.entries(keys).map(([key, val]) => ({
         key,
         secret: val.secret,
         comment: val.comment,
@@ -1458,61 +1414,52 @@ export const api = {
   },
 
   saveKey: async (keyConfig: KeyConfig, oldKeyName?: string): Promise<void> => {
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      config = { providers: {}, models: {}, keys: {} };
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/keys/${encodeURIComponent(keyConfig.key)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: keyConfig.secret,
+          comment: keyConfig.comment,
+          ...(keyConfig.quota ? { quota: keyConfig.quota } : {}),
+        }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to save key');
     }
 
-    if (!config) config = {};
-    if (!config.keys) config.keys = {};
-
-    // If key name changed, delete old key
-    if (oldKeyName && oldKeyName !== keyConfig.key && config.keys[oldKeyName]) {
-      delete config.keys[oldKeyName];
+    // Delete old key only after new one is saved successfully
+    if (oldKeyName && oldKeyName !== keyConfig.key) {
+      await api.deleteKey(oldKeyName);
     }
-
-    config.keys[keyConfig.key] = {
-      secret: keyConfig.secret,
-      comment: keyConfig.comment,
-      ...(keyConfig.quota ? { quota: keyConfig.quota } : {}),
-    };
-
-    const newYaml = stringify(config);
-    await api.saveConfig(newYaml);
   },
 
   deleteKey: async (keyName: string): Promise<void> => {
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      return; // Nothing to delete
-    }
-
-    if (config && config.keys && config.keys[keyName]) {
-      delete config.keys[keyName];
-      const newYaml = stringify(config);
-      await api.saveConfig(newYaml);
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/keys/${encodeURIComponent(keyName)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete key');
     }
   },
 
   getProviders: async (): Promise<Provider[]> => {
     try {
-      const yamlStr = await api.getConfig();
-      const config = parse(yamlStr) as PlexusConfig;
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/providers`);
+      if (!res.ok) throw new Error('Failed to fetch providers');
+      const providers = (await res.json()) as Record<string, any>;
 
-      if (!config.providers) return [];
-
-      return Object.entries(config.providers).map(([key, val]) => {
+      return Object.entries(providers).map(([key, val]) => {
         // Normalize models array format to object format
         let normalizedModels = val.models;
         if (Array.isArray(val.models)) {
           normalizedModels = val.models.reduce(
-            (acc, modelName) => {
+            (acc: Record<string, any>, modelName: string) => {
               acc[modelName] = {};
               return acc;
             },
@@ -1531,7 +1478,7 @@ export const api = {
           apiKey: val.api_key || '',
           oauthProvider: val.oauth_provider,
           oauthAccount: val.oauth_account,
-          enabled: val.enabled !== false, // Default to true if not present
+          enabled: val.enabled !== false,
           estimateTokens: val.estimateTokens || false,
           disableCooldown: val.disable_cooldown === true,
           discount: val.discount,
@@ -1547,97 +1494,20 @@ export const api = {
     }
   },
 
-  saveProviders: async (providers: Provider[]): Promise<void> => {
-    // 1. Get current config to preserve other sections (like models)
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      config = { providers: {}, models: {} };
-    }
-
-    if (!config) config = {};
-    if (!config.providers) config.providers = {};
-
-    // 2. Reconstruct providers object
-    // We need to be careful not to lose existing fields if the Provider interface is a subset
-    // But here we are assuming the Provider interface is the source of truth for the keys we manage.
-    // However, to be safe, we should merge.
-
-    // Strategy: Create a new providers object based on input
-    const newProvidersObj: Record<string, any> = {};
-
-    for (const p of providers) {
-      const existing = config.providers[p.id] || {};
-      newProvidersObj[p.id] = {
-        ...existing, // Keep existing fields like models list if any
-        type: p.type,
-        api_key: p.apiKey,
-        ...(p.oauthProvider && { oauth_provider: p.oauthProvider }),
-        ...(p.oauthAccount && { oauth_account: p.oauthAccount }),
-        api_base_url: p.apiBaseUrl,
-        display_name: p.name,
-        discount: p.discount,
-        disable_cooldown: p.disableCooldown === true ? true : undefined,
-        headers: p.headers,
-        extraBody: p.extraBody,
-        models: p.models,
-        quota_checker: p.quotaChecker?.type
-          ? {
-              type: p.quotaChecker.type,
-              enabled: p.quotaChecker.enabled,
-              intervalMinutes: Math.max(1, p.quotaChecker.intervalMinutes || 30),
-            }
-          : undefined,
-      };
-    }
-
-    config.providers = newProvidersObj;
-
-    // 3. Save
-    const newYaml = stringify(config);
-    await api.saveConfig(newYaml);
-  },
-
   saveProvider: async (provider: Provider, oldId?: string): Promise<void> => {
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      config = { providers: {}, models: {} };
-    }
-
-    if (!config) config = {};
-    if (!config.providers) config.providers = {};
-
-    // If ID changed, delete old key
-    if (oldId && oldId !== provider.id && config.providers[oldId]) {
-      delete config.providers[oldId];
-    }
-
-    // Don't save type field - it will be inferred from api_base_url
-    // Only include it if it's explicitly different from what would be inferred
-    const inferredTypes = inferProviderTypes(provider.apiBaseUrl);
-    const shouldIncludeType =
-      JSON.stringify(inferredTypes) !==
-      JSON.stringify(Array.isArray(provider.type) ? provider.type : [provider.type]);
-
-    config.providers[provider.id] = {
-      ...(shouldIncludeType && { type: provider.type }),
+    const body: any = {
+      api_base_url: provider.apiBaseUrl,
+      display_name: provider.name,
       api_key: provider.apiKey,
       ...(provider.oauthProvider && { oauth_provider: provider.oauthProvider }),
       ...(provider.oauthAccount && { oauth_account: provider.oauthAccount }),
-      api_base_url: provider.apiBaseUrl,
-      display_name: provider.name,
+      enabled: provider.enabled,
       estimateTokens: provider.estimateTokens,
       disable_cooldown: provider.disableCooldown === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,
       models: provider.models,
-      enabled: provider.enabled,
       quota_checker: provider.quotaChecker?.type
         ? {
             type: provider.quotaChecker.type,
@@ -1648,8 +1518,23 @@ export const api = {
         : undefined,
     };
 
-    const newYaml = stringify(config);
-    await api.saveConfig(newYaml);
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/providers/${encodeURIComponent(provider.id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to save provider');
+    }
+
+    // Delete old provider only after new one is saved successfully
+    if (oldId && oldId !== provider.id) {
+      await api.deleteProvider(oldId, false);
+    }
   },
 
   getVisionFallthroughConfig: async (): Promise<{
@@ -1724,23 +1609,7 @@ export const api = {
   },
 
   saveAlias: async (alias: Alias, oldId?: string): Promise<void> => {
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      config = { providers: {}, models: {} };
-    }
-
-    if (!config) config = {};
-    if (!config.models) config.models = {};
-
-    // If ID changed, delete old key
-    if (oldId && oldId !== alias.id && config.models[oldId]) {
-      delete config.models[oldId];
-    }
-
-    config.models[alias.id] = {
+    const body: any = {
       selector: alias.selector,
       priority: alias.priority || 'selector',
       additional_aliases: alias.aliases,
@@ -1755,42 +1624,56 @@ export const api = {
       })),
     };
 
-    const newYaml = stringify(config);
-    await api.saveConfig(newYaml);
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/aliases/${encodeURIComponent(alias.id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to save alias');
+    }
+
+    // Delete old alias only after new one is saved successfully
+    if (oldId && oldId !== alias.id) {
+      await api.deleteAlias(oldId);
+    }
   },
 
   getModels: async (): Promise<Model[]> => {
     try {
-      const yamlStr = await api.getConfig();
-      const config = parse(yamlStr) as PlexusConfig;
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/providers`);
+      if (!res.ok) throw new Error('Failed to fetch providers');
+      const providers = (await res.json()) as Record<string, any>;
       const models: Model[] = [];
 
       // Extract models from providers
-      if (config.providers) {
-        Object.entries(config.providers).forEach(([pKey, pVal]) => {
-          if (pVal.models) {
-            if (Array.isArray(pVal.models)) {
-              pVal.models.forEach((m) => {
-                models.push({
-                  id: m,
-                  name: m,
-                  providerId: pKey,
-                });
+      Object.entries(providers).forEach(([pKey, pVal]) => {
+        if (pVal.models) {
+          if (Array.isArray(pVal.models)) {
+            pVal.models.forEach((m: string) => {
+              models.push({
+                id: m,
+                name: m,
+                providerId: pKey,
               });
-            } else if (typeof pVal.models === 'object') {
-              Object.entries(pVal.models).forEach(([mKey, mVal]) => {
-                models.push({
-                  id: mKey,
-                  name: mKey,
-                  providerId: pKey,
-                  pricingSource: mVal.pricing?.source,
-                  type: mVal.type,
-                });
+            });
+          } else if (typeof pVal.models === 'object') {
+            Object.entries(pVal.models).forEach(([mKey, mVal]: [string, any]) => {
+              models.push({
+                id: mKey,
+                name: mKey,
+                providerId: pKey,
+                pricingSource: mVal.pricing?.source,
+                type: mVal.type,
               });
-            }
+            });
           }
-        });
-      }
+        }
+      });
       return models;
     } catch (e) {
       console.error('API Error getModels', e);
@@ -1800,53 +1683,56 @@ export const api = {
 
   getAliases: async (): Promise<Alias[]> => {
     try {
-      const yamlStr = await api.getConfig();
-      const config = parse(yamlStr) as PlexusConfig;
+      const [aliasRes, providerRes] = await Promise.all([
+        fetchWithAuth(`${API_BASE}/v0/management/aliases`),
+        fetchWithAuth(`${API_BASE}/v0/management/providers`),
+      ]);
+      if (!aliasRes.ok) throw new Error('Failed to fetch aliases');
+      if (!providerRes.ok) throw new Error('Failed to fetch providers');
+
+      const aliasMap = (await aliasRes.json()) as Record<string, any>;
+      const providers = (await providerRes.json()) as Record<string, any>;
       const aliases: Alias[] = [];
-      const providers = config.providers || {};
 
-      if (config.models) {
-        Object.entries(config.models).forEach(([key, val]) => {
-          const targets = (val.targets || []).map(
-            (t: { provider: string; model: string; enabled?: boolean }) => {
-              const providerConfig = providers[t.provider];
+      Object.entries(aliasMap).forEach(([key, val]) => {
+        const targets = (val.targets || []).map(
+          (t: { provider: string; model: string; enabled?: boolean }) => {
+            const providerConfig = providers[t.provider];
 
-              // Infer type from api_base_url if not explicitly provided
-              const inferredTypes =
-                providerConfig?.type || inferProviderTypes(providerConfig?.api_base_url);
-              let apiType: string | string[] = inferredTypes;
+            // Infer type from api_base_url if not explicitly provided
+            const inferredTypes =
+              providerConfig?.type || inferProviderTypes(providerConfig?.api_base_url);
+            let apiType: string | string[] = inferredTypes;
 
-              // Check for specific model config overrides (access_via)
-              if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
-                const modelConfig = providerConfig.models[t.model];
-                // Only use access_via if it exists AND is non-empty
-                if (modelConfig && modelConfig.access_via && modelConfig.access_via.length > 0) {
-                  apiType = modelConfig.access_via;
-                }
+            // Check for specific model config overrides (access_via)
+            if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
+              const modelConfig = providerConfig.models[t.model];
+              if (modelConfig && modelConfig.access_via && modelConfig.access_via.length > 0) {
+                apiType = modelConfig.access_via;
               }
-
-              return {
-                provider: t.provider,
-                model: t.model,
-                apiType: Array.isArray(apiType) ? apiType : [apiType],
-                enabled: t.enabled !== false, // Default to true if not specified
-              };
             }
-          );
 
-          aliases.push({
-            id: key,
-            aliases: val.additional_aliases || [],
-            selector: val.selector,
-            priority: val.priority,
-            type: val.type,
-            use_image_fallthrough: val.use_image_fallthrough || false,
-            advanced: val.advanced || [],
-            targets,
-            metadata: val.metadata,
-          });
+            return {
+              provider: t.provider,
+              model: t.model,
+              apiType: Array.isArray(apiType) ? apiType : [apiType],
+              enabled: t.enabled !== false,
+            };
+          }
+        );
+
+        aliases.push({
+          id: key,
+          aliases: val.additional_aliases || [],
+          selector: val.selector,
+          priority: val.priority,
+          type: val.type,
+          use_image_fallthrough: val.use_image_fallthrough || false,
+          advanced: val.advanced || [],
+          targets,
+          metadata: val.metadata,
         });
-      }
+      });
       return aliases;
     } catch (e) {
       console.error('API Error getAliases', e);
@@ -1995,7 +1881,7 @@ export const api = {
         body.providers = providers;
       }
       const res = await fetchWithAuth(`${API_BASE}/v0/management/debug`, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -2037,7 +1923,7 @@ export const api = {
 
   setLoggingLevel: async (level: string): Promise<LoggingLevelState> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/logging/level`, {
-      method: 'POST',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ level }),
     });
@@ -2359,60 +2245,6 @@ export const api = {
     return json.data || [];
   },
 
-  getConfigQuotas: async (): Promise<QuotaConfig[]> => {
-    try {
-      const yamlStr = await api.getConfig();
-      const config = parse(yamlStr) as PlexusConfig;
-      return config.quotas || [];
-    } catch (e) {
-      console.error('API Error getConfigQuotas', e);
-      return [];
-    }
-  },
-
-  saveConfigQuota: async (quota: QuotaConfig, oldId?: string): Promise<void> => {
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      config = { providers: {}, models: {} };
-    }
-
-    if (!config) config = {};
-    if (!config.quotas) config.quotas = [];
-
-    if (oldId && oldId !== quota.id) {
-      config.quotas = config.quotas.filter((q: QuotaConfig) => q.id !== oldId);
-    }
-
-    const existingIdx = config.quotas.findIndex((q: QuotaConfig) => q.id === quota.id);
-    if (existingIdx >= 0) {
-      config.quotas[existingIdx] = quota;
-    } else {
-      config.quotas.push(quota);
-    }
-
-    const newYaml = stringify(config);
-    await api.saveConfig(newYaml);
-  },
-
-  deleteConfigQuota: async (quotaId: string): Promise<void> => {
-    const yamlStr = await api.getConfig();
-    let config: any;
-    try {
-      config = parse(yamlStr);
-    } catch (e) {
-      return;
-    }
-
-    if (config && config.quotas) {
-      config.quotas = config.quotas.filter((q: QuotaConfig) => q.id !== quotaId);
-      const newYaml = stringify(config);
-      await api.saveConfig(newYaml);
-    }
-  },
-
   getMcpServers: async (): Promise<
     Record<string, { upstream_url: string; enabled: boolean; headers?: Record<string, string> }>
   > => {
@@ -2434,7 +2266,7 @@ export const api = {
       const res = await fetchWithAuth(
         `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}`,
         {
-          method: 'POST',
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(server),
         }
@@ -2548,7 +2380,7 @@ export const api = {
     const res = await fetchWithAuth(
       `${API_BASE}/v0/management/user-quotas/${encodeURIComponent(name)}`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(quota),
       }

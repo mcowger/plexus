@@ -44,16 +44,8 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   };
 
   const getDisplayName = (quota: QuotaCheckerInfo): string => {
-    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-    let normalizedType = checkerType;
-    if (checkerType.includes('openrouter')) normalizedType = 'openrouter';
-    else if (checkerType.includes('minimax')) normalizedType = 'minimax';
-    else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
-    else if (checkerType.includes('naga')) normalizedType = 'naga';
-    else if (checkerType.includes('kilo')) normalizedType = 'kilo';
-    else if (checkerType.includes('poe')) normalizedType = 'poe';
-    else if (checkerType.includes('apertis')) normalizedType = 'apertis';
-    return CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
+    const checkerType = quota.checkerType || quota.checkerId;
+    return CHECKER_DISPLAY_NAMES[checkerType] || quota.checkerId;
   };
 
   if (balanceQuotas.length === 0) {
@@ -68,19 +60,8 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
 
   const renderBalanceRow = (quota: QuotaCheckerInfo) => {
     const result = getQuotaResult(quota);
-    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-
-    // Normalize checker type name
-    let normalizedType = checkerType;
-    if (checkerType.includes('openrouter')) normalizedType = 'openrouter';
-    else if (checkerType.includes('minimax')) normalizedType = 'minimax';
-    else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
-    else if (checkerType.includes('naga')) normalizedType = 'naga';
-    else if (checkerType.includes('kilo')) normalizedType = 'kilo';
-    else if (checkerType.includes('poe')) normalizedType = 'poe';
-    else if (checkerType.includes('apertis')) normalizedType = 'apertis';
-
-    const displayName = CHECKER_DISPLAY_NAMES[normalizedType] || quota.checkerId;
+    const checkerType = quota.checkerType || quota.checkerId;
+    const displayName = CHECKER_DISPLAY_NAMES[checkerType] || quota.checkerId;
     const windows = result.windows || [];
     const subscriptionWindow = windows.find((w: any) => w.windowType === 'subscription');
     const balance = subscriptionWindow?.remaining;

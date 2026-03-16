@@ -259,6 +259,10 @@ export class QuotaScheduler {
     return Array.from(this.checkers.keys());
   }
 
+  getCheckerCategory(checkerId: string): 'balance' | 'rate-limit' | undefined {
+    return (this.checkers.get(checkerId) as any)?.category;
+  }
+
   async getLatestQuota(checkerId: string) {
     try {
       const { db, schema } = this.ensureDb();

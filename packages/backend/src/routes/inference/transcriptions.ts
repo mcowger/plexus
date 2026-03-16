@@ -167,6 +167,8 @@ export async function registerTranscriptionsRoute(
       const pricing = unifiedResponse.plexus?.pricing;
       const providerDiscount = unifiedResponse.plexus?.providerDiscount;
       calculateCosts(usageRecord, pricing, providerDiscount);
+      usageRecord.attemptCount = unifiedResponse.plexus?.attemptCount || 1;
+      usageRecord.retryHistory = unifiedResponse.plexus?.retryHistory || null;
 
       usageStorage.saveRequest(usageRecord as UsageRecord);
 
