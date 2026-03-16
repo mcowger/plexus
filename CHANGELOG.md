@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.9.9 - 2026-03-16
+
+### Plexus v0.9.9: Migration to Database-Backed Configuration and Management API Refactor
+
+## New Features
+- **Database-Driven Configuration**: This release marks a significant architectural shift, moving configuration from legacy YAML files to a robust database-backed storage system ([afba313](https://github.com/mcowger/plexus/commit/afba313)). This includes a new `ConfigService` with in-memory caching for performance ([7928e79](https://github.com/mcowger/plexus/commit/7928e79)).
+- **Expanded Quota Checkers**: Added support for the Apertis Coding Plan quota checker ([03f425a](https://github.com/mcowger/plexus/commit/03f425a)) and updated the WisdomGate provider to utilize the latest billing API and session handling ([c7167d7](https://github.com/mcowger/plexus/commit/c7167d7)).
+- **Application Lifecycle Control**: Introduced a management route to facilitate graceful application restarts directly via the API ([8bd83b4](https://github.com/mcowger/plexus/commit/8bd83b4)).
+- **Security Hardening**: Migrated the `adminKey` to an environment variable (`ADMIN_KEY`) and implemented bootstrap tracking for database initialization ([e6a5afe](https://github.com/mcowger/plexus/commit/e6a5afe), [c633e36](https://github.com/mcowger/plexus/commit/c633e36)).
+
+## Infrastructure & Refactoring
+- **Removal of Legacy File Watchers**: Successfully removed the file-based configuration loading logic and associated file watchers ([dd529e5](https://github.com/mcowger/plexus/commit/dd529e5)).
+- **OAuth Management**: Refactored the `OAuthAuthManager` to persist credentials within the database, ensuring consistency across deployments ([086b809](https://github.com/mcowger/plexus/commit/086b809)).
+- **RESTful API Updates**: Rewrote management routes to standardize on `PUT` and `PATCH` methods with improved request validation ([60b9b34](https://github.com/mcowger/plexus/commit/60b9b34)).
+
+## Bug Fixes
+- **Provider Deletion**: Resolved an issue where deleting providers failed to clean up associated records; implemented cascade cleanup ([a646bd3](https://github.com/mcowger/plexus/commit/a646bd3)).
+- **Test Environment Stability**: Fixed multiple pre-existing test failures and CI-specific 500 errors by improving mock storage and pre-initializing the `DebugManager` ([e3175fc](https://github.com/mcowger/plexus/commit/e3175fc), [089ee73](https://github.com/mcowger/plexus/commit/089ee73)).
+- **Deployment Fixes**: Fixed a bug preventing Docker deployments from being restarted through the settings UI ([e83695f](https://github.com/mcowger/plexus/commit/e83695f)).
+
+---
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.18.13 - 2026-03-12
 
 ### v0.18.13: Enhanced Provider Quota Management and Cooldown Logic
