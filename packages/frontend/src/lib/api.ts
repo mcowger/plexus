@@ -2498,4 +2498,33 @@ export const api = {
       return [];
     }
   },
+
+  /**
+   * Fetches models from a provider API via server-side proxy.
+   * This bypasses CORS restrictions by routing the request through the backend.
+   *
+   * @param url - The provider's models endpoint URL
+   * @param apiKey - Optional API key for authentication
+   * @returns Array of models in OpenAI format { data: [...] }
+   */
+  fetchProviderModels: async (
+    url: string,
+    apiKey?: string
+  ): Promise<{
+    data: Array<{ id: string; object?: string; created?: number; owned_by?: string }>;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/providers/fetch-models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, apiKey }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: 'Unknown error' } }));
+      // Handle API.md error format: { error: { message, type, code, details } }
+      const errorMessage =
+        err.error?.message || err.error || err.details || 'Failed to fetch models';
+      throw new Error(errorMessage);
+    }
+    return res.json();
+  },
 };

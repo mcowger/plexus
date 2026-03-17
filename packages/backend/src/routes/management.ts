@@ -16,6 +16,7 @@ import { registerOAuthRoutes } from './management/oauth';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { registerLoggingRoutes } from './management/logging';
 import { registerRestartRoutes } from './management/restart';
+import { registerProviderRoutes } from './management/providers';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -71,6 +72,7 @@ export async function registerManagementRoutes(
     await registerOAuthRoutes(protected_);
     await registerLoggingRoutes(protected_);
     await registerRestartRoutes(protected_);
+    await registerProviderRoutes(protected_);
     if (quotaScheduler) {
       await registerQuotaRoutes(protected_, quotaScheduler);
     }

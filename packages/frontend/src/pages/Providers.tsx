@@ -822,25 +822,8 @@ export const Providers = () => {
     setFetchError(null);
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      // Add Bearer token if available
-      if (editingProvider.apiKey) {
-        headers['Authorization'] = `Bearer ${editingProvider.apiKey}`;
-      }
-
-      const response = await fetch(modelsUrl, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      // Use server-side proxy to bypass CORS restrictions
+      const data = await api.fetchProviderModels(modelsUrl, editingProvider.apiKey);
 
       if (!data.data || !Array.isArray(data.data)) {
         throw new Error('Invalid response format: expected { data: [...] }');
