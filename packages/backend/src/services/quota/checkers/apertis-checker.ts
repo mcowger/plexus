@@ -6,9 +6,11 @@ interface ApertisBillingCreditsResponse {
   object: 'billing_credits';
   is_subscriber: boolean;
   payg: {
-    remaining_usd: number | null;
-    used_usd: number;
-    total_usd: number | null;
+    account_credits: number;
+    token_used: number;
+    token_total: string | number;
+    token_remaining: string | number;
+    token_is_unlimited: boolean;
   };
 }
 
@@ -45,20 +47,20 @@ export class ApertisQuotaChecker extends QuotaChecker {
 
       const payg = data.payg;
 
-      logger.debug(
-        `[apertis] PAYG: remaining_usd=${payg.remaining_usd}, used_usd=${payg.used_usd}, total_usd=${payg.total_usd}`
-      );
+      logger.debug(`[apertis] PAYG: account_credits=${payg.account_credits}`);
 
-      // Handle PAYG balance - use values directly, ignore is_unlimited
-      if (payg.remaining_usd === null) {
-        return this.errorResult(new Error('Invalid PAYG balance: remaining_usd is null'));
+      // Use account_credits as the PAYG balance
+      if (!Number.isFinite(payg.account_credits)) {
+        return this.errorResult(
+          new Error('Invalid PAYG balance: account_credits is not a valid number')
+        );
       }
 
       const window: QuotaWindow = this.createWindow(
         'subscription',
-        payg.total_usd ?? undefined,
-        payg.used_usd,
-        payg.remaining_usd,
+        undefined,
+        undefined,
+        payg.account_credits,
         'dollars',
         undefined,
         'Apertis PAYG balance'

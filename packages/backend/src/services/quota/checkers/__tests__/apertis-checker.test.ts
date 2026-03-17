@@ -17,17 +17,21 @@ const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig =
 
 const makePaygResponse = (
   overrides: Partial<{
-    remaining_usd: number | null;
-    used_usd: number;
-    total_usd: number | null;
+    account_credits: number;
+    token_used: number;
+    token_total: string | number;
+    token_remaining: string | number;
+    token_is_unlimited: boolean;
   }> = {}
 ) => ({
   object: 'billing_credits' as const,
   is_subscriber: false,
   payg: {
-    remaining_usd: overrides.remaining_usd ?? 5.0,
-    used_usd: overrides.used_usd ?? 2.0,
-    total_usd: overrides.total_usd ?? 7.0,
+    account_credits: overrides.account_credits ?? 24.980973,
+    token_used: overrides.token_used ?? 0,
+    token_total: overrides.token_total ?? 'unlimited',
+    token_remaining: overrides.token_remaining ?? 'unlimited',
+    token_is_unlimited: overrides.token_is_unlimited ?? true,
   },
 });
 
@@ -85,14 +89,16 @@ describe('ApertisQuotaChecker', () => {
     expect(capturedUrl).toBe('https://custom.example.com/billing');
   });
 
-  it('returns PAYG balance as subscription window', async () => {
+  it('returns PAYG balance from account_credits', async () => {
     setFetchMock(async () => {
       return new Response(
         JSON.stringify(
           makePaygResponse({
-            remaining_usd: 5.0,
-            used_usd: 2.0,
-            total_usd: 7.0,
+            account_credits: 24.980973,
+            token_used: 0,
+            token_total: 'unlimited',
+            token_remaining: 'unlimited',
+            token_is_unlimited: true,
           })
         ),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -109,9 +115,9 @@ describe('ApertisQuotaChecker', () => {
     const window = result.windows?.[0];
     expect(window?.windowType).toBe('subscription');
     expect(window?.unit).toBe('dollars');
-    expect(window?.limit).toBe(7.0);
-    expect(window?.used).toBe(2.0);
-    expect(window?.remaining).toBe(5.0);
+    expect(window?.limit).toBeUndefined();
+    expect(window?.used).toBeUndefined();
+    expect(window?.remaining).toBe(24.980973);
     expect(window?.description).toBe('Apertis PAYG balance');
   });
 
@@ -142,16 +148,18 @@ describe('ApertisQuotaChecker', () => {
     expect(result.error).toContain('Invalid response: expected billing_credits object');
   });
 
-  it('returns error when PAYG remaining_usd is null', async () => {
+  it('returns error when account_credits is not a valid number', async () => {
     setFetchMock(async () => {
       return new Response(
         JSON.stringify({
           object: 'billing_credits',
           is_subscriber: false,
           payg: {
-            remaining_usd: null,
-            used_usd: 0,
-            total_usd: null,
+            account_credits: NaN,
+            token_used: 0,
+            token_total: 'unlimited',
+            token_remaining: 'unlimited',
+            token_is_unlimited: true,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -162,7 +170,7 @@ describe('ApertisQuotaChecker', () => {
     const result = await checker.checkQuota();
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Invalid PAYG balance: remaining_usd is null');
+    expect(result.error).toContain('Invalid PAYG balance: account_credits is not a valid number');
   });
 
   it('returns error when fetch throws a network error', async () => {
