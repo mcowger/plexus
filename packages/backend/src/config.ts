@@ -482,6 +482,9 @@ export function getProviderTypes(provider: ProviderConfig): string[] {
     }
 
     // Check for known patterns
+    // NOTE: We do NOT infer 'ollama' from string URLs like 'http://localhost:11434/v1'
+    // because those OpenAI-compatible endpoints should still use 'chat' type.
+    // Native Ollama API must be explicitly configured via object: { ollama: 'http://...' }
     if (url.includes('anthropic.com')) {
       return ['messages'];
     } else if (url.includes('generativelanguage.googleapis.com')) {
