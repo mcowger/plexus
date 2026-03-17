@@ -158,7 +158,6 @@ const AntigravityQuotaCheckerOptionsSchema = z.object({
 });
 
 const ApertisQuotaCheckerOptionsSchema = z.object({
-  session: z.string().trim().min(1, 'Apertis session cookie is required'),
   endpoint: z.string().url().optional(),
 });
 
@@ -263,14 +262,14 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
-    options: ApertisQuotaCheckerOptionsSchema,
+    options: ApertisQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('apertis-coding-plan'),
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
-    options: ApertisQuotaCheckerOptionsSchema,
+    options: ApertisQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('minimax-coding'),
