@@ -278,7 +278,7 @@ export interface UnifiedTranscriptionRequest {
   // Optional parameters
   language?: string;
   prompt?: string;
-  response_format?: 'json' | 'text'; // Only json and text for v1
+  response_format?: 'json' | 'text' | 'verbose_json';
   temperature?: number;
 
   // Internal tracking
@@ -289,6 +289,21 @@ export interface UnifiedTranscriptionRequest {
 // Unified Transcription Response
 export interface UnifiedTranscriptionResponse {
   text: string;
+
+  // Optional fields for verbose_json format
+  language?: string;
+  duration?: number;
+  segments?: Array<{
+    id: number;
+    start: number;
+    end: number;
+    text: string;
+    tokens?: number[];
+    temperature?: number;
+    avg_logprob?: number;
+    compression_ratio?: number;
+    no_speech_prob?: number;
+  }>;
 
   // Optional usage field (present in JSON response)
   usage?: {

@@ -198,6 +198,131 @@ describe('Transcriptions Endpoint', () => {
     expect(response.body).toBe('This is a test transcription.');
   });
 
+  it('should accept transcription request with verbose_json response format', async () => {
+    const audioBuffer = Buffer.from('fake-audio-data');
+
+    // Mock dispatcher to return verbose_json response
+    (mockDispatcher.dispatchTranscription as any).mockImplementationOnce(async () => ({
+      text: 'This is a test transcription.',
+      language: 'en',
+      duration: 10.5,
+      segments: [
+        {
+          id: 0,
+          start: 0.0,
+          end: 5.0,
+          text: 'First segment',
+          tokens: [1, 2, 3],
+          avg_logprob: -0.2,
+          compression_ratio: 1.5,
+          no_speech_prob: 0.01,
+        },
+        {
+          id: 1,
+          start: 5.0,
+          end: 10.5,
+          text: 'Second segment',
+          tokens: [4, 5, 6],
+          avg_logprob: -0.3,
+          compression_ratio: 1.6,
+          no_speech_prob: 0.02,
+        },
+      ],
+      usage: {
+        input_tokens: 150,
+        output_tokens: 25,
+        total_tokens: 175,
+      },
+      plexus: {
+        provider: 'openai',
+        model: 'whisper-1',
+        apiType: 'transcriptions',
+        canonicalModel: 'transcription-model',
+        pricing: { source: 'simple', input: 0.006, output: 0 },
+      },
+    }));
+
+    const { boundary, payload } = createMultipartPayload(
+      { model: 'transcription-model', response_format: 'verbose_json' },
+      { buffer: audioBuffer, filename: 'test.mp3', mimeType: 'audio/mpeg' }
+    );
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/v1/audio/transcriptions',
+      headers: {
+        authorization: 'Bearer sk-valid-key',
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('application/json');
+    const body = JSON.parse(response.body);
+    expect(body.text).toBe('This is a test transcription.');
+    expect(body.language).toBe('en');
+    expect(body.duration).toBe(10.5);
+    expect(body.segments).toHaveLength(2);
+    expect(body.segments?.[0]?.text).toBe('First segment');
+    expect(body.segments?.[1]?.text).toBe('Second segment');
+    expect(body.usage).toEqual({
+      input_tokens: 150,
+      output_tokens: 25,
+      total_tokens: 175,
+    });
+  });
+
+  it('should accept verbose_json response without segments', async () => {
+    const audioBuffer = Buffer.from('fake-audio-data');
+
+    // Mock dispatcher to return verbose_json response without segments
+    (mockDispatcher.dispatchTranscription as any).mockImplementationOnce(async () => ({
+      text: 'This is a test transcription.',
+      language: 'en',
+      duration: 10.5,
+      usage: {
+        input_tokens: 150,
+        output_tokens: 25,
+        total_tokens: 175,
+      },
+      plexus: {
+        provider: 'openai',
+        model: 'whisper-1',
+        apiType: 'transcriptions',
+        canonicalModel: 'transcription-model',
+        pricing: { source: 'simple', input: 0.006, output: 0 },
+      },
+    }));
+
+    const { boundary, payload } = createMultipartPayload(
+      { model: 'transcription-model', response_format: 'verbose_json' },
+      { buffer: audioBuffer, filename: 'test.mp3', mimeType: 'audio/mpeg' }
+    );
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/v1/audio/transcriptions',
+      headers: {
+        authorization: 'Bearer sk-valid-key',
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.text).toBe('This is a test transcription.');
+    expect(body.language).toBe('en');
+    expect(body.duration).toBe(10.5);
+    expect(body.segments).toBeUndefined();
+    expect(body.usage).toEqual({
+      input_tokens: 150,
+      output_tokens: 25,
+      total_tokens: 175,
+    });
+  });
+
   it('should accept optional parameters (language, prompt, temperature)', async () => {
     const audioBuffer = Buffer.from('fake-audio-data');
 
@@ -296,6 +421,7 @@ describe('Transcriptions Endpoint', () => {
     expect(response.statusCode).toBe(400);
     const body = JSON.parse(response.body);
     expect(body.error.message).toContain('Unsupported response_format');
+    expect(body.error.message).toContain('verbose_json');
   });
 
   it('should reject file exceeding 25MB limit', async () => {

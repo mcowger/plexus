@@ -94,10 +94,10 @@ export async function registerTranscriptionsRoute(
       const temperature = body.temperature?.value ? parseFloat(body.temperature.value) : undefined;
 
       // Validate response_format
-      if (!['json', 'text'].includes(response_format)) {
+      if (!['json', 'text', 'verbose_json'].includes(response_format)) {
         return reply.code(400).send({
           error: {
-            message: `Unsupported response_format: ${response_format}. Supported formats: json, text`,
+            message: `Unsupported response_format: ${response_format}. Supported formats: json, text, verbose_json`,
             type: 'invalid_request_error',
           },
         });
