@@ -11,7 +11,17 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download, Info } from 'lucide-react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Download,
+  Info,
+  AlertTriangle,
+} from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
@@ -41,6 +51,7 @@ const KNOWN_APIS = [
   'speech',
   'images',
   'responses',
+  'ollama',
 ];
 
 const OAUTH_PROVIDERS = [
@@ -102,6 +113,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
       return { backgroundColor: '#d946ef', color: 'white', border: 'none' };
     case 'responses':
       return { backgroundColor: '#06b6d4', color: 'white', border: 'none' };
+    case 'ollama':
+      return { backgroundColor: '#1a5f7a', color: 'white', border: 'none' };
     case 'oauth':
       return { backgroundColor: '#111827', color: 'white', border: 'none' };
     default:
@@ -760,9 +773,17 @@ export const Providers = () => {
     setEditingProvider({ ...editingProvider, models });
   };
 
-  // Generate default models URL from chat URL
+  // Generate default models URL from API URLs
   const generateModelsUrl = (): string => {
     if (isOAuthMode) return '';
+
+    // For ollama API type, use the standard ollama library models endpoint
+    const ollamaUrl = getApiUrlValue('ollama');
+    if (ollamaUrl) {
+      return 'https://ollama.com/api/tags';
+    }
+
+    // For chat API type, derive from chat URL
     const chatUrl = getApiUrlValue('chat');
     if (!chatUrl) return '';
 
@@ -1121,10 +1142,40 @@ export const Providers = () => {
                   fontSize: '11px',
                   color: 'var(--color-text-secondary)',
                   marginBottom: '4px',
-                  fontStyle: 'italic',
+                  lineHeight: '1.5',
                 }}
               >
-                API types are automatically inferred from the URLs you provide.
+                <span style={{ fontStyle: 'italic' }}>API types determine the protocol:</span>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                  <li>
+                    <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints,
+                    including Ollama&apos;s{' '}
+                    <code
+                      style={{
+                        background: 'var(--color-bg-subtle)',
+                        padding: '1px 4px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      /v1
+                    </code>{' '}
+                    API
+                  </li>
+                  <li>
+                    <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the
+                    root URL (e.g.{' '}
+                    <code
+                      style={{
+                        background: 'var(--color-bg-subtle)',
+                        padding: '1px 4px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      http://localhost:11434
+                    </code>
+                    )
+                  </li>
+                </ul>
               </div>
               {isOAuthMode ? (
                 <div
@@ -1388,54 +1439,134 @@ export const Providers = () => {
                           No base URLs configured yet.
                         </div>
                       )}
-                      {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => (
-                        <div
-                          key={apiType}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr auto',
-                            gap: '8px',
-                            alignItems: 'start',
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <select
-                              className="w-full py-1.5 px-3 font-body text-xs border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                              style={{ ...getApiBadgeStyle(apiType), fontWeight: 600 }}
-                              value={apiType}
-                              onChange={(e) =>
-                                updateApiBaseUrlEntry(
-                                  apiType,
-                                  e.target.value,
-                                  typeof url === 'string' ? url : ''
-                                )
-                              }
-                            >
-                              {KNOWN_APIS.map((knownType) => (
-                                <option key={knownType} value={knownType}>
-                                  {knownType}
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                              placeholder="https://api.example.com/..."
-                              value={typeof url === 'string' ? url : ''}
-                              onChange={(e) =>
-                                updateApiBaseUrlEntry(apiType, apiType, e.target.value)
-                              }
-                            />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeApiBaseUrlEntry(apiType)}
-                            style={{ padding: '4px', marginTop: '4px' }}
+                      {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => {
+                        // Detect URL/API type mismatches based on endpoint-shape only
+                        const urlLower = typeof url === 'string' ? url.toLowerCase() : '';
+                        // Native Ollama API paths (not hostname-based, only path-based)
+                        const hasNativeOllamaPath =
+                          urlLower.includes('/api/chat') ||
+                          urlLower.includes('/api/generate') ||
+                          urlLower.includes('/api/embeddings') ||
+                          urlLower.includes('/api/tags');
+                        const hasV1Suffix = urlLower.includes('/v1');
+                        // Warn when native Ollama type is selected but URL has /v1 (OpenAI-compatible)
+                        const showOllamaV1Warning = apiType === 'ollama' && hasV1Suffix;
+                        // Warn when chat type is selected but URL looks like native Ollama (path-based, no /v1)
+                        const showChatOllamaWarning =
+                          apiType === 'chat' && hasNativeOllamaPath && !hasV1Suffix;
+
+                        return (
+                          <div
+                            key={apiType}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr auto',
+                              gap: '8px',
+                              alignItems: 'start',
+                            }}
                           >
-                            <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
-                          </Button>
-                        </div>
-                      ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <select
+                                className="w-full py-1.5 px-3 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                value={apiType}
+                                onChange={(e) =>
+                                  updateApiBaseUrlEntry(
+                                    apiType,
+                                    e.target.value,
+                                    typeof url === 'string' ? url : ''
+                                  )
+                                }
+                              >
+                                {KNOWN_APIS.map((knownType) => (
+                                  <option
+                                    key={knownType}
+                                    value={knownType}
+                                    className="bg-bg-surface text-text"
+                                  >
+                                    {knownType}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                placeholder={
+                                  apiType === 'ollama'
+                                    ? 'http://localhost:11434'
+                                    : 'https://api.example.com/v1/...'
+                                }
+                                value={typeof url === 'string' ? url : ''}
+                                onChange={(e) =>
+                                  updateApiBaseUrlEntry(apiType, apiType, e.target.value)
+                                }
+                              />
+                              {showOllamaV1Warning && (
+                                <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
+                                  <AlertTriangle
+                                    size={14}
+                                    className="text-warning flex-shrink-0 mt-0.5"
+                                  />
+                                  <span className="text-[11px] text-warning">
+                                    <span style={{ fontWeight: 600 }}>native ollama</span> type
+                                    expects root URL (e.g.{' '}
+                                    <code
+                                      style={{
+                                        background: 'var(--color-bg-subtle)',
+                                        padding: '0 3px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      http://localhost:11434
+                                    </code>
+                                    ). URLs with{' '}
+                                    <code
+                                      style={{
+                                        background: 'var(--color-bg-subtle)',
+                                        padding: '0 3px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      /v1
+                                    </code>{' '}
+                                    are OpenAI-compatible — use{' '}
+                                    <span style={{ fontWeight: 600 }}>chat</span> type instead.
+                                  </span>
+                                </div>
+                              )}
+                              {showChatOllamaWarning && (
+                                <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
+                                  <AlertTriangle
+                                    size={14}
+                                    className="text-warning flex-shrink-0 mt-0.5"
+                                  />
+                                  <span className="text-[11px] text-warning">
+                                    This URL contains{' '}
+                                    <code
+                                      style={{
+                                        background: 'var(--color-bg-subtle)',
+                                        padding: '0 3px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      /api/
+                                    </code>{' '}
+                                    paths typical of native Ollama. If this is a native Ollama
+                                    endpoint, use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
+                                    type instead.
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeApiBaseUrlEntry(apiType)}
+                              style={{ padding: '4px', marginTop: '4px' }}
+                            >
+                              <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -2331,6 +2462,19 @@ export const Providers = () => {
                                     </label>
                                     <div
                                       style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginBottom: '4px',
+                                        lineHeight: '1.4',
+                                      }}
+                                    >
+                                      Choose which API protocols this model should use.{' '}
+                                      <span style={{ fontWeight: 600 }}>chat</span> works with most
+                                      providers. Use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
+                                      only for native Ollama API.
+                                    </div>
+                                    <div
+                                      style={{
                                         display: 'flex',
                                         gap: '6px',
                                         flexWrap: 'wrap',
@@ -2344,6 +2488,7 @@ export const Providers = () => {
                                             'chat',
                                             'gemini',
                                             'responses',
+                                            'ollama',
                                           ].includes(apiType);
                                         }
                                         return true;
@@ -2411,9 +2556,50 @@ export const Providers = () => {
                                           fontStyle: 'italic',
                                         }}
                                       >
-                                        No APIs selected. Defaults to ALL supported APIs.
+                                        Empty selection — Plexus will use any API type configured
+                                        for this provider.
                                       </div>
                                     )}
+                                    {(() => {
+                                      // Check if provider has an ollama base URL configured
+                                      const providerBaseUrlMap = getApiBaseUrlMap();
+                                      const hasOllamaBaseUrl = Object.entries(
+                                        providerBaseUrlMap
+                                      ).some(
+                                        ([type, url]) =>
+                                          type === 'ollama' && url && url.trim() !== ''
+                                      );
+                                      // Check if model is not opted into ollama access_via
+                                      const accessVia = mCfg.access_via || [];
+                                      const modelMissingOllamaAccess =
+                                        !accessVia.includes('ollama');
+
+                                      if (
+                                        hasOllamaBaseUrl &&
+                                        modelMissingOllamaAccess &&
+                                        mCfg.type !== 'embeddings' &&
+                                        mCfg.type !== 'transcriptions' &&
+                                        mCfg.type !== 'speech' &&
+                                        mCfg.type !== 'image' &&
+                                        mCfg.type !== 'responses'
+                                      ) {
+                                        return (
+                                          <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
+                                            <Info
+                                              size={14}
+                                              className="text-info flex-shrink-0 mt-0.5"
+                                            />
+                                            <span className="text-[11px] text-info">
+                                              Provider has a native Ollama URL. If you want this
+                                              model to use native Ollama, select{' '}
+                                              <span style={{ fontWeight: 600 }}>ollama</span> in
+                                              Access Via above.
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                 )}
                               {mCfg.type === 'embeddings' && (

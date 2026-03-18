@@ -7,6 +7,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'https://api.openai.com/v1',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -16,6 +18,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'https://ollama.com/v1',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -25,6 +29,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'http://localhost:11434/v1',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -34,6 +40,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'https://my-ollama-proxy.example.com/v1',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -43,6 +51,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'http://192.168.1.100:11434/v1',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -51,6 +61,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'https://api.anthropic.com/v1',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['messages']);
     });
@@ -59,6 +71,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: 'https://generativelanguage.googleapis.com/v1beta',
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['gemini']);
     });
@@ -68,6 +82,8 @@ describe('getProviderTypes', () => {
         api_base_url: 'oauth://',
         api_key: 'oauth',
         oauth_provider: 'anthropic',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['oauth']);
     });
@@ -78,6 +94,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: { ollama: 'http://localhost:11434' },
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['ollama']);
     });
@@ -89,6 +107,8 @@ describe('getProviderTypes', () => {
           chat: 'https://api.openai.com/v1',
         },
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       // Order depends on object key order
       const types = getProviderTypes(provider);
@@ -100,6 +120,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: { chat: 'https://api.openai.com/v1' },
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -108,6 +130,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: { messages: 'https://api.anthropic.com/v1' },
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['messages']);
     });
@@ -116,6 +140,8 @@ describe('getProviderTypes', () => {
       const provider: ProviderConfig = {
         api_base_url: { ollama: '', chat: 'https://api.openai.com/v1' },
         api_key: 'test-key',
+        disable_cooldown: false,
+        estimateTokens: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });

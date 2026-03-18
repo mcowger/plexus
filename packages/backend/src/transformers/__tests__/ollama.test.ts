@@ -167,7 +167,7 @@ describe('OllamaTransformer', () => {
 
       expect(result.tool_calls).toBeDefined();
       expect(result.tool_calls).toHaveLength(1);
-      expect(result.tool_calls![0].function.name).toBe('get_weather');
+      expect(result.tool_calls?.[0]?.function.name).toBe('get_weather');
     });
 
     test('should handle missing usage gracefully', async () => {
@@ -275,13 +275,13 @@ describe('OllamaTransformer', () => {
       }
 
       expect(chunks).toHaveLength(3);
-      expect(chunks[0].delta.content).toBe('Hello');
-      expect(chunks[1].delta.content).toBe(' world');
-      expect(chunks[2].delta.content).toBe('!');
-      expect(chunks[2].finish_reason).toBe('stop');
-      expect(chunks[2].usage).toBeDefined();
-      expect(chunks[2].usage?.input_tokens).toBe(5);
-      expect(chunks[2].usage?.output_tokens).toBe(10);
+      expect(chunks[0]?.delta.content).toBe('Hello');
+      expect(chunks[1]?.delta.content).toBe(' world');
+      expect(chunks[2]?.delta.content).toBe('!');
+      expect(chunks[2]?.finish_reason).toBe('stop');
+      expect(chunks[2]?.usage).toBeDefined();
+      expect(chunks[2]?.usage?.input_tokens).toBe(5);
+      expect(chunks[2]?.usage?.output_tokens).toBe(10);
     });
   });
 
@@ -334,9 +334,9 @@ describe('OllamaTransformer', () => {
       const lines = output.split('\n\n').filter(Boolean);
       expect(lines.length).toBeGreaterThanOrEqual(2);
 
-      const firstChunk = JSON.parse(lines[0].replace('data: ', ''));
+      const firstChunk = JSON.parse((lines[0] ?? '').replace('data: ', ''));
       expect(firstChunk.object).toBe('chat.completion.chunk');
-      expect(firstChunk.choices[0].delta.content).toBe('Hello');
+      expect(firstChunk.choices?.[0]?.delta.content).toBe('Hello');
 
       const lastLine = lines[lines.length - 1];
       expect(lastLine).toBe('data: [DONE]');
