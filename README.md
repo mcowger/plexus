@@ -228,11 +228,18 @@ user_quotas:
     limit: 100000
     duration: 1h
 
+  budget:
+    type: daily
+    limitType: cost
+    limit: 10.0        # $10 per day spending limit
+
 keys:
   my-app:
     secret: "sk-plexus-app-key"
     quota: premium
 ```
+
+**Limit types:** `tokens`, `requests`, or `cost` (dollar spending).
 
 → See [Configuration: user_quotas](docs/CONFIGURATION.md#user_quotas-optional)
 
