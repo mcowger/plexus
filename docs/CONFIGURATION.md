@@ -634,13 +634,20 @@ ORDER BY request_count DESC;
 
 Per-API-key usage enforcement. Unlike provider quota checkers (which monitor provider rate limits), user quotas limit how much an individual key can consume.
 
-| Type | Description | Reset Behavior |
-|------|-------------|----------------|
-| `rolling` | Leaky bucket algorithm | Continuously decays over time |
-| `daily` | Calendar day quota | Resets at UTC midnight |
-| `weekly` | Calendar week quota | Resets at UTC midnight Sunday |
+| Type | Description |
+|------|-------------|
+| `rolling` | Time-window quota with behavior based on `limitType` |
+| `daily` | Calendar day quota (resets at UTC midnight) |
+| `weekly` | Calendar week quota (resets at UTC midnight Sunday) |
+| `monthly` | Calendar month quota (resets at 00:00 UTC on the 1st of each month) |
 
-**Limit types:** `requests` (count per call) or `tokens` (sum of input + output + reasoning + cached).
+**Limit types:**
+
+| Type | Description | Rolling Behavior |
+|------|-------------|------------------|
+| `requests` | Count per call | Leaky bucket - continuously decays |
+| `tokens` | Sum of input + output + reasoning + cached | Leaky bucket - continuously decays |
+| `cost` | Dollar spending limit | Cumulative - resets when window expires |
 
 ```yaml
 user_quotas:
@@ -665,6 +672,23 @@ user_quotas:
     type: weekly
     limitType: tokens
     limit: 5000000
+
+  # Cost-based quotas (spending limits)
+  budget_hourly:
+    type: rolling
+    limitType: cost
+    limit: 10.0      # $10 per hour spending limit
+    duration: 1h
+
+  budget_weekly:
+    type: weekly
+    limitType: cost
+    limit: 100.0     # $100 per week spending limit
+
+  budget_monthly:
+    type: monthly
+    limitType: cost
+    limit: 500.0     # $500 per month spending limit
 ```
 
 **Assign to keys:**
@@ -679,18 +703,31 @@ keys:
     secret: "sk-free-secret"
     quota: basic_daily
 
+  budget_user:
+    secret: "sk-budget-secret"
+    quota: budget_hourly
+
   unlimited:
     secret: "sk-unlimited"
     # No quota field = unlimited access
 ```
 
-**How rolling (leaky bucket) quotas work:**
+**How rolling quotas work:**
 
+For `tokens` and `requests` quotas, a leaky bucket algorithm is used:
 1. Usage is recorded after each request completes.
 2. On the next request, usage "leaks" based on elapsed time: `leaked = elapsed_time × (limit / duration)`.
 3. New usage is added to the remaining amount.
 
 Example: 10 requests/hour quota. You make 10 requests at 12:00 PM. At 12:30 PM, 50% has leaked → remaining usage is 5. A new request brings it to 6.
+
+For `cost` quotas, spending is cumulative within the window:
+1. Usage accumulates as requests complete.
+2. No leak/refill - spending only resets when the window expires.
+3. Window alignment is math-based (floor division from Unix epoch), not calendar-aligned.
+4. For calendar-aligned cost quotas, use `daily`, `weekly`, or `monthly` types instead.
+
+> **Note:** For budget-based limits aligned to calendar boundaries (e.g., "$500 per calendar month"), use the `monthly` type rather than `rolling` with a month duration.
 
 > **Note:** The stored usage value may be fractional for `requests` quotas due to the leak calculation. This is expected.
 

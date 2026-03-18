@@ -344,18 +344,23 @@ const ModelTargetSchema = z.object({
 export const QuotaDefinitionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('rolling'),
-    limitType: z.enum(['requests', 'tokens']),
+    limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
     duration: z.string().min(1), // e.g., "1h", "30m", "1d"
   }),
   z.object({
     type: z.literal('daily'),
-    limitType: z.enum(['requests', 'tokens']),
+    limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
   }),
   z.object({
     type: z.literal('weekly'),
-    limitType: z.enum(['requests', 'tokens']),
+    limitType: z.enum(['requests', 'tokens', 'cost']),
+    limit: z.number().min(1),
+  }),
+  z.object({
+    type: z.literal('monthly'),
+    limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
   }),
 ]);
