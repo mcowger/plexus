@@ -24,7 +24,7 @@ interface CompactQuotasCardProps {
 }
 
 // Window type priority for display order (lower = shown first)
-const WINDOW_PRIORITY: Record<string, number> = {
+export const WINDOW_PRIORITY: Record<string, number> = {
   five_hour: 1,
   daily: 2,
   toolcalls: 3,
@@ -34,7 +34,7 @@ const WINDOW_PRIORITY: Record<string, number> = {
 };
 
 // Get the checker category from checkerId or checkerType
-const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
+export const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   const id = (quota.checkerType || quota.checkerId).toLowerCase();
   if (id.includes('synthetic')) return 'synthetic';
   if (id.includes('claude-code') || id.includes('claude')) return 'claude';
@@ -152,7 +152,7 @@ const getCheckerIcon = (category: string) => {
 };
 
 // Define which windows to show for each checker type
-const getTrackedWindowsForChecker = (category: string, windows: any[]): string[] => {
+export const getTrackedWindowsForChecker = (category: string, windows: any[]): string[] => {
   const availableTypes = new Set(windows.map((w) => w.windowType));
 
   switch (category) {
