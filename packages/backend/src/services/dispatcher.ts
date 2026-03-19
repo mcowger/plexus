@@ -616,10 +616,23 @@ export class Dispatcher {
     });
 
     try {
-      const readResult = await Promise.race([reader.read(), timeoutPromise]);
+      const readPromise = reader.read();
+      const readResult = await Promise.race([readPromise, timeoutPromise]);
 
       if ((readResult as any).timeout) {
         const passthrough = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            try {
+              const first = await readPromise;
+              if (!first.done && first.value) {
+                controller.enqueue(first.value);
+              } else if (first.done) {
+                controller.close();
+              }
+            } catch (error) {
+              controller.error(error);
+            }
+          },
           async pull(controller) {
             try {
               const next = await reader.read();
