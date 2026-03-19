@@ -9,50 +9,51 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
 
     it('returns ["chat"] for ollama.com OpenAI-compatible URLs', () => {
-      // ollama.com/v1 is OpenAI-compatible, should NOT be 'ollama'
       const provider: ProviderConfig = {
         api_base_url: 'https://ollama.com/v1',
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
 
     it('returns ["chat"] for localhost:11434/v1 OpenAI-compatible URLs', () => {
-      // localhost:11434/v1 is OpenAI-compatible (OpenAI endpoint), should NOT be 'ollama'
       const provider: ProviderConfig = {
         api_base_url: 'http://localhost:11434/v1',
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
 
     it('returns ["chat"] for any URL containing "ollama" string', () => {
-      // String URLs with 'ollama' in them are OpenAI-compatible and should be 'chat'
       const provider: ProviderConfig = {
         api_base_url: 'https://my-ollama-proxy.example.com/v1',
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
 
     it('returns ["chat"] for port 11434 URLs', () => {
-      // Port 11434 doesn't automatically mean native Ollama - it could be OpenAI-compatible
       const provider: ProviderConfig = {
         api_base_url: 'http://192.168.1.100:11434/v1',
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -63,6 +64,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['messages']);
     });
@@ -73,6 +75,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['gemini']);
     });
@@ -84,6 +87,7 @@ describe('getProviderTypes', () => {
         oauth_provider: 'anthropic',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['oauth']);
     });
@@ -96,6 +100,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['ollama']);
     });
@@ -109,8 +114,8 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
-      // Order depends on object key order
       const types = getProviderTypes(provider);
       expect(types).toContain('ollama');
       expect(types).toContain('chat');
@@ -122,6 +127,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });
@@ -132,6 +138,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['messages']);
     });
@@ -142,6 +149,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         estimateTokens: false,
+        useClaudeMasking: false,
       };
       expect(getProviderTypes(provider)).toEqual(['chat']);
     });

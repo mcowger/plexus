@@ -15,6 +15,7 @@ const EMBEDDINGS_TEST_CONFIG = {
       api_base_url: 'https://api.openai.com/v1',
       estimateTokens: false,
       disable_cooldown: false,
+      useClaudeMasking: false,
       models: {
         'text-embedding-3-small': {
           pricing: { source: 'simple' as const, input: 0.00002, output: 0 },

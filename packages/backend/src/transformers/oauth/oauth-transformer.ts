@@ -398,12 +398,7 @@ export class OAuthTransformer implements Transformer {
       typeof clientHeaders?.['x-app'] === 'string' &&
       clientHeaders['x-app'].toLowerCase() === 'cli';
 
-    // Masking is active when: the resolved token is a Claude Code OAuth token, OR the
-    // provider config has explicitly requested masking via useClaudeMasking.
-    const shouldMask =
-      provider === 'anthropic' && (isClaudeCodeToken || options?.useClaudeMasking === true);
-
-    if (shouldMask) {
+    if (provider === 'anthropic' && isClaudeCodeToken) {
       if (!isClaudeCodeAgent) {
         applyClaudeCodeToolProxy(context);
 
@@ -451,7 +446,6 @@ export class OAuthTransformer implements Transformer {
       apiKeyPreview,
       isClaudeCodeToken,
       isClaudeCodeAgent,
-      shouldMask,
       optionKeys: Object.keys(filteredOptions),
       hasInjectedClaudeCodeHeaders: !!requestOptions.headers,
     });

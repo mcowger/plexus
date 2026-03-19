@@ -100,6 +100,7 @@ describe('Transcriptions Debug Logging', () => {
           api_base_url: 'https://api.openai.com/v1',
           estimateTokens: false,
           disable_cooldown: false,
+          useClaudeMasking: false,
           models: {
             'whisper-1': {
               type: 'transcriptions',
