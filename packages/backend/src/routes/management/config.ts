@@ -140,8 +140,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
   });
 
   // PUT — full create-or-replace with Zod validation
-  fastify.put('/v0/management/aliases/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string };
+  // Using wildcard to support slugs containing '/' (e.g. "provider/model")
+  fastify.put('/v0/management/aliases/*', async (request, reply) => {
+    const slug = (request.params as { '*': string })['*'];
     const result = ModelConfigSchema.safeParse(request.body);
     if (!result.success) {
       return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
@@ -157,8 +158,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
   });
 
   // PATCH — partial update; merges into existing alias then validates
-  fastify.patch('/v0/management/aliases/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string };
+  // Using wildcard to support slugs containing '/' (e.g. "provider/model")
+  fastify.patch('/v0/management/aliases/*', async (request, reply) => {
+    const slug = (request.params as { '*': string })['*'];
     const body = request.body as Record<string, unknown> | null;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return reply.code(400).send({ error: 'Object body is required' });
@@ -182,8 +184,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/v0/management/models/:aliasId', async (request, reply) => {
-    const { aliasId } = request.params as { aliasId: string };
+  // Using wildcard to support aliasIds containing '/' (e.g. "provider/model")
+  fastify.delete('/v0/management/models/*', async (request, reply) => {
+    const aliasId = (request.params as { '*': string })['*'];
 
     try {
       await configService.deleteAlias(aliasId);
