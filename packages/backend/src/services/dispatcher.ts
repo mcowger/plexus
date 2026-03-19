@@ -21,6 +21,11 @@ import { UsageStorageService } from './usage-storage';
 import { CooldownParserRegistry } from './cooldown-parsers';
 import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
+import {
+  applyRequestMasking,
+  CLAUDE_CODE_MASKING_HEADERS,
+  deproxyResponse,
+} from './claude-masking';
 import { getModels } from '@mariozechner/pi-ai';
 import { VisionDescriptorService } from './vision-descriptor-service';
 import { ModelMetadataManager } from './model-metadata-manager';
@@ -287,6 +292,17 @@ export class Dispatcher {
         // 3. Transform Request
         const requestWithTargetModel = { ...currentRequest, model: route.model };
 
+        // Apply Claude Code masking to the unified request before transformation when:
+        //   - the provider config has useClaudeMasking set, AND
+        //   - the target API is Anthropic messages format (not OAuth — OAuth handles masking itself)
+        if (
+          route.config.useClaudeMasking &&
+          targetApiType === 'messages' &&
+          !this.isOAuthRoute(route, targetApiType)
+        ) {
+          applyRequestMasking(requestWithTargetModel);
+        }
+
         const { payload: providerPayload, bypassTransformation } =
           await this.transformRequestPayload(
             requestWithTargetModel,
@@ -352,6 +368,14 @@ export class Dispatcher {
         // 4. Execute Request
         const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
         const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
+
+        // Inject Claude Code masking headers for API-key Anthropic providers when
+        // useClaudeMasking is enabled. These are merged after setupHeaders so they
+        // override any conflicting values.
+        if (route.config.useClaudeMasking && targetApiType === 'messages') {
+          Object.assign(headers, CLAUDE_CODE_MASKING_HEADERS);
+        }
+
         const incomingApi = currentRequest.incomingApiType || 'unknown';
 
         logger.info(
@@ -1303,7 +1327,10 @@ export class Dispatcher {
 
       this.assertOAuthModelSupported(oauthProvider, route.model);
       const oauthContext = context?.context ? context.context : context;
-      const oauthOptions = context?.options;
+      const oauthOptions = {
+        ...(context?.options ?? {}),
+        useClaudeMasking: route.config.useClaudeMasking ?? false,
+      };
 
       logger.debug('OAuth: Dispatching request', {
         routeProvider: route.provider,
@@ -1833,6 +1860,7 @@ export class Dispatcher {
       content: null,
       stream: rawStream,
       bypassTransformation: bypassTransformation,
+      claudeMaskingDeproxy: route.config.useClaudeMasking === true && targetApiType === 'messages',
     };
 
     this.enrichResponseWithMetadata(streamResponse, route, targetApiType);
@@ -1876,6 +1904,11 @@ export class Dispatcher {
       };
     } else {
       unifiedResponse = await transformer.transformResponse(responseBody);
+    }
+
+    // Strip proxy_ prefixes from tool call names when Claude masking was applied.
+    if (route.config.useClaudeMasking === true && targetApiType === 'messages') {
+      deproxyResponse(unifiedResponse);
     }
 
     this.enrichResponseWithMetadata(unifiedResponse, route, targetApiType);

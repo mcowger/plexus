@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "use_claude_masking" boolean DEFAULT false NOT NULL;

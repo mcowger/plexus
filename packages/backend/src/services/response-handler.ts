@@ -6,6 +6,7 @@ import { UsageStorageService } from '../services/usage-storage';
 import { logger } from '../utils/logger';
 import { calculateCosts } from '../utils/calculate-costs';
 import { TransformerFactory } from '../services/transformer-factory';
+import { createDeproxyTransformStream } from './claude-masking';
 import { DebugLoggingInspector, UsageInspector } from './inspectors';
 import { Readable } from 'stream';
 import { DebugManager } from './debug-manager';
@@ -118,9 +119,14 @@ export async function handleResponse(
       const providerTransformer = TransformerFactory.getTransformer(providerApiType);
 
       // Step 1: Raw Provider SSE -> Unified internal objects
-      const unifiedStream = providerTransformer.transformStream
+      const transformedStream = providerTransformer.transformStream
         ? providerTransformer.transformStream(rawStream)
         : rawStream;
+
+      // Step 1.5: Strip proxy_ prefixes from tool call names when Claude masking was applied
+      const unifiedStream = unifiedResponse.claudeMaskingDeproxy
+        ? createDeproxyTransformStream(transformedStream as any)
+        : transformedStream;
 
       // Step 2: Unified internal objects -> Client SSE format
       finalClientStream = clientTransformer.formatStream

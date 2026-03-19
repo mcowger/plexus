@@ -322,6 +322,7 @@ export const ProviderConfigSchema = z
     headers: z.record(z.string()).optional(),
     extraBody: z.record(z.any()).optional(),
     estimateTokens: z.boolean().optional().default(false),
+    useClaudeMasking: z.boolean().optional().default(false),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {

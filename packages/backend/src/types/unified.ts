@@ -175,6 +175,8 @@ export interface UnifiedChatResponse {
   annotations?: Annotation[];
   stream?: ReadableStream | any;
   bypassTransformation?: boolean;
+  /** When true, the response-handler should strip proxy_ prefixes from tool call names. */
+  claudeMaskingDeproxy?: boolean;
   rawResponse?: any;
   rawStream?: ReadableStream;
   finishReason?: string | null;

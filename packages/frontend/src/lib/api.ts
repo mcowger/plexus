@@ -192,6 +192,7 @@ export interface Provider {
   enabled: boolean;
   disableCooldown?: boolean;
   estimateTokens?: boolean;
+  useClaudeMasking?: boolean;
   discount?: number;
   headers?: Record<string, string>;
   extraBody?: Record<string, any>;
@@ -1480,6 +1481,7 @@ export const api = {
           oauthAccount: val.oauth_account,
           enabled: val.enabled !== false,
           estimateTokens: val.estimateTokens || false,
+          useClaudeMasking: val.useClaudeMasking === true,
           disableCooldown: val.disable_cooldown === true,
           discount: val.discount,
           headers: val.headers,
@@ -1503,6 +1505,7 @@ export const api = {
       ...(provider.oauthAccount && { oauth_account: provider.oauthAccount }),
       enabled: provider.enabled,
       estimateTokens: provider.estimateTokens,
+      useClaudeMasking: provider.useClaudeMasking,
       disable_cooldown: provider.disableCooldown === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,

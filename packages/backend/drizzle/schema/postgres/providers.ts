@@ -30,6 +30,7 @@ export const providers = pgTable(
     disableCooldown: boolean('disable_cooldown').notNull().default(false),
     discount: real('discount'),
     estimateTokens: boolean('estimate_tokens').notNull().default(false),
+    useClaudeMasking: boolean('use_claude_masking').notNull().default(false),
     headers: jsonb('headers'), // Record<string, string>
     extraBody: jsonb('extra_body'), // Record<string, any>
     quotaCheckerType: quotaCheckerTypeEnum('quota_checker_type'),

@@ -161,6 +161,7 @@ const EMPTY_PROVIDER: Provider = {
   enabled: true,
   disableCooldown: false,
   estimateTokens: false,
+  useClaudeMasking: false,
   apiBaseUrl: {},
   headers: {},
   extraBody: {},
@@ -2210,6 +2211,36 @@ export const Providers = () => {
                     will always remain eligible for routing regardless of consecutive failures.
                     <span className="text-warning" style={{ marginLeft: '6px' }}>
                       Use only for providers with reliable external rate-limit handling.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Use Claude Masking */}
+                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                  <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+                    <Switch
+                      checked={editingProvider.useClaudeMasking || false}
+                      onChange={(checked) =>
+                        setEditingProvider({ ...editingProvider, useClaudeMasking: checked })
+                      }
+                    />
+                    <label
+                      className="font-body text-[13px] font-medium text-text"
+                      style={{ marginBottom: 0 }}
+                    >
+                      Use Claude Masking
+                    </label>
+                  </div>
+                  <div
+                    className="font-body text-[11px] text-text-secondary"
+                    style={{ lineHeight: 1.35, marginTop: '4px' }}
+                  >
+                    When enabled, requests to this Anthropic provider will be masked as Claude Code
+                    CLI sessions — tool names are prefixed to avoid conflicts with built-in tools,
+                    and Claude Code headers are injected. Applies regardless of API key type or
+                    OAuth.
+                    <span className="text-warning" style={{ marginLeft: '6px' }}>
+                      Only effective for Anthropic providers.
                     </span>
                   </div>
                 </div>

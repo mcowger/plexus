@@ -17,6 +17,7 @@ export const providers = sqliteTable(
     disableCooldown: integer('disable_cooldown').notNull().default(0),
     discount: real('discount'),
     estimateTokens: integer('estimate_tokens').notNull().default(0),
+    useClaudeMasking: integer('use_claude_masking').notNull().default(0),
     headers: text('headers'), // JSON: Record<string, string>
     extraBody: text('extra_body'), // JSON: Record<string, any>
     quotaCheckerType: text('quota_checker_type'),
