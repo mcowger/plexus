@@ -182,6 +182,18 @@ export class OAuthTransformer implements Transformer {
     return getModel(provider as any, modelId);
   }
 
+  private async resolveApiKey(
+    provider: OAuthProvider,
+    auth: { authMode: 'oauth'; accountId: string } | { authMode: 'apiKey'; apiKey: string }
+  ): Promise<string> {
+    if (auth.authMode === 'apiKey') {
+      return auth.apiKey;
+    }
+
+    const authManager = OAuthAuthManager.getInstance();
+    return authManager.getApiKey(provider, auth.accountId);
+  }
+
   async parseRequest(_input: any): Promise<UnifiedChatRequest> {
     throw new Error(
       `${this.name}: OAuth transformer cannot parse direct client requests. ` +
@@ -303,6 +315,10 @@ export class OAuthTransformer implements Transformer {
         : readableStreamToAsyncIterable(streamInput as ReadableStream<any>);
 
       for await (const event of source) {
+        if (!event || typeof event.type !== 'string') {
+          continue;
+        }
+
         const provider =
           event.partial?.provider || event.message?.provider || event.error?.provider;
         const eventModel =
@@ -355,13 +371,23 @@ export class OAuthTransformer implements Transformer {
   async executeRequest(
     context: any,
     provider: OAuthProvider,
-    accountId: string,
     modelId: string,
     streaming: boolean,
-    options?: Record<string, any>
+    options?: Record<string, any>,
+    auth:
+      | { authMode: 'oauth'; accountId: string }
+      | { authMode: 'apiKey'; apiKey: string } = { authMode: 'oauth', accountId: '' }
   ): Promise<any> {
-    const authManager = OAuthAuthManager.getInstance();
-    const apiKey = await authManager.getApiKey(provider, accountId);
+    const rawApiKey = await this.resolveApiKey(provider, auth);
+    // pi-ai enables Claude Code identity/system injection only for OAuth-shaped tokens.
+    // For masked API-key mode, provide a shim token to select that code path while
+    // still sending the real key via x-api-key for Anthropic authentication.
+    const apiKey =
+      provider === 'anthropic' && auth.authMode === 'apiKey'
+        ? `sk-ant-oat-mask-${rawApiKey}`
+        : rawApiKey;
+    const usesClaudeCodeOAuthShim =
+      provider === 'anthropic' && auth.authMode === 'apiKey' && apiKey.includes('sk-ant-oat');
     const model = { ...this.getPiAiModel(provider, modelId) };
 
     // GitHub Copilot Business account fix:
@@ -390,6 +416,7 @@ export class OAuthTransformer implements Transformer {
     const baseHeaders: Record<string, string> = {
       ...((filteredOptions as any).headers as Record<string, string>),
       Version: '0.101.0',
+      ...(provider === 'anthropic' && auth.authMode === 'apiKey' ? { 'x-api-key': rawApiKey } : {}),
       ...(userAgent ? { 'User-Agent': userAgent } : {}),
     };
 
@@ -398,7 +425,7 @@ export class OAuthTransformer implements Transformer {
       typeof clientHeaders?.['x-app'] === 'string' &&
       clientHeaders['x-app'].toLowerCase() === 'cli';
 
-    if (provider === 'anthropic' && isClaudeCodeToken) {
+    if (provider === 'anthropic' && (isClaudeCodeToken || auth.authMode === 'apiKey')) {
       if (!isClaudeCodeAgent) {
         applyClaudeCodeToolProxy(context);
 
@@ -440,11 +467,15 @@ export class OAuthTransformer implements Transformer {
 
     logger.debug(`${this.name}: OAuth credentials resolved`, {
       provider,
-      accountId,
+      accountId: auth.authMode === 'oauth' ? auth.accountId : undefined,
+      authMode: auth.authMode,
       model: model.id,
       streaming,
       apiKeyPreview,
       isClaudeCodeToken,
+      usesClaudeCodeOAuthShim,
+      hasRawAnthropicApiKeyHeader:
+        provider === 'anthropic' && auth.authMode === 'apiKey' && !!requestOptions.headers?.['x-api-key'],
       isClaudeCodeAgent,
       optionKeys: Object.keys(filteredOptions),
       hasInjectedClaudeCodeHeaders: !!requestOptions.headers,
@@ -454,7 +485,7 @@ export class OAuthTransformer implements Transformer {
       logger.debug(`${this.name}: Stripped pi-ai request options`, {
         model: model.id,
         provider,
-        accountId,
+        accountId: auth.authMode === 'oauth' ? auth.accountId : undefined,
         strippedParameters,
       });
     }
@@ -466,7 +497,7 @@ export class OAuthTransformer implements Transformer {
     };
 
     logger.info(
-      `${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", accountId: "${accountId}" }`
+      `${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", authMode: "${auth.authMode}"${auth.authMode === 'oauth' ? `, accountId: "${auth.accountId}"` : ''} }`
     );
 
     if (streaming) {

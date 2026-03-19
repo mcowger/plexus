@@ -87,6 +87,25 @@ function parseSse(output: string): Array<{ event: string; data: any }> {
 }
 
 describe('OAuth -> Anthropic stream regression', () => {
+  test('piAiEventToChunk handles done events without usage payload', () => {
+    const doneEvent = {
+      type: 'done',
+      reason: 'stop',
+      message: {
+        role: 'assistant',
+        content: [],
+      },
+    };
+
+    const chunk = piAiEventToChunk(doneEvent as any, 'claude-sonnet-4-6', 'anthropic');
+
+    expect(chunk).toBeDefined();
+    expect(chunk?.finish_reason).toBe('stop');
+    expect(chunk?.usage?.input_tokens).toBe(0);
+    expect(chunk?.usage?.output_tokens).toBe(0);
+    expect(chunk?.usage?.total_tokens).toBe(0);
+  });
+
   test('piAiEventToChunk ignores toolcall_end chunks', () => {
     const toolcallEndEvent = {
       type: 'toolcall_end',

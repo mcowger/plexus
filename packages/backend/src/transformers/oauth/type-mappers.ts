@@ -455,7 +455,7 @@ export function piAiEventToChunk(
       return {
         ...baseChunk,
         finish_reason: mapStopReason(event.reason),
-        usage: piAiUsageToUnified(event.message.usage),
+        usage: piAiUsageToUnified(event.message?.usage),
       };
     case 'error':
       const errorMessage = extractPiAiErrorMessage(event.error);
@@ -465,7 +465,7 @@ export function piAiEventToChunk(
           content: errorMessage || 'OAuth provider error',
         },
         finish_reason: event.reason === 'aborted' ? 'aborted' : 'error',
-        usage: piAiUsageToUnified(event.error.usage),
+        usage: piAiUsageToUnified(event.error?.usage),
       };
     case 'text_start':
     case 'text_end':
@@ -499,14 +499,24 @@ export function extractPiAiErrorMessage(error: any): string | undefined {
   return undefined;
 }
 
-function piAiUsageToUnified(usage: Usage): UnifiedUsage {
+function piAiUsageToUnified(usage?: Usage | null): UnifiedUsage {
+  const safeUsage =
+    usage ??
+    ({
+      input: 0,
+      output: 0,
+      totalTokens: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    } as Usage);
+
   return {
-    input_tokens: usage.input,
-    output_tokens: usage.output,
-    total_tokens: usage.totalTokens,
+    input_tokens: safeUsage.input,
+    output_tokens: safeUsage.output,
+    total_tokens: safeUsage.totalTokens,
     reasoning_tokens: 0,
-    cached_tokens: usage.cacheRead,
-    cache_creation_tokens: usage.cacheWrite,
+    cached_tokens: safeUsage.cacheRead,
+    cache_creation_tokens: safeUsage.cacheWrite,
   };
 }
 

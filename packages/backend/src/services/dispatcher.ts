@@ -281,7 +281,7 @@ export class Dispatcher {
         );
 
         // 2. Get Transformer
-        const transformerType = targetApiType;
+        const transformerType = this.isPiAiRoute(route, targetApiType) ? 'oauth' : targetApiType;
         const transformer = TransformerFactory.getTransformer(transformerType);
 
         // 3. Transform Request
@@ -303,7 +303,7 @@ export class Dispatcher {
           );
         }
 
-        if (this.isOAuthRoute(route, targetApiType)) {
+        if (this.isPiAiRoute(route, targetApiType)) {
           try {
             const oauthResponse = await this.dispatchOAuthRequest(
               providerPayload,
@@ -697,6 +697,8 @@ export class Dispatcher {
     finalRoute: RouteResult,
     apiType: string
   ): void {
+    const responseApiType = (response?.plexus as any)?.apiType;
+
     response.plexus = {
       ...(response.plexus || {}),
       attemptCount: attemptedProviders.length,
@@ -707,7 +709,9 @@ export class Dispatcher {
       canonicalModel: finalRoute.canonicalModel,
       provider: finalRoute.provider,
       model: finalRoute.model,
-      apiType,
+      // Preserve the response-declared API type (e.g. oauth) so downstream
+      // stream transformation uses the correct transformer.
+      apiType: responseApiType || apiType,
       pricing: finalRoute.modelConfig?.pricing,
       providerDiscount: (finalRoute.config as any).discount,
       config: {
@@ -985,6 +989,25 @@ export class Dispatcher {
     }
     const urlMap = route.config.api_base_url as Record<string, string>;
     return Object.values(urlMap).some((value) => value.startsWith('oauth://'));
+  }
+
+  private isClaudeMaskingApiKeyRoute(route: RouteResult, targetApiType: string): boolean {
+    if (this.isOAuthRoute(route, targetApiType)) {
+      return false;
+    }
+
+    if (targetApiType.toLowerCase() !== 'messages') {
+      return false;
+    }
+
+    return route.config.useClaudeMasking === true;
+  }
+
+  private isPiAiRoute(route: RouteResult, targetApiType: string): boolean {
+    return (
+      this.isOAuthRoute(route, targetApiType) ||
+      this.isClaudeMaskingApiKeyRoute(route, targetApiType)
+    );
   }
 
   private isAsyncIterable<T>(input: any): input is AsyncIterable<T> {
@@ -1293,23 +1316,45 @@ export class Dispatcher {
     }
 
     try {
-      const oauthProvider = route.config.oauth_provider || route.provider;
+      const oauthProvider = this.isClaudeMaskingApiKeyRoute(route, targetApiType)
+        ? 'anthropic'
+        : route.config.oauth_provider || route.provider;
       const oauthAccount = route.config.oauth_account?.trim();
-      if (!oauthAccount) {
+      const authConfig = this.isClaudeMaskingApiKeyRoute(route, targetApiType)
+        ? {
+            authMode: 'apiKey' as const,
+            apiKey: route.config.api_key?.trim() || '',
+          }
+        : {
+            authMode: 'oauth' as const,
+            accountId: oauthAccount || '',
+          };
+
+      if (authConfig.authMode === 'oauth' && !authConfig.accountId) {
         throw new Error(
           `OAuth account is not configured for provider '${route.provider}'. ` +
             `Set providers.${route.provider}.oauth_account in plexus config.`
         );
       }
 
-      this.assertOAuthModelSupported(oauthProvider, route.model);
+      if (authConfig.authMode === 'apiKey' && !authConfig.apiKey) {
+        throw new Error(
+          `API key is not configured for Claude masking provider '${route.provider}'. ` +
+            `Set providers.${route.provider}.api_key in plexus config.`
+        );
+      }
+
+      if (authConfig.authMode === 'oauth') {
+        this.assertOAuthModelSupported(oauthProvider, route.model);
+      }
       const oauthContext = context?.context ? context.context : context;
       const oauthOptions = context?.options;
 
       logger.debug('OAuth: Dispatching request', {
         routeProvider: route.provider,
         oauthProvider,
-        oauthAccount,
+        oauthAccount: authConfig.authMode === 'oauth' ? authConfig.accountId : undefined,
+        authMode: authConfig.authMode,
         model: route.model,
         targetApiType,
         streaming: !!request.stream,
@@ -1323,10 +1368,10 @@ export class Dispatcher {
       const result = await transformer.executeRequest(
         oauthContext,
         oauthProvider,
-        oauthAccount,
         route.model,
         !!request.stream,
-        oauthOptions
+        oauthOptions,
+        authConfig
       );
 
       if (request.stream) {
@@ -1354,12 +1399,12 @@ export class Dispatcher {
           bypassTransformation: false,
         };
 
-        this.enrichResponseWithMetadata(streamResponse, route, targetApiType);
+        this.enrichResponseWithMetadata(streamResponse, route, 'oauth');
         return streamResponse;
       }
 
       const unified = await transformer.transformResponse(result);
-      this.enrichResponseWithMetadata(unified, route, targetApiType);
+      this.enrichResponseWithMetadata(unified, route, 'oauth');
       return unified;
     } catch (error: any) {
       throw this.wrapOAuthError(error, route, targetApiType);
@@ -1543,6 +1588,10 @@ export class Dispatcher {
       return false;
     }
 
+    if (this.isClaudeMaskingApiKeyRoute(route, targetApiType)) {
+      return false;
+    }
+
     const isCompatible =
       !!request.incomingApiType?.toLowerCase() &&
       request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase();
@@ -1582,7 +1631,9 @@ export class Dispatcher {
     } else {
       // Inject OAuth provider into metadata so transformers can set provider/model
       // on assistant messages for thought-signature replay (required by Gemini 3).
-      const oauthProvider = route.config.oauth_provider || route.provider;
+      const oauthProvider = this.isClaudeMaskingApiKeyRoute(route, targetApiType)
+        ? 'anthropic'
+        : route.config.oauth_provider || route.provider;
       if (oauthProvider) {
         request = {
           ...request,
