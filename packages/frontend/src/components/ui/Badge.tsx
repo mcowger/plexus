@@ -7,6 +7,8 @@ interface BadgeProps {
   secondaryText?: string;
   className?: string;
   style?: React.CSSProperties;
+  onClick?: (e: React.MouseEvent) => void;
+  title?: string;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -15,9 +17,13 @@ export const Badge: React.FC<BadgeProps> = ({
   secondaryText,
   className,
   style,
+  onClick,
+  title,
 }) => {
   return (
     <div
+      onClick={onClick}
+      title={title}
       className={clsx(
         'inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium',
         {
@@ -34,7 +40,7 @@ export const Badge: React.FC<BadgeProps> = ({
         padding: secondaryText ? '4px 12px' : undefined,
       }}
     >
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+      <span className="connection-dot w-1.5 h-1.5 rounded-full bg-current" />
       <div
         style={{
           display: 'flex',

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   api,
   Provider,
@@ -6,6 +7,12 @@ import {
   initQuotaCheckerTypes,
   getQuotaCheckerTypes,
 } from '../lib/api';
+import type { QuotaCheckerInfo } from '../types/quota';
+import { formatPoints } from '../lib/format';
+import {
+  getCheckerCategory,
+  getTrackedWindowsForChecker,
+} from '../components/quota/CompactQuotasCard';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -218,6 +225,7 @@ const ModelIdInput = ({ modelId, onCommit }: ModelIdInputProps) => {
 };
 
 export const Providers = () => {
+  const navigate = useNavigate();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
@@ -226,6 +234,8 @@ export const Providers = () => {
   const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([
     ...QUOTA_CHECKER_TYPES_FALLBACK,
   ]);
+  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [quotasLoading, setQuotasLoading] = useState(true);
 
   const [oauthSessionId, setOauthSessionId] = useState<string | null>(null);
   const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
@@ -242,6 +252,17 @@ export const Providers = () => {
       const types = Array.from(getQuotaCheckerTypes());
       setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
     });
+  }, []);
+
+  // Fetch quotas on mount
+  useEffect(() => {
+    api
+      .getQuotas()
+      .then(setQuotas)
+      .catch(() => {
+        // Silently fail - quotas are optional
+      })
+      .finally(() => setQuotasLoading(false));
   }, []);
 
   const isOAuthMode =
@@ -901,6 +922,58 @@ export const Providers = () => {
     setIsFetchModelsModalOpen(false);
   };
 
+  const getQuotaDisplay = (provider: Provider) => {
+    if (!provider.quotaChecker?.enabled) return null;
+    if (quotasLoading) return <span className="text-text-secondary text-xs">—</span>;
+    const quota = quotas.find((q) => q.checkerId === provider.id);
+    if (!quota?.latest?.length) return null;
+
+    const handleQuotaClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigate('/quotas');
+    };
+
+    // Balance-type checkers: show remaining dollars or points
+    const subscriptionWindow = quota.latest.find(
+      (w) => w.windowType === 'subscription' && (w.unit === 'dollars' || w.unit === 'points')
+    );
+    if (subscriptionWindow?.remaining != null) {
+      const formatted =
+        subscriptionWindow.unit === 'points'
+          ? `${formatPoints(subscriptionWindow.remaining)} pts`
+          : `$${subscriptionWindow.remaining.toFixed(2)}`;
+      return (
+        <Badge
+          status="neutral"
+          className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2 bg-bg-subtle border border-border text-text-secondary"
+          onClick={handleQuotaClick}
+        >
+          {formatted}
+        </Badge>
+      );
+    }
+
+    // Rate-limit-type checkers: pick the primary window using the same logic as CompactQuotasCard
+    const category = getCheckerCategory(quota);
+    const windowTypes = quota.latest.map((s) => ({ windowType: s.windowType }));
+    const trackedTypes = getTrackedWindowsForChecker(category, windowTypes);
+    if (!trackedTypes.length) return null;
+    const primarySnapshot = quota.latest.find((s) => s.windowType === trackedTypes[0]);
+    if (!primarySnapshot || primarySnapshot.utilizationPercent == null) return null;
+
+    const pct = Math.round(primarySnapshot.utilizationPercent);
+    const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
+    return (
+      <Badge
+        status={status}
+        className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
+        onClick={handleQuotaClick}
+      >
+        {pct}%
+      </Badge>
+    );
+  };
+
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
       <Card
@@ -924,11 +997,12 @@ export const Providers = () => {
                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  APIs
-                </th>
+
                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                   Models
+                </th>
+                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  Quota/Balance
                 </th>
                 <th
                   className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
@@ -969,20 +1043,7 @@ export const Providers = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {(Array.isArray(p.type) ? p.type : [p.type]).map((t) => (
-                          <Badge
-                            key={t}
-                            status="connected"
-                            style={{ ...getApiBadgeStyle(t), fontSize: '10px', padding: '2px 8px' }}
-                            className="[&_.connection-dot]:hidden"
-                          >
-                            {t}
-                          </Badge>
-                        ))}
-                      </div>
-                    </td>
+
                     <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                       {p.models
                         ? Array.isArray(p.models)
@@ -991,6 +1052,9 @@ export const Providers = () => {
                             ? Object.keys(p.models).length
                             : 0
                         : 0}
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      {getQuotaDisplay(p)}
                     </td>
                     <td
                       className="px-4 py-3 text-left border-b border-border-glass text-text"
