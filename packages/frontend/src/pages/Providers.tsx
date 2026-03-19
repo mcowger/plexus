@@ -6,6 +6,8 @@ import {
   initQuotaCheckerTypes,
   getQuotaCheckerTypes,
 } from '../lib/api';
+import { formatCost } from '../lib/format';
+import type { QuotaCheckerInfo } from '../types/quota';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -224,6 +226,7 @@ export const Providers = () => {
   const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([
     ...QUOTA_CHECKER_TYPES_FALLBACK,
   ]);
+  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
 
   const [oauthSessionId, setOauthSessionId] = useState<string | null>(null);
   const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
@@ -240,6 +243,16 @@ export const Providers = () => {
       const types = Array.from(getQuotaCheckerTypes());
       setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
     });
+  }, []);
+
+  // Fetch quotas on mount
+  useEffect(() => {
+    api
+      .getQuotas()
+      .then(setQuotas)
+      .catch(() => {
+        // Silently fail - quotas are optional
+      });
   }, []);
 
   const isOAuthMode =
@@ -928,6 +941,9 @@ export const Providers = () => {
                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                   Models
                 </th>
+                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  Quota
+                </th>
                 <th
                   className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                   style={{ paddingRight: '24px', textAlign: 'right' }}
@@ -989,6 +1005,33 @@ export const Providers = () => {
                             ? Object.keys(p.models).length
                             : 0
                         : 0}
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      {p.quotaChecker?.enabled
+                        ? (() => {
+                            const quota = quotas.find((q) => q.checkerId === p.id);
+                            if (!quota?.latest?.length) return null;
+                            const subscriptionWindow = quota.latest.find(
+                              (w) => w.windowType === 'subscription' && w.unit === 'dollars'
+                            );
+                            if (!subscriptionWindow?.remaining) return null;
+                            return (
+                              <Badge
+                                status="connected"
+                                style={{
+                                  backgroundColor: '#ebebeb',
+                                  color: '#333',
+                                  border: 'none',
+                                  fontSize: '10px',
+                                  padding: '2px 8px',
+                                }}
+                                className="[&_.connection-dot]:hidden"
+                              >
+                                {formatCost(subscriptionWindow.remaining)}
+                              </Badge>
+                            );
+                          })()
+                        : null}
                     </td>
                     <td
                       className="px-4 py-3 text-left border-b border-border-glass text-text"
