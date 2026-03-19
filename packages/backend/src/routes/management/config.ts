@@ -57,8 +57,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.get('/v0/management/providers/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string };
+  // Using wildcard to support slugs containing '/' (e.g. "provider/model")
+  fastify.get('/v0/management/providers/*', async (request, reply) => {
+    const slug = (request.params as { '*': string })['*'];
     try {
       const provider = await configService.getRepository().getProvider(slug);
       if (!provider) {
@@ -71,8 +72,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
   });
 
   // PUT — full create-or-replace, body must be a complete valid ProviderConfig
-  fastify.put('/v0/management/providers/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string };
+  // Using wildcard to support slugs containing '/' (e.g. "provider/model")
+  fastify.put('/v0/management/providers/*', async (request, reply) => {
+    const slug = (request.params as { '*': string })['*'];
     const result = ProviderConfigSchema.safeParse(request.body);
     if (!result.success) {
       return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
@@ -88,8 +90,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
   });
 
   // PATCH — partial update; merges into existing config then validates the result
-  fastify.patch('/v0/management/providers/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string };
+  // Using wildcard to support slugs containing '/' (e.g. "provider/model")
+  fastify.patch('/v0/management/providers/*', async (request, reply) => {
+    const slug = (request.params as { '*': string })['*'];
     const body = request.body as Record<string, unknown> | null;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return reply.code(400).send({ error: 'Object body is required' });
@@ -113,8 +116,9 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/v0/management/providers/:providerId', async (request, reply) => {
-    const { providerId } = request.params as { providerId: string };
+  // Using wildcard to support providerIds containing '/' (e.g. "provider/model")
+  fastify.delete('/v0/management/providers/*', async (request, reply) => {
+    const providerId = (request.params as { '*': string })['*'];
     const query = request.query as { cascade?: string };
     const cascade = query.cascade === 'true';
 
