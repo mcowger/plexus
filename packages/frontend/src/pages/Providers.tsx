@@ -30,6 +30,7 @@ import { SyntheticQuotaConfig } from '../components/quota/SyntheticQuotaConfig';
 import { NanoGPTQuotaConfig } from '../components/quota/NanoGPTQuotaConfig';
 import { ZAIQuotaConfig } from '../components/quota/ZAIQuotaConfig';
 import { MoonshotQuotaConfig } from '../components/quota/MoonshotQuotaConfig';
+import { NovitaQuotaConfig } from '../components/quota/NovitaQuotaConfig';
 import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
 import { MiniMaxCodingQuotaConfig } from '../components/quota/MiniMaxCodingQuotaConfig';
 import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig';
@@ -72,6 +73,7 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'kimi-code',
   'zai',
   'moonshot',
+  'novita',
   'minimax',
   'minimax-coding',
   'openrouter',
@@ -1724,6 +1726,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'moonshot' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <MoonshotQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'novita' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <NovitaQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({

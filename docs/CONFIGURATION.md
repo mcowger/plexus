@@ -384,6 +384,7 @@ providers:
 - `claude-code`: OAuth-backed; reads token from `auth.json`.
 - `zai`: ZAI balance-based checker.
 - `moonshot`: Moonshot balance-based checker.
+- `novita`: Novita balance-based checker.
 - `minimax`: Requires `options.groupid` and `options.hertzSession` (treat like a password).
 
 **Examples:**

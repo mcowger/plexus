@@ -100,6 +100,10 @@ const MoonshotQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const NovitaQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const MiniMaxQuotaCheckerOptionsSchema = z.object({
   groupid: z.string().trim().min(1, 'MiniMax groupid is required'),
   hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),
@@ -200,6 +204,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: MoonshotQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('novita'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: NovitaQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('minimax'),
@@ -781,6 +792,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'poe',
   'gemini-cli',
   'antigravity',
+  'novita',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

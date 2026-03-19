@@ -6,6 +6,7 @@ import { OpenAICodexQuotaChecker } from './checkers/openai-codex-checker';
 import { NanoGPTQuotaChecker } from './checkers/nanogpt-checker';
 import { ZAIQuotaChecker } from './checkers/zai-checker';
 import { MoonshotQuotaChecker } from './checkers/moonshot-checker';
+import { NovitaQuotaChecker } from './checkers/novita-checker';
 import { MiniMaxQuotaChecker } from './checkers/minimax-checker';
 import { MiniMaxCodingQuotaChecker } from './checkers/minimax-coding-checker';
 import { OpenRouterQuotaChecker } from './checkers/openrouter-checker';
@@ -27,6 +28,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   nanogpt: NanoGPTQuotaChecker,
   zai: ZAIQuotaChecker,
   moonshot: MoonshotQuotaChecker,
+  novita: NovitaQuotaChecker,
   minimax: MiniMaxQuotaChecker,
   'minimax-coding': MiniMaxCodingQuotaChecker,
   openrouter: OpenRouterQuotaChecker,

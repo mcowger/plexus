@@ -431,6 +431,7 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'claude-code',
   'zai',
   'moonshot',
+  'novita',
   'minimax',
   'minimax-coding',
   'kimi-code',

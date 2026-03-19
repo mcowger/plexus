@@ -28,4 +28,5 @@ export const quotaCheckerTypeEnum = pgEnum('quota_checker_type', [
   'poe',
   'gemini-cli',
   'antigravity',
+  'novita',
 ]);

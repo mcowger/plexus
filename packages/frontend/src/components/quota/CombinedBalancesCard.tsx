@@ -18,6 +18,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   openrouter: 'OpenRouter',
   minimax: 'MiniMax',
   moonshot: 'Moonshot',
+  novita: 'Novita',
   naga: 'Naga',
   kilo: 'Kilo',
   poe: 'POE',
