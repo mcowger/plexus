@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.19.1 - 2026-03-19
+
+### v0.19.1: Cost-based quotas, Ollama native routing, and CORS proxy support
+
+## New Features
+
+- **Cost-based quota type** ([#129](https://github.com/mcowger/plexus/commit/bb864c9)): Added support for `cost` as a quota type, enabling fine-grained billing and usage control based on actual model costs.
+- **Native Ollama chat routing** ([8b1024a](https://github.com/mcowger/plexus/commit/8b1024a)): Added native Ollama chat routing with improved UI guidance for better model selection and integration.
+- **Verbose JSON transcriptions** ([a3faada](https://github.com/mcowger/plexus/commit/a3faada)): Added `verbose_json` support to the transcriptions endpoint for more detailed response formatting.
+- **Server-side model fetch proxy** ([89cc064](https://github.com/mcowger/plexus/commit/89cc064)): Implemented server-side proxy for model fetching to resolve CORS issues, improving cross-origin compatibility.
+
+## Improvements
+
+- **Enhanced Claude masking** ([55159f6](https://github.com/mcowger/plexus/commit/55159f6)): Made Claude masking logic more generic and reusable across different contexts.
+
+## Docker
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
 ## v0.19.0 - 2026-03-17
 
 ### Update Apertis Quota & Balance Checking
