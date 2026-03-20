@@ -1,7 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { formatCost } from '../../lib/format';
 import type { QuotaCheckResult } from '../../types/quota';
 
 interface WisdomGateQuotaDisplayProps {
@@ -27,14 +26,16 @@ export const WisdomGateQuotaDisplay: React.FC<WisdomGateQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const window = windows.find((w) => w.windowType === 'subscription');
-  const remaining = window?.remaining;
-  const hasCredits = remaining !== undefined && remaining > 0;
+  const window = windows.find((w) => w.windowType === 'monthly');
+  const remaining = window?.remaining ?? 0;
+  const limit = window?.limit ?? 0;
+  const used = window?.used ?? 0;
+  const hasQuota = remaining > 0;
 
   if (isCollapsed) {
     return (
       <div className="px-2 py-2 flex justify-center">
-        {hasCredits ? (
+        {hasQuota ? (
           <CheckCircle2 size={18} className="text-success" />
         ) : (
           <AlertTriangle size={18} className="text-danger" />
@@ -52,16 +53,24 @@ export const WisdomGateQuotaDisplay: React.FC<WisdomGateQuotaDisplayProps> = ({
       <div className="flex items-baseline gap-2">
         <span className="text-xs font-semibold text-text-secondary">Monthly Credits</span>
       </div>
-      {remaining !== undefined && (
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs text-text-secondary">
-            Remaining:{' '}
-            <span className={clsx('font-semibold', hasCredits ? 'text-success' : 'text-danger')}>
-              {formatCost(remaining)}
-            </span>
+      <div className="flex items-baseline gap-2">
+        <span className="text-xs text-text-secondary">
+          Used: <span className="font-semibold">${used.toFixed(2)}</span>
+        </span>
+        <span className="text-text-muted">/</span>
+        <span className="text-xs font-semibold">${limit.toFixed(2)}</span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-xs text-text-secondary">
+          Remaining:{' '}
+          <span className={clsx('font-semibold', hasQuota ? 'text-success' : 'text-danger')}>
+            ${remaining.toFixed(2)}
           </span>
-        </div>
-      )}
+        </span>
+        <span className="text-xs text-text-muted">
+          ({limit > 0 ? Math.round((remaining / limit) * 100) : 0}%)
+        </span>
+      </div>
     </div>
   );
 };

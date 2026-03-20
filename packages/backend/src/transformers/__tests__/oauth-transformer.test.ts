@@ -34,12 +34,12 @@ describe('OAuthTransformer', () => {
     await transformer.executeRequest(
       context,
       'anthropic' as any,
-      'test-account',
       'claude-test',
       false,
       {
         clientHeaders: { 'x-app': 'cli' },
-      }
+      },
+      { authMode: 'oauth', accountId: 'test-account' }
     );
 
     expect(context.tools[0]?.name).toBe('MyTool');
@@ -58,13 +58,36 @@ describe('OAuthTransformer', () => {
     await transformer.executeRequest(
       context,
       'anthropic' as any,
-      'test-account',
       'claude-test',
       false,
-      {}
+      {},
+      { authMode: 'oauth', accountId: 'test-account' }
     );
 
     expect(context.tools[0]?.name).toBe('proxy_MyTool');
+  });
+
+  test('uses direct API key for claude masking without OAuth auth manager', async () => {
+    const authManager = OAuthAuthManager.getInstance();
+    const getApiKeySpy = spyOn(authManager, 'getApiKey');
+
+    const transformer = new OAuthTransformer();
+    const context = {
+      tools: [{ name: 'MyTool' }],
+      messages: [],
+    };
+
+    await transformer.executeRequest(
+      context,
+      'anthropic' as any,
+      'claude-test',
+      false,
+      {},
+      { authMode: 'apiKey', apiKey: 'sk-ant-api03-direct-test' }
+    );
+
+    expect(context.tools[0]?.name).toBe('proxy_MyTool');
+    expect(getApiKeySpy).not.toHaveBeenCalled();
   });
 
   test('throws enriched errors for pi-ai error envelope responses', async () => {

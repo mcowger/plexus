@@ -52,6 +52,18 @@ describe('TranscriptionsTransformer', () => {
       expect(result.temperature).toBeUndefined();
       // response_format defaults to undefined if not specified
     });
+
+    it('should parse verbose_json response format', async () => {
+      const file = Buffer.from('test audio data');
+      const fields = {
+        model: 'whisper-1',
+        response_format: 'verbose_json',
+      };
+
+      const result = await transformer.parseRequest(file, 'test.mp3', 'audio/mpeg', fields);
+
+      expect(result.response_format).toBe('verbose_json');
+    });
   });
 
   describe('transformRequest', () => {
@@ -143,6 +155,81 @@ describe('TranscriptionsTransformer', () => {
 
       expect(result.text).toBe('This is the transcription');
     });
+
+    it('should transform verbose_json response with all fields', async () => {
+      const providerResponse = {
+        text: 'This is the transcription',
+        language: 'en',
+        duration: 10.5,
+        segments: [
+          {
+            id: 0,
+            start: 0.0,
+            end: 5.0,
+            text: 'This is the first segment',
+            tokens: [1, 2, 3],
+            temperature: 0.5,
+            avg_logprob: -0.2,
+            compression_ratio: 1.5,
+            no_speech_prob: 0.01,
+          },
+          {
+            id: 1,
+            start: 5.0,
+            end: 10.5,
+            text: 'This is the second segment',
+            tokens: [4, 5, 6],
+            temperature: 0.5,
+            avg_logprob: -0.3,
+            compression_ratio: 1.6,
+            no_speech_prob: 0.02,
+          },
+        ],
+        usage: {
+          input_tokens: 100,
+          output_tokens: 20,
+          total_tokens: 120,
+        },
+      };
+
+      const result = await transformer.transformResponse(providerResponse, 'verbose_json');
+
+      expect(result.text).toBe('This is the transcription');
+      expect(result.language).toBe('en');
+      expect(result.duration).toBe(10.5);
+      expect(result.segments).toHaveLength(2);
+      expect(result.segments?.[0]?.text).toBe('This is the first segment');
+      expect(result.segments?.[1]?.text).toBe('This is the second segment');
+      expect(result.usage).toEqual({
+        input_tokens: 100,
+        output_tokens: 20,
+        total_tokens: 120,
+      });
+    });
+
+    it('should transform verbose_json response without usage', async () => {
+      const providerResponse = {
+        text: 'This is the transcription',
+        language: 'en',
+        duration: 10.5,
+        segments: [
+          {
+            id: 0,
+            start: 0.0,
+            end: 10.5,
+            text: 'Complete transcription',
+          },
+        ],
+      };
+
+      const result = await transformer.transformResponse(providerResponse, 'verbose_json');
+
+      expect(result.text).toBe('This is the transcription');
+      expect(result.language).toBe('en');
+      expect(result.duration).toBe(10.5);
+      expect(result.segments).toHaveLength(1);
+      expect(result.usage).toBeUndefined();
+    });
   });
 
   describe('formatResponse', () => {
@@ -187,6 +274,83 @@ describe('TranscriptionsTransformer', () => {
 
       expect(result).toBe('This is the transcription');
       expect(typeof result).toBe('string');
+    });
+
+    it('should format verbose_json response with all fields', async () => {
+      const unifiedResponse = {
+        text: 'This is the transcription',
+        language: 'en',
+        duration: 10.5,
+        segments: [
+          {
+            id: 0,
+            start: 0.0,
+            end: 5.0,
+            text: 'First segment',
+          },
+          {
+            id: 1,
+            start: 5.0,
+            end: 10.5,
+            text: 'Second segment',
+          },
+        ],
+        usage: {
+          input_tokens: 100,
+          output_tokens: 20,
+          total_tokens: 120,
+        },
+      };
+
+      const result = await transformer.formatResponse(unifiedResponse, 'verbose_json');
+
+      expect(result.text).toBe('This is the transcription');
+      expect(result.language).toBe('en');
+      expect(result.duration).toBe(10.5);
+      expect(result.segments).toHaveLength(2);
+      expect(result.segments?.[0]?.text).toBe('First segment');
+      expect(result.usage).toEqual({
+        input_tokens: 100,
+        output_tokens: 20,
+        total_tokens: 120,
+      });
+    });
+
+    it('should format verbose_json response without optional fields', async () => {
+      const unifiedResponse = {
+        text: 'This is the transcription',
+        language: 'en',
+        duration: 10.5,
+      };
+
+      const result = await transformer.formatResponse(unifiedResponse, 'verbose_json');
+
+      expect(result.text).toBe('This is the transcription');
+      expect(result.language).toBe('en');
+      expect(result.duration).toBe(10.5);
+      expect(result.segments).toBeUndefined();
+      expect(result.usage).toBeUndefined();
+    });
+
+    it('should format verbose_json response with only segments', async () => {
+      const unifiedResponse = {
+        text: 'This is the transcription',
+        segments: [
+          {
+            id: 0,
+            start: 0.0,
+            end: 10.5,
+            text: 'Complete transcription',
+          },
+        ],
+      };
+
+      const result = await transformer.formatResponse(unifiedResponse, 'verbose_json');
+
+      expect(result.text).toBe('This is the transcription');
+      expect(result.language).toBeUndefined();
+      expect(result.duration).toBeUndefined();
+      expect(result.segments).toHaveLength(1);
     });
   });
 

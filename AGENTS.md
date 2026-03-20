@@ -927,3 +927,24 @@ The sidebar will automatically display:
 - **CompactQuotasCard**: Shows all rate-limit checkers with format "Provider: 12% / 4%"
 
 Both cards are collapsible sections that navigate to the full Quotas page when clicked.
+
+### 9.8 Quota Checker Type Registrations (Backend, DB, Frontend)
+
+When adding a new quota checker type you must register it consistently across:
+
+- **Backend config/types**
+  - Add the new type string to `VALID_QUOTA_CHECKER_TYPES` and the `QuotaCheckerType` union in `packages/backend/src/config.ts`.
+  - Ensure `/v0/management/quota-checker-types` returns the new value by including it in `VALID_QUOTA_CHECKER_TYPES` in `packages/backend/src/routes/management/config.ts`.
+
+- **Database schema (Postgres)**
+  - Update the `quotaCheckerTypeEnum` definition in `packages/backend/drizzle/schema/postgres/enums.ts` to include the new type.
+  - From `packages/backend`, generate migrations for **both** databases:
+    - `bunx drizzle-kit generate`
+    - `bunx drizzle-kit generate --config drizzle.config.pg.ts`
+  - Do not edit SQL migrations by hand; always rely on `drizzle-kit generate`.
+
+- **Frontend fallback type lists**
+  - Add the new type to `QUOTA_CHECKER_TYPES_FALLBACK` in `packages/frontend/src/pages/Providers.tsx`.
+  - Add the new type to `FALLBACK_QUOTA_CHECKER_TYPES` in `packages/frontend/src/lib/api.ts` so the UI works even if the backend type list cannot be fetched.
+
+If any of these registrations are missed (especially the Postgres enum or frontend fallbacks), the UI may hide the new checker type or saving providers may fail with enum validation errors.

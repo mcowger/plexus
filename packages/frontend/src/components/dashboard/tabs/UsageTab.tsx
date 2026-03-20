@@ -50,7 +50,7 @@ import {
   Cell,
 } from 'recharts';
 
-/** Supported time windows for all usage and concurrency queries. */
+/** Supported time windows for usage and concurrency queries. */
 type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
 
 /**
@@ -89,7 +89,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   timeRange,
   onTimeRangeChange,
   customDateRange,
-  onCustomDateRangeChange,
+  onCustomDateRangeChange: _onCustomDateRangeChange,
 }) => {
   // ---------------------------------------------------------------------------
   // State -- pre-existing usage data
@@ -393,7 +393,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       </div>
 
       <div className="mb-4">
-        <TimeRangeSelector value={timeRange} onChange={onTimeRangeChange} />
+        <TimeRangeSelector value={timeRange} onChange={(r) => onTimeRangeChange(r as TimeRange)} />
       </div>
 
       {/* All Charts in 4-Column Grid */}

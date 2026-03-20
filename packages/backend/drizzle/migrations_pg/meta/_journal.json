@@ -134,6 +134,34 @@
       "when": 1772857531689,
       "tag": "0018_tough_sir_ram",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1773022137285,
+      "tag": "0019_misty_cannonball",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1773626675547,
+      "tag": "0020_concerned_maximus",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1773877564637,
+      "tag": "0021_tan_tana_nile",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1773939032023,
+      "tag": "0022_clever_moon_knight",
+      "breakpoints": true
     }
   ]
 }

@@ -14,81 +14,6 @@ export interface CooldownParser {
 }
 
 /**
- * Parser for Google Antigravity API cooldown messages.
- * Handles patterns like:
- * - "Your quota will reset after 20s"
- * - "reset after 45s"
- * - "reset after 2 minutes"
- */
-export class AntigravityCooldownParser implements CooldownParser {
-  parseCooldownDuration(errorText: string): number | null {
-    try {
-      // Pattern 1: "reset after Xs" or "reset after X seconds"
-      const secondsMatch = errorText.match(/reset after (\d+)\s*(?:s|seconds?)/i);
-      if (secondsMatch?.[1]) {
-        const seconds = parseInt(secondsMatch[1], 10);
-        return seconds * 1000;
-      }
-
-      // Pattern 2: "reset after X minutes" or "reset after X mins"
-      const minutesMatch = errorText.match(/reset after (\d+)\s*(?:m|mins?|minutes?)/i);
-      if (minutesMatch?.[1]) {
-        const minutes = parseInt(minutesMatch[1], 10);
-        return minutes * 60 * 1000;
-      }
-
-      // Pattern 3: "reset after X hours" or "reset after X hrs"
-      const hoursMatch = errorText.match(/reset after (\d+)\s*(?:h|hrs?|hours?)/i);
-      if (hoursMatch?.[1]) {
-        const hours = parseInt(hoursMatch[1], 10);
-        return hours * 60 * 60 * 1000;
-      }
-
-      logger.debug(
-        `Unable to parse Antigravity cooldown duration from: ${errorText.substring(0, 100)}`
-      );
-      return null;
-    } catch (e) {
-      logger.error('Error parsing Antigravity cooldown duration', e);
-      return null;
-    }
-  }
-}
-
-/**
- * Parser for OpenAI Codex usage limit messages emitted by pi-ai.
- * Handles patterns like:
- * - "Try again in ~9725 min"
- * - "Try again in 45 minutes"
- * - "Try again in 2h"
- */
-export class OpenAICodexCooldownParser implements CooldownParser {
-  parseCooldownDuration(errorText: string): number | null {
-    try {
-      const minutesMatch = errorText.match(/try again in\s*~?(\d+)\s*(?:m|min|mins?|minutes?)/i);
-      if (minutesMatch?.[1]) {
-        const minutes = parseInt(minutesMatch[1], 10);
-        return minutes * 60 * 1000;
-      }
-
-      const hoursMatch = errorText.match(/try again in\s*~?(\d+)\s*(?:h|hr|hrs?|hours?)/i);
-      if (hoursMatch?.[1]) {
-        const hours = parseInt(hoursMatch[1], 10);
-        return hours * 60 * 60 * 1000;
-      }
-
-      logger.debug(
-        `Unable to parse OpenAI Codex cooldown duration from: ${errorText.substring(0, 100)}`
-      );
-      return null;
-    } catch (e) {
-      logger.error('Error parsing OpenAI Codex cooldown duration', e);
-      return null;
-    }
-  }
-}
-
-/**
  * Registry for provider-specific cooldown parsers.
  * Maps provider type to parser implementation.
  */
@@ -96,10 +21,16 @@ export class CooldownParserRegistry {
   private static parsers = new Map<string, CooldownParser>();
 
   static {
-    // Register built-in parsers
-    CooldownParserRegistry.register('gemini', new AntigravityCooldownParser());
-    CooldownParserRegistry.register('antigravity', new AntigravityCooldownParser());
-    CooldownParserRegistry.register('openai-codex', new OpenAICodexCooldownParser());
+    // Built-in parser for openai-codex / pi.ai usage limit messages.
+    // Matches patterns like "Try again in ~9725 min." or "Try again in ~45 min".
+    CooldownParserRegistry.register('openai-codex', {
+      parseCooldownDuration(errorText: string): number | null {
+        const match = /try again in ~(\d+)\s*min/i.exec(errorText);
+        if (!match || !match[1]) return null;
+        const minutes = parseInt(match[1], 10);
+        return Number.isFinite(minutes) && minutes > 0 ? minutes * 60 * 1000 : null;
+      },
+    });
   }
 
   /**

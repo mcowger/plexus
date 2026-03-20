@@ -1,5 +1,126 @@
 # Changelog
 
+## v0.19.4 - 2026-03-19
+
+### Provider Quota Tracking and novita.ai Integration
+
+## New Features
+
+- **Provider Quota Column**: Added a quota column to the provider list view, enabling users to see quota information at a glance ([d28eb27](https://github.com/mcowger/plexus/commit/d28eb27))
+- **novita.ai Quota Checker**: Implemented quota checking support for novita.ai provider, allowing monitoring of quota usage ([2f136ae](https://github.com/mcowger/plexus/commit/2f136ae))
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.19.3 - 2026-03-19
+
+### Path parameter encoding fixes for provider and model alias endpoints
+
+## Bug Fixes
+
+- Fixed support for forward slashes in provider IDs across GET, PUT, PATCH, and DELETE routes ([a799e6e](https://github.com/mcowger/plexus/commit/a799e6e))
+- Fixed support for forward slashes in model alias IDs across PUT, PATCH, and DELETE routes ([e831198](https://github.com/mcowger/plexus/commit/e831198))
+
+These fixes improve URL path parameter handling to properly support special characters in resource identifiers, allowing providers and model aliases with forward slashes in their IDs to be accessed and modified correctly via API endpoints.
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.19.2 - 2026-03-19
+
+### Streaming Chunk Preservation and OAuth Transformer Enhancements
+
+## Bug Fixes
+
+- **Stream Chunk Preservation**: Fixed handling of the first stream chunk in `probeStreamingStart` timeout path to prevent data loss during streaming operations ([d3072a2](https://github.com/mcowger/plexus/commit/d3072a2))
+- **Anthropic Tool Call Index Remapping**: Corrected tool call index remapping for Anthropic API integrations ([d3072a2](https://github.com/mcowger/plexus/commit/d3072a2))
+
+## Infrastructure & Enhancements
+
+- **Dispatcher and OAuthTransformer Improvements**: Enhanced Dispatcher and OAuthTransformer components for improved API key handling and OAuth token management ([17bea3c](https://github.com/mcowger/plexus/commit/17bea3c))
+- **Claude Masking Configuration**: Reverted Claude masking logic implementation while preserving the configuration field for future use ([7cda203](https://github.com/mcowger/plexus/commit/7cda203))
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.19.1 - 2026-03-19
+
+### v0.19.1: Cost-based quotas, Ollama native routing, and CORS proxy support
+
+## New Features
+
+- **Cost-based quota type** ([#129](https://github.com/mcowger/plexus/commit/bb864c9)): Added support for `cost` as a quota type, enabling fine-grained billing and usage control based on actual model costs.
+- **Native Ollama chat routing** ([8b1024a](https://github.com/mcowger/plexus/commit/8b1024a)): Added native Ollama chat routing with improved UI guidance for better model selection and integration.
+- **Verbose JSON transcriptions** ([a3faada](https://github.com/mcowger/plexus/commit/a3faada)): Added `verbose_json` support to the transcriptions endpoint for more detailed response formatting.
+- **Server-side model fetch proxy** ([89cc064](https://github.com/mcowger/plexus/commit/89cc064)): Implemented server-side proxy for model fetching to resolve CORS issues, improving cross-origin compatibility.
+
+## Improvements
+
+- **Enhanced Claude masking** ([55159f6](https://github.com/mcowger/plexus/commit/55159f6)): Made Claude masking logic more generic and reusable across different contexts.
+
+## Docker
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
+
+## v0.19.0 - 2026-03-17
+
+### Update Apertis Quota & Balance Checking
+
+**Provider Updates:** Updated the Apertis quota checker to support new endpoints and data shapes ([a160a62](https://github.com/mcowger/plexus/commit/a160a62), [1f5b446](https://github.com/mcowger/plexus/commit/1f5b446)).
+
+## v0.9.9 - 2026-03-16
+
+### Plexus v0.9.9: Migration to Database-Backed Configuration and Management API Refactor
+
+## New Features
+- **Database-Driven Configuration**: This release marks a significant architectural shift, moving configuration from legacy YAML files to a robust database-backed storage system ([afba313](https://github.com/mcowger/plexus/commit/afba313)). This includes a new `ConfigService` with in-memory caching for performance ([7928e79](https://github.com/mcowger/plexus/commit/7928e79)).
+- **Expanded Quota Checkers**: Added support for the Apertis Coding Plan quota checker ([03f425a](https://github.com/mcowger/plexus/commit/03f425a)) and updated the WisdomGate provider to utilize the latest billing API and session handling ([c7167d7](https://github.com/mcowger/plexus/commit/c7167d7)).
+- **Application Lifecycle Control**: Introduced a management route to facilitate graceful application restarts directly via the API ([8bd83b4](https://github.com/mcowger/plexus/commit/8bd83b4)).
+- **Security Hardening**: Migrated the `adminKey` to an environment variable (`ADMIN_KEY`) and implemented bootstrap tracking for database initialization ([e6a5afe](https://github.com/mcowger/plexus/commit/e6a5afe), [c633e36](https://github.com/mcowger/plexus/commit/c633e36)).
+
+## Infrastructure & Refactoring
+- **Removal of Legacy File Watchers**: Successfully removed the file-based configuration loading logic and associated file watchers ([dd529e5](https://github.com/mcowger/plexus/commit/dd529e5)).
+- **OAuth Management**: Refactored the `OAuthAuthManager` to persist credentials within the database, ensuring consistency across deployments ([086b809](https://github.com/mcowger/plexus/commit/086b809)).
+- **RESTful API Updates**: Rewrote management routes to standardize on `PUT` and `PATCH` methods with improved request validation ([60b9b34](https://github.com/mcowger/plexus/commit/60b9b34)).
+
+## Bug Fixes
+- **Provider Deletion**: Resolved an issue where deleting providers failed to clean up associated records; implemented cascade cleanup ([a646bd3](https://github.com/mcowger/plexus/commit/a646bd3)).
+- **Test Environment Stability**: Fixed multiple pre-existing test failures and CI-specific 500 errors by improving mock storage and pre-initializing the `DebugManager` ([e3175fc](https://github.com/mcowger/plexus/commit/e3175fc), [089ee73](https://github.com/mcowger/plexus/commit/089ee73)).
+- **Deployment Fixes**: Fixed a bug preventing Docker deployments from being restarted through the settings UI ([e83695f](https://github.com/mcowger/plexus/commit/e83695f)).
+
+---
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
+## v0.18.13 - 2026-03-12
+
+### v0.18.13: Enhanced Provider Quota Management and Cooldown Logic
+
+### New Features & Improvements
+
+- **Optimized Cooldown and Quota Management**: Enhanced the system's ability to process provider-supplied quota reset metadata. When resource usage exceeds 99%, the system now implements a targeted cooldown until the verified end of the period, replacing the generic exponential backoff strategy ([43674d7](https://github.com/mcowger/plexus/commit/43674d7)).
+- **NanoGPT Quota Checker**: Refined the parser and logic for the NanoGPT quota checker to improve usage tracking accuracy ([7b4281c](https://github.com/mcowger/plexus/commit/7b4281c)).
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
+## v0.18.12 - 2026-03-12
+
+### v0.18.12: Enhanced POE Quota Visualization and State Management
+
+### New Features
+
+- **POE Support in Quotas**: Introduced a new POE (Power over Ethernet) checker category and corresponding iconography to the quota management system, improving visibility for power-related metrics. ([3a258dd](https://github.com/mcowger/plexus/commit/3a258dd))
+
+### Bug Fixes
+
+- **Dynamic Configuration Loading**: Fixed an issue in the quotas route where POE data would fail to display correctly after a configuration reload. The system now retrieves the active configuration at request time to ensure UI consistency. ([395ede4](https://github.com/mcowger/plexus/commit/395ede4))
+
+---
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.18.11 - 2026-03-12
 
 ### Update Gemini Streaming Protocol Compatability

@@ -20,6 +20,7 @@ interface MiniMaxCodingResponse {
 }
 
 export class MiniMaxCodingQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

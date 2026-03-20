@@ -48,9 +48,9 @@ Failed auth returns HTTP `401`:
 
 ### Admin Key Authentication (Management API)
 
-All `/v0/management/*` and `/v0/quotas/*` endpoints require an `x-admin-key` header matching the `adminKey` field in `plexus.yaml`:
+All `/v0/management/*` and `/v0/quotas/*` endpoints require an `x-admin-key` header matching the `ADMIN_KEY` environment variable:
 
-```
+```text
 x-admin-key: your-admin-key-here
 ```
 
@@ -304,7 +304,7 @@ All management endpoints require the `x-admin-key` header (see [Admin Key Authen
 
 #### Verify Admin Key
 - **Endpoint:** `GET /v0/management/auth/verify`
-- **Description:** Validates the provided `x-admin-key` against the configured `adminKey`. Used by the dashboard login page to confirm a key before storing it.
+- **Description:** Validates the provided `x-admin-key` against `ADMIN_KEY`. Used by the dashboard login page to confirm a key before storing it.
 - **Responses:**
   - `200 OK`: `{ "ok": true }` — key is valid.
   - `401 Unauthorized`: Key is missing or incorrect.

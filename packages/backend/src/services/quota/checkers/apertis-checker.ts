@@ -2,26 +2,24 @@ import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../..
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 
-interface ApertisUserResponse {
-  data: {
-    id: number;
-    username: string;
-    display_name: string;
-    quota: number;
-    used_quota: number;
-    request_count: number;
-    [key: string]: unknown;
+interface ApertisBillingCreditsResponse {
+  object: 'billing_credits';
+  is_subscriber: boolean;
+  payg: {
+    account_credits: number;
+    token_used: number;
+    token_total: string | number;
+    token_remaining: string | number;
+    token_is_unlimited: boolean;
   };
-  message: string;
-  success: boolean;
 }
 
-const APERTIS_DEFAULT_ENDPOINT = 'https://api.stima.tech/api/user/self';
-const QUOTA_DIVISOR = 1000000;
+const APERTIS_DEFAULT_ENDPOINT = 'https://api.apertis.ai/v1/dashboard/billing/credits';
 
 export class ApertisQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   async checkQuota(): Promise<QuotaCheckResult> {
-    const session = this.requireOption<string>('session').trim();
+    const apiKey = this.requireOption<string>('apiKey');
     const endpoint = this.getOption<string>('endpoint', APERTIS_DEFAULT_ENDPOINT);
 
     try {
@@ -30,7 +28,7 @@ export class ApertisQuotaChecker extends QuotaChecker {
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          Cookie: `session=${session}`,
+          Authorization: `Bearer ${apiKey}`,
           Accept: 'application/json',
         },
       });
@@ -39,27 +37,33 @@ export class ApertisQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
       }
 
-      const data: ApertisUserResponse = await response.json();
+      const data: ApertisBillingCreditsResponse = await response.json();
 
-      if (!data.success) {
-        return this.errorResult(new Error(`Apertis API error: ${data.message || 'unknown error'}`));
+      logger.debug(`[apertis] Response: ${JSON.stringify(data)}`);
+
+      if (data.object !== 'billing_credits') {
+        return this.errorResult(new Error('Invalid response: expected billing_credits object'));
       }
 
-      const quotaRaw = data.data?.quota;
-      if (typeof quotaRaw !== 'number' || !Number.isFinite(quotaRaw)) {
-        return this.errorResult(new Error(`Invalid quota value received: ${quotaRaw}`));
-      }
+      const payg = data.payg;
 
-      const balanceDollars = quotaRaw / QUOTA_DIVISOR;
+      logger.debug(`[apertis] PAYG: account_credits=${payg.account_credits}`);
+
+      // Use account_credits as the PAYG balance
+      if (!Number.isFinite(payg.account_credits)) {
+        return this.errorResult(
+          new Error('Invalid PAYG balance: account_credits is not a valid number')
+        );
+      }
 
       const window: QuotaWindow = this.createWindow(
         'subscription',
         undefined,
         undefined,
-        balanceDollars,
+        payg.account_credits,
         'dollars',
         undefined,
-        'Apertis account balance'
+        'Apertis PAYG balance'
       );
 
       return this.successResult([window]);

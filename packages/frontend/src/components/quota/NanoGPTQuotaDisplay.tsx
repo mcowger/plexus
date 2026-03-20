@@ -27,7 +27,7 @@ export const NanoGPTQuotaDisplay: React.FC<NanoGPTQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const dailyWindow = windows.find((window) => window.windowType === 'daily');
+  const weeklyWindow = windows.find((window) => window.windowType === 'weekly');
   const monthlyWindow = windows.find((window) => window.windowType === 'monthly');
 
   const statusRank: Record<string, number> = {
@@ -73,13 +73,13 @@ export const NanoGPTQuotaDisplay: React.FC<NanoGPTQuotaDisplayProps> = ({
         <span className="text-xs font-semibold text-text whitespace-nowrap">NanoGPT</span>
       </div>
 
-      {dailyWindow && (
+      {weeklyWindow && (
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-semibold text-text-secondary">Daily</span>
-            {dailyWindow.resetInSeconds !== undefined && dailyWindow.resetInSeconds !== null && (
+            <span className="text-xs font-semibold text-text-secondary">Weekly</span>
+            {weeklyWindow.resetInSeconds !== undefined && weeklyWindow.resetInSeconds !== null && (
               <span className="text-[10px] text-text-muted">
-                {formatDuration(dailyWindow.resetInSeconds)}
+                {formatDuration(weeklyWindow.resetInSeconds)}
               </span>
             )}
           </div>
@@ -88,13 +88,13 @@ export const NanoGPTQuotaDisplay: React.FC<NanoGPTQuotaDisplayProps> = ({
               <div
                 className={clsx(
                   'h-full rounded-md transition-all duration-500 ease-out',
-                  barColorForStatus(dailyWindow.status)
+                  barColorForStatus(weeklyWindow.status)
                 )}
-                style={{ width: `${Math.min(100, Math.max(0, dailyWindow.utilizationPercent))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, weeklyWindow.utilizationPercent))}%` }}
               />
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-cyan-400">
-              {Math.round(dailyWindow.utilizationPercent)}%
+              {Math.round(weeklyWindow.utilizationPercent)}%
             </div>
           </div>
         </div>

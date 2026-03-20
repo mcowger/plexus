@@ -29,7 +29,6 @@ describe('PerformanceSelector', () => {
       providers: {},
       models: {},
       keys: {},
-      adminKey: 'test',
       failover: {
         enabled: false,
         retryableStatusCodes: [429, 500, 502, 503, 504],
@@ -91,7 +90,6 @@ describe('PerformanceSelector', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: {
           enabled: false,
           retryableStatusCodes: [429, 500, 502, 503, 504],
@@ -125,7 +123,6 @@ describe('PerformanceSelector', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: {
           enabled: false,
           retryableStatusCodes: [429, 500, 502, 503, 504],
@@ -162,7 +159,6 @@ describe('PerformanceSelector', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: {
           enabled: false,
           retryableStatusCodes: [429, 500, 502, 503, 504],

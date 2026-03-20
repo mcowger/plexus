@@ -24,30 +24,11 @@ import {
   PoeQuotaDisplay,
   GeminiCliQuotaDisplay,
   AntigravityQuotaDisplay,
+  ApertisCodingPlanQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
 } from '../components/quota';
-
-// Checker type categories
-const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'poe', 'apertis'];
-const RATE_LIMIT_CHECKERS = [
-  'openai-codex',
-  'codex',
-  'claude-code',
-  'claude',
-  'kimi-code',
-  'kimi',
-  'zai',
-  'synthetic',
-  'nanogpt',
-  'copilot',
-  'wisdomgate',
-  'minimax-coding',
-  'gemini-cli',
-  'gemini',
-  'antigravity',
-];
 
 // Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
@@ -59,18 +40,17 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   kilo: 'Kilo',
   poe: 'POE',
   'openai-codex': 'OpenAI Codex',
-  codex: 'Codex',
   'claude-code': 'Claude Code',
-  claude: 'Claude',
   zai: 'ZAI',
   synthetic: 'Synthetic',
   nanogpt: 'NanoGPT',
   'kimi-code': 'Kimi Code',
-  kimi: 'Kimi',
   copilot: 'GitHub Copilot',
   wisdomgate: 'Wisdom Gate',
   'gemini-cli': 'Gemini CLI',
   antigravity: 'Antigravity',
+  apertis: 'Apertis',
+  'apertis-coding-plan': 'Apertis Coding',
 };
 
 export const Quotas = () => {
@@ -82,10 +62,8 @@ export const Quotas = () => {
   const [selectedDisplayName, setSelectedDisplayName] = useState('');
   const [isBalanceModal, setIsBalanceModal] = useState(false);
 
-  // Check if a quota is a balance-based checker
   const isBalanceChecker = (quota: QuotaCheckerInfo): boolean => {
-    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-    return BALANCE_CHECKERS.some((bc) => checkerType.includes(bc));
+    return quota.checkerCategory === 'balance';
   };
 
   const fetchQuotas = async () => {
@@ -172,71 +150,28 @@ export const Quotas = () => {
     };
   };
 
-  // Group quotas by checker type
+  // Group quotas by their exact checkerType (e.g. 'apertis-coding-plan').
+  // Fall back to checkerId if checkerType is not set.
   const groupedQuotas = useMemo(() => {
     const groups: Record<string, QuotaCheckerInfo[]> = {};
-
     for (const quota of quotas) {
-      const checkerType = (quota.checkerType || '').toLowerCase();
-      const checkerId = quota.checkerId.toLowerCase();
-
-      // Determine the base checker type
-      let baseType = checkerType || checkerId;
-
-      // Normalize checker type names
-      if (baseType.includes('openai-codex') || baseType.includes('codex')) {
-        baseType = 'codex';
-      } else if (baseType.includes('claude-code') || baseType.includes('claude')) {
-        baseType = 'claude-code';
-      } else if (baseType.includes('openrouter')) {
-        baseType = 'openrouter';
-      } else if (baseType.includes('minimax-coding')) {
-        baseType = 'minimax-coding';
-      } else if (baseType.includes('minimax')) {
-        baseType = 'minimax';
-      } else if (baseType.includes('moonshot')) {
-        baseType = 'moonshot';
-      } else if (baseType.includes('naga')) {
-        baseType = 'naga';
-      } else if (baseType.includes('kilo')) {
-        baseType = 'kilo';
-      } else if (baseType.includes('poe')) {
-        baseType = 'poe';
-      } else if (baseType.includes('zai')) {
-        baseType = 'zai';
-      } else if (baseType.includes('synthetic')) {
-        baseType = 'synthetic';
-      } else if (baseType.includes('nanogpt')) {
-        baseType = 'nanogpt';
-      } else if (baseType.includes('kimi-code') || baseType.includes('kimi')) {
-        baseType = 'kimi-code';
-      } else if (baseType.includes('wisdomgate')) {
-        baseType = 'wisdomgate';
-      } else if (baseType.includes('gemini-cli') || baseType.includes('gemini')) {
-        baseType = 'gemini-cli';
-      } else if (baseType.includes('antigravity')) {
-        baseType = 'antigravity';
-      }
-
-      if (!groups[baseType]) {
-        groups[baseType] = [];
-      }
-      groups[baseType].push(quota);
+      const key = quota.checkerType || quota.checkerId;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(quota);
     }
-
     return groups;
   }, [quotas]);
 
-  // Separate into balance and rate limit categories
+  // Separate into balance and rate-limit categories using the authoritative checkerCategory field.
   const balanceGroups = useMemo(() => {
     return Object.entries(groupedQuotas)
-      .filter(([type]) => BALANCE_CHECKERS.some((bc) => type.includes(bc)))
+      .filter(([, quotasList]) => quotasList.some((q) => q.checkerCategory === 'balance'))
       .sort(([a], [b]) => a.localeCompare(b));
   }, [groupedQuotas]);
 
   const rateLimitGroups = useMemo(() => {
     return Object.entries(groupedQuotas)
-      .filter(([type]) => RATE_LIMIT_CHECKERS.some((rc) => type.includes(rc)))
+      .filter(([, quotasList]) => quotasList.some((q) => q.checkerCategory === 'rate-limit'))
       .sort(([a], [b]) => a.localeCompare(b));
   }, [groupedQuotas]);
 
@@ -257,7 +192,7 @@ export const Quotas = () => {
   // Render the appropriate quota display component based on checker type
   const renderQuotaDisplay = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
     const result = getQuotaResult(quota);
-    const checkerIdentifier = (quota.checkerType || quota.checkerId).toLowerCase();
+    const checkerType = quota.checkerType || quota.checkerId;
 
     // Add refresh button wrapper
     const wrapper = (children: React.ReactNode) => (
@@ -286,77 +221,33 @@ export const Quotas = () => {
       </div>
     );
 
-    // Use the appropriate display component based on checker type
-    if (checkerIdentifier.includes('synthetic')) {
-      return wrapper(<SyntheticQuotaDisplay result={result} isCollapsed={false} />);
-    }
+    // Exact-match on checkerType to select the display component.
+    const DISPLAY_MAP: Record<string, React.ReactNode> = {
+      synthetic: <SyntheticQuotaDisplay result={result} isCollapsed={false} />,
+      'claude-code': <ClaudeCodeQuotaDisplay result={result} isCollapsed={false} />,
+      naga: <NagaQuotaDisplay result={result} isCollapsed={false} />,
+      nanogpt: <NanoGPTQuotaDisplay result={result} isCollapsed={false} />,
+      'openai-codex': <OpenAICodexQuotaDisplay result={result} isCollapsed={false} />,
+      zai: <ZAIQuotaDisplay result={result} isCollapsed={false} />,
+      moonshot: <MoonshotQuotaDisplay result={result} isCollapsed={false} />,
+      'minimax-coding': <MiniMaxCodingQuotaDisplay result={result} isCollapsed={false} />,
+      minimax: <MiniMaxQuotaDisplay result={result} isCollapsed={false} />,
+      openrouter: <OpenRouterQuotaDisplay result={result} isCollapsed={false} />,
+      kilo: <KiloQuotaDisplay result={result} isCollapsed={false} />,
+      poe: <PoeQuotaDisplay result={result} isCollapsed={false} />,
+      copilot: <CopilotQuotaDisplay result={result} isCollapsed={false} />,
+      'kimi-code': <KimiCodeQuotaDisplay result={result} isCollapsed={false} />,
+      wisdomgate: <WisdomGateQuotaDisplay result={result} isCollapsed={false} />,
+      'gemini-cli': <GeminiCliQuotaDisplay result={result} isCollapsed={false} />,
+      'apertis-coding-plan': <ApertisCodingPlanQuotaDisplay result={result} isCollapsed={false} />,
+      antigravity: <AntigravityQuotaDisplay result={result} isCollapsed={false} />,
+    };
 
-    if (checkerIdentifier.includes('claude')) {
-      return wrapper(<ClaudeCodeQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('naga')) {
-      return wrapper(<NagaQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('nanogpt')) {
-      return wrapper(<NanoGPTQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('openai-codex') || checkerIdentifier.includes('codex')) {
-      return wrapper(<OpenAICodexQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('zai')) {
-      return wrapper(<ZAIQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('moonshot')) {
-      return wrapper(<MoonshotQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('minimax-coding')) {
-      return wrapper(<MiniMaxCodingQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('minimax')) {
-      return wrapper(<MiniMaxQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('openrouter')) {
-      return wrapper(<OpenRouterQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('kilo')) {
-      return wrapper(<KiloQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('poe')) {
-      return wrapper(<PoeQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('copilot')) {
-      return wrapper(<CopilotQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('kimi')) {
-      return wrapper(<KimiCodeQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('wisdomgate')) {
-      return wrapper(<WisdomGateQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('gemini-cli') || checkerIdentifier.includes('gemini')) {
-      return wrapper(<GeminiCliQuotaDisplay result={result} isCollapsed={false} />);
-    }
-
-    if (checkerIdentifier.includes('antigravity')) {
-      return wrapper(<AntigravityQuotaDisplay result={result} isCollapsed={false} />);
-    }
+    const display = DISPLAY_MAP[checkerType];
+    if (display) return wrapper(display);
 
     // Fallback: generic display
-    console.warn(`Unknown quota checker type: ${quota.checkerType || quota.checkerId}`);
+    console.warn(`Unknown quota checker type: ${checkerType}`);
     return wrapper(<SyntheticQuotaDisplay result={result} isCollapsed={false} />);
   };
 

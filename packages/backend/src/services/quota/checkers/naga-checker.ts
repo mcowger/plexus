@@ -6,6 +6,7 @@ interface NagaBalanceResponse {
 }
 
 export class NagaQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

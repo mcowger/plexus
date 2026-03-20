@@ -57,6 +57,7 @@ export interface QuotaCheckResult {
 export interface QuotaCheckerInfo {
   checkerId: string;
   checkerType?: string;
+  checkerCategory?: 'balance' | 'rate-limit';
   oauthAccountId?: string;
   oauthProvider?: string;
   latest: QuotaSnapshot[];

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   api,
   Provider,
@@ -6,12 +7,28 @@ import {
   initQuotaCheckerTypes,
   getQuotaCheckerTypes,
 } from '../lib/api';
+import type { QuotaCheckerInfo } from '../types/quota';
+import { formatPoints } from '../lib/format';
+import {
+  getCheckerCategory,
+  getTrackedWindowsForChecker,
+} from '../components/quota/CompactQuotasCard';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Download, Info } from 'lucide-react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Download,
+  Info,
+  AlertTriangle,
+} from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
 import { OpenRouterSlugInput } from '../components/ui/OpenRouterSlugInput';
@@ -20,6 +37,7 @@ import { SyntheticQuotaConfig } from '../components/quota/SyntheticQuotaConfig';
 import { NanoGPTQuotaConfig } from '../components/quota/NanoGPTQuotaConfig';
 import { ZAIQuotaConfig } from '../components/quota/ZAIQuotaConfig';
 import { MoonshotQuotaConfig } from '../components/quota/MoonshotQuotaConfig';
+import { NovitaQuotaConfig } from '../components/quota/NovitaQuotaConfig';
 import { MiniMaxQuotaConfig } from '../components/quota/MiniMaxQuotaConfig';
 import { MiniMaxCodingQuotaConfig } from '../components/quota/MiniMaxCodingQuotaConfig';
 import { OpenRouterQuotaConfig } from '../components/quota/OpenRouterQuotaConfig';
@@ -28,6 +46,7 @@ import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig
 import { GeminiCliQuotaConfig } from '../components/quota/GeminiCliQuotaConfig';
 import { AntigravityQuotaConfig } from '../components/quota/AntigravityQuotaConfig';
 import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
+import { ApertisCodingPlanQuotaConfig } from '../components/quota/ApertisCodingPlanQuotaConfig';
 import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
 
@@ -40,6 +59,7 @@ const KNOWN_APIS = [
   'speech',
   'images',
   'responses',
+  'ollama',
 ];
 
 const OAUTH_PROVIDERS = [
@@ -60,12 +80,14 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'kimi-code',
   'zai',
   'moonshot',
+  'novita',
   'minimax',
   'minimax-coding',
   'openrouter',
   'kilo',
   'wisdomgate',
   'apertis',
+  'apertis-coding-plan',
   'poe',
   'copilot',
   'gemini-cli',
@@ -100,6 +122,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
       return { backgroundColor: '#d946ef', color: 'white', border: 'none' };
     case 'responses':
       return { backgroundColor: '#06b6d4', color: 'white', border: 'none' };
+    case 'ollama':
+      return { backgroundColor: '#1a5f7a', color: 'white', border: 'none' };
     case 'oauth':
       return { backgroundColor: '#111827', color: 'white', border: 'none' };
     default:
@@ -146,6 +170,7 @@ const EMPTY_PROVIDER: Provider = {
   enabled: true,
   disableCooldown: false,
   estimateTokens: false,
+  useClaudeMasking: false,
   apiBaseUrl: {},
   headers: {},
   extraBody: {},
@@ -200,6 +225,7 @@ const ModelIdInput = ({ modelId, onCommit }: ModelIdInputProps) => {
 };
 
 export const Providers = () => {
+  const navigate = useNavigate();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
@@ -208,6 +234,8 @@ export const Providers = () => {
   const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([
     ...QUOTA_CHECKER_TYPES_FALLBACK,
   ]);
+  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [quotasLoading, setQuotasLoading] = useState(true);
 
   const [oauthSessionId, setOauthSessionId] = useState<string | null>(null);
   const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
@@ -224,6 +252,17 @@ export const Providers = () => {
       const types = Array.from(getQuotaCheckerTypes());
       setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
     });
+  }, []);
+
+  // Fetch quotas on mount
+  useEffect(() => {
+    api
+      .getQuotas()
+      .then(setQuotas)
+      .catch(() => {
+        // Silently fail - quotas are optional
+      })
+      .finally(() => setQuotasLoading(false));
   }, []);
 
   const isOAuthMode =
@@ -758,9 +797,17 @@ export const Providers = () => {
     setEditingProvider({ ...editingProvider, models });
   };
 
-  // Generate default models URL from chat URL
+  // Generate default models URL from API URLs
   const generateModelsUrl = (): string => {
     if (isOAuthMode) return '';
+
+    // For ollama API type, use the standard ollama library models endpoint
+    const ollamaUrl = getApiUrlValue('ollama');
+    if (ollamaUrl) {
+      return 'https://ollama.com/api/tags';
+    }
+
+    // For chat API type, derive from chat URL
     const chatUrl = getApiUrlValue('chat');
     if (!chatUrl) return '';
 
@@ -820,25 +867,8 @@ export const Providers = () => {
     setFetchError(null);
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      // Add Bearer token if available
-      if (editingProvider.apiKey) {
-        headers['Authorization'] = `Bearer ${editingProvider.apiKey}`;
-      }
-
-      const response = await fetch(modelsUrl, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      // Use server-side proxy to bypass CORS restrictions
+      const data = await api.fetchProviderModels(modelsUrl, editingProvider.apiKey);
 
       if (!data.data || !Array.isArray(data.data)) {
         throw new Error('Invalid response format: expected { data: [...] }');
@@ -892,6 +922,58 @@ export const Providers = () => {
     setIsFetchModelsModalOpen(false);
   };
 
+  const getQuotaDisplay = (provider: Provider) => {
+    if (!provider.quotaChecker?.enabled) return null;
+    if (quotasLoading) return <span className="text-text-secondary text-xs">—</span>;
+    const quota = quotas.find((q) => q.checkerId === provider.id);
+    if (!quota?.latest?.length) return null;
+
+    const handleQuotaClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigate('/quotas');
+    };
+
+    // Balance-type checkers: show remaining dollars or points
+    const subscriptionWindow = quota.latest.find(
+      (w) => w.windowType === 'subscription' && (w.unit === 'dollars' || w.unit === 'points')
+    );
+    if (subscriptionWindow?.remaining != null) {
+      const formatted =
+        subscriptionWindow.unit === 'points'
+          ? `${formatPoints(subscriptionWindow.remaining)} pts`
+          : `$${subscriptionWindow.remaining.toFixed(2)}`;
+      return (
+        <Badge
+          status="neutral"
+          className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2 bg-bg-subtle border border-border text-text-secondary"
+          onClick={handleQuotaClick}
+        >
+          {formatted}
+        </Badge>
+      );
+    }
+
+    // Rate-limit-type checkers: pick the primary window using the same logic as CompactQuotasCard
+    const category = getCheckerCategory(quota);
+    const windowTypes = quota.latest.map((s) => ({ windowType: s.windowType }));
+    const trackedTypes = getTrackedWindowsForChecker(category, windowTypes);
+    if (!trackedTypes.length) return null;
+    const primarySnapshot = quota.latest.find((s) => s.windowType === trackedTypes[0]);
+    if (!primarySnapshot || primarySnapshot.utilizationPercent == null) return null;
+
+    const pct = Math.round(primarySnapshot.utilizationPercent);
+    const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
+    return (
+      <Badge
+        status={status}
+        className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
+        onClick={handleQuotaClick}
+      >
+        {pct}%
+      </Badge>
+    );
+  };
+
   return (
     <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
       <Card
@@ -915,11 +997,12 @@ export const Providers = () => {
                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  APIs
-                </th>
+
                 <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                   Models
+                </th>
+                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  Quota/Balance
                 </th>
                 <th
                   className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
@@ -930,77 +1013,69 @@ export const Providers = () => {
               </tr>
             </thead>
             <tbody>
-              {providers.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => handleEdit(p)}
-                  style={{ cursor: 'pointer' }}
-                  className="hover:bg-bg-hover"
-                >
-                  <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
-                    style={{ paddingLeft: '24px' }}
+              {[...providers]
+                .sort((a, b) => a.id.localeCompare(b.id))
+                .map((p) => (
+                  <tr
+                    key={p.id}
+                    onClick={() => handleEdit(p)}
+                    style={{ cursor: 'pointer' }}
+                    className="hover:bg-bg-hover"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Edit2 size={12} style={{ opacity: 0.5 }} />
-                      <div style={{ fontWeight: 600 }}>{p.id}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        ( {p.name} )
+                    <td
+                      className="px-4 py-3 text-left border-b border-border-glass text-text"
+                      style={{ paddingLeft: '24px' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Edit2 size={12} style={{ opacity: 0.5 }} />
+                        <div style={{ fontWeight: 600 }}>{p.id}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          ( {p.name} )
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        checked={p.enabled !== false}
-                        onChange={(val) => handleToggleEnabled(p, val)}
-                        size="sm"
-                      />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {(Array.isArray(p.type) ? p.type : [p.type]).map((t) => (
-                        <Badge
-                          key={t}
-                          status="connected"
-                          style={{ ...getApiBadgeStyle(t), fontSize: '10px', padding: '2px 8px' }}
-                          className="[&_.connection-dot]:hidden"
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={p.enabled !== false}
+                          onChange={(val) => handleToggleEnabled(p, val)}
+                          size="sm"
+                        />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      {p.models
+                        ? Array.isArray(p.models)
+                          ? p.models.length
+                          : typeof p.models === 'object'
+                            ? Object.keys(p.models).length
+                            : 0
+                        : 0}
+                    </td>
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      {getQuotaDisplay(p)}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-left border-b border-border-glass text-text"
+                      style={{ paddingRight: '24px', textAlign: 'right' }}
+                    >
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteModal(p);
+                          }}
+                          style={{ color: 'var(--color-danger)' }}
                         >
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                    {p.models
-                      ? Array.isArray(p.models)
-                        ? p.models.length
-                        : typeof p.models === 'object'
-                          ? Object.keys(p.models).length
-                          : 0
-                      : 0}
-                  </td>
-                  <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
-                    style={{ paddingRight: '24px', textAlign: 'right' }}
-                  >
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteModal(p);
-                        }}
-                        style={{ color: 'var(--color-danger)' }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -1117,10 +1192,40 @@ export const Providers = () => {
                   fontSize: '11px',
                   color: 'var(--color-text-secondary)',
                   marginBottom: '4px',
-                  fontStyle: 'italic',
+                  lineHeight: '1.5',
                 }}
               >
-                API types are automatically inferred from the URLs you provide.
+                <span style={{ fontStyle: 'italic' }}>API types determine the protocol:</span>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                  <li>
+                    <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints,
+                    including Ollama&apos;s{' '}
+                    <code
+                      style={{
+                        background: 'var(--color-bg-subtle)',
+                        padding: '1px 4px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      /v1
+                    </code>{' '}
+                    API
+                  </li>
+                  <li>
+                    <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the
+                    root URL (e.g.{' '}
+                    <code
+                      style={{
+                        background: 'var(--color-bg-subtle)',
+                        padding: '1px 4px',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      http://localhost:11434
+                    </code>
+                    )
+                  </li>
+                </ul>
               </div>
               {isOAuthMode ? (
                 <div
@@ -1384,54 +1489,134 @@ export const Providers = () => {
                           No base URLs configured yet.
                         </div>
                       )}
-                      {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => (
-                        <div
-                          key={apiType}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr auto',
-                            gap: '8px',
-                            alignItems: 'start',
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <select
-                              className="w-full py-1.5 px-3 font-body text-xs border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                              style={{ ...getApiBadgeStyle(apiType), fontWeight: 600 }}
-                              value={apiType}
-                              onChange={(e) =>
-                                updateApiBaseUrlEntry(
-                                  apiType,
-                                  e.target.value,
-                                  typeof url === 'string' ? url : ''
-                                )
-                              }
-                            >
-                              {KNOWN_APIS.map((knownType) => (
-                                <option key={knownType} value={knownType}>
-                                  {knownType}
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                              placeholder="https://api.example.com/..."
-                              value={typeof url === 'string' ? url : ''}
-                              onChange={(e) =>
-                                updateApiBaseUrlEntry(apiType, apiType, e.target.value)
-                              }
-                            />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeApiBaseUrlEntry(apiType)}
-                            style={{ padding: '4px', marginTop: '4px' }}
+                      {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => {
+                        // Detect URL/API type mismatches based on endpoint-shape only
+                        const urlLower = typeof url === 'string' ? url.toLowerCase() : '';
+                        // Native Ollama API paths (not hostname-based, only path-based)
+                        const hasNativeOllamaPath =
+                          urlLower.includes('/api/chat') ||
+                          urlLower.includes('/api/generate') ||
+                          urlLower.includes('/api/embeddings') ||
+                          urlLower.includes('/api/tags');
+                        const hasV1Suffix = urlLower.includes('/v1');
+                        // Warn when native Ollama type is selected but URL has /v1 (OpenAI-compatible)
+                        const showOllamaV1Warning = apiType === 'ollama' && hasV1Suffix;
+                        // Warn when chat type is selected but URL looks like native Ollama (path-based, no /v1)
+                        const showChatOllamaWarning =
+                          apiType === 'chat' && hasNativeOllamaPath && !hasV1Suffix;
+
+                        return (
+                          <div
+                            key={apiType}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr auto',
+                              gap: '8px',
+                              alignItems: 'start',
+                            }}
                           >
-                            <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
-                          </Button>
-                        </div>
-                      ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <select
+                                className="w-full py-1.5 px-3 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                value={apiType}
+                                onChange={(e) =>
+                                  updateApiBaseUrlEntry(
+                                    apiType,
+                                    e.target.value,
+                                    typeof url === 'string' ? url : ''
+                                  )
+                                }
+                              >
+                                {KNOWN_APIS.map((knownType) => (
+                                  <option
+                                    key={knownType}
+                                    value={knownType}
+                                    className="bg-bg-surface text-text"
+                                  >
+                                    {knownType}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                placeholder={
+                                  apiType === 'ollama'
+                                    ? 'http://localhost:11434'
+                                    : 'https://api.example.com/v1/...'
+                                }
+                                value={typeof url === 'string' ? url : ''}
+                                onChange={(e) =>
+                                  updateApiBaseUrlEntry(apiType, apiType, e.target.value)
+                                }
+                              />
+                              {showOllamaV1Warning && (
+                                <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
+                                  <AlertTriangle
+                                    size={14}
+                                    className="text-warning flex-shrink-0 mt-0.5"
+                                  />
+                                  <span className="text-[11px] text-warning">
+                                    <span style={{ fontWeight: 600 }}>native ollama</span> type
+                                    expects root URL (e.g.{' '}
+                                    <code
+                                      style={{
+                                        background: 'var(--color-bg-subtle)',
+                                        padding: '0 3px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      http://localhost:11434
+                                    </code>
+                                    ). URLs with{' '}
+                                    <code
+                                      style={{
+                                        background: 'var(--color-bg-subtle)',
+                                        padding: '0 3px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      /v1
+                                    </code>{' '}
+                                    are OpenAI-compatible — use{' '}
+                                    <span style={{ fontWeight: 600 }}>chat</span> type instead.
+                                  </span>
+                                </div>
+                              )}
+                              {showChatOllamaWarning && (
+                                <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
+                                  <AlertTriangle
+                                    size={14}
+                                    className="text-warning flex-shrink-0 mt-0.5"
+                                  />
+                                  <span className="text-[11px] text-warning">
+                                    This URL contains{' '}
+                                    <code
+                                      style={{
+                                        background: 'var(--color-bg-subtle)',
+                                        padding: '0 3px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      /api/
+                                    </code>{' '}
+                                    paths typical of native Ollama. If this is a native Ollama
+                                    endpoint, use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
+                                    type instead.
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeApiBaseUrlEntry(apiType)}
+                              style={{ padding: '4px', marginTop: '4px' }}
+                            >
+                              <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1504,6 +1689,7 @@ export const Providers = () => {
                       setEditingProvider({
                         ...editingProvider,
                         quotaChecker: {
+                          ...editingProvider.quotaChecker,
                           type: selectedQuotaCheckerType,
                           enabled: selectedQuotaCheckerType
                             ? editingProvider.quotaChecker?.enabled !== false
@@ -1604,6 +1790,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'moonshot' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <MoonshotQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'novita' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <NovitaQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({
@@ -1740,6 +1943,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <ApertisQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis-coding-plan' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <ApertisCodingPlanQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({
@@ -2077,6 +2297,36 @@ export const Providers = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Use Claude Masking */}
+                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                  <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+                    <Switch
+                      checked={editingProvider.useClaudeMasking || false}
+                      onChange={(checked) =>
+                        setEditingProvider({ ...editingProvider, useClaudeMasking: checked })
+                      }
+                    />
+                    <label
+                      className="font-body text-[13px] font-medium text-text"
+                      style={{ marginBottom: 0 }}
+                    >
+                      Use Claude Masking
+                    </label>
+                  </div>
+                  <div
+                    className="font-body text-[11px] text-text-secondary"
+                    style={{ lineHeight: 1.35, marginTop: '4px' }}
+                  >
+                    When enabled, requests to this Anthropic provider will be masked as Claude Code
+                    CLI sessions — tool names are prefixed to avoid conflicts with built-in tools,
+                    and Claude Code headers are injected. Applies regardless of API key type or
+                    OAuth.
+                    <span className="text-warning" style={{ marginLeft: '6px' }}>
+                      Only effective for Anthropic providers.
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2309,6 +2559,19 @@ export const Providers = () => {
                                     </label>
                                     <div
                                       style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginBottom: '4px',
+                                        lineHeight: '1.4',
+                                      }}
+                                    >
+                                      Choose which API protocols this model should use.{' '}
+                                      <span style={{ fontWeight: 600 }}>chat</span> works with most
+                                      providers. Use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
+                                      only for native Ollama API.
+                                    </div>
+                                    <div
+                                      style={{
                                         display: 'flex',
                                         gap: '6px',
                                         flexWrap: 'wrap',
@@ -2322,6 +2585,7 @@ export const Providers = () => {
                                             'chat',
                                             'gemini',
                                             'responses',
+                                            'ollama',
                                           ].includes(apiType);
                                         }
                                         return true;
@@ -2389,9 +2653,50 @@ export const Providers = () => {
                                           fontStyle: 'italic',
                                         }}
                                       >
-                                        No APIs selected. Defaults to ALL supported APIs.
+                                        Empty selection — Plexus will use any API type configured
+                                        for this provider.
                                       </div>
                                     )}
+                                    {(() => {
+                                      // Check if provider has an ollama base URL configured
+                                      const providerBaseUrlMap = getApiBaseUrlMap();
+                                      const hasOllamaBaseUrl = Object.entries(
+                                        providerBaseUrlMap
+                                      ).some(
+                                        ([type, url]) =>
+                                          type === 'ollama' && url && url.trim() !== ''
+                                      );
+                                      // Check if model is not opted into ollama access_via
+                                      const accessVia = mCfg.access_via || [];
+                                      const modelMissingOllamaAccess =
+                                        !accessVia.includes('ollama');
+
+                                      if (
+                                        hasOllamaBaseUrl &&
+                                        modelMissingOllamaAccess &&
+                                        mCfg.type !== 'embeddings' &&
+                                        mCfg.type !== 'transcriptions' &&
+                                        mCfg.type !== 'speech' &&
+                                        mCfg.type !== 'image' &&
+                                        mCfg.type !== 'responses'
+                                      ) {
+                                        return (
+                                          <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
+                                            <Info
+                                              size={14}
+                                              className="text-info flex-shrink-0 mt-0.5"
+                                            />
+                                            <span className="text-[11px] text-info">
+                                              Provider has a native Ollama URL. If you want this
+                                              model to use native Ollama, select{' '}
+                                              <span style={{ fontWeight: 600 }}>ollama</span> in
+                                              Access Via above.
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                 )}
                               {mCfg.type === 'embeddings' && (
@@ -2778,10 +3083,13 @@ export const Providers = () => {
                                         step="0.000001"
                                         value={range.cache_write_per_m || 0}
                                         onChange={(e) => {
+                                          const nextValue = Number(e.target.value);
                                           const newRanges = [...mCfg.pricing.range];
                                           newRanges[idx] = {
                                             ...range,
-                                            cache_write_per_m: parseFloat(e.target.value),
+                                            cache_write_per_m: Number.isFinite(nextValue)
+                                              ? nextValue
+                                              : 0,
                                           };
                                           updateModelConfig(mId, {
                                             pricing: { ...mCfg.pricing, range: newRanges },

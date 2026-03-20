@@ -3,14 +3,14 @@ import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { WisdomGateQuotaChecker } from '../wisdomgate-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
 
-const makeConfig = (apiKey = 'test_api_key'): QuotaCheckerConfig => ({
+const makeConfig = (session = 'test_session_token'): QuotaCheckerConfig => ({
   id: 'wisdomgate-test',
   provider: 'wisdomgate',
   type: 'wisdomgate',
   enabled: true,
   intervalMinutes: 30,
   options: {
-    apiKey,
+    session,
   },
 });
 
@@ -27,22 +27,33 @@ describe('WisdomGateQuotaChecker', () => {
     expect(QuotaCheckerFactory.isRegistered('wisdomgate')).toBe(true);
   });
 
-  it('queries balance with Bearer token and returns subscription quota with dollars', async () => {
+  it('queries balance with session cookie and returns monthly subscription quota with dollars', async () => {
     let capturedUrl: string | undefined;
-    let capturedAuthorization: string | undefined;
+    let capturedCookie: string | undefined;
 
     setFetchMock(async (input: RequestInfo | URL, init?: RequestInit) => {
       capturedUrl = String(input);
       const headers = new Headers(init?.headers);
-      capturedAuthorization = headers.get('Authorization') ?? undefined;
+      capturedCookie = headers.get('Cookie') ?? undefined;
 
       return new Response(
         JSON.stringify({
-          available_balance: 23.852028,
-          package_balance: 23.848028,
-          cash_balance: 0.004,
-          token_balance: 23.852028,
-          is_token_unlimited_quota: false,
+          object: 'billing_details',
+          total_usage: 76.147972,
+          total_available: 23.852028,
+          regular_amount: 100,
+          package_details: [
+            {
+              package_id: 'pkg_123',
+              title: 'Test Package',
+              amount: 23.852028,
+              total_amount: 100,
+              expiry_time: 1735689600,
+              expiry_date: '2025-01-01',
+              begin_time: 1704067200,
+              begin_date: '2024-01-01',
+            },
+          ],
         }),
         {
           status: 200,
@@ -51,22 +62,24 @@ describe('WisdomGateQuotaChecker', () => {
       );
     });
 
-    const checker = new WisdomGateQuotaChecker(makeConfig('my-api-key'));
+    const checker = new WisdomGateQuotaChecker(makeConfig('my-session-token'));
     const result = await checker.checkQuota();
 
-    expect(capturedUrl).toBe('https://wisdom-gate.juheapi.com/v1/users/me/balance');
-    expect(capturedAuthorization).toBe('Bearer my-api-key');
+    expect(capturedUrl).toBe('https://wisgate.ai/api/dashboard/billing/usage/details');
+    expect(capturedCookie).toBe('session=my-session-token');
 
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(result.windows).toHaveLength(1);
 
     const window = result.windows?.[0];
-    expect(window?.windowType).toBe('subscription');
+    expect(window?.windowType).toBe('monthly');
     expect(window?.unit).toBe('dollars');
+    expect(window?.limit).toBe(100);
+    expect(window?.used).toBeCloseTo(76.147972, 6);
     expect(window?.remaining).toBeCloseTo(23.852028, 6);
-    expect(window?.description).toBe('Wisdom Gate account balance');
-    expect(window?.resetsAt).toBeUndefined();
+    expect(window?.description).toBe('Wisdom Gate monthly subscription');
+    expect(window?.resetsAt).toBeInstanceOf(Date);
   });
 
   it('returns error for non-200 response', async () => {
@@ -88,11 +101,22 @@ describe('WisdomGateQuotaChecker', () => {
       capturedUrl = String(input);
       return new Response(
         JSON.stringify({
-          available_balance: 10,
-          package_balance: 10,
-          cash_balance: 0,
-          token_balance: 10,
-          is_token_unlimited_quota: false,
+          object: 'billing_details',
+          total_usage: 0,
+          total_available: 10,
+          regular_amount: 10,
+          package_details: [
+            {
+              package_id: 'pkg_123',
+              title: 'Test Package',
+              amount: 10,
+              total_amount: 10,
+              expiry_time: 1735689600,
+              expiry_date: '2025-01-01',
+              begin_time: 1704067200,
+              begin_date: '2024-01-01',
+            },
+          ],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -105,16 +129,18 @@ describe('WisdomGateQuotaChecker', () => {
       enabled: true,
       intervalMinutes: 30,
       options: {
-        apiKey: 'test-key',
-        endpoint: 'https://custom.endpoint.example.com/v1/users/me/balance',
+        session: 'test-session',
+        endpoint: 'https://custom.endpoint.example.com/api/dashboard/billing/usage/details',
       },
     });
 
     await checker.checkQuota();
-    expect(capturedUrl).toBe('https://custom.endpoint.example.com/v1/users/me/balance');
+    expect(capturedUrl).toBe(
+      'https://custom.endpoint.example.com/api/dashboard/billing/usage/details'
+    );
   });
 
-  it('throws error when apiKey option is missing', async () => {
+  it('throws error when session option is missing', async () => {
     const checker = new WisdomGateQuotaChecker({
       id: 'wisdomgate-test',
       provider: 'wisdomgate',

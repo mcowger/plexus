@@ -4,52 +4,47 @@ import { logger } from '../../../utils/logger';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
 import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
 
+interface UsageWindow {
+  utilization: number;
+  resets_at: string;
+}
+
+interface OAuthUsageResponse {
+  five_hour: UsageWindow | null;
+  seven_day: UsageWindow | null;
+  seven_day_oauth_apps: UsageWindow | null;
+  seven_day_opus: UsageWindow | null;
+  seven_day_sonnet: UsageWindow | null;
+  seven_day_cowork: UsageWindow | null;
+  extra_usage: {
+    is_enabled: boolean;
+    monthly_limit: number | null;
+    used_credits: number | null;
+    utilization: number | null;
+  } | null;
+  [key: string]: unknown;
+}
+
 export class ClaudeCodeQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
-  private model: string;
 
   constructor(config: QuotaCheckerConfig) {
     super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.anthropic.com/v1/messages');
-    this.model = this.getOption<string>('model', 'claude-haiku-4-5-20251001');
+    this.endpoint = this.getOption<string>('endpoint', 'https://api.anthropic.com/api/oauth/usage');
   }
 
   async checkQuota(): Promise<QuotaCheckResult> {
     try {
       const apiKey = await this.resolveApiKey();
-      logger.silly(`[claude-code-checker] Making inference request to ${this.endpoint}?beta=true`);
+      logger.silly(`[claude-code-checker] Fetching usage from ${this.endpoint}`);
 
-      const response = await fetch(`${this.endpoint}?beta=true`, {
-        method: 'POST',
+      const response = await fetch(this.endpoint, {
+        method: 'GET',
         headers: {
-          accept: 'application/json',
-          'anthropic-beta':
-            'oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15',
-          'anthropic-dangerous-direct-browser-access': 'true',
-          'anthropic-version': '2023-06-01',
-          authorization: `Bearer ${apiKey}`,
-          'content-type': 'application/json',
-          'user-agent': 'claude-cli/2.1.25 (external, cli)',
-          'x-app': 'cli',
+          Authorization: `Bearer ${apiKey}`,
+          'anthropic-beta': 'oauth-2025-04-20',
         },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          messages: [{ role: 'user', content: [{ type: 'text', text: 'Are you online' }] }],
-          system: [
-            {
-              type: 'text',
-              text: 'x-anthropic-billing-header: cc_version=2.1.25.3de; cc_entrypoint=cli;',
-            },
-            { type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." },
-          ],
-          tools: [],
-          metadata: {
-            user_id:
-              'user_24df69fab27b77f1171d5c7e798a1c2aeeb2c810eefa1bbd17f16b5e7e07ab72_account_b37bb5b5-6c73-4586-94c4-44313833d598_session_133180ba-5432-4ab3-ae69-635409fe17f1',
-          },
-          max_tokens: 5,
-          stream: false,
-        }),
       });
 
       logger.silly(`[claude-code-checker] Response status: ${response.status}`);
@@ -58,50 +53,40 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
       }
 
-      await response.body?.cancel();
-
-      const fiveHourReset = response.headers.get('anthropic-ratelimit-unified-5h-reset');
-      const fiveHourUtil = response.headers.get('anthropic-ratelimit-unified-5h-utilization');
-      const fiveHourLimit = response.headers.get('anthropic-ratelimit-unified-5h-limit');
-
-      const sevenDayReset = response.headers.get('anthropic-ratelimit-unified-7d-reset');
-      const sevenDayUtil = response.headers.get('anthropic-ratelimit-unified-7d-utilization');
-      const sevenDayLimit = response.headers.get('anthropic-ratelimit-unified-7d-limit');
-
-      logger.silly(
-        `[claude-code-checker] 5h - limit: ${fiveHourLimit}, reset: ${fiveHourReset}, util: ${fiveHourUtil}`
-      );
-      logger.silly(
-        `[claude-code-checker] 7d - limit: ${sevenDayLimit}, reset: ${sevenDayReset}, util: ${sevenDayUtil}`
-      );
+      const usage = (await response.json()) as OAuthUsageResponse;
+      logger.silly(`[claude-code-checker] Usage response: ${JSON.stringify(usage)}`);
 
       const windows: QuotaWindow[] = [];
 
-      if (fiveHourReset && fiveHourUtil) {
-        const limit = fiveHourLimit ? parseInt(fiveHourLimit) : 100;
+      if (usage.five_hour) {
+        logger.silly(
+          `[claude-code-checker] 5h - utilization: ${usage.five_hour.utilization}, resets_at: ${usage.five_hour.resets_at}`
+        );
         windows.push(
           this.createWindow(
             'five_hour',
-            limit,
-            parseFloat(fiveHourUtil) * 100,
+            100,
+            usage.five_hour.utilization,
             undefined,
             'percentage',
-            new Date(parseInt(fiveHourReset) * 1000),
+            new Date(usage.five_hour.resets_at),
             '5-hour request quota'
           )
         );
       }
 
-      if (sevenDayReset && sevenDayUtil) {
-        const limit = sevenDayLimit ? parseInt(sevenDayLimit) : 100;
+      if (usage.seven_day) {
+        logger.silly(
+          `[claude-code-checker] 7d - utilization: ${usage.seven_day.utilization}, resets_at: ${usage.seven_day.resets_at}`
+        );
         windows.push(
           this.createWindow(
             'weekly',
-            limit,
-            parseFloat(sevenDayUtil) * 100,
+            100,
+            usage.seven_day.utilization,
             undefined,
             'percentage',
-            new Date(parseInt(sevenDayReset) * 1000),
+            new Date(usage.seven_day.resets_at),
             'Weekly request quota'
           )
         );
@@ -123,6 +108,16 @@ export class ClaudeCodeQuotaChecker extends QuotaChecker {
     const provider = this.getOption<string>('oauthProvider', 'anthropic').trim() || 'anthropic';
     const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
+
+    const rawCreds = oauthAccountId
+      ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
+      : authManager.getCredentials(provider as OAuthProvider);
+    logger.debug(
+      `[claude-code-checker] resolveApiKey for '${this.id}' — ` +
+        `refresh=${rawCreds?.refresh ? `present(${rawCreds.refresh.length} chars)` : 'MISSING'}, ` +
+        `access=${rawCreds?.access ? `present(${rawCreds.access.length} chars)` : 'MISSING'}, ` +
+        `expires=${rawCreds?.expires} (${rawCreds && rawCreds.expires > Date.now() ? 'valid' : 'EXPIRED or missing'})`
+    );
 
     try {
       return oauthAccountId

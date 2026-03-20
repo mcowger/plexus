@@ -26,6 +26,12 @@ export function transformAnthropicStream(stream: ReadableStream): ReadableStream
   let messageId: string | undefined;
   let model: string | undefined;
 
+  // Maps Anthropic content block index → 0-based sequential tool call index.
+  // Anthropic's block index counts ALL content blocks (text, thinking, tool_use),
+  // but OpenAI tool call indices must be 0-based counting only tool calls.
+  const blockIndexToToolCallIndex = new Map<number, number>();
+  let nextToolCallIndex = 0;
+
   const transformer = new TransformStream({
     start(controller) {
       parser = createParser({
@@ -81,11 +87,12 @@ export function transformAnthropicStream(stream: ReadableStream): ReadableStream
                     },
                   };
                 } else if (data.delta.type === 'input_json_delta') {
+                  const toolCallIdx = blockIndexToToolCallIndex.get(data.index) ?? data.index;
                   unifiedChunk = {
                     delta: {
                       tool_calls: [
                         {
-                          index: data.index,
+                          index: toolCallIdx,
                           function: {
                             arguments: data.delta.partial_json,
                           },
@@ -98,11 +105,13 @@ export function transformAnthropicStream(stream: ReadableStream): ReadableStream
 
               case 'content_block_start':
                 if (data.content_block.type === 'tool_use') {
+                  const toolCallIdx = nextToolCallIndex++;
+                  blockIndexToToolCallIndex.set(data.index, toolCallIdx);
                   unifiedChunk = {
                     delta: {
                       tool_calls: [
                         {
-                          index: data.index,
+                          index: toolCallIdx,
                           id: data.content_block.id,
                           type: 'function',
                           function: {

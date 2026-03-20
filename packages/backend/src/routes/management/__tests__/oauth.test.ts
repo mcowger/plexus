@@ -1,12 +1,40 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import Fastify from 'fastify';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
 import type { OAuthProviderInterface } from '@mariozechner/pi-ai/oauth';
 import { registerOAuthRoutes } from '../oauth';
 import { OAuthLoginSessionManager } from '../../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
+
+mock.module('@mariozechner/pi-ai', () => ({
+  getModels: (provider: string) => {
+    if (provider === 'unknown-provider') {
+      return [];
+    }
+    return [
+      { id: 'claude-opus-4', name: 'Claude Opus 4', contextWindow: 200000, provider: 'anthropic' },
+      {
+        id: 'claude-sonnet-4',
+        name: 'Claude Sonnet 4',
+        contextWindow: 200000,
+        provider: 'anthropic',
+      },
+    ];
+  },
+  getModel: (provider: string, modelId: string) => ({
+    id: modelId,
+    name: modelId,
+    contextWindow: 200000,
+    provider,
+  }),
+  complete: async () => ({
+    content: [{ type: 'text', text: 'ok' }],
+    stopReason: 'stop',
+    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+    provider: 'anthropic',
+    model: 'claude-test',
+  }),
+  stream: async () => ({ ok: true }),
+}));
 
 const waitForStatus = async (
   fastify: ReturnType<typeof Fastify>,
@@ -30,14 +58,8 @@ const waitForStatus = async (
 describe('OAuth management routes', () => {
   let fastify: ReturnType<typeof Fastify>;
   let manager: OAuthLoginSessionManager;
-  let authPath: string;
-  let originalAuthEnv: string | undefined;
 
   beforeEach(async () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plexus-oauth-'));
-    authPath = path.join(tempDir, 'auth.json');
-    originalAuthEnv = process.env.AUTH_JSON;
-    process.env.AUTH_JSON = authPath;
     OAuthAuthManager.resetForTesting();
 
     const provider: OAuthProviderInterface = {
@@ -71,11 +93,6 @@ describe('OAuth management routes', () => {
   afterEach(() => {
     manager.dispose();
     OAuthAuthManager.resetForTesting();
-    if (originalAuthEnv === undefined) {
-      delete process.env.AUTH_JSON;
-    } else {
-      process.env.AUTH_JSON = originalAuthEnv;
-    }
   });
 
   it('persists credentials after prompt flow', async () => {
@@ -97,17 +114,9 @@ describe('OAuth management routes', () => {
 
     await waitForStatus(fastify, session.data.id, 'success');
 
-    const authContents = fs.readFileSync(authPath, 'utf-8');
-    const authJson = JSON.parse(authContents) as Record<string, any>;
-
-    expect(authJson['test-provider']).toBeDefined();
-    expect(authJson['test-provider'].accounts).toBeDefined();
-    expect(authJson['test-provider'].accounts[accountId].type).toBe('oauth');
-    expect(authJson['test-provider'].accounts[accountId].access).toBe('access-token');
-    expect(authJson['test-provider'].accounts[accountId].refresh).toBe('refresh-token');
-
+    // Credentials are now stored in the database, not auth.json.
+    // Verify via the in-memory state of OAuthAuthManager.
     const authManager = OAuthAuthManager.getInstance();
-    authManager.reload();
     expect(authManager.hasProvider('test-provider' as any, accountId)).toBe(true);
 
     const deleteResponse = await fastify.inject({
@@ -117,9 +126,8 @@ describe('OAuth management routes', () => {
     });
     expect(deleteResponse.statusCode).toBe(200);
 
-    const afterDelete = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as Record<string, any>;
-    expect(afterDelete['test-provider']).toBeUndefined();
-    authManager.reload();
+    // After delete, the in-memory cache should reflect the removal.
+    await authManager.reload();
     expect(authManager.hasProvider('test-provider' as any, accountId)).toBe(false);
   });
 
@@ -173,11 +181,9 @@ describe('OAuth management routes', () => {
 
     await waitForStatus(fastify, session.data.id, 'success');
 
-    const authContents = fs.readFileSync(authPath, 'utf-8');
-    const authJson = JSON.parse(authContents) as Record<string, any>;
-
-    expect(authJson['manual-provider']).toBeDefined();
-    expect(authJson['manual-provider'].accounts[accountId].access).toBe('manual-access');
+    // Credentials are now stored in the database, not auth.json.
+    const authManager = OAuthAuthManager.getInstance();
+    expect(authManager.hasProvider('manual-provider' as any, accountId)).toBe(true);
   });
 
   it('fetches OAuth provider models', async () => {

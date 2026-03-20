@@ -15,28 +15,16 @@ export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({ options,
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Session Cookie <span className="text-danger">*</span>
-        </label>
-        <Input
-          type="password"
-          value={(options.session as string) ?? ''}
-          onChange={(e) => handleChange('session', e.target.value)}
-          placeholder="Paste session cookie value from stima.tech"
-        />
-        <span className="text-[10px] text-text-muted">
-          Treated as a password. Found in browser cookies after logging in to stima.tech.
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
           Endpoint (optional)
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
           onChange={(e) => handleChange('endpoint', e.target.value)}
-          placeholder="https://api.stima.tech/api/user/self"
+          placeholder="https://api.apertis.ai/v1/dashboard/billing/credits"
         />
+        <span className="text-[10px] text-text-muted">
+          Uses the provider's API key automatically. No additional configuration needed.
+        </span>
       </div>
     </div>
   );

@@ -31,3 +31,31 @@ export {
   mcpDebugLogs as pgMcpDebugLogs,
 } from './postgres/mcp';
 export { quotaState as pgQuotaState } from './postgres/quota-state';
+
+// Config tables (SQLite default exports)
+export * from './sqlite/providers';
+export * from './sqlite/provider-models';
+export * from './sqlite/model-aliases';
+export * from './sqlite/model-alias-targets';
+export * from './sqlite/api-keys';
+export * from './sqlite/user-quota-definitions';
+export * from './sqlite/mcp-servers';
+export * from './sqlite/system-settings';
+export * from './sqlite/oauth-credentials';
+export {
+  providersRelations,
+  providerModelsRelations,
+  modelAliasesRelations,
+  modelAliasTargetsRelations,
+} from './sqlite/config-relations';
+
+// Config tables (PostgreSQL exports)
+export { providers as pgProviders } from './postgres/providers';
+export { providerModels as pgProviderModels } from './postgres/provider-models';
+export { modelAliases as pgModelAliases } from './postgres/model-aliases';
+export { modelAliasTargets as pgModelAliasTargets } from './postgres/model-alias-targets';
+export { apiKeys as pgApiKeys } from './postgres/api-keys';
+export { userQuotaDefinitions as pgUserQuotaDefinitions } from './postgres/user-quota-definitions';
+export { mcpServers as pgMcpServers } from './postgres/mcp-servers';
+export { systemSettings as pgSystemSettings } from './postgres/system-settings';
+export { oauthCredentials as pgOauthCredentials } from './postgres/oauth-credentials';

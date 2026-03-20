@@ -25,6 +25,7 @@ interface SyntheticQuotaResponse {
 }
 
 export class SyntheticQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

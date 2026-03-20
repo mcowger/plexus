@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import Fastify, { FastifyInstance } from 'fastify';
-import { createTestConfig } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatcher';
@@ -9,15 +8,49 @@ import { mock } from 'bun:test';
 import { DebugManager } from '../../../services/debug-manager';
 import { SelectorFactory } from '../../../services/selectors/factory';
 
+const EMBEDDINGS_TEST_CONFIG = {
+  providers: {
+    openai: {
+      api_key: 'sk-test',
+      api_base_url: 'https://api.openai.com/v1',
+      estimateTokens: false,
+      disable_cooldown: false,
+      useClaudeMasking: false,
+      models: {
+        'text-embedding-3-small': {
+          pricing: { source: 'simple' as const, input: 0.00002, output: 0 },
+        },
+      },
+    },
+  },
+  models: {
+    'embeddings-small': {
+      priority: 'selector' as const,
+      targets: [{ provider: 'openai', model: 'text-embedding-3-small' }],
+    },
+  },
+  keys: {
+    'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
+  },
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+};
+
 describe('Embeddings Endpoint', () => {
   let fastify: FastifyInstance;
   let mockUsageStorage: UsageStorageService;
   let mockDispatcher: Dispatcher;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    // Set config first so it's available when routes register
+    setConfigForTesting(EMBEDDINGS_TEST_CONFIG);
+
     fastify = Fastify();
 
-    // Mock dispatcher with embeddings support
     mockDispatcher = {
       dispatch: mock(async () => ({
         id: '123',
@@ -65,32 +98,15 @@ describe('Embeddings Endpoint', () => {
       emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
-    // Initialize singletons
     DebugManager.getInstance().setStorage(mockUsageStorage);
     SelectorFactory.setUsageStorage(mockUsageStorage);
 
-    // Set config with embeddings models
-    setConfigForTesting(
-      createTestConfig({
-        providers: {
-          openai: {
-            api_key: 'sk-test',
-            api_base_url: 'https://api.openai.com/v1',
-            enabled: true,
-            estimateTokens: false,
-            disable_cooldown: false,
-            models: {
-              'text-embedding-3-small': {
-                pricing: { source: 'simple', input: 0.00002, output: 0 },
-              },
-            },
-          },
-        },
-      })
-    );
-
     await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
     await fastify.ready();
+  });
+
+  afterEach(async () => {
+    await fastify.close();
   });
 
   it('should accept embeddings request with single text input', async () => {
@@ -107,7 +123,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.object).toBe('list');
     expect(body.data).toBeArray();
@@ -119,7 +135,6 @@ describe('Embeddings Endpoint', () => {
   });
 
   it('should accept embeddings request with array input', async () => {
-    // Mock batch response
     (mockDispatcher.dispatchEmbeddings as any).mockImplementationOnce(async () => ({
       object: 'list',
       data: [
@@ -149,7 +164,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.data).toHaveLength(3);
     expect(body.data[0].index).toBe(0);
@@ -172,7 +187,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
   });
 
   it('should accept optional dimensions parameter', async () => {
@@ -190,7 +205,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
   });
 
   it('should track usage correctly for embeddings', async () => {
@@ -207,7 +222,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
 
     const saveRequestCalls = (mockUsageStorage.saveRequest as any).mock.calls;
     const lastCall = saveRequestCalls[saveRequestCalls.length - 1];
@@ -266,7 +281,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
   });
 
   it('should track attribution when provided', async () => {
@@ -283,7 +298,7 @@ describe('Embeddings Endpoint', () => {
       },
     });
 
-    if (response.statusCode !== 200) expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200);
 
     const saveRequestCalls = (mockUsageStorage.saveRequest as any).mock.calls;
     const lastCall = saveRequestCalls[saveRequestCalls.length - 1];
@@ -291,7 +306,6 @@ describe('Embeddings Endpoint', () => {
   });
 
   it('should handle dispatcher errors gracefully', async () => {
-    // Mock error
     (mockDispatcher.dispatchEmbeddings as any).mockRejectedValueOnce(
       new Error('Provider unavailable')
     );

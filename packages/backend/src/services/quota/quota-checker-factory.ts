@@ -6,6 +6,7 @@ import { OpenAICodexQuotaChecker } from './checkers/openai-codex-checker';
 import { NanoGPTQuotaChecker } from './checkers/nanogpt-checker';
 import { ZAIQuotaChecker } from './checkers/zai-checker';
 import { MoonshotQuotaChecker } from './checkers/moonshot-checker';
+import { NovitaQuotaChecker } from './checkers/novita-checker';
 import { MiniMaxQuotaChecker } from './checkers/minimax-checker';
 import { MiniMaxCodingQuotaChecker } from './checkers/minimax-coding-checker';
 import { OpenRouterQuotaChecker } from './checkers/openrouter-checker';
@@ -14,6 +15,7 @@ import { KimiCodeQuotaChecker } from './checkers/kimi-code-checker';
 import { CopilotQuotaChecker } from './checkers/copilot-checker';
 import { WisdomGateQuotaChecker } from './checkers/wisdomgate-checker';
 import { ApertisQuotaChecker } from './checkers/apertis-checker';
+import { ApertisCodingPlanQuotaChecker } from './checkers/apertis-coding-plan-checker';
 import { PoeQuotaChecker } from './checkers/poe-checker';
 import { GeminiCliQuotaChecker } from './checkers/gemini-cli-checker';
 import { AntigravityQuotaChecker } from './checkers/antigravity-checker';
@@ -26,6 +28,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   nanogpt: NanoGPTQuotaChecker,
   zai: ZAIQuotaChecker,
   moonshot: MoonshotQuotaChecker,
+  novita: NovitaQuotaChecker,
   minimax: MiniMaxQuotaChecker,
   'minimax-coding': MiniMaxCodingQuotaChecker,
   openrouter: OpenRouterQuotaChecker,
@@ -34,6 +37,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   copilot: CopilotQuotaChecker,
   wisdomgate: WisdomGateQuotaChecker,
   apertis: ApertisQuotaChecker,
+  'apertis-coding-plan': ApertisCodingPlanQuotaChecker,
   poe: PoeQuotaChecker,
   'gemini-cli': GeminiCliQuotaChecker,
   antigravity: AntigravityQuotaChecker,

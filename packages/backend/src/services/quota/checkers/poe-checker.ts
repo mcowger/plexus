@@ -7,6 +7,7 @@ interface PoeBalanceResponse {
 }
 
 export class PoeQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {
