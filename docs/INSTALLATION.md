@@ -98,6 +98,10 @@ When running Plexus, you can use the following environment variables to control 
 - **`DATABASE_URL`** (**Required**): Database connection string.
     - SQLite: `sqlite:///app/data/plexus.db` or `sqlite://./data/plexus.db`
     - PostgreSQL: `postgres://user:password@host:5432/dbname`
+- **`ENCRYPTION_KEY`** (Optional): Encryption key for sensitive data at rest (API keys, OAuth tokens, provider credentials).
+    - Generate with: `openssl rand -hex 32`
+    - If not set, data is stored in plaintext. A warning is logged at startup.
+    - See [Configuration: Encryption at Rest](CONFIGURATION.md#encryption-at-rest-optional) for details.
 - **`CONFIG_FILE`**: Path to the `plexus.yaml` configuration file.
     - Default: `config/plexus.yaml` (relative to project root).
 - **`LOG_LEVEL`**: The verbosity of the server logs.
