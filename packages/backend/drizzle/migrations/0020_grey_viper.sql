@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `use_claude_masking` integer DEFAULT 0 NOT NULL;

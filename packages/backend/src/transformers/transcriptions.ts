@@ -77,8 +77,25 @@ export class TranscriptionsTransformer {
     }
 
     // For JSON format, response should have text and optional usage
+    if (format === 'json') {
+      return {
+        text: response.text || '',
+        usage: response.usage
+          ? {
+              input_tokens: response.usage.input_tokens || 0,
+              output_tokens: response.usage.output_tokens || 0,
+              total_tokens: response.usage.total_tokens || 0,
+            }
+          : undefined,
+      };
+    }
+
+    // For verbose_json format, include additional fields like language, duration, and segments
     return {
       text: response.text || '',
+      language: response.language,
+      duration: response.duration,
+      segments: response.segments,
       usage: response.usage
         ? {
             input_tokens: response.usage.input_tokens || 0,
@@ -102,6 +119,19 @@ export class TranscriptionsTransformer {
     const result: any = {
       text: response.text,
     };
+
+    if (format === 'verbose_json') {
+      // Include additional fields for verbose_json
+      if (response.language !== undefined) {
+        result.language = response.language;
+      }
+      if (response.duration !== undefined) {
+        result.duration = response.duration;
+      }
+      if (response.segments !== undefined) {
+        result.segments = response.segments;
+      }
+    }
 
     if (response.usage) {
       result.usage = response.usage;

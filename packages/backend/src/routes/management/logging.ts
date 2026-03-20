@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import {
   getCurrentLogLevel,
   getStartupLogLevel,
@@ -7,6 +8,10 @@ import {
   setCurrentLogLevel,
   SUPPORTED_LOG_LEVELS,
 } from '../../utils/logger';
+
+const setLevelSchema = z.object({
+  level: z.string().min(1),
+});
 
 export async function registerLoggingRoutes(fastify: FastifyInstance) {
   fastify.get('/v0/management/logging/level', async (_request, reply) => {
@@ -18,11 +23,9 @@ export async function registerLoggingRoutes(fastify: FastifyInstance) {
     });
   });
 
-  fastify.post('/v0/management/logging/level', async (request, reply) => {
-    const body = request.body as { level?: string } | undefined;
-    const nextLevel = body?.level;
-
-    if (typeof nextLevel !== 'string' || nextLevel.trim().length === 0) {
+  fastify.put('/v0/management/logging/level', async (request, reply) => {
+    const parsed = setLevelSchema.safeParse(request.body);
+    if (!parsed.success) {
       return reply.code(400).send({
         error: 'Invalid request body. Expected: { level: string }',
         supportedLevels: SUPPORTED_LOG_LEVELS,
@@ -32,7 +35,7 @@ export async function registerLoggingRoutes(fastify: FastifyInstance) {
     const previousLevel = getCurrentLogLevel();
 
     try {
-      const level = setCurrentLogLevel(nextLevel);
+      const level = setCurrentLogLevel(parsed.data.level);
       logger.info(`Log level changed from '${previousLevel}' to '${level}' via management API`);
 
       return reply.send({

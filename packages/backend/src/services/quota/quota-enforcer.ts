@@ -13,7 +13,7 @@ export interface QuotaCheckResult {
   limit: number;
   remaining: number;
   resetsAt: Date | null;
-  limitType: 'requests' | 'tokens';
+  limitType: 'requests' | 'tokens' | 'cost';
 }
 
 export interface UsageRecord {
@@ -22,6 +22,7 @@ export interface UsageRecord {
   tokensCached?: number | null;
   tokensCacheWrite?: number | null;
   tokensReasoning?: number | null;
+  costTotal?: number | null;
 }
 
 export class QuotaEnforcer {
@@ -80,12 +81,20 @@ export class QuotaEnforcer {
       lastUpdatedDate = nowDate;
 
       // For calendar quotas, set window start
-      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
+      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly' || quotaDef.type === 'monthly') {
         windowStartDate = new Date(this.getWindowStart(quotaDef.type));
+      }
+      // For rolling cost quotas, align window start to calendar boundary
+      else if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
+        const durationMs = parseDuration(quotaDef.duration);
+        if (durationMs) {
+          const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
+          windowStartDate = new Date(alignedStart);
+        }
       }
     } else {
       const state = existingState[0];
-      const storedLimitType = state!.limitType as 'requests' | 'tokens';
+      const storedLimitType = state!.limitType as 'requests' | 'tokens' | 'cost';
       const storedQuotaName = state!.quotaName as string;
 
       // Check if quota name has changed (key assigned to different quota)
@@ -99,8 +108,20 @@ export class QuotaEnforcer {
         windowStartDate = null;
 
         // For calendar quotas, set new window start
-        if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
+        if (
+          quotaDef.type === 'daily' ||
+          quotaDef.type === 'weekly' ||
+          quotaDef.type === 'monthly'
+        ) {
           windowStartDate = new Date(this.getWindowStart(quotaDef.type));
+        }
+        // For rolling cost quotas, align window start to calendar boundary
+        else if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
+          const durationMs = parseDuration(quotaDef.duration);
+          if (durationMs) {
+            const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
+            windowStartDate = new Date(alignedStart);
+          }
         }
         // Check if quota definition has changed (e.g., requests -> tokens)
       } else if (storedLimitType !== quotaDef.limitType) {
@@ -113,7 +134,11 @@ export class QuotaEnforcer {
         windowStartDate = null;
 
         // For calendar quotas, set new window start
-        if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
+        if (
+          quotaDef.type === 'daily' ||
+          quotaDef.type === 'weekly' ||
+          quotaDef.type === 'monthly'
+        ) {
           windowStartDate = new Date(this.getWindowStart(quotaDef.type));
         }
       } else {
@@ -123,7 +148,11 @@ export class QuotaEnforcer {
         windowStartDate = state!.windowStart as Date | null;
 
         // Handle calendar quota reset
-        if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
+        if (
+          quotaDef.type === 'daily' ||
+          quotaDef.type === 'weekly' ||
+          quotaDef.type === 'monthly'
+        ) {
           const expectedWindowStart = this.getWindowStart(quotaDef.type);
           if (!windowStartDate || windowStartDate.getTime() !== expectedWindowStart) {
             // Window has reset
@@ -145,11 +174,31 @@ export class QuotaEnforcer {
           }
 
           const elapsedMs = nowMs - lastUpdatedDate.getTime();
-          const leakRate = quotaDef.limit / durationMs;
-          const leaked = elapsedMs * leakRate;
 
-          currentUsage = Math.max(0, currentUsage - leaked);
-          lastUpdatedDate = nowDate;
+          // Cost quotas use cumulative spending (no leak), reset when window expires
+          if (quotaDef.limitType === 'cost') {
+            // Check if the rolling window has expired
+            // For cost, we track when the spending window started via windowStartDate
+            if (!windowStartDate || elapsedMs >= durationMs) {
+              // Window expired or not set - reset
+              // Align window start to period boundary for predictable reset times
+              const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
+              logger.debug(
+                `[QuotaEnforcer] Rolling cost quota ${quotaName} for ${keyName} reset (window expired), aligned to ${new Date(alignedStart).toISOString()}`
+              );
+              currentUsage = 0;
+              windowStartDate = new Date(alignedStart);
+              lastUpdatedDate = nowDate;
+            }
+            // Otherwise keep accumulating - no leak for cost
+          } else {
+            // Tokens and requests use leaky bucket
+            const leakRate = quotaDef.limit / durationMs;
+            const leaked = elapsedMs * leakRate;
+
+            currentUsage = Math.max(0, currentUsage - leaked);
+            lastUpdatedDate = nowDate;
+          }
         }
       }
     }
@@ -163,9 +212,14 @@ export class QuotaEnforcer {
     if (quotaDef.type === 'rolling') {
       const durationMs = parseDuration(quotaDef.duration);
       if (durationMs) {
-        // Estimate when current usage will fully leak out
-        const timeToLeakAll = (currentUsage / quotaDef.limit) * durationMs;
-        resetsAt = new Date(nowMs + timeToLeakAll);
+        if (quotaDef.limitType === 'cost' && windowStartDate) {
+          // For cost, reset is when the window expires
+          resetsAt = new Date(windowStartDate.getTime() + durationMs);
+        } else {
+          // For tokens/requests, estimate when current usage will fully leak out
+          const timeToLeakAll = (currentUsage / quotaDef.limit) * durationMs;
+          resetsAt = new Date(nowMs + timeToLeakAll);
+        }
       } else {
         logger.warn(
           `[QuotaEnforcer] Cannot calculate resetsAt for quota ${quotaName}: invalid duration '${quotaDef.duration}'`
@@ -177,6 +231,13 @@ export class QuotaEnforcer {
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
       tomorrow.setUTCHours(0, 0, 0, 0);
       resetsAt = tomorrow;
+    } else if (quotaDef.type === 'monthly') {
+      // Reset at 00:00 UTC on the 1st of next month
+      const nowDateObj = new Date(nowMs);
+      const nextMonth = new Date(
+        Date.UTC(nowDateObj.getUTCFullYear(), nowDateObj.getUTCMonth() + 1, 1, 0, 0, 0, 0)
+      );
+      resetsAt = nextMonth;
     } else if (quotaDef.type === 'weekly') {
       // Reset at next UTC Sunday midnight
       const nowDateObj = new Date(nowMs);
@@ -187,12 +248,16 @@ export class QuotaEnforcer {
       resetsAt = nextSunday;
     }
 
+    // Round for tokens/requests, preserve precision for cost
+    const displayUsage = quotaDef.limitType === 'cost' ? currentUsage : Math.round(currentUsage);
+    const displayRemaining = quotaDef.limitType === 'cost' ? remaining : Math.round(remaining);
+
     const result: QuotaCheckResult = {
       allowed,
       quotaName,
-      currentUsage: Math.round(currentUsage),
+      currentUsage: displayUsage,
       limit: quotaDef.limit,
-      remaining: Math.round(remaining),
+      remaining: displayRemaining,
       resetsAt,
       limitType: quotaDef.limitType,
     };
@@ -220,13 +285,16 @@ export class QuotaEnforcer {
       return;
     }
 
-    // Calculate cost
-    let cost: number;
+    // Calculate usage value based on limitType
+    let usageValue: number;
     if (quotaDef.limitType === 'requests') {
-      cost = 1;
+      usageValue = 1;
+    } else if (quotaDef.limitType === 'cost') {
+      // cost: use costTotal directly
+      usageValue = usageRecord.costTotal || 0;
     } else {
       // tokens: sum of input + output
-      cost =
+      usageValue =
         (usageRecord.tokensInput || 0) +
         (usageRecord.tokensOutput || 0) +
         (usageRecord.tokensReasoning || 0) +
@@ -248,22 +316,28 @@ export class QuotaEnforcer {
     if (existingState.length === 0) {
       // Insert new state
       let windowStartDate: Date | null = null;
-      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly') {
+      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly' || quotaDef.type === 'monthly') {
         windowStartDate = new Date(this.getWindowStart(quotaDef.type));
+      } else if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
+        // Rolling cost quotas need a window start to track when the window expires
+        // Align to period start for predictable reset times
+        const durationMs = parseDuration(quotaDef.duration);
+        const alignedStart = durationMs ? this.alignToPeriodStart(nowMs, durationMs) : nowMs;
+        windowStartDate = new Date(alignedStart);
       }
 
       await this.db.insert(schema.quotaState).values({
         keyName,
         quotaName: keyConfig.quota,
         limitType: quotaDef.limitType,
-        currentUsage: cost,
+        currentUsage: usageValue,
         lastUpdated: nowDate,
         windowStart: windowStartDate,
       });
     } else if (existingState[0]) {
       // Update existing state with leak calculation for rolling quotas
       const state = existingState[0];
-      const storedLimitType = state.limitType as 'requests' | 'tokens';
+      const storedLimitType = state.limitType as 'requests' | 'tokens' | 'cost';
       const storedQuotaName = state.quotaName as string;
 
       // Check if quota name or limitType has changed - if so, start fresh
@@ -272,24 +346,40 @@ export class QuotaEnforcer {
         logger.debug(
           `[QuotaEnforcer] Quota name changed for ${keyName} from '${storedQuotaName}' to '${keyConfig.quota}' in recordUsage`
         );
-        newUsage = cost; // Start fresh with just this request's cost
+        newUsage = usageValue; // Start fresh with just this request's usage
       } else if (storedLimitType !== quotaDef.limitType) {
         logger.debug(
           `[QuotaEnforcer] Quota ${keyConfig.quota} limitType changed from ${storedLimitType} to ${quotaDef.limitType} in recordUsage`
         );
-        newUsage = cost; // Start fresh with just this request's cost
+        newUsage = usageValue; // Start fresh with just this request's usage
       } else {
-        newUsage = state.currentUsage + cost;
+        newUsage = state.currentUsage + usageValue;
 
         if (quotaDef.type === 'rolling') {
-          // Apply leak since last update
           const durationMs = parseDuration(quotaDef.duration);
           if (durationMs) {
             const lastUpdatedDate = state.lastUpdated as Date;
             const elapsedMs = nowMs - lastUpdatedDate.getTime();
-            const leakRate = quotaDef.limit / durationMs;
-            const leaked = elapsedMs * leakRate;
-            newUsage = Math.max(0, state.currentUsage - leaked) + cost;
+
+            // Cost quotas use cumulative spending (no leak), reset when window expires
+            if (quotaDef.limitType === 'cost') {
+              const windowStart = state.windowStart as Date | null;
+              // Check if window has expired
+              if (!windowStart || elapsedMs >= durationMs) {
+                // Window expired - start fresh with just this request's usage
+                logger.debug(
+                  `[QuotaEnforcer] Rolling cost quota window expired for ${keyName}, resetting`
+                );
+                newUsage = usageValue;
+                // Update windowStart below
+              }
+              // Otherwise keep accumulating - no leak for cost
+            } else {
+              // Tokens and requests use leaky bucket
+              const leakRate = quotaDef.limit / durationMs;
+              const leaked = elapsedMs * leakRate;
+              newUsage = Math.max(0, state.currentUsage - leaked) + usageValue;
+            }
           } else {
             logger.warn(
               `[QuotaEnforcer] Invalid duration '${quotaDef.duration}' for rolling quota ${keyConfig.quota}. ` +
@@ -300,18 +390,37 @@ export class QuotaEnforcer {
         }
       }
 
+      // Prepare update values
+      const updateValues: Record<string, unknown> = {
+        quotaName: keyConfig.quota,
+        limitType: quotaDef.limitType,
+        currentUsage: newUsage,
+        lastUpdated: nowDate,
+      };
+
+      // For rolling cost quotas, also update windowStart if needed
+      if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
+        const durationMs = parseDuration(quotaDef.duration);
+        const lastUpdatedDate = state.lastUpdated as Date;
+        const elapsedMs = nowMs - lastUpdatedDate.getTime();
+        const windowStart = state.windowStart as Date | null;
+
+        if (!windowStart || elapsedMs >= (durationMs || 0)) {
+          // Window expired or not set - set new window start aligned to period
+          const alignedStart = durationMs ? this.alignToPeriodStart(nowMs, durationMs) : nowMs;
+          updateValues.windowStart = new Date(alignedStart);
+        }
+      }
+
       await this.db
         .update(schema.quotaState)
-        .set({
-          quotaName: keyConfig.quota,
-          limitType: quotaDef.limitType,
-          currentUsage: newUsage,
-          lastUpdated: nowDate,
-        })
+        .set(updateValues)
         .where(eq(schema.quotaState.keyName, keyName));
     }
 
-    logger.debug(`[QuotaEnforcer] Recorded ${cost} ${quotaDef.limitType} usage for ${keyName}`);
+    logger.debug(
+      `[QuotaEnforcer] Recorded ${usageValue} ${quotaDef.limitType} usage for ${keyName}`
+    );
   }
 
   /**
@@ -335,19 +444,37 @@ export class QuotaEnforcer {
   /**
    * Get the current window start timestamp for calendar quotas.
    */
-  private getWindowStart(type: 'daily' | 'weekly'): number {
+  private getWindowStart(type: 'daily' | 'weekly' | 'monthly'): number {
     const now = new Date();
 
     if (type === 'daily') {
       // Start of current UTC day
       now.setUTCHours(0, 0, 0, 0);
       return now.getTime();
-    } else {
+    } else if (type === 'weekly') {
       // Start of current UTC week (Sunday)
       const dayOfWeek = now.getUTCDay();
       now.setUTCDate(now.getUTCDate() - dayOfWeek);
       now.setUTCHours(0, 0, 0, 0);
       return now.getTime();
+    } else {
+      // type === 'monthly' - Start of current UTC month (1st day)
+      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0);
     }
+  }
+
+  /**
+   * Align timestamp to the start of the current period.
+   * E.g., if now is 10:30 and duration is 1h, returns 10:00 (start of current hour).
+   * Uses simple floor division for all durations.
+   *
+   * @param nowMs - Current timestamp in milliseconds
+   * @param durationMs - Duration of the rolling window in milliseconds
+   * @returns Aligned timestamp at the start of the current period
+   */
+  private alignToPeriodStart(nowMs: number, durationMs: number): number {
+    // Floor division: find how many periods have passed, then multiply back
+    // This gives us the start of the current period
+    return Math.floor(nowMs / durationMs) * durationMs;
   }
 }

@@ -70,7 +70,7 @@ import { TimeRangeSelector } from '../components/dashboard/TimeRangeSelector';
 import { api, type UsageRecord } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
 import type { CustomDateRange } from '../lib/date';
-import { parseISODate, formatISODate } from '../lib/date';
+import { parseISODate } from '../lib/date';
 import {
   Activity,
   BarChart3,
@@ -207,6 +207,12 @@ interface AggregatedPoint {
   successRate: number;
   velocity?: number;
   fill?: string;
+}
+
+interface SummaryPoint {
+  timestamp: string;
+  requests: number;
+  tokens: number;
 }
 
 /**
@@ -432,6 +438,11 @@ const getRangeConfig = (
           return d.getTime();
         },
       };
+    default:
+      return {
+        minutes: 1440,
+        bucketFn: (ts) => Math.floor(ts / 3600000) * 3600000,
+      };
   }
 };
 
@@ -485,7 +496,12 @@ const calcVelocity = (data: AggregatedPoint[]): AggregatedPoint[] => {
  * @param range   - Current time range (determines bucket granularity)
  * @returns Sorted array of aggregated data points with velocity computed
  */
-const aggregateByTime = (records: UsageRecord[], range: TimeRange): AggregatedPoint[] => {
+// @ts-expect-error kept for future use (client-side aggregation fallback)
+const aggregateByTime = (
+  records: UsageRecord[],
+  range: TimeRange,
+  customRange?: CustomDateRange | null
+): AggregatedPoint[] => {
   const { bucketFn } = getRangeConfig(range);
   const grouped = new Map<
     number,
@@ -533,7 +549,7 @@ const aggregateByTime = (records: UsageRecord[], range: TimeRange): AggregatedPo
   const data = Array.from(grouped.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([ms, v]) => ({
-      name: formatBucketLabel(range, ms, timeRange === 'custom' ? customDateRange : null),
+      name: formatBucketLabel(range, ms, range === 'custom' ? customRange : null),
       requests: v.requests,
       errors: v.errors,
       tokens: v.tokens,
@@ -872,6 +888,8 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
 
   /** Raw usage records fetched from the API (used for categorical grouping). */
   const [records, setRecords] = useState<UsageRecord[]>([]);
+  /** Pre-aggregated summary buckets for time-series chart rendering. */
+  const [summaryData, setSummaryData] = useState<SummaryPoint[]>([]);
   /** Whether a data fetch is currently in progress (shows loading spinner on Refresh button). */
   const [loading, setLoading] = useState(false);
   /** Selected time window -- controls how far back data is fetched and bucket granularity. */
@@ -937,17 +955,27 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       if (timeRange === 'custom' && customDateRange) {
         startDate = customDateRange.start.toISOString();
         endDate = customDateRange.end.toISOString();
+      } else if (timeRange !== 'custom') {
+        const now = new Date();
+        const { minutes } = getRangeConfig(timeRange);
+        startDate = new Date(now.getTime() - minutes * 60000).toISOString();
+        endDate = now.toISOString();
       }
 
       // Use backend summary endpoint for time-series views (much more efficient)
       if (groupBy === 'time') {
-        const summaryData = await api.getSummaryData(timeRange, true, startDate, endDate);
+        const [summaryResponse, logsResponse] = await Promise.all([
+          api.getSummaryData(timeRange === 'live' ? 'hour' : timeRange, true, startDate, endDate),
+          api.getLogs(100, 0, { startDate, endDate }),
+        ]);
         // Limit to max 100 points to prevent memory issues
-        const limitedData = summaryData.slice(0, 100);
-        setRecords(limitedData as any);
+        const limitedData = summaryResponse.slice(0, 100) as SummaryPoint[];
+        setSummaryData(limitedData);
+        setRecords(logsResponse.data || []);
       } else {
         // For categorical views, fetch raw records with strict limits
         const logsResponse = await api.getLogs(100, 0, { startDate, endDate });
+        setSummaryData([]);
         setRecords(logsResponse.data || []);
       }
 
@@ -998,9 +1026,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       const isCustom = timeRange === 'custom';
       const customRange = isCustom ? customDateRange : null;
 
-      return records.map((r: any) => ({
-        name: formatBucketLabel(timeRange, r.date, customRange),
-        requests: r.requests || 1,
+      return summaryData.map((r) => ({
+        name: formatBucketLabel(timeRange, Number(r.timestamp), customRange),
+        requests: r.requests || 0,
         errors: 0,
         tokens: r.tokens || 0,
         cost: 0,
@@ -1012,7 +1040,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
     }
     // For categorical views, aggregate raw records
     return aggregateByGroup(records, groupBy);
-  }, [records, groupBy, timeRange, customDateRange]);
+  }, [summaryData, records, groupBy, timeRange, customDateRange]);
 
   /**
    * Summary statistics computed from all raw records in the current time window.

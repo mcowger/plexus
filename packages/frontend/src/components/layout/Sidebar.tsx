@@ -239,34 +239,9 @@ export const Sidebar: React.FC = () => {
     };
   };
 
-  // Filter for balance-type checkers (subscription window type)
-  const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'poe', 'apertis'];
-  const balanceQuotas = quotas.filter((quota) => {
-    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-    return BALANCE_CHECKERS.some((bc) => checkerType.includes(bc));
-  });
-
-  // Filter for rate-limit checkers
-  const RATE_LIMIT_CHECKERS = [
-    'openai-codex',
-    'codex',
-    'claude-code',
-    'claude',
-    'kimi-code',
-    'kimi',
-    'zai',
-    'synthetic',
-    'nanogpt',
-    'copilot',
-    'wisdomgate',
-    'minimax-coding',
-    'gemini-cli',
-    'antigravity',
-  ];
-  const rateLimitQuotas = quotas.filter((quota) => {
-    const checkerType = (quota.checkerType || quota.checkerId).toLowerCase();
-    return RATE_LIMIT_CHECKERS.some((rc) => checkerType.includes(rc));
-  });
+  // Filter using the authoritative checkerCategory field from the backend.
+  const balanceQuotas = quotas.filter((quota) => quota.checkerCategory === 'balance');
+  const rateLimitQuotas = quotas.filter((quota) => quota.checkerCategory === 'rate-limit');
 
   return (
     <aside

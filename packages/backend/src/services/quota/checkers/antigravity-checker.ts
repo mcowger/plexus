@@ -43,6 +43,7 @@ interface ParsedModelQuota {
 }
 
 export class AntigravityQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   constructor(config: QuotaCheckerConfig) {
     super(config);
   }
@@ -166,6 +167,16 @@ export class AntigravityQuotaChecker extends QuotaChecker {
       this.getOption<string>('oauthProvider', 'google-antigravity').trim() || 'google-antigravity';
     const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
     const authManager = OAuthAuthManager.getInstance();
+
+    const rawCreds = oauthAccountId
+      ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
+      : authManager.getCredentials(provider as OAuthProvider);
+    logger.debug(
+      `[antigravity-checker] resolveApiKey for '${this.id}' — ` +
+        `refresh=${rawCreds?.refresh ? `present(${rawCreds.refresh.length} chars)` : 'MISSING'}, ` +
+        `access=${rawCreds?.access ? `present(${rawCreds.access.length} chars)` : 'MISSING'}, ` +
+        `expires=${rawCreds?.expires} (${rawCreds && rawCreds.expires > Date.now() ? 'valid' : 'EXPIRED or missing'})`
+    );
 
     let apiKeyResult: string;
     try {

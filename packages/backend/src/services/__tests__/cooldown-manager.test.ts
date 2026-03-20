@@ -19,7 +19,6 @@ describe('CooldownManager', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);
@@ -45,7 +44,6 @@ describe('CooldownManager', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);
@@ -75,7 +73,6 @@ describe('CooldownManager', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         cooldown: { initialMinutes: 1, maxMinutes: 60 },
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
@@ -112,7 +109,6 @@ describe('CooldownManager', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         cooldown: { initialMinutes: 2, maxMinutes: 10 }, // 10 minute cap
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
@@ -143,7 +139,6 @@ describe('CooldownManager', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);
@@ -190,7 +185,6 @@ describe('CooldownManager', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);
@@ -221,7 +215,6 @@ describe('CooldownManager', () => {
         },
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);
@@ -246,7 +239,6 @@ describe('CooldownManager', () => {
         },
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);
@@ -264,7 +256,6 @@ describe('CooldownManager', () => {
         },
         models: {},
         keys: {},
-        adminKey: 'test',
         failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
         quotas: [],
       } as any);

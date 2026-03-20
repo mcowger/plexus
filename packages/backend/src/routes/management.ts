@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { getConfig } from '../config';
 import { logger } from '../utils/logger';
 import { UsageStorageService } from '../services/usage-storage';
 import { registerConfigRoutes } from './management/config';
@@ -16,16 +15,19 @@ import { registerUserQuotaRoutes } from './management/user-quotas';
 import { registerOAuthRoutes } from './management/oauth';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { registerLoggingRoutes } from './management/logging';
+import { registerRestartRoutes } from './management/restart';
+import { registerProviderRoutes } from './management/providers';
+import { registerMetricsRoutes } from './management/metrics';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage';
 
 function adminKeyAuth(request: FastifyRequest, reply: FastifyReply, done: () => void) {
-  const config = getConfig();
   const providedKey = request.headers['x-admin-key'];
+  const adminKey = process.env.ADMIN_KEY;
 
-  if (!providedKey || providedKey !== config.adminKey) {
+  if (!providedKey || providedKey !== adminKey) {
     logger.silly(
       `[ADMIN AUTH] Rejected request to ${request.url} - invalid or missing x-admin-key`
     );
@@ -70,6 +72,9 @@ export async function registerManagementRoutes(
     await registerTestRoutes(protected_, dispatcher);
     await registerOAuthRoutes(protected_);
     await registerLoggingRoutes(protected_);
+    await registerRestartRoutes(protected_);
+    await registerProviderRoutes(protected_);
+    await registerMetricsRoutes(protected_, usageStorage);
     if (quotaScheduler) {
       await registerQuotaRoutes(protected_, quotaScheduler);
     }

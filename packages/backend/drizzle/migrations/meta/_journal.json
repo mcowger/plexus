@@ -134,6 +134,20 @@
       "when": 1772857531462,
       "tag": "0018_giant_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1773022128659,
+      "tag": "0019_cool_the_hand",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1773877555913,
+      "tag": "0020_grey_viper",
+      "breakpoints": true
     }
   ]
 }

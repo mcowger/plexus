@@ -30,22 +30,25 @@ describe('NanoGPTQuotaChecker', () => {
       return new Response(
         JSON.stringify({
           active: true,
-          limits: { daily: 5000, monthly: 60000 },
-          enforceDailyLimit: true,
-          daily: {
+          state: 'active',
+          graceUntil: null,
+          limits: {
+            weeklyInputTokens: null,
+            dailyInputTokens: 5000,
+            dailyImages: null,
+          },
+          dailyInputTokens: {
             used: 5,
             remaining: 4995,
             percentUsed: 0.001,
             resetAt: 1738540800000,
           },
-          monthly: {
+          weeklyInputTokens: {
             used: 45,
             remaining: 59955,
             percentUsed: 0.00075,
             resetAt: 1739404800000,
           },
-          state: 'active',
-          graceUntil: null,
         }),
         {
           status: 200,
@@ -61,8 +64,13 @@ describe('NanoGPTQuotaChecker', () => {
     expect(result.error).toBeUndefined();
     expect(result.windows).toHaveLength(2);
 
+    const weeklyWindow = result.windows?.find((w) => w.windowType === 'weekly');
     const dailyWindow = result.windows?.find((w) => w.windowType === 'daily');
-    const monthlyWindow = result.windows?.find((w) => w.windowType === 'monthly');
+
+    expect(weeklyWindow).toBeDefined();
+    expect(weeklyWindow?.used).toBe(45);
+    expect(weeklyWindow?.remaining).toBe(59955);
+    expect(weeklyWindow?.resetsAt?.toISOString()).toBe('2025-02-13T00:00:00.000Z');
 
     expect(dailyWindow).toBeDefined();
     expect(dailyWindow?.limit).toBe(5000);
@@ -70,39 +78,12 @@ describe('NanoGPTQuotaChecker', () => {
     expect(dailyWindow?.remaining).toBe(4995);
     expect(dailyWindow?.status).toBe('ok');
     expect(dailyWindow?.resetsAt?.toISOString()).toBe('2025-02-03T00:00:00.000Z');
-
-    expect(monthlyWindow).toBeDefined();
-    expect(monthlyWindow?.limit).toBe(60000);
-    expect(monthlyWindow?.used).toBe(45);
-    expect(monthlyWindow?.remaining).toBe(59955);
-    expect(monthlyWindow?.status).toBe('ok');
-    expect(monthlyWindow?.resetsAt?.toISOString()).toBe('2025-02-13T00:00:00.000Z');
-
-    expect(result.rawResponse).toEqual({
-      active: true,
-      limits: { daily: 5000, monthly: 60000 },
-      enforceDailyLimit: true,
-      daily: {
-        used: 5,
-        remaining: 4995,
-        percentUsed: 0.001,
-        resetAt: 1738540800000,
-      },
-      monthly: {
-        used: 45,
-        remaining: 59955,
-        percentUsed: 0.00075,
-        resetAt: 1739404800000,
-      },
-      state: 'active',
-      graceUntil: null,
-    });
   });
 
   it('returns error when response has no daily/monthly windows', async () => {
     setFetchMock(async () => {
       return new Response(
-        JSON.stringify({ active: true, limits: { daily: 5000, monthly: 60000 } }),
+        JSON.stringify({ active: true, state: 'unknown', limits: { dailyInputTokens: 5000 } }),
         {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -114,7 +95,7 @@ describe('NanoGPTQuotaChecker', () => {
     const result = await checker.checkQuota();
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('did not include daily or monthly usage windows');
+    expect(result.error).toContain('did not include any usage windows');
   });
 
   it('returns error for non-200 response', async () => {
@@ -140,9 +121,11 @@ describe('NanoGPTQuotaChecker', () => {
 
       return new Response(
         JSON.stringify({
-          daily: { used: 1, remaining: 9, resetAt: 1738540800000 },
-          monthly: { used: 3, remaining: 97, resetAt: 1739404800000 },
-          limits: { daily: 10, monthly: 100 },
+          state: 'active',
+          active: true,
+          limits: { dailyInputTokens: 10 },
+          dailyInputTokens: { used: 1, remaining: 9, resetAt: 1738540800000 },
+          weeklyInputTokens: { used: 3, remaining: 97, resetAt: 1739404800000 },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -173,9 +156,11 @@ describe('NanoGPTQuotaChecker', () => {
       expect(headers.get('x-api-key')).toBe('nanogpt_test_key');
       return new Response(
         JSON.stringify({
-          daily: { used: 10, remaining: 90, resetAt: 1738540800000 },
-          monthly: { used: 100, remaining: 900, resetAt: 1739404800000 },
-          limits: { daily: 100, monthly: 1000 },
+          state: 'active',
+          active: true,
+          limits: { dailyInputTokens: 100, weeklyInputTokens: null },
+          dailyInputTokens: { used: 10, remaining: 90, resetAt: 1738540800000 },
+          weeklyInputTokens: { used: 100, remaining: 900, resetAt: 1739404800000 },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );

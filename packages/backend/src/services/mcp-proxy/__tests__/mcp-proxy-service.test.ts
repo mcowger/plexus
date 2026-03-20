@@ -233,7 +233,6 @@ describe('MCP Proxy Service', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'admin-secret',
         failover: {
           enabled: false,
           retryableStatusCodes: [429, 500, 502, 503, 504],
@@ -282,7 +281,6 @@ describe('MCP Proxy Service', () => {
         providers: {},
         models: {},
         keys: {},
-        adminKey: 'admin-secret',
         failover: {
           enabled: false,
           retryableStatusCodes: [429, 500, 502, 503, 504],

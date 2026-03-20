@@ -6,12 +6,13 @@ import {
   OAuthTransformer,
 } from '../transformers';
 import { ResponsesTransformer } from '../transformers/responses';
+import { OllamaTransformer } from '../transformers/ollama';
 
 /**
  * TransformerFactory
  *
  * Factory for retrieving the correct transformer based on the provider's API type.
- * Supports 'messages' (Anthropic), 'gemini' (Google), 'chat' (OpenAI), 'responses' (OpenAI Responses API), and 'oauth'.
+ * Supports 'messages' (Anthropic), 'gemini' (Google), 'chat' (OpenAI), 'responses' (OpenAI Responses API), 'ollama' (Native Ollama), and 'oauth'.
  */
 export class TransformerFactory {
   static getTransformer(providerType: string): Transformer {
@@ -24,11 +25,13 @@ export class TransformerFactory {
         return new OpenAITransformer();
       case 'responses':
         return new ResponsesTransformer();
+      case 'ollama':
+        return new OllamaTransformer();
       case 'oauth':
         return new OAuthTransformer();
       default:
         throw new Error(
-          `Unsupported provider type: ${providerType}. Only 'messages', 'gemini', 'chat', 'responses', and 'oauth' are allowed.`
+          `Unsupported provider type: ${providerType}. Only 'messages', 'gemini', 'chat', 'responses', 'ollama', and 'oauth' are allowed.`
         );
     }
   }

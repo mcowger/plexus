@@ -5,6 +5,7 @@ import { QuotaEstimator } from './quota-estimator';
 import { toDbBoolean, toEpochMs, toDbTimestampMs } from '../../utils/normalize';
 import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
 import { and, eq, gte, desc } from 'drizzle-orm';
+import { CooldownManager } from '../cooldown-manager';
 
 export class QuotaScheduler {
   private static instance: QuotaScheduler;
@@ -97,8 +98,68 @@ export class QuotaScheduler {
     }
 
     await this.persistResult(result);
+    await this.applyCooldownsFromResult(result);
 
     return result;
+  }
+
+  /**
+   * After each quota check, inspect all windows for near-exhaustion (≥99% utilization).
+   * If any window is at or above that threshold AND has a known reset time, inject a
+   * provider-wide cooldown (model='') lasting until that reset — overriding the normal
+   * exponential backoff so routing stops immediately instead of hammering the provider.
+   *
+   * If all windows are healthy, clear any existing provider-wide quota cooldown so
+   * routing resumes as soon as the quota refreshes.
+   */
+  private async applyCooldownsFromResult(result: QuotaCheckResult): Promise<void> {
+    if (!result.success || !result.windows?.length) {
+      return;
+    }
+
+    const EXHAUSTION_THRESHOLD = 99;
+    const cooldownManager = CooldownManager.getInstance();
+    const provider = result.provider;
+
+    // Find the most-constrained exhausted window that also has a reset time.
+    let earliestResetMs: number | null = null;
+    let exhaustedWindowDescription: string | null = null;
+
+    for (const window of result.windows) {
+      if (
+        window.utilizationPercent !== undefined &&
+        window.utilizationPercent >= EXHAUSTION_THRESHOLD
+      ) {
+        const resetMs = window.resetsAt ? window.resetsAt.getTime() : null;
+        if (resetMs !== null && resetMs > Date.now()) {
+          // Use the latest reset time so we don't release the cooldown too early
+          // when multiple windows are exhausted with different reset schedules.
+          if (earliestResetMs === null || resetMs > earliestResetMs) {
+            earliestResetMs = resetMs;
+            exhaustedWindowDescription = window.description ?? window.windowType;
+          }
+        }
+        // If exhausted but no reset time, skip — let existing exponential backoff handle it.
+      }
+    }
+
+    if (earliestResetMs !== null) {
+      const durationMs = Math.max(0, earliestResetMs - Date.now());
+      logger.info(
+        `[quota-scheduler] Provider '${provider}' quota exhausted` +
+          ` (window: ${exhaustedWindowDescription}, checker: ${result.checkerId}).` +
+          ` Injecting provider-wide cooldown for ${Math.round(durationMs / 1000)}s.`
+      );
+      await cooldownManager.markProviderFailure(
+        provider,
+        '',
+        durationMs,
+        `quota exhausted — ${exhaustedWindowDescription}`
+      );
+    } else {
+      // All windows are healthy — clear any standing provider-wide quota cooldown.
+      await cooldownManager.markProviderSuccess(provider, '');
+    }
   }
 
   private async persistResult(result: QuotaCheckResult): Promise<void> {
@@ -196,6 +257,10 @@ export class QuotaScheduler {
 
   getCheckerIds(): string[] {
     return Array.from(this.checkers.keys());
+  }
+
+  getCheckerCategory(checkerId: string): 'balance' | 'rate-limit' | undefined {
+    return (this.checkers.get(checkerId) as any)?.category;
   }
 
   async getLatestQuota(checkerId: string) {

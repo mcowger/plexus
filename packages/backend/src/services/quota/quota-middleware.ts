@@ -8,6 +8,7 @@ interface QuotaUsageRecord {
   tokensCached?: number | null;
   tokensCacheWrite?: number | null;
   tokensReasoning?: number | null;
+  costTotal?: number | null;
 }
 
 /**
@@ -73,6 +74,7 @@ export async function recordQuotaUsage(
       tokensCached: usageRecord.tokensCached ?? undefined,
       tokensCacheWrite: usageRecord.tokensCacheWrite ?? undefined,
       tokensReasoning: usageRecord.tokensReasoning ?? undefined,
+      costTotal: usageRecord.costTotal ?? undefined,
     });
   } catch (error) {
     // Log error but don't fail the request

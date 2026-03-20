@@ -7,6 +7,7 @@ interface KiloBalanceResponse {
 }
 
 export class KiloQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   private endpoint: string;
   private organizationId?: string;
 

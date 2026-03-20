@@ -21,7 +21,6 @@ describe('Router Aliases', () => {
       },
     },
     keys: {},
-    adminKey: 'secret',
   };
 
   beforeEach(() => {
@@ -85,7 +84,6 @@ describe('Router Direct Provider/Model Routing', () => {
       },
     },
     keys: {},
-    adminKey: 'secret',
   };
 
   beforeEach(() => {
@@ -172,7 +170,6 @@ describe('Router.resolveCandidates', () => {
       },
       models: {},
       keys: {},
-      adminKey: 'secret',
     } as any);
 
     const result = await Router.resolveCandidates('unknown-model');
@@ -194,7 +191,6 @@ describe('Router.resolveCandidates', () => {
         },
       },
       keys: {},
-      adminKey: 'secret',
     } as any);
 
     const result = await Router.resolveCandidates('empty-model');
@@ -226,7 +222,6 @@ describe('Router.resolveCandidates', () => {
         },
       },
       keys: {},
-      adminKey: 'secret',
     } as any);
 
     const result = await Router.resolveCandidates('disabled-model');
@@ -257,7 +252,6 @@ describe('Router.resolveCandidates', () => {
         },
       },
       keys: {},
-      adminKey: 'secret',
     } as any);
 
     spyOn(cooldownManager, 'filterHealthyTargets').mockResolvedValue([]);
@@ -300,7 +294,6 @@ describe('Router.resolveCandidates', () => {
         },
       },
       keys: {},
-      adminKey: 'secret',
     } as any);
 
     // Simulate p1 being unhealthy after disabled filtering

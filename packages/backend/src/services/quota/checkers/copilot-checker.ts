@@ -16,6 +16,7 @@ interface CopilotUsageResponse {
 }
 
 export class CopilotQuotaChecker extends QuotaChecker {
+  readonly category = 'rate-limit' as const;
   private endpoint: string;
   private userAgent: string;
   private editorVersion: string;
@@ -148,6 +149,12 @@ export class CopilotQuotaChecker extends QuotaChecker {
 
     // For Copilot, we need the 'refresh' token (ghu_...) not the 'access' cookie
     const refreshToken = (credentials as Record<string, unknown>)?.refresh as string | undefined;
+    logger.debug(
+      `[copilot-checker] resolveApiKey for '${this.id}' — ` +
+        `refresh=${refreshToken ? `present(${refreshToken.length} chars, starts: ${refreshToken.substring(0, 8)}...)` : 'MISSING'}, ` +
+        `access=${credentials.access ? `present(${credentials.access.length} chars)` : 'MISSING'}, ` +
+        `expires=${credentials.expires} (${credentials.expires > Date.now() ? 'valid' : 'EXPIRED'})`
+    );
     if (refreshToken) {
       return refreshToken;
     }

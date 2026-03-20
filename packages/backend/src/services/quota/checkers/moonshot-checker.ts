@@ -14,6 +14,7 @@ interface MoonshotBalanceResponse {
 }
 
 export class MoonshotQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   private endpoint: string;
 
   constructor(config: QuotaCheckerConfig) {

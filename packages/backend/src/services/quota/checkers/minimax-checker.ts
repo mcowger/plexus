@@ -17,6 +17,7 @@ interface MiniMaxBalanceResponse {
 }
 
 export class MiniMaxQuotaChecker extends QuotaChecker {
+  readonly category = 'balance' as const;
   async checkQuota(): Promise<QuotaCheckResult> {
     const groupid = this.requireOption<string>('groupid').trim();
     const hertzSession = this.requireOption<string>('hertzSession').trim();

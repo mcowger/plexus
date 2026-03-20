@@ -1,6 +1,12 @@
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { DebugManager } from '../../services/debug-manager';
 import { UsageStorageService } from '../../services/usage-storage';
+
+const patchDebugSchema = z.object({
+  enabled: z.boolean().optional(),
+  providers: z.array(z.string()).nullable().optional(),
+});
 
 export async function registerDebugRoutes(
   fastify: FastifyInstance,
@@ -14,20 +20,18 @@ export async function registerDebugRoutes(
     });
   });
 
-  fastify.post('/v0/management/debug', async (request, reply) => {
-    const body = request.body as any;
+  fastify.patch('/v0/management/debug', async (request, reply) => {
+    const parsed = patchDebugSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+    }
     const debugManager = DebugManager.getInstance();
 
-    if (typeof body.enabled === 'boolean') {
-      debugManager.setEnabled(body.enabled);
+    if (parsed.data.enabled !== undefined) {
+      debugManager.setEnabled(parsed.data.enabled);
     }
-
-    if (body.providers !== undefined) {
-      if (Array.isArray(body.providers)) {
-        debugManager.setProviderFilter(body.providers);
-      } else if (body.providers === null) {
-        debugManager.setProviderFilter(null);
-      }
+    if (parsed.data.providers !== undefined) {
+      debugManager.setProviderFilter(parsed.data.providers);
     }
 
     return reply.send({
