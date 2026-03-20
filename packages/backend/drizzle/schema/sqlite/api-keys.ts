@@ -4,6 +4,7 @@ export const apiKeys = sqliteTable('api_keys', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
   secret: text('secret').notNull().unique(),
+  secretHash: text('secret_hash'),
   comment: text('comment'),
   quotaName: text('quota_name'),
   createdAt: integer('created_at').notNull(),
