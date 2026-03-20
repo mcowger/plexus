@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
 import { getDatabase, getSchema } from './client';
-import { ConfigRepository } from './config-repository';
 import { logger } from '../utils/logger';
 import {
   encrypt,
@@ -9,8 +8,6 @@ import {
   isEncrypted,
   isEncryptionEnabled,
 } from '../utils/encryption';
-
-const MIGRATION_FLAG_KEY = 'system.encryptionMigrationCompleted';
 
 /**
  * Migrate existing plaintext sensitive data to encrypted form.
@@ -24,13 +21,6 @@ const MIGRATION_FLAG_KEY = 'system.encryptionMigrationCompleted';
 export async function runEncryptionMigration(): Promise<void> {
   if (!isEncryptionEnabled()) {
     logger.debug('ENCRYPTION_KEY not set, skipping encryption migration');
-    return;
-  }
-
-  const repo = new ConfigRepository();
-  const alreadyDone = await repo.getSetting<boolean>(MIGRATION_FLAG_KEY, false);
-  if (alreadyDone) {
-    logger.debug('Encryption migration already completed, skipping');
     return;
   }
 
@@ -147,7 +137,5 @@ export async function runEncryptionMigration(): Promise<void> {
     throw error;
   }
 
-  // Mark migration as completed
-  await repo.setSetting(MIGRATION_FLAG_KEY, true);
   logger.info('Encryption migration completed successfully');
 }

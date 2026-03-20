@@ -25,7 +25,7 @@ Plexus is a high-performance API gateway that unifies access to multiple AI prov
 ```bash
 export ADMIN_KEY="your-secure-admin-password"  # Recommended - will use plexus.yaml as fallback with warning
 export DATABASE_URL="sqlite:///app/data/plexus.db"  # Optional (default shown)
-export ENCRYPTION_KEY="$(openssl rand -hex 32)"  # Optional - encrypts sensitive data at rest
+export ENCRYPTION_KEY="your-generated-hex-key"   # Optional - encrypts sensitive data at rest (generate once: openssl rand -hex 32)
 export PORT="4000"  # Optional
 ```
 
@@ -112,7 +112,7 @@ docker run -p 4000:4000 \
   -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
   -v plexus-data:/app/data \
   -e DATABASE_URL=sqlite:///app/data/plexus.db \
-  -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  -e ENCRYPTION_KEY="your-generated-hex-key" \
   ghcr.io/mcowger/plexus:latest
 ```
 
@@ -271,7 +271,9 @@ Plexus supports AES-256-GCM encryption for all sensitive data stored in the data
 **Enable encryption:**
 
 ```bash
-export ENCRYPTION_KEY="$(openssl rand -hex 32)"
+# Generate once and persist in your .env or secret manager:
+#   openssl rand -hex 32
+export ENCRYPTION_KEY="your-generated-hex-key"
 ```
 
 On first startup with `ENCRYPTION_KEY` set, existing plaintext values are automatically encrypted. Without the key, the system operates in plaintext mode (backward compatible). See [Configuration: Encryption](docs/CONFIGURATION.md#encryption-at-rest-optional) for details.

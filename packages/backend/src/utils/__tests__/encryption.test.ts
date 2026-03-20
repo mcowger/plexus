@@ -25,8 +25,14 @@ function setEncryptionKey(key: string | undefined) {
 }
 
 describe('encryption utility', () => {
+  let originalEncryptionKey: string | undefined;
+
+  beforeEach(() => {
+    originalEncryptionKey = process.env.ENCRYPTION_KEY;
+  });
+
   afterEach(() => {
-    setEncryptionKey(undefined);
+    setEncryptionKey(originalEncryptionKey);
   });
 
   describe('isEncryptionEnabled', () => {

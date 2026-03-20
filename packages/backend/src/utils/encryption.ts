@@ -4,6 +4,9 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 const PREFIX = 'enc:v1:';
+const SCRYPT_SALT = Buffer.from('plexus-encryption-key-derivation');
+const SCRYPT_KEYLEN = 32;
+const SCRYPT_COST = 16384; // N=2^14, reasonable for a one-time startup derivation
 
 let encryptionKey: Buffer | null = null;
 let keyInitialized = false;
@@ -22,8 +25,8 @@ function getEncryptionKey(): Buffer | null {
   if (/^[0-9a-fA-F]{64}$/.test(raw)) {
     encryptionKey = Buffer.from(raw, 'hex');
   } else {
-    // Derive 32-byte key via SHA-256
-    encryptionKey = crypto.createHash('sha256').update(raw).digest();
+    // Derive 32-byte key via scrypt with a fixed application-specific salt
+    encryptionKey = crypto.scryptSync(raw, SCRYPT_SALT, SCRYPT_KEYLEN, { N: SCRYPT_COST });
   }
 
   return encryptionKey;

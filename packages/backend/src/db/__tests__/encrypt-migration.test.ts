@@ -9,7 +9,6 @@ import {
   isEncrypted,
   resetEncryptionKeyCache,
 } from '../../utils/encryption';
-import { ConfigRepository } from '../config-repository';
 
 const TEST_KEY = 'b'.repeat(64);
 
@@ -124,6 +123,62 @@ describe('encryption migration', () => {
     expect(decrypt(rows[0]!.apiKey!)).toBe('provider-api-key-123');
   });
 
+  it('encrypts provider JSON fields (headers, extraBody, quotaCheckerOptions)', async () => {
+    const ts = Date.now();
+    const headers = JSON.stringify({ Authorization: 'Bearer secret-token' });
+    const extraBody = JSON.stringify({ custom: 'data', nested: { key: 'val' } });
+    const quotaOpts = JSON.stringify({ endpoint: '/usage', threshold: 90 });
+    await db.insert(schema.providers).values({
+      slug: 'json-provider',
+      apiBaseUrl: '"https://api.example.com"',
+      apiKey: 'pk-123',
+      headers,
+      extraBody,
+      quotaCheckerOptions: quotaOpts,
+      enabled: 1,
+      disableCooldown: 0,
+      estimateTokens: 0,
+      useClaudeMasking: 0,
+      quotaCheckerEnabled: 1,
+      quotaCheckerInterval: 30,
+      createdAt: ts,
+      updatedAt: ts,
+    });
+
+    setEncryptionKey(TEST_KEY);
+    await runEncryptionMigration();
+
+    const rows = await db.select().from(schema.providers);
+    const row = rows[0]!;
+    expect(isEncrypted(row.headers as string)).toBe(true);
+    expect(isEncrypted(row.extraBody as string)).toBe(true);
+    expect(isEncrypted(row.quotaCheckerOptions as string)).toBe(true);
+    expect(JSON.parse(decrypt(row.headers as string))).toEqual({ Authorization: 'Bearer secret-token' });
+    expect(JSON.parse(decrypt(row.extraBody as string))).toEqual({ custom: 'data', nested: { key: 'val' } });
+    expect(JSON.parse(decrypt(row.quotaCheckerOptions as string))).toEqual({ endpoint: '/usage', threshold: 90 });
+  });
+
+  it('encrypts MCP server headers', async () => {
+    const ts = Date.now();
+    const headers = JSON.stringify({ 'X-Api-Key': 'mcp-secret' });
+    await db.insert(schema.mcpServers).values({
+      name: 'test-mcp',
+      upstreamUrl: 'https://mcp.example.com/mcp',
+      enabled: 1,
+      headers,
+      createdAt: ts,
+      updatedAt: ts,
+    });
+
+    setEncryptionKey(TEST_KEY);
+    await runEncryptionMigration();
+
+    const rows = await db.select().from(schema.mcpServers);
+    const row = rows[0]!;
+    expect(isEncrypted(row.headers as string)).toBe(true);
+    expect(JSON.parse(decrypt(row.headers as string))).toEqual({ 'X-Api-Key': 'mcp-secret' });
+  });
+
   it('is idempotent (does not double-encrypt)', async () => {
     const ts = Date.now();
     await db.insert(schema.apiKeys).values({
@@ -135,26 +190,12 @@ describe('encryption migration', () => {
 
     setEncryptionKey(TEST_KEY);
 
-    // Run migration twice
+    // Run migration twice — per-row isEncrypted checks prevent double-encryption
     await runEncryptionMigration();
-
-    // Reset the completion flag to force re-run
-    const repo = new ConfigRepository();
-    await repo.setSetting('system.encryptionMigrationCompleted', false);
-
     await runEncryptionMigration();
 
     // Should still decrypt to original value (not double-encrypted)
     const rows = await db.select().from(schema.apiKeys);
     expect(decrypt(rows[0]!.secret)).toBe('sk-test-secret');
-  });
-
-  it('sets completion flag after migration', async () => {
-    setEncryptionKey(TEST_KEY);
-    await runEncryptionMigration();
-
-    const repo = new ConfigRepository();
-    const completed = await repo.getSetting<boolean>('system.encryptionMigrationCompleted', false);
-    expect(completed).toBe(true);
   });
 });
