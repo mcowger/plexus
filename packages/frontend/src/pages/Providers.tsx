@@ -975,7 +975,7 @@ export const Providers = () => {
   };
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
+    <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
       <Card
         title="Configured Providers"
         extra={
@@ -1553,7 +1553,7 @@ export const Providers = () => {
                                 <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
                                   <AlertTriangle
                                     size={14}
-                                    className="text-warning flex-shrink-0 mt-0.5"
+                                    className="text-warning shrink-0 mt-0.5"
                                   />
                                   <span className="text-[11px] text-warning">
                                     <span style={{ fontWeight: 600 }}>native ollama</span> type
@@ -1586,7 +1586,7 @@ export const Providers = () => {
                                 <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
                                   <AlertTriangle
                                     size={14}
-                                    className="text-warning flex-shrink-0 mt-0.5"
+                                    className="text-warning shrink-0 mt-0.5"
                                   />
                                   <span className="text-[11px] text-warning">
                                     This URL contains{' '}
@@ -2684,7 +2684,7 @@ export const Providers = () => {
                                           <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
                                             <Info
                                               size={14}
-                                              className="text-info flex-shrink-0 mt-0.5"
+                                              className="text-info shrink-0 mt-0.5"
                                             />
                                             <span className="text-[11px] text-info">
                                               Provider has a native Ollama URL. If you want this
