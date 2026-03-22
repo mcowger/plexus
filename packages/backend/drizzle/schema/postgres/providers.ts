@@ -31,13 +31,13 @@ export const providers = pgTable(
     discount: real('discount'),
     estimateTokens: boolean('estimate_tokens').notNull().default(false),
     useClaudeMasking: boolean('use_claude_masking').notNull().default(false),
-    headers: jsonb('headers'), // Record<string, string>
-    extraBody: jsonb('extra_body'), // Record<string, any>
+    headers: text('headers'), // JSON or encrypted string — text for encryption compatibility
+    extraBody: text('extra_body'), // JSON — not encrypted, text for consistency
     quotaCheckerType: quotaCheckerTypeEnum('quota_checker_type'),
     quotaCheckerId: text('quota_checker_id'),
     quotaCheckerEnabled: boolean('quota_checker_enabled').notNull().default(true),
     quotaCheckerInterval: integer('quota_checker_interval').notNull().default(30),
-    quotaCheckerOptions: jsonb('quota_checker_options'),
+    quotaCheckerOptions: text('quota_checker_options'), // JSON or encrypted string
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },

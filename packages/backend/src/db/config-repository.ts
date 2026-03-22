@@ -1,6 +1,15 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { getDatabase, getSchema, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
+import {
+  encrypt,
+  decrypt,
+  encryptField,
+  decryptField,
+  hashSecret,
+  isEncrypted,
+  isEncryptionEnabled,
+} from '../utils/encryption';
 import type {
   ProviderConfig,
   ModelConfig,
@@ -34,6 +43,37 @@ function toJson(value: unknown): string | unknown {
     return JSON.stringify(value);
   }
   return value; // PG jsonb handles objects natively
+}
+
+/**
+ * Encrypt a JSON value for storage in a TEXT column.
+ * JSON-serializes the value, then encrypts the resulting string.
+ * If encryption is disabled, returns the JSON string as-is.
+ */
+function encryptJsonField(value: unknown): string {
+  if (value === null || value === undefined) return null as unknown as string;
+  const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+  return encrypt(strVal);
+}
+
+/**
+ * Decrypt a JSON value read from the database. Handles:
+ * - Encrypted strings (enc:v1:...) → decrypt then JSON.parse
+ * - Plain strings (SQLite text) → JSON.parse
+ * - Already-parsed objects (PG jsonb with unencrypted data) → return as-is
+ */
+function decryptJsonField<T>(value: unknown): T | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const decrypted = decrypt(value);
+    try {
+      return JSON.parse(decrypted) as T;
+    } catch {
+      return decrypted as unknown as T;
+    }
+  }
+  if (typeof value === 'object') return value as T;
+  return null;
 }
 
 function toBool(value: unknown): boolean {
@@ -165,7 +205,7 @@ export class ConfigRepository {
       slug,
       displayName: config.display_name ?? null,
       apiBaseUrl: toJson(config.api_base_url),
-      apiKey: config.api_key ?? null,
+      apiKey: encryptField(config.api_key ?? null),
       oauthProviderType: config.oauth_provider ?? null,
       oauthCredentialId,
       enabled: fromBool(config.enabled !== false),
@@ -173,14 +213,14 @@ export class ConfigRepository {
       discount: config.discount ?? null,
       estimateTokens: fromBool(config.estimateTokens === true),
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
-      headers: config.headers ? toJson(config.headers) : null,
-      extraBody: config.extraBody ? toJson(config.extraBody) : null,
+      headers: config.headers ? encryptJsonField(config.headers) : null,
+      extraBody: config.extraBody ? JSON.stringify(config.extraBody) : null,
       quotaCheckerType: config.quota_checker?.type ?? null,
       quotaCheckerId: config.quota_checker?.id ?? null,
       quotaCheckerEnabled: fromBool(config.quota_checker?.enabled !== false),
       quotaCheckerInterval: config.quota_checker?.intervalMinutes ?? 30,
       quotaCheckerOptions: config.quota_checker?.options
-        ? toJson(config.quota_checker.options)
+        ? encryptJsonField(config.quota_checker.options)
         : null,
       updatedAt: timestamp,
     };
@@ -318,14 +358,17 @@ export class ConfigRepository {
         enabled: toBool(row.quotaCheckerEnabled),
         intervalMinutes: row.quotaCheckerInterval,
         ...(row.quotaCheckerId ? { id: row.quotaCheckerId } : {}),
-        ...(row.quotaCheckerOptions ? { options: parseJson(row.quotaCheckerOptions) } : {}),
+        ...(row.quotaCheckerOptions ? { options: decryptJsonField(row.quotaCheckerOptions) } : {}),
       };
     }
+
+    // Decrypt sensitive fields
+    const decryptedApiKey = decryptField(row.apiKey);
 
     const result: any = {
       api_base_url: apiBaseUrl ?? '',
       ...(row.displayName ? { display_name: row.displayName } : {}),
-      ...(row.apiKey ? { api_key: row.apiKey } : {}),
+      ...(decryptedApiKey ? { api_key: decryptedApiKey } : {}),
       ...(row.oauthProviderType ? { oauth_provider: row.oauthProviderType } : {}),
       ...(oauthAccountId ? { oauth_account: oauthAccountId } : {}),
       enabled: toBool(row.enabled),
@@ -334,7 +377,7 @@ export class ConfigRepository {
       estimateTokens: toBool(row.estimateTokens),
       useClaudeMasking: toBool(row.useClaudeMasking),
       ...(models ? { models } : {}),
-      ...(row.headers ? { headers: parseJson(row.headers) } : {}),
+      ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),
       ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
       ...(quota_checker ? { quota_checker } : {}),
     };
@@ -488,7 +531,7 @@ export class ConfigRepository {
 
     for (const row of rows) {
       result[row.name] = {
-        secret: row.secret,
+        secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
         ...(row.quotaName ? { quota: row.quotaName } : {}),
       };
@@ -499,11 +542,30 @@ export class ConfigRepository {
 
   async getKeyBySecret(secret: string): Promise<{ name: string; config: KeyConfig } | null> {
     const schema = this.schema();
-    const rows = await this.db()
+    const hash = hashSecret(secret);
+
+    // Try hash-based lookup first (works after encryption migration)
+    let rows = await this.db()
       .select()
       .from(schema.apiKeys)
-      .where(eq(schema.apiKeys.secret, secret))
+      .where(eq(schema.apiKeys.secretHash, hash))
       .limit(1);
+
+    // Fallback to plaintext lookup for backward compatibility (before migration)
+    if (rows.length === 0) {
+      rows = await this.db()
+        .select()
+        .from(schema.apiKeys)
+        .where(eq(schema.apiKeys.secret, secret))
+        .limit(1);
+
+      if (rows.length > 0) {
+        logger.error(
+          'API key matched via plaintext fallback — encryption migration may not have run. ' +
+            'Restart with ENCRYPTION_KEY set to trigger migration.'
+        );
+      }
+    }
 
     if (rows.length === 0) return null;
 
@@ -511,7 +573,7 @@ export class ConfigRepository {
     return {
       name: row.name,
       config: {
-        secret: row.secret,
+        secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
         ...(row.quotaName ? { quota: row.quotaName } : {}),
       },
@@ -521,6 +583,8 @@ export class ConfigRepository {
   async saveKey(name: string, config: KeyConfig): Promise<void> {
     const schema = this.schema();
     const timestamp = now();
+    const encryptedSecret = encrypt(config.secret);
+    const secretHash = hashSecret(config.secret);
 
     const existing = await this.db()
       .select()
@@ -532,7 +596,8 @@ export class ConfigRepository {
       await this.db()
         .update(schema.apiKeys)
         .set({
-          secret: config.secret,
+          secret: encryptedSecret,
+          secretHash,
           comment: config.comment ?? null,
           quotaName: config.quota ?? null,
           updatedAt: timestamp,
@@ -543,7 +608,8 @@ export class ConfigRepository {
         .insert(schema.apiKeys)
         .values({
           name,
-          secret: config.secret,
+          secret: encryptedSecret,
+          secretHash,
           comment: config.comment ?? null,
           quotaName: config.quota ?? null,
           createdAt: timestamp,
@@ -631,7 +697,7 @@ export class ConfigRepository {
         upstream_url: row.upstreamUrl,
         enabled: toBool(row.enabled),
         ...(row.headers
-          ? { headers: parseJson<Record<string, string>>(row.headers) ?? undefined }
+          ? { headers: decryptJsonField<Record<string, string>>(row.headers) ?? undefined }
           : {}),
       };
     }
@@ -655,7 +721,7 @@ export class ConfigRepository {
         .set({
           upstreamUrl: config.upstream_url,
           enabled: fromBool(config.enabled !== false),
-          headers: config.headers ? toJson(config.headers) : null,
+          headers: config.headers ? encryptJsonField(config.headers) : null,
           updatedAt: timestamp,
         })
         .where(eq(schema.mcpServers.name, name));
@@ -666,7 +732,7 @@ export class ConfigRepository {
           name,
           upstreamUrl: config.upstream_url,
           enabled: fromBool(config.enabled !== false),
-          headers: config.headers ? toJson(config.headers) : null,
+          headers: config.headers ? encryptJsonField(config.headers) : null,
           createdAt: timestamp,
           updatedAt: timestamp,
         });
@@ -832,8 +898,8 @@ export class ConfigRepository {
 
     const row = rows[0]!;
     return {
-      accessToken: row.accessToken,
-      refreshToken: row.refreshToken,
+      accessToken: decrypt(row.accessToken),
+      refreshToken: decrypt(row.refreshToken),
       expiresAt: row.expiresAt,
     };
   }
@@ -845,6 +911,9 @@ export class ConfigRepository {
   ): Promise<void> {
     const schema = this.schema();
     const timestamp = now();
+
+    const encryptedAccessToken = encrypt(creds.accessToken);
+    const encryptedRefreshToken = encrypt(creds.refreshToken);
 
     const existing = await this.db()
       .select()
@@ -861,8 +930,8 @@ export class ConfigRepository {
       await this.db()
         .update(schema.oauthCredentials)
         .set({
-          accessToken: creds.accessToken,
-          refreshToken: creds.refreshToken,
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
           expiresAt: creds.expiresAt,
           updatedAt: timestamp,
         })
@@ -871,8 +940,8 @@ export class ConfigRepository {
       await this.db().insert(schema.oauthCredentials).values({
         oauthProviderType: providerType,
         accountId,
-        accessToken: creds.accessToken,
-        refreshToken: creds.refreshToken,
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
         expiresAt: creds.expiresAt,
         createdAt: timestamp,
         updatedAt: timestamp,

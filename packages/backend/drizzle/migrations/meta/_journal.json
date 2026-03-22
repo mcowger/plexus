@@ -148,6 +148,13 @@
       "when": 1773877555913,
       "tag": "0020_grey_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1774000000000,
+      "tag": "0021_add_secret_hash",
+      "breakpoints": true
     }
   ]
 }

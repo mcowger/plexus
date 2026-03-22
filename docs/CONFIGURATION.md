@@ -8,6 +8,7 @@ Plexus is configured via environment variables and a `config/plexus.yaml` file. 
 |----------|-------------|---------|
 | `ADMIN_KEY` | **Required.** Password for admin dashboard and management API access. The server will refuse to start if not set. | _(none)_ |
 | `DATABASE_URL` | Database connection string. Supports `sqlite://` and `postgres://` URIs. | `sqlite://<DATA_DIR>/plexus.db` |
+| `ENCRYPTION_KEY` | Encryption key for sensitive data at rest. See [Encryption at Rest](#encryption-at-rest-optional). | _(none — plaintext mode)_ |
 | `DATA_DIR` | Directory for data files (used as default location for SQLite database). | `./data` |
 | `CONFIG_FILE` | Path to `plexus.yaml` for initial import on first launch. | Auto-detected |
 | `LOG_LEVEL` | Logging level (`error`, `warn`, `info`, `debug`, `silly`). | `info` |
@@ -877,6 +878,55 @@ failover:
 ```
 
 By default, all non-2xx status codes except `400` and `422` trigger failover to the next healthy target. `retryableStatusCodes` and `retryableErrors` can be used to restrict this behaviour.
+
+---
+
+### Encryption at Rest (Optional)
+
+Plexus can encrypt sensitive data stored in the database using AES-256-GCM. When enabled, the following fields are encrypted:
+
+| Table | Fields |
+|-------|--------|
+| API Keys | `secret` |
+| OAuth Credentials | `accessToken`, `refreshToken` |
+| Providers | `apiKey`, `headers`, `quotaCheckerOptions` |
+| MCP Servers | `headers` |
+
+**Setup:**
+
+```bash
+# Generate a 32-byte hex key
+openssl rand -hex 32
+
+# Set as environment variable
+export ENCRYPTION_KEY="your-64-character-hex-key"
+```
+
+**How it works:**
+
+1. On first startup with `ENCRYPTION_KEY` set, Plexus automatically encrypts all existing plaintext values in the database.
+2. All new data is encrypted on write and decrypted on read at the repository layer.
+3. The in-memory configuration cache holds decrypted values, so no other components are affected.
+4. API key authentication uses SHA-256 hash-based lookups (a `secret_hash` column) for performance.
+
+**Key format:** `ENCRYPTION_KEY` accepts either:
+- A 64-character hex string (32 bytes, used directly)
+- An arbitrary passphrase (derived to 32 bytes via scrypt KDF)
+
+**Key rotation:** To rotate the encryption key, use the built-in rekey utility:
+
+```bash
+ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" bun run rekey
+```
+
+This decrypts all data with the old key and re-encrypts with the new key. After re-keying, update `ENCRYPTION_KEY` to the new key before restarting.
+
+**Backward compatibility:** Without `ENCRYPTION_KEY`, the system operates exactly as before — all data stored in plaintext. A warning is logged at startup when the key is not set.
+
+**Important:**
+- If the encryption key is lost, encrypted data **cannot be recovered**. Back up your key securely.
+- Encrypted values are prefixed with `enc:v1:` in the database, making them easy to identify.
+- The migration is idempotent — restarting with the same key does not re-encrypt already encrypted data.
 
 ---
 
