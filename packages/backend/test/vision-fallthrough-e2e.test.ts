@@ -49,6 +49,7 @@ describe('Vision Fallthrough E2E', () => {
         config: mockConfig.providers['test-provider'] as any,
         modelConfig: mockConfig.models['text-only-alias'],
         incomingModelAlias: 'text-only-alias',
+        canonicalModel: 'text-only-alias',
       },
     ]);
 
