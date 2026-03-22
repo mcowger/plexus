@@ -207,11 +207,13 @@ export class Dispatcher {
       // 1. Opt-in is enabled for this alias
       // 2. We're not already in a descriptor call (recursion guard)
       // 3. Request contains images
-      if (
-        !isVisionDescriptorRequest &&
-        route.modelConfig?.use_image_fallthrough &&
-        VisionDescriptorService.hasImages(currentRequest.messages)
-      ) {
+      // Look up use_image_fallthrough from the alias configuration (not provider's model config)
+      const aliasConfig = route.canonicalModel ? config.models?.[route.canonicalModel] : undefined;
+      const hasImages = VisionDescriptorService.hasImages(currentRequest.messages);
+      logger.debug(
+        `[vision-fallthrough] Checking: canonicalModel='${route.canonicalModel}', use_image_fallthrough='${aliasConfig?.use_image_fallthrough}', hasImages='${hasImages}', isVisionDescriptorRequest='${isVisionDescriptorRequest}'`
+      );
+      if (!isVisionDescriptorRequest && aliasConfig?.use_image_fallthrough && hasImages) {
         const vfConfig = config.vision_fallthrough;
         if (vfConfig?.descriptor_model) {
           try {
