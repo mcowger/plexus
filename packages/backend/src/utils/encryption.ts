@@ -4,6 +4,13 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 const PREFIX = 'enc:v1:';
+// Fixed application-specific salt for scrypt KDF (key derivation from passphrase).
+// This is intentionally NOT random or per-message:
+//   - The salt here prevents rainbow-table attacks on the passphrase→key derivation.
+//   - Per-message uniqueness is provided by the random IV generated for each encrypt() call.
+//   - A per-message KDF salt would require storing it alongside each ciphertext AND re-running
+//     scrypt (expensive) for every encrypt/decrypt, rather than once at startup.
+//   - This follows the same pattern used by 1Password, Bitwarden, and similar tools.
 const SCRYPT_SALT = Buffer.from('plexus-encryption-key-derivation');
 const SCRYPT_KEYLEN = 32;
 const SCRYPT_COST = 16384; // N=2^14, reasonable for a one-time startup derivation

@@ -123,7 +123,7 @@ describe('encryption migration', () => {
     expect(decrypt(rows[0]!.apiKey!)).toBe('provider-api-key-123');
   });
 
-  it('encrypts provider JSON fields (headers, extraBody, quotaCheckerOptions)', async () => {
+  it('encrypts provider JSON fields (headers, quotaCheckerOptions) but not extraBody', async () => {
     const ts = Date.now();
     const headers = JSON.stringify({ Authorization: 'Bearer secret-token' });
     const extraBody = JSON.stringify({ custom: 'data', nested: { key: 'val' } });
@@ -151,11 +151,11 @@ describe('encryption migration', () => {
     const rows = await db.select().from(schema.providers);
     const row = rows[0]!;
     expect(isEncrypted(row.headers as string)).toBe(true);
-    expect(isEncrypted(row.extraBody as string)).toBe(true);
     expect(isEncrypted(row.quotaCheckerOptions as string)).toBe(true);
     expect(JSON.parse(decrypt(row.headers as string))).toEqual({ Authorization: 'Bearer secret-token' });
-    expect(JSON.parse(decrypt(row.extraBody as string))).toEqual({ custom: 'data', nested: { key: 'val' } });
     expect(JSON.parse(decrypt(row.quotaCheckerOptions as string))).toEqual({ endpoint: '/usage', threshold: 90 });
+    // extraBody should NOT be encrypted (non-sensitive config data)
+    expect(row.extraBody as string).toBe(extraBody);
   });
 
   it('encrypts MCP server headers', async () => {

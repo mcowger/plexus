@@ -89,8 +89,10 @@ export async function runEncryptionMigration(): Promise<void> {
         updates.apiKey = encrypt(row.apiKey);
       }
 
-      // Encrypt JSONB fields that may contain sensitive data
-      const jsonFields = ['headers', 'extraBody', 'quotaCheckerOptions'] as const;
+      // Encrypt JSONB fields that contain sensitive data (headers may contain auth tokens,
+      // quotaCheckerOptions may contain API credentials). extraBody is excluded as it
+      // contains non-sensitive model parameters.
+      const jsonFields = ['headers', 'quotaCheckerOptions'] as const;
       for (const field of jsonFields) {
         const val = row[field];
         if (val !== null && val !== undefined) {

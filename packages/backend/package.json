@@ -7,7 +7,8 @@
     "dev": "bun run --watch src/index.ts",
     "typecheck": "bun x tsc --noEmit",
     "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test:watch": "bun test --watch",
+    "rekey": "bun run src/cli/rekey.ts"
   },
   "dependencies": {
     "@fastify/bearer-auth": "^10.1.2",

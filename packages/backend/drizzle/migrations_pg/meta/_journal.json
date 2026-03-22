@@ -169,6 +169,13 @@
       "when": 1774000000000,
       "tag": "0023_add_secret_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1774100000000,
+      "tag": "0024_jsonb_to_text_encrypted",
+      "breakpoints": true
     }
   ]
 }

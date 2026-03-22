@@ -889,7 +889,7 @@ Plexus can encrypt sensitive data stored in the database using AES-256-GCM. When
 |-------|--------|
 | API Keys | `secret` |
 | OAuth Credentials | `accessToken`, `refreshToken` |
-| Providers | `apiKey`, `headers`, `extraBody`, `quotaCheckerOptions` |
+| Providers | `apiKey`, `headers`, `quotaCheckerOptions` |
 | MCP Servers | `headers` |
 
 **Setup:**
@@ -911,7 +911,15 @@ export ENCRYPTION_KEY="your-64-character-hex-key"
 
 **Key format:** `ENCRYPTION_KEY` accepts either:
 - A 64-character hex string (32 bytes, used directly)
-- An arbitrary passphrase (SHA-256 hashed to derive 32 bytes)
+- An arbitrary passphrase (derived to 32 bytes via scrypt KDF)
+
+**Key rotation:** To rotate the encryption key, use the built-in rekey utility:
+
+```bash
+ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" bun run rekey
+```
+
+This decrypts all data with the old key and re-encrypts with the new key. After re-keying, update `ENCRYPTION_KEY` to the new key before restarting.
 
 **Backward compatibility:** Without `ENCRYPTION_KEY`, the system operates exactly as before — all data stored in plaintext. A warning is logged at startup when the key is not set.
 

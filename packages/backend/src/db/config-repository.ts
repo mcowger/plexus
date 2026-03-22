@@ -46,18 +46,14 @@ function toJson(value: unknown): string | unknown {
 }
 
 /**
- * Encrypt a JSON value for storage. For SQLite (text columns), encrypts the JSON string.
- * For PG (jsonb columns), stores the encrypted string as a JSON string value.
+ * Encrypt a JSON value for storage in a TEXT column.
+ * JSON-serializes the value, then encrypts the resulting string.
+ * If encryption is disabled, returns the JSON string as-is.
  */
-function encryptJsonField(value: unknown): string | unknown {
-  if (value === null || value === undefined) return null;
+function encryptJsonField(value: unknown): string {
+  if (value === null || value === undefined) return null as unknown as string;
   const strVal = typeof value === 'string' ? value : JSON.stringify(value);
-  const encrypted = encrypt(strVal);
-  const dialect = getCurrentDialect();
-  if (dialect === 'sqlite') {
-    return encrypted; // text column stores the string directly
-  }
-  return encrypted; // PG jsonb: store as text (encrypted string is valid text)
+  return encrypt(strVal);
 }
 
 /**
@@ -218,7 +214,7 @@ export class ConfigRepository {
       estimateTokens: fromBool(config.estimateTokens === true),
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
       headers: config.headers ? encryptJsonField(config.headers) : null,
-      extraBody: config.extraBody ? encryptJsonField(config.extraBody) : null,
+      extraBody: config.extraBody ? JSON.stringify(config.extraBody) : null,
       quotaCheckerType: config.quota_checker?.type ?? null,
       quotaCheckerId: config.quota_checker?.id ?? null,
       quotaCheckerEnabled: fromBool(config.quota_checker?.enabled !== false),
@@ -382,7 +378,7 @@ export class ConfigRepository {
       useClaudeMasking: toBool(row.useClaudeMasking),
       ...(models ? { models } : {}),
       ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),
-      ...(row.extraBody ? { extraBody: decryptJsonField(row.extraBody) } : {}),
+      ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
       ...(quota_checker ? { quota_checker } : {}),
     };
 
@@ -562,6 +558,13 @@ export class ConfigRepository {
         .from(schema.apiKeys)
         .where(eq(schema.apiKeys.secret, secret))
         .limit(1);
+
+      if (rows.length > 0) {
+        logger.error(
+          'API key matched via plaintext fallback — encryption migration may not have run. ' +
+            'Restart with ENCRYPTION_KEY set to trigger migration.'
+        );
+      }
     }
 
     if (rows.length === 0) return null;
