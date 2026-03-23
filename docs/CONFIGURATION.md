@@ -922,6 +922,9 @@ docker exec -e ENCRYPTION_KEY="old-key" -e NEW_ENCRYPTION_KEY="new-key" plexus .
 # Docker Compose:
 docker compose exec -e ENCRYPTION_KEY="old-key" -e NEW_ENCRYPTION_KEY="new-key" plexus ./plexus rekey
 
+# Binary install:
+ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" ./plexus rekey
+
 # From source:
 ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" bun run rekey
 ```
