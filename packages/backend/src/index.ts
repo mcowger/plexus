@@ -1,3 +1,19 @@
+// --- CLI Subcommand Routing ---
+// Check for subcommands (e.g. `./plexus rekey`) before starting the server.
+// This allows Docker users to run CLI tools without needing the source code.
+const subcommand = process.argv[2];
+if (subcommand === 'rekey') {
+  const { rekeyMain } = await import('./cli/rekey');
+  rekeyMain()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Re-key failed:', err);
+      process.exit(1);
+    });
+  // Prevent the rest of the server from initializing
+  await new Promise(() => {}); // Block forever; process.exit above will terminate
+}
+
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
