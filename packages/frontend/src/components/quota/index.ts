@@ -6,6 +6,8 @@ export { NagaQuotaConfig } from './NagaQuotaConfig';
 export { OpenAICodexQuotaDisplay } from './OpenAICodexQuotaDisplay';
 export { NanoGPTQuotaDisplay } from './NanoGPTQuotaDisplay';
 export { NanoGPTQuotaConfig } from './NanoGPTQuotaConfig';
+export { OllamaQuotaDisplay } from './OllamaQuotaDisplay';
+export { OllamaQuotaConfig } from './OllamaQuotaConfig';
 export { ZAIQuotaDisplay } from './ZAIQuotaDisplay';
 export { ZAIQuotaConfig } from './ZAIQuotaConfig';
 export { MoonshotQuotaDisplay } from './MoonshotQuotaDisplay';

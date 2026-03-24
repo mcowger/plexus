@@ -161,6 +161,10 @@ const AntigravityQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const OllamaQuotaCheckerOptionsSchema = z.object({
+  sessionCookie: z.string().min(1, 'Ollama __Secure-session cookie is required'),
+});
+
 const ApertisQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
@@ -309,6 +313,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: AntigravityQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('ollama'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: OllamaQuotaCheckerOptionsSchema,
   }),
 ]);
 
@@ -793,6 +804,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'gemini-cli',
   'antigravity',
   'novita',
+  'ollama',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

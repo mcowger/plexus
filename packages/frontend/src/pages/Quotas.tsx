@@ -25,6 +25,7 @@ import {
   GeminiCliQuotaDisplay,
   AntigravityQuotaDisplay,
   ApertisCodingPlanQuotaDisplay,
+  OllamaQuotaDisplay,
   CombinedBalancesCard,
   QuotaHistoryModal,
   BalanceHistoryModal,
@@ -51,6 +52,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   antigravity: 'Antigravity',
   apertis: 'Apertis',
   'apertis-coding-plan': 'Apertis Coding',
+  ollama: 'Ollama',
 };
 
 export const Quotas = () => {
@@ -241,6 +243,7 @@ export const Quotas = () => {
       'gemini-cli': <GeminiCliQuotaDisplay result={result} isCollapsed={false} />,
       'apertis-coding-plan': <ApertisCodingPlanQuotaDisplay result={result} isCollapsed={false} />,
       antigravity: <AntigravityQuotaDisplay result={result} isCollapsed={false} />,
+      ollama: <OllamaQuotaDisplay result={result} isCollapsed={false} />,
     };
 
     const display = DISPLAY_MAP[checkerType];

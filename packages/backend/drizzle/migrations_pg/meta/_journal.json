@@ -176,6 +176,13 @@
       "when": 1774100000000,
       "tag": "0024_jsonb_to_text_encrypted",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1774370504116,
+      "tag": "0025_add_ollama_quota_checker",
+      "breakpoints": true
     }
   ]
 }

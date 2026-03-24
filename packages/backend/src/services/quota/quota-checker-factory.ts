@@ -19,6 +19,7 @@ import { ApertisCodingPlanQuotaChecker } from './checkers/apertis-coding-plan-ch
 import { PoeQuotaChecker } from './checkers/poe-checker';
 import { GeminiCliQuotaChecker } from './checkers/gemini-cli-checker';
 import { AntigravityQuotaChecker } from './checkers/antigravity-checker';
+import { OllamaQuotaChecker } from './checkers/ollama-checker';
 
 const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
   synthetic: SyntheticQuotaChecker,
@@ -41,6 +42,7 @@ const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => Quota
   poe: PoeQuotaChecker,
   'gemini-cli': GeminiCliQuotaChecker,
   antigravity: AntigravityQuotaChecker,
+  ollama: OllamaQuotaChecker,
 };
 
 export class QuotaCheckerFactory {

@@ -444,6 +444,7 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'poe',
   'gemini-cli',
   'antigravity',
+  'ollama',
 ]);
 
 /**

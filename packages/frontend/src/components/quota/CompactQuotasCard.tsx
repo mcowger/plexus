@@ -49,6 +49,7 @@ export const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   if (id.includes('copilot')) return 'copilot';
   if (id.includes('gemini-cli') || id.includes('gemini')) return 'gemini-cli';
   if (id.includes('poe')) return 'poe';
+  if (id.includes('ollama')) return 'ollama';
   return 'default';
 };
 
@@ -68,6 +69,7 @@ const getTypeDisplayName = (category: string): string => {
     copilot: 'Copilot',
     'gemini-cli': 'Gemini CLI',
     poe: 'POE',
+    ollama: 'Ollama',
   };
   return names[category] || toTitleCase(category);
 };
@@ -96,6 +98,7 @@ const formatCheckerDisplayName = (quota: QuotaCheckerInfo): string => {
     'gemini-',
     'poe-',
     'wisdomgate-',
+    'ollama-',
   ];
   for (const prefix of prefixes) {
     if (displayPart.toLowerCase().startsWith(prefix)) {
@@ -146,6 +149,8 @@ const getCheckerIcon = (category: string) => {
       return <Sparkles className={iconClass} />;
     case 'poe':
       return <Wallet className={iconClass} />;
+    case 'ollama':
+      return <Bot className={iconClass} />;
     default:
       return <Bot className={iconClass} />;
   }
@@ -181,6 +186,8 @@ export const getTrackedWindowsForChecker = (category: string, windows: any[]): s
       return ['monthly'].filter((t) => availableTypes.has(t));
     case 'gemini-cli':
       return ['five_hour'].filter((t) => availableTypes.has(t));
+    case 'ollama':
+      return ['five_hour', 'weekly'].filter((t) => availableTypes.has(t));
     default:
       return Array.from(availableTypes)
         .filter((t) => t !== 'subscription')

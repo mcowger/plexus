@@ -49,6 +49,7 @@ import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
 import { ApertisCodingPlanQuotaConfig } from '../components/quota/ApertisCodingPlanQuotaConfig';
 import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
+import { OllamaQuotaConfig } from '../components/quota/OllamaQuotaConfig';
 
 const KNOWN_APIS = [
   'chat',
@@ -92,6 +93,7 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'copilot',
   'gemini-cli',
   'antigravity',
+  'ollama',
 ] as const;
 
 const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
@@ -1892,6 +1894,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'poe' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <PoeQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'ollama' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <OllamaQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({
