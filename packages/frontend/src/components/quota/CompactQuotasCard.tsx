@@ -305,6 +305,8 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
           .filter(Boolean);
 
         const primaryWindow = trackedWindows[0];
+        const secondaryWindow = trackedWindows[1];
+
         if (!primaryWindow) {
           return (
             <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
@@ -315,8 +317,13 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
           );
         }
 
-        const primaryPct = Math.round(primaryWindow.utilizationPercent || 0);
-        const secondaryWindows = trackedWindows.slice(1);
+        // Use secondary bar value if it's over 98%, otherwise use primary
+        const displayWindow =
+          secondaryWindow && (secondaryWindow.utilizationPercent || 0) >= 98
+            ? secondaryWindow
+            : primaryWindow;
+        const primaryPct = Math.round(displayWindow.utilizationPercent || 0);
+        const secondaryWindows = [];
 
         // All providers: name on row 1, bar(s) on row 2
         return (
