@@ -5,6 +5,7 @@ import { getDatabase, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import crypto from 'node:crypto';
 
 const DRIZZLE_MIGRATIONS_SCHEMA = 'drizzle';
@@ -119,6 +120,75 @@ async function attemptPostgresDuplicateColumnRepair(
   return false;
 }
 
+/**
+ * When running as a compiled Bun binary, drizzle migration SQL files cannot be
+ * read from the filesystem using the source-relative __dirname path.  Instead
+ * they are embedded in the binary via `bun build --compile` and are accessible
+ * through `Bun.embeddedFiles`.  This function extracts those files to a
+ * temporary directory so that the standard drizzle migrator can read them.
+ *
+ * Returns the path to the temp directory on success, or null if no embedded
+ * migration files were found (i.e., running from source in development mode).
+ */
+
+/** Bun embedded-file entry: a Blob with an additional `name` (original path). */
+interface BunEmbeddedFile extends Blob {
+  name: string;
+}
+
+async function extractEmbeddedMigrations(dialect: 'sqlite' | 'postgres'): Promise<string | null> {
+  const embeddedFiles: BunEmbeddedFile[] =
+    typeof globalThis.Bun !== 'undefined' && 'embeddedFiles' in globalThis.Bun
+      ? (globalThis.Bun as unknown as { embeddedFiles: BunEmbeddedFile[] }).embeddedFiles
+      : [];
+
+  if (embeddedFiles.length === 0) {
+    return null;
+  }
+
+  // The compile scripts embed files under their project-root-relative paths:
+  //   packages/backend/drizzle/migrations/...       (SQLite)
+  //   packages/backend/drizzle/migrations_pg/...    (PostgreSQL)
+  //
+  // For SQLite we must NOT match the _pg directory.
+  const matchFile =
+    dialect === 'sqlite'
+      ? (name: string) =>
+          name.includes('drizzle/migrations/') && !name.includes('drizzle/migrations_pg/')
+      : (name: string) => name.includes('drizzle/migrations_pg/');
+
+  const relevant = embeddedFiles.filter((f) => matchFile(f.name));
+
+  if (relevant.length === 0) {
+    return null;
+  }
+
+  // Use a stable, per-process temp directory — reused on retry, cleaned up on exit.
+  const tmpDir = path.join(os.tmpdir(), `plexus-migrations-${process.pid}`);
+  fs.mkdirSync(path.join(tmpDir, 'meta'), { recursive: true });
+
+  // Register a one-time cleanup handler so the temp directory is removed when
+  // the process exits normally (SIGINT/SIGTERM are handled by the server layer).
+  process.once('exit', () => {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup; ignore errors.
+    }
+  });
+
+  for (const file of relevant) {
+    const isMetaFile = file.name.includes('/meta/');
+    const fileName = path.basename(file.name);
+    const destPath = isMetaFile ? path.join(tmpDir, 'meta', fileName) : path.join(tmpDir, fileName);
+
+    fs.writeFileSync(destPath, await file.text());
+  }
+
+  logger.info(`Extracted ${relevant.length} embedded migration files to ${tmpDir}`);
+  return tmpDir;
+}
+
 export async function runMigrations() {
   try {
     const db = getDatabase();
@@ -129,16 +199,20 @@ export async function runMigrations() {
     const migrationsBase = path.resolve(__dirname, '../../drizzle');
 
     if (dialect === 'sqlite') {
+      const embeddedPath = await extractEmbeddedMigrations('sqlite');
       const migrationsPath = process.env.DRIZZLE_MIGRATIONS_PATH
         ? process.env.DRIZZLE_MIGRATIONS_PATH.replace('/migrations_pg', '/migrations')
-        : path.join(migrationsBase, 'migrations');
+        : embeddedPath || path.join(migrationsBase, 'migrations');
       logger.info(`SQLite migrations path: ${migrationsPath}`);
       await migrateSqlite(db as any, {
         migrationsFolder: migrationsPath,
       });
     } else {
+      const embeddedPath = await extractEmbeddedMigrations('postgres');
       const migrationsPath =
-        process.env.DRIZZLE_MIGRATIONS_PATH || path.join(migrationsBase, 'migrations_pg');
+        process.env.DRIZZLE_MIGRATIONS_PATH ||
+        embeddedPath ||
+        path.join(migrationsBase, 'migrations_pg');
       logger.info(`PostgreSQL migrations path: ${migrationsPath}`);
       try {
         await migratePg(db as any, {

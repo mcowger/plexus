@@ -51,7 +51,7 @@ docker run -p 4000:4000 \
 
 ## Standalone Binary
 
-Plexus can be compiled into a single, self-contained binary that includes the Bun runtime, all backend logic, and the pre-built frontend dashboard.
+Plexus can be compiled into a single, self-contained binary that includes the Bun runtime, all backend logic, the pre-built frontend dashboard, and the database migration files.
 
 ### Build Commands
 
@@ -72,6 +72,8 @@ Plexus can be compiled into a single, self-contained binary that includes the Bu
    - **Windows (x64):** `bun run compile:windows`
 
 The resulting executable will be named `plexus-macos` (or `plexus-linux` / `plexus.exe`) in the project root.
+
+The binary is fully self-contained: migration SQL files are embedded inside it at compile time, so no separate `drizzle/` directory or `DRIZZLE_MIGRATIONS_PATH` environment variable is needed when running the standalone binary.
 
 ## Running from Source
 
