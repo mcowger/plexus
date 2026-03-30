@@ -112,7 +112,7 @@ DATABASE_URL=sqlite://./data/plexus.db ./plexus
 # set DATABASE_URL=sqlite://./data/plexus.db && plexus.exe
 ```
 
-The binary is self-contained (no runtime or dependencies required). By default it looks for `config/plexus.yaml` relative to the working directory.
+The binary is self-contained (no runtime or external dependencies required — database migration files are embedded inside the binary). By default it looks for `config/plexus.yaml` relative to the working directory.
 
 ### Test it
 

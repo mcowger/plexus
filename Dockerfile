@@ -35,10 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/plexus-linux ./plexus
 
-# Copy drizzle migrations (required for database migrations)
-COPY --from=builder /app/packages/backend/drizzle/migrations ./packages/backend/drizzle/migrations
-COPY --from=builder /app/packages/backend/drizzle/migrations_pg ./packages/backend/drizzle/migrations_pg
-COPY --from=builder /app/packages/backend/drizzle/schema ./packages/backend/drizzle/schema
+# Migration SQL files are now embedded inside the binary (via bun build --compile).
+# No separate migration directory copy is needed.
 
 # Copy the frontend assets to the location expected by the backend ("../frontend/dist")
 COPY --from=builder /app/packages/frontend/dist /app/frontend/dist
@@ -48,7 +46,6 @@ ENV LOG_LEVEL=info
 ENV DATA_DIR=/app/data
 ENV DATABASE_URL=sqlite:///app/data/plexus.db
 ENV CONFIG_FILE=/app/config/plexus.yaml
-ENV DRIZZLE_MIGRATIONS_PATH=/app/backend/packages/backend/drizzle/migrations_pg
 # ADMIN_KEY must be provided at runtime (no default for security)
 
 # Run the application
