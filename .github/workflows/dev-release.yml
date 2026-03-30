@@ -1,7 +1,6 @@
-name: Dev Release
+name: CI and Dev Release
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
@@ -12,14 +11,23 @@ on:
       - 'packages/**/*.json'
       - '*.yaml'
       - '*.yml'
+  pull_request:
+    paths:
+      - 'packages/**/*.ts'
+      - 'packages/**/*.tsx'
+      - 'packages/**/*.lock'
+      - 'packages/**/*.json'
+      - '*.yaml'
+      - '*.yml'
+  workflow_dispatch:
 
 jobs:
-  test-and-release:
-    name: Test and Dev Release
+  # ------------------------------------------------------------------ #
+  #  Unit Tests                                                          #
+  # ------------------------------------------------------------------ #
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
 
     steps:
       - name: Checkout repository
@@ -46,9 +54,105 @@ jobs:
         run: bun test --verbose --workers=1
         working-directory: ./packages/backend
 
+  # ------------------------------------------------------------------ #
+  #  Binary Startup Test                                                 #
+  # ------------------------------------------------------------------ #
+  binary-startup:
+    name: Binary Startup Test
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Base dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Backend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/backend
+
+      - name: Install Frontend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/frontend
+
+      - name: Compile Linux binary
+        # compile:linux also runs build:frontend first
+        run: bun run compile:linux
+
+      - name: Run binary startup test
+        run: bash scripts/test-startup-binary.sh
+
+  # ------------------------------------------------------------------ #
+  #  Docker Startup Test                                                 #
+  # ------------------------------------------------------------------ #
+  docker-startup:
+    name: Docker Startup Test
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: plexus-test:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Docker startup test
+        run: bash scripts/test-startup-docker.sh plexus-test:latest
+
+  # ------------------------------------------------------------------ #
+  #  Dev Release (main branch / workflow_dispatch only)                 #
+  # ------------------------------------------------------------------ #
+  dev-release:
+    name: Dev Release
+    runs-on: ubuntu-latest
+    needs: [binary-startup, docker-startup]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Base dependencies
+        run: bun install --frozen-lockfile
+        working-directory: .
+
+      - name: Install Backend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/backend
+
+      - name: Install Frontend dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ./packages/frontend
+
       - name: Compile Binaries
         # compiling each platform separately
-        # Note: Each compile script in package.json runs build:frontend. 
+        # Note: Each compile script in package.json runs build:frontend.
         # This is acceptable for correctness to ensure each binary is built with the latest assets.
         env:
           APP_VERSION: dev-${{ github.sha }}
@@ -94,5 +198,5 @@ jobs:
           tag_name: dev-${{ github.sha }}
           body: |
             Development pre-release from commit ${{ github.sha }}
-            
+
             Built from: `${{ github.ref }}` at `${{ github.sha }}`
