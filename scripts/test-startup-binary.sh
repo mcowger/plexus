@@ -44,15 +44,14 @@ chmod +x "${BINARY_WORKDIR}/${BINARY_NAME}"
 # Start the binary
 # ------------------------------------------------------------------
 echo "Starting binary from ${BINARY_WORKDIR}/..."
-(
-  cd "${BINARY_WORKDIR}"
-  DATABASE_URL="sqlite://:memory:" \
+pushd "${BINARY_WORKDIR}" >/dev/null
+DATABASE_URL="sqlite://:memory:" \
   ADMIN_KEY="${ADMIN_KEY}" \
   PORT="${PORT}" \
   LOG_LEVEL="info" \
-  "./${BINARY_NAME}"
-) > "${LOG_FILE}" 2>&1 &
+  "./${BINARY_NAME}" > "${LOG_FILE}" 2>&1 &
 PID=$!
+popd >/dev/null
 echo "Binary PID: ${PID}"
 
 # ------------------------------------------------------------------
