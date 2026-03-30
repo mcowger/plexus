@@ -12,6 +12,13 @@ on:
       - '*.yaml'
       - '*.yml'
   pull_request:
+    paths:
+      - 'packages/**/*.ts'
+      - 'packages/**/*.tsx'
+      - 'packages/**/*.lock'
+      - 'packages/**/*.json'
+      - '*.yaml'
+      - '*.yml'
   workflow_dispatch:
 
 jobs:
