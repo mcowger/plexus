@@ -12,6 +12,7 @@ export const providerModels = sqliteTable(
     pricingConfig: text('pricing_config'), // JSON: pricing object
     modelType: text('model_type'), // 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses'
     accessVia: text('access_via'), // JSON: string[]
+    extraBody: text('extra_body'), // JSON: Record<string, any>
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({

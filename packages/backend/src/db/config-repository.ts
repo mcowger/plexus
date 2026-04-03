@@ -271,9 +271,10 @@ export class ConfigRepository {
           providerId,
           modelName: name,
           pricingConfig: toJson(cfg.pricing),
-          modelType: cfg.type ?? null,
-          accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
-          sortOrder: idx,
+            modelType: cfg.type ?? null,
+            accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
+            extraBody: cfg.extraBody ? JSON.stringify(cfg.extraBody) : null,
+            sortOrder: idx,
         }));
         if (modelRows.length > 0) {
           await this.db().insert(schema.providerModels).values(modelRows);
@@ -343,6 +344,7 @@ export class ConfigRepository {
             pricing: parseJson(m.pricingConfig) ?? { source: 'simple', input: 0, output: 0 },
             ...(m.modelType ? { type: m.modelType } : {}),
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
+            ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
           };
         }
       } else {

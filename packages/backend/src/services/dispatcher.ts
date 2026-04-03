@@ -1664,8 +1664,14 @@ export class Dispatcher {
       providerPayload = await transformer.transformRequest(request);
     }
 
+    // Merge provider-level extraBody first
     if (route.config.extraBody) {
       providerPayload = { ...providerPayload, ...route.config.extraBody };
+    }
+
+    // Then merge model-level extraBody (overrides provider-level)
+    if (route.modelConfig?.extraBody) {
+      providerPayload = { ...providerPayload, ...route.modelConfig.extraBody };
     }
 
     // Apply alias-level advanced behaviors (e.g. strip_adaptive_thinking)
