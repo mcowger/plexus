@@ -635,6 +635,10 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       continue;
     }
 
+    if (providerConfig.disable_quota_check === true) {
+      continue;
+    }
+
     const quotaChecker = providerConfig.quota_checker;
     if (!quotaChecker || quotaChecker.enabled === false) {
       continue;

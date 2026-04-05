@@ -126,11 +126,11 @@ describe('disable_quota_check — suppression behaviour', () => {
 });
 
 // ---------------------------------------------------------------------------
-// disable_quota_check: does NOT affect explicit quota_checker blocks
+// disable_quota_check: also suppresses explicit quota_checker blocks
 // ---------------------------------------------------------------------------
 
-describe('disable_quota_check — does not affect explicit quota_checker blocks', () => {
-  it('still registers an explicit quota_checker even when disable_quota_check is true', () => {
+describe('disable_quota_check — also suppresses explicit quota_checker blocks', () => {
+  it('suppresses an explicit quota_checker block when disable_quota_check is true', () => {
     const config = validateConfig(
       makeYaml(`
   codex-provider:
@@ -143,13 +143,42 @@ describe('disable_quota_check — does not affect explicit quota_checker blocks'
       type: openai-codex
       intervalMinutes: 15`)
     );
-    // The explicit block is processed in the first loop and must still be registered
+    // disable_quota_check overrides even an explicitly-configured checker
+    expect(config.quotas).toHaveLength(0);
+  });
+
+  it('still registers an explicit quota_checker when disable_quota_check is false', () => {
+    const config = validateConfig(
+      makeYaml(`
+  codex-provider:
+    api_base_url: "oauth://"
+    api_key: "oauth"
+    oauth_provider: "openai-codex"
+    oauth_account: "test-account"
+    disable_quota_check: false
+    quota_checker:
+      type: openai-codex
+      intervalMinutes: 15`)
+    );
     expect(config.quotas).toHaveLength(1);
     expect(config.quotas[0]).toMatchObject({
       provider: 'codex-provider',
       type: 'openai-codex',
       intervalMinutes: 15,
     });
+  });
+
+  it('suppresses an explicit quota_checker on a non-OAuth provider when disable_quota_check is true', () => {
+    const config = validateConfig(
+      makeYaml(`
+  openai-provider:
+    api_base_url: "https://api.openai.com/v1"
+    api_key: "sk-test"
+    disable_quota_check: true
+    quota_checker:
+      type: synthetic`)
+    );
+    expect(config.quotas).toHaveLength(0);
   });
 });
 

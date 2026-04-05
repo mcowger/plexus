@@ -2370,9 +2370,10 @@ export const Providers = () => {
                       className="font-body text-[11px] text-text-secondary"
                       style={{ lineHeight: 1.35, marginTop: '4px' }}
                     >
-                      When enabled, Plexus will not automatically schedule quota checks for this
-                      provider. Useful for OAuth connections where the provider does not expose a
-                      quota API or quotas are not applicable.
+                      When enabled, Plexus will skip all quota checks for this provider — both
+                      automatic (implicit) checks and any quota checker previously configured.
+                      Useful for OAuth connections where the provider does not expose a quota API or
+                      quotas are not applicable.
                       <span className="text-warning" style={{ marginLeft: '6px' }}>
                         Use only when this provider has no meaningful quota to enforce.
                       </span>
