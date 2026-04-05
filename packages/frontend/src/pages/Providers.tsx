@@ -774,12 +774,7 @@ export const Providers = () => {
     setEditingProvider({ ...editingProvider, models });
   };
 
-  const updateModelKV = (
-    modelId: string,
-    oldKey: string,
-    newKey: string,
-    value: any
-  ) => {
+  const updateModelKV = (modelId: string, oldKey: string, newKey: string, value: any) => {
     const models = { ...(editingProvider.models as Record<string, any>) };
     const current = { ...(models[modelId]?.extraBody || {}) };
     if (oldKey !== newKey) {
@@ -3193,93 +3188,120 @@ export const Providers = () => {
                               </div>
                             )}
 
-                        {/* Per-Model Extra Body Fields */}
-                        <div className="border border-border-glass rounded-md p-3 bg-bg-subtle" style={{ marginTop: '12px' }}>
-                          <div
-                            className="flex items-center gap-2 cursor-pointer"
-                            style={{ minHeight: '38px' }}
-                            onClick={() => setIsModelExtraBodyOpen({ ...isModelExtraBodyOpen, [mId]: !isModelExtraBodyOpen[mId] })}
-                          >
-                            {isModelExtraBodyOpen[mId] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            <label
-                              className="font-body text-[13px] font-medium text-text-secondary"
-                              style={{ marginBottom: 0, flex: 1, cursor: 'pointer' }}
-                            >
-                              Extra Body Fields
-                            </label>
-                            <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                              {Object.keys(mCfg.extraBody || {}).length}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addModelKV(mId);
-                                setIsModelExtraBodyOpen({ ...isModelExtraBodyOpen, [mId]: true });
-                              }}
-                            >
-                              <Plus size={14} />
-                            </Button>
-                          </div>
-                          {isModelExtraBodyOpen[mId] && (
+                            {/* Per-Model Extra Body Fields */}
                             <div
-                              style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px',
-                                padding: '8px',
-                                borderTop: '1px solid var(--color-border-glass)',
-                                background: 'var(--color-bg-deep)',
-                              }}
+                              className="border border-border-glass rounded-md p-3 bg-bg-subtle"
+                              style={{ marginTop: '12px' }}
                             >
-                              {Object.entries(mCfg.extraBody || {}).length === 0 && (
-                                <div className="font-body text-[11px] text-text-secondary italic">
-                                  No extra body fields configured.
+                              <div
+                                className="flex items-center gap-2 cursor-pointer"
+                                style={{ minHeight: '38px' }}
+                                onClick={() =>
+                                  setIsModelExtraBodyOpen({
+                                    ...isModelExtraBodyOpen,
+                                    [mId]: !isModelExtraBodyOpen[mId],
+                                  })
+                                }
+                              >
+                                {isModelExtraBodyOpen[mId] ? (
+                                  <ChevronDown size={14} />
+                                ) : (
+                                  <ChevronRight size={14} />
+                                )}
+                                <label
+                                  className="font-body text-[13px] font-medium text-text-secondary"
+                                  style={{ marginBottom: 0, flex: 1, cursor: 'pointer' }}
+                                >
+                                  Extra Body Fields
+                                </label>
+                                <Badge
+                                  status="neutral"
+                                  style={{ fontSize: '10px', padding: '2px 8px' }}
+                                >
+                                  {Object.keys(mCfg.extraBody || {}).length}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addModelKV(mId);
+                                    setIsModelExtraBodyOpen({
+                                      ...isModelExtraBodyOpen,
+                                      [mId]: true,
+                                    });
+                                  }}
+                                >
+                                  <Plus size={14} />
+                                </Button>
+                              </div>
+                              {isModelExtraBodyOpen[mId] && (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px',
+                                    padding: '8px',
+                                    borderTop: '1px solid var(--color-border-glass)',
+                                    background: 'var(--color-bg-deep)',
+                                  }}
+                                >
+                                  {Object.entries(mCfg.extraBody || {}).length === 0 && (
+                                    <div className="font-body text-[11px] text-text-secondary italic">
+                                      No extra body fields configured.
+                                    </div>
+                                  )}
+                                  {Object.entries(mCfg.extraBody || {}).map(([key, val], idx) => (
+                                    <div key={idx} style={{ display: 'flex', gap: '6px' }}>
+                                      <Input
+                                        placeholder="Field Name"
+                                        value={key}
+                                        onChange={(e) =>
+                                          updateModelKV(mId, key, e.target.value, val)
+                                        }
+                                        style={{ flex: 1 }}
+                                      />
+                                      <Input
+                                        placeholder="Value"
+                                        value={
+                                          typeof val === 'object'
+                                            ? JSON.stringify(val)
+                                            : String(val)
+                                        }
+                                        onChange={(e) => {
+                                          const rawValue = e.target.value;
+                                          let parsedValue;
+                                          try {
+                                            parsedValue = JSON.parse(rawValue);
+                                          } catch {
+                                            parsedValue = rawValue;
+                                          }
+                                          updateModelKV(mId, key, key, parsedValue);
+                                        }}
+                                        style={{ flex: 1 }}
+                                      />
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeModelKV(mId, key)}
+                                        style={{ padding: '4px' }}
+                                      >
+                                        <Trash2
+                                          size={14}
+                                          style={{ color: 'var(--color-danger)' }}
+                                        />
+                                      </Button>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
-                              {Object.entries(mCfg.extraBody || {}).map(([key, val], idx) => (
-                                <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                                  <Input
-                                    placeholder="Field Name"
-                                    value={key}
-                                    onChange={(e) => updateModelKV(mId, key, e.target.value, val)}
-                                    style={{ flex: 1 }}
-                                  />
-                                  <Input
-                                    placeholder="Value"
-                                    value={typeof val === 'object' ? JSON.stringify(val) : String(val)}
-                                    onChange={(e) => {
-                                      const rawValue = e.target.value;
-                                      let parsedValue;
-                                      try {
-                                        parsedValue = JSON.parse(rawValue);
-                                      } catch {
-                                        parsedValue = rawValue;
-                                      }
-                                      updateModelKV(mId, key, key, parsedValue);
-                                    }}
-                                    style={{ flex: 1 }}
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeModelKV(mId, key)}
-                                    style={{ padding: '4px' }}
-                                  >
-                                    <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
-                                  </Button>
-                                </div>
-                              ))}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              )}
-              <Button
+                    )
+                  )}
+                  <Button
                     variant="secondary"
                     size="sm"
                     leftIcon={<Plus size={14} />}

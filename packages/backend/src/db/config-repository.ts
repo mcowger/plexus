@@ -271,10 +271,10 @@ export class ConfigRepository {
           providerId,
           modelName: name,
           pricingConfig: toJson(cfg.pricing),
-            modelType: cfg.type ?? null,
-            accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
-            extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
-            sortOrder: idx,
+          modelType: cfg.type ?? null,
+          accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
+          extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
+          sortOrder: idx,
         }));
         if (modelRows.length > 0) {
           await this.db().insert(schema.providerModels).values(modelRows);
