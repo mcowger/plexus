@@ -191,7 +191,6 @@ export interface Provider {
   oauthAccount?: string;
   enabled: boolean;
   disableCooldown?: boolean;
-  disableQuotaCheck?: boolean;
   estimateTokens?: boolean;
   useClaudeMasking?: boolean;
   discount?: number;
@@ -1486,7 +1485,6 @@ export const api = {
           estimateTokens: val.estimateTokens || false,
           useClaudeMasking: val.useClaudeMasking === true,
           disableCooldown: val.disable_cooldown === true,
-          disableQuotaCheck: val.disable_quota_check === true,
           discount: val.discount,
           headers: val.headers,
           extraBody: val.extraBody,
@@ -1511,7 +1509,6 @@ export const api = {
       estimateTokens: provider.estimateTokens,
       useClaudeMasking: provider.useClaudeMasking,
       disable_cooldown: provider.disableCooldown === true ? true : undefined,
-      disable_quota_check: provider.disableQuotaCheck === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,

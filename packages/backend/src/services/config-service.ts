@@ -402,7 +402,6 @@ export class ConfigService {
     // Process explicitly configured quota checkers
     for (const [providerId, providerConfig] of Object.entries(providers)) {
       if (providerConfig.enabled === false) continue;
-      if (providerConfig.disable_quota_check === true) continue;
 
       const quotaChecker = providerConfig.quota_checker;
       logger.debug(
@@ -435,44 +434,6 @@ export class ConfigService {
         intervalMinutes: quotaChecker.intervalMinutes,
         options,
       });
-    }
-
-    // Add implicit quota checkers for OAuth providers
-    const oauthQuotaCheckers: Record<string, { type: string; intervalMinutes: number }> = {
-      'openai-codex': { type: 'openai-codex', intervalMinutes: 5 },
-      'claude-code': { type: 'claude-code', intervalMinutes: 5 },
-      'github-copilot': { type: 'copilot', intervalMinutes: 5 },
-      'google-gemini-cli': { type: 'gemini-cli', intervalMinutes: 5 },
-      'google-antigravity': { type: 'antigravity', intervalMinutes: 5 },
-    };
-
-    for (const [providerId, providerConfig] of Object.entries(providers)) {
-      if (providerConfig.enabled === false) continue;
-      if (providerConfig.quota_checker && providerConfig.quota_checker.enabled !== false) continue;
-      if (providerConfig.disable_quota_check === true) continue;
-
-      const oauthProvider = providerConfig.oauth_provider;
-      if (oauthProvider && oauthQuotaCheckers[oauthProvider]) {
-        const quotaInfo = oauthQuotaCheckers[oauthProvider]!;
-        const checkerId = `${providerId}-${oauthProvider}`;
-
-        if (!seenIds.has(checkerId)) {
-          seenIds.add(checkerId);
-
-          const options: Record<string, unknown> = {};
-          if (oauthProvider) options.oauthProvider = oauthProvider;
-          if (providerConfig.oauth_account) options.oauthAccountId = providerConfig.oauth_account;
-
-          quotas.push({
-            id: checkerId,
-            provider: providerId,
-            type: quotaInfo.type,
-            enabled: true,
-            intervalMinutes: quotaInfo.intervalMinutes,
-            options,
-          });
-        }
-      }
     }
 
     return quotas;

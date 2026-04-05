@@ -338,7 +338,6 @@ export const ProviderConfigSchema = z
     oauth_account: z.string().min(1).optional(),
     enabled: z.boolean().default(true).optional(),
     disable_cooldown: z.boolean().optional().default(false),
-    disable_quota_check: z.boolean().optional().default(false),
     discount: z.number().min(0).max(1).optional(),
     models: z
       .union([z.array(z.string()), z.record(z.string(), ModelProviderConfigSchema)])
@@ -635,10 +634,6 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       continue;
     }
 
-    if (providerConfig.disable_quota_check === true) {
-      continue;
-    }
-
     const quotaChecker = providerConfig.quota_checker;
     if (!quotaChecker || quotaChecker.enabled === false) {
       continue;
@@ -685,64 +680,6 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       intervalMinutes: quotaChecker.intervalMinutes,
       options,
     });
-  }
-
-  // Add implicit quota checkers for OAuth providers that don't have explicit quota checkers
-  // These are automatically added based on the oauth_provider type
-  const oauthQuotaCheckers: Record<string, { type: string; intervalMinutes: number }> = {
-    'openai-codex': { type: 'openai-codex', intervalMinutes: 5 },
-    'claude-code': { type: 'claude-code', intervalMinutes: 5 },
-    'github-copilot': { type: 'copilot', intervalMinutes: 5 },
-    'google-gemini-cli': { type: 'gemini-cli', intervalMinutes: 5 },
-    'google-antigravity': { type: 'antigravity', intervalMinutes: 5 },
-  };
-
-  for (const [providerId, providerConfig] of Object.entries(config.providers)) {
-    if (providerConfig.enabled === false) {
-      continue;
-    }
-
-    // Skip if already has explicit quota checker
-    if (providerConfig.quota_checker && providerConfig.quota_checker.enabled !== false) {
-      continue;
-    }
-
-    // Skip if user has opted out of automatic quota checking for this provider
-    if (providerConfig.disable_quota_check === true) {
-      continue;
-    }
-
-    // Check if this provider uses an OAuth provider that needs a quota checker
-    const oauthProvider = providerConfig.oauth_provider;
-    if (oauthProvider && oauthQuotaCheckers[oauthProvider]) {
-      const quotaInfo = oauthQuotaCheckers[oauthProvider];
-      const checkerId = `${providerId}-${oauthProvider}`;
-
-      if (!seenIds.has(checkerId)) {
-        seenIds.add(checkerId);
-
-        const options: Record<string, unknown> = {};
-        if (oauthProvider && options.oauthProvider === undefined) {
-          options.oauthProvider = oauthProvider;
-        }
-        if (providerConfig.oauth_account && options.oauthAccountId === undefined) {
-          options.oauthAccountId = providerConfig.oauth_account;
-        }
-
-        quotas.push({
-          id: checkerId,
-          provider: providerId,
-          type: quotaInfo.type,
-          enabled: true,
-          intervalMinutes: quotaInfo.intervalMinutes,
-          options,
-        });
-
-        logger.info(
-          `Added implicit quota checker '${quotaInfo.type}' for provider '${providerId}'`
-        );
-      }
-    }
   }
 
   return quotas;

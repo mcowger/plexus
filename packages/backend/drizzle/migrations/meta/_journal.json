@@ -169,6 +169,13 @@
       "when": 1775361587979,
       "tag": "0023_tan_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1775367222686,
+      "tag": "0024_lush_maginty",
+      "breakpoints": true
     }
   ]
 }

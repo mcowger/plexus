@@ -197,6 +197,13 @@
       "when": 1775361591089,
       "tag": "0027_adorable_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1775367226509,
+      "tag": "0028_cute_shooting_star",
+      "breakpoints": true
     }
   ]
 }

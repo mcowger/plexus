@@ -1,0 +1,1 @@
+ALTER TABLE `providers` DROP COLUMN `disable_quota_check`;
