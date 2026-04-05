@@ -448,6 +448,7 @@ export class ConfigService {
     for (const [providerId, providerConfig] of Object.entries(providers)) {
       if (providerConfig.enabled === false) continue;
       if (providerConfig.quota_checker && providerConfig.quota_checker.enabled !== false) continue;
+      if (providerConfig.disable_quota_check === true) continue;
 
       const oauthProvider = providerConfig.oauth_provider;
       if (oauthProvider && oauthQuotaCheckers[oauthProvider]) {
