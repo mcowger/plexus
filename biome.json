@@ -10,7 +10,8 @@
       "!!**/*.css",
       "!!packages/frontend/dist/**",
       "!!packages/backend/drizzle/migrations/**",
-      "!!packages/backend/drizzle/migrations_pg/**"
+      "!!packages/backend/drizzle/migrations_pg/**",
+      "!!.claude/**"
     ]
   },
   "formatter": {
