@@ -190,20 +190,14 @@ export const Models = () => {
     setEditingAlias({ ...editingAlias, targets: newTargets });
   };
 
-  const handleOpenAutoAdd = () => {
-    setSubstring(editingAlias.id || '');
-    setFilteredModels([]);
-    setSelectedModels(new Set());
-    setIsAutoAddModalOpen(true);
-  };
-
-  const handleSearchModels = () => {
-    if (!substring.trim()) {
+  const handleSearchModels = (query?: string) => {
+    const searchTerm = query !== undefined ? query : substring;
+    if (!searchTerm.trim()) {
       setFilteredModels([]);
       return;
     }
 
-    const searchLower = substring.toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
 
     const matches: Array<{ model: Model; provider: Provider }> = [];
     availableModels.forEach((model) => {
@@ -218,6 +212,16 @@ export const Models = () => {
     });
 
     setFilteredModels(matches);
+  };
+
+  const handleOpenAutoAdd = () => {
+    const query = editingAlias.id || '';
+    setSubstring(query);
+    setSelectedModels(new Set());
+    setIsAutoAddModalOpen(true);
+    // Run search immediately with the pre-filled query so results appear
+    // without requiring a manual button click (fixes #148).
+    handleSearchModels(query);
   };
 
   const handleToggleModelSelection = (modelId: string, providerId: string) => {
