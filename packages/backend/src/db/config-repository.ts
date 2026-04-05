@@ -380,7 +380,10 @@ export class ConfigRepository {
       useClaudeMasking: toBool(row.useClaudeMasking),
       ...(models ? { models } : {}),
       ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),
-      ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
+      ...(() => {
+        const eb = parseJson<Record<string, unknown>>(row.extraBody);
+        return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
+      })(),
       ...(quota_checker ? { quota_checker } : {}),
     };
 

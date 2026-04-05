@@ -1487,7 +1487,10 @@ export const api = {
           disableCooldown: val.disable_cooldown === true,
           discount: val.discount,
           headers: val.headers,
-          extraBody: val.extraBody,
+          extraBody:
+            val.extraBody && typeof val.extraBody === 'object' && !Array.isArray(val.extraBody)
+              ? val.extraBody
+              : {},
           models: normalizedModels,
           quotaChecker: normalizeProviderQuotaChecker(val.quota_checker),
         };
@@ -1533,7 +1536,8 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to save provider');
+      const detail = err.details ? ` — ${JSON.stringify(err.details)}` : '';
+      throw new Error((err.error || 'Failed to save provider') + detail);
     }
 
     // Delete old provider only after new one is saved successfully
