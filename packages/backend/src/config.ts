@@ -338,6 +338,7 @@ export const ProviderConfigSchema = z
     oauth_account: z.string().min(1).optional(),
     enabled: z.boolean().default(true).optional(),
     disable_cooldown: z.boolean().optional().default(false),
+    disable_quota_check: z.boolean().optional().default(false),
     discount: z.number().min(0).max(1).optional(),
     models: z
       .union([z.array(z.string()), z.record(z.string(), ModelProviderConfigSchema)])
@@ -634,6 +635,10 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       continue;
     }
 
+    if (providerConfig.disable_quota_check === true) {
+      continue;
+    }
+
     const quotaChecker = providerConfig.quota_checker;
     if (!quotaChecker || quotaChecker.enabled === false) {
       continue;
@@ -699,6 +704,11 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
 
     // Skip if already has explicit quota checker
     if (providerConfig.quota_checker && providerConfig.quota_checker.enabled !== false) {
+      continue;
+    }
+
+    // Skip if user has opted out of automatic quota checking for this provider
+    if (providerConfig.disable_quota_check === true) {
       continue;
     }
 
