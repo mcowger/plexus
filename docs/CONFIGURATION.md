@@ -916,6 +916,16 @@ export ENCRYPTION_KEY="your-64-character-hex-key"
 **Key rotation:** To rotate the encryption key, use the built-in rekey utility:
 
 ```bash
+# Docker (no source code required):
+docker exec -e ENCRYPTION_KEY="old-key" -e NEW_ENCRYPTION_KEY="new-key" plexus ./plexus rekey
+
+# Docker Compose:
+docker compose exec -e ENCRYPTION_KEY="old-key" -e NEW_ENCRYPTION_KEY="new-key" plexus ./plexus rekey
+
+# Binary install:
+ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" ./plexus rekey
+
+# From source:
 ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" bun run rekey
 ```
 

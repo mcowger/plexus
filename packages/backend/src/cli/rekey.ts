@@ -196,7 +196,12 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  logger.error('Re-key failed:', err);
-  process.exit(1);
-});
+export { main as rekeyMain };
+
+// Allow direct execution: bun run src/cli/rekey.ts
+if (import.meta.main) {
+  main().catch((err) => {
+    logger.error('Re-key failed:', err);
+    process.exit(1);
+  });
+}
