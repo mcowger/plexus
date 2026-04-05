@@ -96,6 +96,20 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'ollama',
 ] as const;
 
+/** Maps an oauth_provider value to the one checker type relevant for it, or null. */
+const getOAuthCheckerType = (oauthProvider?: string): string | null => {
+  if (!oauthProvider) return null;
+  const map: Record<string, string> = {
+    'openai-codex': 'openai-codex',
+    anthropic: 'claude-code',
+    'claude-code': 'claude-code',
+    'github-copilot': 'copilot',
+    'google-gemini-cli': 'gemini-cli',
+    'google-antigravity': 'antigravity',
+  };
+  return map[oauthProvider] ?? null;
+};
+
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
   switch (apiType.toLowerCase()) {
     case 'messages':
@@ -260,10 +274,18 @@ export const Providers = () => {
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
     editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
-  const selectableQuotaCheckerTypes = quotaCheckerTypes;
+  const oauthCheckerType = isOAuthMode ? getOAuthCheckerType(editingProvider.oauthProvider) : null;
+  // OAuth providers: only show the one relevant checker type (or none if unmapped).
+  // Non-OAuth providers: full list.
+  const selectableQuotaCheckerTypes = oauthCheckerType
+    ? [oauthCheckerType]
+    : isOAuthMode
+      ? [] // OAuth provider with no mapped checker — only <none> will be shown
+      : quotaCheckerTypes;
   const selectedQuotaCheckerType =
     editingProvider.quotaChecker?.type &&
-    selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type)
+    (selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type) ||
+      editingProvider.quotaChecker.type === oauthCheckerType)
       ? editingProvider.quotaChecker.type
       : '';
 
@@ -1686,14 +1708,13 @@ export const Providers = () => {
                   fontStyle: 'italic',
                 }}
               >
-                {selectedQuotaCheckerType ? (
-                  'Quota checker is active for this provider.'
-                ) : (
-                  <>
-                    Select <span style={{ fontWeight: 600 }}>&lt;none&gt;</span> to disable provider
-                    quota checks.
-                  </>
-                )}
+                {isOAuthMode && oauthCheckerType
+                  ? `Only the '${oauthCheckerType}' checker is available for this OAuth provider.`
+                  : isOAuthMode
+                    ? 'No quota checker is available for this OAuth provider type.'
+                    : selectedQuotaCheckerType
+                      ? 'Quota checker is active for this provider.'
+                      : 'Select <none> to disable provider quota checks.'}
               </div>
 
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'naga' && (
