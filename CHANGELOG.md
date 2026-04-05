@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.19.8 - 2026-04-05
+
+### v0.19.8: Per-Model Configuration and Docker Operability
+
+## New Features
+
+- **Per-Model Extra Body Support** ([#149](https://github.com/mcowger/plexus/commit/dbb7fe9)): Added configurable per-model extra body parameters for enhanced model control.
+- **Docker Rekey Support** ([#141](https://github.com/mcowger/plexus/commit/18e08ad)): Enabled rekeying via compiled binary for improved Docker deployment workflows.
+
+## Bug Fixes
+
+- **Auto-Add Modal Search** ([#151](https://github.com/mcowger/plexus/commit/2ab3ec7)): Fixed automatic search execution when opening the auto-add modal.
+- **Provider Models Migration** ([e59bfb4](https://github.com/mcowger/plexus/commit/e59bfb4)): Added missing extra_body column migration for provider_models.
+- **Linux Standalone Startup** ([#146](https://github.com/mcowger/plexus/commit/35711e0)): Embedded drizzle migrations in compiled binary to fix startup issues on Linux standalone instances.
+- **Quota Bar Display** ([ef30bae](https://github.com/mcowger/plexus/commit/ef30bae)): Fixed secondary quota bar visibility when utilization exceeds 98%.
+
+## Infrastructure & Testing
+
+- **Startup Smoke Tests** ([#147](https://github.com/mcowger/plexus/commit/6b83d9a)): Added startup verification tests for Linux binary and Docker image deployments to ensure reliability.
+
+---
+
+The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.19.7 - 2026-03-25
 
 ### Ollama quota card account name display fix
