@@ -1,0 +1,1 @@
+ALTER TABLE `provider_models` ADD `extra_body` text;

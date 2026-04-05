@@ -1,6 +1,6 @@
 {
-  "id": "876cf632-8d1b-49a4-a8a0-b541a282f0eb",
-  "prevId": "6f509d9a-3b7e-41cd-8884-6d278839268f",
+  "id": "135018bb-b3ca-4df0-a7bc-94bf77037f1d",
+  "prevId": "c26e2bf9-4c18-4ed6-b17c-b6b1cd00ce79",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1901,6 +1901,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "extra_body": {
+          "name": "extra_body",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
@@ -2135,6 +2141,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "secret_hash": {
+          "name": "secret_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "comment": {
           "name": "comment",
           "type": "text",
@@ -2158,33 +2170,9 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
-        },
-        "secret_hash": {
-          "name": "secret_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": null,
-          "isUnique": false
         }
       },
-      "indexes": {
-        "api_keys_secret_hash_unique": {
-          "name": "api_keys_secret_hash_unique",
-          "columns": [
-            {
-              "expression": "secret_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -2200,6 +2188,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "secret"
+          ]
+        },
+        "api_keys_secret_hash_unique": {
+          "name": "api_keys_secret_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "secret_hash"
           ]
         }
       },
@@ -2480,7 +2475,8 @@
         "poe",
         "gemini-cli",
         "antigravity",
-        "novita"
+        "novita",
+        "ollama"
       ]
     },
     "public.model_type": {

@@ -7,6 +7,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import { sqliteJournal, pgJournal } from './migrations-bundle';
 
 const DRIZZLE_MIGRATIONS_SCHEMA = 'drizzle';
 const DRIZZLE_MIGRATIONS_TABLE = '__drizzle_migrations';
@@ -121,11 +122,14 @@ async function attemptPostgresDuplicateColumnRepair(
 }
 
 /**
- * When running as a compiled Bun binary, drizzle migration SQL files cannot be
- * read from the filesystem using the source-relative __dirname path.  Instead
- * they are embedded in the binary via `bun build --compile` and are accessible
- * through `Bun.embeddedFiles`.  This function extracts those files to a
- * temporary directory so that the standard drizzle migrator can read them.
+ * When running as a compiled Bun binary, drizzle migration SQL files are
+ * embedded as assets via `bun build --compile --asset-naming="[name].[ext]"`.
+ * They are accessible through `Bun.embeddedFiles` with their original basenames.
+ * The `_journal.json` files are NOT embedded as assets (bun transpiles JSON to
+ * JS); instead they are statically imported via migrations-bundle.ts.
+ *
+ * This function extracts the relevant SQL files and writes the journal to a
+ * temporary directory so the standard drizzle migrator can read them.
  *
  * Returns the path to the temp directory on success, or null if no embedded
  * migration files were found (i.e., running from source in development mode).
@@ -146,29 +150,27 @@ async function extractEmbeddedMigrations(dialect: 'sqlite' | 'postgres'): Promis
     return null;
   }
 
-  // The compile scripts embed files under their project-root-relative paths:
-  //   packages/backend/drizzle/migrations/...       (SQLite)
-  //   packages/backend/drizzle/migrations_pg/...    (PostgreSQL)
-  //
-  // For SQLite we must NOT match the _pg directory.
-  const matchFile =
-    dialect === 'sqlite'
-      ? (name: string) =>
-          name.includes('drizzle/migrations/') && !name.includes('drizzle/migrations_pg/')
-      : (name: string) => name.includes('drizzle/migrations_pg/');
+  // The journal is bundled as JS via migrations-bundle.ts. Use it to get the
+  // set of expected SQL filenames for this dialect.
+  const journal = dialect === 'sqlite' ? sqliteJournal : pgJournal;
+  const expectedTags = new Set(journal.entries.map((e: { tag: string }) => e.tag));
 
-  const relevant = embeddedFiles.filter((f) => matchFile(f.name));
+  // SQL files are embedded with their original basename (--asset-naming="[name].[ext]").
+  // Match by checking if the basename (without .sql) is a known journal tag.
+  const relevant = embeddedFiles.filter((f) => {
+    const tag = f.name.replace(/\.sql$/, '');
+    return expectedTags.has(tag);
+  });
 
   if (relevant.length === 0) {
     return null;
   }
 
   // Use a stable, per-process temp directory — reused on retry, cleaned up on exit.
-  const tmpDir = path.join(os.tmpdir(), `plexus-migrations-${process.pid}`);
+  const tmpDir = path.join(os.tmpdir(), `plexus-migrations-${process.pid}-${dialect}`);
   fs.mkdirSync(path.join(tmpDir, 'meta'), { recursive: true });
 
-  // Register a one-time cleanup handler so the temp directory is removed when
-  // the process exits normally (SIGINT/SIGTERM are handled by the server layer).
+  // Register a one-time cleanup handler.
   process.once('exit', () => {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -177,13 +179,13 @@ async function extractEmbeddedMigrations(dialect: 'sqlite' | 'postgres'): Promis
     }
   });
 
+  // Write SQL files.
   for (const file of relevant) {
-    const isMetaFile = file.name.includes('/meta/');
-    const fileName = path.basename(file.name);
-    const destPath = isMetaFile ? path.join(tmpDir, 'meta', fileName) : path.join(tmpDir, fileName);
-
-    fs.writeFileSync(destPath, await file.text());
+    fs.writeFileSync(path.join(tmpDir, file.name), await file.text());
   }
+
+  // Write the journal (bundled as JS, not available as an embedded asset).
+  fs.writeFileSync(path.join(tmpDir, 'meta', '_journal.json'), JSON.stringify(journal));
 
   logger.info(`Extracted ${relevant.length} embedded migration files to ${tmpDir}`);
   return tmpDir;
@@ -200,9 +202,11 @@ export async function runMigrations() {
 
     if (dialect === 'sqlite') {
       const embeddedPath = await extractEmbeddedMigrations('sqlite');
-      const migrationsPath = process.env.DRIZZLE_MIGRATIONS_PATH
-        ? process.env.DRIZZLE_MIGRATIONS_PATH.replace('/migrations_pg', '/migrations')
-        : embeddedPath || path.join(migrationsBase, 'migrations');
+      const migrationsPath =
+        embeddedPath ||
+        (process.env.DRIZZLE_MIGRATIONS_PATH
+          ? process.env.DRIZZLE_MIGRATIONS_PATH.replace('/migrations_pg', '/migrations')
+          : path.join(migrationsBase, 'migrations'));
       logger.info(`SQLite migrations path: ${migrationsPath}`);
       await migrateSqlite(db as any, {
         migrationsFolder: migrationsPath,
@@ -210,8 +214,8 @@ export async function runMigrations() {
     } else {
       const embeddedPath = await extractEmbeddedMigrations('postgres');
       const migrationsPath =
-        process.env.DRIZZLE_MIGRATIONS_PATH ||
         embeddedPath ||
+        process.env.DRIZZLE_MIGRATIONS_PATH ||
         path.join(migrationsBase, 'migrations_pg');
       logger.info(`PostgreSQL migrations path: ${migrationsPath}`);
       try {

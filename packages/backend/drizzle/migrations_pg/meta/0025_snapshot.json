@@ -1,6 +1,6 @@
 {
-  "id": "876cf632-8d1b-49a4-a8a0-b541a282f0eb",
-  "prevId": "6f509d9a-3b7e-41cd-8884-6d278839268f",
+  "id": "c26e2bf9-4c18-4ed6-b17c-b6b1cd00ce79",
+  "prevId": "876cf632-8d1b-49a4-a8a0-b541a282f0eb",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2164,8 +2164,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "default": null,
-          "isUnique": false
+          "default": null
         }
       },
       "indexes": {
@@ -2480,7 +2479,8 @@
         "poe",
         "gemini-cli",
         "antigravity",
-        "novita"
+        "novita",
+        "ollama"
       ]
     },
     "public.model_type": {
