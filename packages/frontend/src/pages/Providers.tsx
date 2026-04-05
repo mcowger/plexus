@@ -96,16 +96,6 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'ollama',
 ] as const;
 
-const getForcedOAuthQuotaCheckerType = (oauthProvider?: string): string | null => {
-  if (!oauthProvider) return null;
-  if (oauthProvider === 'openai-codex') return 'openai-codex';
-  if (oauthProvider === 'anthropic' || oauthProvider === 'claude-code') return 'claude-code';
-  if (oauthProvider === 'github-copilot') return 'copilot';
-  if (oauthProvider === 'google-gemini-cli') return 'gemini-cli';
-  if (oauthProvider === 'google-antigravity') return 'antigravity';
-  return null;
-};
-
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
   switch (apiType.toLowerCase()) {
     case 'messages':
@@ -270,18 +260,10 @@ export const Providers = () => {
   const isOAuthMode =
     typeof editingProvider.apiBaseUrl === 'string' &&
     editingProvider.apiBaseUrl.toLowerCase().startsWith('oauth://');
-  const forcedOAuthQuotaCheckerType = isOAuthMode
-    ? getForcedOAuthQuotaCheckerType(editingProvider.oauthProvider)
-    : null;
-  const selectableQuotaCheckerTypes = forcedOAuthQuotaCheckerType
-    ? [forcedOAuthQuotaCheckerType]
-    : isOAuthMode
-      ? quotaCheckerTypes.filter((type) => type !== 'openai-codex' && type !== 'claude-code')
-      : quotaCheckerTypes.filter((type) => type !== 'openai-codex' && type !== 'claude-code');
-  const selectedQuotaCheckerType = forcedOAuthQuotaCheckerType
-    ? forcedOAuthQuotaCheckerType
-    : editingProvider.quotaChecker?.type &&
-        selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type)
+  const selectableQuotaCheckerTypes = quotaCheckerTypes;
+  const selectedQuotaCheckerType =
+    editingProvider.quotaChecker?.type &&
+    selectableQuotaCheckerTypes.includes(editingProvider.quotaChecker.type)
       ? editingProvider.quotaChecker.type
       : '';
 
@@ -432,20 +414,6 @@ export const Providers = () => {
           quotaChecker: undefined,
         };
       }
-      if (isOAuthMode && providerToSave.oauthProvider) {
-        const forcedType = getForcedOAuthQuotaCheckerType(providerToSave.oauthProvider);
-        if (forcedType) {
-          providerToSave = {
-            ...providerToSave,
-            quotaChecker: {
-              type: forcedType,
-              enabled: true,
-              intervalMinutes: Math.max(1, providerToSave.quotaChecker?.intervalMinutes || 30),
-              options: providerToSave.quotaChecker?.options,
-            },
-          };
-        }
-      }
       await api.saveProvider(providerToSave, originalId || undefined);
       await loadData();
       setIsModalOpen(false);
@@ -522,29 +490,6 @@ export const Providers = () => {
     if (!isOAuthMode) return;
     resetOAuthState();
   }, [editingProvider.oauthProvider, isOAuthMode]);
-
-  useEffect(() => {
-    if (!forcedOAuthQuotaCheckerType) return;
-    setEditingProvider((prev) => {
-      const intervalMinutes = Math.max(1, prev.quotaChecker?.intervalMinutes || 30);
-      if (
-        prev.quotaChecker?.type === forcedOAuthQuotaCheckerType &&
-        prev.quotaChecker?.enabled === true &&
-        prev.quotaChecker?.intervalMinutes === intervalMinutes
-      ) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        quotaChecker: {
-          type: forcedOAuthQuotaCheckerType,
-          enabled: true,
-          intervalMinutes,
-        },
-      };
-    });
-  }, [forcedOAuthQuotaCheckerType]);
 
   useEffect(() => {
     if (!oauthSessionId) return;
@@ -1677,7 +1622,6 @@ export const Providers = () => {
                   <select
                     className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                     value={selectedQuotaCheckerType}
-                    disabled={!!forcedOAuthQuotaCheckerType}
                     onChange={(e) => {
                       const quotaType = e.target.value;
                       if (!quotaType) {
@@ -1698,7 +1642,7 @@ export const Providers = () => {
                       });
                     }}
                   >
-                    {!forcedOAuthQuotaCheckerType && <option value="">&lt;none&gt;</option>}
+                    {<option value="">&lt;none&gt;</option>}
                     {selectableQuotaCheckerTypes.map((type) => (
                       <option key={type} value={type}>
                         {type}
@@ -1742,8 +1686,8 @@ export const Providers = () => {
                   fontStyle: 'italic',
                 }}
               >
-                {forcedOAuthQuotaCheckerType ? (
-                  `Quota checker type is fixed to '${forcedOAuthQuotaCheckerType}' for this OAuth provider.`
+                {selectedQuotaCheckerType ? (
+                  'Quota checker is active for this provider.'
                 ) : (
                   <>
                     Select <span style={{ fontWeight: 600 }}>&lt;none&gt;</span> to disable provider
