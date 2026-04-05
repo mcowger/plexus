@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.19.9 - 2026-04-05
+
+### v0.19.9: Quota Checker: Implicit Quotas Removed for OAuth providers
+
+Eliminated implicit OAuth quota checker injection from provider configuration pipeline
+
 ## v0.19.8 - 2026-04-05
 
 ### v0.19.8: Per-Model Configuration and Docker Operability
