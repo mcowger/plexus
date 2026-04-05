@@ -214,7 +214,7 @@ export class ConfigRepository {
       estimateTokens: fromBool(config.estimateTokens === true),
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
       headers: config.headers ? encryptJsonField(config.headers) : null,
-      extraBody: config.extraBody ? JSON.stringify(config.extraBody) : null,
+      extraBody: config.extraBody ? toJson(config.extraBody) : null,
       quotaCheckerType: config.quota_checker?.type ?? null,
       quotaCheckerId: config.quota_checker?.id ?? null,
       quotaCheckerEnabled: fromBool(config.quota_checker?.enabled !== false),
@@ -273,6 +273,7 @@ export class ConfigRepository {
           pricingConfig: toJson(cfg.pricing),
           modelType: cfg.type ?? null,
           accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
+          extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
           sortOrder: idx,
         }));
         if (modelRows.length > 0) {
@@ -343,6 +344,7 @@ export class ConfigRepository {
             pricing: parseJson(m.pricingConfig) ?? { source: 'simple', input: 0, output: 0 },
             ...(m.modelType ? { type: m.modelType } : {}),
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
+            ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
           };
         }
       } else {

@@ -21,6 +21,7 @@ export const providerModels = pgTable(
     pricingConfig: jsonb('pricing_config'),
     modelType: modelTypeEnum('model_type'),
     accessVia: jsonb('access_via'), // string[]
+    extraBody: jsonb('extra_body'), // Record<string, any>
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({

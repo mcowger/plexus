@@ -68,6 +68,7 @@ const ModelProviderConfigSchema = z.object({
   }),
   access_via: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  extraBody: z.record(z.any()).optional(),
 });
 
 const OAuthProviderSchema = z.enum([
