@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `disable_quota_check` integer DEFAULT 0 NOT NULL;

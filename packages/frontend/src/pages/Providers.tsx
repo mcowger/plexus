@@ -171,6 +171,7 @@ const EMPTY_PROVIDER: Provider = {
   oauthAccount: '',
   enabled: true,
   disableCooldown: false,
+  disableQuotaCheck: false,
   estimateTokens: false,
   useClaudeMasking: false,
   apiBaseUrl: {},
@@ -2347,6 +2348,37 @@ export const Providers = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Disable Quota Checking — OAuth providers only */}
+                {editingProvider.oauthProvider && (
+                  <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                    <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+                      <Switch
+                        checked={editingProvider.disableQuotaCheck || false}
+                        onChange={(checked) =>
+                          setEditingProvider({ ...editingProvider, disableQuotaCheck: checked })
+                        }
+                      />
+                      <label
+                        className="font-body text-[13px] font-medium text-text"
+                        style={{ marginBottom: 0 }}
+                      >
+                        Disable Quota Checking
+                      </label>
+                    </div>
+                    <div
+                      className="font-body text-[11px] text-text-secondary"
+                      style={{ lineHeight: 1.35, marginTop: '4px' }}
+                    >
+                      When enabled, Plexus will not automatically schedule quota checks for this
+                      provider. Useful for OAuth connections where the provider does not expose a
+                      quota API or quotas are not applicable.
+                      <span className="text-warning" style={{ marginLeft: '6px' }}>
+                        Use only when this provider has no meaningful quota to enforce.
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Use Claude Masking */}
                 <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">

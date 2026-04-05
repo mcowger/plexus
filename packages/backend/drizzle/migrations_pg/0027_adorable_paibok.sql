@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "disable_quota_check" boolean DEFAULT false NOT NULL;
