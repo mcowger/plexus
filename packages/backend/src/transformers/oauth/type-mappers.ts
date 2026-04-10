@@ -321,6 +321,40 @@ export function piAiMessageToUnified(
     return name.startsWith('proxy_') ? name.slice('proxy_'.length) : name;
   };
 
+  // Reverse OAuth tool name remapping (TitleCase -> lowercase)
+  const reverseOauthToolName = (name?: string): string | undefined => {
+    if (!name) return name;
+    // Map of TitleCase Claude Code tool names to lowercase
+    const reverseMap: Record<string, string> = {
+      Bash: 'bash',
+      Read: 'read',
+      Write: 'write',
+      Edit: 'edit',
+      Glob: 'glob',
+      Grep: 'grep',
+      Task: 'task',
+      WebFetch: 'webfetch',
+      TodoWrite: 'todowrite',
+      Question: 'question',
+      Skill: 'skill',
+      LS: 'ls',
+      TodoRead: 'todoread',
+      NotebookEdit: 'notebookedit',
+      AskUserQuestion: 'askuserquestion',
+      EnterPlanMode: 'enterplanmode',
+      ExitPlanMode: 'exitplanmode',
+      KillShell: 'killshell',
+      TaskOutput: 'taskoutput',
+      WebSearch: 'websearch',
+    };
+    return reverseMap[name] ?? name;
+  };
+
+  // Combined tool name normalizer
+  const normalizeToolName = (name?: string): string | undefined => {
+    return reverseOauthToolName(stripProxyPrefix(name));
+  };
+
   let textContent: string | null = null;
   let thinkingContent: string | null = null;
   const toolCalls: any[] = [];
@@ -340,7 +374,7 @@ export function piAiMessageToUnified(
           id: callId || block.id,
           type: 'function',
           function: {
-            name: stripProxyPrefix(block.name) || block.name,
+            name: normalizeToolName(block.name) || block.name,
             arguments: JSON.stringify(block.arguments),
           },
           ...(thoughtSignature ? { thinking: { signature: thoughtSignature } } : {}),
@@ -377,6 +411,39 @@ export function piAiEventToChunk(
   const stripProxyPrefix = (name?: string) => {
     if (!name || provider !== 'anthropic') return name;
     return name.startsWith('proxy_') ? name.slice('proxy_'.length) : name;
+  };
+
+  // Reverse OAuth tool name remapping (TitleCase -> lowercase)
+  const reverseOauthToolName = (name?: string): string | undefined => {
+    if (!name) return name;
+    const reverseMap: Record<string, string> = {
+      Bash: 'bash',
+      Read: 'read',
+      Write: 'write',
+      Edit: 'edit',
+      Glob: 'glob',
+      Grep: 'grep',
+      Task: 'task',
+      WebFetch: 'webfetch',
+      TodoWrite: 'todowrite',
+      Question: 'question',
+      Skill: 'skill',
+      LS: 'ls',
+      TodoRead: 'todoread',
+      NotebookEdit: 'notebookedit',
+      AskUserQuestion: 'askuserquestion',
+      EnterPlanMode: 'enterplanmode',
+      ExitPlanMode: 'exitplanmode',
+      KillShell: 'killshell',
+      TaskOutput: 'taskoutput',
+      WebSearch: 'websearch',
+    };
+    return reverseMap[name] ?? name;
+  };
+
+  // Combined tool name normalizer
+  const normalizeToolName = (name?: string): string | undefined => {
+    return reverseOauthToolName(stripProxyPrefix(name));
   };
 
   const baseChunk = {
@@ -432,7 +499,7 @@ export function piAiEventToChunk(
                 id: callId || (toolCall as any).id,
                 type: 'function',
                 function: {
-                  name: stripProxyPrefix((toolCall as any).name),
+                  name: normalizeToolName((toolCall as any).name),
                   arguments: event.delta,
                 },
               },

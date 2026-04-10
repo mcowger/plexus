@@ -8,3 +8,4 @@ export * from './transcriptions';
 export * from './speech';
 export * from './image';
 export * from './oauth/oauth-transformer';
+export * from './oauth/oauth-claude';

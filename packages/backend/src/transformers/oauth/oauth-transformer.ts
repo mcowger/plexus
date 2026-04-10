@@ -19,6 +19,13 @@ import {
   extractPiAiErrorMessage,
 } from './type-mappers';
 import { logger } from '../../utils/logger';
+import {
+  applyClaudeOAuthTransform,
+  reverseClaudeOAuthTransform,
+  reverseClaudeOAuthTransformForStreamLine,
+  isClaudeOAuthToken,
+  type ClaudeOAuthContext,
+} from './oauth-claude';
 
 /**
  * Returns the pi-ai request options needed to enable thinking/reasoning for a given
@@ -493,10 +500,44 @@ export class OAuthTransformer implements Transformer {
       });
     }
 
+    // Store OAuth context for request/response transformation
+    let oauthContext: ClaudeOAuthContext = {
+      apiKey,
+      isOAuth: false,
+      toolNamesRemapped: false,
+    };
+
     // Log the actual HTTP payload pi-ai sends so we can verify tool schemas
+    // Also apply Claude OAuth transforms when using OAuth tokens
     requestOptions.onPayload = (payload: any) => {
+      // Apply OAuth transforms for Claude OAuth tokens
+      if (provider === 'anthropic' && isClaudeCodeToken) {
+        const { payload: transformedPayload, context } = applyClaudeOAuthTransform(
+          payload,
+          apiKey,
+          {
+            version: '2.1.63',
+            entrypoint: 'cli',
+            workload: '',
+            oauthMode: true,
+          }
+        );
+        oauthContext = context;
+
+        // Store OAuth context on the model for response transformation
+        (model as any).__oauthContext = oauthContext;
+
+        const payloadStr =
+          typeof transformedPayload === 'string'
+            ? transformedPayload
+            : JSON.stringify(transformedPayload);
+        logger.info(`${this.name}: FULL-OUTGOING-PAYLOAD ${payloadStr}`);
+        return transformedPayload;
+      }
+
       const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
       logger.info(`${this.name}: FULL-OUTGOING-PAYLOAD ${payloadStr}`);
+      return payload;
     };
 
     logger.info(
