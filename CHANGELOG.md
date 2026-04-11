@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.19.10 - 2026-04-11
+
+### v0.19.10: Vision Fallthrough Tracking, Synthetic Quotas, Config Database Migration, and Quota System Enhancements
+
+- **New Features**
+  - Added comprehensive tracking and logging for vision fallthrough descriptor models, including usage recording and enhanced Logs UI display ([bcede85](https://github.com/mcowger/plexus/commit/bcede85), [8f8665b](https://github.com/mcowger/plexus/commit/8f8665b), [3203f04](https://github.com/mcowger/plexus/commit/3203f04)). This improves insight into image processing fallback behavior.
+  - Introduced support for the new Synthetic quota system to better manage free tool calls and quota tracking ([92d7c19](https://github.com/mcowger/plexus/commit/92d7c19), [8544af9](https://github.com/mcowger/plexus/commit/8544af9)).
+  - Added a `disable_quota_check` provider option allowing users to suppress implicit OAuth quota checkers and explicit quota validations ([e1c73dd](https://github.com/mcowger/plexus/commit/e1c73dd), [82a07bc](https://github.com/mcowger/plexus/commit/82a07bc), [63f73fa](https://github.com/mcowger/plexus/commit/63f73fa)).
+  - Added per-model support for extraBody fields enabling richer model configurations ([3e6e113](https://github.com/mcowger/plexus/commit/3e6e113)).
+  - Added management routes for graceful application restart ([d1cbfe4](https://github.com/mcowger/plexus/commit/d1cbfe4)).
+  - Improved frontend UI with alphabetical sorting of providers and additional quota checker UI enhancements ([4009269](https://github.com/mcowger/plexus/commit/4009269)).
+
+- **Configuration & Database Migration**
+  - Completed migration from YAML and embedded file configs to a fully database-backed ConfigService with in-memory caching, CRUD schema, and improved startup flow ([ad3299c](https://github.com/mcowger/plexus/commit/ad3299c), [a65069c](https://github.com/mcowger/plexus/commit/a65069c)).
+  - Embedded migrations have been refactored to use `Bun.embeddedFiles` and then reverted back to a virtual file system for better reliability ([e2045b1](https://github.com/mcowger/plexus/commit/e2045b1), [1bf7f23](https://github.com/mcowger/plexus/commit/1bf7f23)).
+  - Added detailed migration source logging to distinguish embedded vs filesystem assets ([63a2287](https://github.com/mcowger/plexus/commit/63a2287)).
+
+- **Quota System Improvements**
+  - Enhanced cooldown logic and quota checker behaviors for providers supporting quota reset data to avoid exponential backoff once usage nears 99% ([3209491](https://github.com/mcowger/plexus/commit/3209491)).
+  - Fixed UI issues around quota bar colors and utilization display for better visual feedback ([d32f4ee](https://github.com/mcowger/plexus/commit/d32f4ee), [46d63ae](https://github.com/mcowger/plexus/commit/46d63ae)).
+  - Added support for new quota checkers including Ollama with session and weekly limits ([904e48d](https://github.com/mcowger/plexus/commit/904e48d)), and various fixes to OAuth quota checker dropdown and UI ([53e7666](https://github.com/mcowger/plexus/commit/53e7666)).
+  - Refactored to remove implicit OAuth quota checker injections to simplify quota logic ([97ec2fe](https://github.com/mcowger/plexus/commit/97ec2fe), [b588acd](https://github.com/mcowger/plexus/commit/b588acd)).
+
+- **Security and Data Handling**
+  - Added AES-256-GCM encryption at rest for sensitive database fields to enhance data protection ([430f333](https://github.com/mcowger/plexus/commit/430f333)).
+  - Fixed corrupted extraBody string data reads from the database to prevent invalid data ([08c87bd](https://github.com/mcowger/plexus/commit/08c87bd)).
+
+- **Testing and CI Stabilization**
+  - Numerous fixes to test spies, mock injections, and configuration resets to prevent cross-test pollution and flaky CI results ([b672f11](https://github.com/mcowger/plexus/commit/b672f11), [1671b39](https://github.com/mcowger/plexus/commit/1671b39), [2ddb843](https://github.com/mcowger/plexus/commit/2ddb843)).
+  - Moved some tests from in-memory SQLite to file-based DB to increase reliability ([c793a65](https://github.com/mcowger/plexus/commit/c793a65)).
+
+- **Infrastructure and Refactoring**
+  - Frontend assets now served from embedded binaries using Bun file imports for streamlined deployments ([1bd4517](https://github.com/mcowger/plexus/commit/1bd4517)).
+  - Refactored usage storage service to improve schema loading and DB connection management ([300941e](https://github.com/mcowger/plexus/commit/300941e)).
+  - Cleaned up code in Providers component for consistent styling and structure ([4e8c558](https://github.com/mcowger/plexus/commit/4e8c558), [6cde317](https://github.com/mcowger/plexus/commit/6cde317)).
+  - Updated dependencies including Bun to version 1.3.10 for platform stability ([6a298a1](https://github.com/mcowger/plexus/commit/6a298a1)).
+
+**Additional Notes:** The docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
+
 ## v0.19.9 - 2026-04-05
 
 ### v0.19.9: Quota Checker: Implicit Quotas Removed for OAuth providers
