@@ -58,3 +58,6 @@ packages/logs.txt
 packages/backend/.test-db.sqlite
 packages/backend/.test-db.sqlite-shm
 packages/backend/.test-db.sqlite-wal
+.test-db.sqlite
+.test-db.sqlite-shm
+.test-db.sqlite-wal
