@@ -106,643 +106,127 @@ interface ModelFamilyHeuristic {
 }
 
 const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
-  // OpenAI GPT-4 family
-  'gpt-4': {
-    total_params: 1.76, // Expert estimates around 1.7-1.8T
-    active_params: 1.76, // Dense model
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128, // Assumed for GQA
-    qk_rope_head_dim: 96,
-    context_length: 128000,
+  // Anthropic Claude 4 Series (Frontier Reasoning)
+  // Claude 4.6 (Released Feb 2026): 1M Context + Adaptive Thinking
+  'claude-4-6-opus': {
+    total_params: 2500, // 2.5T total
+    active_params: 2500, // Dense for flagship reasoning depth
+    layers: 136,
+    heads: 112,
+    kv_lora_rank: 256,
+    qk_rope_head_dim: 128,
+    context_length: 1000000,
     default_dtype: 'fp8',
   },
-  'gpt-4o': {
-    total_params: 1.76,
-    active_params: 1.76,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-  'gpt-4-turbo': {
-    total_params: 1.76,
-    active_params: 1.76,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-  'gpt-4.1': {
-    total_params: 1.76,
-    active_params: 1.76,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-  o1: {
-    total_params: 1.76, // Same base as GPT-4
-    active_params: 1.76,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 200000, // o1 has 200k context
-    default_dtype: 'fp8',
-  },
-  o3: {
-    total_params: 1.76,
-    active_params: 1.76,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'o4-mini': {
-    total_params: 0.4, // Smaller variant
-    active_params: 0.4,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-
-  // OpenAI GPT-3.5 / GPT-4o mini
-  'gpt-3.5': {
-    total_params: 0.175, // 175B
-    active_params: 0.175,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 16385,
-    default_dtype: 'fp16',
-  },
-  'gpt-4o-mini': {
-    total_params: 0.2, // ~200B estimated
-    active_params: 0.2,
-    layers: 60,
-    heads: 48,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 48,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-
-  // Anthropic Claude family
-  'claude-3-5-sonnet': {
-    total_params: 0.45, // Estimated ~450B total params
-    active_params: 0.15, // Mixture of Experts - ~3-5 active experts
-    layers: 90,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-3-5-haiku': {
-    total_params: 0.2, // Estimated ~200B
-    active_params: 0.2,
-    layers: 56,
-    heads: 48,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 48,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-3-opus': {
-    total_params: 0.45,
-    active_params: 0.15,
-    layers: 90,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-3-sonnet': {
-    total_params: 0.45,
-    active_params: 0.15,
-    layers: 90,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-3-haiku': {
-    total_params: 0.2,
-    active_params: 0.2,
-    layers: 56,
-    heads: 48,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 48,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-3.7-sonnet': {
-    total_params: 0.45,
-    active_params: 0.15,
-    layers: 90,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-
-  // Anthropic Claude 4
-  'claude-4-sonnet': {
-    total_params: 0.5,
-    active_params: 0.17,
+  'claude-4-6-sonnet': {
+    total_params: 800,
+    active_params: 800,
     layers: 96,
-    heads: 72,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 72,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-opus': {
-    total_params: 0.6,
-    active_params: 0.2,
-    layers: 120,
     heads: 80,
     kv_lora_rank: 128,
-    qk_rope_head_dim: 80,
+    qk_rope_head_dim: 96,
+    context_length: 1000000,
+    default_dtype: 'fp8',
+  },
+
+  // Claude 4.5 (Released Nov 2025)
+  'claude-4-5-opus': {
+    total_params: 2200,
+    active_params: 2200,
+    layers: 128,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
     context_length: 200000,
     default_dtype: 'fp8',
   },
-  'claude-4-haiku': {
-    total_params: 0.25,
-    active_params: 0.25,
+  'claude-4-5-sonnet': {
+    total_params: 600,
+    active_params: 200, // MoE-based mid-tier (3 experts)
+    layers: 90,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+
+  // Claude 4.1 / 4.0 (Mid-2025 Series)
+  'claude-4-1-opus': {
+    total_params: 1800,
+    active_params: 1800,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-4-sonnet': {
+    total_params: 500,
+    active_params: 170,
+    layers: 90,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+
+  // OpenAI GPT-5 Series (Agentic & Reasoning)
+  // GPT-5.4 (Released March 2026): Configurable Reasoning & 1M Context
+  'gpt-5-4-pro': {
+    total_params: 3200, // Large Sparse MoE
+    active_params: 1200, // High-effort reasoning activation
+    layers: 144,
+    heads: 128,
+    kv_lora_rank: 512,
+    qk_rope_head_dim: 128,
+    context_length: 1048576,
+    default_dtype: 'fp8',
+  },
+  'gpt-5': {
+    total_params: 3200,
+    active_params: 650, // Standard routing for general chat
+    layers: 144,
+    heads: 128,
+    kv_lora_rank: 256,
+    qk_rope_head_dim: 128,
+    context_length: 400000,
+    default_dtype: 'fp8',
+  },
+
+  // GPT-5 Codex (Agentic Coding Specialists)
+  'gpt-5-codex-max': {
+    total_params: 3200,
+    active_params: 800,
+    layers: 144,
+    heads: 128,
+    kv_lora_rank: 512, // Deep context attention for massive repos
+    qk_rope_head_dim: 128,
+    context_length: 400000,
+    default_dtype: 'fp8',
+  },
+  'gpt-5-codex-mini': {
+    total_params: 350,
+    active_params: 350,
     layers: 64,
     heads: 48,
     kv_lora_rank: 64,
     qk_rope_head_dim: 48,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-
-  // Google Gemini family
-  'gemini-2.5': {
-    total_params: 0.6, // Gemini 2.5 is ~600B estimated
-    active_params: 0.2, // MoE with ~3 active experts
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 1048576, // 1M context
-    default_dtype: 'fp8',
-  },
-  'gemini-2.0': {
-    total_params: 0.6,
-    active_params: 0.2,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 2000000, // 2M context
-    default_dtype: 'fp8',
-  },
-  'gemini-1.5': {
-    total_params: 0.5,
-    active_params: 0.17,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 2000000, // 2M context
-    default_dtype: 'fp8',
-  },
-  'gemini-1.0': {
-    total_params: 0.6,
-    active_params: 0.2,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 32768,
-    default_dtype: 'fp16',
-  },
-  'gemini-pro': {
-    total_params: 0.6,
-    active_params: 0.2,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 32768,
-    default_dtype: 'fp16',
-  },
-
-  // Meta LLaMA family (often available on HF but include fallback)
-  'llama-4': {
-    total_params: 0.4, // LLaMA 4 is estimated ~400B MoE
-    active_params: 0.1, // ~4 active experts
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'llama-3.1': {
-    total_params: 0.405, // 405B
-    active_params: 0.405, // Dense
-    layers: 126,
-    heads: 128,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 128,
     context_length: 128000,
     default_dtype: 'fp8',
   },
-  'llama-3': {
-    total_params: 0.405,
-    active_params: 0.405,
-    layers: 126,
-    heads: 128,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 128,
-    context_length: 8192,
-    default_dtype: 'fp8',
-  },
-  'llama-2': {
-    total_params: 0.7, // 70B
-    active_params: 0.7,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 4096,
-    default_dtype: 'fp16',
-  },
 
-  // Mistral family
-  mixtral: {
-    total_params: 0.12, // 12B total
-    active_params: 0.012, // 8 experts × 12B/8 = ~1.5B active
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 32768,
-    default_dtype: 'fp16',
-  },
-  mistral: {
-    total_params: 0.007, // 7B
-    active_params: 0.007,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // DeepSeek family
-  'deepseek-v3': {
-    total_params: 0.671, // 671B
-    active_params: 0.037, // ~18 active experts
-    layers: 61,
-    heads: 128,
-    kv_lora_rank: 512,
-    qk_rope_head_dim: 64,
-    context_length: 256000,
-    default_dtype: 'fp8',
-  },
-  'deepseek-r1': {
-    total_params: 0.671,
-    active_params: 0.037,
-    layers: 61,
-    heads: 128,
-    kv_lora_rank: 512,
-    qk_rope_head_dim: 64,
-    context_length: 256000,
-    default_dtype: 'fp8',
-  },
-  'deepseek-coder': {
-    total_params: 0.016, // 16B
-    active_params: 0.016,
-    layers: 40,
-    heads: 40,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 40,
-    context_length: 16384,
-    default_dtype: 'fp16',
-  },
-
-  // Cohere
-  'command-r': {
-    total_params: 0.35, // 35B
-    active_params: 0.35,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 131072,
-    default_dtype: 'fp8',
-  },
-  command: {
-    total_params: 0.35,
-    active_params: 0.35,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 4096,
-    default_dtype: 'fp16',
-  },
-
-  // xAI Grok
-  'grok-2': {
-    total_params: 0.3, // 300B estimated
-    active_params: 0.03, // ~10 active experts
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 131072,
-    default_dtype: 'fp8',
-  },
-  'grok-1': {
-    total_params: 0.3,
-    active_params: 0.03,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 131072,
-    default_dtype: 'fp8',
-  },
-
-  // Meta Code Llama
-  codellama: {
-    total_params: 0.07, // 70B
-    active_params: 0.07,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 16384,
-    default_dtype: 'fp16',
-  },
-
-  // Qwen family
-  'qwen-2.5': {
-    total_params: 0.72, // 72B
-    active_params: 0.72,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 32768,
-    default_dtype: 'fp8',
-  },
-  'qwen-2': {
-    total_params: 0.72,
-    active_params: 0.72,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 32768,
-    default_dtype: 'fp8',
-  },
-  'qwen-1.5': {
-    total_params: 0.72,
-    active_params: 0.72,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 32768,
-    default_dtype: 'fp8',
-  },
-
-  // AI21 Jurassic
-  jurassic: {
-    total_params: 0.175, // 175B
-    active_params: 0.175,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Stability AI
-  'stable-chat': {
-    total_params: 0.04, // 40B
-    active_params: 0.04,
-    layers: 48,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Salesforce
-  santacoder: {
-    total_params: 0.0011, // 1.1B
-    active_params: 0.0011,
-    layers: 24,
-    heads: 16,
-    kv_lora_rank: 16,
-    qk_rope_head_dim: 16,
-    context_length: 2048,
-    default_dtype: 'fp16',
-  },
-
-  // BigCode / StarCoder
-  starcoder: {
-    total_params: 0.015, // 15B
-    active_params: 0.015,
-    layers: 40,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Mistral Codestral
-  codestral: {
-    total_params: 0.022, // 22B
-    active_params: 0.022,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 32768,
-    default_dtype: 'fp16',
-  },
-
-  // Reka
-  reka: {
-    total_params: 0.21, // 21B estimated
-    active_params: 0.21,
-    layers: 48,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 32768,
-    default_dtype: 'fp16',
-  },
-
-  // Aleph Alpha
-  luminous: {
-    total_params: 0.7, // 70B
-    active_params: 0.7,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Perplexity
-  pplx: {
-    total_params: 0.12, // 12B (based on Mixtral architecture)
-    active_params: 0.012,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 32768,
-    default_dtype: 'fp16',
-  },
-
-  // Together AI models (often based on other architectures)
-  'together-': {
-    total_params: 0.1, // Default assumption for together models
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Fireworks AI models
-  'fireworks-': {
-    total_params: 0.1,
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Anyscale
-  'anyscale-': {
-    total_params: 0.1,
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Novita AI
-  'novita-': {
-    total_params: 0.1,
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Lepton AI
-  'lepton-': {
-    total_params: 0.1,
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Hyperbolic
-  'hyperbolic-': {
-    total_params: 0.1,
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // DeepInfra
-  'deepinfra-': {
-    total_params: 0.1,
-    active_params: 0.1,
-    layers: 32,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 32,
-    context_length: 8192,
-    default_dtype: 'fp16',
-  },
-
-  // Azure OpenAI
-  'azure-openai-': {
-    total_params: 1.76, // Assume GPT-4 level
-    active_params: 1.76,
+  // Legacy GPT-4 Series
+  'gpt-4o': {
+    total_params: 1760,
+    active_params: 1760,
     layers: 120,
     heads: 96,
     kv_lora_rank: 128,
     qk_rope_head_dim: 96,
     context_length: 128000,
-    default_dtype: 'fp8',
-  },
-
-  // AWS Bedrock
-  'bedrock-': {
-    total_params: 1.76,
-    active_params: 1.76,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-
-  // Vertex AI (Google)
-  'vertex-': {
-    total_params: 0.6,
-    active_params: 0.2,
-    layers: 80,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 2000000,
     default_dtype: 'fp8',
   },
 };
@@ -767,7 +251,7 @@ export class HuggingFaceModelFetcher {
   private cache: Map<string, ModelParams> = new Map();
   private dtypeCache: Map<string, string> = new Map();
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): HuggingFaceModelFetcher {
     if (!HuggingFaceModelFetcher.instance) {
