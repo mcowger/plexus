@@ -109,8 +109,8 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
   // Anthropic Claude 4 Series (Frontier Reasoning)
   // Claude 4.6 (Released Feb 2026): 1M Context + Adaptive Thinking
   'claude-4-6-opus': {
-    total_params: 2500, // 2.5T total
-    active_params: 2500, // Dense for flagship reasoning depth
+    total_params: 4500, // ~4.5T total
+    active_params: 340, // 30B base * ~11x output price premium
     layers: 136,
     heads: 112,
     kv_lora_rank: 256,
@@ -119,8 +119,8 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
     default_dtype: 'fp8',
   },
   'claude-4-6-sonnet': {
-    total_params: 800,
-    active_params: 800,
+    total_params: 1400,
+    active_params: 110, // 15B base * ~7x output price premium
     layers: 96,
     heads: 80,
     kv_lora_rank: 128,
@@ -128,11 +128,21 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
     context_length: 1000000,
     default_dtype: 'fp8',
   },
+  'claude-4-6-haiku': {
+    total_params: 350,
+    active_params: 24, // 8B base * ~3x output price premium
+    layers: 64,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
 
   // Claude 4.5 (Released Nov 2025)
   'claude-4-5-opus': {
-    total_params: 2200,
-    active_params: 2200,
+    total_params: 3800,
+    active_params: 300,
     layers: 128,
     heads: 96,
     kv_lora_rank: 128,
@@ -141,8 +151,8 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
     default_dtype: 'fp8',
   },
   'claude-4-5-sonnet': {
-    total_params: 600,
-    active_params: 200, // MoE-based mid-tier (3 experts)
+    total_params: 1200,
+    active_params: 90,
     layers: 90,
     heads: 64,
     kv_lora_rank: 128,
@@ -150,11 +160,21 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
     context_length: 200000,
     default_dtype: 'fp8',
   },
+  'claude-4-5-haiku': {
+    total_params: 250,
+    active_params: 18,
+    layers: 60,
+    heads: 48,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
 
   // Claude 4.1 / 4.0 (Mid-2025 Series)
   'claude-4-1-opus': {
-    total_params: 1800,
-    active_params: 1800,
+    total_params: 2800,
+    active_params: 250,
     layers: 120,
     heads: 96,
     kv_lora_rank: 128,
@@ -163,11 +183,21 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
     default_dtype: 'fp8',
   },
   'claude-4-sonnet': {
-    total_params: 500,
-    active_params: 170,
+    total_params: 800,
+    active_params: 75,
     layers: 90,
     heads: 64,
     kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-4-haiku': {
+    total_params: 150,
+    active_params: 12,
+    layers: 48,
+    heads: 32,
+    kv_lora_rank: 32,
     qk_rope_head_dim: 64,
     context_length: 200000,
     default_dtype: 'fp8',
@@ -176,8 +206,8 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
   // OpenAI GPT-5 Series (Agentic & Reasoning)
   // GPT-5.4 (Released March 2026): Configurable Reasoning & 1M Context
   'gpt-5-4-pro': {
-    total_params: 3200, // Large Sparse MoE
-    active_params: 1200, // High-effort reasoning activation
+    total_params: 4000,
+    active_params: 320, // High-effort reasoning activation
     layers: 144,
     heads: 128,
     kv_lora_rank: 512,
@@ -186,10 +216,10 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
     default_dtype: 'fp8',
   },
   'gpt-5': {
-    total_params: 3200,
-    active_params: 650, // Standard routing for general chat
-    layers: 144,
-    heads: 128,
+    total_params: 1500,
+    active_params: 100, // Standard routing for general chat
+    layers: 112,
+    heads: 96,
     kv_lora_rank: 256,
     qk_rope_head_dim: 128,
     context_length: 400000,
@@ -199,17 +229,17 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
   // GPT-5 Codex (Agentic Coding Specialists)
   'gpt-5-codex-max': {
     total_params: 3200,
-    active_params: 800,
-    layers: 144,
+    active_params: 280, // Heavy attention activation for massive codebases
+    layers: 128,
     heads: 128,
-    kv_lora_rank: 512, // Deep context attention for massive repos
+    kv_lora_rank: 512,
     qk_rope_head_dim: 128,
     context_length: 400000,
     default_dtype: 'fp8',
   },
   'gpt-5-codex-mini': {
-    total_params: 350,
-    active_params: 350,
+    total_params: 300,
+    active_params: 20, // Mini/Haiku scale for autocomplete tasks
     layers: 64,
     heads: 48,
     kv_lora_rank: 64,
@@ -221,7 +251,7 @@ const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
   // Legacy GPT-4 Series
   'gpt-4o': {
     total_params: 1760,
-    active_params: 1760,
+    active_params: 110, // Likely 2 experts out of 16 active
     layers: 120,
     heads: 96,
     kv_lora_rank: 128,
