@@ -1,11 +1,6 @@
-import { migrate as migrateSqlite } from 'drizzle-orm/bun-sqlite/migrator';
-import { migrate as migratePg } from 'drizzle-orm/postgres-js/migrator';
 import { sql } from 'drizzle-orm';
 import { getDatabase, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
-import path from 'node:path';
-import fs from 'node:fs';
-import os from 'node:os';
 import crypto from 'node:crypto';
 import sqliteVfs from './migrations-vfs-sqlite';
 import pgVfs from './migrations-vfs-pg';
@@ -15,9 +10,32 @@ import pgJournal from '../../drizzle/migrations_pg/meta/_journal.json';
 const DRIZZLE_MIGRATIONS_SCHEMA = 'drizzle';
 const DRIZZLE_MIGRATIONS_TABLE = '__drizzle_migrations';
 
-interface MigrationJournalEntry {
-  when: number;
-  tag: string;
+// Shape expected by db.dialect.migrate() — mirrors drizzle-orm's internal MigrationMeta.
+interface MigrationMeta {
+  sql: string[];
+  bps: boolean;
+  folderMillis: number;
+  hash: string;
+}
+
+type Journal = { entries: Array<{ tag: string; when: number; breakpoints: boolean }> };
+
+/**
+ * Builds the MigrationMeta[] array that drizzle's dialect.migrate() expects,
+ * sourcing SQL content from the VFS module instead of the filesystem.
+ * This replicates what drizzle-orm's readMigrationFiles() does, minus the fs calls.
+ */
+function migrationsFromVfs(vfs: Record<string, string>, journal: Journal): MigrationMeta[] {
+  return journal.entries.map((entry) => {
+    const content = vfs[`${entry.tag}.sql`];
+    if (!content) throw new Error(`Missing migration in VFS: ${entry.tag}`);
+    return {
+      sql: content.split('--> statement-breakpoint'),
+      bps: entry.breakpoints,
+      folderMillis: entry.when,
+      hash: crypto.createHash('sha256').update(content).digest('hex'),
+    };
+  });
 }
 
 function normalizeSqlStatement(statement: string): string {
@@ -40,43 +58,23 @@ function toIdempotentStatement(statement: string): string {
 
 async function attemptPostgresDuplicateColumnRepair(
   db: any,
-  migrationsPath: string,
   migrationError: any
 ): Promise<boolean> {
   const failedQuery = typeof migrationError?.query === 'string' ? migrationError.query : '';
-  if (!failedQuery) {
-    return false;
-  }
+  if (!failedQuery) return false;
 
-  const journalPath = path.join(migrationsPath, 'meta', '_journal.json');
-  if (!fs.existsSync(journalPath)) {
-    return false;
-  }
-
-  const journal = JSON.parse(fs.readFileSync(journalPath, 'utf8')) as {
-    entries?: MigrationJournalEntry[];
-  };
-  const entries = Array.isArray(journal.entries) ? journal.entries : [];
   const normalizedFailedQuery = normalizeSqlStatement(failedQuery);
 
-  for (const entry of entries) {
-    const migrationPath = path.join(migrationsPath, `${entry.tag}.sql`);
-    if (!fs.existsSync(migrationPath)) {
-      continue;
-    }
+  for (const entry of pgJournal.entries) {
+    const migrationSql = pgVfs[`${entry.tag}.sql` as keyof typeof pgVfs] as string | undefined;
+    if (!migrationSql) continue;
 
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
     const statements = migrationSql
       .split('--> statement-breakpoint')
-      .map((statement) => statement.trim())
-      .filter((statement) => statement.length > 0);
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
 
-    const includesFailedQuery = statements.some(
-      (statement) => normalizeSqlStatement(statement) === normalizedFailedQuery
-    );
-    if (!includesFailedQuery) {
-      continue;
-    }
+    if (!statements.some((s) => normalizeSqlStatement(s) === normalizedFailedQuery)) continue;
 
     logger.warn(
       `Detected duplicate-column migration drift in ${entry.tag}; applying idempotent repair`
@@ -85,12 +83,12 @@ async function attemptPostgresDuplicateColumnRepair(
     await db.execute(sql.raw(`CREATE SCHEMA IF NOT EXISTS "${DRIZZLE_MIGRATIONS_SCHEMA}"`));
     await db.execute(
       sql.raw(`
-      CREATE TABLE IF NOT EXISTS "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}" (
-        id SERIAL PRIMARY KEY,
-        hash text NOT NULL,
-        created_at bigint
-      )
-    `)
+        CREATE TABLE IF NOT EXISTS "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}" (
+          id SERIAL PRIMARY KEY,
+          hash text NOT NULL,
+          created_at bigint
+        )
+      `)
     );
 
     for (const statement of statements) {
@@ -99,9 +97,7 @@ async function attemptPostgresDuplicateColumnRepair(
         await db.execute(sql.raw(repairedStatement));
       } catch (statementError: any) {
         const isAddColumnStatement = /ALTER\s+TABLE[\s\S]+ADD\s+COLUMN/i.test(repairedStatement);
-        if (isAddColumnStatement && isDuplicateColumnError(statementError)) {
-          continue;
-        }
+        if (isAddColumnStatement && isDuplicateColumnError(statementError)) continue;
         throw statementError;
       }
     }
@@ -109,13 +105,13 @@ async function attemptPostgresDuplicateColumnRepair(
     const hash = crypto.createHash('sha256').update(migrationSql).digest('hex');
     await db.execute(
       sql.raw(`
-      INSERT INTO "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}" ("hash", "created_at")
-      SELECT '${hash}', ${entry.when}
-      WHERE NOT EXISTS (
-        SELECT 1 FROM "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}"
-        WHERE "created_at" = ${entry.when}
-      )
-    `)
+        INSERT INTO "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}" ("hash", "created_at")
+        SELECT '${hash}', ${entry.when}
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}"
+          WHERE "created_at" = ${entry.when}
+        )
+      `)
     );
 
     return true;
@@ -124,80 +120,35 @@ async function attemptPostgresDuplicateColumnRepair(
   return false;
 }
 
-// Cached tmpdir paths per dialect — written once per process.
-const migrationsDirCache = new Map<string, string>();
-
-/**
- * Writes the VFS migration files (SQL + journal) for the given dialect to a
- * stable per-process temporary directory and returns that directory path.
- *
- * Both dev (source) and compiled binary modes use this path — the VFS modules
- * are generated at build time by `make-vfs` and bundled as standard TypeScript,
- * so no Bun.embeddedFiles or filesystem hacks are needed.
- */
-async function getMigrationsDir(dialect: 'sqlite' | 'postgres'): Promise<string> {
-  const cached = migrationsDirCache.get(dialect);
-  if (cached) return cached;
-
-  const vfs = dialect === 'sqlite' ? sqliteVfs : pgVfs;
-  const journal = dialect === 'sqlite' ? sqliteJournal : pgJournal;
-
-  const tmpDir = path.join(os.tmpdir(), `plexus-migrations-${process.pid}-${dialect}`);
-  fs.mkdirSync(path.join(tmpDir, 'meta'), { recursive: true });
-
-  for (const [filename, content] of Object.entries(vfs)) {
-    fs.writeFileSync(path.join(tmpDir, filename), content as string);
-  }
-
-  fs.writeFileSync(path.join(tmpDir, 'meta', '_journal.json'), JSON.stringify(journal));
-
-  process.once(`exit`, () => {
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch {
-      // Best-effort cleanup; ignore errors.
-    }
-  });
-
-  migrationsDirCache.set(dialect, tmpDir);
-  logger.debug(`Migrations for ${dialect} written to ${tmpDir}`);
-  return tmpDir;
-}
-
 export async function runMigrations() {
   try {
     const db = getDatabase();
     const dialect = getCurrentDialect();
 
-    logger.info(`Running ${dialect} migrations...`);
+    logger.info(`Running ${dialect} migrations from VFS...`);
 
     if (dialect === 'sqlite') {
-      const migrationsPath = process.env.DRIZZLE_MIGRATIONS_PATH
-        ? process.env.DRIZZLE_MIGRATIONS_PATH.replace('/migrations_pg', '/migrations')
-        : await getMigrationsDir('sqlite');
-      logger.info(`SQLite migrations path: ${migrationsPath}`);
-      await migrateSqlite(db as any, {
-        migrationsFolder: migrationsPath,
+      const migrations = migrationsFromVfs(sqliteVfs, sqliteJournal as Journal);
+      (db as any).dialect.migrate(migrations, (db as any).session, {
+        migrationsFolder: '',
       });
     } else {
-      const migrationsPath =
-        process.env.DRIZZLE_MIGRATIONS_PATH || (await getMigrationsDir('postgres'));
-      logger.info(`PostgreSQL migrations path: ${migrationsPath}`);
+      const migrations = migrationsFromVfs(pgVfs, pgJournal as Journal);
       try {
-        await migratePg(db as any, {
-          migrationsFolder: migrationsPath,
+        await (db as any).dialect.migrate(migrations, (db as any).session, {
+          migrationsFolder: '',
+          migrationsSchema: DRIZZLE_MIGRATIONS_SCHEMA,
+          migrationsTable: DRIZZLE_MIGRATIONS_TABLE,
         });
       } catch (error: any) {
         if (isDuplicateColumnError(error)) {
-          const repaired = await attemptPostgresDuplicateColumnRepair(
-            db as any,
-            migrationsPath,
-            error
-          );
+          const repaired = await attemptPostgresDuplicateColumnRepair(db as any, error);
           if (repaired) {
             logger.warn('Retrying PostgreSQL migrations after duplicate-column repair');
-            await migratePg(db as any, {
-              migrationsFolder: migrationsPath,
+            await (db as any).dialect.migrate(migrations, (db as any).session, {
+              migrationsFolder: '',
+              migrationsSchema: DRIZZLE_MIGRATIONS_SCHEMA,
+              migrationsTable: DRIZZLE_MIGRATIONS_TABLE,
             });
           } else {
             throw error;
@@ -211,13 +162,6 @@ export async function runMigrations() {
     logger.info('Migrations completed successfully');
   } catch (error: any) {
     logger.error('Migration failed', error);
-
-    if (error.message?.includes("Can't find meta/_journal.json file")) {
-      logger.error('Drizzle journal file path issue detected.');
-      logger.error('This is often caused by migration file structure.');
-      logger.error('Try regenerating migrations with: bunx drizzle-kit generate');
-    }
-
     throw error;
   }
 }
