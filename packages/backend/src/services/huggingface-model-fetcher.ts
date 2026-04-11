@@ -1,0 +1,1155 @@
+/**
+ * HuggingFace Model Fetcher
+ *
+ * Fetches model architecture configuration from Hugging Face model repositories
+ * and provides heuristics for proprietary models that aren't on Hugging Face.
+ *
+ * Used by the inference energy calculator to get accurate model parameters
+ * (layers, heads, hidden_size, context_length, etc.) for energy estimation.
+ */
+
+import { logger } from '../utils/logger';
+import type { ModelParams } from './inference-energy';
+
+// Common data type sizes in bytes
+export const DTYPE_SIZES: Record<string, number> = {
+  fp32: 4,
+  fp16: 2,
+  bf16: 2,
+  fp8: 1,
+  fp8_e4m3: 1,
+  fp8_e5m2: 1,
+  nvfp4: 0.5,
+  int4: 0.5,
+  int8: 1,
+  default: 2, // Default to FP16
+};
+
+// ─── HuggingFace API Response Types ──────────────────────────
+
+interface HuggingFaceConfig {
+  // General model info
+  model_type?: string;
+  architectures?: string[];
+
+  // Architecture parameters
+  hidden_size?: number;
+  num_hidden_layers?: number;
+  num_attention_heads?: number;
+  num_key_value_heads?: number; // For GQA/MQA
+  intermediate_size?: number;
+
+  // Context length
+  max_position_embeddings?: number;
+  max_sequence_length?: number;
+  ctx_length?: number;
+
+  // KV cache / RoPE parameters
+  kv_lora_rank?: number;
+  qk_lora_rank?: number;
+  rope_theta?: number;
+  rope_scaling?: {
+    type?: string;
+    factor?: number;
+    original_max_position_embeddings?: number;
+  };
+
+  // Attention
+  attention_bias?: boolean;
+  attention_dropout?: number;
+
+  // Vocab
+  vocab_size?: number;
+
+  // Other
+  torch_dtype?: string;
+  transformers_version?: string;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface HuggingFaceApiResponse {
+  id: string;
+  modelId: string;
+  safetensors?: {
+    parameters: {
+      F32?: number;
+      F16?: number;
+      BF16?: number;
+      F8_E4M3?: number;
+      F8_E5M2?: number;
+      I32?: number; // int4 stored as int32
+      I16?: number;
+      I8?: number;
+      [key: string]: number | undefined;
+    };
+    total: number;
+  };
+  config?: HuggingFaceConfig;
+}
+
+// ─── Proprietary Model Heuristics ──────────────────────────
+// Heuristics for estimating architecture of proprietary models not on Hugging Face
+
+interface ModelFamilyHeuristic {
+  // Architecture estimation
+  total_params: number; // In billions
+  active_params: number; // In billions (for MoE)
+  layers: number;
+  heads: number;
+  kv_lora_rank: number;
+  qk_rope_head_dim: number;
+  context_length: number;
+  // Assumed dtype for energy calc
+  default_dtype: string;
+}
+
+const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
+  // OpenAI GPT-4 family
+  'gpt-4': {
+    total_params: 1.76, // Expert estimates around 1.7-1.8T
+    active_params: 1.76, // Dense model
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128, // Assumed for GQA
+    qk_rope_head_dim: 96,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+  'gpt-4o': {
+    total_params: 1.76,
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+  'gpt-4-turbo': {
+    total_params: 1.76,
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+  'gpt-4.1': {
+    total_params: 1.76,
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+  o1: {
+    total_params: 1.76, // Same base as GPT-4
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 200000, // o1 has 200k context
+    default_dtype: 'fp8',
+  },
+  o3: {
+    total_params: 1.76,
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'o4-mini': {
+    total_params: 0.4, // Smaller variant
+    active_params: 0.4,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+
+  // OpenAI GPT-3.5 / GPT-4o mini
+  'gpt-3.5': {
+    total_params: 0.175, // 175B
+    active_params: 0.175,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 16385,
+    default_dtype: 'fp16',
+  },
+  'gpt-4o-mini': {
+    total_params: 0.2, // ~200B estimated
+    active_params: 0.2,
+    layers: 60,
+    heads: 48,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 48,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+
+  // Anthropic Claude family
+  'claude-3-5-sonnet': {
+    total_params: 0.45, // Estimated ~450B total params
+    active_params: 0.15, // Mixture of Experts - ~3-5 active experts
+    layers: 90,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-3-5-haiku': {
+    total_params: 0.2, // Estimated ~200B
+    active_params: 0.2,
+    layers: 56,
+    heads: 48,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 48,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-3-opus': {
+    total_params: 0.45,
+    active_params: 0.15,
+    layers: 90,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-3-sonnet': {
+    total_params: 0.45,
+    active_params: 0.15,
+    layers: 90,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-3-haiku': {
+    total_params: 0.2,
+    active_params: 0.2,
+    layers: 56,
+    heads: 48,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 48,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-3.7-sonnet': {
+    total_params: 0.45,
+    active_params: 0.15,
+    layers: 90,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+
+  // Anthropic Claude 4
+  'claude-4-sonnet': {
+    total_params: 0.5,
+    active_params: 0.17,
+    layers: 96,
+    heads: 72,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 72,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-4-opus': {
+    total_params: 0.6,
+    active_params: 0.2,
+    layers: 120,
+    heads: 80,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 80,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'claude-4-haiku': {
+    total_params: 0.25,
+    active_params: 0.25,
+    layers: 64,
+    heads: 48,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 48,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+
+  // Google Gemini family
+  'gemini-2.5': {
+    total_params: 0.6, // Gemini 2.5 is ~600B estimated
+    active_params: 0.2, // MoE with ~3 active experts
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 1048576, // 1M context
+    default_dtype: 'fp8',
+  },
+  'gemini-2.0': {
+    total_params: 0.6,
+    active_params: 0.2,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 2000000, // 2M context
+    default_dtype: 'fp8',
+  },
+  'gemini-1.5': {
+    total_params: 0.5,
+    active_params: 0.17,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 2000000, // 2M context
+    default_dtype: 'fp8',
+  },
+  'gemini-1.0': {
+    total_params: 0.6,
+    active_params: 0.2,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 32768,
+    default_dtype: 'fp16',
+  },
+  'gemini-pro': {
+    total_params: 0.6,
+    active_params: 0.2,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 32768,
+    default_dtype: 'fp16',
+  },
+
+  // Meta LLaMA family (often available on HF but include fallback)
+  'llama-4': {
+    total_params: 0.4, // LLaMA 4 is estimated ~400B MoE
+    active_params: 0.1, // ~4 active experts
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 200000,
+    default_dtype: 'fp8',
+  },
+  'llama-3.1': {
+    total_params: 0.405, // 405B
+    active_params: 0.405, // Dense
+    layers: 126,
+    heads: 128,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 128,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+  'llama-3': {
+    total_params: 0.405,
+    active_params: 0.405,
+    layers: 126,
+    heads: 128,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 128,
+    context_length: 8192,
+    default_dtype: 'fp8',
+  },
+  'llama-2': {
+    total_params: 0.7, // 70B
+    active_params: 0.7,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 4096,
+    default_dtype: 'fp16',
+  },
+
+  // Mistral family
+  mixtral: {
+    total_params: 0.12, // 12B total
+    active_params: 0.012, // 8 experts × 12B/8 = ~1.5B active
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 32768,
+    default_dtype: 'fp16',
+  },
+  mistral: {
+    total_params: 0.007, // 7B
+    active_params: 0.007,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // DeepSeek family
+  'deepseek-v3': {
+    total_params: 0.671, // 671B
+    active_params: 0.037, // ~18 active experts
+    layers: 61,
+    heads: 128,
+    kv_lora_rank: 512,
+    qk_rope_head_dim: 64,
+    context_length: 256000,
+    default_dtype: 'fp8',
+  },
+  'deepseek-r1': {
+    total_params: 0.671,
+    active_params: 0.037,
+    layers: 61,
+    heads: 128,
+    kv_lora_rank: 512,
+    qk_rope_head_dim: 64,
+    context_length: 256000,
+    default_dtype: 'fp8',
+  },
+  'deepseek-coder': {
+    total_params: 0.016, // 16B
+    active_params: 0.016,
+    layers: 40,
+    heads: 40,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 40,
+    context_length: 16384,
+    default_dtype: 'fp16',
+  },
+
+  // Cohere
+  'command-r': {
+    total_params: 0.35, // 35B
+    active_params: 0.35,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 131072,
+    default_dtype: 'fp8',
+  },
+  command: {
+    total_params: 0.35,
+    active_params: 0.35,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 4096,
+    default_dtype: 'fp16',
+  },
+
+  // xAI Grok
+  'grok-2': {
+    total_params: 0.3, // 300B estimated
+    active_params: 0.03, // ~10 active experts
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 131072,
+    default_dtype: 'fp8',
+  },
+  'grok-1': {
+    total_params: 0.3,
+    active_params: 0.03,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 131072,
+    default_dtype: 'fp8',
+  },
+
+  // Meta Code Llama
+  codellama: {
+    total_params: 0.07, // 70B
+    active_params: 0.07,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 16384,
+    default_dtype: 'fp16',
+  },
+
+  // Qwen family
+  'qwen-2.5': {
+    total_params: 0.72, // 72B
+    active_params: 0.72,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 32768,
+    default_dtype: 'fp8',
+  },
+  'qwen-2': {
+    total_params: 0.72,
+    active_params: 0.72,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 32768,
+    default_dtype: 'fp8',
+  },
+  'qwen-1.5': {
+    total_params: 0.72,
+    active_params: 0.72,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 32768,
+    default_dtype: 'fp8',
+  },
+
+  // AI21 Jurassic
+  jurassic: {
+    total_params: 0.175, // 175B
+    active_params: 0.175,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Stability AI
+  'stable-chat': {
+    total_params: 0.04, // 40B
+    active_params: 0.04,
+    layers: 48,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Salesforce
+  santacoder: {
+    total_params: 0.0011, // 1.1B
+    active_params: 0.0011,
+    layers: 24,
+    heads: 16,
+    kv_lora_rank: 16,
+    qk_rope_head_dim: 16,
+    context_length: 2048,
+    default_dtype: 'fp16',
+  },
+
+  // BigCode / StarCoder
+  starcoder: {
+    total_params: 0.015, // 15B
+    active_params: 0.015,
+    layers: 40,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Mistral Codestral
+  codestral: {
+    total_params: 0.022, // 22B
+    active_params: 0.022,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 32768,
+    default_dtype: 'fp16',
+  },
+
+  // Reka
+  reka: {
+    total_params: 0.21, // 21B estimated
+    active_params: 0.21,
+    layers: 48,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 32768,
+    default_dtype: 'fp16',
+  },
+
+  // Aleph Alpha
+  luminous: {
+    total_params: 0.7, // 70B
+    active_params: 0.7,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 64,
+    qk_rope_head_dim: 64,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Perplexity
+  pplx: {
+    total_params: 0.12, // 12B (based on Mixtral architecture)
+    active_params: 0.012,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 32768,
+    default_dtype: 'fp16',
+  },
+
+  // Together AI models (often based on other architectures)
+  'together-': {
+    total_params: 0.1, // Default assumption for together models
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Fireworks AI models
+  'fireworks-': {
+    total_params: 0.1,
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Anyscale
+  'anyscale-': {
+    total_params: 0.1,
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Novita AI
+  'novita-': {
+    total_params: 0.1,
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Lepton AI
+  'lepton-': {
+    total_params: 0.1,
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Hyperbolic
+  'hyperbolic-': {
+    total_params: 0.1,
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // DeepInfra
+  'deepinfra-': {
+    total_params: 0.1,
+    active_params: 0.1,
+    layers: 32,
+    heads: 32,
+    kv_lora_rank: 32,
+    qk_rope_head_dim: 32,
+    context_length: 8192,
+    default_dtype: 'fp16',
+  },
+
+  // Azure OpenAI
+  'azure-openai-': {
+    total_params: 1.76, // Assume GPT-4 level
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+
+  // AWS Bedrock
+  'bedrock-': {
+    total_params: 1.76,
+    active_params: 1.76,
+    layers: 120,
+    heads: 96,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 128000,
+    default_dtype: 'fp8',
+  },
+
+  // Vertex AI (Google)
+  'vertex-': {
+    total_params: 0.6,
+    active_params: 0.2,
+    layers: 80,
+    heads: 64,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 64,
+    context_length: 2000000,
+    default_dtype: 'fp8',
+  },
+};
+
+// ─── Default Fallback ──────────────────────────
+
+const DEFAULT_MODEL_PARAMS: ModelParams = {
+  total_params: 1000, // Represented as billions
+  active_params: 32, // Represented as billions
+  layers: 61,
+  context_length: 256000,
+  kv_lora_rank: 512,
+  qk_rope_head_dim: 64,
+  dtype_size: 2, // FP16 = 2 bytes
+  heads: 64,
+};
+
+// ─── Fetcher Implementation ──────────────────────────
+
+export class HuggingFaceModelFetcher {
+  private static instance: HuggingFaceModelFetcher;
+  private cache: Map<string, ModelParams> = new Map();
+  private dtypeCache: Map<string, string> = new Map();
+
+  private constructor() {}
+
+  public static getInstance(): HuggingFaceModelFetcher {
+    if (!HuggingFaceModelFetcher.instance) {
+      HuggingFaceModelFetcher.instance = new HuggingFaceModelFetcher();
+    }
+    return HuggingFaceModelFetcher.instance;
+  }
+
+  /**
+   * Reset the singleton (used in tests)
+   */
+  public static resetForTesting(): void {
+    HuggingFaceModelFetcher.instance = new HuggingFaceModelFetcher();
+  }
+
+  /**
+   * Try to fetch model architecture from Hugging Face,
+   * fall back to heuristics, then fall back to defaults.
+   */
+  public async getModelParams(
+    modelId: string,
+    dtype?: string
+  ): Promise<{
+    params: ModelParams;
+    source: 'huggingface' | 'heuristic' | 'default';
+    dtype: string;
+  }> {
+    // Normalize model ID (remove org prefix if present for heuristic matching)
+    const normalizedId = modelId
+      .toLowerCase()
+      .replace(/^models:\/\//, '')
+      .replace(/^hf_/, '');
+    const baseModelId = normalizedId.split('/').pop() || normalizedId;
+
+    // Check cache first
+    const cacheKey = `${modelId}:${dtype || 'default'}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return { params: cached, source: 'huggingface', dtype: dtype || 'fp16' };
+    }
+
+    // Try Hugging Face first
+    const hfResult = await this.fetchFromHuggingFace(modelId);
+    if (hfResult) {
+      const finalDtype = dtype || hfResult.dtype;
+      const params: ModelParams = {
+        total_params: hfResult.params.total_params ?? DEFAULT_MODEL_PARAMS.total_params,
+        active_params: hfResult.params.active_params ?? DEFAULT_MODEL_PARAMS.active_params,
+        layers: hfResult.params.layers ?? DEFAULT_MODEL_PARAMS.layers,
+        heads: hfResult.params.heads ?? DEFAULT_MODEL_PARAMS.heads,
+        kv_lora_rank: hfResult.params.kv_lora_rank ?? DEFAULT_MODEL_PARAMS.kv_lora_rank,
+        qk_rope_head_dim: hfResult.params.qk_rope_head_dim ?? DEFAULT_MODEL_PARAMS.qk_rope_head_dim,
+        context_length: hfResult.params.context_length ?? DEFAULT_MODEL_PARAMS.context_length,
+        dtype_size: DTYPE_SIZES[finalDtype] || DTYPE_SIZES.default,
+      };
+      this.cache.set(cacheKey, params);
+      return { params, source: 'huggingface', dtype: finalDtype };
+    }
+
+    // Fall back to heuristics for proprietary models
+    const heuristicResult = this.getHeuristicParams(baseModelId);
+    if (heuristicResult) {
+      const finalDtype = dtype || heuristicResult.dtype;
+      const params: ModelParams = {
+        total_params: heuristicResult.params.total_params ?? DEFAULT_MODEL_PARAMS.total_params,
+        active_params: heuristicResult.params.active_params ?? DEFAULT_MODEL_PARAMS.active_params,
+        layers: heuristicResult.params.layers ?? DEFAULT_MODEL_PARAMS.layers,
+        heads: heuristicResult.params.heads ?? DEFAULT_MODEL_PARAMS.heads,
+        kv_lora_rank: heuristicResult.params.kv_lora_rank ?? DEFAULT_MODEL_PARAMS.kv_lora_rank,
+        qk_rope_head_dim:
+          heuristicResult.params.qk_rope_head_dim ?? DEFAULT_MODEL_PARAMS.qk_rope_head_dim,
+        context_length:
+          heuristicResult.params.context_length ?? DEFAULT_MODEL_PARAMS.context_length,
+        dtype_size: DTYPE_SIZES[finalDtype] || DTYPE_SIZES.default,
+      };
+      this.cache.set(cacheKey, params);
+      return { params, source: 'heuristic', dtype: finalDtype };
+    }
+
+    // Fall back to defaults
+    const finalDtype = dtype || 'fp16';
+    const params: ModelParams = {
+      ...DEFAULT_MODEL_PARAMS,
+      dtype_size: DTYPE_SIZES[finalDtype] || DTYPE_SIZES.default,
+    };
+    this.cache.set(cacheKey, params);
+    return { params, source: 'default', dtype: finalDtype };
+  }
+
+  /**
+   * Fetch model config from Hugging Face
+   */
+  private async fetchFromHuggingFace(
+    modelId: string
+  ): Promise<{ params: Partial<ModelParams>; dtype: string } | null> {
+    // Normalize model ID for URL
+    const normalizedModelId = modelId.replace(/^models:\/\//, '').replace(/^hf_/, '');
+
+    try {
+      // First, fetch the HF API endpoint to get safetensors parameter info
+      const apiUrl = `https://huggingface.co/api/models/${normalizedModelId}`;
+      logger.debug(`[HuggingFaceModelFetcher] Fetching API data from ${apiUrl}`);
+
+      const apiResponse = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      let totalParams: number | undefined;
+      let inferredDtype: string | undefined;
+
+      if (apiResponse.ok) {
+        const apiData: HuggingFaceApiResponse = await apiResponse.json();
+
+        // Use safetensors info to get total params
+        // safetensors.parameters contains the actual parameter counts (not bytes)
+        if (apiData.safetensors?.parameters) {
+          const params = apiData.safetensors.parameters;
+
+          // Sum all dtype parameter counts to get total params
+          const fp8Params = params.F8_E4M3 || 0;
+          const i32Params = params.I32 || 0; // int4 stored as int32
+          const bf16Params = params.BF16 || 0;
+          const fp32Params = params.F32 || 0;
+          const fp16Params = params.F16 || 0;
+          const f8E5m2Params = params.F8_E5M2 || 0;
+
+          const totalFromSafetensors =
+            fp8Params + i32Params + bf16Params + fp32Params + fp16Params + f8E5m2Params;
+
+          if (totalFromSafetensors > 0) {
+            totalParams = Math.round((totalFromSafetensors / 1e9) * 10) / 10;
+
+            // Determine dominant dtype
+            if (
+              i32Params > fp8Params &&
+              i32Params > bf16Params &&
+              i32Params > fp32Params &&
+              i32Params > fp16Params &&
+              i32Params > f8E5m2Params
+            ) {
+              inferredDtype = 'int4';
+            } else if (
+              fp8Params > bf16Params &&
+              fp8Params > fp32Params &&
+              fp8Params > fp16Params &&
+              fp8Params > f8E5m2Params
+            ) {
+              inferredDtype = 'fp8';
+            } else if (bf16Params > fp32Params && bf16Params > fp16Params) {
+              inferredDtype = 'bf16';
+            } else if (fp16Params > fp32Params) {
+              inferredDtype = 'fp16';
+            } else if (fp32Params > 0) {
+              inferredDtype = 'fp16'; // Use fp16 for energy calc (fp32 is rare)
+            } else if (f8E5m2Params > 0) {
+              inferredDtype = 'fp8';
+            }
+          }
+        }
+      }
+
+      // Then fetch the config.json for architecture details
+      const configUrl = `https://huggingface.co/${normalizedModelId}/resolve/main/config.json`;
+      logger.debug(`[HuggingFaceModelFetcher] Fetching config from ${configUrl}`);
+
+      const configResponse = await fetch(configUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      if (!configResponse.ok) {
+        logger.debug(`[HuggingFaceModelFetcher] Config not found: ${configResponse.status}`);
+        // If we have safetensors data but no config, still return what we have
+        if (totalParams) {
+          return {
+            params: { total_params: totalParams, active_params: totalParams },
+            dtype: inferredDtype || 'fp8',
+          };
+        }
+        return null;
+      }
+
+      const config: HuggingFaceConfig = await configResponse.json();
+      const parsedParams = this.parseConfig(config, totalParams);
+      const dtype = inferredDtype || this.inferDtype(config);
+
+      logger.info(`[HuggingFaceModelFetcher] Successfully fetched config for ${modelId}`);
+      return { params: parsedParams, dtype };
+    } catch (error) {
+      logger.debug(`[HuggingFaceModelFetcher] Error fetching config: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Parse HuggingFace config into ModelParams
+   */
+  private parseConfig(
+    config: HuggingFaceConfig,
+    safetensorsTotalParams?: number
+  ): Partial<ModelParams> {
+    const params: Partial<ModelParams> = {};
+
+    // Layers
+    if (config.num_hidden_layers) {
+      params.layers = config.num_hidden_layers;
+    }
+
+    // Heads
+    if (config.num_attention_heads) {
+      params.heads = config.num_attention_heads;
+    }
+
+    // KV heads (for GQA/MQA)
+    const kvHeads = config.num_key_value_heads || config.num_attention_heads;
+
+    // Calculate hidden size per head for qk_rope_head_dim
+    if (config.hidden_size && config.num_attention_heads) {
+      const dimPerHead = config.hidden_size / config.num_attention_heads;
+      params.qk_rope_head_dim = Math.floor(dimPerHead);
+    }
+
+    // Context length - try multiple fields
+    params.context_length =
+      config.max_position_embeddings || config.max_sequence_length || config.ctx_length || 4096; // Default
+
+    // RoPE scaling can extend context length
+    if (config.rope_scaling?.factor && config.rope_scaling?.original_max_position_embeddings) {
+      params.context_length = Math.max(
+        params.context_length,
+        config.rope_scaling.original_max_position_embeddings * config.rope_scaling.factor
+      );
+    }
+
+    // KV cache rank (specific to some architectures like Mixtral)
+    if (config.kv_lora_rank) {
+      params.kv_lora_rank = config.kv_lora_rank;
+    }
+
+    // Use safetensors total params if available (more accurate), otherwise estimate from config
+    if (safetensorsTotalParams) {
+      params.total_params = safetensorsTotalParams;
+    } else if (
+      config.vocab_size &&
+      config.hidden_size &&
+      config.num_hidden_layers &&
+      config.intermediate_size
+    ) {
+      // Fallback: estimate from vocab and hidden size
+      // Formula: vocab_size * hidden_size * 4 (embed + output) + layers * hidden_size * (4*hidden_size + intermediate_size)
+      const vocabEmbed = config.vocab_size * config.hidden_size * 4;
+      const perLayer =
+        config.hidden_size *
+        (4 * config.hidden_size + config.intermediate_size + 2 * config.hidden_size);
+      const total = (vocabEmbed + config.num_hidden_layers * perLayer) / 1e9; // Convert to billions
+      params.total_params = Math.round(total * 10) / 10; // Round to 1 decimal
+    }
+
+    // Calculate active params based on MoE configuration
+    // Check for expert config in both top-level and nested (some models like Kimi have it in text_config)
+    const textConfig = config.text_config || {};
+    const numLocalExperts =
+      config.num_local_experts ||
+      config.n_routed_experts ||
+      textConfig.num_local_experts ||
+      textConfig.n_routed_experts;
+    const numExpertsPerTok = config.num_experts_per_tok || textConfig.num_experts_per_tok;
+
+    if (params.total_params && numLocalExperts && numExpertsPerTok) {
+      // MoE: active_params = (total_params / num_local_experts) * num_experts_per_tok
+      const paramsPerExpert = params.total_params / numLocalExperts;
+      params.active_params = Math.round(paramsPerExpert * numExpertsPerTok * 10) / 10;
+    } else if (config.model_type?.includes('mixtral') || config.model_type?.includes('moe')) {
+      // MoE models without explicit expert config: assume ~5-15% active params
+      params.active_params = Math.round(params.total_params! * 0.1 * 10) / 10;
+    } else {
+      // Dense model: all params are active
+      params.active_params = params.total_params || 0.1;
+    }
+
+    return params;
+  }
+
+  /**
+   * Infer likely dtype from model config or defaults
+   */
+  private inferDtype(config: HuggingFaceConfig): string {
+    if (config.torch_dtype) {
+      const dtype = config.torch_dtype.toLowerCase();
+      if (dtype.includes('float16') || dtype.includes('fp16')) return 'fp16';
+      if (dtype.includes('bfloat16') || dtype.includes('bf16')) return 'bf16';
+      if (dtype.includes('float8') || dtype.includes('fp8')) return 'fp8';
+      if (dtype.includes('int8')) return 'int8';
+      if (dtype.includes('int4')) return 'int4';
+    }
+
+    // Model type based inference
+    const modelType = config.model_type?.toLowerCase() || '';
+    if (
+      modelType.includes('llama') ||
+      modelType.includes('mistral') ||
+      modelType.includes('qwen')
+    ) {
+      // Modern models often use FP8
+      return 'fp8';
+    }
+
+    return 'fp16'; // Default
+  }
+
+  /**
+   * Get heuristic parameters for known proprietary model families
+   */
+  private getHeuristicParams(
+    modelId: string
+  ): { params: Partial<ModelParams>; dtype: string } | null {
+    const normalizedId = modelId.toLowerCase();
+
+    // Try exact match first
+    for (const [key, heuristic] of Object.entries(PROPRIETARY_MODEL_HEURISTICS)) {
+      if (normalizedId.includes(key.replace(/-/g, '').replace(/_/g, ''))) {
+        // Check for exact match or prefix match (for models like "together-")
+        if (key.endsWith('-')) {
+          // Prefix match - only match if model ID starts with the prefix
+          if (normalizedId.startsWith(key.slice(0, -1))) {
+            return this.heuristicToModelParams(heuristic);
+          }
+        } else if (normalizedId.includes(key)) {
+          return this.heuristicToModelParams(heuristic);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Convert heuristic to ModelParams
+   */
+  private heuristicToModelParams(heuristic: ModelFamilyHeuristic): {
+    params: Partial<ModelParams>;
+    dtype: string;
+  } {
+    return {
+      params: {
+        total_params: heuristic.total_params,
+        active_params: heuristic.active_params,
+        layers: heuristic.layers,
+        heads: heuristic.heads,
+        kv_lora_rank: heuristic.kv_lora_rank,
+        qk_rope_head_dim: heuristic.qk_rope_head_dim,
+        context_length: heuristic.context_length,
+      },
+      dtype: heuristic.default_dtype,
+    };
+  }
+
+  /**
+   * Clear cache (useful for testing or after config changes)
+   */
+  public clearCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Get available dtype options for UI
+   */
+  public static getDtypeOptions(): Array<{ value: string; label: string; bytes: number }> {
+    return [
+      { value: 'fp16', label: 'FP16 (Float16)', bytes: 2 },
+      { value: 'bf16', label: 'BF16 (BFloat16)', bytes: 2 },
+      { value: 'fp8', label: 'FP8 (Float8)', bytes: 1 },
+      { value: 'fp8_e4m3', label: 'FP8 E4M3', bytes: 1 },
+      { value: 'fp8_e5m2', label: 'FP8 E5M2', bytes: 1 },
+      { value: 'nvfp4', label: 'NVFP4', bytes: 0.5 },
+      { value: 'int4', label: 'INT4', bytes: 0.5 },
+      { value: 'int8', label: 'INT8', bytes: 1 },
+    ];
+  }
+}

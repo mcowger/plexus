@@ -2031,6 +2031,120 @@ export const Providers = () => {
             </div>
           </div>
 
+          {/* GPU Profile section for inference energy calculation */}
+          <div className="flex flex-col gap-2">
+            <label className="font-body text-[13px] font-medium text-text-secondary">
+              GPU Profile
+            </label>
+            <div className="flex gap-3 items-end">
+              <select
+                className="flex-1 py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                value={editingProvider.gpu_profile || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditingProvider({
+                    ...editingProvider,
+                    gpu_profile: (value as any) || undefined,
+                  });
+                }}
+              >
+                <option value="">Default (B200)</option>
+                <option value="H100">NVIDIA H100 (80GB)</option>
+                <option value="H200">NVIDIA H200 (141GB)</option>
+                <option value="GH100">NVIDIA GH100 (144GB)</option>
+                <option value="GH200">NVIDIA GH200 (144GB)</option>
+                <option value="B200">NVIDIA B200 (192GB)</option>
+                <option value="B300">NVIDIA B300 (288GB)</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            {editingProvider.gpu_profile === 'custom' && (
+              <div className="mt-2 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary">
+                      RAM (GB)
+                    </label>
+                    <input
+                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={editingProvider.gpu_ram_gb || ''}
+                      onChange={(e) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_ram_gb: parseFloat(e.target.value) || undefined,
+                        })
+                      }
+                      placeholder="e.g. 80"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary">
+                      Bandwidth (TB/s)
+                    </label>
+                    <input
+                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={editingProvider.gpu_bandwidth_tb_s || ''}
+                      onChange={(e) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_bandwidth_tb_s: parseFloat(e.target.value) || undefined,
+                        })
+                      }
+                      placeholder="e.g. 3.35"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary">
+                      FLOPS (TFLOPs)
+                    </label>
+                    <input
+                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="100"
+                      min="1"
+                      value={editingProvider.gpu_flops_tflop || ''}
+                      onChange={(e) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_flops_tflop: parseFloat(e.target.value) || undefined,
+                        })
+                      }
+                      placeholder="e.g. 4000"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary">
+                      Power Draw (Watts)
+                    </label>
+                    <input
+                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="10"
+                      min="1"
+                      value={editingProvider.gpu_power_draw_watts || ''}
+                      onChange={(e) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_power_draw_watts: parseInt(e.target.value, 10) || undefined,
+                        })
+                      }
+                      placeholder="e.g. 700"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="text-[11px] text-text-muted">
+              Used for inference energy calculation. Select a preset or enter custom GPU specs.
+            </div>
+          </div>
+
           {/* Advanced accordion */}
           <div className="border border-border-glass rounded-sm overflow-hidden">
             <button

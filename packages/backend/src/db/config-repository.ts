@@ -298,6 +298,12 @@ export class ConfigRepository {
       quotaCheckerOptions: config.quota_checker?.options
         ? encryptJsonField(config.quota_checker.options)
         : null,
+      // GPU Profile settings for inference energy calculation
+      gpuProfile: config.gpu_profile ?? null,
+      gpuRamGb: config.gpu_ram_gb ?? null,
+      gpuBandwidthTbS: config.gpu_bandwidth_tb_s ?? null,
+      gpuFlopsTflop: config.gpu_flops_tflop ?? null,
+      gpuPowerDrawWatts: config.gpu_power_draw_watts ?? null,
       updatedAt: timestamp,
     };
 
@@ -461,6 +467,12 @@ export class ConfigRepository {
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
       ...(quota_checker ? { quota_checker } : {}),
+      // GPU Profile settings for inference energy calculation
+      ...(row.gpuProfile ? { gpu_profile: row.gpuProfile } : {}),
+      ...(row.gpuRamGb ? { gpu_ram_gb: row.gpuRamGb } : {}),
+      ...(row.gpuBandwidthTbS ? { gpu_bandwidth_tb_s: row.gpuBandwidthTbS } : {}),
+      ...(row.gpuFlopsTflop ? { gpu_flops_tflop: row.gpuFlopsTflop } : {}),
+      ...(row.gpuPowerDrawWatts ? { gpu_power_draw_watts: row.gpuPowerDrawWatts } : {}),
     };
 
     return result as ProviderConfig;
@@ -555,6 +567,8 @@ export class ConfigRepository {
       metadataSource: config.metadata?.source ?? null,
       metadataSourcePath: config.metadata?.source_path ?? null,
       useImageFallthrough: fromBool(config.use_image_fallthrough === true),
+      // Model architecture override for inference energy calculation
+      modelArchitecture: config.model_architecture ? toJson(config.model_architecture) : null,
       updatedAt: timestamp,
     };
 
@@ -661,6 +675,16 @@ export class ConfigRepository {
       ...(row.modelType ? { type: row.modelType } : {}),
       ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),
       ...(row.advanced ? { advanced: parseJson(row.advanced) } : {}),
+      ...(row.metadataSource
+        ? {
+          metadata: {
+            source: row.metadataSource,
+            source_path: row.metadataSourcePath,
+          },
+        }
+        : {}),
+      // Model architecture override for inference energy calculation
+      ...(row.modelArchitecture ? { model_architecture: parseJson(row.modelArchitecture) } : {}),
     };
 
     if (row.metadataSource) {
@@ -729,7 +753,7 @@ export class ConfigRepository {
       if (rows.length > 0) {
         logger.error(
           'API key matched via plaintext fallback — encryption migration may not have run. ' +
-            'Restart with ENCRYPTION_KEY set to trigger migration.'
+          'Restart with ENCRYPTION_KEY set to trigger migration.'
         );
       }
     }

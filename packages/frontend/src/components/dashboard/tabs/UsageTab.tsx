@@ -28,10 +28,12 @@ import { useEffect, useMemo, useState } from 'react';
  * Each record represents a single (provider, model, timestamp) data point returned
  * from the `GET /v0/management/concurrency?timeRange=...` endpoint.
  */
-import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
+import { api, UsageData, PieChartDataPoint, type ConcurrencyData, UsageRecord } from '../../../lib/api';
 import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { SlicesToasted } from '../../SlicesToasted';
+import { EnergyTimeComparison } from '../../EnergyTimeComparison';
+import { EnergyOverTime } from '../../EnergyOverTime';
 import { TimeRangeSelector } from '../TimeRangeSelector';
 import type { CustomDateRange } from '../../../lib/date';
 import {
@@ -109,6 +111,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
    */
   const [concurrencyByProvider, setConcurrencyByProvider] = useState<ConcurrencyData[]>([]);
   const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
+  const [energyRecords, setEnergyRecords] = useState<Array<Pick<UsageRecord, 'durationMs' | 'ttftMs' | 'kwhUsed'>>>([]);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -137,6 +140,28 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     if (timeRange === 'custom' && customDateRange) {
       startDate = customDateRange.start.toISOString();
       endDate = customDateRange.end.toISOString();
+    } else {
+      // Calculate date range for non-custom time ranges
+      const now = new Date();
+      const rangeStart = new Date(now);
+
+      switch (timeRange) {
+        case 'hour':
+          rangeStart.setHours(rangeStart.getHours() - 1);
+          break;
+        case 'day':
+          rangeStart.setHours(rangeStart.getHours() - 24);
+          break;
+        case 'week':
+          rangeStart.setDate(rangeStart.getDate() - 7);
+          break;
+        case 'month':
+          rangeStart.setDate(rangeStart.getDate() - 30);
+          break;
+      }
+
+      startDate = rangeStart.toISOString();
+      endDate = now.toISOString();
     }
 
     // Use summary endpoint for time-series data (much more efficient)
@@ -151,6 +176,15 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     api
       .getConcurrencyData(timeRange, 'timeline', 'model', startDate, endDate)
       .then(setConcurrencyByModel);
+    api
+      .getUsageRecords({
+        limit: 1000,
+        startDate,
+        endDate,
+        fields: ['kwhUsed', 'ttftMs', 'durationMs'],
+        cache: true,
+      })
+      .then((res) => setEnergyRecords(res.data || []));
   }, [timeRange, customDateRange]);
 
   // ---------------------------------------------------------------------------
@@ -607,6 +641,13 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           </div>
         </Card>
 
+        {/* Energy Usage Over Time */}
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Usage">
+          <div style={{ height: 300, marginTop: '12px' }}>
+            <EnergyOverTime data={data} />
+          </div>
+        </Card>
+
         {/* Model Distribution - Requests */}
         <Card
           className="min-w-0"
@@ -662,6 +703,14 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Slices of bread toasted">
           <div style={{ marginTop: '12px', height: 300 }}>
             <SlicesToasted data={data} />
+          </div>
+        </Card>
+
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy vs Streaming">
+          <div style={{ marginTop: '12px', height: 300 }}>
+            <EnergyTimeComparison
+              data={energyRecords as Array<{ kwhUsed?: number; ttftMs?: number; durationMs: number }>}
+            />
           </div>
         </Card>
       </div>

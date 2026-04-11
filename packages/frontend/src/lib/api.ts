@@ -50,13 +50,13 @@ function inferProviderTypes(apiBaseUrl?: string | Record<string, string>): strin
 export type Principal =
   | { role: 'admin' }
   | {
-      role: 'limited';
-      keyName: string;
-      allowedProviders: string[];
-      allowedModels: string[];
-      quotaName?: string | null;
-      comment?: string | null;
-    };
+    role: 'limited';
+    keyName: string;
+    allowedProviders: string[];
+    allowedModels: string[];
+    quotaName?: string | null;
+    comment?: string | null;
+  };
 
 /**
  * Verify a credential against the backend. Returns the resolved principal on
@@ -242,6 +242,12 @@ export interface Provider {
     intervalMinutes: number;
     options?: Record<string, unknown>;
   };
+  // GPU Profile settings for inference energy calculation
+  gpu_profile?: 'H100' | 'H200' | 'GH100' | 'GH200' | 'B200' | 'B300' | 'custom';
+  gpu_ram_gb?: number;
+  gpu_bandwidth_tb_s?: number;
+  gpu_flops_tflop?: number;
+  gpu_power_draw_watts?: number;
 }
 
 export interface McpServer {
@@ -353,15 +359,15 @@ export interface NormalizedModelMetadata {
 // an overrides blob with a non-empty `name` (there is no catalog fallback).
 export type AliasMetadata =
   | {
-      source: Exclude<MetadataSource, 'custom'>;
-      source_path: string;
-      overrides?: MetadataOverrides;
-    }
+    source: Exclude<MetadataSource, 'custom'>;
+    source_path: string;
+    overrides?: MetadataOverrides;
+  }
   | {
-      source: 'custom';
-      source_path?: string;
-      overrides: MetadataOverrides & { name: string };
-    };
+    source: 'custom';
+    source_path?: string;
+    overrides: MetadataOverrides & { name: string };
+  };
 
 export interface Alias {
   id: string;
@@ -373,6 +379,17 @@ export interface Alias {
   advanced?: AliasBehavior[];
   metadata?: AliasMetadata;
   use_image_fallthrough?: boolean;
+  // Model architecture override for inference energy calculation
+  model_architecture?: {
+    total_params?: number;
+    active_params?: number;
+    layers?: number;
+    heads?: number;
+    kv_lora_rank?: number;
+    qk_rope_head_dim?: number;
+    context_length?: number;
+    dtype?: 'fp16' | 'bf16' | 'fp8' | 'fp8_e4m3' | 'fp8_e5m2' | 'nvfp4' | 'int4' | 'int8';
+  };
 }
 
 export interface InferenceError {
@@ -382,17 +399,17 @@ export interface InferenceError {
   errorMessage: string;
   errorStack?: string;
   details?:
-    | string
-    | {
-        apiType?: string;
-        provider?: string;
-        targetModel?: string;
-        targetApiType?: string;
-        url?: string;
-        headers?: Record<string, string>;
-        statusCode?: number;
-        providerResponse?: string;
-      };
+  | string
+  | {
+    apiType?: string;
+    provider?: string;
+    targetModel?: string;
+    targetApiType?: string;
+    url?: string;
+    headers?: Record<string, string>;
+    statusCode?: number;
+    providerResponse?: string;
+  };
   createdAt: number;
 }
 
@@ -917,18 +934,18 @@ export interface UserQuota {
 export interface QuotaConfig {
   id: string;
   type:
-    | 'synthetic'
-    | 'naga'
-    | 'nanogpt'
-    | 'codex'
-    | 'claude-code'
-    | 'zai'
-    | 'moonshot'
-    | 'minimax'
-    | 'minimax-coding'
-    | 'kimi-code'
-    | 'openrouter'
-    | 'kilo';
+  | 'synthetic'
+  | 'naga'
+  | 'nanogpt'
+  | 'codex'
+  | 'claude-code'
+  | 'zai'
+  | 'moonshot'
+  | 'minimax'
+  | 'minimax-coding'
+  | 'kimi-code'
+  | 'openrouter'
+  | 'kilo';
   provider: string;
   enabled: boolean;
   intervalMinutes: number;
@@ -1519,6 +1536,8 @@ export const api = {
     return (await res.json()) as BackendResponse<UsageRecord[]>;
   },
 
+  getUsageRecords: fetchUsageRecords,
+
   getConfig: async (): Promise<any> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config`);
     if (!res.ok) throw new Error('Failed to fetch config');
@@ -1675,12 +1694,18 @@ export const api = {
       models: provider.models,
       quota_checker: provider.quotaChecker?.type
         ? {
-            type: provider.quotaChecker.type,
-            enabled: provider.quotaChecker.enabled,
-            intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30),
-            options: provider.quotaChecker.options,
-          }
+          type: provider.quotaChecker.type,
+          enabled: provider.quotaChecker.enabled,
+          intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30),
+          options: provider.quotaChecker.options,
+        }
         : undefined,
+      // GPU Profile settings for inference energy calculation
+      ...(provider.gpu_profile && { gpu_profile: provider.gpu_profile }),
+      ...(provider.gpu_ram_gb && { gpu_ram_gb: provider.gpu_ram_gb }),
+      ...(provider.gpu_bandwidth_tb_s && { gpu_bandwidth_tb_s: provider.gpu_bandwidth_tb_s }),
+      ...(provider.gpu_flops_tflop && { gpu_flops_tflop: provider.gpu_flops_tflop }),
+      ...(provider.gpu_power_draw_watts && { gpu_power_draw_watts: provider.gpu_power_draw_watts }),
     };
 
     const res = await fetchWithAuth(
@@ -1783,6 +1808,8 @@ export const api = {
       ...(alias.type && { type: alias.type }),
       ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
       ...(alias.metadata && { metadata: alias.metadata }),
+      // Model architecture override for inference energy calculation
+      ...(alias.model_architecture && { model_architecture: alias.model_architecture }),
       targets: alias.targets.map((t) => ({
         provider: t.provider,
         model: t.model,
@@ -1897,6 +1924,7 @@ export const api = {
           advanced: val.advanced || [],
           targets,
           metadata: val.metadata,
+          model_architecture: val.model_architecture,
         });
       });
       return aliases;
@@ -2791,6 +2819,40 @@ export const api = {
   }> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/self/quota`);
     if (!res.ok) throw new Error('Failed to fetch quota status');
+    return res.json();
+  },
+
+  /**
+   * Fetches model architecture from Hugging Face via the backend API.
+   * This centralizes the HF API calls on the backend to avoid CORS issues
+   * and provide consistent caching.
+   *
+   * @param modelId - The Hugging Face model ID (e.g., 'moonshotai/Kimi-K2.5')
+   * @returns Model architecture data including total_params, active_params, layers, etc.
+   */
+  fetchHuggingFaceModelArchitecture: async (
+    modelId: string
+  ): Promise<{
+    success: boolean;
+    model_id: string;
+    architecture: {
+      total_params?: number;
+      active_params?: number;
+      layers?: number;
+      heads?: number;
+      kv_lora_rank?: number;
+      qk_rope_head_dim?: number;
+      context_length?: number;
+      dtype?: string;
+    };
+  }> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/models/huggingface/${encodeURIComponent(modelId)}`
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: 'Unknown error' } }));
+      throw new Error(err.error?.message || `Failed to fetch model architecture: ${res.status}`);
+    }
     return res.json();
   },
 };

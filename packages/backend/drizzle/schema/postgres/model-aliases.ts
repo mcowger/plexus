@@ -29,6 +29,8 @@ export const modelAliases = pgTable('model_aliases', {
   metadataSource: metadataSourceEnum('metadata_source'),
   metadataSourcePath: text('metadata_source_path'),
   useImageFallthrough: boolean('use_image_fallthrough').notNull().default(false),
+  // Model architecture override for inference energy calculation
+  modelArchitecture: jsonb('model_architecture'), // override for total_params, active_params, layers, heads, kv_lora_rank, qk_rope_head_dim, context_length, dtype
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

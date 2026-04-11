@@ -8,8 +8,12 @@ import {
   McpServerConfigSchema,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
+import { UsageStorageService } from '../../services/usage-storage';
 
-export async function registerConfigRoutes(fastify: FastifyInstance) {
+export async function registerConfigRoutes(
+  fastify: FastifyInstance,
+  usageStorage?: UsageStorageService
+) {
   const configService = ConfigService.getInstance();
 
   // ─── Config Status ────────────────────────────────────────────────
@@ -153,6 +157,21 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
     try {
       await configService.saveAlias(slug, result.data);
+
+      // Recalculate energy usage if model_architecture was provided
+      if (result.data.model_architecture && usageStorage) {
+        try {
+          const updated = await usageStorage.recalculateEnergyForAlias(
+            slug,
+            result.data.model_architecture
+          );
+          logger.info(`Recalculated energy for ${updated} requests for alias '${slug}'`);
+        } catch (recalcError) {
+          // Don't fail the save if recalculation fails, just log the error
+          logger.error(`Failed to recalculate energy for alias '${slug}'`, recalcError);
+        }
+      }
+
       logger.info(`Model alias '${slug}' saved via API (PUT)`);
       return reply.send({ success: true, slug });
     } catch (e: any) {
@@ -180,6 +199,21 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
       }
       await configService.saveAlias(slug, result.data);
+
+      // Recalculate energy usage if model_architecture was provided
+      if (result.data.model_architecture && usageStorage) {
+        try {
+          const updated = await usageStorage.recalculateEnergyForAlias(
+            slug,
+            result.data.model_architecture
+          );
+          logger.info(`Recalculated energy for ${updated} requests for alias '${slug}'`);
+        } catch (recalcError) {
+          // Don't fail the save if recalculation fails, just log the error
+          logger.error(`Failed to recalculate energy for alias '${slug}'`, recalcError);
+        }
+      }
+
       logger.info(`Model alias '${slug}' updated via API (PATCH)`);
       return reply.send({ success: true, slug });
     } catch (e: any) {

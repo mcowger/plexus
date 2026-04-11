@@ -347,6 +347,12 @@ export const ProviderConfigSchema = z
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
+    // GPU Profile settings for inference energy calculation
+    gpu_profile: z.enum(['H100', 'H200', 'GH100', 'GH200', 'B200', 'B300', 'custom']).optional(),
+    gpu_ram_gb: z.number().positive().optional(),
+    gpu_bandwidth_tb_s: z.number().positive().optional(),
+    gpu_flops_tflop: z.number().positive().optional(),
+    gpu_power_draw_watts: z.number().positive().optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",
@@ -483,6 +489,21 @@ export const ModelConfigSchema = z.object({
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
   metadata: ModelMetadataSchema.optional(),
+  // Model architecture override for inference energy calculation
+  model_architecture: z
+    .object({
+      total_params: z.number().positive().optional(),
+      active_params: z.number().positive().optional(),
+      layers: z.number().int().positive().optional(),
+      heads: z.number().int().positive().optional(),
+      kv_lora_rank: z.number().int().positive().optional(),
+      qk_rope_head_dim: z.number().int().positive().optional(),
+      context_length: z.number().int().positive().optional(),
+      dtype: z
+        .enum(['fp16', 'bf16', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'nvfp4', 'int4', 'int8'])
+        .optional(),
+    })
+    .optional(),
 });
 
 export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;

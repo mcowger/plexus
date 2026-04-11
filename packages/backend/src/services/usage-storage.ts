@@ -6,6 +6,18 @@ import { EventEmitter } from 'node:events';
 import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 import { getCurrentKeyName } from './request-context';
+import { estimateKwhUsed, getGpuParams, type GpuParams } from './inference-energy';
+
+export interface ModelArchitecture {
+  total_params?: number;
+  active_params?: number;
+  layers?: number;
+  heads?: number;
+  kv_lora_rank?: number;
+  qk_rope_head_dim?: number;
+  context_length?: number;
+  dtype?: string;
+}
 
 export interface UsageFilters {
   startDate?: string;
@@ -936,6 +948,122 @@ export class UsageStorageService extends EventEmitter {
     } catch (error) {
       logger.error('Failed to get provider performance', { provider, model, error });
       return [];
+    }
+  }
+
+  /**
+   * Recalculate energy usage for all requests associated with an alias.
+   * This is called when an alias's model_architecture is updated.
+   *
+   * @param aliasSlug - The alias slug to recalculate energy for
+   * @param modelArchitecture - The new model architecture parameters
+   * @param providerGpuProfiles - Optional map of provider -> GPU profile override
+   * @returns The number of records updated
+   */
+  async recalculateEnergyForAlias(
+    aliasSlug: string,
+    modelArchitecture: ModelArchitecture,
+    providerGpuProfiles?: Record<string, string>
+  ): Promise<number> {
+    try {
+      const db = this.ensureDb();
+
+      // Find all requests for this alias
+      const requests = await db
+        .select({
+          requestId: this.schema.requestUsage.requestId,
+          tokensInput: this.schema.requestUsage.tokensInput,
+          tokensOutput: this.schema.requestUsage.tokensOutput,
+          provider: this.schema.requestUsage.finalAttemptProvider,
+        })
+        .from(this.schema.requestUsage)
+        .where(eq(this.schema.requestUsage.incomingModelAlias, aliasSlug));
+
+      if (requests.length === 0) {
+        logger.debug(`No requests found for alias ${aliasSlug}`);
+        return 0;
+      }
+
+      logger.info(`Recalculating energy for ${requests.length} requests for alias ${aliasSlug}`);
+
+      let updatedCount = 0;
+      const batchSize = 100;
+
+      // Process in batches
+      for (let i = 0; i < requests.length; i += batchSize) {
+        const batch = requests.slice(i, i + batchSize);
+
+        await Promise.all(
+          batch.map(async (request) => {
+            const tokensInput = request.tokensInput || 0;
+            const tokensOutput = request.tokensOutput || 0;
+
+            if (tokensInput === 0 && tokensOutput === 0) {
+              return; // Skip requests with no tokens
+            }
+
+            // Get GPU profile for this provider (use default H100 if not specified)
+            const gpuProfile = providerGpuProfiles?.[request.provider || ''] || 'H100';
+            const gpuParams = getGpuParams(gpuProfile);
+
+            // Build model params from architecture
+            const modelParams = {
+              total_params: modelArchitecture.total_params || 1000, // Default 1T if not specified
+              active_params:
+                modelArchitecture.active_params || modelArchitecture.total_params || 1000,
+              layers: modelArchitecture.layers || 61,
+              context_length: modelArchitecture.context_length || 4096,
+              kv_lora_rank: modelArchitecture.kv_lora_rank || 512,
+              qk_rope_head_dim: modelArchitecture.qk_rope_head_dim || 64,
+              heads: modelArchitecture.heads || 64,
+              dtype_size: this.getDtypeSize(modelArchitecture.dtype),
+            };
+
+            // Calculate new energy
+            const kwhUsed = estimateKwhUsed(tokensInput, tokensOutput, {
+              model: modelParams,
+              gpu: gpuParams,
+            });
+
+            // Update the record
+            await db
+              .update(this.schema.requestUsage)
+              .set({ kwhUsed })
+              .where(eq(this.schema.requestUsage.requestId, request.requestId));
+
+            updatedCount++;
+          })
+        );
+      }
+
+      logger.info(`Recalculated energy for ${updatedCount} requests for alias ${aliasSlug}`);
+      return updatedCount;
+    } catch (error) {
+      logger.error(`Failed to recalculate energy for alias ${aliasSlug}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the byte size for a given dtype
+   */
+  private getDtypeSize(dtype?: string): number {
+    switch (dtype) {
+      case 'fp16':
+      case 'bf16':
+        return 2;
+      case 'fp8':
+      case 'fp8_e4m3':
+      case 'fp8_e5m2':
+        return 1;
+      case 'fp32':
+        return 4;
+      case 'int4':
+        return 0.5;
+      case 'int8':
+        return 1;
+      default:
+        return 2; // Default to FP16
     }
   }
 }
