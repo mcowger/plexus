@@ -2,13 +2,26 @@ import { sql } from 'drizzle-orm';
 import { getDatabase, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
 import crypto from 'node:crypto';
-import sqliteVfs from './migrations-vfs-sqlite';
-import pgVfs from './migrations-vfs-pg';
+import path from 'node:path';
 import sqliteJournal from '../../drizzle/migrations/meta/_journal.json';
 import pgJournal from '../../drizzle/migrations_pg/meta/_journal.json';
 
 const DRIZZLE_MIGRATIONS_SCHEMA = 'drizzle';
 const DRIZZLE_MIGRATIONS_TABLE = '__drizzle_migrations';
+
+// Bun types embeddedFiles as Blob[] but the runtime objects are BunFile with a name property.
+type EmbeddedFile = Blob & { name: string };
+
+// Populated at startup in a compiled binary; empty when running from source.
+const embedded = new Map(
+  (Bun.embeddedFiles as EmbeddedFile[]).map((f) => [f.name, f])
+);
+
+// Filesystem paths used as a fallback in dev/source mode.
+const DEV_MIGRATIONS_DIR = {
+  sqlite: path.join(import.meta.dir, '../../drizzle/migrations'),
+  postgres: path.join(import.meta.dir, '../../drizzle/migrations_pg'),
+} as const;
 
 // Shape expected by db.dialect.migrate() — mirrors drizzle-orm's internal MigrationMeta.
 interface MigrationMeta {
@@ -20,22 +33,24 @@ interface MigrationMeta {
 
 type Journal = { entries: Array<{ tag: string; when: number; breakpoints: boolean }> };
 
-/**
- * Builds the MigrationMeta[] array that drizzle's dialect.migrate() expects,
- * sourcing SQL content from the VFS module instead of the filesystem.
- * This replicates what drizzle-orm's readMigrationFiles() does, minus the fs calls.
- */
-function migrationsFromVfs(vfs: Record<string, string>, journal: Journal): MigrationMeta[] {
-  return journal.entries.map((entry) => {
-    const content = vfs[`${entry.tag}.sql`];
-    if (!content) throw new Error(`Missing migration in VFS: ${entry.tag}`);
-    return {
-      sql: content.split('--> statement-breakpoint'),
-      bps: entry.breakpoints,
-      folderMillis: entry.when,
-      hash: crypto.createHash('sha256').update(content).digest('hex'),
-    };
-  });
+async function readSql(tag: string, devDir: string): Promise<string> {
+  const asset = embedded.get(`${tag}.sql`);
+  if (asset) return asset.text();
+  return Bun.file(path.join(devDir, `${tag}.sql`)).text();
+}
+
+async function buildMigrations(journal: Journal, devDir: string): Promise<MigrationMeta[]> {
+  return Promise.all(
+    journal.entries.map(async (entry) => {
+      const content = await readSql(entry.tag, devDir);
+      return {
+        sql: content.split('--> statement-breakpoint'),
+        bps: entry.breakpoints,
+        folderMillis: entry.when,
+        hash: crypto.createHash('sha256').update(content).digest('hex'),
+      };
+    })
+  );
 }
 
 function normalizeSqlStatement(statement: string): string {
@@ -58,6 +73,8 @@ function toIdempotentStatement(statement: string): string {
 
 async function attemptPostgresDuplicateColumnRepair(
   db: any,
+  migrations: MigrationMeta[],
+  journal: Journal,
   migrationError: any
 ): Promise<boolean> {
   const failedQuery = typeof migrationError?.query === 'string' ? migrationError.query : '';
@@ -65,14 +82,10 @@ async function attemptPostgresDuplicateColumnRepair(
 
   const normalizedFailedQuery = normalizeSqlStatement(failedQuery);
 
-  for (const entry of pgJournal.entries) {
-    const migrationSql = pgVfs[`${entry.tag}.sql` as keyof typeof pgVfs] as string | undefined;
-    if (!migrationSql) continue;
-
-    const statements = migrationSql
-      .split('--> statement-breakpoint')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+  for (let i = 0; i < migrations.length; i++) {
+    const migration = migrations[i]!;
+    const entry = journal.entries[i]!;
+    const statements = migration.sql.map((s) => s.trim()).filter((s) => s.length > 0);
 
     if (!statements.some((s) => normalizeSqlStatement(s) === normalizedFailedQuery)) continue;
 
@@ -96,20 +109,22 @@ async function attemptPostgresDuplicateColumnRepair(
       try {
         await db.execute(sql.raw(repairedStatement));
       } catch (statementError: any) {
-        const isAddColumnStatement = /ALTER\s+TABLE[\s\S]+ADD\s+COLUMN/i.test(repairedStatement);
-        if (isAddColumnStatement && isDuplicateColumnError(statementError)) continue;
+        if (
+          /ALTER\s+TABLE[\s\S]+ADD\s+COLUMN/i.test(repairedStatement) &&
+          isDuplicateColumnError(statementError)
+        )
+          continue;
         throw statementError;
       }
     }
 
-    const hash = crypto.createHash('sha256').update(migrationSql).digest('hex');
     await db.execute(
       sql.raw(`
         INSERT INTO "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}" ("hash", "created_at")
-        SELECT '${hash}', ${entry.when}
+        SELECT '${migration.hash}', ${migration.folderMillis}
         WHERE NOT EXISTS (
           SELECT 1 FROM "${DRIZZLE_MIGRATIONS_SCHEMA}"."${DRIZZLE_MIGRATIONS_TABLE}"
-          WHERE "created_at" = ${entry.when}
+          WHERE "created_at" = ${migration.folderMillis}
         )
       `)
     );
@@ -125,15 +140,13 @@ export async function runMigrations() {
     const db = getDatabase();
     const dialect = getCurrentDialect();
 
-    logger.info(`Running ${dialect} migrations from VFS...`);
+    logger.info(`Running ${dialect} migrations...`);
 
     if (dialect === 'sqlite') {
-      const migrations = migrationsFromVfs(sqliteVfs, sqliteJournal as Journal);
-      (db as any).dialect.migrate(migrations, (db as any).session, {
-        migrationsFolder: '',
-      });
+      const migrations = await buildMigrations(sqliteJournal as Journal, DEV_MIGRATIONS_DIR.sqlite);
+      (db as any).dialect.migrate(migrations, (db as any).session, { migrationsFolder: '' });
     } else {
-      const migrations = migrationsFromVfs(pgVfs, pgJournal as Journal);
+      const migrations = await buildMigrations(pgJournal as Journal, DEV_MIGRATIONS_DIR.postgres);
       try {
         await (db as any).dialect.migrate(migrations, (db as any).session, {
           migrationsFolder: '',
@@ -142,7 +155,12 @@ export async function runMigrations() {
         });
       } catch (error: any) {
         if (isDuplicateColumnError(error)) {
-          const repaired = await attemptPostgresDuplicateColumnRepair(db as any, error);
+          const repaired = await attemptPostgresDuplicateColumnRepair(
+            db,
+            migrations,
+            pgJournal as Journal,
+            error
+          );
           if (repaired) {
             logger.warn('Retrying PostgreSQL migrations after duplicate-column repair');
             await (db as any).dialect.migrate(migrations, (db as any).session, {
