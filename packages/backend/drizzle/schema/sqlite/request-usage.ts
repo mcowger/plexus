@@ -52,6 +52,7 @@ export const requestUsage = sqliteTable(
     // Vision Fallthrough metadata
     isVisionFallthrough: integer('is_vision_fallthrough').notNull().default(0),
     isDescriptorRequest: integer('is_descriptor_request').notNull().default(0),
+    visionFallthroughModel: text('vision_fallthrough_model'),
     // Energy estimation
     kwhUsed: real('kwh_used'),
   },
