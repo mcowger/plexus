@@ -95,13 +95,37 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
   // Colors for different window types
   const WINDOW_COLORS: Record<string, string> = {
     five_hour: '#3b82f6', // blue
+    rolling_five_hour: '#60a5fa', // light blue
     toolcalls: '#06b6d4', // cyan
     search: '#8b5cf6', // violet
     daily: '#10b981', // emerald
     weekly: '#a855f7', // purple
+    rolling_weekly: '#c084fc', // light purple
     monthly: '#f59e0b', // amber
     subscription: '#ec4899', // pink
     custom: '#6b7280', // gray
+  };
+
+  // Synthetic-specific display names for window types
+  const SYNTHETIC_DISPLAY_NAMES: Record<string, string> = {
+    five_hour: 'Five Hour (old)',
+    rolling_five_hour: 'Five Hour',
+    toolcalls: 'Tool Calls (old)',
+    rolling_weekly: 'Weekly',
+  };
+
+  // Check if this is a Synthetic checker
+  const isSynthetic = quota
+    ? (quota.checkerType || quota.checkerId).toLowerCase().includes('synthetic')
+    : false;
+
+  // Format window type for display
+  const formatWindowType = (windowType: string): string => {
+    const defaultName = windowType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+
+    if (!isSynthetic) return defaultName;
+
+    return SYNTHETIC_DISPLAY_NAMES[windowType] || defaultName;
   };
 
   // Process history data for the chart - group by window type
@@ -186,10 +210,12 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
     // Sort window types by priority
     const priorityOrder = [
       'five_hour',
+      'rolling_five_hour',
       'toolcalls',
       'search',
       'daily',
       'weekly',
+      'rolling_weekly',
       'monthly',
       'subscription',
       'custom',
@@ -461,9 +487,7 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                                   .filter((p) => p.value !== null && p.value !== undefined)
                                   .map((p) => {
                                     const windowType = p.dataKey;
-                                    const displayName = windowType
-                                      .replace(/_/g, ' ')
-                                      .replace(/\b\w/g, (l) => l.toUpperCase());
+                                    const displayName = formatWindowType(windowType);
                                     return (
                                       <div key={windowType} className="flex items-center gap-2">
                                         <div
@@ -523,9 +547,7 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                         strokeWidth={2}
                         fillOpacity={1}
                         fill={`url(#color${windowType})`}
-                        name={windowType
-                          .replace(/_/g, ' ')
-                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                        name={formatWindowType(windowType)}
                         connectNulls={false}
                       />
                     ))}
@@ -540,7 +562,7 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                         style={{ backgroundColor: WINDOW_COLORS[windowType] || '#6b7280' }}
                       />
                       <span className="text-xs text-text-secondary">
-                        {windowType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                        {formatWindowType(windowType)}
                       </span>
                     </div>
                   ))}

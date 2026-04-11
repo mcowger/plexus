@@ -26,10 +26,12 @@ interface CompactQuotasCardProps {
 // Window type priority for display order (lower = shown first)
 export const WINDOW_PRIORITY: Record<string, number> = {
   five_hour: 1,
+  rolling_five_hour: 1,
   daily: 2,
   toolcalls: 3,
   search: 4,
   weekly: 5,
+  rolling_weekly: 5,
   monthly: 6,
 };
 
@@ -162,7 +164,7 @@ export const getTrackedWindowsForChecker = (category: string, windows: any[]): s
 
   switch (category) {
     case 'synthetic':
-      return ['five_hour', 'toolcalls'].filter((t) => availableTypes.has(t));
+      return ['rolling_weekly', 'rolling_five_hour'].filter((t) => availableTypes.has(t));
     case 'claude':
     case 'codex':
       return ['five_hour', 'weekly'].filter((t) => availableTypes.has(t));

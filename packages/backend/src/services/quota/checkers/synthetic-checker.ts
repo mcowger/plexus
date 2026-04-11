@@ -22,6 +22,20 @@ interface SyntheticQuotaResponse {
     remaining?: number;
     renewsAt?: string;
   };
+  weeklyTokenLimit?: {
+    nextRegenAt?: string;
+    percentRemaining?: number;
+    maxCredits?: string;
+    remainingCredits?: string;
+    nextRegenCredits?: string;
+  };
+  rollingFiveHourLimit?: {
+    nextTickAt?: string;
+    tickPercent?: number;
+    remaining?: number;
+    max?: number;
+    limited?: boolean;
+  };
 }
 
 export class SyntheticQuotaChecker extends QuotaChecker {
@@ -52,16 +66,17 @@ export class SyntheticQuotaChecker extends QuotaChecker {
       const data: SyntheticQuotaResponse = await response.json();
       const windows: QuotaWindow[] = [];
 
-      if (data.subscription) {
+      if (data.rollingFiveHourLimit) {
+        const { remaining, max, nextTickAt } = data.rollingFiveHourLimit;
         windows.push(
           this.createWindow(
-            'five_hour',
-            data.subscription.limit,
-            data.subscription.requests,
-            data.subscription.remaining,
+            'rolling_five_hour',
+            max,
+            max !== undefined && remaining !== undefined ? max - remaining : undefined,
+            remaining,
             'requests',
-            data.subscription.renewsAt ? new Date(data.subscription.renewsAt) : undefined,
-            '5-hour request quota'
+            nextTickAt ? new Date(nextTickAt) : undefined,
+            'Rolling 5-hour limit'
           )
         );
       }
@@ -80,16 +95,26 @@ export class SyntheticQuotaChecker extends QuotaChecker {
         );
       }
 
-      if (data.freeToolCalls) {
+      if (data.weeklyTokenLimit) {
+        const { maxCredits, remainingCredits, nextRegenAt } = data.weeklyTokenLimit;
+        const parseCredits = (val?: string) => {
+          if (!val) return undefined;
+          const num = parseFloat(val.replace('$', ''));
+          return isNaN(num) ? undefined : num;
+        };
+        const parsedMax = parseCredits(maxCredits);
+        const parsedRemaining = parseCredits(remainingCredits);
         windows.push(
           this.createWindow(
-            'toolcalls',
-            data.freeToolCalls.limit,
-            data.freeToolCalls.requests,
-            data.freeToolCalls.remaining,
-            'requests',
-            data.freeToolCalls.renewsAt ? new Date(data.freeToolCalls.renewsAt) : undefined,
-            'Free tool calls (5-hour)'
+            'rolling_weekly',
+            parsedMax,
+            parsedMax !== undefined && parsedRemaining !== undefined
+              ? parsedMax - parsedRemaining
+              : undefined,
+            parsedRemaining,
+            'dollars',
+            nextRegenAt ? new Date(nextRegenAt) : undefined,
+            'Weekly token credits'
           )
         );
       }
