@@ -598,7 +598,7 @@ export const Logs = () => {
                               style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
                             >
                               {log.isVisionFallthrough && (
-                                <div title="Vision Fallthrough (Images converted to text)">
+                                <div title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}>
                                   <ScanSearch size={12} className="text-amber-500" />
                                 </div>
                               )}
@@ -649,6 +649,23 @@ export const Logs = () => {
                             </button>
                           )}
                         </div>
+                        {log.isVisionFallthrough && log.visionFallthroughModel && (
+                          <div className="group/vft flex items-center gap-1" title="Vision fallthrough descriptor model">
+                            <ScanSearch size={10} className="text-amber-500 shrink-0" />
+                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}>
+                              {log.visionFallthroughModel}
+                            </span>
+                            <button
+                              onClick={() =>
+                                navigator.clipboard.writeText(log.visionFallthroughModel || '')
+                              }
+                              className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
+                              title="Copy fallthrough model name"
+                            >
+                              <Copy size={10} className="text-text-secondary hover:text-text" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td

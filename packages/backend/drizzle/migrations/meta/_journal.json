@@ -176,6 +176,13 @@
       "when": 1775367222686,
       "tag": "0024_lush_maginty",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1775877757988,
+      "tag": "0025_cynical_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

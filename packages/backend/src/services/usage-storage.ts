@@ -656,7 +656,7 @@ export class UsageStorageService extends EventEmitter {
     model: string,
     canonicalModelName: string | null,
     requestId: string,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean }
+    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean; visionFallthroughModel?: string }
   ) {
     if (metadata) {
       try {
@@ -665,6 +665,7 @@ export class UsageStorageService extends EventEmitter {
           .set({
             isVisionFallthrough: metadata.isVisionFallthrough ? 1 : 0,
             isDescriptorRequest: metadata.isDescriptorRequest ? 1 : 0,
+            visionFallthroughModel: metadata.visionFallthroughModel ?? null,
           })
           .where(eq(this.schema.requestUsage.requestId, requestId));
       } catch (error) {
@@ -689,7 +690,7 @@ export class UsageStorageService extends EventEmitter {
     model: string,
     canonicalModelName: string | null,
     requestId: string,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean }
+    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean; visionFallthroughModel?: string }
   ) {
     if (metadata) {
       try {
@@ -698,6 +699,7 @@ export class UsageStorageService extends EventEmitter {
           .set({
             isVisionFallthrough: metadata.isVisionFallthrough ? 1 : 0,
             isDescriptorRequest: metadata.isDescriptorRequest ? 1 : 0,
+            visionFallthroughModel: metadata.visionFallthroughModel ?? null,
           })
           .where(eq(this.schema.requestUsage.requestId, requestId));
       } catch (error) {

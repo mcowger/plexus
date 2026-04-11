@@ -1,0 +1,1 @@
+ALTER TABLE `request_usage` ADD `vision_fallthrough_model` text;

@@ -141,7 +141,7 @@ export class Dispatcher {
     route: RouteResult,
     requestId: string | undefined,
     success: boolean,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean }
+    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean; visionFallthroughModel?: string }
   ): Promise<void> {
     if (!this.usageStorage) return;
 
@@ -240,6 +240,7 @@ export class Dispatcher {
 
             // Tag the request as having undergone fallthrough
             (currentRequest as any)._hasVisionFallthrough = true;
+            (currentRequest as any)._visionFallthroughModel = vfConfig.descriptor_model;
             logger.info(
               `[vision-fallthrough] Successfully preprocessed images for ${route.provider}/${route.model}`
             );
@@ -317,6 +318,7 @@ export class Dispatcher {
             await this.recordAttemptMetric(route, currentRequest.requestId, true, {
               isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
               isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+              visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
             });
             this.appendSuccessAttempt(retryHistory, route, targetApiType);
             this.attachAttemptMetadata(
@@ -338,6 +340,7 @@ export class Dispatcher {
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+                visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
               await this.markOAuthProviderFailure(route, oauthError);
               logger.warn(
@@ -390,6 +393,7 @@ export class Dispatcher {
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+                visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
               // Only mark as failed if the error actually triggered a cooldown (i.e., it's not a caller error like validation)
               // Caller errors (400 validation errors, 413, 422) should not cause cooldown
@@ -429,6 +433,7 @@ export class Dispatcher {
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+                visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
               this.appendFailureAttempt(retryHistory, route, error, targetApiType, true);
               // Always mark as failed when retrying — provider couldn't serve this request
@@ -457,6 +462,7 @@ export class Dispatcher {
           await this.recordAttemptMetric(route, currentRequest.requestId, true, {
             isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
             isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+            visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
           });
           CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
           this.appendSuccessAttempt(retryHistory, route, targetApiType);
@@ -481,6 +487,7 @@ export class Dispatcher {
         await this.recordAttemptMetric(route, currentRequest.requestId, true, {
           isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
           isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+          visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
         });
 
         if ((currentRequest as any)._isVisionDescriptorRequest && this.usageStorage) {
@@ -516,6 +523,7 @@ export class Dispatcher {
         await this.recordAttemptMetric(route, currentRequest.requestId, false, {
           isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
           isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+          visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
         });
 
         const canRetryNetwork =
