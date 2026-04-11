@@ -48,6 +48,7 @@ export interface UsageRecord {
   // Vision Fallthrough metadata
   isVisionFallthrough?: boolean;
   isDescriptorRequest?: boolean;
+  visionFallthroughModel?: string | null;
   // Energy estimation
   kwhUsed?: number | null;
 }

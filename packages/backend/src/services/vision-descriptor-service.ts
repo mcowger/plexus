@@ -9,6 +9,8 @@ import { Dispatcher } from './dispatcher';
 import { logger } from '../utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../utils/constants';
 import { UsageStorageService } from './usage-storage';
+import { calculateCosts } from '../utils/calculate-costs';
+import { estimateKwhUsed } from './inference-energy';
 
 export class VisionDescriptorService {
   /**
@@ -142,10 +144,57 @@ export class VisionDescriptorService {
     (descriptorRequest as any)._descriptorStartTime = Date.now();
     (descriptorRequest as any).requestId = `desc-${crypto.randomUUID()}`;
 
+    const startTime: number = (descriptorRequest as any)._descriptorStartTime;
+    const requestId: string = (descriptorRequest as any).requestId;
+
     try {
       logger.debug(`[vision-fallthrough] Dispatching description request to model '${model}'`);
       const response = await dispatcher.dispatch(descriptorRequest);
+      const durationMs = Date.now() - startTime;
       const description = response.content;
+
+      if (usageStorage) {
+        const usageRecord: any = {
+          requestId,
+          date: new Date().toISOString(),
+          startTime,
+          durationMs,
+          createdAt: Date.now(),
+          incomingApiType: 'chat',
+          outgoingApiType: response.plexus?.apiType ?? null,
+          provider: response.plexus?.provider ?? null,
+          selectedModelName: response.plexus?.model ?? model,
+          canonicalModelName: response.plexus?.canonicalModel ?? null,
+          incomingModelAlias: model,
+          sourceIp: (parentRequest as any)?.sourceIp ?? null,
+          apiKey: (parentRequest as any)?.apiKey ?? null,
+          attribution: (parentRequest as any)?.attribution ?? null,
+          attemptCount: 1,
+          isStreamed: false,
+          isPassthrough: false,
+          responseStatus: description ? 'success' : 'error',
+          tokensInput: response.usage?.input_tokens ?? null,
+          tokensOutput: response.usage?.output_tokens ?? null,
+          tokensCached: response.usage?.cached_tokens ?? null,
+          tokensCacheWrite: response.usage?.cache_creation_tokens ?? null,
+          tokensReasoning: response.usage?.reasoning_tokens ?? null,
+          isDescriptorRequest: true,
+          isVisionFallthrough: false,
+        };
+
+        // Calculate costs if pricing data is available
+        if (response.plexus?.pricing) {
+          calculateCosts(usageRecord, response.plexus.pricing, response.plexus.providerDiscount);
+        }
+
+        if (usageRecord.tokensInput != null && usageRecord.tokensOutput != null) {
+          usageRecord.kwhUsed = estimateKwhUsed(usageRecord.tokensInput, usageRecord.tokensOutput);
+        }
+
+        usageStorage.saveRequest(usageRecord).catch((err) => {
+          logger.error(`[vision-fallthrough] Failed to save descriptor usage record: ${err}`);
+        });
+      }
 
       if (!description) {
         logger.warn(`[vision-fallthrough] Model ${model} returned empty description for image`);
@@ -156,6 +205,42 @@ export class VisionDescriptorService {
       return description;
     } catch (error) {
       logger.error(`[vision-fallthrough] Error describing image with ${model}:`, error);
+
+      if (usageStorage) {
+        const durationMs = Date.now() - startTime;
+        usageStorage.saveRequest({
+          requestId,
+          date: new Date().toISOString(),
+          startTime,
+          durationMs,
+          createdAt: Date.now(),
+          incomingApiType: 'chat',
+          outgoingApiType: null,
+          provider: null,
+          selectedModelName: model,
+          canonicalModelName: null,
+          incomingModelAlias: model,
+          sourceIp: (parentRequest as any)?.sourceIp ?? null,
+          apiKey: (parentRequest as any)?.apiKey ?? null,
+          attribution: (parentRequest as any)?.attribution ?? null,
+          attemptCount: 1,
+          isStreamed: false,
+          isPassthrough: false,
+          responseStatus: 'error',
+          tokensInput: null,
+          tokensOutput: null,
+          tokensCached: null,
+          costInput: null,
+          costOutput: null,
+          costCached: null,
+          costTotal: null,
+          costSource: null,
+          costMetadata: null,
+          isDescriptorRequest: true,
+          isVisionFallthrough: false,
+        } as any).catch(() => {});
+      }
+
       return 'Error generating image description.';
     }
   }
