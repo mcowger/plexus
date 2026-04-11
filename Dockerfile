@@ -19,27 +19,18 @@ RUN bun install --frozen-lockfile
 # Copy the rest of the source code
 COPY . .
 
-# Build the frontend and compile the backend into a single binary
-# This script runs 'bun run build:frontend' and then 'bun build ... --compile ...'
+# Build the frontend and compile everything into a single self-contained binary.
+# Frontend assets (HTML, JS, CSS, images) and migration SQL files are all embedded
+# inside the binary via `bun build --compile` — no runtime file copies needed.
 RUN bun run compile:linux
 
-# Stage 2: Create the production image - use debian for debug
+# Stage 2: Minimal production image — just the binary
 FROM debian:bookworm-slim
 
-# Set the working directory to /app/backend so that relative paths like "../frontend/dist" work as expected
-WORKDIR /app/backend
-
-# Install bash for debugging
-RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/plexus-linux ./plexus
-
-# Migration SQL files are now embedded inside the binary (via bun build --compile).
-# No separate migration directory copy is needed.
-
-# Copy the frontend assets to the location expected by the backend ("../frontend/dist")
-COPY --from=builder /app/packages/frontend/dist /app/frontend/dist
 
 # Environment variables
 ENV LOG_LEVEL=info
@@ -48,5 +39,4 @@ ENV DATABASE_URL=sqlite:///app/data/plexus.db
 ENV CONFIG_FILE=/app/config/plexus.yaml
 # ADMIN_KEY must be provided at runtime (no default for security)
 
-# Run the application
 CMD ["./plexus"]

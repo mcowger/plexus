@@ -55,4 +55,9 @@ research_and_plans/
 packages/logs.txt
 .vscode/mcp.json
 .pi/readcache/
+packages/backend/.test-db.sqlite
 packages/backend/.test-db.sqlite-shm
+packages/backend/.test-db.sqlite-wal
+.test-db.sqlite
+.test-db.sqlite-shm
+.test-db.sqlite-wal

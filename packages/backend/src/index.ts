@@ -17,8 +17,10 @@ if (subcommand === 'rekey') {
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import fastifyStatic from '@fastify/static';
 import path from 'path';
+import indexHtmlPath from '../../frontend/dist/index.html' with { type: 'file' };
+import mainJsPath from '../../frontend/dist/main.js' with { type: 'file' };
+import mainCssPath from '../../frontend/dist/main.css' with { type: 'file' };
 import fs from 'fs';
 import yaml from 'yaml';
 import { logger } from './utils/logger';
@@ -380,24 +382,72 @@ await registerManagementRoutes(
 fastify.get('/health', (request, reply) => reply.send('OK'));
 
 // --- Static File Serving ---
+// `indexHtmlPath` is a string path — the filesystem path in dev, or a $bunfs/ path in a
+// compiled binary. Bun embeds index.html and all assets it references (JS, CSS, images, SVGs)
+// automatically when compiled. `Bun.file()` resolves both path forms transparently.
 
-// Serve the production React build from packages/frontend/dist
-// This is used for dev as well.
-const staticRoot = path.join(process.cwd(), '../frontend/dist');
-logger.info(`Serving static files from: ${staticRoot} (CWD: ${process.cwd()})`);
+const mimeTypes: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.svg': 'image/svg+xml',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.webmanifest': 'application/manifest+json',
+};
 
-fastify.register(fastifyStatic, {
-  root: staticRoot,
-  prefix: '/ui/',
-  // Disable caching to ensure frontend updates are seen immediately
-  cacheControl: false,
-  etag: false,
-  lastModified: false,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  },
+// Map of known frontend assets to their embedded paths.
+// These are explicitly referenced here so Bun's bundler does not tree-shake
+// the `with { type: 'file' }` imports away during --compile.
+const frontendDistDir = path.dirname(indexHtmlPath);
+const frontendAssetPaths: Record<string, string> = {
+  'index.html': indexHtmlPath,
+  'main.js': mainJsPath,
+  'main.css': mainCssPath,
+};
+
+// For any other assets in the dist dir (favicons, images, etc.), fall back to
+// Bun.embeddedFiles (populated from CLI args with --asset-naming="[name].[ext]")
+// or the filesystem path in dev mode.
+type EmbeddedFile = Blob & { name: string };
+const embeddedByName = new Map<string, EmbeddedFile>(
+  (Bun.embeddedFiles as EmbeddedFile[]).map((f) => [f.name, f])
+);
+
+logger.info(`Serving frontend from: ${frontendDistDir}`);
+
+const serveAsset = async (reply: FastifyReply, filePath: string, ext: string) => {
+  const mimeType = mimeTypes[ext] ?? 'application/octet-stream';
+  return reply.header('Cache-Control', 'no-store').type(mimeType).send(Buffer.from(await Bun.file(filePath).arrayBuffer()));
+};
+
+fastify.get('/ui/', async (request, reply) =>
+  serveAsset(reply, indexHtmlPath, '.html')
+);
+fastify.get('/ui/index.html', async (request, reply) =>
+  serveAsset(reply, indexHtmlPath, '.html')
+);
+fastify.get('/ui/:filename', async (request, reply) => {
+  const { filename } = request.params as { filename: string };
+  const ext = path.extname(filename);
+  // Known asset with an explicit embedded path
+  const knownPath = frontendAssetPaths[filename];
+  if (knownPath) return serveAsset(reply, knownPath, ext);
+  // Asset embedded via CLI args (favicons, images, SVGs, etc.)
+  const embedded = embeddedByName.get(filename);
+  if (embedded) {
+    const mimeType = mimeTypes[ext] ?? 'application/octet-stream';
+    return reply.header('Cache-Control', 'no-store').type(mimeType).send(Buffer.from(await embedded.arrayBuffer()));
+  }
+  // Dev mode: serve from the dist directory on disk
+  const fsPath = path.join(frontendDistDir, filename);
+  const fsFile = Bun.file(fsPath);
+  if (await fsFile.exists()) return serveAsset(reply, fsPath, ext);
+  return reply.code(404).send('Not Found');
 });
 
 // Root Redirect to UI
@@ -411,11 +461,11 @@ fastify.get('/ui', (request, reply) => {
 
 // Single Page Application (SPA) Fallback
 // Redirects all non-API routes to index.html so React Router can take over
-fastify.setNotFoundHandler((request, reply) => {
+fastify.setNotFoundHandler(async (request, reply) => {
   if (request.url.startsWith('/v1') || request.url.startsWith('/v0')) {
     reply.code(404).send({ error: 'Not Found' });
   } else if (request.url.startsWith('/ui/') || request.url === '/ui') {
-    reply.sendFile('index.html');
+    return serveAsset(reply, indexHtmlPath, '.html');
   } else {
     reply.code(404).send({ error: 'Not Found' });
   }
