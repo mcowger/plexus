@@ -29,13 +29,14 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('maps rollingFiveHourLimit to rolling_five_hour window', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          rollingFiveHourLimit: { remaining: 30, max: 100, nextTickAt: '2026-04-10T12:00:00Z' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            rollingFiveHourLimit: { remaining: 30, max: 100, nextTickAt: '2026-04-10T12:00:00Z' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
@@ -51,17 +52,18 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('maps weeklyTokenLimit dollar strings to rolling_weekly window', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          weeklyTokenLimit: {
-            maxCredits: '$50.00',
-            remainingCredits: '$20.00',
-            nextRegenAt: '2026-04-17T00:00:00Z',
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            weeklyTokenLimit: {
+              maxCredits: '$50.00',
+              remainingCredits: '$20.00',
+              nextRegenAt: '2026-04-17T00:00:00Z',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
@@ -77,13 +79,14 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('handles weeklyTokenLimit with dollar-sign-less credit strings', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          weeklyTokenLimit: { maxCredits: '100', remainingCredits: '40' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            weeklyTokenLimit: { maxCredits: '100', remainingCredits: '40' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
@@ -94,13 +97,14 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('omits rolling_weekly window when credit strings are unparseable', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          weeklyTokenLimit: { maxCredits: 'N/A', remainingCredits: 'N/A' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            weeklyTokenLimit: { maxCredits: 'N/A', remainingCredits: 'N/A' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
@@ -111,15 +115,16 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('maps search hourly window when present', async () => {
-    setFetchMock(async () =>
-      new Response(
-        JSON.stringify({
-          search: {
-            hourly: { limit: 50, requests: 10, remaining: 40, renewsAt: '2026-04-10T13:00:00Z' },
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            search: {
+              hourly: { limit: 50, requests: 10, remaining: 40, renewsAt: '2026-04-10T13:00:00Z' },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
@@ -131,11 +136,12 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('returns success with empty windows when response has no known fields', async () => {
-    setFetchMock(async () =>
-      new Response(JSON.stringify({}), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
 
     const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();

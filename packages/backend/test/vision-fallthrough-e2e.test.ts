@@ -46,14 +46,19 @@ describe('Vision Fallthrough E2E', () => {
     configModule.setConfigForTesting(mockConfig as any);
 
     // 2. Mock VisionDescriptorService.process to return a modified request
-    const processSpy = registerSpy(VisionDescriptorService, 'process').mockImplementation(async (req) => {
-      return {
-        ...req,
-        messages: [
-          { role: 'user', content: [{ type: 'text', text: 'This is a description of an image.' }] },
-        ],
-      } as any;
-    });
+    const processSpy = registerSpy(VisionDescriptorService, 'process').mockImplementation(
+      async (req) => {
+        return {
+          ...req,
+          messages: [
+            {
+              role: 'user',
+              content: [{ type: 'text', text: 'This is a description of an image.' }],
+            },
+          ],
+        } as any;
+      }
+    );
 
     // 3. Mock Router.resolveCandidates to return a valid candidate with the modelConfig
     registerSpy(Router, 'resolveCandidates').mockResolvedValue([

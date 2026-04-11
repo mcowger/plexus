@@ -598,7 +598,9 @@ export const Logs = () => {
                               style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
                             >
                               {log.isVisionFallthrough && (
-                                <div title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}>
+                                <div
+                                  title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}
+                                >
                                   <ScanSearch size={12} className="text-amber-500" />
                                 </div>
                               )}
@@ -650,9 +652,14 @@ export const Logs = () => {
                           )}
                         </div>
                         {log.isVisionFallthrough && log.visionFallthroughModel && (
-                          <div className="group/vft flex items-center gap-1" title="Vision fallthrough descriptor model">
+                          <div
+                            className="group/vft flex items-center gap-1"
+                            title="Vision fallthrough descriptor model"
+                          >
                             <ScanSearch size={10} className="text-amber-500 shrink-0" />
-                            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}>
+                            <span
+                              style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}
+                            >
                               {log.visionFallthroughModel}
                             </span>
                             <button

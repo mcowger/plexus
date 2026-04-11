@@ -141,7 +141,11 @@ export class Dispatcher {
     route: RouteResult,
     requestId: string | undefined,
     success: boolean,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean; visionFallthroughModel?: string }
+    metadata?: {
+      isVisionFallthrough?: boolean;
+      isDescriptorRequest?: boolean;
+      visionFallthroughModel?: string;
+    }
   ): Promise<void> {
     if (!this.usageStorage) return;
 

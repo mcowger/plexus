@@ -656,7 +656,11 @@ export class UsageStorageService extends EventEmitter {
     model: string,
     canonicalModelName: string | null,
     requestId: string,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean; visionFallthroughModel?: string }
+    metadata?: {
+      isVisionFallthrough?: boolean;
+      isDescriptorRequest?: boolean;
+      visionFallthroughModel?: string;
+    }
   ) {
     if (metadata) {
       try {
@@ -690,7 +694,11 @@ export class UsageStorageService extends EventEmitter {
     model: string,
     canonicalModelName: string | null,
     requestId: string,
-    metadata?: { isVisionFallthrough?: boolean; isDescriptorRequest?: boolean; visionFallthroughModel?: string }
+    metadata?: {
+      isVisionFallthrough?: boolean;
+      isDescriptorRequest?: boolean;
+      visionFallthroughModel?: string;
+    }
   ) {
     if (metadata) {
       try {

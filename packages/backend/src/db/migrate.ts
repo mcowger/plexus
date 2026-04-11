@@ -13,9 +13,7 @@ const DRIZZLE_MIGRATIONS_TABLE = '__drizzle_migrations';
 type EmbeddedFile = Blob & { name: string };
 
 // Populated at startup in a compiled binary; empty when running from source.
-const embedded = new Map(
-  (Bun.embeddedFiles as EmbeddedFile[]).map((f) => [f.name, f])
-);
+const embedded = new Map((Bun.embeddedFiles as EmbeddedFile[]).map((f) => [f.name, f]));
 
 // Filesystem paths used as a fallback in dev/source mode.
 const DEV_MIGRATIONS_DIR = {
@@ -33,7 +31,10 @@ interface MigrationMeta {
 
 type Journal = { entries: Array<{ tag: string; when: number; breakpoints: boolean }> };
 
-async function readSql(tag: string, devDir: string): Promise<{ content: string; source: 'embedded' | 'filesystem' }> {
+async function readSql(
+  tag: string,
+  devDir: string
+): Promise<{ content: string; source: 'embedded' | 'filesystem' }> {
   const asset = embedded.get(`${tag}.sql`);
   if (asset) return { content: await asset.text(), source: 'embedded' };
   return { content: await Bun.file(path.join(devDir, `${tag}.sql`)).text(), source: 'filesystem' };

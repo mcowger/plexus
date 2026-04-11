@@ -3,7 +3,7 @@
  * 1. visionFallthroughModel not being stored in the parent request's usage record
  * 2. The child descriptor request never being saved to usage storage
  */
-import { expect, test, describe, mock } from 'bun:test';
+import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { registerSpy } from './test-utils';
 import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
 import { Dispatcher } from '../src/services/dispatcher';
@@ -80,9 +80,7 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
       messages: [
         {
           role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } },
-          ],
+          content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } }],
         },
       ],
     };
@@ -158,6 +156,15 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
 // ---------------------------------------------------------------------------
 
 describe('VisionDescriptorService: child request usage logging', () => {
+  beforeEach(() => {
+    VisionDescriptorService.process.mockRestore?.();
+  });
+
+  afterEach(() => {
+    VisionDescriptorService.process.mockRestore?.();
+    Dispatcher.prototype.dispatch.mockRestore?.();
+  });
+
   const imageUrl =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 

@@ -422,15 +422,14 @@ logger.info(`Serving frontend from: ${frontendDistDir}`);
 
 const serveAsset = async (reply: FastifyReply, filePath: string, ext: string) => {
   const mimeType = mimeTypes[ext] ?? 'application/octet-stream';
-  return reply.header('Cache-Control', 'no-store').type(mimeType).send(Buffer.from(await Bun.file(filePath).arrayBuffer()));
+  return reply
+    .header('Cache-Control', 'no-store')
+    .type(mimeType)
+    .send(Buffer.from(await Bun.file(filePath).arrayBuffer()));
 };
 
-fastify.get('/ui/', async (request, reply) =>
-  serveAsset(reply, indexHtmlPath, '.html')
-);
-fastify.get('/ui/index.html', async (request, reply) =>
-  serveAsset(reply, indexHtmlPath, '.html')
-);
+fastify.get('/ui/', async (request, reply) => serveAsset(reply, indexHtmlPath, '.html'));
+fastify.get('/ui/index.html', async (request, reply) => serveAsset(reply, indexHtmlPath, '.html'));
 fastify.get('/ui/:filename', async (request, reply) => {
   const { filename } = request.params as { filename: string };
   const ext = path.extname(filename);
@@ -441,7 +440,10 @@ fastify.get('/ui/:filename', async (request, reply) => {
   const embedded = embeddedByName.get(filename);
   if (embedded) {
     const mimeType = mimeTypes[ext] ?? 'application/octet-stream';
-    return reply.header('Cache-Control', 'no-store').type(mimeType).send(Buffer.from(await embedded.arrayBuffer()));
+    return reply
+      .header('Cache-Control', 'no-store')
+      .type(mimeType)
+      .send(Buffer.from(await embedded.arrayBuffer()));
   }
   // Dev mode: serve from the dist directory on disk
   const fsPath = path.join(frontendDistDir, filename);

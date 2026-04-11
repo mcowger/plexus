@@ -129,6 +129,22 @@ The dashboard is at `http://localhost:4000` — log in with your `adminKey`.
 
 See [Installation Guide](docs/INSTALLATION.md) for Docker Compose, building from source, and all environment variable options.
 
+## Local pre-commit test hook
+
+To enforce a local health check before commits, install the repo's git hook:
+
+```bash
+bun run setup:hooks
+```
+
+That configures `core.hooksPath` to `.githooks` and installs a `pre-commit` hook that runs:
+
+```bash
+cd packages/backend && bun test
+```
+
+If the tests fail, the commit is blocked.
+
 ---
 
 ## Configuration Migration Details
