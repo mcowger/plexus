@@ -33,24 +33,34 @@ interface MigrationMeta {
 
 type Journal = { entries: Array<{ tag: string; when: number; breakpoints: boolean }> };
 
-async function readSql(tag: string, devDir: string): Promise<string> {
+async function readSql(tag: string, devDir: string): Promise<{ content: string; source: 'embedded' | 'filesystem' }> {
   const asset = embedded.get(`${tag}.sql`);
-  if (asset) return asset.text();
-  return Bun.file(path.join(devDir, `${tag}.sql`)).text();
+  if (asset) return { content: await asset.text(), source: 'embedded' };
+  return { content: await Bun.file(path.join(devDir, `${tag}.sql`)).text(), source: 'filesystem' };
 }
 
 async function buildMigrations(journal: Journal, devDir: string): Promise<MigrationMeta[]> {
-  return Promise.all(
+  const results = await Promise.all(
     journal.entries.map(async (entry) => {
-      const content = await readSql(entry.tag, devDir);
+      const { content, source } = await readSql(entry.tag, devDir);
       return {
-        sql: content.split('--> statement-breakpoint'),
-        bps: entry.breakpoints,
-        folderMillis: entry.when,
-        hash: crypto.createHash('sha256').update(content).digest('hex'),
+        meta: { tag: entry.tag, source },
+        migration: {
+          sql: content.split('--> statement-breakpoint'),
+          bps: entry.breakpoints,
+          folderMillis: entry.when,
+          hash: crypto.createHash('sha256').update(content).digest('hex'),
+        },
       };
     })
   );
+
+  const sources = new Set(results.map((r) => r.meta.source));
+  logger.info(
+    `Loaded ${results.length} migrations from ${sources.size === 1 ? [...sources][0] : 'mixed'} source`
+  );
+
+  return results.map((r) => r.migration);
 }
 
 function normalizeSqlStatement(statement: string): string {
