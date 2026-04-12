@@ -8,6 +8,7 @@ import { getClientIp } from '../../utils/ip';
 import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { UnifiedTranscriptionRequest } from '../../types/unified';
+import { attachKeyAccessPolicy } from '../../utils/auth';
 
 export async function registerTranscriptionsRoute(
   fastify: FastifyInstance,
@@ -105,7 +106,7 @@ export async function registerTranscriptionsRoute(
 
       // Build unified request
       const transformer = new TranscriptionsTransformer();
-      const unifiedRequest: UnifiedTranscriptionRequest = {
+      let unifiedRequest: UnifiedTranscriptionRequest = {
         file: fileBuffer,
         filename: fileData.filename,
         mimeType: fileData.mimetype,
@@ -117,6 +118,7 @@ export async function registerTranscriptionsRoute(
         requestId,
         incomingApiType: 'transcriptions',
       };
+      unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
       usageRecord.incomingModelAlias = model;
       usageRecord.apiKey = (request as any).keyName;
@@ -201,7 +203,7 @@ export async function registerTranscriptionsRoute(
       DebugManager.getInstance().flush(requestId);
       logger.error('Error processing transcription request', e);
 
-      return reply.code(500).send({
+      return reply.code(e.routingContext?.statusCode || 500).send({
         error: { message: e.message, type: 'api_error' },
       });
     }

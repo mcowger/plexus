@@ -4,7 +4,13 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { CostToolTip } from '../components/ui/CostToolTip';
-import { api, UsageRecord, formatLargeNumber } from '../lib/api';
+import {
+  api,
+  UsageRecord,
+  formatLargeNumber,
+  type UsageSortDirection,
+  type UsageSortField,
+} from '../lib/api';
 import {
   KWH_PER_SLICE,
   formatCost,
@@ -103,7 +109,10 @@ export const Logs = () => {
   const [limit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [newestLogId, setNewestLogId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<UsageSortField>('date');
+  const [sortDir, setSortDir] = useState<UsageSortDirection>('desc');
   const [filters, setFilters] = useState({
+    apiKey: '',
     incomingModelAlias: '',
     provider: '',
   });
@@ -137,10 +146,11 @@ export const Logs = () => {
     setLoading(true);
     try {
       const cleanFilters: Record<string, any> = {};
+      if (filters.apiKey) cleanFilters.apiKey = filters.apiKey;
       if (filters.incomingModelAlias) cleanFilters.incomingModelAlias = filters.incomingModelAlias;
       if (filters.provider) cleanFilters.provider = filters.provider;
 
-      const res = await api.getLogs(limit, offset, cleanFilters);
+      const res = await api.getLogs(limit, offset, cleanFilters, sortBy, sortDir);
       setLogs(res.data);
       setTotal(Number(res.total) || 0);
     } catch (e) {
@@ -199,10 +209,10 @@ export const Logs = () => {
 
   useEffect(() => {
     loadLogs();
-  }, [offset, limit]); // Refresh when page changes
+  }, [offset, limit, sortBy, sortDir]); // Refresh when page or sort changes
 
   useEffect(() => {
-    if (offset !== 0 || !adminKey) return;
+    if (offset !== 0 || !adminKey || sortBy !== 'date' || sortDir !== 'desc') return;
 
     const controller = new AbortController();
 
@@ -258,6 +268,12 @@ export const Logs = () => {
                 // Client-side filtering to match server-side LIKE behavior
                 let matches = true;
                 if (
+                  currentFilters.apiKey &&
+                  !newLog.apiKey?.toLowerCase().includes(currentFilters.apiKey.toLowerCase())
+                ) {
+                  matches = false;
+                }
+                if (
                   currentFilters.incomingModelAlias &&
                   !newLog.incomingModelAlias
                     ?.toLowerCase()
@@ -307,12 +323,46 @@ export const Logs = () => {
     return () => {
       controller.abort();
     };
-  }, [offset, limit, adminKey]);
+  }, [offset, limit, adminKey, sortBy, sortDir]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setOffset(0); // Reset to first page
     loadLogs();
+  };
+
+  const handleSort = (field: UsageSortField) => {
+    setOffset(0);
+    if (sortBy === field) {
+      setSortDir((current) => (current === 'desc' ? 'asc' : 'desc'));
+      return;
+    }
+
+    setSortBy(field);
+    setSortDir(field === 'date' ? 'desc' : 'asc');
+  };
+
+  const renderSortableHeader = (label: string, field: UsageSortField) => {
+    const isActive = sortBy === field;
+
+    return (
+      <button
+        type="button"
+        onClick={() => handleSort(field)}
+        className="inline-flex items-center justify-center gap-1 bg-transparent border-0 p-0 m-0 font-inherit text-inherit uppercase tracking-wider cursor-pointer"
+        title={`Sort by ${label.toLowerCase()}`}
+      >
+        <span>{label}</span>
+        <ChevronDown
+          size={12}
+          style={{
+            opacity: isActive ? 1 : 0.35,
+            transform: isActive && sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease, opacity 0.2s ease',
+          }}
+        />
+      </button>
+    );
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -342,8 +392,26 @@ export const Logs = () => {
 
       <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
         <div className="mb-4">
-          <form onSubmit={handleSearch} className="flex gap-2 mb-4 justify-between">
-            <div className="flex gap-2">
+          <form onSubmit={handleSearch} className="flex flex-wrap gap-3 mb-4 justify-between">
+            <div className="flex flex-wrap gap-2">
+              <div className="relative w-62.5">
+                <Search
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                />
+                <Input
+                  placeholder="Filter by Key..."
+                  value={filters.apiKey}
+                  onChange={(e) => setFilters({ ...filters, apiKey: e.target.value })}
+                  style={{ paddingLeft: '32px' }}
+                />
+              </div>
               <div className="relative w-62.5">
                 <Search
                   size={16}
@@ -402,16 +470,16 @@ export const Logs = () => {
             <thead>
               <tr className="text-center border-b border-border">
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Date
+                  {renderSortableHeader('Date', 'date')}
                 </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Key
+                  {renderSortableHeader('Key', 'apiKey')}
                 </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                   API
                 </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Model
+                  {renderSortableHeader('Model', 'incomingModelAlias')}
                 </th>
                 {/* <th style={{ padding: '6px' }}>Provider</th> */}
                 <th
@@ -424,10 +492,10 @@ export const Logs = () => {
                   className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
                   style={{ minWidth: '70px' }}
                 >
-                  Cost
+                  {renderSortableHeader('Cost', 'costTotal')}
                 </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Perf
+                  {renderSortableHeader('Perf', 'durationMs')}
                 </th>
                 <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                   Meta

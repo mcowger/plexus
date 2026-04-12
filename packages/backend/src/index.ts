@@ -433,6 +433,10 @@ fastify.get('/ui/index.html', async (request, reply) => serveAsset(reply, indexH
 fastify.get('/ui/:filename', async (request, reply) => {
   const { filename } = request.params as { filename: string };
   const ext = path.extname(filename);
+  // SPA routes like /ui/logs should resolve to the frontend shell.
+  if (!ext) {
+    return serveAsset(reply, indexHtmlPath, '.html');
+  }
   // Known asset with an explicit embedded path
   const knownPath = frontendAssetPaths[filename];
   if (knownPath) return serveAsset(reply, knownPath, ext);

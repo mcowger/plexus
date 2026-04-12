@@ -7,6 +7,8 @@ export const apiKeys = sqliteTable('api_keys', {
   secretHash: text('secret_hash').unique(),
   comment: text('comment'),
   quotaName: text('quota_name'),
+  allowedModels: text('allowed_models'),
+  allowedProviders: text('allowed_providers'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

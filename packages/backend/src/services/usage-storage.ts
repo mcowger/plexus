@@ -3,12 +3,13 @@ import { UsageRecord } from '../types/usage';
 import { getDatabase, getSchema } from '../db/client';
 import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
-import { eq, and, gte, lte, like, desc, sql, getTableName } from 'drizzle-orm';
+import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 
 export interface UsageFilters {
   startDate?: string;
   endDate?: string;
+  apiKey?: string;
   incomingApiType?: string;
   provider?: string;
   incomingModelAlias?: string;
@@ -22,7 +23,19 @@ export interface UsageFilters {
 export interface PaginationOptions {
   limit: number;
   offset: number;
+  sortBy?: UsageSortField;
+  sortDir?: UsageSortDirection;
 }
+
+export type UsageSortField =
+  | 'date'
+  | 'apiKey'
+  | 'provider'
+  | 'incomingModelAlias'
+  | 'costTotal'
+  | 'durationMs';
+
+export type UsageSortDirection = 'asc' | 'desc';
 
 export class UsageStorageService extends EventEmitter {
   private db: ReturnType<typeof getDatabase> | null = null;
@@ -395,6 +408,9 @@ export class UsageStorageService extends EventEmitter {
     if (filters.incomingApiType) {
       conditions.push(eq(schema.requestUsage.incomingApiType, filters.incomingApiType));
     }
+    if (filters.apiKey) {
+      conditions.push(like(schema.requestUsage.apiKey, `%${filters.apiKey}%`));
+    }
     if (filters.provider) {
       conditions.push(like(schema.requestUsage.provider, `%${filters.provider}%`));
     }
@@ -422,6 +438,19 @@ export class UsageStorageService extends EventEmitter {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const sortFieldMap = {
+      date: schema.requestUsage.date,
+      apiKey: schema.requestUsage.apiKey,
+      provider: schema.requestUsage.provider,
+      incomingModelAlias: schema.requestUsage.incomingModelAlias,
+      costTotal: schema.requestUsage.costTotal,
+      durationMs: schema.requestUsage.durationMs,
+    } satisfies Record<UsageSortField, any>;
+    const sortBy =
+      pagination.sortBy && sortFieldMap[pagination.sortBy] ? pagination.sortBy : 'date';
+    const sortColumn = sortFieldMap[sortBy];
+    const sortDir = pagination.sortDir === 'asc' ? 'asc' : 'desc';
 
     try {
       const data = await db
@@ -473,7 +502,10 @@ export class UsageStorageService extends EventEmitter {
         })
         .from(schema.requestUsage)
         .where(whereClause)
-        .orderBy(desc(schema.requestUsage.date))
+        .orderBy(
+          sortDir === 'asc' ? asc(sortColumn) : desc(sortColumn),
+          desc(schema.requestUsage.date)
+        )
         .limit(pagination.limit)
         .offset(pagination.offset);
 

@@ -76,6 +76,11 @@ export interface UnifiedToolConfig {
 
 export type ThinkLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
+export interface KeyAccessPolicy {
+  allowedModels?: string[];
+  allowedProviders?: string[];
+}
+
 // Unified Request
 
 export interface UnifiedChatRequest {
@@ -118,6 +123,7 @@ export interface UnifiedChatRequest {
   originalBody?: any;
   metadata?: {
     [key: string]: any;
+    plexus_key_policy?: KeyAccessPolicy;
   };
 }
 
@@ -239,7 +245,7 @@ export interface UnifiedEmbeddingsRequest {
   user?: string;
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
 }
 
 // Unified Embeddings Response
@@ -284,6 +290,7 @@ export interface UnifiedTranscriptionRequest {
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
+  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
 }
 
 // Unified Transcription Response
@@ -340,7 +347,7 @@ export interface UnifiedSpeechRequest {
   stream_format?: 'sse' | 'audio';
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
 }
 
 // Unified Speech Response
@@ -379,7 +386,7 @@ export interface UnifiedImageGenerationRequest {
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
 }
 
 // Unified Image Generation Response
@@ -426,7 +433,7 @@ export interface UnifiedImageEditRequest {
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
 }
 
 // Unified Image Edit Response

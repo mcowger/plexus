@@ -2,7 +2,11 @@ import { FastifyInstance } from 'fastify';
 import { encode } from 'eventsource-encoder';
 import { and, gte, lte, sql, isNull, isNotNull } from 'drizzle-orm';
 import { getCurrentDialect, getSchema } from '../../db/client';
-import { UsageStorageService } from '../../services/usage-storage';
+import {
+  UsageStorageService,
+  type UsageSortDirection,
+  type UsageSortField,
+} from '../../services/usage-storage';
 
 const USAGE_FIELDS = new Set([
   'requestId',
@@ -52,10 +56,23 @@ export async function registerUsageRoutes(
   fastify: FastifyInstance,
   usageStorage: UsageStorageService
 ) {
+  const sortableFields = new Set<UsageSortField>([
+    'date',
+    'apiKey',
+    'provider',
+    'incomingModelAlias',
+    'costTotal',
+    'durationMs',
+  ]);
+
   fastify.get('/v0/management/usage', async (request, reply) => {
     const query = request.query as any;
     const limit = parseInt(query.limit || '50');
     const offset = parseInt(query.offset || '0');
+    const sortBy = sortableFields.has(query.sortBy as UsageSortField)
+      ? (query.sortBy as UsageSortField)
+      : 'date';
+    const sortDir: UsageSortDirection = query.sortDir === 'asc' ? 'asc' : 'desc';
     const rawFields = typeof query.fields === 'string' ? query.fields : '';
     const requestedFields = rawFields
       .split(',')
@@ -65,6 +82,7 @@ export async function registerUsageRoutes(
     const filters: any = {
       startDate: query.startDate,
       endDate: query.endDate,
+      apiKey: query.apiKey,
       incomingApiType: query.incomingApiType,
       provider: query.provider,
       incomingModelAlias: query.incomingModelAlias,
@@ -77,7 +95,7 @@ export async function registerUsageRoutes(
     if (query.maxDurationMs) filters.maxDurationMs = parseInt(query.maxDurationMs);
 
     try {
-      const result = await usageStorage.getUsage(filters, { limit, offset });
+      const result = await usageStorage.getUsage(filters, { limit, offset, sortBy, sortDir });
       if (requestedFields.length === 0) {
         return reply.send(result);
       }

@@ -24,6 +24,14 @@ const EMPTY_KEY: KeyConfig = {
   comment: '',
 };
 
+const parseCommaSeparated = (value: string): string[] | undefined => {
+  const items = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
+};
+
 const EMPTY_QUOTA: UserQuota & { name: string } = {
   name: '',
   type: 'rolling',
@@ -229,7 +237,9 @@ export const Keys = () => {
     (k) =>
       k.key.toLowerCase().includes(search.toLowerCase()) ||
       (k.comment && k.comment.toLowerCase().includes(search.toLowerCase())) ||
-      (k.quota && k.quota.toLowerCase().includes(search.toLowerCase()))
+      (k.quota && k.quota.toLowerCase().includes(search.toLowerCase())) ||
+      k.allowedModels?.some((model) => model.toLowerCase().includes(search.toLowerCase())) ||
+      k.allowedProviders?.some((provider) => provider.toLowerCase().includes(search.toLowerCase()))
   );
 
   const filteredQuotas = Object.entries(quotas).filter(([name]) =>
@@ -649,6 +659,36 @@ export const Keys = () => {
             placeholder="Optional description..."
           />
 
+          <Input
+            label="Allowed Model Aliases"
+            value={editingKey.allowedModels?.join(', ') || ''}
+            onChange={(e) =>
+              setEditingKey({
+                ...editingKey,
+                allowedModels: parseCommaSeparated(e.target.value),
+              })
+            }
+            placeholder="Optional, comma-separated aliases"
+          />
+          <p className="text-xs text-text-muted -mt-1">
+            Optional allowlist. If set, this key can only use these configured model aliases.
+          </p>
+
+          <Input
+            label="Allowed Providers"
+            value={editingKey.allowedProviders?.join(', ') || ''}
+            onChange={(e) =>
+              setEditingKey({
+                ...editingKey,
+                allowedProviders: parseCommaSeparated(e.target.value),
+              })
+            }
+            placeholder="Optional, comma-separated provider ids"
+          />
+          <p className="text-xs text-text-muted -mt-1">
+            Optional allowlist. If set, routing is limited to these provider IDs.
+          </p>
+
           <div className="flex flex-col gap-2">
             <label className="font-body text-[13px] font-medium text-text-secondary">
               Quota Assignment
@@ -669,7 +709,9 @@ export const Keys = () => {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-text-muted">Optional: Assign a quota limit to this key</p>
+            <p className="text-xs text-text-muted">
+              Optional: assign a quota to this key. Allowlist checks run before and during routing.
+            </p>
           </div>
         </div>
       </Modal>

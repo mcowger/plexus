@@ -384,4 +384,76 @@ describe('UsageStorageService performance metrics', () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     expect(calls).toEqual(['started', 'updated']);
   });
+
+  it('sorts usage rows by requested field and direction', async () => {
+    const storage = new UsageStorageService();
+
+    await storage.saveRequest({
+      ...createUsageRecord('sort-a-new', 'provider-a', 'alias-a', 'canonical-a', 'model-a'),
+      apiKey: 'alpha',
+      costTotal: 0.2,
+      durationMs: 300,
+      date: '2026-01-02T00:00:00.000Z',
+    });
+    await storage.saveRequest({
+      ...createUsageRecord('sort-z', 'provider-z', 'alias-z', 'canonical-z', 'model-z'),
+      apiKey: 'zeta',
+      costTotal: 0.5,
+      durationMs: 100,
+      date: '2026-01-01T00:00:00.000Z',
+    });
+    await storage.saveRequest({
+      ...createUsageRecord('sort-a-old', 'provider-a', 'alias-a2', 'canonical-a', 'model-a2'),
+      apiKey: 'alpha',
+      costTotal: 0.1,
+      durationMs: 200,
+      date: '2025-12-31T00:00:00.000Z',
+    });
+
+    const byKeyAsc = await storage.getUsage(
+      {},
+      { limit: 10, offset: 0, sortBy: 'apiKey', sortDir: 'asc' }
+    );
+    expect(byKeyAsc.data.map((row) => row.requestId)).toEqual([
+      'sort-a-new',
+      'sort-a-old',
+      'sort-z',
+    ]);
+
+    const byCostDesc = await storage.getUsage(
+      {},
+      { limit: 10, offset: 0, sortBy: 'costTotal', sortDir: 'desc' }
+    );
+    expect(byCostDesc.data.map((row) => row.requestId)).toEqual([
+      'sort-z',
+      'sort-a-new',
+      'sort-a-old',
+    ]);
+
+    const byDurationAsc = await storage.getUsage(
+      {},
+      { limit: 10, offset: 0, sortBy: 'durationMs', sortDir: 'asc' }
+    );
+    expect(byDurationAsc.data.map((row) => row.requestId)).toEqual([
+      'sort-z',
+      'sort-a-old',
+      'sort-a-new',
+    ]);
+  });
+
+  it('filters usage rows by apiKey substring', async () => {
+    const storage = new UsageStorageService();
+
+    await storage.saveRequest({
+      ...createUsageRecord('filter-alpha', 'provider-a', 'alias-a', 'canonical-a', 'model-a'),
+      apiKey: 'alpha-key',
+    });
+    await storage.saveRequest({
+      ...createUsageRecord('filter-beta', 'provider-b', 'alias-b', 'canonical-b', 'model-b'),
+      apiKey: 'beta-key',
+    });
+
+    const filtered = await storage.getUsage({ apiKey: 'alpha' }, { limit: 10, offset: 0 });
+    expect(filtered.data.map((row) => row.requestId)).toEqual(['filter-alpha']);
+  });
 });

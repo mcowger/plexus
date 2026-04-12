@@ -7,6 +7,7 @@ import { UsageRecord } from '../../types/usage';
 import { getClientIp } from '../../utils/ip';
 import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
+import { attachKeyAccessPolicy } from '../../utils/auth';
 
 export async function registerEmbeddingsRoute(
   fastify: FastifyInstance,
@@ -52,10 +53,11 @@ export async function registerEmbeddingsRoute(
       logger.silly('Incoming Embeddings Request', body);
 
       const transformer = new EmbeddingsTransformer();
-      const unifiedRequest = await transformer.parseRequest(body);
+      let unifiedRequest = await transformer.parseRequest(body);
       unifiedRequest.incomingApiType = 'embeddings';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
       DebugManager.getInstance().startLog(requestId, body);
 
@@ -109,7 +111,7 @@ export async function registerEmbeddingsRoute(
       DebugManager.getInstance().flush(requestId);
       logger.error('Error processing embeddings request', e);
 
-      return reply.code(500).send({
+      return reply.code(e.routingContext?.statusCode || 500).send({
         error: { message: e.message, type: 'api_error' },
       });
     }

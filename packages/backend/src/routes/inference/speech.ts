@@ -8,6 +8,7 @@ import { getClientIp } from '../../utils/ip';
 import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { UnifiedSpeechRequest } from '../../types/unified';
+import { attachKeyAccessPolicy } from '../../utils/auth';
 
 const VALID_VOICES = [
   'alloy',
@@ -73,7 +74,7 @@ export async function registerSpeechRoute(
 
       const transformer = new SpeechTransformer();
 
-      const unifiedRequest: UnifiedSpeechRequest = {
+      let unifiedRequest: UnifiedSpeechRequest = {
         model: body.model,
         input: body.input,
         voice: body.voice,
@@ -85,6 +86,7 @@ export async function registerSpeechRoute(
         incomingApiType: 'speech',
         originalBody: body,
       };
+      unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
       DebugManager.getInstance().startLog(requestId, {
         model: body.model,
@@ -152,7 +154,7 @@ export async function registerSpeechRoute(
       DebugManager.getInstance().flush(requestId);
       logger.error('Error processing speech request', e);
 
-      return reply.code(500).send({
+      return reply.code(e.routingContext?.statusCode || 500).send({
         error: { message: e.message, type: 'api_error' },
       });
     }

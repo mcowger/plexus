@@ -91,6 +91,31 @@ function now(): number {
   return Date.now();
 }
 
+function parseStringArray(value: string | null | undefined): string[] | undefined {
+  if (!value) return undefined;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return undefined;
+
+    const normalized = parsed
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    return normalized.length > 0 ? normalized : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function stringifyStringArray(value: string[] | undefined): string | null {
+  if (!value || value.length === 0) return null;
+
+  const normalized = value.map((entry) => entry.trim()).filter(Boolean);
+  return normalized.length > 0 ? JSON.stringify(normalized) : null;
+}
+
 export interface OAuthCredentialsData {
   accessToken: string;
   refreshToken: string;
@@ -535,10 +560,15 @@ export class ConfigRepository {
     const result: Record<string, KeyConfig> = {};
 
     for (const row of rows) {
+      const allowedModels = parseStringArray(row.allowedModels);
+      const allowedProviders = parseStringArray(row.allowedProviders);
+
       result[row.name] = {
         secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
         ...(row.quotaName ? { quota: row.quotaName } : {}),
+        ...(allowedModels ? { allowedModels } : {}),
+        ...(allowedProviders ? { allowedProviders } : {}),
       };
     }
 
@@ -575,12 +605,17 @@ export class ConfigRepository {
     if (rows.length === 0) return null;
 
     const row = rows[0]!;
+    const allowedModels = parseStringArray(row.allowedModels);
+    const allowedProviders = parseStringArray(row.allowedProviders);
+
     return {
       name: row.name,
       config: {
         secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
         ...(row.quotaName ? { quota: row.quotaName } : {}),
+        ...(allowedModels ? { allowedModels } : {}),
+        ...(allowedProviders ? { allowedProviders } : {}),
       },
     };
   }
@@ -605,6 +640,8 @@ export class ConfigRepository {
           secretHash,
           comment: config.comment ?? null,
           quotaName: config.quota ?? null,
+          allowedModels: stringifyStringArray(config.allowedModels),
+          allowedProviders: stringifyStringArray(config.allowedProviders),
           updatedAt: timestamp,
         })
         .where(eq(schema.apiKeys.name, name));
@@ -617,6 +654,8 @@ export class ConfigRepository {
           secretHash,
           comment: config.comment ?? null,
           quotaName: config.quota ?? null,
+          allowedModels: stringifyStringArray(config.allowedModels),
+          allowedProviders: stringifyStringArray(config.allowedProviders),
           createdAt: timestamp,
           updatedAt: timestamp,
         });

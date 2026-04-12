@@ -9,6 +9,7 @@ import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware, recordQuotaUsage } from '../../services/quota/quota-middleware';
+import { attachKeyAccessPolicy } from '../../utils/auth';
 
 export async function registerChatRoute(
   fastify: FastifyInstance,
@@ -56,10 +57,11 @@ export async function registerChatRoute(
 
       logger.silly('Incoming OpenAI Request', body);
       const transformer = new OpenAITransformer();
-      const unifiedRequest = await transformer.parseRequest(body);
+      let unifiedRequest = await transformer.parseRequest(body);
       unifiedRequest.incomingApiType = 'chat';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])
         ? request.headers['x-app'][0]
         : request.headers['x-app'];

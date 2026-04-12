@@ -8,6 +8,7 @@ import { getClientIp } from '../../utils/ip';
 import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { UnifiedImageGenerationRequest, UnifiedImageEditRequest } from '../../types/unified';
+import { attachKeyAccessPolicy } from '../../utils/auth';
 
 export async function registerImagesRoute(
   fastify: FastifyInstance,
@@ -55,7 +56,7 @@ export async function registerImagesRoute(
 
       const transformer = new ImageTransformer();
 
-      const unifiedRequest: UnifiedImageGenerationRequest = {
+      let unifiedRequest: UnifiedImageGenerationRequest = {
         model: body.model,
         prompt: body.prompt,
         n: body.n,
@@ -68,6 +69,7 @@ export async function registerImagesRoute(
         incomingApiType: 'images',
         originalBody: body,
       };
+      unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
       DebugManager.getInstance().startLog(requestId, {
         model: body.model,
@@ -132,7 +134,7 @@ export async function registerImagesRoute(
       DebugManager.getInstance().flush(requestId);
       logger.error('Error processing image generation request', e);
 
-      return reply.code(500).send({
+      return reply.code(e.routingContext?.statusCode || 500).send({
         error: { message: e.message, type: 'api_error' },
       });
     }
@@ -217,7 +219,7 @@ export async function registerImagesRoute(
         hasMask: !!maskBuffer,
       });
 
-      const unifiedRequest: UnifiedImageEditRequest = {
+      let unifiedRequest: UnifiedImageEditRequest = {
         model: formFields.model,
         prompt: formFields.prompt,
         image: imageBuffer,
@@ -235,6 +237,7 @@ export async function registerImagesRoute(
         incomingApiType: 'images',
         originalBody: formFields,
       };
+      unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
       DebugManager.getInstance().startLog(requestId, {
         model: formFields.model,
@@ -299,7 +302,7 @@ export async function registerImagesRoute(
       DebugManager.getInstance().flush(requestId);
       logger.error('Error processing image edit request', e);
 
-      return reply.code(500).send({
+      return reply.code(e.routingContext?.statusCode || 500).send({
         error: { message: e.message, type: 'api_error' },
       });
     }

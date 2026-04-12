@@ -9,6 +9,7 @@ import {
   UnifiedImageGenerationResponse,
   UnifiedImageEditRequest,
   UnifiedImageEditResponse,
+  KeyAccessPolicy,
 } from '../types/unified';
 import { Router } from './router';
 import { TransformerFactory } from './transformer-factory';
@@ -193,6 +194,8 @@ export class Dispatcher {
     if (candidates.length === 0) {
       throw new Error(`No route candidates found for model '${request.model}'`);
     }
+
+    candidates = this.applyKeyAccessPolicy(request, candidates, request.incomingApiType || 'chat');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
@@ -821,6 +824,73 @@ export class Dispatcher {
     };
 
     return enriched;
+  }
+
+  private buildAccessDeniedError(message: string): Error {
+    const error = new Error(message) as Error & {
+      routingContext?: Record<string, unknown>;
+    };
+    error.routingContext = {
+      statusCode: 403,
+      errorType: 'access_denied',
+    };
+    return error;
+  }
+
+  private getKeyAccessPolicy(request: {
+    metadata?: {
+      plexus_key_policy?: KeyAccessPolicy;
+    };
+  }): KeyAccessPolicy | null {
+    const policy = request.metadata?.plexus_key_policy;
+    if (!policy) return null;
+
+    // Normalization (trim/filter) is already performed by attachKeyAccessPolicy()
+    // in auth.ts before the policy is attached to the request metadata.
+    // This method trusts that the policy is already clean.
+    if (
+      (!policy.allowedModels || policy.allowedModels.length === 0) &&
+      (!policy.allowedProviders || policy.allowedProviders.length === 0)
+    ) {
+      return null;
+    }
+
+    return policy;
+  }
+
+  private applyKeyAccessPolicy(
+    request: {
+      model: string;
+      metadata?: {
+        plexus_key_policy?: KeyAccessPolicy;
+      };
+    },
+    candidates: RouteResult[],
+    apiType: string
+  ): RouteResult[] {
+    const policy = this.getKeyAccessPolicy(request);
+    if (!policy) return candidates;
+
+    if (policy.allowedModels && !policy.allowedModels.includes(request.model)) {
+      throw this.buildAccessDeniedError(
+        `Key is not allowed to access model '${request.model}' for ${apiType}`
+      );
+    }
+
+    if (!policy.allowedProviders) {
+      return candidates;
+    }
+
+    const filtered = candidates.filter((candidate) =>
+      policy.allowedProviders!.includes(candidate.provider)
+    );
+    if (filtered.length === 0) {
+      throw this.buildAccessDeniedError(
+        `Key is not allowed to access any provider configured for model '${request.model}'`
+      );
+    }
+
+    return filtered;
   }
 
   private async parseJsonResponseBody(
@@ -1986,6 +2056,8 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
+    candidates = this.applyKeyAccessPolicy(request, candidates, 'embeddings');
+
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
     const retryHistory: RetryAttemptRecord[] = [];
@@ -2176,6 +2248,8 @@ export class Dispatcher {
       const singleRoute = await Router.resolve(request.model, 'transcriptions');
       candidates = [singleRoute];
     }
+
+    candidates = this.applyKeyAccessPolicy(request, candidates, 'transcriptions');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
@@ -2376,6 +2450,8 @@ export class Dispatcher {
       const singleRoute = await Router.resolve(request.model, 'speech');
       candidates = [singleRoute];
     }
+
+    candidates = this.applyKeyAccessPolicy(request, candidates, 'speech');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
@@ -2612,6 +2688,8 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
+    candidates = this.applyKeyAccessPolicy(request, candidates, 'images');
+
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
     const retryHistory: RetryAttemptRecord[] = [];
@@ -2802,6 +2880,8 @@ export class Dispatcher {
       const singleRoute = await Router.resolve(request.model, 'images');
       candidates = [singleRoute];
     }
+
+    candidates = this.applyKeyAccessPolicy(request, candidates, 'images');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];

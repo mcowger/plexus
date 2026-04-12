@@ -410,4 +410,50 @@ describe('Dispatcher Failover', () => {
     const cooldowns = cm.getCooldowns();
     expect(cooldowns).toHaveLength(0);
   });
+
+  test('provider allowlist filters candidates before dispatch', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock.mockImplementation(async () => successChatResponse('model-2'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch({
+      ...makeChatRequest(),
+      metadata: {
+        plexus_key_policy: {
+          allowedProviders: ['p2'],
+        },
+      },
+    });
+    const meta = (response as any).plexus;
+
+    expect(meta?.attemptCount).toBe(1);
+    expect(meta?.finalAttemptProvider).toBe('p2');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String((fetchMock as any).mock.calls[0]?.[0])).toContain('p2.example.com');
+  });
+
+  test('model allowlist blocks disallowed aliases with 403 before fetch', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+
+    const dispatcher = new Dispatcher();
+
+    await expect(
+      dispatcher.dispatch({
+        ...makeChatRequest(),
+        metadata: {
+          plexus_key_policy: {
+            allowedModels: ['other-alias'],
+          },
+        },
+      })
+    ).rejects.toMatchObject({
+      message: "Key is not allowed to access model 'test-alias' for chat",
+      routingContext: {
+        statusCode: 403,
+        errorType: 'access_denied',
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
 });

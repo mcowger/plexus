@@ -790,7 +790,19 @@ export interface KeyConfig {
   secret: string; // The actual sk-uuid
   comment?: string;
   quota?: string; // Optional quota assignment
+  allowedModels?: string[];
+  allowedProviders?: string[];
 }
+
+export type UsageSortField =
+  | 'date'
+  | 'apiKey'
+  | 'provider'
+  | 'incomingModelAlias'
+  | 'costTotal'
+  | 'durationMs';
+
+export type UsageSortDirection = 'asc' | 'desc';
 
 export interface UserQuota {
   type: 'rolling' | 'daily' | 'weekly' | 'monthly';
@@ -1360,11 +1372,15 @@ export const api = {
   getLogs: async (
     limit: number = 50,
     offset: number = 0,
-    filters: Record<string, any> = {}
+    filters: Record<string, any> = {},
+    sortBy: UsageSortField = 'date',
+    sortDir: UsageSortDirection = 'desc'
   ): Promise<{ data: UsageRecord[]; total: number }> => {
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
+      sortBy,
+      sortDir,
       ...filters,
     });
 
@@ -1402,7 +1418,13 @@ export const api = {
       if (!res.ok) throw new Error('Failed to fetch keys');
       const keys = (await res.json()) as Record<
         string,
-        { secret: string; comment?: string; quota?: string }
+        {
+          secret: string;
+          comment?: string;
+          quota?: string;
+          allowedModels?: string[];
+          allowedProviders?: string[];
+        }
       >;
 
       return Object.entries(keys).map(([key, val]) => ({
@@ -1410,6 +1432,8 @@ export const api = {
         secret: val.secret,
         comment: val.comment,
         quota: val.quota,
+        allowedModels: val.allowedModels,
+        allowedProviders: val.allowedProviders,
       }));
     } catch (e) {
       console.error('API Error getKeys', e);
@@ -1427,6 +1451,8 @@ export const api = {
           secret: keyConfig.secret,
           comment: keyConfig.comment,
           ...(keyConfig.quota ? { quota: keyConfig.quota } : {}),
+          allowedModels: keyConfig.allowedModels ?? [],
+          allowedProviders: keyConfig.allowedProviders ?? [],
         }),
       }
     );
