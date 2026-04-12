@@ -239,9 +239,7 @@ export const Keys = () => {
       (k.comment && k.comment.toLowerCase().includes(search.toLowerCase())) ||
       (k.quota && k.quota.toLowerCase().includes(search.toLowerCase())) ||
       k.allowedModels?.some((model) => model.toLowerCase().includes(search.toLowerCase())) ||
-      k.allowedProviders?.some((provider) =>
-        provider.toLowerCase().includes(search.toLowerCase())
-      )
+      k.allowedProviders?.some((provider) => provider.toLowerCase().includes(search.toLowerCase()))
   );
 
   const filteredQuotas = Object.entries(quotas).filter(([name]) =>

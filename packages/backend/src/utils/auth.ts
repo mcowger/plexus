@@ -13,12 +13,17 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
       }
     | undefined;
 
+  // Canonical normalization: trim/strip empty entries.
+  // Dispatcher's getKeyAccessPolicy() trusts this is already clean.
   const allowedModels = keyConfig?.allowedModels?.map((entry) => entry.trim()).filter(Boolean);
   const allowedProviders = keyConfig?.allowedProviders
     ?.map((entry) => entry.trim())
     .filter(Boolean);
 
-  if ((!allowedModels || allowedModels.length === 0) && (!allowedProviders || allowedProviders.length === 0)) {
+  if (
+    (!allowedModels || allowedModels.length === 0) &&
+    (!allowedProviders || allowedProviders.length === 0)
+  ) {
     return unifiedRequest;
   }
 

@@ -414,19 +414,31 @@ describe('UsageStorageService performance metrics', () => {
       {},
       { limit: 10, offset: 0, sortBy: 'apiKey', sortDir: 'asc' }
     );
-    expect(byKeyAsc.data.map((row) => row.requestId)).toEqual(['sort-a-new', 'sort-a-old', 'sort-z']);
+    expect(byKeyAsc.data.map((row) => row.requestId)).toEqual([
+      'sort-a-new',
+      'sort-a-old',
+      'sort-z',
+    ]);
 
     const byCostDesc = await storage.getUsage(
       {},
       { limit: 10, offset: 0, sortBy: 'costTotal', sortDir: 'desc' }
     );
-    expect(byCostDesc.data.map((row) => row.requestId)).toEqual(['sort-z', 'sort-a-new', 'sort-a-old']);
+    expect(byCostDesc.data.map((row) => row.requestId)).toEqual([
+      'sort-z',
+      'sort-a-new',
+      'sort-a-old',
+    ]);
 
     const byDurationAsc = await storage.getUsage(
       {},
       { limit: 10, offset: 0, sortBy: 'durationMs', sortDir: 'asc' }
     );
-    expect(byDurationAsc.data.map((row) => row.requestId)).toEqual(['sort-z', 'sort-a-old', 'sort-a-new']);
+    expect(byDurationAsc.data.map((row) => row.requestId)).toEqual([
+      'sort-z',
+      'sort-a-old',
+      'sort-a-new',
+    ]);
   });
 
   it('filters usage rows by apiKey substring', async () => {

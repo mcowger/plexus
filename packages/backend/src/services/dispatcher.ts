@@ -195,11 +195,7 @@ export class Dispatcher {
       throw new Error(`No route candidates found for model '${request.model}'`);
     }
 
-    candidates = this.applyKeyAccessPolicy(
-      request,
-      candidates,
-      request.incomingApiType || 'chat'
-    );
+    candidates = this.applyKeyAccessPolicy(request, candidates, request.incomingApiType || 'chat');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
@@ -849,19 +845,17 @@ export class Dispatcher {
     const policy = request.metadata?.plexus_key_policy;
     if (!policy) return null;
 
-    const allowedModels = policy.allowedModels?.map((entry) => entry.trim()).filter(Boolean);
-    const allowedProviders = policy.allowedProviders
-      ?.map((entry) => entry.trim())
-      .filter(Boolean);
-
-    if ((!allowedModels || allowedModels.length === 0) && (!allowedProviders || allowedProviders.length === 0)) {
+    // Normalization (trim/filter) is already performed by attachKeyAccessPolicy()
+    // in auth.ts before the policy is attached to the request metadata.
+    // This method trusts that the policy is already clean.
+    if (
+      (!policy.allowedModels || policy.allowedModels.length === 0) &&
+      (!policy.allowedProviders || policy.allowedProviders.length === 0)
+    ) {
       return null;
     }
 
-    return {
-      ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
-      ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
-    };
+    return policy;
   }
 
   private applyKeyAccessPolicy(
@@ -887,7 +881,9 @@ export class Dispatcher {
       return candidates;
     }
 
-    const filtered = candidates.filter((candidate) => policy.allowedProviders!.includes(candidate.provider));
+    const filtered = candidates.filter((candidate) =>
+      policy.allowedProviders!.includes(candidate.provider)
+    );
     if (filtered.length === 0) {
       throw this.buildAccessDeniedError(
         `Key is not allowed to access any provider configured for model '${request.model}'`

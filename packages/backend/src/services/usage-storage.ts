@@ -447,7 +447,8 @@ export class UsageStorageService extends EventEmitter {
       costTotal: schema.requestUsage.costTotal,
       durationMs: schema.requestUsage.durationMs,
     } satisfies Record<UsageSortField, any>;
-    const sortBy = pagination.sortBy && sortFieldMap[pagination.sortBy] ? pagination.sortBy : 'date';
+    const sortBy =
+      pagination.sortBy && sortFieldMap[pagination.sortBy] ? pagination.sortBy : 'date';
     const sortColumn = sortFieldMap[sortBy];
     const sortDir = pagination.sortDir === 'asc' ? 'asc' : 'desc';
 
@@ -501,7 +502,10 @@ export class UsageStorageService extends EventEmitter {
         })
         .from(schema.requestUsage)
         .where(whereClause)
-        .orderBy(sortDir === 'asc' ? asc(sortColumn) : desc(sortColumn), desc(schema.requestUsage.date))
+        .orderBy(
+          sortDir === 'asc' ? asc(sortColumn) : desc(sortColumn),
+          desc(schema.requestUsage.date)
+        )
         .limit(pagination.limit)
         .offset(pagination.offset);
 
