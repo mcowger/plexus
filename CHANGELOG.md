@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.19.11 - 2026-04-12
+
+### v0.19.11: key allowlists, vision fallthrough usage tracking, and logs UI updates
+
+## New Features
+- Added key access allowlists and improved log filtering to support more granular key policy control and easier audit review ([319011d](https://github.com/mcowger/plexus/commit/319011d)).
+- Replaced the key allowlist text inputs with a tag-style multi-select UI, improving usability and making allowlist editing less error-prone ([b5b5a76](https://github.com/mcowger/plexus/commit/b5b5a76)).
+- Added vision fallthrough descriptor model visibility in the Logs UI so child-request model selection is now surfaced directly in log inspection ([d03981c](https://github.com/mcowger/plexus/commit/d03981c)).
+- Recorded vision fallthrough descriptor model data in request usage, and ensured child request usage records are persisted for fallthrough scenarios ([6f5bf89](https://github.com/mcowger/plexus/commit/6f5bf89), [0e59eb3](https://github.com/mcowger/plexus/commit/0e59eb3)).
+
+## Bug Fixes
+- Fixed CI test failures to restore build stability ([84ba200](https://github.com/mcowger/plexus/commit/84ba200)).
+- Added coverage for vision fallthrough usage tracking to prevent regressions in descriptor/model attribution ([7287596](https://github.com/mcowger/plexus/commit/7287596)).
+
+## Refactoring / Internal Improvements
+- Deduplicated key policy normalization logic between `auth.ts` and `dispatcher`, reducing maintenance overhead and keeping policy handling consistent ([df920bb](https://github.com/mcowger/plexus/commit/df920bb)).
+- Updated GitHub Actions to use Node 24, keeping CI aligned with the current runtime baseline ([5c98c76](https://github.com/mcowger/plexus/commit/5c98c76)).
+- Removed the GEMINI file as part of repository cleanup ([039ca33](https://github.com/mcowger/plexus/commit/039ca33)).
+
+## Release / Packaging
+- Release tagged as v0.19.11.
+- Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest.
+
 ## v0.19.10 - 2026-04-11
 
 ### v0.19.10: Vision Fallthrough Tracking, Synthetic Quotas, Config Database Migration, and Quota System Enhancements
