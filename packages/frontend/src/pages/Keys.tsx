@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, KeyConfig, UserQuota } from '../lib/api';
 import { Input } from '../components/ui/Input';
+import { TagSelect } from '../components/ui/TagSelect';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -22,14 +23,6 @@ const EMPTY_KEY: KeyConfig = {
   key: '',
   secret: '',
   comment: '',
-};
-
-const parseCommaSeparated = (value: string): string[] | undefined => {
-  const items = value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  return items.length > 0 ? items : undefined;
 };
 
 const EMPTY_QUOTA: UserQuota & { name: string } = {
@@ -54,6 +47,8 @@ export const Keys = () => {
   const [keys, setKeys] = useState<KeyConfig[]>([]);
   const [quotas, setQuotas] = useState<Record<string, UserQuota>>({});
   const [quotaStatuses, setQuotaStatuses] = useState<Record<string, QuotaStatus>>({});
+  const [providerIds, setProviderIds] = useState<string[]>([]);
+  const [aliasIds, setAliasIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'keys' | 'quotas'>('keys');
@@ -81,9 +76,21 @@ export const Keys = () => {
 
   const loadData = async () => {
     try {
-      const [k, q] = await Promise.all([api.getKeys(), api.getUserQuotas()]);
+      const [k, q, provs, aliases] = await Promise.all([
+        api.getKeys(),
+        api.getUserQuotas(),
+        api.getProviders(),
+        api.getAliases(),
+      ]);
       setKeys(k);
       setQuotas(q);
+      setProviderIds(
+        provs
+          .filter((p) => p.enabled)
+          .map((p) => p.id)
+          .sort()
+      );
+      setAliasIds(aliases.map((a) => a.id).sort());
 
       // Load quota status for all keys that have quotas
       const statuses: Record<string, QuotaStatus> = {};
@@ -659,31 +666,33 @@ export const Keys = () => {
             placeholder="Optional description..."
           />
 
-          <Input
+          <TagSelect
             label="Allowed Model Aliases"
-            value={editingKey.allowedModels?.join(', ') || ''}
-            onChange={(e) =>
+            placeholder="Optional: select model aliases..."
+            options={aliasIds}
+            selected={editingKey.allowedModels || []}
+            onChange={(allowedModels) =>
               setEditingKey({
                 ...editingKey,
-                allowedModels: parseCommaSeparated(e.target.value),
+                allowedModels: allowedModels.length > 0 ? allowedModels : undefined,
               })
             }
-            placeholder="Optional, comma-separated aliases"
           />
           <p className="text-xs text-text-muted -mt-1">
             Optional allowlist. If set, this key can only use these configured model aliases.
           </p>
 
-          <Input
+          <TagSelect
             label="Allowed Providers"
-            value={editingKey.allowedProviders?.join(', ') || ''}
-            onChange={(e) =>
+            placeholder="Optional: select providers..."
+            options={providerIds}
+            selected={editingKey.allowedProviders || []}
+            onChange={(allowedProviders) =>
               setEditingKey({
                 ...editingKey,
-                allowedProviders: parseCommaSeparated(e.target.value),
+                allowedProviders: allowedProviders.length > 0 ? allowedProviders : undefined,
               })
             }
-            placeholder="Optional, comma-separated provider ids"
           />
           <p className="text-xs text-text-muted -mt-1">
             Optional allowlist. If set, routing is limited to these provider IDs.
