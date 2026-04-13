@@ -5,6 +5,7 @@ import { UsageInspector } from '../inspectors/usage-logging';
 import { UsageStorageService } from '../usage-storage';
 import { DebugManager } from '../debug-manager';
 import type { UsageRecord } from '../../types/usage';
+import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 
 describe('UsageInspector', () => {
   let mockStorage: any;
@@ -39,7 +40,11 @@ describe('UsageInspector', () => {
         undefined,
         startTime,
         false,
-        'chat'
+        'chat',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();
@@ -95,7 +100,11 @@ describe('UsageInspector', () => {
         undefined,
         startTime,
         false,
-        'chat'
+        'chat',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();
@@ -142,7 +151,11 @@ describe('UsageInspector', () => {
         undefined,
         startTime,
         false,
-        'chat'
+        'chat',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();
@@ -190,7 +203,11 @@ describe('UsageInspector', () => {
         undefined,
         startTime,
         false,
-        'messages'
+        'messages',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();
@@ -236,7 +253,11 @@ describe('UsageInspector', () => {
         undefined,
         startTime,
         false,
-        'gemini'
+        'gemini',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();
@@ -282,7 +303,11 @@ describe('UsageInspector', () => {
         undefined,
         startTime,
         false,
-        'chat'
+        'chat',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();
@@ -336,7 +361,9 @@ describe('UsageInspector', () => {
         true,
         'gemini',
         'chat',
-        originalRequest
+        originalRequest,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
       );
 
       const debugManager = DebugManager.getInstance();

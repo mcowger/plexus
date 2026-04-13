@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { formatEnergy, formatTimeLabel } from '../lib/format';
 
 interface EnergyOverTimeProps {
   /** Time-series data with kwhUsed values */
@@ -21,35 +22,6 @@ interface EnergyOverTimeProps {
   }>;
   /** Height of the chart container */
   height?: number;
-}
-
-/**
- * Formats a timestamp string into a readable time label.
- * Expects timestamp in epoch milliseconds or ISO string format.
- */
-function formatTimeLabel(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (isNaN(date.getTime())) {
-    // If it's already a numeric string, try parsing as number
-    const num = Number(timestamp);
-    if (!isNaN(num)) {
-      const dateFromNum = new Date(num);
-      if (!isNaN(dateFromNum.getTime())) {
-        return dateFromNum.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      }
-    }
-    return timestamp;
-  }
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-/**
- * Formats kWh values for tooltip display.
- */
-function formatKwh(value: number): string {
-  if (value === 0) return '0 kWh';
-  if (value < 0.001) return `${(value * 1000).toFixed(2)} Wh`;
-  return `${value.toFixed(3)} kWh`;
 }
 
 export function EnergyOverTime({ data, height = 300 }: EnergyOverTimeProps) {
@@ -100,11 +72,13 @@ export function EnergyOverTime({ data, height = 300 }: EnergyOverTimeProps) {
           tickLine={false}
           axisLine={false}
           domain={yAxisDomain}
-          tickFormatter={(value) => (value < 1 ? `${(value * 1000).toFixed(0)} Wh` : `${value.toFixed(2)} kWh`)}
+          tickFormatter={(value) =>
+            value < 1 ? `${(value * 1000).toFixed(0)} Wh` : `${value.toFixed(2)} kWh`
+          }
           width={60}
         />
         <Tooltip
-          formatter={(value) => [formatKwh(value as number), 'Energy']}
+          formatter={(value) => [formatEnergy(value as number), 'Energy']}
           contentStyle={{
             backgroundColor: 'var(--color-bg-card)',
             border: '1px solid var(--color-border)',

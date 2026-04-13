@@ -1,3 +1,4 @@
+import type { ModelParams, GpuParams } from '@plexus/shared';
 import { logger } from '../../utils/logger';
 import { PassThrough } from 'stream';
 import { UsageStorageService } from '../usage-storage';
@@ -12,6 +13,7 @@ import {
 } from '../../utils/usage-normalizer';
 import { estimateKwhUsed } from '../inference-energy';
 import { applyProviderReportedCost } from '../../utils/provider-cost';
+import { DEFAULT_MODEL, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 
 export class UsageInspector extends PassThrough {
   private usageStorage: UsageStorageService;
@@ -25,6 +27,9 @@ export class UsageInspector extends PassThrough {
   private originalRequest?: any;
   private firstChunk = true;
 
+  private modelParams: ModelParams;
+  private gpuParams: GpuParams;
+
   constructor(
     requestId: string,
     usageStorage: UsageStorageService,
@@ -35,7 +40,9 @@ export class UsageInspector extends PassThrough {
     shouldEstimateTokens: boolean = false,
     apiType: string = 'chat',
     incomingApiType?: string,
-    originalRequest?: any
+    originalRequest?: any,
+    gpuParams: GpuParams = DEFAULT_GPU_PARAMS,
+    modelParams: ModelParams = DEFAULT_MODEL
   ) {
     super();
     this.usageStorage = usageStorage;
@@ -47,6 +54,8 @@ export class UsageInspector extends PassThrough {
     this.apiType = apiType;
     this.incomingApiType = incomingApiType || apiType;
     this.originalRequest = originalRequest;
+    this.gpuParams = gpuParams;
+    this.modelParams = modelParams;
   }
 
   override _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
@@ -99,7 +108,7 @@ export class UsageInspector extends PassThrough {
           this.usageRecord.tokensEstimated = 1;
           logger.info(
             `[Inspector:Usage] Estimated tokens for ${this.usageRecord.requestId}: ` +
-              `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
+            `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
           );
           debugManager.discardEphemeral(this.usageRecord.requestId!);
         }
@@ -134,8 +143,13 @@ export class UsageInspector extends PassThrough {
         applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
       }
 
-      // Estimate energy consumption
-      this.usageRecord.kwhUsed = estimateKwhUsed(stats.inputTokens, stats.outputTokens);
+      // Estimate energy consumption using resolved GPU and model params
+      this.usageRecord.kwhUsed = estimateKwhUsed(
+        stats.inputTokens,
+        stats.outputTokens,
+        this.modelParams,
+        this.gpuParams
+      );
 
       // Fire-and-forget: saveRequest is async but _flush is synchronous
       // Attach error handler to prevent unhandled promise rejections
@@ -212,12 +226,12 @@ export class UsageInspector extends PassThrough {
       case 'messages':
         return reconstructed.usage
           ? {
-              inputTokens: reconstructed.usage.input_tokens || 0,
-              outputTokens: reconstructed.usage.output_tokens || 0,
-              cachedTokens: reconstructed.usage.cache_read_input_tokens || 0,
-              cacheWriteTokens: reconstructed.usage.cache_creation_input_tokens || 0,
-              reasoningTokens: 0,
-            }
+            inputTokens: reconstructed.usage.input_tokens || 0,
+            outputTokens: reconstructed.usage.output_tokens || 0,
+            cachedTokens: reconstructed.usage.cache_read_input_tokens || 0,
+            cacheWriteTokens: reconstructed.usage.cache_creation_input_tokens || 0,
+            reasoningTokens: 0,
+          }
           : null;
       case 'gemini':
         if (!reconstructed.usageMetadata) return null;
@@ -234,12 +248,12 @@ export class UsageInspector extends PassThrough {
       case 'oauth':
         return reconstructed.usage
           ? {
-              inputTokens: reconstructed.usage.input_tokens || 0,
-              outputTokens: reconstructed.usage.output_tokens || 0,
-              cachedTokens: reconstructed.usage.cached_tokens || 0,
-              cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
-              reasoningTokens: reconstructed.usage.reasoning_tokens || 0,
-            }
+            inputTokens: reconstructed.usage.input_tokens || 0,
+            outputTokens: reconstructed.usage.output_tokens || 0,
+            cachedTokens: reconstructed.usage.cached_tokens || 0,
+            cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
+            reasoningTokens: reconstructed.usage.reasoning_tokens || 0,
+          }
           : null;
       default:
         return null;

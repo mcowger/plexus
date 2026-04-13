@@ -243,7 +243,7 @@ export interface Provider {
     options?: Record<string, unknown>;
   };
   // GPU Profile settings for inference energy calculation
-  gpu_profile?: 'H100' | 'H200' | 'GH100' | 'GH200' | 'B200' | 'B300' | 'custom';
+  gpu_profile?: string;
   gpu_ram_gb?: number;
   gpu_bandwidth_tb_s?: number;
   gpu_flops_tflop?: number;
@@ -399,17 +399,17 @@ export interface InferenceError {
   errorMessage: string;
   errorStack?: string;
   details?:
-  | string
-  | {
-    apiType?: string;
-    provider?: string;
-    targetModel?: string;
-    targetApiType?: string;
-    url?: string;
-    headers?: Record<string, string>;
-    statusCode?: number;
-    providerResponse?: string;
-  };
+    | string
+    | {
+        apiType?: string;
+        provider?: string;
+        targetModel?: string;
+        targetApiType?: string;
+        url?: string;
+        headers?: Record<string, string>;
+        statusCode?: number;
+        providerResponse?: string;
+      };
   createdAt: number;
 }
 
@@ -608,6 +608,9 @@ export function getQuotaCheckerTypes(): Set<string> {
 export async function initQuotaCheckerTypes(): Promise<void> {
   await fetchQuotaCheckerTypes();
 }
+
+// Re-export GpuProfileOption from shared package for use by other components
+export type { GpuProfileOption } from '@plexus/shared';
 
 const normalizeProviderQuotaChecker = (checker?: {
   type?: string;
@@ -934,18 +937,18 @@ export interface UserQuota {
 export interface QuotaConfig {
   id: string;
   type:
-  | 'synthetic'
-  | 'naga'
-  | 'nanogpt'
-  | 'codex'
-  | 'claude-code'
-  | 'zai'
-  | 'moonshot'
-  | 'minimax'
-  | 'minimax-coding'
-  | 'kimi-code'
-  | 'openrouter'
-  | 'kilo';
+    | 'synthetic'
+    | 'naga'
+    | 'nanogpt'
+    | 'codex'
+    | 'claude-code'
+    | 'zai'
+    | 'moonshot'
+    | 'minimax'
+    | 'minimax-coding'
+    | 'kimi-code'
+    | 'openrouter'
+    | 'kilo';
   provider: string;
   enabled: boolean;
   intervalMinutes: number;
@@ -1694,18 +1697,23 @@ export const api = {
       models: provider.models,
       quota_checker: provider.quotaChecker?.type
         ? {
-          type: provider.quotaChecker.type,
-          enabled: provider.quotaChecker.enabled,
-          intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30),
-          options: provider.quotaChecker.options,
-        }
+            type: provider.quotaChecker.type,
+            enabled: provider.quotaChecker.enabled,
+            intervalMinutes: Math.max(1, provider.quotaChecker.intervalMinutes || 30),
+            options: provider.quotaChecker.options,
+          }
         : undefined,
-      // GPU Profile settings for inference energy calculation
-      ...(provider.gpu_profile && { gpu_profile: provider.gpu_profile }),
-      ...(provider.gpu_ram_gb && { gpu_ram_gb: provider.gpu_ram_gb }),
-      ...(provider.gpu_bandwidth_tb_s && { gpu_bandwidth_tb_s: provider.gpu_bandwidth_tb_s }),
-      ...(provider.gpu_flops_tflop && { gpu_flops_tflop: provider.gpu_flops_tflop }),
-      ...(provider.gpu_power_draw_watts && { gpu_power_draw_watts: provider.gpu_power_draw_watts }),
+      // GPU Profile settings — always send resolved numeric fields so backend
+      // never needs to resolve profile names. gpu_profile is a display hint only.
+      ...(provider.gpu_profile ? { gpu_profile: provider.gpu_profile } : {}),
+      ...(provider.gpu_ram_gb != null ? { gpu_ram_gb: provider.gpu_ram_gb } : {}),
+      ...(provider.gpu_bandwidth_tb_s != null
+        ? { gpu_bandwidth_tb_s: provider.gpu_bandwidth_tb_s }
+        : {}),
+      ...(provider.gpu_flops_tflop != null ? { gpu_flops_tflop: provider.gpu_flops_tflop } : {}),
+      ...(provider.gpu_power_draw_watts != null
+        ? { gpu_power_draw_watts: provider.gpu_power_draw_watts }
+        : {}),
     };
 
     const res = await fetchWithAuth(

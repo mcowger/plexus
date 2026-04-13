@@ -20,6 +20,7 @@ import type {
   CooldownPolicy,
   MetadataOverrides,
 } from '../config';
+import { resolveGpuParams } from '@plexus/shared';
 
 // Helper to parse JSON from SQLite text columns (PG jsonb auto-deserializes)
 function parseJson<T>(value: unknown): T | null {
@@ -467,12 +468,52 @@ export class ConfigRepository {
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
       ...(quota_checker ? { quota_checker } : {}),
-      // GPU Profile settings for inference energy calculation
-      ...(row.gpuProfile ? { gpu_profile: row.gpuProfile } : {}),
-      ...(row.gpuRamGb ? { gpu_ram_gb: row.gpuRamGb } : {}),
-      ...(row.gpuBandwidthTbS ? { gpu_bandwidth_tb_s: row.gpuBandwidthTbS } : {}),
-      ...(row.gpuFlopsTflop ? { gpu_flops_tflop: row.gpuFlopsTflop } : {}),
-      ...(row.gpuPowerDrawWatts ? { gpu_power_draw_watts: row.gpuPowerDrawWatts } : {}),
+      // GPU Profile settings — resolve named profiles to concrete values for
+      // backward compatibility with existing DB rows that may only have gpuProfile
+      // set without the numeric fields.
+      ...(() => {
+        const gpuProfile = row.gpuProfile;
+        if (!gpuProfile) {
+          // No profile set — include whatever numeric fields exist
+          return {
+            ...(row.gpuRamGb != null ? { gpu_ram_gb: row.gpuRamGb } : {}),
+            ...(row.gpuBandwidthTbS != null ? { gpu_bandwidth_tb_s: row.gpuBandwidthTbS } : {}),
+            ...(row.gpuFlopsTflop != null ? { gpu_flops_tflop: row.gpuFlopsTflop } : {}),
+            ...(row.gpuPowerDrawWatts != null
+              ? { gpu_power_draw_watts: row.gpuPowerDrawWatts }
+              : {}),
+          };
+        }
+        // Profile name exists — if any numeric field is missing, resolve from the profile name
+        if (row.gpuRamGb == null || row.gpuBandwidthTbS == null) {
+          const resolved = resolveGpuParams(
+            gpuProfile,
+            gpuProfile === 'custom'
+              ? {
+                  ram_gb: row.gpuRamGb ?? undefined,
+                  bandwidth_tb_s: row.gpuBandwidthTbS ?? undefined,
+                  flops_tflop: row.gpuFlopsTflop ?? undefined,
+                  power_draw_watts: row.gpuPowerDrawWatts ?? undefined,
+                }
+              : undefined
+          );
+          return {
+            gpu_profile: gpuProfile,
+            gpu_ram_gb: resolved.ram_gb,
+            gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+            gpu_flops_tflop: resolved.flops_tflop,
+            gpu_power_draw_watts: resolved.power_draw_watts,
+          };
+        }
+        // All numeric fields already present — just use them directly
+        return {
+          gpu_profile: gpuProfile,
+          gpu_ram_gb: row.gpuRamGb!,
+          gpu_bandwidth_tb_s: row.gpuBandwidthTbS!,
+          gpu_flops_tflop: row.gpuFlopsTflop!,
+          gpu_power_draw_watts: row.gpuPowerDrawWatts!,
+        };
+      })(),
     };
 
     return result as ProviderConfig;

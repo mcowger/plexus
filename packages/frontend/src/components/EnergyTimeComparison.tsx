@@ -1,3 +1,5 @@
+import { formatDuration } from '../lib/format';
+
 /**
  * Netflix streaming energy consumption: 0.077 kWh per hour
  * Source: user-provided value
@@ -27,7 +29,8 @@ export function EnergyTimeComparison({ data }: EnergyTimeComparisonProps) {
 
   // Power in watts - kWh/hr directly converts to watts (kW * 1000 = W)
   const netflixWatts = KWH_PER_STREAMING_HOUR * 1000; // 0.077 kW * 1000 = 77 W
-  const aiWatts = totalProcessingSeconds > 0 ? (totalKwh / (totalProcessingSeconds / 3600)) * 1000 : 0;
+  const aiWatts =
+    totalProcessingSeconds > 0 ? (totalKwh / (totalProcessingSeconds / 3600)) * 1000 : 0;
 
   // For bar chart - compare total time
   const maxSeconds = Math.max(streamingSecondsEquivalent, totalProcessingSeconds || 1);
@@ -47,9 +50,8 @@ export function EnergyTimeComparison({ data }: EnergyTimeComparisonProps) {
     );
   }
 
-  // Format times without decimals (just remove decimals, don't round)
-  const streamingDisplay = formatStreamingTime(streamingSecondsEquivalent);
-  const processingDisplay = formatStreamingTime(totalProcessingSeconds);
+  const streamingDisplay = formatDuration(streamingSecondsEquivalent);
+  const processingDisplay = formatDuration(totalProcessingSeconds);
 
   return (
     <div className="space-y-4">
@@ -172,18 +174,4 @@ export function EnergyTimeComparison({ data }: EnergyTimeComparisonProps) {
       </div>
     </div>
   );
-}
-
-function formatStreamingTime(seconds: number): string {
-  if (seconds < 60) {
-    return `${Math.floor(seconds)}s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  if (minutes < 60) {
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }

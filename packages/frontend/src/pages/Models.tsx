@@ -840,7 +840,7 @@ export const Models = () => {
           kv_lora_rank: arch.kv_lora_rank,
           qk_rope_head_dim: arch.qk_rope_head_dim,
           context_length: arch.context_length,
-          dtype: arch.dtype,
+          dtype: arch.dtype as NonNullable<Alias['model_architecture']>['dtype'],
         },
       });
     } catch (error) {
@@ -1171,7 +1171,7 @@ export const Models = () => {
                   value={hfModelId}
                   onChange={(e) => setHfModelId(e.target.value)}
                   placeholder="e.g. meta-llama/Llama-3.1-70B-Instruct"
-                  onKeyPress={(e) => e.key === 'Enter' && fetchHfModelArchitecture()}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchHfModelArchitecture()}
                 />
               </div>
               <Button
@@ -2076,7 +2076,7 @@ export const Models = () => {
               placeholder="Search models (e.g. 'gpt-4', 'claude')"
               value={substring}
               onChange={(e) => setSubstring(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearchModels()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchModels()}
               style={{ flex: 1 }}
             />
             <Button onClick={() => handleSearchModels()}>Search</Button>

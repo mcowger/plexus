@@ -11,6 +11,7 @@ import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../utils/constants';
 import { UsageStorageService } from './usage-storage';
 import { calculateCosts } from '../utils/calculate-costs';
 import { estimateKwhUsed } from './inference-energy';
+import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 
 export class VisionDescriptorService {
   /**
@@ -188,7 +189,12 @@ export class VisionDescriptorService {
         }
 
         if (usageRecord.tokensInput != null && usageRecord.tokensOutput != null) {
-          usageRecord.kwhUsed = estimateKwhUsed(usageRecord.tokensInput, usageRecord.tokensOutput);
+          usageRecord.kwhUsed = estimateKwhUsed(
+            usageRecord.tokensInput,
+            usageRecord.tokensOutput,
+            response.plexus?.modelParams ?? DEFAULT_MODEL,
+            response.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS
+          );
         }
 
         usageStorage.saveRequest(usageRecord).catch((err) => {

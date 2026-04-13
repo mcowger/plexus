@@ -289,6 +289,12 @@
           "type": "real",
           "primaryKey": false,
           "notNull": false
+        },
+        "vision_fallthrough_model": {
+          "name": "vision_fallthrough_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {

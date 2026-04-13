@@ -9,21 +9,10 @@
  */
 
 import { logger } from '../utils/logger';
-import type { ModelParams } from './inference-energy';
+import type { ModelParams } from '@plexus/shared';
+import { DTYPE_SIZES } from '@plexus/shared';
 
-// Common data type sizes in bytes
-export const DTYPE_SIZES: Record<string, number> = {
-  fp32: 4,
-  fp16: 2,
-  bf16: 2,
-  fp8: 1,
-  fp8_e4m3: 1,
-  fp8_e5m2: 1,
-  nvfp4: 0.5,
-  int4: 0.5,
-  int8: 1,
-  default: 2, // Default to FP16
-};
+// DTYPE_SIZES is imported from @plexus/shared (single source of truth)
 
 // ─── HuggingFace API Response Types ──────────────────────────
 
@@ -281,7 +270,7 @@ export class HuggingFaceModelFetcher {
   private cache: Map<string, ModelParams> = new Map();
   private dtypeCache: Map<string, string> = new Map();
 
-  private constructor() { }
+  private constructor() {}
 
   public static getInstance(): HuggingFaceModelFetcher {
     if (!HuggingFaceModelFetcher.instance) {

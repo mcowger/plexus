@@ -11,6 +11,8 @@ import { Readable } from 'stream';
 import { DebugManager } from './debug-manager';
 import { estimateKwhUsed } from './inference-energy';
 import { applyProviderReportedCost } from '../utils/provider-cost';
+import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
+import type { GpuParams } from '@plexus/shared';
 /**
  * handleResponse
  *
@@ -41,19 +43,14 @@ export async function handleResponse(
   if (usageRecord.provider) {
     DebugManager.getInstance().setProviderForRequest(usageRecord.requestId!, usageRecord.provider);
   }
-  usageRecord.attemptCount = (unifiedResponse.plexus as any)?.attemptCount || 1;
-  usageRecord.retryHistory =
-    ((unifiedResponse.plexus as any)?.retryHistory as string | undefined) || null;
+  usageRecord.attemptCount = unifiedResponse.plexus?.attemptCount || 1;
+  usageRecord.retryHistory = unifiedResponse.plexus?.retryHistory || null;
   usageRecord.finalAttemptProvider =
-    ((unifiedResponse.plexus as any)?.finalAttemptProvider as string | undefined) ||
-    usageRecord.provider ||
-    null;
+    unifiedResponse.plexus?.finalAttemptProvider || usageRecord.provider || null;
   usageRecord.finalAttemptModel =
-    ((unifiedResponse.plexus as any)?.finalAttemptModel as string | undefined) ||
-    usageRecord.selectedModelName ||
-    null;
+    unifiedResponse.plexus?.finalAttemptModel || usageRecord.selectedModelName || null;
   usageRecord.allAttemptedProviders =
-    ((unifiedResponse.plexus as any)?.allAttemptedProviders as string | undefined) ||
+    unifiedResponse.plexus?.allAttemptedProviders ||
     JSON.stringify([
       `${usageRecord.provider || 'unknown'}/${usageRecord.selectedModelName || unifiedResponse.model}`,
     ]);
@@ -167,7 +164,9 @@ export async function handleResponse(
       shouldEstimateTokens,
       providerApiType,
       apiType,
-      originalRequest
+      originalRequest,
+      unifiedResponse.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS,
+      unifiedResponse.plexus?.modelParams ?? DEFAULT_MODEL
     );
 
     // Convert Web Stream to Node Stream for piping
@@ -266,10 +265,14 @@ async function finalizeUsage(
     usageRecord.tokensPerSec = (outputTokens / usageRecord.durationMs) * 1000;
   }
 
-  // Estimate energy consumption
+  // Estimate energy consumption using resolved GPU and model params from dispatcher
+  const plexusGpuParams = unifiedResponse.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS;
+  const plexusModelParams = unifiedResponse.plexus?.modelParams ?? DEFAULT_MODEL;
   usageRecord.kwhUsed = estimateKwhUsed(
     usageRecord.tokensInput ?? 0,
-    usageRecord.tokensOutput ?? 0
+    usageRecord.tokensOutput ?? 0,
+    plexusModelParams,
+    plexusGpuParams
   );
 
   // Persist usage record to database

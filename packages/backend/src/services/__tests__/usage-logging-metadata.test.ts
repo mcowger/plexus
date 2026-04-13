@@ -4,6 +4,7 @@ import { PassThrough } from 'stream';
 import { UsageInspector } from '../inspectors/usage-logging';
 import { DebugManager } from '../debug-manager';
 import type { UsageRecord } from '../../types/usage';
+import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 
 describe('UsageInspector Metadata Robustness', () => {
   let mockStorage: any;
@@ -40,7 +41,11 @@ describe('UsageInspector Metadata Robustness', () => {
       undefined,
       Date.now(),
       false,
-      apiType
+      apiType,
+      undefined,
+      undefined,
+      DEFAULT_GPU_PARAMS,
+      DEFAULT_MODEL
     );
 
     const dm = DebugManager.getInstance();
@@ -134,7 +139,10 @@ describe('UsageInspector Metadata Robustness', () => {
       Date.now(),
       false,
       'gemini', // providerApiType
-      'messages' // incomingApiType
+      'messages', // incomingApiType
+      undefined, // originalRequest
+      DEFAULT_GPU_PARAMS,
+      DEFAULT_MODEL
     );
 
     const dm = DebugManager.getInstance();

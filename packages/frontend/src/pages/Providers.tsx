@@ -7,6 +7,7 @@ import {
   initQuotaCheckerTypes,
   getQuotaCheckerTypes,
 } from '../lib/api';
+import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
 import type { QuotaCheckerInfo } from '../types/quota';
 import { formatPoints } from '../lib/format';
 import {
@@ -2042,20 +2043,53 @@ export const Providers = () => {
                 value={editingProvider.gpu_profile || ''}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setEditingProvider({
-                    ...editingProvider,
-                    gpu_profile: (value as any) || undefined,
-                  });
+                  if (!value) {
+                    // "Default (B200)" selected — resolve B200 preset
+                    const resolved = resolveGpuParams('B200');
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_profile: undefined,
+                      gpu_ram_gb: resolved.ram_gb,
+                      gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                      gpu_flops_tflop: resolved.flops_tflop,
+                      gpu_power_draw_watts: resolved.power_draw_watts,
+                    });
+                  } else if (value === 'custom') {
+                    // Custom selected — merge any existing overrides with H100 defaults
+                    const resolved = resolveGpuParams('custom', {
+                      ram_gb: editingProvider.gpu_ram_gb,
+                      bandwidth_tb_s: editingProvider.gpu_bandwidth_tb_s,
+                      flops_tflop: editingProvider.gpu_flops_tflop,
+                      power_draw_watts: editingProvider.gpu_power_draw_watts,
+                    });
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_profile: 'custom',
+                      gpu_ram_gb: resolved.ram_gb,
+                      gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                      gpu_flops_tflop: resolved.flops_tflop,
+                      gpu_power_draw_watts: resolved.power_draw_watts,
+                    });
+                  } else {
+                    // Named preset selected — resolve immediately to concrete params
+                    const resolved = resolveGpuParams(value);
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_profile: value,
+                      gpu_ram_gb: resolved.ram_gb,
+                      gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                      gpu_flops_tflop: resolved.flops_tflop,
+                      gpu_power_draw_watts: resolved.power_draw_watts,
+                    });
+                  }
                 }}
               >
                 <option value="">Default (B200)</option>
-                <option value="H100">NVIDIA H100 (80GB)</option>
-                <option value="H200">NVIDIA H200 (141GB)</option>
-                <option value="GH100">NVIDIA GH100 (144GB)</option>
-                <option value="GH200">NVIDIA GH200 (144GB)</option>
-                <option value="B200">NVIDIA B200 (192GB)</option>
-                <option value="B300">NVIDIA B300 (288GB)</option>
-                <option value="custom">Custom</option>
+                {GPU_PROFILE_OPTIONS.map((profile) => (
+                  <option key={profile.value} value={profile.value}>
+                    {profile.label}
+                  </option>
+                ))}
               </select>
             </div>
             {editingProvider.gpu_profile === 'custom' && (

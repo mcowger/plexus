@@ -11,6 +11,7 @@
     "rekey": "bun run src/cli/rekey.ts"
   },
   "dependencies": {
+    "@plexus/shared": "workspace:*",
     "@fastify/bearer-auth": "^10.1.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",

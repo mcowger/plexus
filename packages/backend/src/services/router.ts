@@ -1,14 +1,22 @@
 import { logger } from 'src/utils/logger';
-import { getConfig, ModelTarget, ProviderConfig, getProviderTypes } from '../config';
+import {
+  getConfig,
+  ModelTarget,
+  ProviderConfig,
+  ModelProviderConfig,
+  getProviderTypes,
+} from '../config';
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
+import type { ModelArchitecture } from '@plexus/shared';
 
 export interface RouteResult {
   provider: string; // provider key in config
   model: string; // model slug for that provider
   config: ProviderConfig; // ProviderConfig
-  modelConfig?: any; // The specific model config within that provider
+  modelConfig?: ModelProviderConfig; // Per-provider, per-model config
+  modelArchitecture?: ModelArchitecture; // Alias-level model architecture override
   incomingModelAlias?: string; // The alias requested by the user
   canonicalModel?: string; // The canonical alias key in config
 }
@@ -210,6 +218,7 @@ export class Router {
           model: target.model,
           config: providerConfig,
           modelConfig,
+          modelArchitecture: config.models?.[modelName]?.model_architecture,
           incomingModelAlias: modelName,
           canonicalModel,
         } as RouteResult;

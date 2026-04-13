@@ -28,6 +28,8 @@ import { ModelMetadataManager } from './model-metadata-manager';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../utils/constants';
 import { UsageRecord } from '../types/usage';
 import { calculateCosts } from '../utils/calculate-costs';
+import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
+import type { GpuParams, ModelParams } from '@plexus/shared';
 
 interface RetryAttemptRecord {
   index: number;
@@ -727,7 +729,7 @@ export class Dispatcher {
     finalRoute: RouteResult,
     apiType: string
   ): void {
-    const responseApiType = (response?.plexus as any)?.apiType;
+    const responseApiType = response?.plexus?.apiType;
 
     response.plexus = {
       ...(response.plexus || {}),
@@ -743,10 +745,22 @@ export class Dispatcher {
       // stream transformation uses the correct transformer.
       apiType: responseApiType || apiType,
       pricing: finalRoute.modelConfig?.pricing,
-      providerDiscount: (finalRoute.config as any).discount,
+      providerDiscount: finalRoute.config.discount,
       config: {
         estimateTokens: finalRoute.config.estimateTokens,
       },
+      // GPU params — read directly from the resolved numeric fields.
+      // The frontend (or config hydration) resolves named profiles to concrete
+      // values before they reach this point. Fall back to H100 only if no GPU
+      // fields are set at all (i.e. no GPU profile was configured).
+      gpuParams: {
+        ram_gb: finalRoute.config.gpu_ram_gb ?? DEFAULT_GPU_PARAMS.ram_gb,
+        bandwidth_tb_s: finalRoute.config.gpu_bandwidth_tb_s ?? DEFAULT_GPU_PARAMS.bandwidth_tb_s,
+        flops_tflop: finalRoute.config.gpu_flops_tflop ?? DEFAULT_GPU_PARAMS.flops_tflop,
+        power_draw_watts:
+          finalRoute.config.gpu_power_draw_watts ?? DEFAULT_GPU_PARAMS.power_draw_watts,
+      },
+      modelParams: resolveModelParams(finalRoute.modelArchitecture),
     } as any;
   }
 

@@ -166,6 +166,15 @@ export interface UnifiedChatResponse {
     providerDiscount?: number;
     canonicalModel?: string;
     config?: any;
+    // Dispatcher retry/routing metadata
+    attemptCount?: number;
+    finalAttemptProvider?: string;
+    finalAttemptModel?: string;
+    allAttemptedProviders?: string;
+    retryHistory?: string;
+    // Energy estimation — resolved GPU and model params from dispatcher
+    gpuParams?: import('@plexus/shared').GpuParams;
+    modelParams?: import('@plexus/shared').ModelParams;
   };
   reasoning_content?: string | null;
   thinking?: {

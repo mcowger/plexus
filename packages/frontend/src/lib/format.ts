@@ -25,7 +25,7 @@ export function formatDuration(seconds: number): string {
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
   if (secs > 0 && years === 0 && months === 0 && weeks === 0 && days === 0 && hours === 0)
-    parts.push(`${secs}s`);
+    parts.push(`${Math.round(secs)}s`);
 
   return parts.slice(0, 2).join(' ');
 }
@@ -148,6 +148,26 @@ export function formatPercent(value: number, decimals: number = 1): string {
   if (value === 0) return '0%';
   if (value === 100) return '100%';
   return `${value.toFixed(decimals)}%`;
+}
+
+/**
+ * Format a timestamp string into a readable time label for chart axes.
+ * Handles ISO strings and epoch-millisecond numeric strings.
+ */
+export function formatTimeLabel(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (!isNaN(date.getTime())) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  // Try parsing as a numeric string (epoch ms)
+  const num = Number(timestamp);
+  if (!isNaN(num)) {
+    const dateFromNum = new Date(num);
+    if (!isNaN(dateFromNum.getTime())) {
+      return dateFromNum.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  return timestamp;
 }
 
 /**

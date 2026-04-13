@@ -6,18 +6,11 @@ import { EventEmitter } from 'node:events';
 import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 import { getCurrentKeyName } from './request-context';
-import { estimateKwhUsed, getGpuParams, type GpuParams } from './inference-energy';
+import { estimateKwhUsed, getGpuParams } from './inference-energy';
+import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
+import type { ModelArchitecture, GpuParams } from '@plexus/shared';
 
-export interface ModelArchitecture {
-  total_params?: number;
-  active_params?: number;
-  layers?: number;
-  heads?: number;
-  kv_lora_rank?: number;
-  qk_rope_head_dim?: number;
-  context_length?: number;
-  dtype?: string;
-}
+// ModelArchitecture is now imported from @plexus/shared
 
 export interface UsageFilters {
   startDate?: string;
@@ -957,42 +950,39 @@ export class UsageStorageService extends EventEmitter {
    *
    * @param aliasSlug - The alias slug to recalculate energy for
    * @param modelArchitecture - The new model architecture parameters
-   * @param providerGpuProfiles - Optional map of provider -> GPU profile override
+   * @param providerGpuParams - Optional map of provider -> resolved GpuParams
    * @returns The number of records updated
    */
   async recalculateEnergyForAlias(
     aliasSlug: string,
     modelArchitecture: ModelArchitecture,
-    providerGpuProfiles?: Record<string, string>
+    providerGpuParams?: Record<string, GpuParams>
   ): Promise<number> {
     try {
       const db = this.ensureDb();
+      const BATCH_SIZE = 500;
+      let totalUpdated = 0;
+      let offset = 0;
 
-      // Find all requests for this alias
-      const requests = await db
-        .select({
-          requestId: this.schema.requestUsage.requestId,
-          tokensInput: this.schema.requestUsage.tokensInput,
-          tokensOutput: this.schema.requestUsage.tokensOutput,
-          provider: this.schema.requestUsage.finalAttemptProvider,
-        })
-        .from(this.schema.requestUsage)
-        .where(eq(this.schema.requestUsage.incomingModelAlias, aliasSlug));
+      logger.info(`Recalculating energy for alias ${aliasSlug} (batched)`);
 
-      if (requests.length === 0) {
-        logger.debug(`No requests found for alias ${aliasSlug}`);
-        return 0;
-      }
+      // Process in batches using limit+offset to avoid loading all rows into memory
+      while (true) {
+        const batch = await db
+          .select({
+            requestId: this.schema.requestUsage.requestId,
+            tokensInput: this.schema.requestUsage.tokensInput,
+            tokensOutput: this.schema.requestUsage.tokensOutput,
+            provider: this.schema.requestUsage.finalAttemptProvider,
+          })
+          .from(this.schema.requestUsage)
+          .where(eq(this.schema.requestUsage.incomingModelAlias, aliasSlug))
+          .limit(BATCH_SIZE)
+          .offset(offset);
 
-      logger.info(`Recalculating energy for ${requests.length} requests for alias ${aliasSlug}`);
+        if (batch.length === 0) break;
 
-      let updatedCount = 0;
-      const batchSize = 100;
-
-      // Process in batches
-      for (let i = 0; i < requests.length; i += batchSize) {
-        const batch = requests.slice(i, i + batchSize);
-
+        // Process this batch
         await Promise.all(
           batch.map(async (request) => {
             const tokensInput = request.tokensInput || 0;
@@ -1002,28 +992,14 @@ export class UsageStorageService extends EventEmitter {
               return; // Skip requests with no tokens
             }
 
-            // Get GPU profile for this provider (use default H100 if not specified)
-            const gpuProfile = providerGpuProfiles?.[request.provider || ''] || 'H100';
-            const gpuParams = getGpuParams(gpuProfile);
+            // Get GPU params for this provider (use default H100 if not specified)
+            const gpuParams = providerGpuParams?.[request.provider || ''] ?? DEFAULT_GPU_PARAMS;
 
-            // Build model params from architecture
-            const modelParams = {
-              total_params: modelArchitecture.total_params || 1000, // Default 1T if not specified
-              active_params:
-                modelArchitecture.active_params || modelArchitecture.total_params || 1000,
-              layers: modelArchitecture.layers || 61,
-              context_length: modelArchitecture.context_length || 4096,
-              kv_lora_rank: modelArchitecture.kv_lora_rank || 512,
-              qk_rope_head_dim: modelArchitecture.qk_rope_head_dim || 64,
-              heads: modelArchitecture.heads || 64,
-              dtype_size: this.getDtypeSize(modelArchitecture.dtype),
-            };
+            // Build model params from architecture using shared resolver
+            const modelParams = resolveModelParams(modelArchitecture);
 
             // Calculate new energy
-            const kwhUsed = estimateKwhUsed(tokensInput, tokensOutput, {
-              model: modelParams,
-              gpu: gpuParams,
-            });
+            const kwhUsed = estimateKwhUsed(tokensInput, tokensOutput, modelParams, gpuParams);
 
             // Update the record
             await db
@@ -1031,39 +1007,25 @@ export class UsageStorageService extends EventEmitter {
               .set({ kwhUsed })
               .where(eq(this.schema.requestUsage.requestId, request.requestId));
 
-            updatedCount++;
+            totalUpdated++;
           })
         );
+
+        offset += BATCH_SIZE;
+
+        // If we got fewer than BATCH_SIZE rows, we've reached the end
+        if (batch.length < BATCH_SIZE) break;
       }
 
-      logger.info(`Recalculated energy for ${updatedCount} requests for alias ${aliasSlug}`);
-      return updatedCount;
+      if (totalUpdated === 0) {
+        logger.debug(`No requests found for alias ${aliasSlug}`);
+      } else {
+        logger.info(`Recalculated energy for ${totalUpdated} requests for alias ${aliasSlug}`);
+      }
+      return totalUpdated;
     } catch (error) {
       logger.error(`Failed to recalculate energy for alias ${aliasSlug}`, error);
       throw error;
-    }
-  }
-
-  /**
-   * Get the byte size for a given dtype
-   */
-  private getDtypeSize(dtype?: string): number {
-    switch (dtype) {
-      case 'fp16':
-      case 'bf16':
-        return 2;
-      case 'fp8':
-      case 'fp8_e4m3':
-      case 'fp8_e5m2':
-        return 1;
-      case 'fp32':
-        return 4;
-      case 'int4':
-        return 0.5;
-      case 'int8':
-        return 1;
-      default:
-        return 2; // Default to FP16
     }
   }
 }

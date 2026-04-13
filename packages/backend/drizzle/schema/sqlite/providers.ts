@@ -25,12 +25,13 @@ export const providers = sqliteTable(
     quotaCheckerEnabled: integer('quota_checker_enabled').notNull().default(1),
     quotaCheckerInterval: integer('quota_checker_interval').notNull().default(30),
     quotaCheckerOptions: text('quota_checker_options'), // JSON
-    // GPU Profile settings for inference energy calculation
-    gpuProfile: text('gpu_profile'), // 'H100' | 'H200' | 'GH100' | 'GH200' | 'B200' | 'B300' | 'custom'
-    gpuRamGb: real('gpu_ram_gb'), // Custom RAM override in GB
-    gpuBandwidthTbS: real('gpu_bandwidth_tb_s'), // Custom bandwidth override in TB/s
-    gpuFlopsTflop: real('gpu_flops_tflop'), // Custom FLOPS override in TFLOP
-    gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Custom power draw override in watts
+    // GPU Profile settings — display hint + resolved numeric params
+    // gpu_profile is kept as a display hint; the 4 numeric fields are the source of truth.
+    gpuProfile: text('gpu_profile'), // GPU profile name (e.g. 'H100', 'custom') — display hint only
+    gpuRamGb: real('gpu_ram_gb'), // RAM in GB
+    gpuBandwidthTbS: real('gpu_bandwidth_tb_s'), // Bandwidth in TB/s
+    gpuFlopsTflop: real('gpu_flops_tflop'), // FLOPS in TFLOP
+    gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Power draw in watts
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
