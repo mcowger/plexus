@@ -15,9 +15,11 @@ import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Errors: React.FC = () => {
   const location = useLocation();
+  const { isAdmin, isLimited, principal } = useAuth();
   const [errors, setErrors] = useState<InferenceError[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedError, setSelectedError] = useState<InferenceError | null>(null);
@@ -144,19 +146,23 @@ export const Errors: React.FC = () => {
             Inference Errors
           </h1>
           <p className="text-[15px] text-text-secondary m-0">
-            Investigate failed requests and exceptions
+            {isLimited && principal?.role === 'limited'
+              ? `Errors for key "${principal.keyName}" only.`
+              : 'Investigate failed requests and exceptions'}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={handleDeleteAll}
-            variant="danger"
-            className="flex items-center gap-2"
-            disabled={errors.length === 0}
-          >
-            <Trash2 size={16} />
-            Delete All
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={handleDeleteAll}
+              variant="danger"
+              className="flex items-center gap-2"
+              disabled={errors.length === 0}
+            >
+              <Trash2 size={16} />
+              Delete All
+            </Button>
+          )}
           <Button onClick={fetchErrors} variant="secondary" className="flex items-center gap-2">
             <RefreshCw size={16} className={clsx(loading && 'animate-spin')} />
             Refresh

@@ -190,6 +190,13 @@
       "when": 1776026985219,
       "tag": "0026_mean_scrambler",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1776500000000,
+      "tag": "0027_limited_login_scoping",
+      "breakpoints": true
     }
   ]
 }

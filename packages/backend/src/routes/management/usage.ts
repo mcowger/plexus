@@ -1,12 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { encode } from 'eventsource-encoder';
-import { and, gte, lte, sql, isNull, isNotNull } from 'drizzle-orm';
+import { and, eq, gte, lte, sql, isNull, isNotNull } from 'drizzle-orm';
 import { getCurrentDialect, getSchema } from '../../db/client';
 import {
   UsageStorageService,
   type UsageSortDirection,
   type UsageSortField,
 } from '../../services/usage-storage';
+import { isLimited, scopedKeyName } from './_principal';
 
 const USAGE_FIELDS = new Set([
   'requestId',
@@ -93,6 +94,14 @@ export async function registerUsageRoutes(
 
     if (query.minDurationMs) filters.minDurationMs = parseInt(query.minDurationMs);
     if (query.maxDurationMs) filters.maxDurationMs = parseInt(query.maxDurationMs);
+
+    // Limited users are force-scoped to their own key (exact match), regardless
+    // of any client-supplied apiKey filter.
+    const scopeKey = scopedKeyName(request);
+    if (scopeKey) {
+      filters.apiKey = scopeKey;
+      filters.apiKeyMatch = 'exact';
+    }
 
     try {
       const result = await usageStorage.getUsage(filters, { limit, offset, sortBy, sortDir });
@@ -234,6 +243,12 @@ export async function registerUsageRoutes(
     const toNumber = (value: unknown) =>
       value === null || value === undefined ? 0 : Number(value);
 
+    // Scope by the limited user's key if applicable.
+    const summaryScopeKey = scopedKeyName(request);
+    const keyFilter = summaryScopeKey
+      ? eq(schema.requestUsage.apiKey, summaryScopeKey)
+      : undefined;
+
     try {
       const seriesRows = await db
         .select({
@@ -249,7 +264,8 @@ export async function registerUsageRoutes(
         .where(
           and(
             gte(schema.requestUsage.startTime, rangeStartMs),
-            lte(schema.requestUsage.startTime, rangeEndMs)
+            lte(schema.requestUsage.startTime, rangeEndMs),
+            ...(keyFilter ? [keyFilter] : [])
           )
         )
         .groupBy(bucketStartMs)
@@ -269,7 +285,8 @@ export async function registerUsageRoutes(
         .where(
           and(
             gte(schema.requestUsage.startTime, statsStartMs),
-            lte(schema.requestUsage.startTime, nowMs)
+            lte(schema.requestUsage.startTime, nowMs),
+            ...(keyFilter ? [keyFilter] : [])
           )
         );
 
@@ -288,7 +305,8 @@ export async function registerUsageRoutes(
         .where(
           and(
             gte(schema.requestUsage.startTime, todayStartMs),
-            lte(schema.requestUsage.startTime, nowMs)
+            lte(schema.requestUsage.startTime, nowMs),
+            ...(keyFilter ? [keyFilter] : [])
           )
         );
 
@@ -356,6 +374,9 @@ export async function registerUsageRoutes(
   });
 
   fastify.delete('/v0/management/usage', async (request, reply) => {
+    if (isLimited(request)) {
+      return reply.code(403).send({ error: 'Admin privileges required' });
+    }
     const query = request.query as any;
     const olderThanDays = query.olderThanDays;
     let beforeDate: Date | undefined;
@@ -374,6 +395,9 @@ export async function registerUsageRoutes(
   });
 
   fastify.delete('/v0/management/usage/:requestId', async (request, reply) => {
+    if (isLimited(request)) {
+      return reply.code(403).send({ error: 'Admin privileges required' });
+    }
     const params = request.params as any;
     const requestId = params.requestId;
     const success = await usageStorage.deleteUsageLog(requestId);
@@ -538,7 +562,10 @@ export async function registerUsageRoutes(
             and(
               isNotNull(groupField),
               gte(schema.requestUsage.startTime, startTime),
-              lte(schema.requestUsage.startTime, endTime)
+              lte(schema.requestUsage.startTime, endTime),
+              ...(scopedKeyName(request)
+                ? [eq(schema.requestUsage.apiKey, scopedKeyName(request)!)]
+                : [])
             )
           )
           .groupBy(groupField, bucketSql)
@@ -556,6 +583,7 @@ export async function registerUsageRoutes(
 
       // Live mode (default): currently in-flight requests for Live Metrics card
       const liveNow = Date.now();
+      const liveScopeKey = scopedKeyName(request);
       const results = await db
         .select({
           provider: schema.requestUsage.provider,
@@ -568,7 +596,8 @@ export async function registerUsageRoutes(
           and(
             isNull(schema.requestUsage.durationMs),
             isNotNull(schema.requestUsage.provider),
-            gte(schema.requestUsage.startTime, liveNow - 60 * 60 * 1000)
+            gte(schema.requestUsage.startTime, liveNow - 60 * 60 * 1000),
+            ...(liveScopeKey ? [eq(schema.requestUsage.apiKey, liveScopeKey)] : [])
           )
         )
         .groupBy(schema.requestUsage.provider, schema.requestUsage.canonicalModelName);

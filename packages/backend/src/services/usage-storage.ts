@@ -10,6 +10,12 @@ export interface UsageFilters {
   startDate?: string;
   endDate?: string;
   apiKey?: string;
+  /**
+   * How to match the `apiKey` filter. Defaults to 'like' (substring match) for
+   * back-compat. Limited-role users should always force 'exact' to scope
+   * their view to their own key.
+   */
+  apiKeyMatch?: 'exact' | 'like';
   incomingApiType?: string;
   provider?: string;
   incomingModelAlias?: string;
@@ -218,6 +224,7 @@ export class UsageStorageService extends EventEmitter {
         .insert(this.schema.debugLogs)
         .values({
           requestId: record.requestId,
+          apiKey: record.apiKey ?? null,
           rawRequest: record.rawRequest
             ? typeof record.rawRequest === 'string'
               ? record.rawRequest
@@ -253,13 +260,31 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async saveError(requestId: string, error: any, details?: any) {
+  async saveError(requestId: string, error: any, details?: any, apiKey?: string | null) {
     try {
+      // If the caller didn't supply apiKey, try to look it up by requestId so
+      // limited-user scoping still works even for error paths we haven't
+      // threaded through.
+      let effectiveApiKey = apiKey ?? null;
+      if (!effectiveApiKey) {
+        try {
+          const rows = await this.ensureDb()
+            .select({ apiKey: this.schema.requestUsage.apiKey })
+            .from(this.schema.requestUsage)
+            .where(eq(this.schema.requestUsage.requestId, requestId))
+            .limit(1);
+          if (rows[0]?.apiKey) effectiveApiKey = rows[0].apiKey;
+        } catch {
+          // Best-effort; null apiKey is acceptable fallback.
+        }
+      }
+
       await this.ensureDb()
         .insert(this.schema.inferenceErrors)
         .values({
           requestId,
           date: new Date().toISOString(),
+          apiKey: effectiveApiKey,
           errorMessage: error.message || String(error),
           errorStack: error.stack || null,
           details: details
@@ -276,19 +301,48 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async getErrors(limit: number = 50, offset: number = 0): Promise<any[]> {
+  async getErrors(limit: number = 50, offset: number = 0, apiKey?: string): Promise<any[]> {
     try {
-      const results = await this.ensureDb()
+      const where = apiKey ? eq(this.schema.inferenceErrors.apiKey, apiKey) : undefined;
+      const query = this.ensureDb()
         .select()
         .from(this.schema.inferenceErrors)
         .orderBy(desc(this.schema.inferenceErrors.createdAt))
         .limit(limit)
         .offset(offset);
-
+      const results = where ? await query.where(where) : await query;
       return results;
     } catch (error) {
       logger.error('Failed to get inference errors', error);
       return [];
+    }
+  }
+
+  async getErrorOwner(requestId: string): Promise<string | null> {
+    try {
+      const rows = await this.ensureDb()
+        .select({ apiKey: this.schema.inferenceErrors.apiKey })
+        .from(this.schema.inferenceErrors)
+        .where(eq(this.schema.inferenceErrors.requestId, requestId))
+        .limit(1);
+      return rows[0]?.apiKey ?? null;
+    } catch (error) {
+      logger.error(`Failed to look up error owner for ${requestId}`, error);
+      return null;
+    }
+  }
+
+  async getDebugLogOwner(requestId: string): Promise<string | null> {
+    try {
+      const rows = await this.ensureDb()
+        .select({ apiKey: this.schema.debugLogs.apiKey })
+        .from(this.schema.debugLogs)
+        .where(eq(this.schema.debugLogs.requestId, requestId))
+        .limit(1);
+      return rows[0]?.apiKey ?? null;
+    } catch (error) {
+      logger.error(`Failed to look up debug log owner for ${requestId}`, error);
+      return null;
     }
   }
 
@@ -317,10 +371,12 @@ export class UsageStorageService extends EventEmitter {
 
   async getDebugLogs(
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
+    apiKey?: string
   ): Promise<{ requestId: string; createdAt: number }[]> {
     try {
-      const results = await this.ensureDb()
+      const where = apiKey ? eq(this.schema.debugLogs.apiKey, apiKey) : undefined;
+      const query = this.ensureDb()
         .select({
           requestId: this.schema.debugLogs.requestId,
           createdAt: this.schema.debugLogs.createdAt,
@@ -329,6 +385,7 @@ export class UsageStorageService extends EventEmitter {
         .orderBy(desc(this.schema.debugLogs.createdAt))
         .limit(limit)
         .offset(offset);
+      const results = where ? await query.where(where) : await query;
 
       return results.map((row) => ({
         requestId: row.requestId,
@@ -409,7 +466,11 @@ export class UsageStorageService extends EventEmitter {
       conditions.push(eq(schema.requestUsage.incomingApiType, filters.incomingApiType));
     }
     if (filters.apiKey) {
-      conditions.push(like(schema.requestUsage.apiKey, `%${filters.apiKey}%`));
+      if (filters.apiKeyMatch === 'exact') {
+        conditions.push(eq(schema.requestUsage.apiKey, filters.apiKey));
+      } else {
+        conditions.push(like(schema.requestUsage.apiKey, `%${filters.apiKey}%`));
+      }
     }
     if (filters.provider) {
       conditions.push(like(schema.requestUsage.provider, `%${filters.provider}%`));

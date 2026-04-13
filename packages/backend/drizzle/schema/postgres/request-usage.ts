@@ -59,5 +59,6 @@ export const requestUsage = pgTable(
     dateIdx: index('idx_request_usage_date').on(table.date),
     providerIdx: index('idx_request_usage_provider').on(table.provider),
     requestIdIdx: index('idx_request_usage_request_id').on(table.requestId),
+    apiKeyIdx: index('idx_request_usage_api_key').on(table.apiKey, table.startTime),
   })
 );

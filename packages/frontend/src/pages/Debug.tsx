@@ -19,6 +19,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { useLocation } from 'react-router-dom';
 import type { Provider } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DebugLogMeta {
   requestId: string;
@@ -36,6 +37,7 @@ interface DebugLogDetail extends DebugLogMeta {
 
 export const Debug: React.FC = () => {
   const location = useLocation();
+  const { isAdmin, isLimited, principal } = useAuth();
   const [logs, setLogs] = useState<DebugLogMeta[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DebugLogDetail | null>(null);
@@ -264,28 +266,31 @@ export const Debug: React.FC = () => {
         <div>
           <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Debug Traces</h1>
           <p className="text-[15px] text-text-secondary m-0">
-            Inspect full request/response lifecycles
+            {isLimited && principal?.role === 'limited'
+              ? `Traces for key "${principal.keyName}" only. Toggle capture in My Key.`
+              : 'Inspect full request/response lifecycles'}
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {/* Provider Filter */}
-          <div className="relative provider-filter-dropdown">
-            <Button
-              variant="secondary"
-              className={clsx(
-                'flex items-center gap-2',
-                selectedProviders.length > 0 && 'border-primary'
-              )}
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              leftIcon={<Filter size={14} />}
-            >
-              Filter
-              {selectedProviders.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-white rounded-full">
-                  {selectedProviders.length}
-                </span>
-              )}
-            </Button>
+          {/* Provider Filter — admin-only: the global filter affects all users. */}
+          {isAdmin && (
+            <div className="relative provider-filter-dropdown">
+              <Button
+                variant="secondary"
+                className={clsx(
+                  'flex items-center gap-2',
+                  selectedProviders.length > 0 && 'border-primary'
+                )}
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                leftIcon={<Filter size={14} />}
+              >
+                Filter
+                {selectedProviders.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-white rounded-full">
+                    {selectedProviders.length}
+                  </span>
+                )}
+              </Button>
 
             {isFilterOpen && (
               <div className="absolute right-0 top-full mt-2 w-72 bg-bg-surface border border-border-glass rounded-lg shadow-lg z-50 p-4">
@@ -338,7 +343,8 @@ export const Debug: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {detail && (
             <>
@@ -362,15 +368,17 @@ export const Debug: React.FC = () => {
               </Button>
             </>
           )}
-          <Button
-            onClick={handleDeleteAll}
-            variant="danger"
-            className="flex items-center gap-2"
-            disabled={logs.length === 0}
-          >
-            <Trash2 size={16} />
-            Delete All
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={handleDeleteAll}
+              variant="danger"
+              className="flex items-center gap-2"
+              disabled={logs.length === 0}
+            >
+              <Trash2 size={16} />
+              Delete All
+            </Button>
+          )}
           <Button onClick={fetchLogs} variant="secondary" className="flex items-center gap-2">
             <RefreshCw size={16} className={clsx(loading && 'animate-spin')} />
             Refresh

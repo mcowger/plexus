@@ -102,7 +102,7 @@ const parseRetryHistory = (value?: string | null): RetryAttemptDetail[] => {
 
 export const Logs = () => {
   const navigate = useNavigate();
-  const { adminKey } = useAuth();
+  const { adminKey, isLimited, principal } = useAuth();
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -388,30 +388,39 @@ export const Logs = () => {
     <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
       <div className="mb-4">
         <h1 className="font-heading text-3xl font-bold text-text m-0">Logs</h1>
+        {isLimited && principal?.role === 'limited' && (
+          <p className="text-sm text-text-muted mt-1">
+            Scoped to key "{principal.keyName}".
+          </p>
+        )}
       </div>
 
       <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
         <div className="mb-4">
           <form onSubmit={handleSearch} className="flex flex-wrap gap-3 mb-4 justify-between">
             <div className="flex flex-wrap gap-2">
-              <div className="relative w-62.5">
-                <Search
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                />
-                <Input
-                  placeholder="Filter by Key..."
-                  value={filters.apiKey}
-                  onChange={(e) => setFilters({ ...filters, apiKey: e.target.value })}
-                  style={{ paddingLeft: '32px' }}
-                />
-              </div>
+              {/* The apiKey filter is redundant for limited users — backend
+                  force-scopes results to their key. */}
+              {!isLimited && (
+                <div className="relative w-62.5">
+                  <Search
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  />
+                  <Input
+                    placeholder="Filter by Key..."
+                    value={filters.apiKey}
+                    onChange={(e) => setFilters({ ...filters, apiKey: e.target.value })}
+                    style={{ paddingLeft: '32px' }}
+                  />
+                </div>
+              )}
               <div className="relative w-62.5">
                 <Search
                   size={16}
