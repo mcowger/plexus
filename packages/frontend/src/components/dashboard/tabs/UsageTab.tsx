@@ -28,13 +28,7 @@ import { useEffect, useMemo, useState } from 'react';
  * Each record represents a single (provider, model, timestamp) data point returned
  * from the `GET /v0/management/concurrency?timeRange=...` endpoint.
  */
-import {
-  api,
-  UsageData,
-  PieChartDataPoint,
-  type ConcurrencyData,
-  UsageRecord,
-} from '../../../lib/api';
+import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
 import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { SlicesToasted } from '../../SlicesToasted';
@@ -117,9 +111,10 @@ export const UsageTab: React.FC<UsageTabProps> = ({
    */
   const [concurrencyByProvider, setConcurrencyByProvider] = useState<ConcurrencyData[]>([]);
   const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
-  const [energyRecords, setEnergyRecords] = useState<
-    Array<Pick<UsageRecord, 'durationMs' | 'ttftMs' | 'kwhUsed'>>
-  >([]);
+  const [energySummary, setEnergySummary] = useState<{
+    totalKwhUsed: number;
+    totalDurationMs: number;
+  } | null>(null);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -185,14 +180,8 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       .getConcurrencyData(timeRange, 'timeline', 'model', startDate, endDate)
       .then(setConcurrencyByModel);
     api
-      .getUsageRecords({
-        limit: 1000,
-        startDate,
-        endDate,
-        fields: ['kwhUsed', 'ttftMs', 'durationMs'],
-        cache: true,
-      })
-      .then((res) => setEnergyRecords(res.data || []));
+      .getEnergySummary(timeRange, true, startDate, endDate)
+      .then((summary) => setEnergySummary(summary));
   }, [timeRange, customDateRange]);
 
   // ---------------------------------------------------------------------------
@@ -708,18 +697,17 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           <div style={{ height: 300, marginTop: '12px' }}>{renderPieChart('tokens', keyData)}</div>
         </Card>
 
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Slices of bread toasted">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Slices of Bread Toasted">
           <div style={{ marginTop: '12px', height: 300 }}>
             <SlicesToasted data={data} />
           </div>
         </Card>
 
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy vs Streaming">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Usage Rate">
           <div style={{ marginTop: '12px', height: 300 }}>
             <EnergyTimeComparison
-              data={
-                energyRecords as Array<{ kwhUsed?: number; ttftMs?: number; durationMs: number }>
-              }
+              totalKwh={energySummary?.totalKwhUsed}
+              totalDurationMs={energySummary?.totalDurationMs}
             />
           </div>
         </Card>

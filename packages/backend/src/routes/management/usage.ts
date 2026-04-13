@@ -278,6 +278,7 @@ export async function registerUsageRoutes(
           cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
           kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           avgDurationMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
+          totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
         })
         .from(schema.requestUsage)
         .where(
@@ -316,6 +317,7 @@ export async function registerUsageRoutes(
         cacheWriteTokens: 0,
         kwhUsed: 0,
         avgDurationMs: 0,
+        totalDurationMs: 0,
       };
 
       const todayRow = todayRows[0] || {
@@ -354,6 +356,7 @@ export async function registerUsageRoutes(
             toNumber(statsRow.cacheWriteTokens),
           totalKwhUsed: toNumber(statsRow.kwhUsed),
           avgDurationMs: toNumber(statsRow.avgDurationMs),
+          totalDurationMs: toNumber(statsRow.totalDurationMs),
         },
         today: {
           requests: toNumber(todayRow.requests),
