@@ -31,7 +31,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
 import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
-import { SlicesToasted } from '../../SlicesToasted';
+import { TotalEnergyComparison } from '../../TotalEnergyComparison';
 import { EnergyTimeComparison } from '../../EnergyTimeComparison';
 import { EnergyOverTime } from '../../EnergyOverTime';
 import { TimeRangeSelector } from '../TimeRangeSelector';
@@ -697,9 +697,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           <div style={{ height: 300, marginTop: '12px' }}>{renderPieChart('tokens', keyData)}</div>
         </Card>
 
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Slices of Bread Toasted">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Comparisons">
           <div style={{ marginTop: '12px', height: 300 }}>
-            <SlicesToasted data={data} />
+            <TotalEnergyComparison totalKwh={energySummary?.totalKwhUsed} />
           </div>
         </Card>
 
