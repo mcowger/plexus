@@ -71,16 +71,25 @@ export const TagSelect: React.FC<TagSelectProps> = ({
     setIsOpen(true);
   };
 
+  // Add one or more free-form tags in a single onChange call. Skips empty,
+  // duplicate, and already-selected values. Does NOT touch `search` — callers
+  // decide whether to clear the input.
+  const addCustomTags = (raws: string[]) => {
+    const seen = new Set(selected);
+    const toAdd: string[] = [];
+    for (const raw of raws) {
+      const value = raw.trim();
+      if (!value || seen.has(value)) continue;
+      seen.add(value);
+      toAdd.push(value);
+    }
+    if (toAdd.length > 0) onChange([...selected, ...toAdd]);
+  };
+
   // Commit the current search text as a new free-form tag. No-ops if the
   // value is empty (after trim) or already selected.
   const commitCustom = (raw: string) => {
-    const value = raw.trim();
-    if (!value) return;
-    if (selected.includes(value)) {
-      setSearch('');
-      return;
-    }
-    onChange([...selected, value]);
+    addCustomTags([raw]);
     setSearch('');
   };
 
@@ -97,11 +106,13 @@ export const TagSelect: React.FC<TagSelectProps> = ({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.value;
-    // Commit on comma even inside onChange (handles paste of "a, b, c").
+    // Commit on comma even inside onChange (handles paste of "a, b, c"). Batch
+    // all new tags into a single onChange so later calls don't overwrite
+    // earlier ones via the stale `selected` snapshot.
     if (allowCustom && next.includes(',')) {
       const parts = next.split(',');
       const tail = parts.pop() ?? '';
-      parts.forEach((p) => commitCustom(p));
+      addCustomTags(parts);
       setSearch(tail);
       return;
     }
@@ -195,7 +206,14 @@ export const TagSelect: React.FC<TagSelectProps> = ({
                   'w-full text-left px-3.5 py-2 text-sm font-body cursor-pointer transition-colors',
                   'hover:bg-bg-hover text-text'
                 )}
-                onClick={() => handleToggle(option)}
+                onMouseDown={(e) => {
+                  // Use onMouseDown so the click registers before the input
+                  // blur handler fires. Otherwise, onBlur's commitCustom(search)
+                  // would add the partial search text as a new tag before the
+                  // suggestion is selected.
+                  e.preventDefault();
+                  handleToggle(option);
+                }}
               >
                 {option}
               </button>

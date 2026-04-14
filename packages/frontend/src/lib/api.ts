@@ -349,7 +349,8 @@ export interface NormalizedModelMetadata {
 }
 
 // Discriminated union mirrors backend validation: catalog-backed sources
-// must carry a non-empty source_path; 'custom' may omit it.
+// must carry a non-empty source_path; 'custom' may omit it but MUST carry
+// an overrides blob with a non-empty `name` (there is no catalog fallback).
 export type AliasMetadata =
   | {
       source: Exclude<MetadataSource, 'custom'>;
@@ -359,7 +360,7 @@ export type AliasMetadata =
   | {
       source: 'custom';
       source_path?: string;
-      overrides?: MetadataOverrides;
+      overrides: MetadataOverrides & { name: string };
     };
 
 export interface Alias {

@@ -458,6 +458,77 @@ export const Models = () => {
   };
 
   /**
+   * Return `current` with its overrides replaced by `overrides`, preserving
+   * the 'custom' variant's `name: string` invariant for the type system.
+   * Callers that delete `name` for a custom source are relying on the
+   * runtime code path that substitutes an empty string; this helper keeps
+   * that guarantee visible to TypeScript.
+   */
+  const withOverrides = (
+    current: AliasMetadata,
+    overrides: MetadataOverrides
+  ): AliasMetadata => {
+    if (current.source === 'custom') {
+      return {
+        ...current,
+        overrides: {
+          ...overrides,
+          name: overrides.name ?? current.overrides.name,
+        },
+      };
+    }
+    return { ...current, overrides };
+  };
+
+  /**
+   * Return the subset of `existing` that differs from `reference`. Used to
+   * strip auto-populated-from-catalog values out of an overrides blob so that
+   * only genuine user-edits remain. Top-level fields are compared by identity
+   * (or element-wise for arrays); nested objects (pricing/architecture/
+   * top_provider) are compared field-by-field one level deep.
+   */
+  const diffOverrides = (
+    existing: MetadataOverrides,
+    reference: MetadataOverrides
+  ): MetadataOverrides => {
+    const valuesEqual = (a: unknown, b: unknown): boolean => {
+      if (a === b) return true;
+      if (Array.isArray(a) && Array.isArray(b)) {
+        return a.length === b.length && a.every((v, i) => v === b[i]);
+      }
+      return false;
+    };
+    const out: MetadataOverrides = {};
+    for (const key of Object.keys(existing) as (keyof MetadataOverrides)[]) {
+      const ev = existing[key];
+      const rv = reference[key];
+      if (ev === undefined) continue;
+      if (
+        ev !== null &&
+        typeof ev === 'object' &&
+        !Array.isArray(ev) &&
+        rv !== null &&
+        typeof rv === 'object' &&
+        !Array.isArray(rv)
+      ) {
+        // Nested object (pricing/architecture/top_provider): recurse one level.
+        const nested: Record<string, unknown> = {};
+        for (const sub of Object.keys(ev as object)) {
+          const sev = (ev as Record<string, unknown>)[sub];
+          const srv = (rv as Record<string, unknown>)[sub];
+          if (sev !== undefined && !valuesEqual(sev, srv)) nested[sub] = sev;
+        }
+        if (Object.keys(nested).length > 0) {
+          (out as Record<string, unknown>)[key] = nested;
+        }
+      } else if (!valuesEqual(ev, rv)) {
+        (out as Record<string, unknown>)[key] = ev;
+      }
+    }
+    return out;
+  };
+
+  /**
    * Fetch catalog metadata for (source, sourcePath) and populate the override
    * form with those values, preserving any overrides the user has already
    * typed (user-entered values win on conflict).
@@ -475,6 +546,11 @@ export const Models = () => {
     sourcePath: string
   ) => {
     if (!sourcePath) return;
+    // Capture the current catalog snapshot BEFORE the async fetch. When the
+    // caller (e.g. selectMetadataResult) has just switched catalog models,
+    // this is still the prior catalog — exactly what we need to distinguish
+    // true user edits from values that were auto-populated last time.
+    const priorCatalog = catalogReference ?? null;
     try {
       const catalog = await api.getModelMetadata(source, sourcePath);
       if (!catalog) return;
@@ -485,28 +561,32 @@ export const Models = () => {
         if (!prev.metadata || prev.metadata.source === 'custom') return prev;
         if (prev.metadata.source !== source || prev.metadata.source_path !== sourcePath)
           return prev;
-        // Merge so anything the user already typed takes precedence over the
-        // freshly-fetched catalog values.
+        // `existing` may hold values that were auto-populated from the prior
+        // catalog rather than typed by the user. Strip anything matching the
+        // prior snapshot so only real user-edits layer over the new catalog.
+        // When we have no prior snapshot (first populate), treat `existing`
+        // as all user-edits.
         const existing = prev.metadata.overrides ?? {};
+        const userEdits = priorCatalog ? diffOverrides(existing, priorCatalog) : existing;
         const merged: MetadataOverrides = {
           ...catalogOverrides,
-          ...existing,
-          ...(catalogOverrides.pricing || existing.pricing
-            ? { pricing: { ...(catalogOverrides.pricing ?? {}), ...(existing.pricing ?? {}) } }
+          ...userEdits,
+          ...(catalogOverrides.pricing || userEdits.pricing
+            ? { pricing: { ...(catalogOverrides.pricing ?? {}), ...(userEdits.pricing ?? {}) } }
             : {}),
-          ...(catalogOverrides.architecture || existing.architecture
+          ...(catalogOverrides.architecture || userEdits.architecture
             ? {
                 architecture: {
                   ...(catalogOverrides.architecture ?? {}),
-                  ...(existing.architecture ?? {}),
+                  ...(userEdits.architecture ?? {}),
                 },
               }
             : {}),
-          ...(catalogOverrides.top_provider || existing.top_provider
+          ...(catalogOverrides.top_provider || userEdits.top_provider
             ? {
                 top_provider: {
                   ...(catalogOverrides.top_provider ?? {}),
-                  ...(existing.top_provider ?? {}),
+                  ...(userEdits.top_provider ?? {}),
                 },
               }
             : {}),
@@ -571,7 +651,7 @@ export const Models = () => {
     }
     setEditingAlias({
       ...editingAlias,
-      metadata: { ...current, overrides: nextOverrides },
+      metadata: withOverrides(current, nextOverrides),
     });
   };
 
@@ -587,7 +667,7 @@ export const Models = () => {
     const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
     if (Object.keys(pricing).length === 0) delete nextOverrides.pricing;
     else nextOverrides.pricing = pricing;
-    setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
+    setEditingAlias({ ...editingAlias, metadata: withOverrides(current, nextOverrides) });
   };
 
   const setArchitectureField = (
@@ -603,7 +683,7 @@ export const Models = () => {
     const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
     if (Object.keys(arch).length === 0) delete nextOverrides.architecture;
     else nextOverrides.architecture = arch;
-    setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
+    setEditingAlias({ ...editingAlias, metadata: withOverrides(current, nextOverrides) });
   };
 
   const setTopProviderField = (
@@ -618,7 +698,7 @@ export const Models = () => {
     const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
     if (Object.keys(tp).length === 0) delete nextOverrides.top_provider;
     else nextOverrides.top_provider = tp;
-    setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
+    setEditingAlias({ ...editingAlias, metadata: withOverrides(current, nextOverrides) });
   };
 
   /**
@@ -1143,8 +1223,17 @@ export const Models = () => {
                     value={editingAlias.metadata?.source ?? 'openrouter'}
                     onChange={(e) => {
                       const source = e.target.value as MetadataSource;
+                      const prevSource = editingAlias.metadata?.source;
                       const existingOverrides = editingAlias.metadata?.overrides;
                       const existingSourcePath = editingAlias.metadata?.source_path;
+                      // Different catalogs use different path formats (e.g.
+                      // openrouter's "openai/gpt-4.1-nano" ≠ models.dev's
+                      // "openai.gpt-4.1-nano"), so a path from the old catalog
+                      // is always wrong under a new one. Only carry the path
+                      // when the source is unchanged or switching to 'custom'
+                      // (where source_path is a free-form label).
+                      const carryPath = prevSource === source || source === 'custom';
+                      const carriedSourcePath = carryPath ? existingSourcePath : undefined;
                       let next: AliasMetadata;
                       if (source === 'custom') {
                         // Seed defaults, then layer any existing overrides on top so
@@ -1153,23 +1242,27 @@ export const Models = () => {
                         const mergedOverrides = {
                           ...buildCustomDefaults(editingAlias.id),
                           ...(existingOverrides ?? {}),
-                        };
+                        } as MetadataOverrides & { name: string };
                         next = {
                           source: 'custom',
-                          ...(existingSourcePath ? { source_path: existingSourcePath } : {}),
+                          ...(carriedSourcePath ? { source_path: carriedSourcePath } : {}),
                           overrides: mergedOverrides,
                         };
                         setIsOverrideOpen(true);
                       } else {
                         next = {
                           source,
-                          source_path: existingSourcePath ?? '',
+                          source_path: carriedSourcePath ?? '',
                           ...(existingOverrides ? { overrides: existingOverrides } : {}),
                         };
                       }
                       setEditingAlias({ ...editingAlias, metadata: next });
-                      // Re-run search with new source if there's a query
-                      if (metadataQuery && source !== 'custom')
+                      // When we dropped the path, also clear the visible model
+                      // query input so it doesn't show a stale value that no
+                      // longer matches metadata.source_path.
+                      if (!carryPath) setMetadataQuery('');
+                      // Re-run search only when we kept the query (same catalog).
+                      if (carryPath && source !== 'custom' && metadataQuery)
                         handleMetadataSearch(metadataQuery, source);
                     }}
                   >
