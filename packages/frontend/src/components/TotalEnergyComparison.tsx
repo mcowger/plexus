@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KWH_PER_SLICE, formatDuration, formatEnergy, formatSlices } from '../lib/format';
-import { Tv, Flame, Play } from 'lucide-react';
+import { Tv, Flame, Play, Gamepad2 } from 'lucide-react';
 import toastFull from '../assets/toast/toast-full.png';
 import toast75 from '../assets/toast/toast-75.png';
 import toast50 from '../assets/toast/toast-50.png';
@@ -45,6 +45,17 @@ const COMPARISONS: ComparisonOption[] = [
     noun: 'TV',
     sourceUrl: 'https://www.energysage.com/electricity/house-watts/how-many-watts-does-a-tv-use/',
     sourceName: 'EnergySage.com',
+  },
+  {
+    id: 'ps5',
+    label: 'PlayStation 5 gaming',
+    shortLabel: 'PS5',
+    kwhPerHour: 0.2,
+    icon: <Gamepad2 size={28} className="text-indigo-400" />,
+    verb: 'play',
+    noun: 'PS5',
+    sourceUrl: 'https://www.playstation.com/en-no/legal/ecodesign/',
+    sourceName: 'Sony (ECODESIGN)',
   },
   {
     id: 'oven',

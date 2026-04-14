@@ -1,5 +1,5 @@
 {
-  "id": "8cc6f615-7b70-4151-81b7-ff1233166e94",
+  "id": "62d2b852-3783-4cdb-bc1d-ac1768048127",
   "prevId": "c08500c3-dce2-47e8-a7dc-e21b05a5b384",
   "version": "7",
   "dialect": "postgresql",
@@ -295,6 +295,12 @@
           "type": "real",
           "primaryKey": false,
           "notNull": false
+        },
+        "provider_reported_cost": {
+          "name": "provider_reported_cost",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -333,27 +339,6 @@
           "columns": [
             {
               "expression": "request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_request_usage_api_key": {
-          "name": "idx_request_usage_api_key",
-          "columns": [
-            {
-              "expression": "api_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "start_time",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -470,12 +455,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "api_key": {
-          "name": "api_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "raw_request": {
           "name": "raw_request",
           "type": "text",
@@ -549,21 +528,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_debug_logs_api_key": {
-          "name": "idx_debug_logs_api_key",
-          "columns": [
-            {
-              "expression": "api_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {},
@@ -594,12 +558,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "api_key": {
-          "name": "api_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "error_message": {
           "name": "error_message",
@@ -647,21 +605,6 @@
           "columns": [
             {
               "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_inference_errors_api_key": {
-          "name": "idx_inference_errors_api_key",
-          "columns": [
-            {
-              "expression": "api_key",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1870,6 +1813,36 @@
           "primaryKey": false,
           "notNull": false
         },
+        "gpu_profile": {
+          "name": "gpu_profile",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_ram_gb": {
+          "name": "gpu_ram_gb",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_bandwidth_tb_s": {
+          "name": "gpu_bandwidth_tb_s",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_flops_tflop": {
+          "name": "gpu_flops_tflop",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_power_draw_watts": {
+          "name": "gpu_power_draw_watts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "bigint",
@@ -2083,6 +2056,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "model_architecture": {
+          "name": "model_architecture",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

@@ -114,6 +114,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   const [energySummary, setEnergySummary] = useState<{
     totalKwhUsed: number;
     totalDurationMs: number;
+    totalActiveMs: number;
   } | null>(null);
 
   // ---------------------------------------------------------------------------
@@ -708,6 +709,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             <EnergyTimeComparison
               totalKwh={energySummary?.totalKwhUsed}
               totalDurationMs={energySummary?.totalDurationMs}
+              totalActiveMs={energySummary?.totalActiveMs}
             />
           </div>
         </Card>

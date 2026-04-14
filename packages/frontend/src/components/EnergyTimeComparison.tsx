@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDuration } from '../lib/format';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 
 interface ComparisonOption {
   id: string;
@@ -27,7 +27,15 @@ const COMPARISONS: ComparisonOption[] = [
     shortLabel: '55" TV',
     kwhPerHour: 0.1,
     sourceUrl: 'https://www.energysage.com/electricity/house-watts/how-many-watts-does-a-tv-use/',
-    sourceName: 'EnnnergySage.com',
+    sourceName: 'EnergySage.com',
+  },
+  {
+    id: 'ps5',
+    label: 'PlayStation 5 gaming',
+    shortLabel: 'PS5',
+    kwhPerHour: 0.2,
+    sourceUrl: 'https://www.playstation.com/en-no/legal/ecodesign/',
+    sourceName: 'Sony (ECODESIGN)',
   },
   {
     id: 'oven',
@@ -40,38 +48,43 @@ const COMPARISONS: ComparisonOption[] = [
   },
 ];
 
+/** Google Analytics session timeout documentation — same model we use for active time. */
+const ACTIVE_TIME_REF_URL = 'https://support.google.com/analytics/answer/2731565';
+
 interface EnergyTimeComparisonProps {
   /** Pre-computed total kWh used across all requests (from backend summary). */
   totalKwh?: number;
-  /** Pre-computed total processing duration in ms across all requests (from backend summary). */
+  /** Pre-computed total inference duration in ms across all requests (from backend summary). */
   totalDurationMs?: number;
+  /** Session-based active time in ms (gaps > 15 min split sessions). */
+  totalActiveMs?: number;
 }
 
 /**
  * Compares AI energy consumption to common household activities.
- * Shows how efficiently AI used energy compared to the selected comparison.
+ * Uses "active time" (session-based) as the real time the person was working with AI,
+ * rather than raw inference duration.
  */
 export function EnergyTimeComparison({
   totalKwh = 0,
   totalDurationMs = 0,
+  totalActiveMs = 0,
 }: EnergyTimeComparisonProps) {
   const [selectedComparison, setSelectedComparison] = useState<ComparisonOption>(COMPARISONS[0]);
 
-  const totalProcessingMs = totalDurationMs;
-
-  const totalProcessingSeconds = Math.round(totalProcessingMs / 1000);
+  // Use active time when available, fall back to inference duration
+  const aiTimeMs = totalActiveMs || totalDurationMs;
+  const aiTimeSeconds = Math.round(aiTimeMs / 1000);
   const comparisonSecondsEquivalent = (totalKwh / selectedComparison.kwhPerHour) * 3600;
 
-  // Power in watts - kWh/hr directly converts to watts (kW * 1000 = W)
+  // Power in watts — kWh/hr directly converts to watts (kW * 1000 = W)
   const comparisonWatts = selectedComparison.kwhPerHour * 1000;
-  const aiWatts =
-    totalProcessingSeconds > 0 ? (totalKwh / (totalProcessingSeconds / 3600)) * 1000 : 0;
+  const aiWatts = aiTimeSeconds > 0 ? (totalKwh / (aiTimeSeconds / 3600)) * 1000 : 0;
 
-  // AI efficiency ratio: Comparison time / AI time
+  // Efficiency ratio: Comparison time / AI active time
   // > 1 = Comparison takes LONGER = AI used energy faster = AI LESS efficient
   // < 1 = Comparison takes LESS time = AI took longer = AI MORE efficient
-  const efficiencyRatio =
-    totalProcessingSeconds > 0 ? comparisonSecondsEquivalent / totalProcessingSeconds : 0;
+  const efficiencyRatio = aiTimeSeconds > 0 ? comparisonSecondsEquivalent / aiTimeSeconds : 0;
 
   // For bar: when AI is more efficient (ratio < 1), bar is smaller (ratio * 100 %)
   // When AI is less efficient (ratio > 1), bar is full (100%)
@@ -85,7 +98,7 @@ export function EnergyTimeComparison({
   const comparisonWattsPercent = (comparisonWatts / maxWatts) * 100;
   const aiWattsPercent = (aiWatts / maxWatts) * 100;
 
-  if (totalKwh === 0 && totalProcessingSeconds === 0) {
+  if (totalKwh === 0 && aiTimeSeconds === 0) {
     return (
       <div className="h-full flex items-center justify-center text-text-secondary text-sm">
         No energy data available
@@ -94,7 +107,7 @@ export function EnergyTimeComparison({
   }
 
   const comparisonDisplay = formatDuration(comparisonSecondsEquivalent);
-  const processingDisplay = formatDuration(totalProcessingSeconds);
+  const activeTimeDisplay = formatDuration(aiTimeSeconds);
 
   // Dynamic wording based on comparison type
   const getComparisonVerb = () => {
@@ -103,6 +116,8 @@ export function EnergyTimeComparison({
         return 'watch';
       case 'tv':
         return 'watch';
+      case 'ps5':
+        return 'play';
       case 'oven':
         return 'cook with';
       default:
@@ -116,6 +131,8 @@ export function EnergyTimeComparison({
         return 'Netflix';
       case 'tv':
         return 'TV';
+      case 'ps5':
+        return 'PS5';
       case 'oven':
         return 'the oven';
       default:
@@ -150,10 +167,7 @@ export function EnergyTimeComparison({
 
       {/* AI Efficiency Comparison */}
       <div className="space-y-3">
-        <div
-          className="
-flex items-center gap-2"
-        >
+        <div className="flex items-center gap-2">
           <div className="text-sm font-semibold text-text-primary">
             AI Efficiency vs {selectedComparison.shortLabel}
           </div>
@@ -169,7 +183,7 @@ flex items-center gap-2"
           )}
         </div>
 
-        {/* Main bar - Comparison equivalent, sized by AI efficiency */}
+        {/* Main bar — Comparison equivalent, sized by AI efficiency */}
         <div className="space-y-2">
           <div className="h-3 bg-bg-hover rounded-full overflow-hidden">
             <div
@@ -188,13 +202,13 @@ flex items-center gap-2"
               <span className="font-semibold text-text-primary">{comparisonDisplay}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-text-tertiary">AI used that energy in:</span>
+              <span className="text-text-tertiary">You worked with AI for:</span>
               <span
                 className={`font-semibold ${
                   isAiLessEfficient ? 'text-danger' : 'text-text-primary'
                 }`}
               >
-                {processingDisplay}
+                {activeTimeDisplay}
               </span>
               {isAiLessEfficient && <AlertTriangle size={14} className="text-danger" />}
             </div>
@@ -204,15 +218,14 @@ flex items-center gap-2"
         {/* Explanation for bar interpretation */}
         {isAiMoreEfficient ? (
           <p className="text-xs text-text-tertiary">
-            Smaller bar = AI more efficient. You'd have to {getComparisonVerb()}{' '}
-            {getComparisonNoun()} for {comparisonDisplay} to use the same energy your AI used in
-            just {processingDisplay}.
+            You'd have to {getComparisonVerb()} {getComparisonNoun()} for {comparisonDisplay} to use
+            the same energy you consumed during {activeTimeDisplay} of active AI work.
           </p>
         ) : isAiLessEfficient ? (
           <p className="text-xs text-danger">
             AI used energy faster than {selectedComparison.label}. {selectedComparison.shortLabel}{' '}
-            would take {comparisonDisplay} to use the same energy your AI burned through in only{' '}
-            {processingDisplay}.
+            would take {comparisonDisplay} to use the same energy your AI burned through in just{' '}
+            {activeTimeDisplay} of active work.
           </p>
         ) : null}
       </div>
@@ -236,7 +249,7 @@ flex items-center gap-2"
 
           <div className="space-y-1">
             <div className="flex justify-between text-xs">
-              <span className="text-text-secondary">AI compute</span>
+              <span className="text-text-secondary">AI compute (active rate)</span>
               <span className="font-semibold text-primary">
                 {aiWatts > 0 ? `${aiWatts.toFixed(1)} W` : 'N/A'}
               </span>
@@ -251,34 +264,33 @@ flex items-center gap-2"
         </div>
       </div>
 
-      {/* Source footnote */}
-      {selectedComparison.sourceUrl && (
-        <div className="pt-2">
+      {/* Footnotes */}
+      <div className="space-y-1.5 pt-2">
+        {/* Source footnote */}
+        {selectedComparison.sourceUrl && (
           <a
             href={selectedComparison.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4" />
-              <path d="M12 8h.01" />
-            </svg>
+            <Info size={10} />
             {selectedComparison.label} energy: {selectedComparison.sourceName}
           </a>
-        </div>
-      )}
+        )}
+
+        {/* Active time methodology footnote */}
+        <a
+          href={ACTIVE_TIME_REF_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
+        >
+          <Info size={10} />
+          "Active time" groups requests into sessions with a 15-min inactivity timeout (same model
+          as Google Analytics sessions)
+        </a>
+      </div>
     </div>
   );
 }

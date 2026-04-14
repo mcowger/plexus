@@ -11,8 +11,12 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import { formatEnergy, formatTimeLabel } from '../lib/format';
+
+/** kWh per hour for PS5 gaming (200W), used as a reference line on the chart. */
+const PS5_KWH_PER_HOUR = 0.2;
 
 interface EnergyOverTimeProps {
   /** Time-series data with kwhUsed values */
@@ -22,9 +26,15 @@ interface EnergyOverTimeProps {
   }>;
   /** Height of the chart container */
   height?: number;
+  /** Show a PS5 (200W) reference line on the chart */
+  showPs5Reference?: boolean;
 }
 
-export function EnergyOverTime({ data, height = 300 }: EnergyOverTimeProps) {
+export function EnergyOverTime({
+  data,
+  height = 300,
+  showPs5Reference = true,
+}: EnergyOverTimeProps) {
   // Filter out data points with no kwhUsed or zero values for cleaner display
   const chartData = data
     .filter((point) => point.kwhUsed !== undefined && point.kwhUsed > 0)
@@ -87,6 +97,20 @@ export function EnergyOverTime({ data, height = 300 }: EnergyOverTimeProps) {
           }}
           labelFormatter={(label) => `Time: ${label}`}
         />
+        {showPs5Reference && (
+          <ReferenceLine
+            y={PS5_KWH_PER_HOUR}
+            stroke="#818cf8"
+            strokeDasharray="6 4"
+            strokeWidth={1}
+            label={{
+              value: 'PS5 (200W)',
+              position: 'right',
+              fill: '#818cf8',
+              fontSize: 10,
+            }}
+          />
+        )}
         <Area
           type="monotone"
           dataKey="kwh"
