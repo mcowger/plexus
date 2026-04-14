@@ -50,8 +50,16 @@ export const TagSelect: React.FC<TagSelectProps> = ({
     }
   }, [isOpen]);
 
+  // Single source of truth for tag identity: duplicate detection across
+  // filteredOptions / showCreateOption / addCustomTags must agree, otherwise
+  // the dropdown can hide a "Create" option while keyboard/blur/paste still
+  // commits it (or vice versa).
+  const normalize = (s: string) => s.trim().toLowerCase();
+
   const filteredOptions = options.filter(
-    (opt) => opt.toLowerCase().includes(search.toLowerCase()) && !selected.includes(opt)
+    (opt) =>
+      normalize(opt).includes(normalize(search)) &&
+      !selected.some((s) => normalize(s) === normalize(opt))
   );
 
   const handleToggle = (option: string) => {
@@ -72,15 +80,18 @@ export const TagSelect: React.FC<TagSelectProps> = ({
   };
 
   // Add one or more free-form tags in a single onChange call. Skips empty,
-  // duplicate, and already-selected values. Does NOT touch `search` — callers
-  // decide whether to clear the input.
+  // duplicate, and already-selected values (case-insensitive). Preserves the
+  // user-typed casing in the committed value. Does NOT touch `search` —
+  // callers decide whether to clear the input.
   const addCustomTags = (raws: string[]) => {
-    const seen = new Set(selected);
+    const seen = new Set(selected.map(normalize));
     const toAdd: string[] = [];
     for (const raw of raws) {
       const value = raw.trim();
-      if (!value || seen.has(value)) continue;
-      seen.add(value);
+      if (!value) continue;
+      const key = normalize(value);
+      if (seen.has(key)) continue;
+      seen.add(key);
       toAdd.push(value);
     }
     if (toAdd.length > 0) onChange([...selected, ...toAdd]);
@@ -120,11 +131,12 @@ export const TagSelect: React.FC<TagSelectProps> = ({
   };
 
   const searchTrimmed = search.trim();
+  const searchKey = normalize(searchTrimmed);
   const showCreateOption =
     allowCustom &&
     searchTrimmed.length > 0 &&
-    !selected.includes(searchTrimmed) &&
-    !options.some((o) => o.toLowerCase() === searchTrimmed.toLowerCase());
+    !selected.some((s) => normalize(s) === searchKey) &&
+    !options.some((o) => normalize(o) === searchKey);
 
   return (
     <div className={clsx('flex flex-col gap-2', className)} ref={containerRef}>
@@ -165,8 +177,15 @@ export const TagSelect: React.FC<TagSelectProps> = ({
             value={search}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
-            onBlur={() => {
-              if (allowCustom) commitCustom(search);
+            onBlur={(e) => {
+              if (!allowCustom) return;
+              // Only commit when focus leaves the component entirely. A blur
+              // to another element inside the container (e.g. clicking a
+              // dropdown item) would otherwise commit the partial search text
+              // as a new tag before the item's click handler fires.
+              const related = e.relatedTarget as Node | null;
+              if (related && containerRef.current?.contains(related)) return;
+              commitCustom(search);
             }}
             placeholder={
               selected.length === 0 ? placeholder : allowCustom ? 'Type to add...' : 'Search...'
@@ -206,14 +225,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
                   'w-full text-left px-3.5 py-2 text-sm font-body cursor-pointer transition-colors',
                   'hover:bg-bg-hover text-text'
                 )}
-                onMouseDown={(e) => {
-                  // Use onMouseDown so the click registers before the input
-                  // blur handler fires. Otherwise, onBlur's commitCustom(search)
-                  // would add the partial search text as a new tag before the
-                  // suggestion is selected.
-                  e.preventDefault();
-                  handleToggle(option);
-                }}
+                onClick={() => handleToggle(option)}
               >
                 {option}
               </button>
@@ -223,12 +235,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
                 type="button"
                 key={`__create__${searchTrimmed}`}
                 className="w-full text-left px-3.5 py-2 text-sm font-body cursor-pointer transition-colors hover:bg-bg-hover text-text border-t border-border-glass"
-                onMouseDown={(e) => {
-                  // Use onMouseDown so the click registers before the input
-                  // blur handler fires and closes the dropdown.
-                  e.preventDefault();
-                  commitCustom(searchTrimmed);
-                }}
+                onClick={() => commitCustom(searchTrimmed)}
               >
                 <span className="text-text-muted">Create </span>
                 <span className="font-medium">&quot;{searchTrimmed}&quot;</span>

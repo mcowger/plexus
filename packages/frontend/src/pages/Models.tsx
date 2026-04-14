@@ -1238,10 +1238,40 @@ export const Models = () => {
                       if (source === 'custom') {
                         // Seed defaults, then layer any existing overrides on top so
                         // user-typed values take precedence while missing required
-                        // fields (e.g., name) still have a sensible default.
+                        // fields (e.g., name) still have a sensible default. Nested
+                        // objects (architecture/pricing/top_provider) are merged
+                        // field-by-field so a partial user override (e.g. only
+                        // input_modalities) doesn't wipe default sibling fields
+                        // (e.g. output_modalities).
+                        const defaults = buildCustomDefaults(editingAlias.id);
+                        const existing = existingOverrides ?? {};
                         const mergedOverrides = {
-                          ...buildCustomDefaults(editingAlias.id),
-                          ...(existingOverrides ?? {}),
+                          ...defaults,
+                          ...existing,
+                          ...(defaults.pricing || existing.pricing
+                            ? {
+                                pricing: {
+                                  ...(defaults.pricing ?? {}),
+                                  ...(existing.pricing ?? {}),
+                                },
+                              }
+                            : {}),
+                          ...(defaults.architecture || existing.architecture
+                            ? {
+                                architecture: {
+                                  ...(defaults.architecture ?? {}),
+                                  ...(existing.architecture ?? {}),
+                                },
+                              }
+                            : {}),
+                          ...(defaults.top_provider || existing.top_provider
+                            ? {
+                                top_provider: {
+                                  ...(defaults.top_provider ?? {}),
+                                  ...(existing.top_provider ?? {}),
+                                },
+                              }
+                            : {}),
                         } as MetadataOverrides & { name: string };
                         next = {
                           source: 'custom',
