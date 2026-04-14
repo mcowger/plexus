@@ -3,6 +3,7 @@ import { providers } from './providers';
 import { providerModels } from './provider-models';
 import { modelAliases } from './model-aliases';
 import { modelAliasTargets } from './model-alias-targets';
+import { aliasMetadataOverrides } from './alias-metadata-overrides';
 import { oauthCredentials } from './oauth-credentials';
 
 export const providersRelations = relations(providers, ({ many, one }) => ({
@@ -20,13 +21,24 @@ export const providerModelsRelations = relations(providerModels, ({ one }) => ({
   }),
 }));
 
-export const modelAliasesRelations = relations(modelAliases, ({ many }) => ({
+export const modelAliasesRelations = relations(modelAliases, ({ many, one }) => ({
   targets: many(modelAliasTargets),
+  metadataOverride: one(aliasMetadataOverrides, {
+    fields: [modelAliases.id],
+    references: [aliasMetadataOverrides.aliasId],
+  }),
 }));
 
 export const modelAliasTargetsRelations = relations(modelAliasTargets, ({ one }) => ({
   alias: one(modelAliases, {
     fields: [modelAliasTargets.aliasId],
+    references: [modelAliases.id],
+  }),
+}));
+
+export const aliasMetadataOverridesRelations = relations(aliasMetadataOverrides, ({ one }) => ({
+  alias: one(modelAliases, {
+    fields: [aliasMetadataOverrides.aliasId],
     references: [modelAliases.id],
   }),
 }));

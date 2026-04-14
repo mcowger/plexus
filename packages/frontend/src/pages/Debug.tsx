@@ -292,57 +292,57 @@ export const Debug: React.FC = () => {
                 )}
               </Button>
 
-            {isFilterOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-bg-surface border border-border-glass rounded-lg shadow-lg z-50 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-text">Provider Filter</span>
-                  {selectedProviders.length > 0 && (
-                    <button
-                      onClick={clearProviderFilter}
-                      className="text-xs text-text-muted hover:text-text transition-colors flex items-center gap-1"
+              {isFilterOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-bg-surface border border-border-glass rounded-lg shadow-lg z-50 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-text">Provider Filter</span>
+                    {selectedProviders.length > 0 && (
+                      <button
+                        onClick={clearProviderFilter}
+                        className="text-xs text-text-muted hover:text-text transition-colors flex items-center gap-1"
+                      >
+                        <X size={12} />
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mb-3">
+                    Only log requests for selected providers
+                  </p>
+                  <div className="max-h-64 overflow-y-auto space-y-1">
+                    {providers.map((provider) => (
+                      <label
+                        key={provider.id}
+                        className="flex items-center gap-2 p-2 rounded hover:bg-bg-hover cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProviders.includes(provider.id)}
+                          onChange={() => handleProviderToggle(provider.id)}
+                          className="rounded border-border-glass text-primary focus:ring-primary"
+                        />
+                        <span className="text-sm text-text">{provider.name || provider.id}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 mt-4 pt-3 border-t border-border-glass">
+                    <Button
+                      variant="secondary"
+                      className="flex-1 text-xs"
+                      onClick={() => setIsFilterOpen(false)}
                     >
-                      <X size={12} />
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-text-muted mb-3">
-                  Only log requests for selected providers
-                </p>
-                <div className="max-h-64 overflow-y-auto space-y-1">
-                  {providers.map((provider) => (
-                    <label
-                      key={provider.id}
-                      className="flex items-center gap-2 p-2 rounded hover:bg-bg-hover cursor-pointer"
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      className="flex-1 text-xs"
+                      onClick={applyProviderFilter}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedProviders.includes(provider.id)}
-                        onChange={() => handleProviderToggle(provider.id)}
-                        className="rounded border-border-glass text-primary focus:ring-primary"
-                      />
-                      <span className="text-sm text-text">{provider.name || provider.id}</span>
-                    </label>
-                  ))}
+                      Apply
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2 mt-4 pt-3 border-t border-border-glass">
-                  <Button
-                    variant="secondary"
-                    className="flex-1 text-xs"
-                    onClick={() => setIsFilterOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    className="flex-1 text-xs"
-                    onClick={applyProviderFilter}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              </div>
-            )}
+              )}
             </div>
           )}
 

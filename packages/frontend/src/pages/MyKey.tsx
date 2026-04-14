@@ -269,9 +269,7 @@ export const MyKey: React.FC = () => {
       >
         {newSecret ? (
           <div className="space-y-3">
-            <p className="text-sm text-text">
-              Copy this secret now — it will not be shown again.
-            </p>
+            <p className="text-sm text-text">Copy this secret now — it will not be shown again.</p>
             <div className="flex gap-2 items-center">
               <code className="flex-1 p-2 bg-bg-card border border-border rounded text-xs font-mono break-all">
                 {newSecret}

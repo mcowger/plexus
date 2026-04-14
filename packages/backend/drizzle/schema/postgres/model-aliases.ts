@@ -15,6 +15,7 @@ export const metadataSourceEnum = pgEnum('metadata_source', [
   'openrouter',
   'models.dev',
   'catwalk',
+  'custom',
 ]);
 
 export const modelAliases = pgTable('model_aliases', {

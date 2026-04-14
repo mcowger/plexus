@@ -245,9 +245,7 @@ export async function registerUsageRoutes(
 
     // Scope by the limited user's key if applicable.
     const summaryScopeKey = scopedKeyName(request);
-    const keyFilter = summaryScopeKey
-      ? eq(schema.requestUsage.apiKey, summaryScopeKey)
-      : undefined;
+    const keyFilter = summaryScopeKey ? eq(schema.requestUsage.apiKey, summaryScopeKey) : undefined;
 
     try {
       const seriesRows = await db

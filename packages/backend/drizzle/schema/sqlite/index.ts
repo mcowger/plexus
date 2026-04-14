@@ -13,6 +13,7 @@ export * from './providers';
 export * from './provider-models';
 export * from './model-aliases';
 export * from './model-alias-targets';
+export * from './alias-metadata-overrides';
 export * from './api-keys';
 export * from './user-quota-definitions';
 export * from './mcp-servers';

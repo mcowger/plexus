@@ -18,6 +18,7 @@ import type {
   McpServerConfig,
   FailoverPolicy,
   CooldownPolicy,
+  MetadataOverrides,
 } from '../config';
 
 // Helper to parse JSON from SQLite text columns (PG jsonb auto-deserializes)
@@ -74,6 +75,56 @@ function decryptJsonField<T>(value: unknown): T | null {
   }
   if (typeof value === 'object') return value as T;
   return null;
+}
+
+function hasAnyOverrideField(o: MetadataOverrides): boolean {
+  if (o.name !== undefined) return true;
+  if (o.description !== undefined) return true;
+  if (o.context_length !== undefined) return true;
+  if (o.pricing && Object.values(o.pricing).some((v) => v !== undefined)) return true;
+  if (o.architecture) {
+    if (o.architecture.tokenizer !== undefined) return true;
+    if (o.architecture.input_modalities !== undefined) return true;
+    if (o.architecture.output_modalities !== undefined) return true;
+  }
+  if (o.supported_parameters !== undefined) return true;
+  if (o.top_provider && Object.values(o.top_provider).some((v) => v !== undefined)) return true;
+  return false;
+}
+
+function overrideRowToOverrides(row: any): MetadataOverrides {
+  const overrides: MetadataOverrides = {};
+  if (row.name != null) overrides.name = row.name;
+  if (row.description != null) overrides.description = row.description;
+  if (row.contextLength != null) overrides.context_length = row.contextLength;
+
+  const pricing: MetadataOverrides['pricing'] = {};
+  if (row.pricingPrompt != null) pricing.prompt = row.pricingPrompt;
+  if (row.pricingCompletion != null) pricing.completion = row.pricingCompletion;
+  if (row.pricingInputCacheRead != null) pricing.input_cache_read = row.pricingInputCacheRead;
+  if (row.pricingInputCacheWrite != null) pricing.input_cache_write = row.pricingInputCacheWrite;
+  if (Object.keys(pricing).length > 0) overrides.pricing = pricing;
+
+  const architecture: MetadataOverrides['architecture'] = {};
+  const inputMods = parseJson<string[]>(row.architectureInputModalities);
+  const outputMods = parseJson<string[]>(row.architectureOutputModalities);
+  if (inputMods && Array.isArray(inputMods)) architecture.input_modalities = inputMods;
+  if (outputMods && Array.isArray(outputMods)) architecture.output_modalities = outputMods;
+  if (row.architectureTokenizer != null) architecture.tokenizer = row.architectureTokenizer;
+  if (Object.keys(architecture).length > 0) overrides.architecture = architecture;
+
+  const supportedParams = parseJson<string[]>(row.supportedParameters);
+  if (supportedParams && Array.isArray(supportedParams))
+    overrides.supported_parameters = supportedParams;
+
+  const topProvider: MetadataOverrides['top_provider'] = {};
+  if (row.topProviderContextLength != null)
+    topProvider.context_length = row.topProviderContextLength;
+  if (row.topProviderMaxCompletionTokens != null)
+    topProvider.max_completion_tokens = row.topProviderMaxCompletionTokens;
+  if (Object.keys(topProvider).length > 0) overrides.top_provider = topProvider;
+
+  return overrides;
 }
 
 function toBool(value: unknown): boolean {
@@ -429,7 +480,8 @@ export class ConfigRepository {
         .where(eq(schema.modelAliasTargets.aliasId, row.id))
         .orderBy(schema.modelAliasTargets.sortOrder);
 
-      result[row.slug] = this.rowToModelConfig(row, targets);
+      const overrideRow = await this.getMetadataOverrideRow(row.id);
+      result[row.slug] = this.rowToModelConfig(row, targets, overrideRow);
     }
 
     return result;
@@ -452,7 +504,18 @@ export class ConfigRepository {
       .where(eq(schema.modelAliasTargets.aliasId, row.id))
       .orderBy(schema.modelAliasTargets.sortOrder);
 
-    return this.rowToModelConfig(row, targets);
+    const overrideRow = await this.getMetadataOverrideRow(row.id);
+    return this.rowToModelConfig(row, targets, overrideRow);
+  }
+
+  private async getMetadataOverrideRow(aliasId: number): Promise<any | null> {
+    const schema = this.schema();
+    const rows = await this.db()
+      .select()
+      .from(schema.aliasMetadataOverrides)
+      .where(eq(schema.aliasMetadataOverrides.aliasId, aliasId))
+      .limit(1);
+    return rows.length > 0 ? rows[0] : null;
   }
 
   async saveAlias(slug: string, config: ModelConfig): Promise<void> {
@@ -509,6 +572,40 @@ export class ConfigRepository {
       }));
       await this.db().insert(schema.modelAliasTargets).values(targetRows);
     }
+
+    // Replace metadata overrides
+    await this.db()
+      .delete(schema.aliasMetadataOverrides)
+      .where(eq(schema.aliasMetadataOverrides.aliasId, aliasId));
+
+    const overrides = config.metadata?.overrides;
+    if (overrides && hasAnyOverrideField(overrides)) {
+      await this.db()
+        .insert(schema.aliasMetadataOverrides)
+        .values({
+          aliasId,
+          name: overrides.name ?? null,
+          description: overrides.description ?? null,
+          contextLength: overrides.context_length ?? null,
+          pricingPrompt: overrides.pricing?.prompt ?? null,
+          pricingCompletion: overrides.pricing?.completion ?? null,
+          pricingInputCacheRead: overrides.pricing?.input_cache_read ?? null,
+          pricingInputCacheWrite: overrides.pricing?.input_cache_write ?? null,
+          architectureInputModalities: overrides.architecture?.input_modalities
+            ? toJson(overrides.architecture.input_modalities)
+            : null,
+          architectureOutputModalities: overrides.architecture?.output_modalities
+            ? toJson(overrides.architecture.output_modalities)
+            : null,
+          architectureTokenizer: overrides.architecture?.tokenizer ?? null,
+          supportedParameters: overrides.supported_parameters
+            ? toJson(overrides.supported_parameters)
+            : null,
+          topProviderContextLength: overrides.top_provider?.context_length ?? null,
+          topProviderMaxCompletionTokens: overrides.top_provider?.max_completion_tokens ?? null,
+          updatedAt: timestamp,
+        });
+    }
   }
 
   async deleteAlias(slug: string): Promise<void> {
@@ -524,7 +621,7 @@ export class ConfigRepository {
     return count.length;
   }
 
-  private rowToModelConfig(row: any, targetRows: any[]): ModelConfig {
+  private rowToModelConfig(row: any, targetRows: any[], overrideRow?: any | null): ModelConfig {
     const targets = targetRows.map((t: any) => ({
       provider: t.providerSlug,
       model: t.modelName,
@@ -539,15 +636,25 @@ export class ConfigRepository {
       ...(row.modelType ? { type: row.modelType } : {}),
       ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),
       ...(row.advanced ? { advanced: parseJson(row.advanced) } : {}),
-      ...(row.metadataSource
-        ? {
-            metadata: {
-              source: row.metadataSource,
-              source_path: row.metadataSourcePath,
-            },
-          }
-        : {}),
     };
+
+    if (row.metadataSource) {
+      const overrides = overrideRow ? overrideRowToOverrides(overrideRow) : undefined;
+      if (row.metadataSource === 'custom') {
+        // Custom sources always carry overrides (possibly empty if no row found).
+        result.metadata = {
+          source: 'custom',
+          ...(row.metadataSourcePath ? { source_path: row.metadataSourcePath } : {}),
+          overrides: overrides ?? {},
+        };
+      } else {
+        result.metadata = {
+          source: row.metadataSource,
+          source_path: row.metadataSourcePath,
+          ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
+        };
+      }
+    }
 
     return result as ModelConfig;
   }

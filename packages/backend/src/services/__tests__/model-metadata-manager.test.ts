@@ -1,6 +1,8 @@
 import { describe, expect, test, beforeAll, afterEach } from 'bun:test';
 import path from 'path';
-import { ModelMetadataManager } from '../model-metadata-manager';
+import { ModelMetadataManager, mergeOverrides } from '../model-metadata-manager';
+import type { NormalizedModelMetadata } from '../model-metadata-manager';
+import type { MetadataOverrides } from '../../config';
 
 const FIXTURES = path.join(__dirname, '../../utils/__tests__/fixtures');
 
@@ -346,5 +348,97 @@ describe('ModelMetadataManager – singleton', () => {
     const mgr2 = ModelMetadataManager.getInstance();
     expect(mgr2.isInitialized('openrouter')).toBe(false);
     expect(mgr2).not.toBe(mgr);
+  });
+});
+
+// ─── mergeOverrides ─────────────────────────────────────────────
+
+describe('mergeOverrides', () => {
+  const base: NormalizedModelMetadata = {
+    id: 'openai/gpt-4',
+    name: 'GPT-4',
+    description: 'Catalog description',
+    context_length: 8192,
+    pricing: {
+      prompt: '0.00003',
+      completion: '0.00006',
+      input_cache_read: '0.0000015',
+    },
+    architecture: {
+      input_modalities: ['text'],
+      output_modalities: ['text'],
+      tokenizer: 'cl100k_base',
+    },
+    supported_parameters: ['temperature', 'tools'],
+    top_provider: { context_length: 8192, max_completion_tokens: 4096 },
+  };
+
+  test('returns base unchanged when overrides is undefined', () => {
+    expect(mergeOverrides(base, undefined)).toEqual(base);
+  });
+
+  test('scalar overrides replace catalog values', () => {
+    const out = mergeOverrides(base, { name: 'My GPT-4', context_length: 16384 })!;
+    expect(out.name).toBe('My GPT-4');
+    expect(out.context_length).toBe(16384);
+    // Untouched fields still come from catalog
+    expect(out.description).toBe('Catalog description');
+  });
+
+  test('partial pricing override merges with catalog pricing', () => {
+    const out = mergeOverrides(base, { pricing: { prompt: '0.00001' } })!;
+    expect(out.pricing?.prompt).toBe('0.00001');
+    // Siblings preserved
+    expect(out.pricing?.completion).toBe('0.00006');
+    expect(out.pricing?.input_cache_read).toBe('0.0000015');
+  });
+
+  test('partial architecture override merges with catalog architecture', () => {
+    const out = mergeOverrides(base, { architecture: { tokenizer: 'custom-bpe' } })!;
+    expect(out.architecture?.tokenizer).toBe('custom-bpe');
+    expect(out.architecture?.input_modalities).toEqual(['text']);
+  });
+
+  test('supported_parameters array replaces entirely', () => {
+    const out = mergeOverrides(base, { supported_parameters: ['reasoning'] })!;
+    expect(out.supported_parameters).toEqual(['reasoning']);
+  });
+
+  test('modality arrays replace entirely when present', () => {
+    const out = mergeOverrides(base, {
+      architecture: { input_modalities: ['text', 'image', 'audio'] },
+    })!;
+    expect(out.architecture?.input_modalities).toEqual(['text', 'image', 'audio']);
+    // Output modalities untouched
+    expect(out.architecture?.output_modalities).toEqual(['text']);
+  });
+
+  test('custom source — undefined base + full overrides builds result from overrides alone', () => {
+    const overrides: MetadataOverrides = {
+      name: 'My Custom',
+      context_length: 2048,
+      pricing: { prompt: '0', completion: '0' },
+      architecture: { input_modalities: ['text'], output_modalities: ['text'] },
+      supported_parameters: [],
+      top_provider: { max_completion_tokens: 1024 },
+    };
+    const out = mergeOverrides(undefined, overrides)!;
+    expect(out.name).toBe('My Custom');
+    expect(out.context_length).toBe(2048);
+    expect(out.pricing?.prompt).toBe('0');
+    expect(out.top_provider?.max_completion_tokens).toBe(1024);
+  });
+
+  test('undefined base with empty overrides returns undefined', () => {
+    expect(mergeOverrides(undefined, {})).toBeUndefined();
+  });
+
+  test('overrides do not mutate the base object', () => {
+    const snapshot = JSON.parse(JSON.stringify(base));
+    mergeOverrides(base, {
+      pricing: { prompt: '0.5' },
+      architecture: { tokenizer: 'custom' },
+    });
+    expect(base).toEqual(snapshot);
   });
 });

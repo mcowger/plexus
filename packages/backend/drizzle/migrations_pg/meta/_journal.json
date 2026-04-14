@@ -218,6 +218,13 @@
       "when": 1776500000000,
       "tag": "0030_limited_login_scoping",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1776127239072,
+      "tag": "0031_friendly_pretty_boy",
+      "breakpoints": true
     }
   ]
 }
