@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.20.0 - 2026-04-14
+
+### Add Support for Neuralwatt cost data, support for the new Synthetic quota system, Added provider access allowlists and improved log filtering
+
+## New Features
+
 ## v0.19.9 - 2026-04-14
 
 ### v0.19.9 provider quota/config hardening and usage telemetry
