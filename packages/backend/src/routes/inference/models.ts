@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getConfig } from '../../config';
 import { PricingManager } from '../../services/pricing-manager';
-import { ModelMetadataManager } from '../../services/model-metadata-manager';
+import { ModelMetadataManager, mergeOverrides } from '../../services/model-metadata-manager';
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
   /**
@@ -36,8 +36,13 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         return base;
       }
 
-      // Look up enriched metadata from the appropriate source
-      const enriched = metadataManager.getMetadata(metaConfig.source, metaConfig.source_path);
+      // Look up enriched metadata from the appropriate source. Custom sources
+      // skip the catalog entirely and derive everything from overrides.
+      let catalog: ReturnType<typeof metadataManager.getMetadata> = undefined;
+      if (metaConfig.source !== 'custom') {
+        catalog = metadataManager.getMetadata(metaConfig.source, metaConfig.source_path);
+      }
+      const enriched = mergeOverrides(catalog, metaConfig.overrides);
       if (!enriched) {
         return base;
       }
@@ -80,6 +85,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
 
     const source = query.source as 'openrouter' | 'models.dev' | 'catwalk' | undefined;
     if (!source || !['openrouter', 'models.dev', 'catwalk'].includes(source)) {
+      // Note: 'custom' is intentionally rejected — there's no catalog to search.
       return reply.status(400).send({
         error: `Missing or invalid 'source' parameter. Must be one of: openrouter, models.dev, catwalk`,
       });

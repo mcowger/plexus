@@ -1,8 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { api, Alias, AliasMetadata, AliasBehavior, Provider, Model } from '../lib/api';
+import {
+  api,
+  Alias,
+  AliasMetadata,
+  AliasBehavior,
+  MetadataOverrides,
+  MetadataSource,
+  Provider,
+  Model,
+} from '../lib/api';
 import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
+import { MetadataOverrideForm } from '../components/models/MetadataOverrideForm';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -52,6 +62,9 @@ export const Models = () => {
   // Modal State
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isMetadataOpen, setIsMetadataOpen] = useState(false);
+  // "Override" toggle for non-custom sources. When on, the editable field
+  // grid is shown so the user can override individual enriched fields.
+  const [isOverrideOpen, setIsOverrideOpen] = useState(false);
 
   // Metadata search state
   const [metadataQuery, setMetadataQuery] = useState('');
@@ -102,6 +115,19 @@ export const Models = () => {
     };
     fetchVFConfig();
   }, []);
+
+  // When the modal opens, sync override panel state + search query with the
+  // current alias's metadata block.
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const meta = editingAlias.metadata;
+    setIsOverrideOpen(!!meta && (meta.source === 'custom' || !!meta.overrides));
+    setMetadataQuery(meta?.source_path ?? '');
+    setShowMetadataDropdown(false);
+    setMetadataResults([]);
+    // Only re-run when the modal transitions open (or editingAlias.id changes).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isModalOpen, editingAlias.id]);
 
   const handleSaveDescriptor = async () => {
     setIsSavingDescriptor(true);
@@ -301,7 +327,14 @@ export const Models = () => {
   };
 
   /** Search metadata catalog for autocomplete */
-  const handleMetadataSearch = useCallback((query: string, source: AliasMetadata['source']) => {
+  const handleMetadataSearch = useCallback((query: string, source: MetadataSource) => {
+    if (source === 'custom') {
+      // Custom has no catalog to search against.
+      setMetadataQuery(query);
+      setMetadataResults([]);
+      setShowMetadataDropdown(false);
+      return;
+    }
     setMetadataQuery(query);
     if (metadataSearchRef.current) clearTimeout(metadataSearchRef.current);
     if (!query.trim()) {
@@ -323,12 +356,18 @@ export const Models = () => {
     }, 250);
   }, []);
 
-  /** Select a metadata result and set it on the alias */
+  /** Select a metadata result and set it on the alias (preserves existing overrides). */
   const selectMetadataResult = (result: { id: string; name: string }) => {
-    const source = editingAlias.metadata?.source ?? 'openrouter';
+    const current = editingAlias.metadata;
+    const source: MetadataSource =
+      current?.source && current.source !== 'custom' ? current.source : 'openrouter';
     setEditingAlias({
       ...editingAlias,
-      metadata: { source, source_path: result.id },
+      metadata: {
+        source,
+        source_path: result.id,
+        ...(current?.overrides ? { overrides: current.overrides } : {}),
+      },
     });
     setMetadataQuery(result.name);
     setShowMetadataDropdown(false);
@@ -341,6 +380,95 @@ export const Models = () => {
     setEditingAlias(rest as Alias);
     setMetadataQuery('');
     setShowMetadataDropdown(false);
+  };
+
+  /** Seed defaults when a user first picks the 'custom' source. */
+  const buildCustomDefaults = (aliasId: string): MetadataOverrides => ({
+    name: aliasId || 'Custom Model',
+    context_length: 4096,
+    architecture: { input_modalities: ['text'], output_modalities: ['text'] },
+    pricing: { prompt: '0', completion: '0' },
+    supported_parameters: [],
+  });
+
+  /** Patch a single field in the override blob. `undefined` removes the key. */
+  const setOverrideField = <K extends keyof MetadataOverrides>(
+    key: K,
+    value: MetadataOverrides[K] | undefined
+  ) => {
+    const current = editingAlias.metadata;
+    if (!current) return;
+    const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
+    if (value === undefined) delete nextOverrides[key];
+    else nextOverrides[key] = value;
+    setEditingAlias({
+      ...editingAlias,
+      metadata: { ...current, overrides: nextOverrides },
+    });
+  };
+
+  const setPricingField = (
+    key: keyof NonNullable<MetadataOverrides['pricing']>,
+    value: string | undefined
+  ) => {
+    const current = editingAlias.metadata;
+    if (!current) return;
+    const pricing = { ...(current.overrides?.pricing ?? {}) };
+    if (value === undefined || value === '') delete pricing[key];
+    else pricing[key] = value;
+    const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
+    if (Object.keys(pricing).length === 0) delete nextOverrides.pricing;
+    else nextOverrides.pricing = pricing;
+    setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
+  };
+
+  const setArchitectureField = (
+    key: keyof NonNullable<MetadataOverrides['architecture']>,
+    value: string | string[] | undefined
+  ) => {
+    const current = editingAlias.metadata;
+    if (!current) return;
+    const arch = { ...(current.overrides?.architecture ?? {}) };
+    if (value === undefined || (Array.isArray(value) && value.length === 0) || value === '')
+      delete arch[key];
+    else (arch as any)[key] = value;
+    const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
+    if (Object.keys(arch).length === 0) delete nextOverrides.architecture;
+    else nextOverrides.architecture = arch;
+    setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
+  };
+
+  const setTopProviderField = (
+    key: keyof NonNullable<MetadataOverrides['top_provider']>,
+    value: number | undefined
+  ) => {
+    const current = editingAlias.metadata;
+    if (!current) return;
+    const tp = { ...(current.overrides?.top_provider ?? {}) };
+    if (value === undefined) delete tp[key];
+    else tp[key] = value;
+    const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
+    if (Object.keys(tp).length === 0) delete nextOverrides.top_provider;
+    else nextOverrides.top_provider = tp;
+    setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
+  };
+
+  /** Count the number of overridden fields for the preview strip. */
+  const countOverrides = (o?: MetadataOverrides): number => {
+    if (!o) return 0;
+    let n = 0;
+    if (o.name !== undefined) n++;
+    if (o.description !== undefined) n++;
+    if (o.context_length !== undefined) n++;
+    if (o.pricing) n += Object.values(o.pricing).filter((v) => v !== undefined).length;
+    if (o.architecture) {
+      if (o.architecture.input_modalities !== undefined) n++;
+      if (o.architecture.output_modalities !== undefined) n++;
+      if (o.architecture.tokenizer !== undefined) n++;
+    }
+    if (o.supported_parameters !== undefined) n++;
+    if (o.top_provider) n += Object.values(o.top_provider).filter((v) => v !== undefined).length;
+    return n;
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
@@ -792,103 +920,210 @@ export const Models = () => {
                     style={{ padding: '5px 8px', height: '30px' }}
                     value={editingAlias.metadata?.source ?? 'openrouter'}
                     onChange={(e) => {
-                      const source = e.target.value as AliasMetadata['source'];
-                      setEditingAlias({
-                        ...editingAlias,
-                        metadata: { source, source_path: editingAlias.metadata?.source_path ?? '' },
-                      });
+                      const source = e.target.value as MetadataSource;
+                      const existingOverrides = editingAlias.metadata?.overrides;
+                      let next: AliasMetadata;
+                      if (source === 'custom') {
+                        next = {
+                          source: 'custom',
+                          overrides: existingOverrides ?? buildCustomDefaults(editingAlias.id),
+                        };
+                        setIsOverrideOpen(true);
+                      } else {
+                        next = {
+                          source,
+                          source_path: editingAlias.metadata?.source_path ?? '',
+                          ...(existingOverrides ? { overrides: existingOverrides } : {}),
+                        };
+                      }
+                      setEditingAlias({ ...editingAlias, metadata: next });
                       // Re-run search with new source if there's a query
-                      if (metadataQuery) handleMetadataSearch(metadataQuery, source);
+                      if (metadataQuery && source !== 'custom')
+                        handleMetadataSearch(metadataQuery, source);
                     }}
                   >
                     <option value="openrouter">OpenRouter</option>
                     <option value="models.dev">models.dev</option>
                     <option value="catwalk">Catwalk (Charm)</option>
+                    <option value="custom">Custom (manual entry)</option>
                   </select>
                 </div>
 
-                {/* Search / source_path */}
-                <div style={{ position: 'relative' }}>
-                  <label
-                    className="font-body text-[12px] font-medium text-text-secondary"
-                    style={{ display: 'block', marginBottom: '4px' }}
-                  >
-                    Model
-                    {editingAlias.metadata?.source_path && (
-                      <span className="ml-2 font-normal text-text-muted">
-                        ({editingAlias.metadata.source_path})
-                      </span>
-                    )}
-                  </label>
-                  <div style={{ position: 'relative', display: 'flex', gap: '4px' }}>
-                    <div ref={metadataInputWrapperRef} style={{ position: 'relative', flex: 1 }}>
-                      <Input
-                        value={metadataQuery}
-                        onChange={(e) => {
-                          const source = editingAlias.metadata?.source ?? 'openrouter';
-                          handleMetadataSearch(e.target.value, source);
-                          // Update rect so portal dropdown follows the input
-                          if (metadataInputWrapperRef.current) {
-                            const r = metadataInputWrapperRef.current.getBoundingClientRect();
-                            setDropdownRect({ top: r.bottom + 2, left: r.left, width: r.width });
-                          }
-                        }}
-                        onFocus={() => {
-                          if (metadataResults.length > 0) {
+                {/* Search / source_path — hidden for 'custom' (no catalog) */}
+                {editingAlias.metadata?.source !== 'custom' && (
+                  <div style={{ position: 'relative' }}>
+                    <label
+                      className="font-body text-[12px] font-medium text-text-secondary"
+                      style={{ display: 'block', marginBottom: '4px' }}
+                    >
+                      Model
+                      {editingAlias.metadata?.source_path && (
+                        <span className="ml-2 font-normal text-text-muted">
+                          ({editingAlias.metadata.source_path})
+                        </span>
+                      )}
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', gap: '4px' }}>
+                      <div ref={metadataInputWrapperRef} style={{ position: 'relative', flex: 1 }}>
+                        <Input
+                          value={metadataQuery}
+                          onChange={(e) => {
+                            const source = editingAlias.metadata?.source ?? 'openrouter';
+                            handleMetadataSearch(e.target.value, source);
+                            // Update rect so portal dropdown follows the input
                             if (metadataInputWrapperRef.current) {
                               const r = metadataInputWrapperRef.current.getBoundingClientRect();
                               setDropdownRect({ top: r.bottom + 2, left: r.left, width: r.width });
                             }
-                            setShowMetadataDropdown(true);
-                          }
-                        }}
-                        placeholder={`Search ${editingAlias.metadata?.source ?? 'openrouter'} catalog...`}
-                        style={{
-                          width: '100%',
-                          paddingRight: isMetadataSearching ? '28px' : undefined,
-                        }}
-                        onBlur={() => setShowMetadataDropdown(false)}
-                      />
-                      {isMetadataSearching && (
-                        <Loader2
-                          size={14}
-                          className="animate-spin text-text-muted"
-                          style={{
-                            position: 'absolute',
-                            right: '8px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
                           }}
+                          onFocus={() => {
+                            if (metadataResults.length > 0) {
+                              if (metadataInputWrapperRef.current) {
+                                const r = metadataInputWrapperRef.current.getBoundingClientRect();
+                                setDropdownRect({
+                                  top: r.bottom + 2,
+                                  left: r.left,
+                                  width: r.width,
+                                });
+                              }
+                              setShowMetadataDropdown(true);
+                            }
+                          }}
+                          placeholder={`Search ${editingAlias.metadata?.source ?? 'openrouter'} catalog...`}
+                          style={{
+                            width: '100%',
+                            paddingRight: isMetadataSearching ? '28px' : undefined,
+                          }}
+                          onBlur={() => setShowMetadataDropdown(false)}
                         />
+                        {isMetadataSearching && (
+                          <Loader2
+                            size={14}
+                            className="animate-spin text-text-muted"
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                            }}
+                          />
+                        )}
+                      </div>
+                      {editingAlias.metadata && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearMetadata}
+                          style={{
+                            color: 'var(--color-danger)',
+                            padding: '4px',
+                            minHeight: 'auto',
+                          }}
+                          title="Remove metadata"
+                        >
+                          <X size={14} />
+                        </Button>
                       )}
                     </div>
-                    {editingAlias.metadata && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearMetadata}
-                        style={{ color: 'var(--color-danger)', padding: '4px', minHeight: 'auto' }}
-                        title="Remove metadata"
-                      >
-                        <X size={14} />
-                      </Button>
-                    )}
                   </div>
-                </div>
+                )}
 
                 {/* Selected metadata preview */}
-                {editingAlias.metadata?.source_path && (
-                  <div
-                    className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
-                    style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCircle size={12} className="text-success" />
-                      <span>
-                        Metadata assigned from <strong>{editingAlias.metadata.source}</strong>:{' '}
-                        <code className="text-primary">{editingAlias.metadata.source_path}</code>
-                      </span>
+                {editingAlias.metadata &&
+                  (editingAlias.metadata.source === 'custom' ||
+                    editingAlias.metadata.source_path ||
+                    editingAlias.metadata.overrides) && (
+                    <div
+                      className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
+                      style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle size={12} className="text-success" />
+                        <span>
+                          {editingAlias.metadata.source === 'custom' ? (
+                            <>
+                              Custom metadata
+                              {editingAlias.metadata.source_path && (
+                                <>
+                                  :{' '}
+                                  <code className="text-primary">
+                                    {editingAlias.metadata.source_path}
+                                  </code>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              Metadata assigned from <strong>{editingAlias.metadata.source}</strong>
+                              {editingAlias.metadata.source_path && (
+                                <>
+                                  :{' '}
+                                  <code className="text-primary">
+                                    {editingAlias.metadata.source_path}
+                                  </code>
+                                </>
+                              )}
+                            </>
+                          )}
+                          {countOverrides(editingAlias.metadata.overrides) > 0 && (
+                            <span className="ml-2 text-text-muted">
+                              + {countOverrides(editingAlias.metadata.overrides)} field
+                              {countOverrides(editingAlias.metadata.overrides) === 1 ? '' : 's'}{' '}
+                              overridden
+                            </span>
+                          )}
+                        </span>
+                      </div>
                     </div>
+                  )}
+
+                {/* Override toggle + editable form */}
+                {editingAlias.metadata && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {editingAlias.metadata.source !== 'custom' && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <label
+                          className="font-body text-[12px] font-medium text-text-secondary"
+                          style={{ marginBottom: 0 }}
+                        >
+                          Override catalog fields
+                        </label>
+                        <Switch
+                          checked={isOverrideOpen}
+                          onChange={(v) => {
+                            setIsOverrideOpen(v);
+                            if (!v) {
+                              // Flipping override off clears any existing overrides.
+                              const current = editingAlias.metadata;
+                              if (current) {
+                                const { overrides: _o, ...rest } = current;
+                                setEditingAlias({
+                                  ...editingAlias,
+                                  metadata: rest as AliasMetadata,
+                                });
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {(isOverrideOpen || editingAlias.metadata.source === 'custom') && (
+                      <MetadataOverrideForm
+                        overrides={editingAlias.metadata.overrides ?? {}}
+                        isCustom={editingAlias.metadata.source === 'custom'}
+                        onSetField={setOverrideField}
+                        onSetPricing={setPricingField}
+                        onSetArchitecture={setArchitectureField}
+                        onSetTopProvider={setTopProviderField}
+                      />
+                    )}
                   </div>
                 )}
               </div>

@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import type { MetadataOverrides } from '../config';
 
 // ─── Normalized model metadata (OpenRouter-style) ──────────────────────────
 // All three sources are normalized into this shape.
@@ -445,4 +446,68 @@ export class ModelMetadataManager {
   public getAllIds(source: 'openrouter' | 'models.dev' | 'catwalk'): string[] {
     return Array.from(this.getMap(source).keys());
   }
+}
+
+/**
+ * Merge per-field metadata overrides on top of a catalog entry.
+ *
+ * - Scalars (name, description, context_length) replace.
+ * - Nested objects (pricing, architecture, top_provider) are spread-merged so
+ *   partial overrides don't wipe untouched sibling keys.
+ * - Arrays (supported_parameters, *_modalities) fully replace when present.
+ *
+ * When `base` is undefined (e.g. `source === 'custom'`), the overrides form the
+ * entire result. When both `base` and `overrides` are empty/undefined, returns
+ * undefined so callers can treat the alias as having no enriched metadata.
+ */
+export function mergeOverrides(
+  base: NormalizedModelMetadata | undefined,
+  overrides: MetadataOverrides | undefined
+): NormalizedModelMetadata | undefined {
+  if (!overrides) return base;
+
+  const merged: NormalizedModelMetadata = {
+    id: base?.id ?? '',
+    name: base?.name ?? '',
+    ...(base?.description !== undefined && { description: base.description }),
+    ...(base?.context_length !== undefined && { context_length: base.context_length }),
+    ...(base?.architecture !== undefined && { architecture: { ...base.architecture } }),
+    ...(base?.pricing !== undefined && { pricing: { ...base.pricing } }),
+    ...(base?.supported_parameters !== undefined && {
+      supported_parameters: [...base.supported_parameters],
+    }),
+    ...(base?.top_provider !== undefined && { top_provider: { ...base.top_provider } }),
+  };
+
+  if (overrides.name !== undefined) merged.name = overrides.name;
+  if (overrides.description !== undefined) merged.description = overrides.description;
+  if (overrides.context_length !== undefined) merged.context_length = overrides.context_length;
+
+  if (overrides.pricing) {
+    merged.pricing = { ...(merged.pricing ?? {}), ...overrides.pricing };
+  }
+  if (overrides.architecture) {
+    merged.architecture = { ...(merged.architecture ?? {}), ...overrides.architecture };
+  }
+  if (overrides.top_provider) {
+    merged.top_provider = { ...(merged.top_provider ?? {}), ...overrides.top_provider };
+  }
+  if (overrides.supported_parameters !== undefined) {
+    merged.supported_parameters = overrides.supported_parameters;
+  }
+
+  // If nothing meaningful ended up in merged, signal "no metadata".
+  if (
+    !merged.name &&
+    merged.description === undefined &&
+    merged.context_length === undefined &&
+    merged.pricing === undefined &&
+    merged.architecture === undefined &&
+    merged.supported_parameters === undefined &&
+    merged.top_provider === undefined
+  ) {
+    return undefined;
+  }
+
+  return merged;
 }

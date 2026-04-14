@@ -405,14 +405,71 @@ const ModelBehaviorSchema = z.discriminatedUnion('type', [StripAdaptiveThinkingB
 // ─── Model Metadata ──────────────────────
 // Optional reference to an external model catalog entry. When configured,
 // Plexus fetches metadata at startup and includes it in GET /v1/models.
-const ModelMetadataSchema = z.object({
-  source: z.enum(['openrouter', 'models.dev', 'catwalk']),
-  // Path within the source catalog:
-  //   openrouter:  "openai/gpt-4.1-nano"
-  //   models.dev:  "anthropic.claude-3-5-haiku-20241022"
-  //   catwalk:     "anthropic.claude-3-5-haiku-20241022"
-  source_path: z.string().min(1),
+//
+// `overrides` lets users override individual fields per alias. Overridden
+// fields win over catalog values; untouched fields still track the catalog.
+// When `source === 'custom'`, all data comes from overrides (no catalog lookup).
+const MetadataPricingOverridesSchema = z
+  .object({
+    prompt: z.string().optional(),
+    completion: z.string().optional(),
+    input_cache_read: z.string().optional(),
+    input_cache_write: z.string().optional(),
+  })
+  .partial();
+
+const MetadataArchitectureOverridesSchema = z
+  .object({
+    input_modalities: z.array(z.string()).optional(),
+    output_modalities: z.array(z.string()).optional(),
+    tokenizer: z.string().optional(),
+  })
+  .partial();
+
+const MetadataTopProviderOverridesSchema = z
+  .object({
+    context_length: z.number().int().positive().optional(),
+    max_completion_tokens: z.number().int().positive().optional(),
+  })
+  .partial();
+
+const MetadataOverridesSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  context_length: z.number().int().positive().optional(),
+  pricing: MetadataPricingOverridesSchema.optional(),
+  architecture: MetadataArchitectureOverridesSchema.optional(),
+  supported_parameters: z.array(z.string()).optional(),
+  top_provider: MetadataTopProviderOverridesSchema.optional(),
 });
+
+const ModelMetadataSchema = z.discriminatedUnion('source', [
+  z.object({
+    source: z.literal('openrouter'),
+    // Path within the source catalog (e.g., "openai/gpt-4.1-nano")
+    source_path: z.string().min(1),
+    overrides: MetadataOverridesSchema.optional(),
+  }),
+  z.object({
+    source: z.literal('models.dev'),
+    // e.g., "anthropic.claude-3-5-haiku-20241022"
+    source_path: z.string().min(1),
+    overrides: MetadataOverridesSchema.optional(),
+  }),
+  z.object({
+    source: z.literal('catwalk'),
+    // e.g., "anthropic.claude-3-5-haiku-20241022"
+    source_path: z.string().min(1),
+    overrides: MetadataOverridesSchema.optional(),
+  }),
+  z.object({
+    source: z.literal('custom'),
+    // Optional free-form label; not used for any catalog lookup.
+    source_path: z.string().optional(),
+    // All metadata for custom sources lives in overrides.
+    overrides: MetadataOverridesSchema,
+  }),
+]);
 
 export const ModelConfigSchema = z.object({
   selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
@@ -428,6 +485,7 @@ export const ModelConfigSchema = z.object({
 export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
 export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinkingBehaviorSchema>;
 export type ModelMetadata = z.infer<typeof ModelMetadataSchema>;
+export type MetadataOverrides = z.infer<typeof MetadataOverridesSchema>;
 
 export const KeyConfigSchema = z.object({
   secret: z.string(),

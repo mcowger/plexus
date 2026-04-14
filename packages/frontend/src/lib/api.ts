@@ -296,9 +296,35 @@ export interface StripAdaptiveThinkingBehavior {
 
 export type AliasBehavior = StripAdaptiveThinkingBehavior; // | NextBehavior | ...
 
+export type MetadataSource = 'openrouter' | 'models.dev' | 'catwalk' | 'custom';
+
+export interface MetadataOverrides {
+  name?: string;
+  description?: string;
+  context_length?: number;
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    input_cache_read?: string;
+    input_cache_write?: string;
+  };
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+    tokenizer?: string;
+  };
+  supported_parameters?: string[];
+  top_provider?: {
+    context_length?: number;
+    max_completion_tokens?: number;
+  };
+}
+
 export interface AliasMetadata {
-  source: 'openrouter' | 'models.dev' | 'catwalk';
-  source_path: string;
+  source: MetadataSource;
+  // Required for openrouter/models.dev/catwalk; optional for 'custom'.
+  source_path?: string;
+  overrides?: MetadataOverrides;
 }
 
 export interface Alias {
@@ -2306,7 +2332,7 @@ export const api = {
    * @param limit  - max results (default 50)
    */
   searchModelMetadata: async (
-    source: 'openrouter' | 'models.dev' | 'catwalk',
+    source: Exclude<MetadataSource, 'custom'>,
     query?: string,
     limit?: number
   ): Promise<{ data: { id: string; name: string }[]; count: number }> => {
