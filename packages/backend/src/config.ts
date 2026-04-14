@@ -466,8 +466,11 @@ const ModelMetadataSchema = z.discriminatedUnion('source', [
     source: z.literal('custom'),
     // Optional free-form label; not used for any catalog lookup.
     source_path: z.string().optional(),
-    // All metadata for custom sources lives in overrides.
-    overrides: MetadataOverridesSchema,
+    // All metadata for custom sources lives in overrides. A non-empty `name`
+    // is required because there is no catalog fallback.
+    overrides: MetadataOverridesSchema.extend({
+      name: z.string().min(1),
+    }),
   }),
 ]);
 

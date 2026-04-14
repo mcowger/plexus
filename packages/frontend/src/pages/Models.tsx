@@ -144,6 +144,16 @@ export const Models = () => {
 
   const handleSave = async () => {
     if (!editingAlias.id) return;
+    // Custom metadata requires a non-empty name — the backend Zod schema will
+    // reject it otherwise. Surface a clear error here instead of letting the
+    // save API call fail generically.
+    if (editingAlias.metadata?.source === 'custom') {
+      const name = editingAlias.metadata.overrides?.name;
+      if (!name || name.trim() === '') {
+        alert('Custom metadata requires a non-empty Name.');
+        return;
+      }
+    }
     await hookSave(editingAlias, originalId);
   };
 
@@ -391,7 +401,13 @@ export const Models = () => {
     supported_parameters: [],
   });
 
-  /** Patch a single field in the override blob. `undefined` removes the key. */
+  /**
+   * Patch a single field in the override blob. `undefined` removes the key
+   * so the field falls back to the catalog value — except for the `name`
+   * field in custom mode, which has no catalog fallback and is required by
+   * the backend schema. In that case we store an empty string instead of
+   * deleting, letting the save-time validator surface the error clearly.
+   */
   const setOverrideField = <K extends keyof MetadataOverrides>(
     key: K,
     value: MetadataOverrides[K] | undefined
@@ -399,8 +415,15 @@ export const Models = () => {
     const current = editingAlias.metadata;
     if (!current) return;
     const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
-    if (value === undefined) delete nextOverrides[key];
-    else nextOverrides[key] = value;
+    if (value === undefined) {
+      if (current.source === 'custom' && key === 'name') {
+        nextOverrides.name = '';
+      } else {
+        delete nextOverrides[key];
+      }
+    } else {
+      nextOverrides[key] = value;
+    }
     setEditingAlias({
       ...editingAlias,
       metadata: { ...current, overrides: nextOverrides },
@@ -922,17 +945,26 @@ export const Models = () => {
                     onChange={(e) => {
                       const source = e.target.value as MetadataSource;
                       const existingOverrides = editingAlias.metadata?.overrides;
+                      const existingSourcePath = editingAlias.metadata?.source_path;
                       let next: AliasMetadata;
                       if (source === 'custom') {
+                        // Seed defaults, then layer any existing overrides on top so
+                        // user-typed values take precedence while missing required
+                        // fields (e.g., name) still have a sensible default.
+                        const mergedOverrides = {
+                          ...buildCustomDefaults(editingAlias.id),
+                          ...(existingOverrides ?? {}),
+                        };
                         next = {
                           source: 'custom',
-                          overrides: existingOverrides ?? buildCustomDefaults(editingAlias.id),
+                          ...(existingSourcePath ? { source_path: existingSourcePath } : {}),
+                          overrides: mergedOverrides,
                         };
                         setIsOverrideOpen(true);
                       } else {
                         next = {
                           source,
-                          source_path: editingAlias.metadata?.source_path ?? '',
+                          source_path: existingSourcePath ?? '',
                           ...(existingOverrides ? { overrides: existingOverrides } : {}),
                         };
                       }

@@ -535,54 +535,55 @@ export class ConfigRepository {
       updatedAt: timestamp,
     };
 
-    const existing = await this.db()
-      .select()
-      .from(schema.modelAliases)
-      .where(eq(schema.modelAliases.slug, slug))
-      .limit(1);
+    // Wrap the whole save — alias upsert, target replace, override replace —
+    // in one transaction so partial failures don't leave the row inconsistent.
+    await this.db().transaction(async (tx: any) => {
+      const existing = await tx
+        .select()
+        .from(schema.modelAliases)
+        .where(eq(schema.modelAliases.slug, slug))
+        .limit(1);
 
-    let aliasId: number;
+      let aliasId: number;
 
-    if (existing.length > 0) {
-      aliasId = existing[0]!.id;
-      await this.db()
-        .update(schema.modelAliases)
-        .set(aliasData)
-        .where(eq(schema.modelAliases.id, aliasId));
-    } else {
-      const inserted = await this.db()
-        .insert(schema.modelAliases)
-        .values({ ...aliasData, createdAt: timestamp })
-        .returning({ id: schema.modelAliases.id });
-      aliasId = inserted[0]!.id;
-    }
+      if (existing.length > 0) {
+        aliasId = existing[0]!.id;
+        await tx
+          .update(schema.modelAliases)
+          .set(aliasData)
+          .where(eq(schema.modelAliases.id, aliasId));
+      } else {
+        const inserted = await tx
+          .insert(schema.modelAliases)
+          .values({ ...aliasData, createdAt: timestamp })
+          .returning({ id: schema.modelAliases.id });
+        aliasId = inserted[0]!.id;
+      }
 
-    // Replace targets
-    await this.db()
-      .delete(schema.modelAliasTargets)
-      .where(eq(schema.modelAliasTargets.aliasId, aliasId));
+      // Replace targets
+      await tx
+        .delete(schema.modelAliasTargets)
+        .where(eq(schema.modelAliasTargets.aliasId, aliasId));
 
-    if (config.targets && config.targets.length > 0) {
-      const targetRows = config.targets.map((t, idx) => ({
-        aliasId,
-        providerSlug: t.provider,
-        modelName: t.model,
-        enabled: fromBool(t.enabled !== false),
-        sortOrder: idx,
-      }));
-      await this.db().insert(schema.modelAliasTargets).values(targetRows);
-    }
+      if (config.targets && config.targets.length > 0) {
+        const targetRows = config.targets.map((t, idx) => ({
+          aliasId,
+          providerSlug: t.provider,
+          modelName: t.model,
+          enabled: fromBool(t.enabled !== false),
+          sortOrder: idx,
+        }));
+        await tx.insert(schema.modelAliasTargets).values(targetRows);
+      }
 
-    // Replace metadata overrides
-    await this.db()
-      .delete(schema.aliasMetadataOverrides)
-      .where(eq(schema.aliasMetadataOverrides.aliasId, aliasId));
+      // Replace metadata overrides
+      await tx
+        .delete(schema.aliasMetadataOverrides)
+        .where(eq(schema.aliasMetadataOverrides.aliasId, aliasId));
 
-    const overrides = config.metadata?.overrides;
-    if (overrides && hasAnyOverrideField(overrides)) {
-      await this.db()
-        .insert(schema.aliasMetadataOverrides)
-        .values({
+      const overrides = config.metadata?.overrides;
+      if (overrides && hasAnyOverrideField(overrides)) {
+        await tx.insert(schema.aliasMetadataOverrides).values({
           aliasId,
           name: overrides.name ?? null,
           description: overrides.description ?? null,
@@ -605,7 +606,8 @@ export class ConfigRepository {
           topProviderMaxCompletionTokens: overrides.top_provider?.max_completion_tokens ?? null,
           updatedAt: timestamp,
         });
-    }
+      }
+    });
   }
 
   async deleteAlias(slug: string): Promise<void> {

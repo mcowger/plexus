@@ -15,10 +15,10 @@ export const aliasMetadataOverrides = pgTable(
     pricingCompletion: text('pricing_completion'),
     pricingInputCacheRead: text('pricing_input_cache_read'),
     pricingInputCacheWrite: text('pricing_input_cache_write'),
-    architectureInputModalities: jsonb('architecture_input_modalities'), // string[]
-    architectureOutputModalities: jsonb('architecture_output_modalities'), // string[]
+    architectureInputModalities: jsonb('architecture_input_modalities').$type<string[]>(),
+    architectureOutputModalities: jsonb('architecture_output_modalities').$type<string[]>(),
     architectureTokenizer: text('architecture_tokenizer'),
-    supportedParameters: jsonb('supported_parameters'), // string[]
+    supportedParameters: jsonb('supported_parameters').$type<string[]>(),
     topProviderContextLength: integer('top_provider_context_length'),
     topProviderMaxCompletionTokens: integer('top_provider_max_completion_tokens'),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
