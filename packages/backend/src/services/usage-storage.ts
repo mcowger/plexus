@@ -314,8 +314,9 @@ export class UsageStorageService extends EventEmitter {
 
   async getErrors(limit: number = 50, offset: number = 0, apiKey?: string): Promise<any[]> {
     try {
+      const db = this.ensureDb();
       const where = apiKey ? eq(this.schema.inferenceErrors.apiKey, apiKey) : undefined;
-      const query = this.ensureDb()
+      const query = db
         .select()
         .from(this.schema.inferenceErrors)
         .orderBy(desc(this.schema.inferenceErrors.createdAt))
@@ -386,8 +387,9 @@ export class UsageStorageService extends EventEmitter {
     apiKey?: string
   ): Promise<{ requestId: string; createdAt: number }[]> {
     try {
+      const db = this.ensureDb();
       const where = apiKey ? eq(this.schema.debugLogs.apiKey, apiKey) : undefined;
-      const query = this.ensureDb()
+      const query = db
         .select({
           requestId: this.schema.debugLogs.requestId,
           createdAt: this.schema.debugLogs.createdAt,
