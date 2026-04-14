@@ -122,6 +122,31 @@ export class DebugLoggingInspector extends BaseInspector {
     }
   }
 
+  /**
+   * Extract provider-reported cost from SSE comment lines.
+   * Some providers emit `: cost {"request_cost_usd": ...}` as SSE comments
+   * alongside the standard `data:` events. These are ignored by eventsource-parser
+   * but contain valuable actual cost information.
+   */
+  private extractProviderCostFromSSEComments(fullBody: string): any | null {
+    const lines = fullBody.split(/\r?\n/);
+    let lastCost: any = null;
+
+    for (const line of lines) {
+      // Match `: cost {json}` pattern (SSE comment with cost data)
+      const costMatch = line.match(/^:\s*cost\s+(\{.+\})\s*$/);
+      if (costMatch) {
+        try {
+          lastCost = JSON.parse(costMatch[1]!);
+        } catch (e) {
+          // Skip malformed cost lines
+        }
+      }
+    }
+
+    return lastCost;
+  }
+
   private reconstructChatCompletions(fullBody: string): any {
     const trimmed = fullBody.trim();
     if (!trimmed) return null;
@@ -129,7 +154,13 @@ export class DebugLoggingInspector extends BaseInspector {
     // Try parsing as a single JSON object (non-streaming)
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
-        return JSON.parse(trimmed);
+        const parsed = JSON.parse(trimmed);
+        // Check for provider-reported cost in SSE comments even for non-streaming
+        const providerCost = this.extractProviderCostFromSSEComments(fullBody);
+        if (providerCost) {
+          parsed.providerReportedCost = providerCost;
+        }
+        return parsed;
       } catch (e) {
         // Not a single JSON object, continue to stream parsing
       }
@@ -137,6 +168,9 @@ export class DebugLoggingInspector extends BaseInspector {
 
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
+
+    // Extract provider-reported cost from SSE comment lines
+    const providerCost = this.extractProviderCostFromSSEComments(fullBody);
 
     for (const line of lines) {
       if (!line.startsWith('data:')) continue;
@@ -150,6 +184,12 @@ export class DebugLoggingInspector extends BaseInspector {
         // Skip malformed/non-JSON lines
       }
     }
+
+    // Attach provider-reported cost if found in SSE comments
+    if (providerCost && snapshot) {
+      snapshot.providerReportedCost = providerCost;
+    }
+
     return snapshot;
   }
 
@@ -160,7 +200,12 @@ export class DebugLoggingInspector extends BaseInspector {
     // Try parsing as a single JSON object (non-streaming)
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
-        return JSON.parse(trimmed);
+        const parsed = JSON.parse(trimmed);
+        const providerCost = this.extractProviderCostFromSSEComments(fullBody);
+        if (providerCost) {
+          parsed.providerReportedCost = providerCost;
+        }
+        return parsed;
       } catch (e) {
         // Not a single JSON object, continue to stream parsing
       }
@@ -168,6 +213,9 @@ export class DebugLoggingInspector extends BaseInspector {
 
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
+
+    // Extract provider-reported cost from SSE comment lines
+    const providerCost = this.extractProviderCostFromSSEComments(fullBody);
 
     for (const line of lines) {
       if (!line.startsWith('data:')) continue;
@@ -181,6 +229,11 @@ export class DebugLoggingInspector extends BaseInspector {
         // Skip malformed/non-JSON lines
       }
     }
+
+    if (providerCost && snapshot) {
+      snapshot.providerReportedCost = providerCost;
+    }
+
     return snapshot;
   }
 
@@ -191,7 +244,12 @@ export class DebugLoggingInspector extends BaseInspector {
     // Try parsing as a single JSON object (non-streaming)
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
-        return JSON.parse(trimmed);
+        const parsed = JSON.parse(trimmed);
+        const providerCost = this.extractProviderCostFromSSEComments(fullBody);
+        if (providerCost) {
+          parsed.providerReportedCost = providerCost;
+        }
+        return parsed;
       } catch (e) {
         // Not a single JSON object, continue to stream parsing
       }
@@ -199,6 +257,9 @@ export class DebugLoggingInspector extends BaseInspector {
 
     const lines = fullBody.split(/\r?\n/);
     let snapshot: any = null;
+
+    // Extract provider-reported cost from SSE comment lines
+    const providerCost = this.extractProviderCostFromSSEComments(fullBody);
 
     for (const line of lines) {
       if (!line.startsWith('data:')) continue;
@@ -212,6 +273,11 @@ export class DebugLoggingInspector extends BaseInspector {
         // Skip malformed/non-JSON lines
       }
     }
+
+    if (providerCost && snapshot) {
+      snapshot.providerReportedCost = providerCost;
+    }
+
     return snapshot;
   }
 
@@ -222,7 +288,12 @@ export class DebugLoggingInspector extends BaseInspector {
     // Try parsing as a single JSON object (non-streaming)
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
-        return JSON.parse(trimmed);
+        const parsed = JSON.parse(trimmed);
+        const providerCost = this.extractProviderCostFromSSEComments(fullBody);
+        if (providerCost) {
+          parsed.providerReportedCost = providerCost;
+        }
+        return parsed;
       } catch (e) {
         // Not a single JSON object, continue to stream parsing
       }
@@ -243,6 +314,13 @@ export class DebugLoggingInspector extends BaseInspector {
         // Skip malformed/non-JSON lines
       }
     }
+
+    // Attach provider-reported cost if found in SSE comments
+    const providerCost = this.extractProviderCostFromSSEComments(fullBody);
+    if (providerCost && snapshot) {
+      snapshot.providerReportedCost = providerCost;
+    }
+
     return snapshot;
   }
 
@@ -322,6 +400,12 @@ export class DebugLoggingInspector extends BaseInspector {
       } catch (e) {
         // Skip malformed lines
       }
+    }
+
+    // Extract provider-reported cost from SSE comment lines
+    const providerCost = this.extractProviderCostFromSSEComments(fullBody);
+    if (providerCost) {
+      snapshot.providerReportedCost = providerCost;
     }
 
     return snapshot;

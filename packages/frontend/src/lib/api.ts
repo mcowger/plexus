@@ -355,6 +355,8 @@ export interface UsageRecord {
   visionFallthroughModel?: string | null;
   // Energy estimation
   kwhUsed?: number;
+  // Provider-reported cost
+  providerReportedCost?: number;
 }
 
 interface BackendResponse<T> {

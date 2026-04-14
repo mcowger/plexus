@@ -54,6 +54,8 @@ export const requestUsage = pgTable(
     visionFallthroughModel: text('vision_fallthrough_model'),
     // Energy estimation
     kwhUsed: real('kwh_used'),
+    // Provider-reported cost (actual cost from provider, e.g. from SSE `: cost` comments)
+    providerReportedCost: real('provider_reported_cost'),
   },
   (table) => ({
     dateIdx: index('idx_request_usage_date').on(table.date),

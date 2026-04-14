@@ -51,4 +51,7 @@ export interface UsageRecord {
   visionFallthroughModel?: string | null;
   // Energy estimation
   kwhUsed?: number | null;
+  // Provider-reported cost (from SSE `: cost` comments or response payload)
+  // When present, costTotal/costInput/costOutput are overridden with actual values
+  providerReportedCost?: number | null;
 }

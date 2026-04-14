@@ -112,6 +112,44 @@ export const CostToolTip: React.FC<CostToolTipProps> = ({ source, costMetadata, 
           </div>
         </div>
       );
+    } else if (s === 'provider_reported') {
+      content = (
+        <div style={containerStyle}>
+          <div style={headerStyle}>Source: Provider Reported</div>
+          <div style={gridStyle}>
+            <span style={labelStyle}>Cost:</span>
+            <span style={valueStyle}>${formatRate(data.request_cost_usd)}</span>
+
+            {data.cache_savings_usd !== undefined && (
+              <>
+                <span style={labelStyle}>Saved:</span>
+                <span style={{ ...valueStyle, color: '#4ade80' }}>
+                  ${formatRate(data.cache_savings_usd)}
+                </span>
+              </>
+            )}
+
+            {data.allowance_remaining_usd !== undefined && (
+              <>
+                <span style={labelStyle}>Allowance:</span>
+                <span style={valueStyle}>${formatRate(data.allowance_remaining_usd)}</span>
+              </>
+            )}
+
+            {data.budget_remaining_usd !== undefined && (
+              <>
+                <span style={labelStyle}>Budget:</span>
+                <span style={valueStyle}>${formatRate(data.budget_remaining_usd)}</span>
+              </>
+            )}
+          </div>
+          <div
+            style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '11px', marginTop: '4px' }}
+          >
+            Actual cost reported by provider
+          </div>
+        </div>
+      );
     } else if (s === 'openrouter') {
       content = (
         <div style={containerStyle}>

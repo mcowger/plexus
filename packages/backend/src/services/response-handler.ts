@@ -10,6 +10,7 @@ import { DebugLoggingInspector, UsageInspector } from './inspectors';
 import { Readable } from 'stream';
 import { DebugManager } from './debug-manager';
 import { estimateKwhUsed } from './inference-energy';
+import { applyProviderReportedCost } from '../utils/provider-cost';
 /**
  * handleResponse
  *
@@ -247,6 +248,14 @@ async function finalizeUsage(
 
   // Finalize costs and duration
   calculateCosts(usageRecord, pricing, providerDiscount);
+
+  // Override with provider-reported cost if available in the raw response
+  // (e.g. from SSE `: cost` comments or provider response payloads)
+  const debugManager = DebugManager.getInstance();
+  const reconstructed = debugManager.getReconstructedRawResponse(usageRecord.requestId!);
+  if (reconstructed?.providerReportedCost) {
+    applyProviderReportedCost(usageRecord, reconstructed.providerReportedCost);
+  }
   usageRecord.responseStatus = 'success';
   usageRecord.durationMs = Date.now() - startTime;
 

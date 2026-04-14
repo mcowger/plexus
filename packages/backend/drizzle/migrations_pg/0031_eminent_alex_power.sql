@@ -1,0 +1,1 @@
+ALTER TABLE "request_usage" ADD COLUMN "provider_reported_cost" real;

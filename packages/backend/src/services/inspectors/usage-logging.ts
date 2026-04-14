@@ -11,6 +11,7 @@ import {
   normalizeOpenAIResponsesUsage,
 } from '../../utils/usage-normalizer';
 import { estimateKwhUsed } from '../inference-energy';
+import { applyProviderReportedCost } from '../../utils/provider-cost';
 
 export class UsageInspector extends PassThrough {
   private usageStorage: UsageStorageService;
@@ -126,6 +127,12 @@ export class UsageInspector extends PassThrough {
       }
 
       calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
+
+      // Override with provider-reported cost if available
+      // Some providers emit `: cost {"request_cost_usd": ...}` as SSE comments
+      if (reconstructed?.providerReportedCost) {
+        applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
+      }
 
       // Estimate energy consumption
       this.usageRecord.kwhUsed = estimateKwhUsed(stats.inputTokens, stats.outputTokens);
