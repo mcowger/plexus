@@ -9,6 +9,12 @@ interface TagSelectProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   className?: string;
+  /**
+   * When true, users can add free-form values that aren't in `options`.
+   * Pressing Enter or typing a comma commits the current search text as a
+   * new tag, and the dropdown shows a "Create '<search>'" affordance.
+   */
+  allowCustom?: boolean;
 }
 
 export const TagSelect: React.FC<TagSelectProps> = ({
@@ -18,6 +24,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
   selected,
   onChange,
   className,
+  allowCustom = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -64,6 +71,50 @@ export const TagSelect: React.FC<TagSelectProps> = ({
     setIsOpen(true);
   };
 
+  // Commit the current search text as a new free-form tag. No-ops if the
+  // value is empty (after trim) or already selected.
+  const commitCustom = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    if (selected.includes(value)) {
+      setSearch('');
+      return;
+    }
+    onChange([...selected, value]);
+    setSearch('');
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!allowCustom) return;
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      commitCustom(search);
+    } else if (e.key === 'Backspace' && search === '' && selected.length > 0) {
+      // Quality-of-life: backspace on empty input peels off the last tag.
+      onChange(selected.slice(0, -1));
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value;
+    // Commit on comma even inside onChange (handles paste of "a, b, c").
+    if (allowCustom && next.includes(',')) {
+      const parts = next.split(',');
+      const tail = parts.pop() ?? '';
+      parts.forEach((p) => commitCustom(p));
+      setSearch(tail);
+      return;
+    }
+    setSearch(next);
+  };
+
+  const searchTrimmed = search.trim();
+  const showCreateOption =
+    allowCustom &&
+    searchTrimmed.length > 0 &&
+    !selected.includes(searchTrimmed) &&
+    !options.some((o) => o.toLowerCase() === searchTrimmed.toLowerCase());
+
   return (
     <div className={clsx('flex flex-col gap-2', className)} ref={containerRef}>
       {label && (
@@ -101,8 +152,14 @@ export const TagSelect: React.FC<TagSelectProps> = ({
             ref={searchInputRef}
             className="flex-1 min-w-[80px] bg-transparent border-0 outline-none text-text text-sm p-0 placeholder:text-text-muted"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={selected.length === 0 ? placeholder : 'Search...'}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+            onBlur={() => {
+              if (allowCustom) commitCustom(search);
+            }}
+            placeholder={
+              selected.length === 0 ? placeholder : allowCustom ? 'Type to add...' : 'Search...'
+            }
           />
         ) : (
           <span className="text-text-muted text-sm flex-1">
@@ -121,9 +178,13 @@ export const TagSelect: React.FC<TagSelectProps> = ({
       {isOpen && (
         <div className="relative -mt-1">
           <div className="absolute z-50 w-full max-h-52 overflow-y-auto bg-bg-surface border border-border-glass rounded-sm shadow-lg">
-            {filteredOptions.length === 0 && (
+            {filteredOptions.length === 0 && !showCreateOption && (
               <div className="px-3.5 py-2.5 text-xs text-text-muted">
-                {search ? 'No matches found' : 'All items selected'}
+                {search
+                  ? 'No matches found'
+                  : allowCustom
+                    ? 'Type to add a new tag'
+                    : 'All items selected'}
               </div>
             )}
             {filteredOptions.map((option) => (
@@ -139,6 +200,22 @@ export const TagSelect: React.FC<TagSelectProps> = ({
                 {option}
               </button>
             ))}
+            {showCreateOption && (
+              <button
+                type="button"
+                key={`__create__${searchTrimmed}`}
+                className="w-full text-left px-3.5 py-2 text-sm font-body cursor-pointer transition-colors hover:bg-bg-hover text-text border-t border-border-glass"
+                onMouseDown={(e) => {
+                  // Use onMouseDown so the click registers before the input
+                  // blur handler fires and closes the dropdown.
+                  e.preventDefault();
+                  commitCustom(searchTrimmed);
+                }}
+              >
+                <span className="text-text-muted">Create </span>
+                <span className="font-medium">&quot;{searchTrimmed}&quot;</span>
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -491,7 +491,7 @@ This section defines virtual model aliases that clients use in the `model` field
   The metadata catalog is loaded at startup from:
   - OpenRouter: `https://openrouter.ai/api/v1/models`
   - models.dev: `https://models.dev/api.json`
-  - Catwalk: `https://catwalk.charm.sh/providers`
+  - Catwalk: `https://catwalk.charm.sh/v2/providers`
 
   Metadata loading is non-fatal — if a source is unavailable, Plexus continues operating and returns base model information for aliases that reference that source.
 

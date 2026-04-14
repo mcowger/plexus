@@ -1,5 +1,33 @@
 import type { MetadataOverrides } from '../../lib/api';
 import { Input } from '../ui/Input';
+import { TagSelect } from '../ui/TagSelect';
+
+// Suggested values shown in the TagSelect dropdowns. Users can still enter
+// arbitrary strings via `allowCustom`; these are just hints for the common case.
+const MODALITY_SUGGESTIONS = ['text', 'image', 'audio', 'video', 'file'];
+const SUPPORTED_PARAM_SUGGESTIONS = [
+  'temperature',
+  'top_p',
+  'top_k',
+  'min_p',
+  'top_a',
+  'frequency_penalty',
+  'presence_penalty',
+  'repetition_penalty',
+  'seed',
+  'max_tokens',
+  'logit_bias',
+  'logprobs',
+  'top_logprobs',
+  'response_format',
+  'structured_outputs',
+  'stop',
+  'tools',
+  'tool_choice',
+  'reasoning',
+  'include_reasoning',
+  'web_search_options',
+];
 
 interface Props {
   overrides: MetadataOverrides;
@@ -39,12 +67,6 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
     {children}
   </label>
 );
-
-const parseCsv = (s: string): string[] =>
-  s
-    .split(',')
-    .map((x) => x.trim())
-    .filter((x) => x.length > 0);
 
 const parseIntOrUndef = (s: string): number | undefined => {
   const trimmed = s.trim();
@@ -166,25 +188,27 @@ export function MetadataOverrideForm({
         <SectionLabel>Architecture</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <div>
-            <FieldLabel>Input modalities (comma-separated)</FieldLabel>
-            <Input
-              value={(overrides.architecture?.input_modalities ?? []).join(', ')}
-              onChange={(e) => {
-                const list = parseCsv(e.target.value);
-                onSetArchitecture('input_modalities', list.length > 0 ? list : undefined);
-              }}
-              placeholder="text, image"
+            <FieldLabel>Input modalities</FieldLabel>
+            <TagSelect
+              placeholder="Add modalities..."
+              options={MODALITY_SUGGESTIONS}
+              selected={overrides.architecture?.input_modalities ?? []}
+              allowCustom
+              onChange={(list) =>
+                onSetArchitecture('input_modalities', list.length > 0 ? list : undefined)
+              }
             />
           </div>
           <div>
-            <FieldLabel>Output modalities (comma-separated)</FieldLabel>
-            <Input
-              value={(overrides.architecture?.output_modalities ?? []).join(', ')}
-              onChange={(e) => {
-                const list = parseCsv(e.target.value);
-                onSetArchitecture('output_modalities', list.length > 0 ? list : undefined);
-              }}
-              placeholder="text"
+            <FieldLabel>Output modalities</FieldLabel>
+            <TagSelect
+              placeholder="Add modalities..."
+              options={MODALITY_SUGGESTIONS}
+              selected={overrides.architecture?.output_modalities ?? []}
+              allowCustom
+              onChange={(list) =>
+                onSetArchitecture('output_modalities', list.length > 0 ? list : undefined)
+              }
             />
           </div>
           <div style={{ gridColumn: 'span 2' }}>
@@ -205,14 +229,15 @@ export function MetadataOverrideForm({
         <SectionLabel>Capabilities</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px' }}>
           <div>
-            <FieldLabel>Supported parameters (comma-separated)</FieldLabel>
-            <Input
-              value={(overrides.supported_parameters ?? []).join(', ')}
-              onChange={(e) => {
-                const list = parseCsv(e.target.value);
-                onSetField('supported_parameters', list.length > 0 ? list : undefined);
-              }}
-              placeholder="tools, temperature, reasoning"
+            <FieldLabel>Supported parameters</FieldLabel>
+            <TagSelect
+              placeholder="Add parameters..."
+              options={SUPPORTED_PARAM_SUGGESTIONS}
+              selected={overrides.supported_parameters ?? []}
+              allowCustom
+              onChange={(list) =>
+                onSetField('supported_parameters', list.length > 0 ? list : undefined)
+              }
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
