@@ -115,6 +115,50 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
   });
 
   /**
+   * GET /v1/metadata/lookup
+   * Return the full normalized metadata for a single model in a catalog source.
+   * Used by the frontend to auto-populate the override form when a user enables
+   * "Override catalog fields" — so the user sees the current values and can
+   * tweak them rather than starting blank.
+   *
+   * Query parameters:
+   *   - source (required): "openrouter" | "models.dev" | "catwalk"
+   *   - source_path (required): the model id within the source
+   *
+   * Returns: the NormalizedModelMetadata record, or 404 if not found.
+   */
+  fastify.get('/v1/metadata/lookup', async (request, reply) => {
+    const metadataManager = ModelMetadataManager.getInstance();
+    const query = request.query as { source?: string; source_path?: string };
+
+    const source = query.source as 'openrouter' | 'models.dev' | 'catwalk' | undefined;
+    if (!source || !['openrouter', 'models.dev', 'catwalk'].includes(source)) {
+      return reply.status(400).send({
+        error: `Missing or invalid 'source' parameter. Must be one of: openrouter, models.dev, catwalk`,
+      });
+    }
+
+    if (!query.source_path) {
+      return reply.status(400).send({ error: `Missing 'source_path' parameter` });
+    }
+
+    if (!metadataManager.isInitialized(source)) {
+      return reply.status(503).send({
+        error: `Metadata source '${source}' is not yet loaded or failed to load`,
+      });
+    }
+
+    const metadata = metadataManager.getMetadata(source, query.source_path);
+    if (!metadata) {
+      return reply.status(404).send({
+        error: `No metadata found for '${query.source_path}' in source '${source}'`,
+      });
+    }
+
+    return reply.send({ data: metadata });
+  });
+
+  /**
    * GET /v1/openrouter/models
    * Returns a list of OpenRouter model slugs, optionally filtered by a search query.
    * Query parameter: ?q=search-term

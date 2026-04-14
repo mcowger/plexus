@@ -7,6 +7,7 @@ import {
   AliasBehavior,
   MetadataOverrides,
   MetadataSource,
+  NormalizedModelMetadata,
   Provider,
   Model,
 } from '../lib/api';
@@ -101,6 +102,15 @@ export const Models = () => {
   // Global Descriptor State
   const [globalDescriptorModel, setGlobalDescriptorModel] = useState('');
   const [isSavingDescriptor, setIsSavingDescriptor] = useState(false);
+
+  // Reference values used by `countOverrides` to distinguish genuine overrides
+  // from fields that merely mirror the auto-populated catalog values.
+  //   undefined -> catalog lookup hasn't resolved yet (or not applicable)
+  //   null      -> lookup failed / no catalog record (treat as empty reference)
+  //   object    -> loaded catalog values, converted to the overrides shape
+  const [catalogReference, setCatalogReference] = useState<MetadataOverrides | null | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     const fetchVFConfig = async () => {
@@ -369,7 +379,7 @@ export const Models = () => {
   /** Select a metadata result and set it on the alias (preserves existing overrides). */
   const selectMetadataResult = (result: { id: string; name: string }) => {
     const current = editingAlias.metadata;
-    const source: MetadataSource =
+    const source: Exclude<MetadataSource, 'custom'> =
       current?.source && current.source !== 'custom' ? current.source : 'openrouter';
     setEditingAlias({
       ...editingAlias,
@@ -382,6 +392,11 @@ export const Models = () => {
     setMetadataQuery(result.name);
     setShowMetadataDropdown(false);
     setMetadataResults([]);
+    // If override is already on, refresh the form with the newly-selected
+    // model's catalog values (still preserving any fields the user typed).
+    if (isOverrideOpen) {
+      populateOverridesFromCatalog(source, result.id);
+    }
   };
 
   /** Clear metadata from the alias */
@@ -400,6 +415,136 @@ export const Models = () => {
     pricing: { prompt: '0', completion: '0' },
     supported_parameters: [],
   });
+
+  /**
+   * Convert a catalog metadata record into the `MetadataOverrides` shape,
+   * keeping only defined fields so no spurious empty keys land in the config.
+   */
+  const metadataToOverrides = (meta: NormalizedModelMetadata): MetadataOverrides => {
+    const out: MetadataOverrides = {};
+    if (meta.name) out.name = meta.name;
+    if (meta.description !== undefined) out.description = meta.description;
+    if (meta.context_length !== undefined) out.context_length = meta.context_length;
+    if (meta.pricing) {
+      const p: NonNullable<MetadataOverrides['pricing']> = {};
+      if (meta.pricing.prompt !== undefined) p.prompt = meta.pricing.prompt;
+      if (meta.pricing.completion !== undefined) p.completion = meta.pricing.completion;
+      if (meta.pricing.input_cache_read !== undefined)
+        p.input_cache_read = meta.pricing.input_cache_read;
+      if (meta.pricing.input_cache_write !== undefined)
+        p.input_cache_write = meta.pricing.input_cache_write;
+      if (Object.keys(p).length > 0) out.pricing = p;
+    }
+    if (meta.architecture) {
+      const a: NonNullable<MetadataOverrides['architecture']> = {};
+      if (meta.architecture.input_modalities && meta.architecture.input_modalities.length > 0)
+        a.input_modalities = [...meta.architecture.input_modalities];
+      if (meta.architecture.output_modalities && meta.architecture.output_modalities.length > 0)
+        a.output_modalities = [...meta.architecture.output_modalities];
+      if (meta.architecture.tokenizer !== undefined) a.tokenizer = meta.architecture.tokenizer;
+      if (Object.keys(a).length > 0) out.architecture = a;
+    }
+    if (meta.supported_parameters && meta.supported_parameters.length > 0)
+      out.supported_parameters = [...meta.supported_parameters];
+    if (meta.top_provider) {
+      const tp: NonNullable<MetadataOverrides['top_provider']> = {};
+      if (meta.top_provider.context_length !== undefined)
+        tp.context_length = meta.top_provider.context_length;
+      if (meta.top_provider.max_completion_tokens !== undefined)
+        tp.max_completion_tokens = meta.top_provider.max_completion_tokens;
+      if (Object.keys(tp).length > 0) out.top_provider = tp;
+    }
+    return out;
+  };
+
+  /**
+   * Fetch catalog metadata for (source, sourcePath) and populate the override
+   * form with those values, preserving any overrides the user has already
+   * typed (user-entered values win on conflict).
+   *
+   * Silently no-ops when source is custom, source_path is unset, or the lookup
+   * fails — in those cases the form simply stays empty.
+   *
+   * Caller must pass explicit (source, sourcePath) rather than reading
+   * `editingAlias` here, because we're often invoked right after a state
+   * update that hasn't flushed — e.g. when the user selects a new catalog
+   * model while override is already on.
+   */
+  const populateOverridesFromCatalog = async (
+    source: Exclude<MetadataSource, 'custom'>,
+    sourcePath: string
+  ) => {
+    if (!sourcePath) return;
+    try {
+      const catalog = await api.getModelMetadata(source, sourcePath);
+      if (!catalog) return;
+      const catalogOverrides = metadataToOverrides(catalog);
+      setEditingAlias((prev) => {
+        // Bail if the alias's metadata pointer changed while we were fetching
+        // (e.g. user toggled off, or picked a different model).
+        if (!prev.metadata || prev.metadata.source === 'custom') return prev;
+        if (prev.metadata.source !== source || prev.metadata.source_path !== sourcePath)
+          return prev;
+        // Merge so anything the user already typed takes precedence over the
+        // freshly-fetched catalog values.
+        const existing = prev.metadata.overrides ?? {};
+        const merged: MetadataOverrides = {
+          ...catalogOverrides,
+          ...existing,
+          ...(catalogOverrides.pricing || existing.pricing
+            ? { pricing: { ...(catalogOverrides.pricing ?? {}), ...(existing.pricing ?? {}) } }
+            : {}),
+          ...(catalogOverrides.architecture || existing.architecture
+            ? {
+                architecture: {
+                  ...(catalogOverrides.architecture ?? {}),
+                  ...(existing.architecture ?? {}),
+                },
+              }
+            : {}),
+          ...(catalogOverrides.top_provider || existing.top_provider
+            ? {
+                top_provider: {
+                  ...(catalogOverrides.top_provider ?? {}),
+                  ...(existing.top_provider ?? {}),
+                },
+              }
+            : {}),
+        };
+        return { ...prev, metadata: { ...prev.metadata, overrides: merged } };
+      });
+    } catch {
+      // Leave the form blank on error; existing helper text tells the user
+      // blank fields fall back to the catalog value.
+    }
+  };
+
+  // Keep `catalogReference` in sync with the currently selected catalog
+  // (source, source_path). Used by `countOverrides` to decide which fields
+  // actually differ from the auto-populated values.
+  useEffect(() => {
+    const meta = editingAlias.metadata;
+    if (!meta || meta.source === 'custom' || !meta.source_path) {
+      setCatalogReference(undefined);
+      return;
+    }
+    const { source, source_path } = meta;
+    let cancelled = false;
+    (async () => {
+      try {
+        const catalog = await api.getModelMetadata(source, source_path);
+        if (cancelled) return;
+        setCatalogReference(catalog ? metadataToOverrides(catalog) : null);
+      } catch {
+        if (!cancelled) setCatalogReference(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // metadataToOverrides is a stable local helper that doesn't close over state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingAlias.metadata?.source, editingAlias.metadata?.source_path]);
 
   /**
    * Patch a single field in the override blob. `undefined` removes the key
@@ -476,21 +621,75 @@ export const Models = () => {
     setEditingAlias({ ...editingAlias, metadata: { ...current, overrides: nextOverrides } });
   };
 
-  /** Count the number of overridden fields for the preview strip. */
-  const countOverrides = (o?: MetadataOverrides): number => {
-    if (!o) return 0;
-    let n = 0;
-    if (o.name !== undefined) n++;
-    if (o.description !== undefined) n++;
-    if (o.context_length !== undefined) n++;
-    if (o.pricing) n += Object.values(o.pricing).filter((v) => v !== undefined).length;
-    if (o.architecture) {
-      if (o.architecture.input_modalities !== undefined) n++;
-      if (o.architecture.output_modalities !== undefined) n++;
-      if (o.architecture.tokenizer !== undefined) n++;
+  /**
+   * Count the number of overridden fields for the preview strip. Only fields
+   * whose values *differ* from the reference are counted:
+   *   - custom source: compared against `buildCustomDefaults(aliasId)`
+   *   - catalog source: compared against the auto-populated catalog values
+   * While the catalog lookup is still in flight for a catalog-backed source
+   * we report 0 so the strip doesn't flash a spurious "all fields overridden"
+   * count on open.
+   */
+  const countOverrides = (metadata?: AliasMetadata): number => {
+    if (!metadata?.overrides) return 0;
+    const o = metadata.overrides;
+    let ref: MetadataOverrides;
+    if (metadata.source === 'custom') {
+      ref = buildCustomDefaults(editingAlias.id);
+    } else if (catalogReference === undefined) {
+      // Catalog still loading — avoid flashing a spurious count.
+      return 0;
+    } else {
+      ref = catalogReference ?? {};
     }
-    if (o.supported_parameters !== undefined) n++;
-    if (o.top_provider) n += Object.values(o.top_provider).filter((v) => v !== undefined).length;
+    const arrayEq = (a?: string[], b?: string[]): boolean => {
+      if (a === b) return true;
+      if (!a || !b) return false;
+      if (a.length !== b.length) return false;
+      return a.every((v, i) => v === b[i]);
+    };
+    let n = 0;
+    if (o.name !== undefined && o.name !== ref.name) n++;
+    if (o.description !== undefined && o.description !== ref.description) n++;
+    if (o.context_length !== undefined && o.context_length !== ref.context_length) n++;
+    if (o.pricing) {
+      const r = ref.pricing ?? {};
+      if (o.pricing.prompt !== undefined && o.pricing.prompt !== r.prompt) n++;
+      if (o.pricing.completion !== undefined && o.pricing.completion !== r.completion) n++;
+      if (o.pricing.input_cache_read !== undefined && o.pricing.input_cache_read !== r.input_cache_read)
+        n++;
+      if (
+        o.pricing.input_cache_write !== undefined &&
+        o.pricing.input_cache_write !== r.input_cache_write
+      )
+        n++;
+    }
+    if (o.architecture) {
+      const r = ref.architecture ?? {};
+      if (
+        o.architecture.input_modalities !== undefined &&
+        !arrayEq(o.architecture.input_modalities, r.input_modalities)
+      )
+        n++;
+      if (
+        o.architecture.output_modalities !== undefined &&
+        !arrayEq(o.architecture.output_modalities, r.output_modalities)
+      )
+        n++;
+      if (o.architecture.tokenizer !== undefined && o.architecture.tokenizer !== r.tokenizer) n++;
+    }
+    if (o.supported_parameters !== undefined && !arrayEq(o.supported_parameters, ref.supported_parameters))
+      n++;
+    if (o.top_provider) {
+      const r = ref.top_provider ?? {};
+      if (o.top_provider.context_length !== undefined && o.top_provider.context_length !== r.context_length)
+        n++;
+      if (
+        o.top_provider.max_completion_tokens !== undefined &&
+        o.top_provider.max_completion_tokens !== r.max_completion_tokens
+      )
+        n++;
+    }
     return n;
   };
 
@@ -1097,11 +1296,10 @@ export const Models = () => {
                               )}
                             </>
                           )}
-                          {countOverrides(editingAlias.metadata.overrides) > 0 && (
+                          {countOverrides(editingAlias.metadata) > 0 && (
                             <span className="ml-2 text-text-muted">
-                              + {countOverrides(editingAlias.metadata.overrides)} field
-                              {countOverrides(editingAlias.metadata.overrides) === 1 ? '' : 's'}{' '}
-                              overridden
+                              + {countOverrides(editingAlias.metadata)} field
+                              {countOverrides(editingAlias.metadata) === 1 ? '' : 's'} overridden
                             </span>
                           )}
                         </span>
@@ -1139,6 +1337,14 @@ export const Models = () => {
                                   ...editingAlias,
                                   metadata: rest as AliasMetadata,
                                 });
+                              }
+                            } else {
+                              // Flipping override on auto-populates the form with
+                              // the catalog's current values so the user sees what
+                              // they're overriding instead of a blank form.
+                              const cur = editingAlias.metadata;
+                              if (cur && cur.source !== 'custom' && cur.source_path) {
+                                populateOverridesFromCatalog(cur.source, cur.source_path);
                               }
                             }
                           }}

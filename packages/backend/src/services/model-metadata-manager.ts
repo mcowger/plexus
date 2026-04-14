@@ -258,7 +258,7 @@ export class ModelMetadataManager {
     const {
       openrouter = 'https://openrouter.ai/api/v1/models',
       modelsDev = 'https://models.dev/api.json',
-      catwalk = 'https://catwalk.charm.sh/providers',
+      catwalk = 'https://catwalk.charm.sh/v2/providers',
     } = sources ?? {};
 
     await Promise.all([

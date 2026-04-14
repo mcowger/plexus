@@ -357,3 +357,93 @@ describe('GET /v1/metadata/search', () => {
     expect(response.json().data.length).toBe(1);
   });
 });
+
+// ─── GET /v1/metadata/lookup ──────────────────────────────
+
+describe('GET /v1/metadata/lookup', () => {
+  it('should return 400 when source param is missing', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/lookup?source_path=anthropic/claude-3.5-sonnet',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toContain('source');
+  });
+
+  it('should return 400 when source_path param is missing', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/lookup?source=openrouter',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toContain('source_path');
+  });
+
+  it('should return 503 when source is not yet initialized', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/lookup?source=openrouter&source_path=anthropic/claude-3.5-sonnet',
+    });
+    expect(response.statusCode).toBe(503);
+  });
+
+  it('should return 404 when source_path is not found', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterMetadataFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/lookup?source=openrouter&source_path=does/not-exist',
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('should return full normalized metadata for a known model', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterMetadataFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/lookup?source=openrouter&source_path=anthropic/claude-3.5-sonnet',
+    });
+    expect(response.statusCode).toBe(200);
+
+    const meta = response.json().data;
+    expect(meta.id).toBe('anthropic/claude-3.5-sonnet');
+    expect(meta.name).toBe('Anthropic: Claude 3.5 Sonnet');
+    expect(meta.context_length).toBe(200000);
+    expect(meta.pricing.prompt).toBe('0.000003');
+    expect(meta.pricing.completion).toBe('0.000015');
+    expect(meta.architecture.input_modalities).toContain('image');
+    expect(meta.supported_parameters).toContain('tools');
+    expect(meta.top_provider.max_completion_tokens).toBe(8192);
+  });
+});
