@@ -320,12 +320,19 @@ export interface MetadataOverrides {
   };
 }
 
-export interface AliasMetadata {
-  source: MetadataSource;
-  // Required for openrouter/models.dev/catwalk; optional for 'custom'.
-  source_path?: string;
-  overrides?: MetadataOverrides;
-}
+// Discriminated union mirrors backend validation: catalog-backed sources
+// must carry a non-empty source_path; 'custom' may omit it.
+export type AliasMetadata =
+  | {
+      source: Exclude<MetadataSource, 'custom'>;
+      source_path: string;
+      overrides?: MetadataOverrides;
+    }
+  | {
+      source: 'custom';
+      source_path?: string;
+      overrides?: MetadataOverrides;
+    };
 
 export interface Alias {
   id: string;

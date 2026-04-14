@@ -37,12 +37,19 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       }
 
       // Look up enriched metadata from the appropriate source. Custom sources
-      // skip the catalog entirely and derive everything from overrides.
-      let catalog: ReturnType<typeof metadataManager.getMetadata> = undefined;
-      if (metaConfig.source !== 'custom') {
-        catalog = metadataManager.getMetadata(metaConfig.source, metaConfig.source_path);
+      // skip the catalog entirely and derive everything from overrides. For
+      // catalog-backed sources, a missing catalog hit is treated as a miss —
+      // we don't silently synthesize a partial record from overrides alone,
+      // because that would hide typos in source_path or unloaded sources.
+      let enriched: ReturnType<typeof mergeOverrides> = undefined;
+      if (metaConfig.source === 'custom') {
+        enriched = mergeOverrides(undefined, metaConfig.overrides);
+      } else {
+        const catalog = metadataManager.getMetadata(metaConfig.source, metaConfig.source_path);
+        if (catalog) {
+          enriched = mergeOverrides(catalog, metaConfig.overrides);
+        }
       }
-      const enriched = mergeOverrides(catalog, metaConfig.overrides);
       if (!enriched) {
         return base;
       }
