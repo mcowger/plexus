@@ -5,6 +5,7 @@ export const debugLogs = pgTable(
   {
     id: serial('id').primaryKey(),
     requestId: text('request_id').notNull(),
+    apiKey: text('api_key'),
     rawRequest: text('raw_request'),
     transformedRequest: text('transformed_request'),
     rawResponse: text('raw_response'),
@@ -16,5 +17,6 @@ export const debugLogs = pgTable(
   (table) => ({
     requestIdIdx: index('idx_debug_logs_request_id').on(table.requestId),
     createdAtIdx: index('idx_debug_logs_created_at').on(table.createdAt),
+    apiKeyIdx: index('idx_debug_logs_api_key').on(table.apiKey),
   })
 );

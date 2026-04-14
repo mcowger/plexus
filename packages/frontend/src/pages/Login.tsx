@@ -24,12 +24,12 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!key.trim()) {
-      setError('Please enter an Admin Key');
+      setError('Please enter a key');
       return;
     }
     const valid = await login(key.trim());
     if (!valid) {
-      setError('Invalid Admin Key');
+      setError('Invalid key');
     }
     // On success, navigation happens via the useEffect above once isAuthenticated becomes true
   };
@@ -39,8 +39,11 @@ export const Login: React.FC = () => {
       <div className="w-full" style={{ maxWidth: '600px' }}>
         <div className="text-center mb-8">
           <img src={logo} alt="Plexus" className="h-16 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-text">Admin Access</h1>
-          <p className="text-text-muted">Enter your Admin Key to continue</p>
+          <h1 className="text-2xl font-bold text-text">Sign in</h1>
+          <p className="text-text-muted">
+            Enter your admin key for full access, or an API key secret for a scoped view of your
+            key's activity.
+          </p>
         </div>
 
         <Card>
@@ -56,7 +59,7 @@ export const Login: React.FC = () => {
             />
             <div>
               <label htmlFor="adminKey" className="block text-sm font-medium text-text-muted mb-1">
-                Admin Key
+                Admin key or API key secret
               </label>
               <Input
                 id="adminKey"
@@ -64,7 +67,7 @@ export const Login: React.FC = () => {
                 autoComplete="current-password"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                placeholder="sk-admin-..."
+                placeholder="sk-admin-... or sk-..."
                 autoFocus
               />
             </div>

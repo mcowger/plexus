@@ -7,6 +7,7 @@ export const inferenceErrors = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     requestId: text('request_id').notNull(),
     date: text('date').notNull(),
+    apiKey: text('api_key'),
     errorMessage: text('error_message'),
     errorStack: text('error_stack'),
     details: text('details'),
@@ -15,5 +16,6 @@ export const inferenceErrors = sqliteTable(
   (table) => ({
     requestIdIdx: index('idx_errors_request_id').on(table.requestId),
     dateIdx: index('idx_errors_date').on(table.date),
+    apiKeyIdx: index('idx_inference_errors_api_key').on(table.apiKey),
   })
 );

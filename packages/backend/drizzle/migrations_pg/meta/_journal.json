@@ -211,6 +211,13 @@
       "when": 1776026985342,
       "tag": "0029_flat_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776500000000,
+      "tag": "0030_limited_login_scoping",
+      "breakpoints": true
     }
   ]
 }

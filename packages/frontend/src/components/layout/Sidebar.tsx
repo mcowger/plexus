@@ -15,6 +15,7 @@ import {
   ChevronRight,
   PieChart,
   Plug,
+  UserCircle2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
@@ -82,7 +83,7 @@ export const Sidebar: React.FC = () => {
   const [configExpanded, setConfigExpanded] = useState(true);
   const [devToolsExpanded, setDevToolsExpanded] = useState(false);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
-  const { logout } = useAuth();
+  const { logout, isAdmin, isLimited, principal } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   useEffect(() => {
@@ -315,13 +316,18 @@ export const Sidebar: React.FC = () => {
             <>
               <NavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={isCollapsed} />
               <NavItem to="/logs" icon={FileText} label="Logs" isCollapsed={isCollapsed} />
-              <NavItem to="/quotas" icon={PieChart} label="Quotas" isCollapsed={isCollapsed} />
+              {isAdmin && (
+                <NavItem to="/quotas" icon={PieChart} label="Quotas" isCollapsed={isCollapsed} />
+              )}
+              {isLimited && (
+                <NavItem to="/me" icon={UserCircle2} label="My Key" isCollapsed={isCollapsed} />
+              )}
             </>
           )}
         </div>
 
         {/* Balances Section */}
-        {balanceQuotas.length > 0 && (
+        {isAdmin && balanceQuotas.length > 0 && (
           <div className="mt-4 px-2">
             <button
               onClick={() => setBalancesExpanded(!balancesExpanded)}
@@ -362,7 +368,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Rate Limits Section */}
-        {rateLimitQuotas.length > 0 && (
+        {isAdmin && rateLimitQuotas.length > 0 && (
           <div className="mt-4 px-2">
             <button
               onClick={() => setQuotasExpanded(!quotasExpanded)}
@@ -402,39 +408,46 @@ export const Sidebar: React.FC = () => {
           </div>
         )}
 
-        <div className="mt-4 px-2">
-          <button
-            onClick={() => setConfigExpanded(!configExpanded)}
-            className="w-full flex items-center justify-between mb-1 group"
-          >
-            <h3
-              className={clsx(
-                'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200',
-                isCollapsed && 'opacity-0 h-0 overflow-hidden'
-              )}
+        {isAdmin && (
+          <div className="mt-4 px-2">
+            <button
+              onClick={() => setConfigExpanded(!configExpanded)}
+              className="w-full flex items-center justify-between mb-1 group"
             >
-              Configuration
-            </h3>
-            {!isCollapsed && (
-              <ChevronRight
-                size={14}
+              <h3
                 className={clsx(
-                  'text-text-muted transition-transform duration-200 group-hover:text-text',
-                  configExpanded && 'rotate-90'
+                  'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-200',
+                  isCollapsed && 'opacity-0 h-0 overflow-hidden'
                 )}
-              />
+              >
+                Configuration
+              </h3>
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
+                  className={clsx(
+                    'text-text-muted transition-transform duration-200 group-hover:text-text',
+                    configExpanded && 'rotate-90'
+                  )}
+                />
+              )}
+            </button>
+            {(configExpanded || isCollapsed) && (
+              <>
+                <NavItem
+                  to="/providers"
+                  icon={Server}
+                  label="Providers"
+                  isCollapsed={isCollapsed}
+                />
+                <NavItem to="/models" icon={Box} label="Models" isCollapsed={isCollapsed} />
+                <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
+                <NavItem to="/mcp" icon={Plug} label="MCP" isCollapsed={isCollapsed} />
+                <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
+              </>
             )}
-          </button>
-          {(configExpanded || isCollapsed) && (
-            <>
-              <NavItem to="/providers" icon={Server} label="Providers" isCollapsed={isCollapsed} />
-              <NavItem to="/models" icon={Box} label="Models" isCollapsed={isCollapsed} />
-              <NavItem to="/keys" icon={Key} label="Keys" isCollapsed={isCollapsed} />
-              <NavItem to="/mcp" icon={Plug} label="MCP" isCollapsed={isCollapsed} />
-              <NavItem to="/config" icon={Settings} label="Settings" isCollapsed={isCollapsed} />
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="mt-4 px-2 mt-auto">
           <button
@@ -463,7 +476,9 @@ export const Sidebar: React.FC = () => {
             <>
               <div className="flex items-center justify-between">
                 <NavItem to="/debug" icon={Database} label="Traces" isCollapsed={isCollapsed} />
-                {!isCollapsed && (
+                {/* Global debug toggle is admin-only. Limited users manage their
+                    own key's trace capture via the My Key page. */}
+                {isAdmin && !isCollapsed && (
                   <button
                     onClick={handleToggleClick}
                     className={clsx(
@@ -478,13 +493,33 @@ export const Sidebar: React.FC = () => {
                 )}
               </div>
               <NavItem to="/errors" icon={AlertTriangle} label="Errors" isCollapsed={isCollapsed} />
-              <NavItem
-                to="/system-logs"
-                icon={FileText}
-                label="System Logs"
-                isCollapsed={isCollapsed}
-              />
+              {isAdmin && (
+                <NavItem
+                  to="/system-logs"
+                  icon={FileText}
+                  label="System Logs"
+                  isCollapsed={isCollapsed}
+                />
+              )}
             </>
+          )}
+          {principal && !isCollapsed && (
+            <div className="mt-3 mx-1 px-2 py-1.5 rounded-md bg-bg-card border border-border flex items-center gap-2">
+              <UserCircle2 size={16} className="text-text-muted flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-text truncate">
+                  {principal.role === 'admin' ? 'Admin' : principal.keyName}
+                </div>
+                <div
+                  className={clsx(
+                    'text-[10px] uppercase tracking-wider font-semibold',
+                    principal.role === 'admin' ? 'text-primary' : 'text-text-muted'
+                  )}
+                >
+                  {principal.role === 'admin' ? 'Full access' : 'Limited'}
+                </div>
+              </div>
+            </div>
           )}
           {(() => {
             const logoutButton = (

@@ -42,15 +42,54 @@ function inferProviderTypes(apiBaseUrl?: string | Record<string, string>): strin
   }
 }
 
-export async function verifyAdminKey(key: string): Promise<boolean> {
+/**
+ * Shape of the principal returned by GET /v0/management/auth/verify.
+ * Admins get just { role: 'admin' }; api-key users get the key metadata so
+ * the frontend can render a scoped view without a follow-up call.
+ */
+export type Principal =
+  | { role: 'admin' }
+  | {
+      role: 'limited';
+      keyName: string;
+      allowedProviders: string[];
+      allowedModels: string[];
+      quotaName?: string | null;
+      comment?: string | null;
+    };
+
+/**
+ * Verify a credential against the backend. Returns the resolved principal on
+ * success, or null on 401/network error.
+ */
+export async function verifyAdminKey(key: string): Promise<Principal | null> {
   try {
     const res = await fetch('/v0/management/auth/verify', {
       method: 'GET',
       headers: { 'x-admin-key': key },
     });
-    return res.status === 200;
+    if (res.status !== 200) return null;
+    const body = (await res.json()) as {
+      ok: boolean;
+      role: 'admin' | 'limited';
+      keyName?: string;
+      allowedProviders?: string[];
+      allowedModels?: string[];
+      quotaName?: string | null;
+      comment?: string | null;
+    };
+    if (!body.ok) return null;
+    if (body.role === 'admin') return { role: 'admin' };
+    return {
+      role: 'limited',
+      keyName: body.keyName!,
+      allowedProviders: body.allowedProviders ?? [],
+      allowedModels: body.allowedModels ?? [],
+      quotaName: body.quotaName ?? null,
+      comment: body.comment ?? null,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -2561,6 +2600,65 @@ export const api = {
         err.error?.message || err.error || err.details || 'Failed to fetch models';
       throw new Error(errorMessage);
     }
+    return res.json();
+  },
+
+  // ─── Self-service (limited user operating on their own key) ──────────
+
+  /**
+   * Fetch metadata about the current principal's key (name, allowed providers /
+   * models, quota, comment, trace state).
+   */
+  getSelfMe: async (): Promise<{
+    role: 'admin' | 'limited';
+    keyName?: string;
+    allowedProviders?: string[];
+    allowedModels?: string[];
+    quotaName?: string | null;
+    comment?: string | null;
+    traceEnabled?: boolean;
+    traceEnabledGlobal?: boolean;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/self/me`);
+    if (!res.ok) throw new Error('Failed to fetch self info');
+    return res.json();
+  },
+
+  /** Rotate the current principal's secret. Returns the new plaintext once. */
+  rotateSelfSecret: async (): Promise<{ keyName: string; secret: string; message: string }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/self/rotate`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Rotation failed' }));
+      throw new Error(err.error?.message || err.error || 'Rotation failed');
+    }
+    return res.json();
+  },
+
+  /** Update the current principal's key comment. */
+  updateSelfComment: async (
+    comment: string | null
+  ): Promise<{ success: boolean; keyName: string; comment: string | null }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/self/comment`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment }),
+    });
+    if (!res.ok) throw new Error('Failed to update comment');
+    return res.json();
+  },
+
+  /** Enable or disable trace capture for the current principal's key only. */
+  toggleSelfDebug: async (
+    enabled: boolean
+  ): Promise<{ keyName: string; enabled: boolean; enabledGlobal: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/self/debug/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) throw new Error('Failed to toggle trace');
     return res.json();
   },
 };

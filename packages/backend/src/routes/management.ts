@@ -1,5 +1,4 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { logger } from '../utils/logger';
+import { FastifyInstance } from 'fastify';
 import { UsageStorageService } from '../services/usage-storage';
 import { registerConfigRoutes } from './management/config';
 import { registerUsageRoutes } from './management/usage';
@@ -18,26 +17,12 @@ import { registerLoggingRoutes } from './management/logging';
 import { registerRestartRoutes } from './management/restart';
 import { registerProviderRoutes } from './management/providers';
 import { registerMetricsRoutes } from './management/metrics';
+import { registerSelfRoutes } from './management/self';
+import { authenticate, requireAdmin } from './management/_principal';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage';
-
-function adminKeyAuth(request: FastifyRequest, reply: FastifyReply, done: () => void) {
-  const providedKey = request.headers['x-admin-key'];
-  const adminKey = process.env.ADMIN_KEY;
-
-  if (!providedKey || providedKey !== adminKey) {
-    logger.silly(
-      `[ADMIN AUTH] Rejected request to ${request.url} - invalid or missing x-admin-key`
-    );
-    reply.code(401).send({ error: { message: 'Unauthorized', type: 'auth_error', code: 401 } });
-    return;
-  }
-
-  logger.silly(`[ADMIN AUTH] Accepted request to ${request.url}`);
-  done();
-}
 
 export async function registerManagementRoutes(
   fastify: FastifyInstance,
@@ -47,43 +32,70 @@ export async function registerManagementRoutes(
   mcpUsageStorage?: McpUsageStorageService,
   quotaEnforcer?: QuotaEnforcer
 ) {
-  // Verify endpoint is outside the auth scope so the login page can call it
-  // with the candidate key and get a 200/401 back.
+  // Verify endpoint runs the authentication hook but has no further checks,
+  // so the login page can call it with a candidate credential. Returns
+  // principal info (role + key metadata for limited users) on success.
   fastify.get(
     '/v0/management/auth/verify',
-    { preHandler: adminKeyAuth },
-    async (_request, reply) => {
-      return reply.send({ ok: true });
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const p = request.principal!;
+      if (p.role === 'admin') {
+        return reply.send({ ok: true, role: 'admin' });
+      }
+      return reply.send({
+        ok: true,
+        role: 'limited',
+        keyName: p.keyName,
+        allowedProviders: p.allowedProviders,
+        allowedModels: p.allowedModels,
+        quotaName: p.quotaName ?? null,
+        comment: p.comment ?? null,
+      });
     }
   );
 
-  // All other management routes are protected by the same admin key hook,
-  // scoped inside this plugin so the v1 bearer-auth routes are unaffected.
-  fastify.register(async (protected_) => {
-    protected_.addHook('preHandler', adminKeyAuth);
+  // Limited-user routes: authenticated, but not admin-gated. Handlers must
+  // enforce their own scoping (or use requireAdmin where appropriate).
+  fastify.register(async (scoped) => {
+    scoped.addHook('preHandler', authenticate);
 
-    await registerConfigRoutes(protected_);
-    await registerUsageRoutes(protected_, usageStorage);
-    await registerCooldownRoutes(protected_);
-    await registerPerformanceRoutes(protected_, usageStorage);
-    await registerDebugRoutes(protected_, usageStorage);
-    await registerErrorRoutes(protected_, usageStorage);
-    await registerSystemLogRoutes(protected_);
-    await registerTestRoutes(protected_, dispatcher);
-    await registerOAuthRoutes(protected_);
-    await registerLoggingRoutes(protected_);
-    await registerRestartRoutes(protected_);
-    await registerProviderRoutes(protected_);
-    await registerMetricsRoutes(protected_, usageStorage);
+    // Self-service: /self/me, /self/rotate, /self/comment, /self/debug/toggle
+    await registerSelfRoutes(scoped);
+
+    // Cooldowns: admin can clear any; limited restricted by allowedProviders.
+    await registerCooldownRoutes(scoped);
+
+    // Usage / Logs / Errors / Debug: handlers force-inject the limited user's
+    // keyName as a filter.
+    await registerUsageRoutes(scoped, usageStorage);
+    await registerDebugRoutes(scoped, usageStorage);
+    await registerErrorRoutes(scoped, usageStorage);
+  });
+
+  // Admin-only routes: mutating config, system-level controls, etc.
+  fastify.register(async (adminOnly) => {
+    adminOnly.addHook('preHandler', authenticate);
+    adminOnly.addHook('preHandler', requireAdmin);
+
+    await registerConfigRoutes(adminOnly);
+    await registerSystemLogRoutes(adminOnly);
+    await registerTestRoutes(adminOnly, dispatcher);
+    await registerOAuthRoutes(adminOnly);
+    await registerLoggingRoutes(adminOnly);
+    await registerRestartRoutes(adminOnly);
+    await registerProviderRoutes(adminOnly);
+    await registerMetricsRoutes(adminOnly, usageStorage);
+    await registerPerformanceRoutes(adminOnly, usageStorage);
     if (quotaScheduler) {
-      await registerQuotaRoutes(protected_, quotaScheduler);
+      await registerQuotaRoutes(adminOnly, quotaScheduler);
     }
     if (mcpUsageStorage) {
-      await registerMcpLogRoutes(protected_, mcpUsageStorage);
+      await registerMcpLogRoutes(adminOnly, mcpUsageStorage);
     }
     if (quotaEnforcer) {
-      await registerQuotaEnforcementRoutes(protected_, quotaEnforcer);
+      await registerQuotaEnforcementRoutes(adminOnly, quotaEnforcer);
     }
-    await registerUserQuotaRoutes(protected_);
+    await registerUserQuotaRoutes(adminOnly);
   });
 }
