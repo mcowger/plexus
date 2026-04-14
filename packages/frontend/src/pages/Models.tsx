@@ -130,11 +130,15 @@ export const Models = () => {
   // current alias's metadata block.
   useEffect(() => {
     if (!isModalOpen) return;
+    // Cancel any debounce left over from the previous modal session so it
+    // can't land results against the newly-loaded alias.
+    cancelMetadataDebounce();
     const meta = editingAlias.metadata;
     setIsOverrideOpen(!!meta && (meta.source === 'custom' || !!meta.overrides));
     setMetadataQuery(meta?.source_path ?? '');
     setShowMetadataDropdown(false);
     setMetadataResults([]);
+    setIsMetadataSearching(false);
     // Only re-run when the modal transitions open (or editingAlias.id changes).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, editingAlias.id]);
@@ -346,20 +350,37 @@ export const Models = () => {
     setEditingAlias({ ...editingAlias, advanced: next });
   };
 
+  /**
+   * Cancel any pending debounced metadata search so a stale response cannot
+   * later overwrite `metadataResults` after the source/query has moved on.
+   * Callers that change `metadata.source` or clear the query must invoke this
+   * before mutating state.
+   */
+  const cancelMetadataDebounce = () => {
+    if (metadataSearchRef.current) {
+      clearTimeout(metadataSearchRef.current);
+      metadataSearchRef.current = null;
+    }
+  };
+
   /** Search metadata catalog for autocomplete */
   const handleMetadataSearch = useCallback((query: string, source: MetadataSource) => {
     if (source === 'custom') {
-      // Custom has no catalog to search against.
+      // Custom has no catalog to search against — also kill any pending debounce
+      // from the prior catalog source so it can't land stale results.
+      cancelMetadataDebounce();
       setMetadataQuery(query);
       setMetadataResults([]);
       setShowMetadataDropdown(false);
+      setIsMetadataSearching(false);
       return;
     }
     setMetadataQuery(query);
-    if (metadataSearchRef.current) clearTimeout(metadataSearchRef.current);
+    cancelMetadataDebounce();
     if (!query.trim()) {
       setMetadataResults([]);
       setShowMetadataDropdown(false);
+      setIsMetadataSearching(false);
       return;
     }
     setIsMetadataSearching(true);
@@ -401,10 +422,18 @@ export const Models = () => {
 
   /** Clear metadata from the alias */
   const clearMetadata = () => {
+    // Drop any in-flight debounced search so it can't repopulate results
+    // against an alias that no longer has metadata attached.
+    cancelMetadataDebounce();
     const { metadata: _removed, ...rest } = editingAlias;
     setEditingAlias(rest as Alias);
     setMetadataQuery('');
+    setMetadataResults([]);
     setShowMetadataDropdown(false);
+    setIsMetadataSearching(false);
+    // Without this, re-adding a source would reopen the override form with
+    // stale `isOverrideOpen` state from the cleared metadata.
+    setIsOverrideOpen(false);
   };
 
   /** Seed defaults when a user first picks the 'custom' source. */
@@ -1287,6 +1316,16 @@ export const Models = () => {
                         };
                       }
                       setEditingAlias({ ...editingAlias, metadata: next });
+                      // Changing catalogs (or switching to custom) can leave
+                      // a pending debounced search from the prior source that
+                      // would overwrite `metadataResults` with stale data; kill
+                      // it before any conditional re-run below.
+                      if (prevSource !== source) {
+                        cancelMetadataDebounce();
+                        setMetadataResults([]);
+                        setShowMetadataDropdown(false);
+                        setIsMetadataSearching(false);
+                      }
                       // When we dropped the path, also clear the visible model
                       // query input so it doesn't show a stale value that no
                       // longer matches metadata.source_path.
