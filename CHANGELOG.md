@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.19.9 - 2026-04-14
+
+### v0.19.9 provider quota/config hardening and usage telemetry
+
+## New Features
+- Added support for the new Synthetic quota system, including backend/frontend wiring and quota UI integration. The main implementation landed in [8544af9](https://github.com/mcowger/plexus/commit/8544af9), with provider-option support to suppress implicit OAuth quota checkers in [e1c73dd](https://github.com/mcowger/plexus/commit/e1c73dd).
+- Added provider access allowlists and improved log filtering, including a tag-style multi-select UI for key allowlists. See [319011d](https://github.com/mcowger/plexus/commit/319011d) and [c8522d3](https://github.com/mcowger/plexus/commit/c8522d3).
+- Expanded usage accounting for vision fallthrough flows: descriptor model usage is now recorded and surfaced in Logs UI. Key changes are in [6f5bf89](https://github.com/mcowger/plexus/commit/6f5bf89), [d03981c](https://github.com/mcowger/plexus/commit/d03981c), and [0e59eb3](https://github.com/mcowger/plexus/commit/0e59eb3).
+- Added extraction of provider-reported costs from SSE comments so usage records can include more accurate cost data. Implemented in [2e9a4f7](https://github.com/mcowger/plexus/commit/2e9a4f7).
+
+## Bug Fixes
+- Fixed PostgreSQL quota enum coverage for `cost` and `monthly` values to match the new quota types in [ed2bfe9](https://github.com/mcowger/plexus/commit/ed2bfe9).
+- Corrected `disable_quota_check` behavior so it suppresses both implicit and explicit quota checkers, and ensured provider quota config generation respects the flag. See [82a07bc](https://github.com/mcowger/plexus/commit/82a07bc) and [63f73fa](https://github.com/mcowger/plexus/commit/63f73fa).
+- Fixed corrupted `extraBody` reads from the database by discarding invalid `[object Object]` payloads in [08c87bd](https://github.com/mcowger/plexus/commit/08c87bd).
+- Addressed quota checker filtering for OAuth providers so the UI only offers relevant checker types, via [53e7666](https://github.com/mcowger/plexus/commit/53e7666).
+- Fixed several CI and test stability issues, including restored spies, config cache isolation, file-based SQLite usage, and embedded asset serving. Notable commits: [92d9cdd](https://github.com/mcowger/plexus/commit/92d9cdd), [c793a65](https://github.com/mcowger/plexus/commit/c793a65), [15496ab](https://github.com/mcowger/plexus/commit/15496ab), [2ddb843](https://github.com/mcowger/plexus/commit/2ddb843), and [1bd4517](https://github.com/mcowger/plexus/commit/1bd4517).
+- Fixed frontend/backend migration and embedded-file handling for startup and database migrations, including direct VFS migration execution and Bun embedded asset support. See [e2045b1](https://github.com/mcowger/plexus/commit/e2045b1), [82efb5f](https://github.com/mcowger/plexus/commit/82efb5f), and [1bf7f23](https://github.com/mcowger/plexus/commit/1bf7f23).
+
+## Infrastructure / Refactoring
+- Reduced quota-policy duplication by deduplicating key normalization between auth and dispatcher codepaths in [df920bb](https://github.com/mcowger/plexus/commit/df920bb).
+- Modernized CI and build tooling for Node 24, including GitHub Actions updates in [5c98c76](https://github.com/mcowger/plexus/commit/5c98c76).
+- Continued the embedded-binary / filesystem packaging cleanup for migrations and static assets, including migration source logging and use of Bun embedded files. See [63a2287](https://github.com/mcowger/plexus/commit/63a2287), [e2045b1](https://github.com/mcowger/plexus/commit/e2045b1), and [82efb5f](https://github.com/mcowger/plexus/commit/82efb5f).
+- Added broader release/test hygiene: new test-utils spy cleanup, lint enforcement for registerSpy usage, and better test DB ignores. Relevant commits include [ee4146c](https://github.com/mcowger/plexus/commit/ee4146c), [a25c528](https://github.com/mcowger/plexus/commit/a25c528), [6b81f5c](https://github.com/mcowger/plexus/commit/6b81f5c), and [3da03fa](https://github.com/mcowger/plexus/commit/3da03fa).
+
+## Release Impact
+This release strengthens quota configuration correctness, improves visibility into actual provider-reported cost and usage, and makes the system more reliable in CI and embedded deployment scenarios. It also adds useful UI controls for key allowlists and refines how OAuth-related quota checkers are selected and suppressed.
+
+The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
+
 ## v0.19.11 - 2026-04-12
 
 ### v0.19.11: key allowlists, vision fallthrough usage tracking, and logs UI updates
