@@ -17,7 +17,9 @@ export async function registerErrorRoutes(
 
   fastify.delete('/v0/management/errors', async (request, reply) => {
     if (isLimited(request)) {
-      return reply.code(403).send({ error: 'Admin privileges required' });
+      return reply.code(403).send({
+        error: { message: 'Admin privileges required', type: 'forbidden', code: 403 },
+      });
     }
     const success = await usageStorage.deleteAllErrors();
     if (!success) return reply.code(500).send({ error: 'Failed to delete error logs' });

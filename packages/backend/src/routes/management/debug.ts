@@ -20,9 +20,15 @@ export async function registerDebugRoutes(
     const debugManager = DebugManager.getInstance();
     const scopeKey = scopedKeyName(request);
     if (scopeKey) {
+      const enabledGlobal = debugManager.isEnabled();
+      const enabledForKey = debugManager.isEnabledForKey(scopeKey);
+      // `enabled` is kept for backward compatibility with frontend callers
+      // that predate the per-key toggle; it reports whether capture will
+      // happen for THIS principal's requests (global OR per-key).
       return reply.send({
-        enabledGlobal: debugManager.isEnabled(),
-        enabledForKey: debugManager.isEnabledForKey(scopeKey),
+        enabled: enabledGlobal || enabledForKey,
+        enabledGlobal,
+        enabledForKey,
         providers: debugManager.getProviderFilter(),
       });
     }
@@ -38,7 +44,9 @@ export async function registerDebugRoutes(
   // /self/debug/toggle endpoint to affect only their own key.
   fastify.patch('/v0/management/debug', async (request, reply) => {
     if (isLimited(request)) {
-      return reply.code(403).send({ error: 'Admin privileges required' });
+      return reply.code(403).send({
+        error: { message: 'Admin privileges required', type: 'forbidden', code: 403 },
+      });
     }
     const parsed = patchDebugSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -72,7 +80,9 @@ export async function registerDebugRoutes(
 
   fastify.delete('/v0/management/debug/logs', async (request, reply) => {
     if (isLimited(request)) {
-      return reply.code(403).send({ error: 'Admin privileges required' });
+      return reply.code(403).send({
+        error: { message: 'Admin privileges required', type: 'forbidden', code: 403 },
+      });
     }
     const success = await usageStorage.deleteAllDebugLogs();
     if (!success) return reply.code(500).send({ error: 'Failed to delete logs' });

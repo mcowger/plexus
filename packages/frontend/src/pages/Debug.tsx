@@ -266,7 +266,7 @@ export const Debug: React.FC = () => {
         <div>
           <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Debug Traces</h1>
           <p className="text-[15px] text-text-secondary m-0">
-            {isLimited && principal?.role === 'limited'
+            {isLimited && principal?.keyName
               ? `Traces for key "${principal.keyName}" only. Toggle capture in My Key.`
               : 'Inspect full request/response lifecycles'}
           </p>

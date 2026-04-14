@@ -375,7 +375,9 @@ export async function registerUsageRoutes(
 
   fastify.delete('/v0/management/usage', async (request, reply) => {
     if (isLimited(request)) {
-      return reply.code(403).send({ error: 'Admin privileges required' });
+      return reply.code(403).send({
+        error: { message: 'Admin privileges required', type: 'forbidden', code: 403 },
+      });
     }
     const query = request.query as any;
     const olderThanDays = query.olderThanDays;
@@ -396,7 +398,9 @@ export async function registerUsageRoutes(
 
   fastify.delete('/v0/management/usage/:requestId', async (request, reply) => {
     if (isLimited(request)) {
-      return reply.code(403).send({ error: 'Admin privileges required' });
+      return reply.code(403).send({
+        error: { message: 'Admin privileges required', type: 'forbidden', code: 403 },
+      });
     }
     const params = request.params as any;
     const requestId = params.requestId;
@@ -551,6 +555,7 @@ export async function registerUsageRoutes(
             ? schema.requestUsage.canonicalModelName
             : schema.requestUsage.provider;
 
+        const timelineScopeKey = scopedKeyName(request);
         const results = await db
           .select({
             timestamp: bucketSql,
@@ -563,9 +568,7 @@ export async function registerUsageRoutes(
               isNotNull(groupField),
               gte(schema.requestUsage.startTime, startTime),
               lte(schema.requestUsage.startTime, endTime),
-              ...(scopedKeyName(request)
-                ? [eq(schema.requestUsage.apiKey, scopedKeyName(request)!)]
-                : [])
+              ...(timelineScopeKey ? [eq(schema.requestUsage.apiKey, timelineScopeKey)] : [])
             )
           )
           .groupBy(groupField, bucketSql)

@@ -34,6 +34,18 @@ function constantTimeEquals(a: string, b: string): boolean {
 }
 
 /**
+ * Constant-time string compare via SHA-256. Hashing normalizes input length
+ * (so no length leak from `timingSafeEqual`) and keeps the per-comparison
+ * cost independent of where the mismatch first occurs. Cost is one extra
+ * hash per stored key per login — acceptable for a small keys set.
+ */
+function constantTimeHashEquals(a: string, b: string): boolean {
+  const aHash = crypto.createHash('sha256').update(a).digest();
+  const bHash = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(aHash, bHash);
+}
+
+/**
  * Resolve the principal for an incoming management request.
  * Returns null if no valid credential was presented.
  */
@@ -50,22 +62,34 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
   // in-memory config (same source v1 inference uses) rather than a direct DB
   // query so that test harnesses using setConfigForTesting(...) work and we
   // avoid a DB round-trip on every management request.
+  //
+  // Walk the whole list even after a match so the rejection path doesn't
+  // leak a count-of-keys-before-match timing signal.
   try {
     const config = getConfig();
     if (!config.keys) return null;
+    let matched: { name: string; cfg: unknown } | null = null;
     for (const [name, cfg] of Object.entries(config.keys)) {
-      if ((cfg as { secret: string }).secret === providedKey) {
-        return {
-          role: 'limited',
-          keyName: name,
-          allowedProviders: (cfg as { allowedProviders?: string[] }).allowedProviders ?? [],
-          allowedModels: (cfg as { allowedModels?: string[] }).allowedModels ?? [],
-          quotaName: (cfg as { quota?: string | null }).quota ?? null,
-          comment: (cfg as { comment?: string | null }).comment ?? null,
-        };
+      const storedSecret = (cfg as { secret: string }).secret;
+      if (typeof storedSecret === 'string' && constantTimeHashEquals(storedSecret, providedKey)) {
+        if (!matched) matched = { name, cfg };
       }
     }
-    return null;
+    if (!matched) return null;
+    const cfg = matched.cfg as {
+      allowedProviders?: string[];
+      allowedModels?: string[];
+      quota?: string | null;
+      comment?: string | null;
+    };
+    return {
+      role: 'limited',
+      keyName: matched.name,
+      allowedProviders: cfg.allowedProviders ?? [],
+      allowedModels: cfg.allowedModels ?? [],
+      quotaName: cfg.quota ?? null,
+      comment: cfg.comment ?? null,
+    };
   } catch (err) {
     logger.silly(`[AUTH] api_keys lookup failed: ${(err as Error).message}`);
     return null;

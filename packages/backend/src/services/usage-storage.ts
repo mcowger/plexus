@@ -5,6 +5,7 @@ import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
 import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
+import { getCurrentKeyName } from './request-context';
 
 export interface UsageFilters {
   startDate?: string;
@@ -262,10 +263,20 @@ export class UsageStorageService extends EventEmitter {
 
   async saveError(requestId: string, error: any, details?: any, apiKey?: string | null) {
     try {
-      // If the caller didn't supply apiKey, try to look it up by requestId so
-      // limited-user scoping still works even for error paths we haven't
-      // threaded through.
+      // Resolve the owning key name in preference order:
+      //   1. Explicit caller-supplied apiKey (most accurate).
+      //   2. AsyncLocalStorage request context (keyName seeded by v1 auth
+      //      middleware) — this catches error paths we haven't threaded
+      //      apiKey through manually, without any DB round-trip.
+      //   3. DB lookup on request_usage by requestId — last-resort fallback,
+      //      which can miss attribution if the request_usage row hasn't been
+      //      written yet (it's inserted via emitStartedAsync, which runs
+      //      concurrently with the error path).
       let effectiveApiKey = apiKey ?? null;
+      if (!effectiveApiKey) {
+        const ctxKeyName = getCurrentKeyName();
+        if (ctxKeyName) effectiveApiKey = ctxKeyName;
+      }
       if (!effectiveApiKey) {
         try {
           const rows = await this.ensureDb()
