@@ -49,18 +49,3 @@ export interface GpuProfileOption {
   flops_tflop?: number;
   power_draw_watts?: number;
 }
-
-/**
- * Model architecture as supplied by the user or HuggingFace fetcher.
- * This is the shape stored in config and sent to the energy calculator.
- */
-export interface ModelArchitecture {
-  total_params?: number;
-  active_params?: number;
-  layers?: number;
-  heads?: number;
-  kv_lora_rank?: number;
-  qk_rope_head_dim?: number;
-  context_length?: number;
-  dtype?: 'fp16' | 'bf16' | 'fp8' | 'fp8_e4m3' | 'fp8_e5m2' | 'nvfp4' | 'int4' | 'int8';
-}

@@ -4,19 +4,38 @@ export type {
   ModelParams,
   InferenceFootprint,
   GpuProfileOption,
-  ModelArchitecture,
 } from './types';
 
-// GPU presets, profile options, default model, dtype sizes, and resolution helper
+// ModelArchitecture is exported from model-params.ts
+
+// GPU presets, profile options, and GPU resolution
 export {
   GPU_PRESETS,
   VALID_GPU_PROFILES,
   GPU_PROFILE_OPTIONS,
   DEFAULT_GPU_PARAMS,
   resolveGpuParams,
-  resolveModelParams,
-  DEFAULT_MODEL,
-  DTYPE_SIZES,
 } from './gpu-profiles';
 
 export type { GpuProfileName, GpuProfileType } from './gpu-profiles';
+
+// Model params, dtype utilities, heuristics, and resolution helpers
+export {
+  DTYPE_SIZES,
+  resolveDtypeSize,
+  normalizeDtypeName,
+  inferDataType,
+  DEFAULT_MODEL,
+  resolveModelParams,
+  PROPRIETARY_MODEL_HEURISTICS,
+  estimateTotalParamsFromConfig,
+  estimateActiveParams,
+} from './model-params';
+
+export type {
+  InferDtypeOptions,
+  EstimateTotalParamsOptions,
+  EstimateActiveParamsOptions,
+  ModelParamsWithDtype,
+  ModelArchitecture,
+} from './model-params';

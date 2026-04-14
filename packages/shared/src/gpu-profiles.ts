@@ -1,4 +1,5 @@
-import type { GpuParams, GpuProfileOption, ModelParams, ModelArchitecture } from './types';
+import type { GpuParams, GpuProfileOption, ModelArchitecture } from './types';
+import { DTYPE_SIZES, DEFAULT_MODEL } from './model-params';
 
 // ─── GPU Presets ──────────────────────────
 // GPU specifications based on official NVIDIA specs
@@ -78,52 +79,18 @@ export function resolveGpuParams(profile?: string, overrides?: Partial<GpuParams
   };
 }
 
-// ─── Default Model Parameters ──────────────────────────
-// Fallback model architecture for energy estimation when no
-// model_architecture is provided.
-
-export const DEFAULT_MODEL: ModelParams = {
-  total_params: 1000, // In billions
-  active_params: 32, // In billions
-  layers: 61,
-  context_length: 256000,
-  kv_lora_rank: 512,
-  qk_rope_head_dim: 64,
-  dtype_size: 1, // FP8 = 1 byte
-  heads: 64,
-};
-
-// ─── Data Type Sizes ──────────────────────────
-// Common data type sizes in bytes — single source of truth
-// Used by inference-energy, huggingface-model-fetcher, and usage-storage
-
-export const DTYPE_SIZES: Record<string, number> = {
-  fp32: 4,
-  fp16: 2,
-  bf16: 2,
-  fp8: 1,
-  fp8_e4m3: 1,
-  fp8_e5m2: 1,
-  nvfp4: 0.5,
-  int4: 0.5,
-  int8: 1,
-  default: 1, // Default to FP8
-};
-
 /**
  * Resolve fully-populated ModelParams from a ModelArchitecture
  * (which may have partial/optional fields) by filling in defaults
  * and looking up dtype_size.
+ *
+ * Re-exported from model-params.ts for backward compatibility.
  */
-export function resolveModelParams(arch?: ModelArchitecture): ModelParams {
-  return {
-    total_params: arch?.total_params ?? DEFAULT_MODEL.total_params,
-    active_params: arch?.active_params ?? arch?.total_params ?? DEFAULT_MODEL.active_params,
-    layers: arch?.layers ?? DEFAULT_MODEL.layers,
-    context_length: arch?.context_length ?? DEFAULT_MODEL.context_length,
-    kv_lora_rank: arch?.kv_lora_rank ?? DEFAULT_MODEL.kv_lora_rank,
-    qk_rope_head_dim: arch?.qk_rope_head_dim ?? DEFAULT_MODEL.qk_rope_head_dim,
-    dtype_size: DTYPE_SIZES[arch?.dtype ?? 'default'] ?? DTYPE_SIZES.default!,
-    heads: arch?.heads ?? DEFAULT_MODEL.heads,
-  };
-}
+export { DEFAULT_MODEL, resolveModelParams } from './model-params';
+
+/**
+ * Re-export dtype utilities from model-params.ts for backward compatibility.
+ */
+export { DTYPE_SIZES, resolveDtypeSize, normalizeDtypeName, inferDataType } from './model-params';
+
+export type { InferDtypeOptions } from './model-params';

@@ -187,8 +187,9 @@ export function EnergyTimeComparison({
         <div className="space-y-2">
           <div className="h-3 bg-bg-hover rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${isAiMoreEfficient ? 'bg-success' : isAiLessEfficient ? 'bg-danger' : 'bg-info'
-                }`}
+              className={`h-full rounded-full transition-all duration-500 ${
+                isAiMoreEfficient ? 'bg-success' : isAiLessEfficient ? 'bg-danger' : 'bg-info'
+              }`}
               style={{ width: `${barPercent}%` }}
             />
           </div>
@@ -203,8 +204,9 @@ export function EnergyTimeComparison({
             <div className="flex items-center gap-1.5">
               <span className="text-text-tertiary">You worked with AI for:</span>
               <span
-                className={`font-semibold ${isAiLessEfficient ? 'text-danger' : 'text-text-primary'
-                  }`}
+                className={`font-semibold ${
+                  isAiLessEfficient ? 'text-danger' : 'text-text-primary'
+                }`}
               >
                 {activeTimeDisplay}
               </span>

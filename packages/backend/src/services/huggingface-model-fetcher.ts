@@ -9,10 +9,16 @@
  */
 
 import { logger } from '../utils/logger';
-import type { ModelParams } from '@plexus/shared';
-import { DTYPE_SIZES } from '@plexus/shared';
-
-// DTYPE_SIZES is imported from @plexus/shared (single source of truth)
+import type { ModelParams, ModelParamsWithDtype } from '@plexus/shared';
+import {
+  DEFAULT_MODEL,
+  DTYPE_SIZES,
+  estimateActiveParams,
+  estimateTotalParamsFromConfig,
+  inferDataType,
+  PROPRIETARY_MODEL_HEURISTICS,
+  resolveDtypeSize,
+} from '@plexus/shared';
 
 // ─── HuggingFace API Response Types ──────────────────────────
 
@@ -78,197 +84,31 @@ interface HuggingFaceApiResponse {
   config?: HuggingFaceConfig;
 }
 
-// ─── Proprietary Model Heuristics ──────────────────────────
-// Heuristics for estimating architecture of proprietary models not on Hugging Face
+// ─── Intermediate fetch result types ──────────────────────────
+// Raw data returned by fetchModelData before translation to ModelParams.
 
-interface ModelFamilyHeuristic {
-  // Architecture estimation
-  total_params: number; // In billions
-  active_params: number; // In billions (for MoE)
-  layers: number;
-  heads: number;
-  kv_lora_rank: number;
-  qk_rope_head_dim: number;
-  context_length: number;
-  // Assumed dtype for energy calc
-  default_dtype: string;
+interface HuggingFaceModelData {
+  source: 'huggingface';
+  /** Safetensors dtype→param-count distribution (undefined values stripped). */
+  safetensorsParams?: Record<string, number>;
+  /** Total parameters in billions (computed from safetensors). */
+  totalParams?: number;
+  /** Parsed config.json from the model repository. */
+  config?: HuggingFaceConfig;
 }
 
-const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelFamilyHeuristic> = {
-  // Anthropic Claude 4 Series (Frontier Reasoning)
-  // Claude 4.6 (Released Feb 2026): 1M Context + Adaptive Thinking
-  'claude-4-6-opus': {
-    total_params: 4500, // ~4.5T total
-    active_params: 340, // 30B base * ~11x output price premium
-    layers: 136,
-    heads: 112,
-    kv_lora_rank: 256,
-    qk_rope_head_dim: 128,
-    context_length: 1000000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-6-sonnet': {
-    total_params: 1400,
-    active_params: 110, // 15B base * ~7x output price premium
-    layers: 96,
-    heads: 80,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 1000000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-6-haiku': {
-    total_params: 350,
-    active_params: 24, // 8B base * ~3x output price premium
-    layers: 64,
-    heads: 64,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
+interface HeuristicModelData {
+  source: 'heuristic';
+  heuristic: ModelParamsWithDtype;
+}
 
-  // Claude 4.5 (Released Nov 2025)
-  'claude-4-5-opus': {
-    total_params: 3800,
-    active_params: 300,
-    layers: 128,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-5-sonnet': {
-    total_params: 1200,
-    active_params: 90,
-    layers: 90,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-5-haiku': {
-    total_params: 250,
-    active_params: 18,
-    layers: 60,
-    heads: 48,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-
-  // Claude 4.1 / 4.0 (Mid-2025 Series)
-  'claude-4-1-opus': {
-    total_params: 2800,
-    active_params: 250,
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-sonnet': {
-    total_params: 800,
-    active_params: 75,
-    layers: 90,
-    heads: 64,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-  'claude-4-haiku': {
-    total_params: 150,
-    active_params: 12,
-    layers: 48,
-    heads: 32,
-    kv_lora_rank: 32,
-    qk_rope_head_dim: 64,
-    context_length: 200000,
-    default_dtype: 'fp8',
-  },
-
-  // OpenAI GPT-5 Series (Agentic & Reasoning)
-  // GPT-5.4 (Released March 2026): Configurable Reasoning & 1M Context
-  'gpt-5-4-pro': {
-    total_params: 4000,
-    active_params: 320, // High-effort reasoning activation
-    layers: 144,
-    heads: 128,
-    kv_lora_rank: 512,
-    qk_rope_head_dim: 128,
-    context_length: 1048576,
-    default_dtype: 'fp8',
-  },
-  'gpt-5': {
-    total_params: 1500,
-    active_params: 100, // Standard routing for general chat
-    layers: 112,
-    heads: 96,
-    kv_lora_rank: 256,
-    qk_rope_head_dim: 128,
-    context_length: 400000,
-    default_dtype: 'fp8',
-  },
-
-  // GPT-5 Codex (Agentic Coding Specialists)
-  'gpt-5-codex-max': {
-    total_params: 3200,
-    active_params: 280, // Heavy attention activation for massive codebases
-    layers: 128,
-    heads: 128,
-    kv_lora_rank: 512,
-    qk_rope_head_dim: 128,
-    context_length: 400000,
-    default_dtype: 'fp8',
-  },
-  'gpt-5-codex-mini': {
-    total_params: 300,
-    active_params: 20, // Mini/Haiku scale for autocomplete tasks
-    layers: 64,
-    heads: 48,
-    kv_lora_rank: 64,
-    qk_rope_head_dim: 48,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-
-  // Legacy GPT-4 Series
-  'gpt-4o': {
-    total_params: 1760,
-    active_params: 110, // Likely 2 experts out of 16 active
-    layers: 120,
-    heads: 96,
-    kv_lora_rank: 128,
-    qk_rope_head_dim: 96,
-    context_length: 128000,
-    default_dtype: 'fp8',
-  },
-};
-
-// ─── Default Fallback ──────────────────────────
-
-const DEFAULT_MODEL_PARAMS: ModelParams = {
-  total_params: 1000, // Represented as billions
-  active_params: 32, // Represented as billions
-  layers: 61,
-  context_length: 256000,
-  kv_lora_rank: 512,
-  qk_rope_head_dim: 64,
-  dtype_size: 2, // FP16 = 2 bytes
-  heads: 64,
-};
+type FetchedModelData = HuggingFaceModelData | HeuristicModelData;
 
 // ─── Fetcher Implementation ──────────────────────────
 
 export class HuggingFaceModelFetcher {
   private static instance: HuggingFaceModelFetcher;
-  private cache: Map<string, ModelParams> = new Map();
-  private dtypeCache: Map<string, string> = new Map();
+  private cache: Map<string, ModelParamsWithDtype> = new Map();
 
   private constructor() {}
 
@@ -280,204 +120,210 @@ export class HuggingFaceModelFetcher {
   }
 
   /**
-   * Reset the singleton (used in tests)
+   * Reset the singleton (used in tests).
    */
   public static resetForTesting(): void {
     HuggingFaceModelFetcher.instance = new HuggingFaceModelFetcher();
   }
 
+  // ─── Public API ──────────────────────────────────────
+
   /**
-   * Try to fetch model architecture from Hugging Face,
-   * fall back to heuristics, then fall back to defaults.
+   * Get fully-resolved ModelParams for a model.
+   *
+   * Fetches architecture data from HuggingFace or falls back to proprietary
+   * model heuristics, then translates the result into a complete ModelParams
+   * object (filling in defaults for any missing fields) and caches it.
+   *
+   * @param modelId  Exact HuggingFace model identifier (e.g. "org/model-name").
+   *                 No prefix stripping or normalization is performed.
+   * @param dtype    Optional dtype override (e.g. "fp8", "bf16").
    */
   public async getModelParams(
     modelId: string,
     dtype?: string
   ): Promise<{
-    params: ModelParams;
+    params: ModelParamsWithDtype;
     source: 'huggingface' | 'heuristic' | 'default';
     dtype: string;
   }> {
-    // Normalize model ID (remove org prefix if present for heuristic matching)
-    const normalizedId = modelId
-      .toLowerCase()
-      .replace(/^models:\/\//, '')
-      .replace(/^hf_/, '');
-    const baseModelId = normalizedId.split('/').pop() || normalizedId;
-
-    // Check cache first
     const cacheKey = `${modelId}:${dtype || 'default'}`;
     const cached = this.cache.get(cacheKey);
     if (cached) {
-      return { params: cached, source: 'huggingface', dtype: dtype || 'fp16' };
+      return { params: cached, source: 'huggingface', dtype: cached.dtype };
     }
 
-    // Try Hugging Face first
-    const hfResult = await this.fetchFromHuggingFace(modelId);
-    if (hfResult) {
-      const finalDtype = dtype || hfResult.dtype;
-      const params: ModelParams = {
-        total_params: hfResult.params.total_params ?? DEFAULT_MODEL_PARAMS.total_params,
-        active_params: hfResult.params.active_params ?? DEFAULT_MODEL_PARAMS.active_params,
-        layers: hfResult.params.layers ?? DEFAULT_MODEL_PARAMS.layers,
-        heads: hfResult.params.heads ?? DEFAULT_MODEL_PARAMS.heads,
-        kv_lora_rank: hfResult.params.kv_lora_rank ?? DEFAULT_MODEL_PARAMS.kv_lora_rank,
-        qk_rope_head_dim: hfResult.params.qk_rope_head_dim ?? DEFAULT_MODEL_PARAMS.qk_rope_head_dim,
-        context_length: hfResult.params.context_length ?? DEFAULT_MODEL_PARAMS.context_length,
-        dtype_size: DTYPE_SIZES[finalDtype] || DTYPE_SIZES.default,
-      };
+    const modelData = await this.fetchModelData(modelId);
+
+    if (!modelData) {
+      // No data found anywhere — return defaults
+      const finalDtype = dtype || DEFAULT_MODEL.dtype;
+
+      // Return DEFAULT_MODEL directly if no dtype override, otherwise clone with new dtype/dtype_size
+      const params = dtype
+        ? { ...DEFAULT_MODEL, dtype: finalDtype, dtype_size: resolveDtypeSize(finalDtype) }
+        : DEFAULT_MODEL;
+
       this.cache.set(cacheKey, params);
-      return { params, source: 'huggingface', dtype: finalDtype };
+      return { params, source: 'default', dtype: finalDtype };
     }
 
-    // Fall back to heuristics for proprietary models
-    const heuristicResult = this.getHeuristicParams(baseModelId);
-    if (heuristicResult) {
-      const finalDtype = dtype || heuristicResult.dtype;
-      const params: ModelParams = {
-        total_params: heuristicResult.params.total_params ?? DEFAULT_MODEL_PARAMS.total_params,
-        active_params: heuristicResult.params.active_params ?? DEFAULT_MODEL_PARAMS.active_params,
-        layers: heuristicResult.params.layers ?? DEFAULT_MODEL_PARAMS.layers,
-        heads: heuristicResult.params.heads ?? DEFAULT_MODEL_PARAMS.heads,
-        kv_lora_rank: heuristicResult.params.kv_lora_rank ?? DEFAULT_MODEL_PARAMS.kv_lora_rank,
-        qk_rope_head_dim:
-          heuristicResult.params.qk_rope_head_dim ?? DEFAULT_MODEL_PARAMS.qk_rope_head_dim,
-        context_length:
-          heuristicResult.params.context_length ?? DEFAULT_MODEL_PARAMS.context_length,
-        dtype_size: DTYPE_SIZES[finalDtype] || DTYPE_SIZES.default,
-      };
-      this.cache.set(cacheKey, params);
-      return { params, source: 'heuristic', dtype: finalDtype };
+    // Determine params and dtype based on source
+    let partialParams: Partial<ModelParamsWithDtype>;
+    let inferredDtype: string;
+
+    if (modelData.source === 'heuristic') {
+      // Heuristic source — already has complete params with dtype
+      partialParams = modelData.heuristic;
+      inferredDtype = modelData.heuristic.dtype;
+    } else {
+      // HuggingFace source — parseConfig already did dtype inference
+      partialParams = this.parseConfig(modelData);
+      inferredDtype = partialParams.dtype!;
     }
 
-    // Fall back to defaults
-    const finalDtype = dtype || 'fp16';
-    const params: ModelParams = {
-      ...DEFAULT_MODEL_PARAMS,
-      dtype_size: DTYPE_SIZES[finalDtype] || DTYPE_SIZES.default,
+    const finalDtype = dtype || inferredDtype;
+    const params: ModelParamsWithDtype = {
+      ...DEFAULT_MODEL,
+      ...partialParams,
+      dtype: finalDtype,
+      dtype_size: resolveDtypeSize(finalDtype),
     };
     this.cache.set(cacheKey, params);
-    return { params, source: 'default', dtype: finalDtype };
+    return { params, source: modelData.source, dtype: finalDtype };
+  }
+
+  // ─── Data Fetching ───────────────────────────────────
+
+  /**
+   * Fetch model architecture data from HuggingFace, falling back to
+   * proprietary model heuristics if the model is not found.
+   *
+   * This method only fetches and parses — no translation to ModelParams.
+   *
+   * @param modelId  Exact HuggingFace model identifier (e.g. "org/model-name").
+   */
+  private async fetchModelData(modelId: string): Promise<FetchedModelData | null> {
+    const hfResult = await this.fetchFromHuggingFace(modelId);
+    if (hfResult) return hfResult;
+
+    // Fall back to proprietary model heuristics
+    const heuristic = this.matchHeuristic(modelId);
+    if (heuristic) {
+      logger.debug(`[HuggingFaceModelFetcher] Using heuristic for ${modelId}`);
+      return { source: 'heuristic', heuristic };
+    }
+
+    return null;
   }
 
   /**
-   * Fetch model config from Hugging Face
+   * Fetch raw model data from the two HuggingFace endpoints:
+   *  1. /api/models/{modelId}  — safetensors parameter distribution
+   *  2. /{modelId}/resolve/main/config.json — architecture config
+   *
+   * Returns partial data if only one endpoint succeeds.
+   * Returns null only if both endpoints fail.
    */
-  private async fetchFromHuggingFace(
-    modelId: string
-  ): Promise<{ params: Partial<ModelParams>; dtype: string } | null> {
-    // Normalize model ID for URL
-    const normalizedModelId = modelId.replace(/^models:\/\//, '').replace(/^hf_/, '');
-
+  private async fetchFromHuggingFace(modelId: string): Promise<HuggingFaceModelData | null> {
     try {
-      // First, fetch the HF API endpoint to get safetensors parameter info
-      const apiUrl = `https://huggingface.co/api/models/${normalizedModelId}`;
+      // Fetch the HF API endpoint for safetensors parameter info
+      const apiUrl = `https://huggingface.co/api/models/${modelId}`;
       logger.debug(`[HuggingFaceModelFetcher] Fetching API data from ${apiUrl}`);
 
       const apiResponse = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
 
+      let safetensorsParams: Record<string, number> | undefined;
       let totalParams: number | undefined;
-      let inferredDtype: string | undefined;
 
       if (apiResponse.ok) {
         const apiData: HuggingFaceApiResponse = await apiResponse.json();
 
-        // Use safetensors info to get total params
-        // safetensors.parameters contains the actual parameter counts (not bytes)
         if (apiData.safetensors?.parameters) {
-          const params = apiData.safetensors.parameters;
+          // Strip undefined values so inferDataType gets Record<string, number>
+          safetensorsParams = Object.fromEntries(
+            Object.entries(apiData.safetensors.parameters).filter(
+              (e): e is [string, number] => e[1] !== undefined
+            )
+          );
 
-          // Sum all dtype parameter counts to get total params
-          const fp8Params = params.F8_E4M3 || 0;
-          const i32Params = params.I32 || 0; // int4 stored as int32
-          const bf16Params = params.BF16 || 0;
-          const fp32Params = params.F32 || 0;
-          const fp16Params = params.F16 || 0;
-          const f8E5m2Params = params.F8_E5M2 || 0;
-
-          const totalFromSafetensors =
-            fp8Params + i32Params + bf16Params + fp32Params + fp16Params + f8E5m2Params;
+          const totalFromSafetensors = Object.values(safetensorsParams).reduce(
+            (sum, count) => sum + count,
+            0
+          );
 
           if (totalFromSafetensors > 0) {
             totalParams = Math.round((totalFromSafetensors / 1e9) * 10) / 10;
-
-            // Determine dominant dtype
-            if (
-              i32Params > fp8Params &&
-              i32Params > bf16Params &&
-              i32Params > fp32Params &&
-              i32Params > fp16Params &&
-              i32Params > f8E5m2Params
-            ) {
-              inferredDtype = 'int4';
-            } else if (
-              fp8Params > bf16Params &&
-              fp8Params > fp32Params &&
-              fp8Params > fp16Params &&
-              fp8Params > f8E5m2Params
-            ) {
-              inferredDtype = 'fp8';
-            } else if (bf16Params > fp32Params && bf16Params > fp16Params) {
-              inferredDtype = 'bf16';
-            } else if (fp16Params > fp32Params) {
-              inferredDtype = 'fp16';
-            } else if (fp32Params > 0) {
-              inferredDtype = 'fp16'; // Use fp16 for energy calc (fp32 is rare)
-            } else if (f8E5m2Params > 0) {
-              inferredDtype = 'fp8';
-            }
           }
         }
       }
 
-      // Then fetch the config.json for architecture details
-      const configUrl = `https://huggingface.co/${normalizedModelId}/resolve/main/config.json`;
+      // Fetch config.json for architecture details
+      const configUrl = `https://huggingface.co/${modelId}/resolve/main/config.json`;
       logger.debug(`[HuggingFaceModelFetcher] Fetching config from ${configUrl}`);
 
       const configResponse = await fetch(configUrl, {
         method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
 
-      if (!configResponse.ok) {
+      let config: HuggingFaceConfig | undefined;
+      if (configResponse.ok) {
+        config = await configResponse.json();
+      } else {
         logger.debug(`[HuggingFaceModelFetcher] Config not found: ${configResponse.status}`);
-        // If we have safetensors data but no config, still return what we have
-        if (totalParams) {
-          return {
-            params: { total_params: totalParams, active_params: totalParams },
-            dtype: inferredDtype || 'fp8',
-          };
-        }
-        return null;
       }
 
-      const config: HuggingFaceConfig = await configResponse.json();
-      const parsedParams = this.parseConfig(config, totalParams);
-      const dtype = inferredDtype || this.inferDtype(config);
+      // Return whatever we got — even partial data (safetensors-only) is useful
+      if (safetensorsParams || config) {
+        logger.info(`[HuggingFaceModelFetcher] Fetched data for ${modelId}`);
+        return { source: 'huggingface', safetensorsParams, totalParams, config };
+      }
 
-      logger.info(`[HuggingFaceModelFetcher] Successfully fetched config for ${modelId}`);
-      return { params: parsedParams, dtype };
+      return null;
     } catch (error) {
-      logger.debug(`[HuggingFaceModelFetcher] Error fetching config: ${error}`);
+      logger.debug(`[HuggingFaceModelFetcher] Error fetching model data: ${error}`);
       return null;
     }
   }
 
+  // ─── Config Parsing ─────────────────────────────────
+
   /**
-   * Parse HuggingFace config into ModelParams
+   * Parse HuggingFace model data into partial ModelParamsWithDtype.
+   *
+   * Extracts architecture fields (layers, heads, context length, etc.)
+   * and estimates total/active params from the config or safetensors data.
+   * Also infers the dtype from config and safetensors parameters.
+   *
+   * If no config is available, returns total_params = active_params from safetensors.
    */
-  private parseConfig(
-    config: HuggingFaceConfig,
-    safetensorsTotalParams?: number
-  ): Partial<ModelParams> {
-    const params: Partial<ModelParams> = {};
+  private parseConfig(modelData: HuggingFaceModelData): Partial<ModelParamsWithDtype> {
+    const { safetensorsParams, totalParams, config } = modelData;
+
+    // Infer dtype from config and safetensors
+    const inferredDtype = inferDataType({
+      torch_dtype: config?.torch_dtype,
+      safetensors: safetensorsParams,
+    });
+
+    // No config available — fall back to safetensors total params
+    if (!config) {
+      return {
+        total_params: totalParams,
+        active_params: totalParams,
+        dtype: inferredDtype,
+        dtype_size: resolveDtypeSize(inferredDtype),
+      };
+    }
+
+    const params: Partial<ModelParamsWithDtype> = {
+      dtype: inferredDtype,
+      dtype_size: resolveDtypeSize(inferredDtype),
+    };
 
     // Layers
     if (config.num_hidden_layers) {
@@ -500,7 +346,7 @@ export class HuggingFaceModelFetcher {
 
     // Context length - try multiple fields
     params.context_length =
-      config.max_position_embeddings || config.max_sequence_length || config.ctx_length || 4096; // Default
+      config.max_position_embeddings || config.max_sequence_length || config.ctx_length || 4096;
 
     // RoPE scaling can extend context length
     if (config.rope_scaling?.factor && config.rope_scaling?.original_max_position_embeddings) {
@@ -516,26 +362,18 @@ export class HuggingFaceModelFetcher {
     }
 
     // Use safetensors total params if available (more accurate), otherwise estimate from config
-    if (safetensorsTotalParams) {
-      params.total_params = safetensorsTotalParams;
-    } else if (
-      config.vocab_size &&
-      config.hidden_size &&
-      config.num_hidden_layers &&
-      config.intermediate_size
-    ) {
-      // Fallback: estimate from vocab and hidden size
-      // Formula: vocab_size * hidden_size * 4 (embed + output) + layers * hidden_size * (4*hidden_size + intermediate_size)
-      const vocabEmbed = config.vocab_size * config.hidden_size * 4;
-      const perLayer =
-        config.hidden_size *
-        (4 * config.hidden_size + config.intermediate_size + 2 * config.hidden_size);
-      const total = (vocabEmbed + config.num_hidden_layers * perLayer) / 1e9; // Convert to billions
-      params.total_params = Math.round(total * 10) / 10; // Round to 1 decimal
+    if (totalParams) {
+      params.total_params = totalParams;
+    } else {
+      params.total_params = estimateTotalParamsFromConfig({
+        vocab_size: config.vocab_size,
+        hidden_size: config.hidden_size,
+        num_hidden_layers: config.num_hidden_layers,
+        intermediate_size: config.intermediate_size,
+      });
     }
 
     // Calculate active params based on MoE configuration
-    // Check for expert config in both top-level and nested (some models like Kimi have it in text_config)
     const textConfig = config.text_config || {};
     const numLocalExperts =
       config.num_local_experts ||
@@ -544,115 +382,66 @@ export class HuggingFaceModelFetcher {
       textConfig.n_routed_experts;
     const numExpertsPerTok = config.num_experts_per_tok || textConfig.num_experts_per_tok;
 
-    if (params.total_params && numLocalExperts && numExpertsPerTok) {
-      // MoE: active_params = (total_params / num_local_experts) * num_experts_per_tok
-      const paramsPerExpert = params.total_params / numLocalExperts;
-      params.active_params = Math.round(paramsPerExpert * numExpertsPerTok * 10) / 10;
-    } else if (config.model_type?.includes('mixtral') || config.model_type?.includes('moe')) {
-      // MoE models without explicit expert config: assume ~5-15% active params
-      params.active_params = Math.round(params.total_params! * 0.1 * 10) / 10;
-    } else {
-      // Dense model: all params are active
-      params.active_params = params.total_params || 0.1;
-    }
+    params.active_params = estimateActiveParams({
+      totalParams: params.total_params || 0,
+      numLocalExperts,
+      numExpertsPerTok,
+    });
 
     return params;
   }
 
-  /**
-   * Infer likely dtype from model config or defaults
-   */
-  private inferDtype(config: HuggingFaceConfig): string {
-    if (config.torch_dtype) {
-      const dtype = config.torch_dtype.toLowerCase();
-      if (dtype.includes('float16') || dtype.includes('fp16')) return 'fp16';
-      if (dtype.includes('bfloat16') || dtype.includes('bf16')) return 'bf16';
-      if (dtype.includes('float8') || dtype.includes('fp8')) return 'fp8';
-      if (dtype.includes('int8')) return 'int8';
-      if (dtype.includes('int4')) return 'int4';
-    }
-
-    // Model type based inference
-    const modelType = config.model_type?.toLowerCase() || '';
-    if (
-      modelType.includes('llama') ||
-      modelType.includes('mistral') ||
-      modelType.includes('qwen')
-    ) {
-      // Modern models often use FP8
-      return 'fp8';
-    }
-
-    return 'fp16'; // Default
-  }
+  // ─── Heuristic Matching ──────────────────────────────
 
   /**
-   * Get heuristic parameters for known proprietary model families
+   * Match a model ID against proprietary model heuristics.
+   *
+   * Performs a simple case-insensitive substring match against the
+   * known heuristic keys (e.g. "claude-4-6-opus", "gpt-5").
    */
-  private getHeuristicParams(
-    modelId: string
-  ): { params: Partial<ModelParams>; dtype: string } | null {
-    const normalizedId = modelId.toLowerCase();
-
-    // Try exact match first
-    for (const [key, heuristic] of Object.entries(PROPRIETARY_MODEL_HEURISTICS)) {
-      if (normalizedId.includes(key.replace(/-/g, '').replace(/_/g, ''))) {
-        // Check for exact match or prefix match (for models like "together-")
-        if (key.endsWith('-')) {
-          // Prefix match - only match if model ID starts with the prefix
-          if (normalizedId.startsWith(key.slice(0, -1))) {
-            return this.heuristicToModelParams(heuristic);
-          }
-        } else if (normalizedId.includes(key)) {
-          return this.heuristicToModelParams(heuristic);
-        }
+  private matchHeuristic(modelId: string): ModelParamsWithDtype | null {
+    const lower = modelId.toLowerCase();
+    // Sort keys by length descending so more-specific keys match first.
+    // Without this, 'gpt-5' would match 'gpt-5-codex-max' before 'gpt-5-codex-max' could.
+    const entries = Object.entries(PROPRIETARY_MODEL_HEURISTICS).sort(
+      (a, b) => b[0].length - a[0].length
+    );
+    for (const [key, heuristic] of entries) {
+      if (lower.includes(key)) {
+        return heuristic;
       }
     }
-
     return null;
   }
 
-  /**
-   * Convert heuristic to ModelParams
-   */
-  private heuristicToModelParams(heuristic: ModelFamilyHeuristic): {
-    params: Partial<ModelParams>;
-    dtype: string;
-  } {
-    return {
-      params: {
-        total_params: heuristic.total_params,
-        active_params: heuristic.active_params,
-        layers: heuristic.layers,
-        heads: heuristic.heads,
-        kv_lora_rank: heuristic.kv_lora_rank,
-        qk_rope_head_dim: heuristic.qk_rope_head_dim,
-        context_length: heuristic.context_length,
-      },
-      dtype: heuristic.default_dtype,
-    };
-  }
+  // ─── Utilities ──────────────────────────────────────
 
   /**
-   * Clear cache (useful for testing or after config changes)
+   * Clear cache (useful for testing or after config changes).
    */
   public clearCache(): void {
     this.cache.clear();
   }
 
   /**
-   * Get available dtype options for UI
+   * Get available dtype options for UI.
+   * Automatically pulled from DTYPE_SIZES in @plexus/shared.
    */
   public static getDtypeOptions(): Array<{ value: string; label: string; bytes: number }> {
-    return [
-      { value: 'fp16', label: 'FP16 (Float16)', bytes: 2 },
-      { value: 'bf16', label: 'BF16 (BFloat16)', bytes: 2 },
-      { value: 'fp8', label: 'FP8 (Float8)', bytes: 1 },
-      { value: 'fp8_e4m3', label: 'FP8 E4M3', bytes: 1 },
-      { value: 'fp8_e5m2', label: 'FP8 E5M2', bytes: 1 },
-      { value: 'nvfp4', label: 'NVFP4', bytes: 0.5 },
-      { value: 'int4', label: 'INT4', bytes: 0.5 },
-      { value: 'int8', label: 'INT8', bytes: 1 },
-    ];
+    return Object.entries(DTYPE_SIZES)
+      .filter(([key]) => key !== 'default')
+      .map(([value, bytes]) => ({
+        value,
+        label: this.formatDtypeLabel(value),
+        bytes,
+      }));
+  }
+
+  /**
+   * Format a dtype key into a human-readable label.
+   * E.g., 'fp8_e4m3' -> 'FP8 E4M3'
+   */
+  private static formatDtypeLabel(dtype: string): string {
+    return dtype.replace(/_/g, ' ').toUpperCase();
   }
 }
