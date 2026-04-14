@@ -641,7 +641,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
 
         {/* Energy Usage Over Time */}
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Usage">
-          <div style={{ height: 300, marginTop: '12px' }}>
+          <div style={{ height: 400, marginTop: '12px' }}>
             <EnergyOverTime data={data} />
           </div>
         </Card>
@@ -705,7 +705,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         </Card>
 
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Usage Rate">
-          <div style={{ marginTop: '12px', height: 300 }}>
+          <div style={{ marginTop: '12px' }}>
             <EnergyTimeComparison
               totalKwh={energySummary?.totalKwhUsed}
               totalDurationMs={energySummary?.totalDurationMs}
