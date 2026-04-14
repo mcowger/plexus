@@ -102,7 +102,7 @@ const parseRetryHistory = (value?: string | null): RetryAttemptDetail[] => {
 
 export const Logs = () => {
   const navigate = useNavigate();
-  const { adminKey, isLimited, principal } = useAuth();
+  const { adminKey, isAdmin, isLimited, principal } = useAuth();
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -388,7 +388,7 @@ export const Logs = () => {
     <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
       <div className="mb-4">
         <h1 className="font-heading text-3xl font-bold text-text m-0">Logs</h1>
-        {isLimited && principal?.role === 'limited' && (
+        {isLimited && principal?.keyName && (
           <p className="text-sm text-text-muted mt-1">
             Scoped to key "{principal.keyName}".
           </p>
@@ -461,16 +461,18 @@ export const Logs = () => {
                 Search
               </Button>
             </div>
-            <Button
-              onClick={handleDeleteAll}
-              variant="danger"
-              className="flex items-center gap-2"
-              disabled={logs.length === 0}
-              type="button"
-            >
-              <Trash2 size={16} />
-              Delete All
-            </Button>
+            {isAdmin && (
+              <Button
+                onClick={handleDeleteAll}
+                variant="danger"
+                className="flex items-center gap-2"
+                disabled={logs.length === 0}
+                type="button"
+              >
+                <Trash2 size={16} />
+                Delete All
+              </Button>
+            )}
           </form>
         </div>
 

@@ -146,7 +146,7 @@ export const Errors: React.FC = () => {
             Inference Errors
           </h1>
           <p className="text-[15px] text-text-secondary m-0">
-            {isLimited && principal?.role === 'limited'
+            {isLimited && principal?.keyName
               ? `Errors for key "${principal.keyName}" only.`
               : 'Investigate failed requests and exceptions'}
           </p>

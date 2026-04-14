@@ -15,7 +15,13 @@ export async function registerCooldownRoutes(fastify: FastifyInstance) {
   // to a limited user.
   fastify.delete('/v0/management/cooldowns', (request, reply) => {
     if (isLimited(request)) {
-      return reply.code(403).send({ error: 'Admin privileges required' });
+      return reply.code(403).send({
+        error: {
+          message: 'Admin privileges required',
+          type: 'forbidden',
+          code: 403,
+        },
+      });
     }
     CooldownManager.getInstance().clearCooldown();
     logger.info('[AUDIT] admin cleared all cooldowns');

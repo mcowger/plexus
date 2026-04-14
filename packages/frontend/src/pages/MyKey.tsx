@@ -26,7 +26,7 @@ interface SelfInfo {
  * capture for their key only, and rotate their secret.
  */
 export const MyKey: React.FC = () => {
-  const { isLimited, isAdmin } = useAuth();
+  const { isLimited, isAdmin, login } = useAuth();
   const [info, setInfo] = useState<SelfInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
@@ -109,7 +109,20 @@ export const MyKey: React.FC = () => {
     setError(null);
     try {
       const res = await api.rotateSelfSecret();
+      // Persist the new secret into the active session BEFORE revealing it.
+      // The old secret stops working server-side the moment rotateSelfSecret
+      // returns, so any subsequent fetchWithAuth call that still carries the
+      // old credential would 401 and evict the session — locking the user
+      // out of the very modal that's showing their new secret. login() does:
+      // fetch /auth/verify with the new secret → update localStorage →
+      // setAdminKey + setPrincipal, so every later request uses it.
+      const ok = await login(res.secret);
       setNewSecret(res.secret);
+      if (!ok) {
+        // Highly unlikely — the new secret just came from the server — but
+        // surface something useful instead of silently drifting.
+        setError('Secret rotated, but session refresh failed. Re-login with the new secret.');
+      }
     } catch (e: any) {
       setError(e?.message || 'Rotation failed');
     } finally {
