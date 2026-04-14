@@ -676,8 +676,8 @@ export class ConfigRepository {
 
     for (const row of rows) {
       result[row.name] = {
-        type: row.quotaType as 'rolling' | 'daily' | 'weekly',
-        limitType: row.limitType as 'requests' | 'tokens',
+        type: row.quotaType as 'rolling' | 'daily' | 'weekly' | 'monthly',
+        limitType: row.limitType as 'requests' | 'tokens' | 'cost',
         limit: row.limitValue,
         ...(row.duration ? { duration: row.duration } : {}),
       } as QuotaDefinition;

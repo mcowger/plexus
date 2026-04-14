@@ -1,7 +1,7 @@
 import { pgTable, serial, text, integer, bigint, pgEnum } from 'drizzle-orm/pg-core';
 
-export const quotaTypeEnum = pgEnum('quota_type', ['rolling', 'daily', 'weekly']);
-export const limitTypeEnum = pgEnum('limit_type', ['requests', 'tokens']);
+export const quotaTypeEnum = pgEnum('quota_type', ['rolling', 'daily', 'weekly', 'monthly']);
+export const limitTypeEnum = pgEnum('limit_type', ['requests', 'tokens', 'cost']);
 
 export const userQuotaDefinitions = pgTable('user_quota_definitions', {
   id: serial('id').primaryKey(),
