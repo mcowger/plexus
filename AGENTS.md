@@ -1,984 +1,122 @@
-## 1. Executive Summary
-**Plexus** is a high-performance, unified API gateway and virtualization layer for Large Language Models (LLMs). Built on the **Bun** runtime and **Fastify** framework, it abstracts the complexity of integrating with multiple AI providers (OpenAI, Anthropic, Google, etc.) by transforming incoming APIs (`/v1/messages`, `/v1/chat/completions`, etc.). This enables developers to switch providers, load-balance requests, and manage model configurations without altering their client application code.
+## Project Overview
 
-## 2. Target Audience - **AI Engineers & Developers:** Building applications that consume LLM APIs and require flexibility in provider selection. - **Platform Architects:** 
-Seeking to unify LLM traffic through a centralized, controllable gateway.
+**Plexus** is a unified API gateway for LLMs. Built on **Bun** + **Fastify**, it exposes OpenAI- and Anthropic-compatible endpoints and routes requests to any backend provider, handling request/response transformation automatically.
 
-
-## CRITICAL REQUIREMENTS:   NEVER default to searching types definitions files for libraries.  ALWAYS rely on the tavily and context7 MCP tools to search the web for better documentation. FOLLOWING THIS REQUIREMENT IS CRITICAL.
-
-## NEVER produce implementation or summary documents unless specifically requested.
+**Stack:** Bun, Fastify, Drizzle ORM (SQLite/Postgres), Zod, React frontend (Tailwind v4).
 
 ---
 
-## ⚠️ MANDATORY: Run Biome Formatter Before Every Commit
+## Critical Requirements
 
-**All code MUST be formatted with Biome before committing.** Unformatted code will cause CI failures and makes diffs harder to review. This is non-negotiable.
-
-**Run the formatter now — before you commit:**
-
-```bash
-bun run format
-```
-
-Or to check without writing changes (e.g. in CI):
-
-```bash
-bun run format:check
-```
-
-### What Biome does in this project
-- **Formatting only** — linting and import sorting are both disabled.
-- Enforces: 2-space indentation, single quotes, LF line endings, 100-char line width, trailing commas (ES5), semicolons.
-- Ignores: `node_modules/`, `dist/`, `build/`, `*.min.js`, and all generated migration files.
-
-**Never commit without running `bun run format` first.**
+- **NEVER** search library type definitions for documentation. Use tavily and context7 MCP tools to search the web instead.
+- **NEVER** produce implementation or summary documents unless specifically requested.
+- **ALWAYS** run `bun run format` (Biome) before committing. CI will fail on unformatted code.
+- **NEVER** edit existing migration files or manually create SQL migrations. See [Migrations](#migrations) below.
 
 ---
 
-## Goal The core objective is to provide a single entry point for various LLM APIs:
+## Architecture
 
-- `/v1/chat/completions` (OpenAI style)
-- `/v1/messages` (Anthropic style)
-- `/v1/responses` (OpenAI Responses style - Planned)
+### Endpoints
+- `POST /v1/chat/completions` (OpenAI style)
+- `POST /v1/messages` (Anthropic style)
+- `GET /v1/models`
 
-Plexus routes requests to any backend provider regardless of its native API format. For example, a request sent to the `/v1/chat/completions` endpoint can be routed to an Anthropic model, with Plexus handling the transformation of both the request and the response.
+### Transformation Flow
+1. Receive request in supported style → 2. Resolve provider/model from `model` field → 3. Transform to target provider format → 4. Execute call → 5. Transform response back
 
-### Transformation Workflow:
-1. **Receive Request:** Accept a request in a supported style (e.g., OpenAI chat completions).
-2. **Select Provider:** Resolve the target provider and model based on the request's `model` field and the system configuration.
-3. **Transform Request:** Convert the input payload into the internal `UnifiedChatRequest` format, then into the target provider's specific format (e.g., Anthropic messages).
-4. **Execute Call:** Make the HTTP request to the target provider's endpoint with appropriate headers and authentication.
-5. **Transform Response:** Convert the provider's response back into the original requesting style before returning it to the client.
+### Key Components
+| Path | Purpose |
+|------|---------|
+| `packages/backend/src/services/` | Dispatcher, Router, TransformerFactory |
+| `packages/backend/src/transformers/` | Protocol translation (OpenAI, Anthropic, Gemini) |
+| `packages/backend/src/types/` | Unified request/response/streaming types |
+| `packages/backend/drizzle/schema/` | Database table definitions |
+| `packages/frontend/` | React dashboard |
+| DB (via management API) | Model aliases, provider config, routing |
 
-## 3. Core Features & Capabilities
+### Reference Implementations (read-only)
+- `llms/` — Backend transformer patterns for Vertex, Gemini, Cerebras, etc.
+- `CAP-UI/` — UI techniques only. Do NOT use for backend reference.
 
-### 3.1 Unified API Surface
-- **Implemented Endpoints:**
-  - `POST /v1/chat/completions`: Standard OpenAI-compatible chat completion endpoint.
-  - `POST /v1/messages`: Standard Anthropic-compatible messages endpoint.
-  - `GET /v1/models`: List available models and aliases.
+---
 
-- **Planned Endpoints:**
-  - `POST /v1/responses`: OpenAI Responses API style.
+## Database & Migrations
 
-### 3.2 Advanced Routing & Virtualization
-- **Model Aliasing:** Decouples requested model IDs from actual provider implementations.
-- **Load Balancing:** Supports multiple targets for a single alias with randomized distribution.
-- **Configuration-Driven:** Routing and provider settings are defined in `config/plexus.yaml`.
+Drizzle ORM with SQLite (default) or Postgres. Tables: `request_usage`, `provider_cooldowns`, `debug_logs`, `inference_errors`, `provider_performance`.
 
-### 3.3 Multi-Provider Support
-Uses a "Transformer" architecture in `packages/backend/src/transformers/`:
-- **OpenAI:** Handles OpenAI, OpenRouter, DeepSeek, Groq, and other compatible APIs.
-- **Anthropic:** Native support for Anthropic's messages format.
-- **Streaming:** Full support for Server-Sent Events (SSE) across different formats.
-- **Tool Use:** Normalizes tool calling/function calling.
-
-## 4. Technical Architecture
-
-### 4.1 Stack
-- **Runtime:** [Bun](https://bun.sh)
-- **Web Framework:** Fastify
-- **Configuration:** YAML (via `yaml` package)
-- **Validation:** [Zod](https://zod.dev/)
-- **ORM:** [Drizzle ORM](https://orm.drizzle.team/) with SQLite
-- **Libraries:** Where possible, use native Bun libraries
-
-### 4.2 System Components
-- **`packages/backend`**: The core Fastify server. Contains the dispatcher, router, and transformer logic.
-- **`packages/frontend`**: React-based dashboard.
-- **`llms/`**: A reference implementation (Fastify-based) containing extensive transformer logic for diverse providers (Vertex, Gemini, Cerebras, etc.) used to guide development in `packages/backend`.
-- **`CAP-UI/`**: A reference implementation of a management UI and usage tracking tool used to guide development in `packages/frontend`.  Do not use it as a reference for backend code.   Primarily use it for UI techniques and layout.
-- **`testcommands/`**: TypeScript-based CLI tools and JSON payloads for verifying transformations and streaming.
-
-## 5. Directory Structure
-- `config/`: Configuration files (`plexus.yaml`).
-- `packages/backend/src/`:
-  - `services/`: Core logic (`Dispatcher`, `Router`, `TransformerFactory`).
-  - `transformers/`: Protocol translation logic.
-  - `types/`: Unified types for requests, responses, and streaming chunks.
-  - `utils/`: Shared utilities (Logger).
-  - `db/`: Database client and types.
-  - `drizzle/schema/`: Drizzle ORM table definitions.
-  - `drizzle/migrations/`: Auto-generated migration files.
-
-# Database Migrations - CRITICAL RULES
-
-## NEVER Edit Existing Migrations
-
-**Modifying existing migration files is NEVER acceptable.** Migration files represent the historical change sequence of your database schema. Editing them can:
-
-- Break production databases with out-of-sync migration history
-- Cause data loss or corruption
-- Create inconsistencies between development and production environments
-
-## NEVER Manually Create Migration Files
-
-**You must NEVER manually create migration SQL files or edit the migration journal (`meta/_journal.json`).** Always use `drizzle-kit generate` to create migrations automatically. Manual migration creation causes critical issues:
-
-- Drizzle-kit ignores migrations not in the journal
-- Running `drizzle-kit generate` will create conflicting migrations
-- The migration system becomes out of sync with the schema
-- Causes failed deployments and database corruption
-
-## The ONLY Correct Migration Workflow
+### Migrations
 
 **Migrations are auto-generated by CI after schema changes merge to `main`.** PRs should only contain schema `.ts` file changes — never migration artifacts.
 
-### For PRs (community and internal)
+**Workflow:** Edit schema in `drizzle/schema/sqlite/` (and/or `postgres/`) → optionally validate locally with `bunx drizzle-kit generate` (don't commit output) → CI generates migrations on merge.
 
-1. **Edit the schema files** in `packages/backend/drizzle/schema/sqlite/` and/or `packages/backend/drizzle/schema/postgres/`
-2. **Validate locally** (optional): run `bunx drizzle-kit generate` to verify your schema produces valid SQL, but do **NOT** commit the output
-3. **Commit only the schema `.ts` files** — the pre-commit hook will block migration artifacts
-4. After your PR merges, CI automatically generates and commits the migrations on `main`
+**Adding a new table:** You MUST update `drizzle/schema/index.ts` to export the new schema, or `drizzle-kit generate` will report "No schema changes."
 
-### Enforcement layers
+**Enforcement:** Pre-commit hook blocks migration files. PR check workflow fails on migration changes. Post-merge CI generates them.
 
-- **Pre-commit hook** (`.githooks/pre-commit`): blocks commits that include migration files. Installed automatically via `bun install` (the `prepare` script sets `core.hooksPath`).
-- **PR check** (`.github/workflows/check-no-migrations-in-pr.yml`): fails PRs that modify `drizzle/migrations/` or `drizzle/migrations_pg/`.
-- **Post-merge CI** (`.github/workflows/generate-migrations.yml`): generates migrations for both SQLite and PostgreSQL on `main` and commits them.
+**Bypasses (maintainers only):** `ALLOW_MIGRATIONS=1 git commit`, or add `migrations-ok` label to PR.
 
-### Bypasses (maintainers only)
+---
 
-- **Pre-commit hook**: `ALLOW_MIGRATIONS=1 git commit ...`
-- **PR check**: add the `migrations-ok` label to the PR
+## Development & Testing
 
-**NEVER:**
-- Create `.sql` files manually
-- Edit `meta/_journal.json` manually
-- Modify the database schema directly with SQL commands
+- **Dev server:** `bun run dev` (backend port 4000 + frontend watcher)
+- **Tests:** `bun test` from `packages/backend/`
+- **Format:** `bun run format` / `bun run format:check`
 
-## Live Database Safety
+### Test Isolation
 
-- It is NEVER acceptable to attempt to modify a live database directly
-- Always use migrations for schema changes
-- Test migrations in development/staging before production
+- **Global setup:** `bunfig.toml` preloads `packages/backend/test/setup.ts` which mocks Logger and initializes in-memory DB.
+- **Do NOT** use `mock.module` to globally mock `config.ts` — it pollutes other tests.
+- **Use `registerSpy`** from `test/test-utils.ts` instead of raw `spyOn` — automatic cleanup after each test.
+- If you must mock a module, implement its **full public interface**.
 
-## 6. Database & ORM
+---
 
-Plexus uses **Drizzle ORM** with **SQLite** for data persistence.
+## Frontend
 
-**For PostgreSQL deployments**, migrations are stored in `drizzle/migrations_pg/` and schema definitions are in `drizzle/schema/postgres/`.
+### Tailwind CSS v4
+- **NEVER** import CSS files with Tailwind directives into `.ts`/`.tsx` files — Bun's CSS loader breaks Tailwind v4 `@theme`/`@source`.
+- Build: `@tailwindcss/cli` from `packages/frontend`, input `./src/globals.css`, output `./dist/main.css`.
+- Source directive: `@source "../src/**/*.{tsx,ts,jsx,js}";` in `globals.css`.
 
-### 6.1 Database Schema
+### Assets
+- Place in `packages/frontend/src/assets/`, import with ES6 imports. No dynamic paths.
 
-All database tables are defined in `packages/backend/drizzle/schema/`:
-- **`request_usage`** - Tracks API usage, costs, and timing
-- **`provider_cooldowns`** - Provider failure tracking with per-account support
-- **`debug_logs`** - Request/response debugging
-- **`inference_errors`** - Error logging
-- **`provider_performance`** - Performance metrics (last 10 requests per provider/model)
+### Formatting Utilities
+Use centralized formatters from `packages/frontend/src/lib/format.ts` — `formatCost`, `formatMs`, `formatTPS`, `formatDuration`, `formatTokens`, `formatNumber`, `formatTimeAgo`. Do NOT use `toFixed()`, `toLocaleString()`, or inline formatting.
 
-### 6.2 Type-Safe Queries
+---
 
-Drizzle provides full TypeScript type safety:
+## Adding a Quota Checker
 
-```typescript
-import { eq, and, desc, sql } from 'drizzle-orm';
-import * as schema from '../../drizzle/schema';
-import { getDatabase } from '../db/client';
+Five areas to touch: backend schema, checker implementation, factory registration, frontend components, and type registrations.
 
-const db = getDatabase();
+### 1. Backend Config (`packages/backend/src/config.ts`)
+- Add Zod schema for checker options
+- Add discriminated union variant to `ProviderQuotaCheckerSchema`
 
-// Insert with type checking
-await db.insert(schema.requestUsage).values({
-  requestId: 'uuid-123',
-  date: new Date().toISOString(),
-  provider: 'openai',
-  // ... all fields are type-checked
-});
+### 2. Backend Checker (`packages/backend/src/services/quota/checkers/`)
+- Extend `QuotaChecker`, implement `checkQuota()` returning `QuotaCheckResult`
+- Rate-limit checkers: `five_hour`/`daily`/`monthly` windows, `percentage`/`requests`/`tokens` units
+- Balance checkers: `subscription` window, `dollars` unit, `Wallet` icon in UI
+- API key auto-inherited from provider config via `this.requireOption<string>('apiKey')`
+- Debug log with `[checker-name]` prefix
 
-// Select with filters
-const results = await db
-  .select()
-  .from(schema.requestUsage)
-  .where(and(
-    eq(schema.requestUsage.provider, 'openai'),
-    sql`${schema.requestUsage.createdAt} > ${Date.now() - 86400000}`
-  ))
-  .orderBy(desc(schema.requestUsage.createdAt));
+### 3. Backend Factory (`packages/backend/src/services/quota/quota-checker-factory.ts`)
+Register in `CHECKER_REGISTRY`.
 
-// Update with conflict handling
-await db.insert(schema.providerCooldowns)
-  .values({ provider, model, accountId, expiry })
-  .onConflictDoUpdate({
-    target: [schema.providerCooldowns.provider, schema.providerCooldowns.model, schema.providerCooldowns.accountId],
-    set: { expiry }
-  });
-```
+### 4. Frontend Integration
+- **Config component** — `NewCheckerQuotaConfig.tsx` (don't add apiKey field — auto-inherited)
+- **Display component** — `NewCheckerQuotaDisplay.tsx` (rate-limit → progress bar, balance → wallet icon)
+- **Exports** — `components/quota/index.ts`
+- **Sidebar** — add to `BALANCE_CHECKERS` or `RATE_LIMIT_CHECKERS` arrays in `Sidebar.tsx`
+- **Combined Balances Card** — add to `CHECKER_DISPLAY_NAMES` and normalization logic in `CombinedBalancesCard.tsx`
+- **Provider page** — add to `QUOTA_CHECKER_TYPES` in `Providers.tsx`, add config component conditional rendering
+- **API fallback** — add to `FALLBACK_QUOTA_CHECKER_TYPES` in `lib/api.ts`
 
-### 6.3 Running Migrations
-
-Migrations run automatically on application startup. To generate new migrations after schema changes:
-
-```bash
-# From packages/backend directory
-cd packages/backend
-
-# Generate migration (creates SQL file in drizzle/migrations/)
-bunx drizzle-kit generate
-
-# Review the generated SQL file
-cat drizzle/migrations/XXXX_description.sql
-
-# Apply migrations manually (optional, usually auto-applied)
-bunx drizzle-kit migrate
-```
-
-### 6.4 Adding New Tables or Columns
-
-To add a new table or modify existing schema:
-
-1. **Edit the schema file** (e.g., `drizzle/schema/request-usage.ts`):
-   ```typescript
-   export const requestUsage = sqliteTable('request_usage', {
-     // ... existing columns
-     newColumn: text('new_column'),  // Add new column
-   });
-   ```
-
-2. **Update exports for new tables**: When adding a NEW table (not just columns), you MUST update `drizzle/schema/index.ts` to export the new schema so drizzle-kit can detect it:
-   ```typescript
-   // Add to SQLite exports (top section)
-   export * from './sqlite/new-table-name';
-   
-   // Add to PostgreSQL exports (bottom section)
-   export { newTableName as pgNewTableName } from './postgres/new-table-name';
-   ```
-   **CRITICAL**: Without updating these exports, `drizzle-kit generate` will report "No schema changes" and won't create migrations.
-
-3. **Generate migration**:
-   ```bash
-   bunx drizzle-kit generate
-   ```
-
-4. **Review the generated SQL** in `drizzle/migrations/XXXX_description.sql`
-
-5. **Restart the application** - migrations auto-apply on startup
-
-### 6.5 Type Definitions
-
-Inferred types are available in `packages/backend/src/db/types.ts`:
-
-```typescript
-import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
-
-// Automatically inferred from schema
-export type RequestUsage = InferSelectModel<typeof schema.requestUsage>;
-export type NewRequestUsage = InferInsertModel<typeof schema.requestUsage>;
-```
-
-## 7. Development & Testing
-- **Full Stack Dev:** Run `bun run dev` from the root to start both the Backend (port 4000, watch mode) and Frontend Builder (watch mode).
-
-### 7.1 Testing Guidelines
-When writing tests for the backend, especially those involving configuration (`packages/backend/src/config.ts`), strict adherence to isolation principles is required to prevent "mock pollution" across tests.
-
-**Do NOT use `mock.module` to mock the configuration module globally.** 
-Bun's test runner can share state between test files, and hard-mocking the config module will cause other tests (like `pricing_config.test.ts` or `dispatcher.test.ts`) to fail unpredictably because they receive the mocked configuration instead of the real logic.  
-
-
-## Global Test Setup
-
-To ensure test isolation and prevent "mock pollution" in Bun's shared-worker environment, this project uses a global setup script.
-
-### `bunfig.toml` and `test/setup.ts`
-
-The root `bunfig.toml` is configured to preload `packages/backend/test/setup.ts` before any tests run. This script establishes "Gold Standard" mocks for global dependencies like the **Logger** and initializes an in-memory database with migrations.
-
-### Mocking Pattern: Shared Dependencies
-
-Bun's `mock.module` is a process-global operation. Once a module is mocked, it remains mocked for the duration of that worker thread, and `mock.restore()` does **not** reset it.
-
-To prevent crashes in other tests (e.g., `TypeError: logger.info is not a function`), follow these rules:
-
-1.  **Use the Global Setup:** Common modules like `src/utils/logger` should be mocked once in `setup.ts`.
-2.  **Robust Mocking:** If you must mock a module in a specific test file, your mock **MUST** implement the entire public interface of that module (including all log levels like `silly`, `debug`, etc.).
-3.  **Prefer Spying:** If you need to assert that a global dependency was called, use `spyOn` on the already-mocked global instance rather than re-mocking the module.
-
-```typescript
-import { logger } from "src/utils/logger";
-import { spyOn, expect, test } from "bun:test";
-
-test("my test", () => {
-    const infoSpy = spyOn(logger, "info");
-    // ... run code ...
-    expect(infoSpy).toHaveBeenCalled();
-});
-```
-
-### Using `registerSpy` for Automatic Spy Cleanup
-
-Bun's test runner shares spies across test file boundaries. If you use `spyOn()` without `mockRestore()`, subsequent tests will inherit the spy.
-
-**Use `registerSpy` from `packages/backend/test/test-utils.ts` instead of `spyOn`:**
-
-```typescript
-import { registerSpy, restoreAllSpies, afterEach } from '../test/test-utils';
-import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
-
-describe('My Tests', () => {
-  // Spies are automatically restored after each test
-  const processSpy = registerSpy(VisionDescriptorService, 'process');
-
-  test('my test', async () => {
-    // spy is active here
-    processSpy.mockResolvedValue({ result: 'mocked' });
-    // ...
-  });
-
-  test('another test', async () => {
-    // spy is fresh here (restored before this test)
-    processSpy.mockResolvedValue({ result: 'different' });
-    // ...
-  });
-});
-```
-
-The `registerSpy` function:
-1. Creates the spy using `spyOn()`
-2. Registers it for automatic cleanup
-3. Automatically restores ALL tracked spies after each test via a global `afterEach`
-
-**This is the preferred way to use spies in this project.**
-
-## 8. Frontend Styling & Tailwind CSS
-
-### 8.1 Tailwind CSS Build Process
-The frontend uses Tailwind CSS v4. To ensure utility classes are correctly scanned and generated, the following configurations are CRITICAL:
-
-- **No CSS-in-JS Imports:** **NEVER** import `globals.css` (or any CSS file containing Tailwind v4 directives) directly into `.ts` or `.tsx` files. Bun's internal CSS loader does not support Tailwind v4 `@theme` or `@source` directives and will overwrite the valid CSS generated by the CLI with a broken version. The build script (`build.ts`) handles linking the generated `main.css` in the final `index.html`.
-- **Build Command Execution:** The `@tailwindcss/cli` should be executed from the `packages/frontend` directory. The input path should be `./src/globals.css` and the output path should be `./dist/main.css`.
-- **Source Directives:** In `packages/frontend/src/globals.css`, use `@source "../src/**/*.{tsx,ts,jsx,js}";`. This ensures the scanner looks at the source files relative to the CSS file's location.
-
-Failure to follow these settings will result in a `main.css` file that contains only base styles and no generated utility classes, causing the UI to appear unstyled.
-
-### 8.2 Static Assets Location
-All static assets (images, logos, icons, etc.) must be placed in `packages/frontend/src/assets/`.
-
-- **Import Assets in Components:** Import assets using ES6 import statements (e.g., `import logo from '../assets/logo.svg'`) rather than using direct paths.
-- **Do NOT use dynamic paths:** Avoid using template strings or dynamic paths like `/images/${filename}.svg` as they won't work with the build process.
-- **Move Existing Assets:** If you find assets in other locations (e.g., `packages/frontend/images/`), move them to `packages/frontend/src/assets/` and update any references to use imports.
-
-This ensures assets are properly bundled by the build system and served correctly in both development and production environments.
-
-### 8.3 Number and Time Formatting - **PREFERRED APPROACH**
-
-The project uses centralized formatting utilities in `packages/frontend/src/lib/format.ts` powered by the [human-format](https://www.npmjs.com/package/human-format) library.
-
-**ALWAYS use these utilities instead of creating custom formatting logic:**
-
-- **`formatNumber(num, decimals?)`**: Large numbers with K/M/B suffixes (e.g., "1.3k", "2.5M")
-- **`formatTokens(tokens)`**: Alias for `formatNumber` specifically for token counts
-- **`formatDuration(seconds)`**: Human-readable durations with two most significant units (e.g., "2h 30m", "3mo 2w", "1y 2mo")
-- **`formatTimeAgo(seconds)`**: Relative time format (e.g., "5m ago", "2h ago", "3d ago")
-- **`formatCost(cost, maxDecimals?)`**: Dollar formatting with appropriate precision (e.g., "$0.001234", "$1.23")
-- **`formatMs(ms)`**: Milliseconds to seconds conversion (e.g., "45ms", "2.5s", "∅")
-- **`formatTPS(tps)`**: Tokens per second with one decimal place (e.g., "15.3")
-
-**DO NOT:**
-- Use `toFixed()` for number formatting
-- Use `toLocaleString()` with custom fraction digits for numbers
-- Create inline formatting logic with manual calculations
-- Duplicate formatting code across components
-
-**Example Usage:**
-
-```typescript
-import { formatCost, formatMs, formatTPS, formatDuration, formatTokens } from '../lib/format';
-
-// Cost formatting
-{formatCost(log.costTotal)}           // "$1.23"
-{formatCost(log.costInput)}           // "$0.000456"
-
-// Time formatting
-{formatMs(log.durationMs)}            // "2.5s"
-{formatMs(log.ttftMs)}                // "450ms"
-{formatTPS(log.tokensPerSec)}         // "15.3"
-
-// Duration formatting (tokens, cooldowns, etc.)
-{formatDuration(account.expires_in_seconds)}     // "2h 30m"
-{formatDuration(cooldownRemaining)}              // "45m"
-{formatDuration(3600 * 24 * 365 + 2592000)}      // "1y 1mo"
-
-// Token counts
-{formatTokens(log.tokensInput)}       // "1.3k"
-```
-
-**Backend Integration:**
-
-The `formatLargeNumber` function exported from `packages/frontend/src/lib/api.ts` is an alias to `formatNumber` for backward compatibility. Always import from `format.ts` for new code:
-
-```typescript
-// ✅ Preferred
-import { formatNumber } from '../lib/format';
-
-// ⚠️ Legacy (still works but avoid in new code)
-import { formatLargeNumber } from '../lib/api';
-```
-
-## 9. Implementing a New Quota Checker
-
-This section documents the pattern for adding a new quota checker (e.g., for a new AI provider). The implementation involves both backend and frontend changes.
-
-### 9.1 Backend - Schema & Configuration
-
-**Update `packages/backend/src/config.ts`:**
-
-1. Add a new Zod schema for checker options:
-```typescript
-const NewQuotaCheckerOptionsSchema = z.object({
-  endpoint: z.string().url().optional(),
-  // Add other provider-specific options here
-});
-```
-
-2. Add a new discriminated union variant to `ProviderQuotaCheckerSchema`:
-```typescript
-z.object({
-  type: z.literal('new-checker-name'),
-  enabled: z.boolean().default(true),
-  intervalMinutes: z.number().min(1).default(30),
-  id: z.string().trim().min(1).optional(),
-  options: NewQuotaCheckerOptionsSchema.optional().default({}),
-}),
-```
-
-### 9.2 Backend - Quota Checker Implementation
-
-**Create `packages/backend/src/services/quota/checkers/new-checker-name.ts`:**
-
-```typescript
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
-import { logger } from '../../../utils/logger';
-
-interface ProviderQuotaLimitResponse {
-  // Define the API response shape
-}
-
-export class NewQuotaCheckerNameQuotaChecker extends QuotaChecker {
-  private endpoint: string;
-
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://default.api.endpoint');
-  }
-
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
-
-    try {
-      logger.debug(`[new-checker-name] Calling ${this.endpoint}`);
-      
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: ProviderQuotaLimitResponse = await response.json();
-      
-      const windows: QuotaWindow[] = [];
-      const limits = data.data?.limits ?? [];
-
-      for (const limit of limits) {
-        // Map provider-specific fields to QuotaWindow
-        windows.push(this.createWindow(
-          'five_hour',           // windowType: 'five_hour' | 'daily' | 'monthly'
-          limit.total ?? 100,    // limit (max value)
-          limit.currentValue,   // current usage
-          limit.remaining,      // remaining (optional)
-          'percentage' | 'requests' | 'tokens',  // unit type
-          limit.nextResetTime ? new Date(limit.nextResetTime) : undefined,
-          'Human-readable label'
-        ));
-      }
-
-      return this.successResult(windows);
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
-}
-```
-
-### 9.3 Backend - Factory Registration
-
-**Update `packages/backend/src/services/quota/quota-checker-factory.ts`:**
-
-```typescript
-import { NewQuotaCheckerNameQuotaChecker } from './checkers/new-checker-name';
-
-const CHECKER_REGISTRY: Record<string, new (config: QuotaCheckerConfig) => QuotaChecker> = {
-  // ... existing entries
-  'new-checker-name': NewQuotaCheckerNameQuotaChecker,
-};
-```
-
-### 9.4 Frontend - UI Components
-
-**Create `packages/frontend/src/components/quota/NewCheckerQuotaConfig.tsx`:**
-
-```typescript
-import React from 'react';
-import { Input } from '../ui/Input';
-
-interface NewCheckerQuotaConfigProps {
-  options: Record<string, unknown>;
-  onChange: (options: Record<string, unknown>) => void;
-}
-
-export const NewCheckerQuotaConfig: React.FC<NewCheckerQuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
-  const handleChange = (key: string, value: string) => {
-    onChange({ ...options, [key]: value });
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
-        </label>
-        <Input
-          value={(options.endpoint as string) ?? ''}
-          onChange={(e) => handleChange('endpoint', e.target.value)}
-          placeholder="https://api.provider.com/quota"
-        />
-      </div>
-    </div>
-  );
-};
-```
-
-**Create `packages/frontend/src/components/quota/NewCheckerQuotaDisplay.tsx`:**
-
-```typescript
-import React from 'react';
-import { clsx } from 'clsx';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
-import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
-
-interface NewCheckerQuotaDisplayProps {
-  result: QuotaCheckResult;
-  isCollapsed: boolean;
-}
-
-export const NewCheckerQuotaDisplay: React.FC<NewCheckerQuotaDisplayProps> = ({
-  result,
-  isCollapsed,
-}) => {
-  if (!result.success) {
-    return (
-      <div className="px-2 py-2">
-        <div className={clsx("flex items-center gap-2 text-danger", isCollapsed && "justify-center")}>
-          <AlertTriangle size={16} />
-          {!isCollapsed && <span className="text-xs">Error</span>}
-        </div>
-      </div>
-    );
-  }
-
-  const windows = result.windows || [];
-  const primaryWindow = windows[0]; // Choose appropriate window
-  const overallStatus = primaryWindow?.status || 'ok';
-
-  const statusColors: Record<QuotaStatus, string> = {
-    ok: 'bg-success',
-    warning: 'bg-warning',
-    critical: 'bg-danger',
-    exhausted: 'bg-danger',
-  };
-
-  if (isCollapsed) {
-    return (
-      <div className="px-2 py-2 flex justify-center">
-        {overallStatus === 'ok' ? (
-          <CheckCircle2 size={18} className="text-success" />
-        ) : (
-          <AlertTriangle size={18} className={clsx(overallStatus === 'warning' ? 'text-warning' : 'text-danger')} />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="px-2 py-1 space-y-1">
-      {/* Render progress bars for each window */}
-      {windows.map((window) => (
-        <div key={window.windowType} className="space-y-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs font-semibold text-text-secondary">{window.label}:</span>
-          </div>
-          <div className="relative h-2">
-            <div className="h-2 rounded-md bg-bg-hover overflow-hidden">
-              <div
-                className={clsx(
-                  'h-full rounded-md transition-all',
-                  statusColors[window.status || 'ok']
-                )}
-                style={{ width: `${Math.min(100, Math.max(0, window.utilizationPercent))}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-```
-
-### 9.5 Frontend - Export & Integration
-
-**Update `packages/frontend/src/components/quota/index.ts`:**
-
-```typescript
-export { NewCheckerQuotaDisplay } from './NewCheckerQuotaDisplay';
-export { NewCheckerQuotaConfig } from './NewCheckerQuotaConfig';
-```
-
-**Update `packages/frontend/src/lib/api.ts`:**
-
-```typescript
-const VALID_QUOTA_CHECKER_TYPES = new Set([
-  'synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'new-checker-name'
-]);
-```
-
-**Update `packages/frontend/src/pages/Providers.tsx`:**
-
-1. Import the config component:
-```typescript
-import { NewCheckerQuotaConfig } from '../components/quota/NewCheckerQuotaConfig';
-```
-
-2. Add to QUOTA_CHECKER_TYPES:
-```typescript
-const QUOTA_CHECKER_TYPES = ['synthetic', 'naga', 'nanogpt', 'openai-codex', 'claude-code', 'new-checker-name'] as const;
-```
-
-3. Add conditional rendering for the config form:
-```typescript
-{selectedQuotaCheckerType === 'new-checker-name' && (
-  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-    <NewCheckerQuotaConfig
-      options={editingProvider.quotaChecker?.options || {}}
-      onChange={(options) => setEditingProvider({
-        ...editingProvider,
-        quotaChecker: { ...editingProvider.quotaChecker, options }
-      })}
-    />
-  </div>
-)}
-```
-
-**Update `packages/frontend/src/components/layout/Sidebar.tsx`:**
-
-1. Import the display component:
-```typescript
-import { NewCheckerQuotaDisplay } from '../quota';
-```
-
-2. Add conditional rendering (use `checkerType` when available):
-```typescript
-const checkerIdentifier = (quota.checkerType || quota.checkerId).toLowerCase();
-
-if (checkerIdentifier.includes('new-checker-name')) {
-  return (
-    <NewCheckerQuotaDisplay result={result} isCollapsed={isCollapsed} />
-  );
-}
-```
-
-Why: `checkerId` may be a custom connection name, so UI routing should key off the implementation type (`checkerType`) rather than assuming the ID contains the type string.
-
-### 9.6 Key Patterns
-
-- **Window Types:** Use `five_hour`, `daily`, or `monthly` depending on the provider's quota window
-- **Unit Types:** Use `percentage`, `requests`, or `tokens` depending on what the provider reports
-- **Status Values:** Return `ok`, `warning`, `critical`, or `exhausted` based on utilization thresholds
-- **Debug Logging:** Use `[new-checker-name]` prefix in logger.debug() calls for easy troubleshooting
-- **Error Handling:** Always return `errorResult()` on failures, `successResult()` on success
-
-### 9.7 Implementing a Balance-Style Quota Checker
-
-Some providers (like Moonshot AI, Naga) provide a prepaid account balance rather than time-based rate limits. These "balance-style" checkers have specific requirements:
-
-#### Key Differences from Rate-Limit Checkers
-
-| Aspect | Rate-Limit Checker | Balance Checker |
-|--------|-------------------|----------------|
-| Window Type | `five_hour`, `daily`, `monthly` | `subscription` |
-| Unit Type | `requests`, `tokens`, `percentage` | `dollars` |
-| API Key | May require separate provisioning key | Inherits from provider config |
-| Display | Progress bar with usage/limit | Wallet icon with remaining balance |
-
-#### API Key Inheritance
-
-The system automatically injects the provider's API key into quota checker options. In your checker implementation, use:
-
-```typescript
-const apiKey = this.requireOption<string>('apiKey');
-```
-
-This works because `config.ts` automatically injects the provider's `api_key` into the checker's options (see lines 396-401 in `packages/backend/src/config.ts`):
-
-```typescript
-// Inject the provider's API key for quota checkers that need it
-const apiKey = providerConfig.api_key?.trim();
-if (apiKey && apiKey.toLowerCase() !== 'oauth' && options.apiKey === undefined) {
-  options.apiKey = apiKey;
-}
-```
-
-#### Balance Checker Implementation Pattern
-
-**Backend - Quota Checker:**
-
-```typescript
-interface ProviderBalanceResponse {
-  code: number;
-  data: {
-    available_balance: number;
-    voucher_balance?: number;
-    cash_balance?: number;
-  };
-  status: boolean;
-}
-
-export class MoonshotQuotaChecker extends QuotaChecker {
-  private endpoint: string;
-
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.moonshot.ai/v1/users/me/balance');
-  }
-
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
-
-    try {
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: ProviderBalanceResponse = await response.json();
-
-      if (!data.status || data.code !== 0) {
-        return this.errorResult(new Error(`API error: code=${data.code}`));
-      }
-
-      const { available_balance } = data.data;
-
-      // Use 'subscription' window type for prepaid balances
-      // Use 'dollars' as the unit
-      const window: QuotaWindow = this.createWindow(
-        'subscription',           // windowType: prepaid balance
-        undefined,                // limit: not applicable for balance
-        undefined,                // used: not applicable
-        available_balance,        // remaining: the balance
-        'dollars',                // unit type
-        undefined,                // resetsAt: no reset for prepaid
-        'Provider account balance' // description
-      );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
-}
-```
-
-#### Frontend - Display Component
-
-Balance checkers should display the remaining balance with a wallet icon:
-
-```typescript
-import { Wallet, AlertTriangle } from 'lucide-react';
-import { formatCost } from '../../lib/format';
-
-export const MoonshotQuotaDisplay: React.FC<QuotaDisplayProps> = ({
-  result,
-  isCollapsed,
-}) => {
-  if (!result.success) {
-    return (
-      <div className="px-2 py-2">
-        <div className="flex items-center gap-2 text-danger">
-          <AlertTriangle size={16} />
-          {!isCollapsed && <span className="text-xs">Error</span>}
-        </div>
-      </div>
-    );
-  }
-
-  const windows = result.windows || [];
-  const subscriptionWindow = windows.find(w => w.windowType === 'subscription');
-  const balance = subscriptionWindow?.remaining;
-
-  if (isCollapsed) {
-    return (
-      <div className="px-2 py-2 flex justify-center">
-        <Wallet size={18} className="text-info" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="px-2 py-1 space-y-1">
-      <div className="flex items-center gap-2">
-        <Wallet size={14} className="text-info" />
-        <span className="text-xs font-semibold">Provider Name</span>
-      </div>
-      {balance !== undefined && (
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs text-text-secondary">Balance</span>
-          <span className="text-xs font-semibold text-info">
-            {formatCost(balance)}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
-```
-
-#### Frontend - Config Component
-
-Balance checkers that inherit the API key only need an optional endpoint field:
-
-```typescript
-export const MoonshotQuotaConfig: React.FC<QuotaConfigProps> = ({
-  options,
-  onChange,
-}) => {
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
-        </label>
-        <Input
-          value={(options.endpoint as string) ?? ''}
-          onChange={(e) => onChange({ ...options, endpoint: e.target.value })}
-          placeholder="https://api.provider.com/v1/users/me/balance"
-        />
-      </div>
-    </div>
-  );
-};
-```
-
-**Do NOT add an apiKey field** - the checker will automatically inherit the API key from the provider configuration.
-
-#### MiniMax Balance Checker Notes
-
-MiniMax is also a balance-style checker, but unlike Moonshot/Naga API-key patterns it requires two explicit options:
-
-- `options.groupid` (**required**)
-- `options.hertzSession` (**required**, sensitive; treat like a password)
-
-Request pattern:
-
-```text
-GET https://platform.minimax.io/account/query_balance?GroupId=<groupid>
-Cookie: HERTZ-SESSION=<hertzSession>
-```
-
-Map `available_amount` as the primary balance into a `subscription` window with `unit: dollars`.
-
-#### Combined Balances Card Integration
-
-**IMPORTANT:** When adding a new balance-style quota checker, you must update TWO frontend locations:
-
-1. **Create individual display component** (e.g., `NagaQuotaDisplay.tsx`) - This is still required for the sidebar display
-2. **Update `CombinedBalancesCard.tsx`** - Add the new checker to the normalization logic
-
-**Update `packages/frontend/src/components/quota/CombinedBalancesCard.tsx`:**
-
-Add the new checker type to the `CHECKER_DISPLAY_NAMES` constant:
-```typescript
-const CHECKER_DISPLAY_NAMES: Record<string, string> = {
-  'openrouter': 'OpenRouter',
-  'minimax': 'MiniMax',
-  'moonshot': 'Moonshot',
-  'naga': 'Naga',
-  'kilo': 'Kilo',
-  'new-provider': 'New Provider Name',  // Add your new checker here
-};
-```
-
-And add normalization logic in the render loop (around line 50):
-```typescript
-let normalizedType = checkerType;
-if (checkerType.includes('openrouter')) normalizedType = 'openrouter';
-else if (checkerType.includes('minimax')) normalizedType = 'minimax';
-else if (checkerType.includes('moonshot')) normalizedType = 'moonshot';
-else if (checkerType.includes('naga')) normalizedType = 'naga';
-else if (checkerType.includes('kilo')) normalizedType = 'kilo';
-else if (checkerType.includes('new-provider')) normalizedType = 'new-provider';  // Add here
-```
-
-The Combined Balances Card provides a space-efficient view of all account balances on the Quotas page. Individual display components are still needed for the sidebar and other UI contexts.
-
-#### Sidebar Compact Cards Integration
-
-**IMPORTANT:** When adding a new quota checker (balance OR rate-limit style), you must update the sidebar filter lists to ensure the new checker appears in the compact sidebar cards.
-
-**Update `packages/frontend/src/components/layout/Sidebar.tsx`:**
-
-For **balance-style checkers**, add to the `BALANCE_CHECKERS` array (around line 212):
-```typescript
-const BALANCE_CHECKERS = ['openrouter', 'minimax', 'moonshot', 'naga', 'kilo', 'new-balance-checker'];
-```
-
-For **rate-limit checkers**, add to the `RATE_LIMIT_CHECKERS` array (around line 218):
-```typescript
-const RATE_LIMIT_CHECKERS = ['openai-codex', 'codex', 'claude-code', 'claude', 'zai', 'synthetic', 'nanogpt', 'new-rate-limit-checker'];
-```
-
-The sidebar will automatically display:
-- **CompactBalancesCard**: Shows all balance checkers with format "Provider: $BAL"
-- **CompactQuotasCard**: Shows all rate-limit checkers with format "Provider: 12% / 4%"
-
-Both cards are collapsible sections that navigate to the full Quotas page when clicked.
-
-### 9.8 Quota Checker Type Registrations (Backend, DB, Frontend)
-
-When adding a new quota checker type you must register it consistently across:
-
-- **Backend config/types**
-  - Add the new type string to `VALID_QUOTA_CHECKER_TYPES` and the `QuotaCheckerType` union in `packages/backend/src/config.ts`.
-  - Ensure `/v0/management/quota-checker-types` returns the new value by including it in `VALID_QUOTA_CHECKER_TYPES` in `packages/backend/src/routes/management/config.ts`.
-
-- **Database schema (Postgres)**
-  - Update the `quotaCheckerTypeEnum` definition in `packages/backend/drizzle/schema/postgres/enums.ts` to include the new type.
-  - From `packages/backend`, generate migrations for **both** databases:
-    - `bunx drizzle-kit generate`
-    - `bunx drizzle-kit generate --config drizzle.config.pg.ts`
-  - Do not edit SQL migrations by hand; always rely on `drizzle-kit generate`.
-
-- **Frontend fallback type lists**
-  - Add the new type to `QUOTA_CHECKER_TYPES_FALLBACK` in `packages/frontend/src/pages/Providers.tsx`.
-  - Add the new type to `FALLBACK_QUOTA_CHECKER_TYPES` in `packages/frontend/src/lib/api.ts` so the UI works even if the backend type list cannot be fetched.
-
-If any of these registrations are missed (especially the Postgres enum or frontend fallbacks), the UI may hide the new checker type or saving providers may fail with enum validation errors.
+### 5. Type Registrations (all required)
+- **Backend config:** `VALID_QUOTA_CHECKER_TYPES` + `QuotaCheckerType` union in `config.ts`, `/v0/management/quota-checker-types` route
+- **Postgres enum:** `quotaCheckerTypeEnum` in `drizzle/schema/postgres/enums.ts`, then `drizzle-kit generate` for both databases
+- **Frontend fallbacks:** `QUOTA_CHECKER_TYPES_FALLBACK` in `Providers.tsx`, `FALLBACK_QUOTA_CHECKER_TYPES` in `lib/api.ts`
