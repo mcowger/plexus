@@ -34,9 +34,11 @@ jobs:
       - name: Parse AI config from secret
         id: ai_config
         uses: actions/github-script@v7
+        env:
+          AI_DATA: ${{ secrets.AI_DATA }}
         with:
           script: |
-            const ai = JSON.parse('${{ secrets.AI_DATA }}');
+            const ai = JSON.parse(process.env.AI_DATA);
             core.setOutput('base_url', ai.base_url);
             core.setOutput('model', ai.model_name);
             core.setOutput('api_key', ai.api_key);
