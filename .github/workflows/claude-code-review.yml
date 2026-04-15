@@ -48,10 +48,10 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ steps.ai_config.outputs.base_url }}
+          ANTHROPIC_SMALL_FAST_MODEL: ${{ steps.ai_config.outputs.model }}
         with:
           anthropic_api_key: ${{ steps.ai_config.outputs.api_key }}
-          claude_args: '--model ${{ steps.ai_config.outputs.model }}'
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          claude_args: '--model ${{ steps.ai_config.outputs.model }}': 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md

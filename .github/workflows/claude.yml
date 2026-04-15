@@ -47,6 +47,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ steps.ai_config.outputs.base_url }}
+          ANTHROPIC_SMALL_FAST_MODEL: ${{ steps.ai_config.outputs.model }}
         with:
           anthropic_api_key: ${{ steps.ai_config.outputs.api_key }}
           claude_args: '--model ${{ steps.ai_config.outputs.model }}'
