@@ -204,7 +204,24 @@ export async function registerMetricsRoutes(
         .where(isNotNull(schema.requestUsage.apiKey))
         .groupBy(schema.requestUsage.apiKey);
 
-      // 6. Currently in-flight requests grouped by provider
+      // 6. All-time per-API-key + attribution totals
+      const byApiKeyAttributionRows = await db
+        .select({
+          apiKey: schema.requestUsage.apiKey,
+          attribution: schema.requestUsage.attribution,
+          requests: sql<number>`COUNT(*)`,
+          tokensInput: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
+          tokensOutput: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
+          tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
+          tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
+          costTotal: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
+          errors: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(schema.requestUsage)
+        .where(isNotNull(schema.requestUsage.apiKey))
+        .groupBy(schema.requestUsage.apiKey, schema.requestUsage.attribution);
+
+      // 7. Currently in-flight requests grouped by provider
       //    (durationMs IS NULL = request started but not yet completed)
       const inFlightByProviderRows = await db
         .select({
@@ -221,7 +238,7 @@ export async function registerMetricsRoutes(
         )
         .groupBy(schema.requestUsage.provider);
 
-      // 7. Currently in-flight requests grouped by canonical model name
+      // 8. Currently in-flight requests grouped by canonical model name
       const inFlightByModelRows = await db
         .select({
           model: schema.requestUsage.canonicalModelName,
@@ -237,7 +254,7 @@ export async function registerMetricsRoutes(
         )
         .groupBy(schema.requestUsage.canonicalModelName);
 
-      // 8. Provider performance aggregates (TTFT, throughput)
+      // 9. Provider performance aggregates (TTFT, throughput)
       const rawPerfRows = await usageStorage.getProviderPerformance();
 
       // Active cooldowns from in-memory CooldownManager (no DB query needed)
@@ -602,6 +619,72 @@ export async function registerMetricsRoutes(
               toNum(r.tokensOutput) +
               toNum(r.tokensCached) +
               toNum(r.tokensCacheWrite),
+          }))
+        )
+      );
+
+      // --- Per-API-key + attribution counters ------------------------------
+
+      blocks.push(
+        metricBlock(
+          'plexus_api_key_attribution_requests_total',
+          'counter',
+          'Total requests per API key and attribution suffix (the part after the colon in the key, e.g. "mysecret:copilot" → attribution="copilot").',
+          byApiKeyAttributionRows.map((r) => ({
+            labels: {
+              api_key: r.apiKey ?? 'unknown',
+              attribution: r.attribution ?? '',
+            },
+            value: toNum(r.requests),
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_api_key_attribution_tokens_total',
+          'counter',
+          'Total tokens per API key and attribution suffix.',
+          byApiKeyAttributionRows.map((r) => ({
+            labels: {
+              api_key: r.apiKey ?? 'unknown',
+              attribution: r.attribution ?? '',
+            },
+            value:
+              toNum(r.tokensInput) +
+              toNum(r.tokensOutput) +
+              toNum(r.tokensCached) +
+              toNum(r.tokensCacheWrite),
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_api_key_attribution_cost_usd_total',
+          'counter',
+          'Cumulative cost in USD per API key and attribution suffix.',
+          byApiKeyAttributionRows.map((r) => ({
+            labels: {
+              api_key: r.apiKey ?? 'unknown',
+              attribution: r.attribution ?? '',
+            },
+            value: toNum(r.costTotal),
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_api_key_attribution_errors_total',
+          'counter',
+          'Total non-success responses per API key and attribution suffix.',
+          byApiKeyAttributionRows.map((r) => ({
+            labels: {
+              api_key: r.apiKey ?? 'unknown',
+              attribution: r.attribution ?? '',
+            },
+            value: toNum(r.errors),
           }))
         )
       );
