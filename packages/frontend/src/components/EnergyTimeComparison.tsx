@@ -1,6 +1,14 @@
-import { useState } from 'react';
-import { formatDuration } from '../lib/format';
-import { AlertTriangle, Info } from 'lucide-react';
+import { Info, Zap } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 interface ComparisonOption {
   id: string;
@@ -13,6 +21,15 @@ interface ComparisonOption {
 
 const COMPARISONS: ComparisonOption[] = [
   {
+    id: 'led-bulb',
+    label: 'LED light bulb',
+    shortLabel: 'LED Bulb',
+    kwhPerHour: 0.01,
+    sourceUrl:
+      'https://www.energysage.com/electricity/house-watts/how-many-watts-does-a-light-bulb-use/',
+    sourceName: 'EnergySage.com',
+  },
+  {
     id: 'netflix',
     label: 'Netflix streaming',
     shortLabel: 'Netflix',
@@ -23,8 +40,8 @@ const COMPARISONS: ComparisonOption[] = [
   },
   {
     id: 'tv',
-    label: '55" LCD/LED TV',
-    shortLabel: '55" TV',
+    label: 'LCD/LED TV',
+    shortLabel: 'LCD TV',
     kwhPerHour: 0.1,
     sourceUrl: 'https://www.energysage.com/electricity/house-watts/how-many-watts-does-a-tv-use/',
     sourceName: 'EnergySage.com',
@@ -51,6 +68,26 @@ const COMPARISONS: ComparisonOption[] = [
 /** Google Analytics session timeout documentation — same model we use for active time. */
 const ACTIVE_TIME_REF_URL = 'https://support.google.com/analytics/answer/2731565';
 
+/** Comparison items use info blue; AI compute uses primary amber. */
+const COLOR_COMPARISON = '#3B82F6';
+const COLOR_AI = '#F59E0B';
+
+interface ChartRow {
+  id: string;
+  name: string;
+  shortName: string;
+  watts: number;
+  isAi: boolean;
+  sourceUrl?: string;
+  sourceName?: string;
+}
+
+const formatWatts = (w: number): string => {
+  if (w >= 1000) return `${(w / 1000).toFixed(1)} kW`;
+  if (w >= 1) return `${w.toFixed(w < 10 ? 1 : 0)} W`;
+  return `${(w * 1000).toFixed(0)} mW`;
+};
+
 interface EnergyTimeComparisonProps {
   /** Pre-computed total kWh used across all requests (from backend summary). */
   totalKwh?: number;
@@ -61,42 +98,18 @@ interface EnergyTimeComparisonProps {
 }
 
 /**
- * Compares AI energy consumption to common household activities.
- * Uses "active time" (session-based) as the real time the person was working with AI,
- * rather than raw inference duration.
+ * Compares AI compute power usage rate to common household items
+ * as a vertical bar chart on a logarithmic scale.
  */
 export function EnergyTimeComparison({
   totalKwh = 0,
   totalDurationMs = 0,
   totalActiveMs = 0,
 }: EnergyTimeComparisonProps) {
-  const [selectedComparison, setSelectedComparison] = useState<ComparisonOption>(COMPARISONS[0]);
-
   // Use active time when available, fall back to inference duration
   const aiTimeMs = totalActiveMs || totalDurationMs;
   const aiTimeSeconds = Math.round(aiTimeMs / 1000);
-  const comparisonSecondsEquivalent = (totalKwh / selectedComparison.kwhPerHour) * 3600;
-
-  // Power in watts — kWh/hr directly converts to watts (kW * 1000 = W)
-  const comparisonWatts = selectedComparison.kwhPerHour * 1000;
   const aiWatts = aiTimeSeconds > 0 ? (totalKwh / (aiTimeSeconds / 3600)) * 1000 : 0;
-
-  // Efficiency ratio: Comparison time / AI active time
-  // > 1 = Comparison takes LONGER = AI used energy faster = AI LESS efficient
-  // < 1 = Comparison takes LESS time = AI took longer = AI MORE efficient
-  const efficiencyRatio = aiTimeSeconds > 0 ? comparisonSecondsEquivalent / aiTimeSeconds : 0;
-
-  // For bar: when AI is more efficient (ratio < 1), bar is smaller (ratio * 100 %)
-  // When AI is less efficient (ratio > 1), bar is full (100%)
-  const barPercent = efficiencyRatio < 1 ? Math.min(efficiencyRatio * 100, 100) : 100;
-
-  const isAiMoreEfficient = efficiencyRatio < 1;
-  const isAiLessEfficient = efficiencyRatio >= 1;
-
-  // For energy per second bars
-  const maxWatts = Math.max(comparisonWatts, aiWatts) || 1;
-  const comparisonWattsPercent = (comparisonWatts / maxWatts) * 100;
-  const aiWattsPercent = (aiWatts / maxWatts) * 100;
 
   if (totalKwh === 0 && aiTimeSeconds === 0) {
     return (
@@ -106,180 +119,111 @@ export function EnergyTimeComparison({
     );
   }
 
-  const comparisonDisplay = formatDuration(comparisonSecondsEquivalent);
-  const activeTimeDisplay = formatDuration(aiTimeSeconds);
+  // Build chart rows: comparisons + AI compute, sorted by watts ascending
+  const rows: ChartRow[] = [
+    ...COMPARISONS.map((c) => ({
+      id: c.id,
+      name: c.label,
+      shortName: c.shortLabel,
+      watts: c.kwhPerHour * 1000,
+      isAi: false,
+      sourceUrl: c.sourceUrl,
+      sourceName: c.sourceName,
+    })),
+  ];
 
-  // Dynamic wording based on comparison type
-  const getComparisonVerb = () => {
-    switch (selectedComparison.id) {
-      case 'netflix':
-        return 'watch';
-      case 'tv':
-        return 'watch';
-      case 'ps5':
-        return 'play';
-      case 'oven':
-        return 'cook with';
-      default:
-        return 'use';
-    }
-  };
+  if (aiWatts > 0) {
+    rows.push({
+      id: 'ai-compute',
+      name: 'AI compute (active)',
+      shortName: 'AI Compute',
+      watts: aiWatts,
+      isAi: true,
+    });
+  }
 
-  const getComparisonNoun = () => {
-    switch (selectedComparison.id) {
-      case 'netflix':
-        return 'Netflix';
-      case 'tv':
-        return 'TV';
-      case 'ps5':
-        return 'PS5';
-      case 'oven':
-        return 'the oven';
-      default:
-        return selectedComparison.shortLabel;
-    }
-  };
+  rows.sort((a, b) => a.watts - b.watts);
+
+  // Log-scale domain: all values ≥ 1 W, with headroom above max
+  const maxWatts = Math.max(...rows.map((r) => r.watts), 10);
+  const logDomain: [number, number] = [1, Math.ceil(maxWatts * 1.5)];
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Comparison Tabs */}
-      <div className="border-b border-border-glass">
-        <div className="flex gap-0">
-          {COMPARISONS.map((comparison) => {
-            const isActive = comparison.id === selectedComparison.id;
-            return (
-              <button
-                key={comparison.id}
-                onClick={() => setSelectedComparison(comparison)}
-                className={[
-                  'flex items-center gap-2 px-3 py-2 text-[12px] font-medium transition-all border-b-2 -mb-px',
-                  isActive
-                    ? 'border-accent text-text'
-                    : 'border-transparent text-text-muted hover:text-text hover:border-border-glass',
-                ].join(' ')}
-              >
-                {comparison.shortLabel}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* AI Efficiency Comparison */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="text-sm font-semibold text-text-primary">
-            AI Efficiency vs {selectedComparison.shortLabel}
-          </div>
-          {isAiMoreEfficient && (
-            <span className="text-xs px-2 py-0.5 bg-success/20 text-success rounded-full font-medium">
-              {(1 / efficiencyRatio).toFixed(1)}× more efficient
-            </span>
-          )}
-          {isAiLessEfficient && (
-            <span className="text-xs px-2 py-0.5 bg-danger/20 text-danger rounded-full font-medium">
-              {efficiencyRatio.toFixed(1)}× less efficient
-            </span>
-          )}
-        </div>
-
-        {/* Main bar — Comparison equivalent, sized by AI efficiency */}
-        <div className="space-y-2">
-          <div className="h-3 bg-bg-hover rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                isAiMoreEfficient ? 'bg-success' : isAiLessEfficient ? 'bg-danger' : 'bg-info'
-              }`}
-              style={{ width: `${barPercent}%` }}
+      {/* Vertical bar chart */}
+      <div style={{ height: 260, marginTop: '8px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ left: 10, right: 10, top: 0, bottom: 0 }}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--color-border-glass)"
+              vertical={false}
             />
-          </div>
-
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-text-secondary">
-                {selectedComparison.shortLabel} time for same energy:
-              </span>
-              <span className="font-semibold text-text-primary">{comparisonDisplay}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-text-tertiary">You worked with AI for:</span>
-              <span
-                className={`font-semibold ${
-                  isAiLessEfficient ? 'text-danger' : 'text-text-primary'
-                }`}
-              >
-                {activeTimeDisplay}
-              </span>
-              {isAiLessEfficient && <AlertTriangle size={14} className="text-danger" />}
-            </div>
-          </div>
-        </div>
-
-        {/* Explanation for bar interpretation */}
-        {isAiMoreEfficient ? (
-          <p className="text-xs text-text-tertiary">
-            You'd have to {getComparisonVerb()} {getComparisonNoun()} for {comparisonDisplay} to use
-            the same energy you consumed during {activeTimeDisplay} of active AI work.
-          </p>
-        ) : isAiLessEfficient ? (
-          <p className="text-xs text-danger">
-            AI used energy faster than {selectedComparison.label}. {selectedComparison.shortLabel}{' '}
-            would take {comparisonDisplay} to use the same energy your AI burned through in just{' '}
-            {activeTimeDisplay} of active work.
-          </p>
-        ) : null}
+            <XAxis
+              dataKey="shortName"
+              stroke="var(--color-text-secondary)"
+              tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+            />
+            <YAxis
+              type="number"
+              scale="log"
+              domain={logDomain}
+              stroke="var(--color-text-secondary)"
+              tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+              tickFormatter={(v: number) => formatWatts(v)}
+              width={55}
+            />
+            <Tooltip
+              formatter={(value) => [formatWatts(Number(value || 0)), 'Power']}
+              contentStyle={{
+                background: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+              }}
+              itemStyle={{ color: 'var(--color-text)' }}
+              labelStyle={{ color: 'var(--color-text-secondary)' }}
+            />
+            <Bar dataKey="watts" radius={[4, 4, 0, 0]} barSize={28}>
+              {rows.map((entry) => (
+                <Cell
+                  key={entry.id}
+                  fill={entry.isAi ? COLOR_AI : COLOR_COMPARISON}
+                  stroke={entry.isAi ? COLOR_AI : COLOR_COMPARISON}
+                  strokeWidth={0.5}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* Power Usage Rate Comparison */}
-      <div className="space-y-2 pt-2 border-t border-border">
-        <div className="text-xs font-medium text-text-secondary">Power Usage Rate</div>
-        <div className="space-y-2">
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-text-secondary">{selectedComparison.label}</span>
-              <span className="font-semibold text-info">{comparisonWatts.toFixed(1)} W</span>
-            </div>
-            <div className="h-2 bg-bg-hover rounded-full overflow-hidden">
-              <div
-                className="h-full bg-info rounded-full"
-                style={{ width: `${comparisonWattsPercent}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-text-secondary">AI compute (active rate)</span>
-              <span className="font-semibold text-primary">
-                {aiWatts > 0 ? `${aiWatts.toFixed(1)} W` : 'N/A'}
-              </span>
-            </div>
-            <div className="h-2 bg-bg-hover rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full"
-                style={{ width: `${aiWattsPercent}%` }}
-              />
-            </div>
-          </div>
+      {/* AI compute fallback when no active time */}
+      {aiWatts === 0 && (
+        <div className="flex items-center gap-2 text-xs text-text-tertiary">
+          <Zap size={14} className="text-primary" />
+          <span>AI compute: N/A (no active time data)</span>
         </div>
+      )}
+
+      {/* Scale note */}
+      <div className="text-[10px] text-text-tertiary italic">
+        Logarithmic scale — bar lengths represent log₁₀(watts)
       </div>
 
-      {/* Footnotes */}
-      <div className="space-y-1.5 pt-2">
-        {/* Source footnote */}
-        {selectedComparison.sourceUrl && (
+      {/* Source footnotes */}
+      <div className="space-y-1.5 pt-1">
+        {COMPARISONS.filter((c) => c.sourceUrl).map((c) => (
           <a
-            href={selectedComparison.sourceUrl}
+            key={c.id}
+            href={c.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
+            className="inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors mr-3"
           >
             <Info size={10} />
-            {selectedComparison.label} energy: {selectedComparison.sourceName}
+            {c.shortLabel}: {c.sourceName}
           </a>
-        )}
-
-        {/* Active time methodology footnote */}
+        ))}
         <a
           href={ACTIVE_TIME_REF_URL}
           target="_blank"
@@ -287,8 +231,7 @@ export function EnergyTimeComparison({
           className="inline-flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
         >
           <Info size={10} />
-          "Active time" groups requests into sessions with a 15-min inactivity timeout (same model
-          as Google Analytics sessions)
+          &quot;Active time&quot; uses 15-min session timeout (same model as Google Analytics)
         </a>
       </div>
     </div>

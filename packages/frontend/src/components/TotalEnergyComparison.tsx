@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KWH_PER_SLICE, formatDuration, formatEnergy, formatSlices } from '../lib/format';
-import { Tv, Flame, Play, Gamepad2 } from 'lucide-react';
+import { Tv, Flame, Play, Gamepad2, Lightbulb } from 'lucide-react';
 import toastFull from '../assets/toast/toast-full.png';
 import toast75 from '../assets/toast/toast-75.png';
 import toast50 from '../assets/toast/toast-50.png';
@@ -23,6 +23,18 @@ interface ComparisonOption {
 }
 
 const COMPARISONS: ComparisonOption[] = [
+  {
+    id: 'led-bulb',
+    label: 'LED light bulb',
+    shortLabel: 'LED Bulb',
+    kwhPerHour: 0.01,
+    icon: <Lightbulb size={28} className="text-yellow-400" />,
+    verb: 'run',
+    noun: 'an LED bulb',
+    sourceUrl:
+      'https://www.energysage.com/electricity/house-watts/how-many-watts-does-a-light-bulb-use/',
+    sourceName: 'EnergySage.com',
+  },
   {
     id: 'netflix',
     label: 'Netflix streaming',
