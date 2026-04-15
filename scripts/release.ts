@@ -40,7 +40,9 @@ async function main() {
     console.log(`  bun scripts/release.ts [options]`);
     console.log('\nOptions:');
     console.log(`  ${pc.cyan('--help, -h')} Show this help message`);
-    console.log('\nThis script tags the repo and pushes the tag. Release notes are handled by GitHub Actions.\n');
+    console.log(
+      '\nThis script tags the repo and pushes the tag. Release notes are handled by GitHub Actions.\n'
+    );
     process.exit(0);
   }
 
@@ -98,7 +100,9 @@ async function main() {
     console.log(pc.dim('⬆️  Pushing tag...'));
     await run(['git', 'push', 'origin', version]);
     console.log(`${pc.green('✅ Pushed tag')} ${pc.bold(version)}\n`);
-    console.log(`${pc.bold(pc.magenta('🎊 Release tag created! GitHub Actions will handle the rest.'))}\n`);
+    console.log(
+      `${pc.bold(pc.magenta('🎊 Release tag created! GitHub Actions will handle the rest.'))}\n`
+    );
   } catch (e) {
     console.error(`\n${pc.red('❌ Git operation failed:')}`, e);
     process.exit(1);

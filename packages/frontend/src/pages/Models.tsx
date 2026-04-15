@@ -493,10 +493,7 @@ export const Models = () => {
    * runtime code path that substitutes an empty string; this helper keeps
    * that guarantee visible to TypeScript.
    */
-  const withOverrides = (
-    current: AliasMetadata,
-    overrides: MetadataOverrides
-  ): AliasMetadata => {
+  const withOverrides = (current: AliasMetadata, overrides: MetadataOverrides): AliasMetadata => {
     if (current.source === 'custom') {
       return {
         ...current,
@@ -765,7 +762,10 @@ export const Models = () => {
       const r = ref.pricing ?? {};
       if (o.pricing.prompt !== undefined && o.pricing.prompt !== r.prompt) n++;
       if (o.pricing.completion !== undefined && o.pricing.completion !== r.completion) n++;
-      if (o.pricing.input_cache_read !== undefined && o.pricing.input_cache_read !== r.input_cache_read)
+      if (
+        o.pricing.input_cache_read !== undefined &&
+        o.pricing.input_cache_read !== r.input_cache_read
+      )
         n++;
       if (
         o.pricing.input_cache_write !== undefined &&
@@ -787,11 +787,17 @@ export const Models = () => {
         n++;
       if (o.architecture.tokenizer !== undefined && o.architecture.tokenizer !== r.tokenizer) n++;
     }
-    if (o.supported_parameters !== undefined && !arrayEq(o.supported_parameters, ref.supported_parameters))
+    if (
+      o.supported_parameters !== undefined &&
+      !arrayEq(o.supported_parameters, ref.supported_parameters)
+    )
       n++;
     if (o.top_provider) {
       const r = ref.top_provider ?? {};
-      if (o.top_provider.context_length !== undefined && o.top_provider.context_length !== r.context_length)
+      if (
+        o.top_provider.context_length !== undefined &&
+        o.top_provider.context_length !== r.context_length
+      )
         n++;
       if (
         o.top_provider.max_completion_tokens !== undefined &&

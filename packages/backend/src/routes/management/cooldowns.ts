@@ -15,15 +15,11 @@ export async function registerCooldownRoutes(fastify: FastifyInstance) {
   // cooldowns to steer away from providers with real failure signals (rate
   // limits, outages, quota exhaustion), so forcing a retry has system-wide
   // blast radius and is not a safe self-service action for a key holder.
-  fastify.delete(
-    '/v0/management/cooldowns',
-    { preHandler: requireAdmin },
-    (_request, reply) => {
-      CooldownManager.getInstance().clearCooldown();
-      logger.info('[AUDIT] admin cleared all cooldowns');
-      return reply.send({ success: true });
-    }
-  );
+  fastify.delete('/v0/management/cooldowns', { preHandler: requireAdmin }, (_request, reply) => {
+    CooldownManager.getInstance().clearCooldown();
+    logger.info('[AUDIT] admin cleared all cooldowns');
+    return reply.send({ success: true });
+  });
 
   fastify.delete(
     '/v0/management/cooldowns/:provider',
