@@ -72,6 +72,11 @@ function isDuplicateColumnError(error: any): boolean {
   return error?.cause?.code === '42701' || error?.code === '42701';
 }
 
+function isSQLiteAlreadyExistsError(error: any): boolean {
+  const msg = (error?.cause?.message ?? '').toLowerCase();
+  return error?.cause?.name === 'SQLiteError' && msg.includes('already exists');
+}
+
 function toIdempotentStatement(statement: string): string {
   if (
     /ALTER\s+TABLE[\s\S]+ADD\s+COLUMN/i.test(statement) &&
@@ -80,6 +85,83 @@ function toIdempotentStatement(statement: string): string {
     return statement.replace(/ADD\s+COLUMN\s+/i, 'ADD COLUMN IF NOT EXISTS ');
   }
   return statement;
+}
+
+// Make a SQLite DDL statement idempotent by inserting IF NOT EXISTS guards.
+// Only handles CREATE TABLE and CREATE [UNIQUE] INDEX — ALTER TABLE ADD COLUMN
+// is left unchanged because ADD COLUMN IF NOT EXISTS requires SQLite 3.37.0+
+// and may not be available in all compiled binaries. Duplicate-column errors
+// from ALTER TABLE are instead caught and ignored in the caller.
+function toIdempotentSQLiteStatement(statement: string): string {
+  let s = statement;
+  s = s.replace(/(CREATE\s+TABLE\s+)(`[\w]+`|\w+)/i, '$1IF NOT EXISTS $2');
+  s = s.replace(/(CREATE\s+(?:UNIQUE\s+)?INDEX\s+)(`[\w]+`|\w+)/i, '$1IF NOT EXISTS $2');
+  return s;
+}
+
+function attemptSQLiteAlreadyExistsRepair(
+  db: any,
+  migrations: MigrationMeta[],
+  journal: Journal,
+  migrationError: any
+): boolean {
+  const errorMsg = migrationError?.cause?.message ?? '';
+  const nameMatch = errorMsg.match(/(?:table|index)\s+[`']?(\w+)[`']?\s+already exists/i);
+  if (!nameMatch) return false;
+  const objectName = nameMatch[1]!.toLowerCase();
+
+  // Reach the underlying Bun SQLite Database through the drizzle session
+  const sqlite = db?.session?.client;
+  if (!sqlite?.run) return false;
+
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS ${DRIZZLE_MIGRATIONS_TABLE} (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hash TEXT NOT NULL,
+      created_at INTEGER
+    )
+  `);
+
+  for (let i = 0; i < migrations.length; i++) {
+    const migration = migrations[i]!;
+    const entry = journal.entries[i]!;
+    const statements = migration.sql.map((s) => s.trim()).filter((s) => s.length > 0);
+
+    const refersToObject = statements.some((s) =>
+      s.toLowerCase().replace(/\s+/g, ' ').includes(`\`${objectName}\``)
+    );
+    if (!refersToObject) continue;
+
+    const alreadyApplied = sqlite.query(
+      `SELECT id FROM ${DRIZZLE_MIGRATIONS_TABLE} WHERE hash = ?`
+    ).get(migration.hash);
+    if (alreadyApplied) continue;
+
+    logger.warn(
+      `Detected SQLite "already exists" migration drift in ${entry.tag}; applying idempotent repair`
+    );
+
+    for (const statement of statements) {
+      const idempotent = toIdempotentSQLiteStatement(statement);
+      try {
+        sqlite.run(idempotent);
+      } catch (err: any) {
+        const msg = (err?.message ?? '').toLowerCase();
+        if (msg.includes('already exists') || msg.includes('duplicate column')) continue;
+        throw err;
+      }
+    }
+
+    // alreadyApplied check above ensures we only reach here when the migration
+    // isn't tracked yet, so a plain INSERT is safe.
+    sqlite
+      .prepare(`INSERT INTO ${DRIZZLE_MIGRATIONS_TABLE} (hash, created_at) VALUES (?, ?)`)
+      .run(migration.hash, migration.folderMillis);
+
+    return true;
+  }
+
+  return false;
 }
 
 async function attemptPostgresDuplicateColumnRepair(
@@ -155,7 +237,26 @@ export async function runMigrations() {
 
     if (dialect === 'sqlite') {
       const migrations = await buildMigrations(sqliteJournal as Journal, DEV_MIGRATIONS_DIR.sqlite);
-      (db as any).dialect.migrate(migrations, (db as any).session, { migrationsFolder: '' });
+      try {
+        (db as any).dialect.migrate(migrations, (db as any).session, { migrationsFolder: '' });
+      } catch (error: any) {
+        if (isSQLiteAlreadyExistsError(error)) {
+          const repaired = attemptSQLiteAlreadyExistsRepair(
+            db,
+            migrations,
+            sqliteJournal as Journal,
+            error
+          );
+          if (repaired) {
+            logger.warn('Retrying SQLite migrations after already-exists repair');
+            (db as any).dialect.migrate(migrations, (db as any).session, { migrationsFolder: '' });
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
     } else {
       const migrations = await buildMigrations(pgJournal as Journal, DEV_MIGRATIONS_DIR.postgres);
       try {

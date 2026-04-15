@@ -149,6 +149,20 @@ When schema changes are needed, follow these steps **exactly**:
 - Skip generating migrations for both databases
 - Modify the database schema directly with SQL commands
 
+## Rebase & Renumbering — Never Ship Mid-Rebase Builds
+
+When a PR branch is rebased onto `main` after new migrations have landed on `main`, the feature branch migration must be regenerated at the next available index (e.g. the old `0026_foo` becomes `0029_bar`). **This changes the migration's tag and hash.**
+
+Any Docker image built from the branch *before* the final regeneration commit contains the old tag/hash. Users who ran that intermediate image will have the old hash recorded in `__drizzle_migrations`. When they upgrade to the final image, the migration runner sees the new hash as unapplied and tries to re-run the DDL — causing `"table already exists"` startup failures.
+
+**Rules to prevent this:**
+
+- **Do not build or push Docker images** from a feature branch while a rebase + migration regeneration is still in progress.
+- **Complete the full rebase workflow** (reset to main, regenerate for both dialects, verify SQL, commit) in a single atomic step before any image is built.
+- If CI builds images on every push, finish the rebase in a single commit or use a draft PR to suppress builds until the migrations are final.
+
+The migration runner has a runtime repair path for SQLite and PostgreSQL that recovers from drift caused by this scenario, but it is a safety net — not a substitute for avoiding it.
+
 ## Live Database Safety
 
 - It is NEVER acceptable to attempt to modify a live database directly
