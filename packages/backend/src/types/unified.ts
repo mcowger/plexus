@@ -119,6 +119,10 @@ export interface UnifiedChatRequest {
     type: 'text' | 'json_object' | 'json_schema';
     json_schema?: any;
   };
+  cacheRoutingHeaders?: {
+    session_id?: string;
+    'x-client-request-id'?: string;
+  };
   incomingApiType?: string;
   originalBody?: any;
   metadata?: {

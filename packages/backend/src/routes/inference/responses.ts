@@ -31,7 +31,8 @@ export async function registerResponsesRoute(
    * This enables true stateless multi-turn conversations where the client only sends the
    * new input and the previous_response_id, without needing to re-send all history.
    */
-  fastify.post('/v1/responses', async (request: FastifyRequest, reply: FastifyReply) => {
+  // Handler for Responses API requests (shared between /v1/responses and /v1/codex/responses)
+  const responsesHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
@@ -127,6 +128,17 @@ export async function registerResponsesRoute(
       unifiedRequest.incomingApiType = 'responses';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+
+      // Forward cache routing headers for prompt caching support.
+      // These headers enable server-side cache routing at the upstream provider.
+      const sessionId = request.headers['session_id'] as string | undefined;
+      const clientRequestId = request.headers['x-client-request-id'] as string | undefined;
+      if (sessionId || clientRequestId || body.prompt_cache_key) {
+        unifiedRequest.cacheRoutingHeaders = {
+          session_id: sessionId || body.prompt_cache_key,
+          'x-client-request-id': clientRequestId || body.prompt_cache_key,
+        };
+      }
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])
         ? request.headers['x-app'][0]
@@ -241,7 +253,11 @@ export async function registerResponsesRoute(
         },
       });
     }
-  });
+  };
+
+  fastify.post('/v1/responses', responsesHandler);
+  // Codex CLI sends requests to /v1/codex/responses — alias to the same handler
+  fastify.post('/v1/codex/responses', responsesHandler);
 
   /**
    * GET /v1/responses/:response_id
