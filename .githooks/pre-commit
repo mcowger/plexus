@@ -24,6 +24,20 @@ if [ "${CI:-}" != "true" ] && [ "${ALLOW_MIGRATIONS:-}" != "1" ]; then
   fi
 fi
 
+# --- Validate GitHub Actions workflow YAML ---
+workflow_files=$(git diff --cached --name-only -- '.github/workflows/*.yml' '.github/workflows/*.yaml' || true)
+if [ -n "$workflow_files" ]; then
+  echo "[pre-commit] Validating workflow YAML files..."
+  for f in $workflow_files; do
+    if [ -f "$repo_root/$f" ]; then
+      if ! bun -e "const fs=require('fs');const yaml=require('$repo_root/packages/backend/node_modules/yaml');try{yaml.parse(fs.readFileSync('$repo_root/$f','utf8'));console.log('  ✓ $f')}catch(e){console.error('  ✗ $f:',e.message);process.exit(1)}" 2>&1; then
+        echo "[pre-commit] ERROR: Invalid YAML in $f"
+        exit 1
+      fi
+    fi
+  done
+fi
+
 echo "[pre-commit] Running backend tests..."
 cd packages/backend
 bun test
