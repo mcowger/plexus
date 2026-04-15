@@ -4,6 +4,26 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+# --- Block migration file commits (CI auto-generates these) ---
+if [ "${CI:-}" != "true" ] && [ "${ALLOW_MIGRATIONS:-}" != "1" ]; then
+  migration_files=$(git diff --cached --name-only -- \
+    'packages/backend/drizzle/migrations/' \
+    'packages/backend/drizzle/migrations_pg/' || true)
+  if [ -n "$migration_files" ]; then
+    echo ""
+    echo "[pre-commit] ERROR: Migration files should not be committed manually."
+    echo "Migrations are auto-generated on main by CI after schema changes merge."
+    echo ""
+    echo "Blocked files:"
+    echo "$migration_files" | sed 's/^/  /'
+    echo ""
+    echo "To remove them from your commit:  git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/"
+    echo "To bypass (maintainers only):     ALLOW_MIGRATIONS=1 git commit ..."
+    echo ""
+    exit 1
+  fi
+fi
+
 echo "[pre-commit] Running backend tests..."
 cd packages/backend
 bun test

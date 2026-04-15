@@ -1,0 +1,59 @@
+name: Generate Migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/backend/drizzle/schema/**/*.ts'
+
+concurrency:
+  group: generate-migrations
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate Migrations
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd packages/backend && bun install --frozen-lockfile
+
+      - name: Generate SQLite migrations
+        working-directory: packages/backend
+        run: bunx drizzle-kit generate
+
+      - name: Generate PostgreSQL migrations
+        working-directory: packages/backend
+        run: bunx drizzle-kit generate --config drizzle.config.pg.ts
+
+      - name: Check for new migrations
+        id: check
+        run: |
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard packages/backend/drizzle/migrations packages/backend/drizzle/migrations_pg)" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push migrations
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/
+          git commit -m "chore: auto-generate migrations for schema changes"
+          git push

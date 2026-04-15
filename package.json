@@ -24,6 +24,7 @@
     "install:all": "bun install && (cd packages/backend && bun install) && (cd packages/frontend && bun install)",
     "typecheck": "bun run --workspaces typecheck",
     "release": "bun run scripts/release.ts",
+    "prepare": "git config core.hooksPath .githooks",
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
     "format": "bunx biome format --write .",
     "format:check": "bunx biome format ."

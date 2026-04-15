@@ -1,0 +1,24 @@
+name: Check No Migrations in PR
+
+on:
+  pull_request:
+    paths:
+      - 'packages/backend/drizzle/migrations/**'
+      - 'packages/backend/drizzle/migrations_pg/**'
+
+jobs:
+  check-migrations:
+    name: Block migration files in PR
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'migrations-ok') }}
+    steps:
+      - name: Reject migration files
+        run: |
+          echo "::error::This PR modifies migration files (drizzle/migrations/ or drizzle/migrations_pg/)."
+          echo ""
+          echo "Community PRs should only modify schema .ts files in drizzle/schema/."
+          echo "Migrations are auto-generated after merge by CI."
+          echo ""
+          echo "To test locally: run 'bunx drizzle-kit generate' but do not commit the output."
+          echo "If this is a maintainer PR that intentionally includes migrations, add the 'migrations-ok' label."
+          exit 1
