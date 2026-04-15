@@ -61,6 +61,14 @@ jobs:
           build-args: |
             APP_VERSION=${{ github.ref_name }}
 
+      - name: Get previous release tag
+        id: prev_tag
+        run: |
+          CURRENT_TAG="${GITHUB_REF##*/}"
+          PREV_TAG=$(git tag --sort=-version:refname --list "v*.*.*" | grep -A1 "^${CURRENT_TAG}$" | tail -1)
+          echo "Previous release tag: $PREV_TAG"
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Generate Release Notes
         id: release_notes
         uses: mistricky/ccc@v0.2.2
@@ -68,6 +76,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           model: claude-sonnet-4-6
+          from_tag: ${{ steps.prev_tag.outputs.tag }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
