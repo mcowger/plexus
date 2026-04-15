@@ -318,8 +318,8 @@ export const OverallTab: React.FC = () => {
             <div className="flex items-start gap-2 text-sm text-warning">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
               <span>
-                Could not load quota status. If this key has a quota assigned, its current
-                usage is not shown here — try refreshing.
+                Could not load quota status. If this key has a quota assigned, its current usage is
+                not shown here — try refreshing.
               </span>
             </div>
           ) : !quota || !quota.quotaName ? (

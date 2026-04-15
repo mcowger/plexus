@@ -296,10 +296,72 @@ export interface StripAdaptiveThinkingBehavior {
 
 export type AliasBehavior = StripAdaptiveThinkingBehavior; // | NextBehavior | ...
 
-export interface AliasMetadata {
-  source: 'openrouter' | 'models.dev' | 'catwalk';
-  source_path: string;
+export type MetadataSource = 'openrouter' | 'models.dev' | 'catwalk' | 'custom';
+
+export interface MetadataOverrides {
+  name?: string;
+  description?: string;
+  context_length?: number;
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    input_cache_read?: string;
+    input_cache_write?: string;
+  };
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+    tokenizer?: string;
+  };
+  supported_parameters?: string[];
+  top_provider?: {
+    context_length?: number;
+    max_completion_tokens?: number;
+  };
 }
+
+/**
+ * Mirror of the backend `NormalizedModelMetadata` shape. Returned by
+ * `GET /v1/metadata/lookup` and used to pre-fill the override form.
+ */
+export interface NormalizedModelMetadata {
+  id: string;
+  name: string;
+  description?: string;
+  context_length?: number;
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+    tokenizer?: string;
+    instruct_type?: string | null;
+  };
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    input_cache_read?: string;
+    input_cache_write?: string;
+  };
+  supported_parameters?: string[];
+  top_provider?: {
+    context_length?: number;
+    max_completion_tokens?: number;
+  };
+}
+
+// Discriminated union mirrors backend validation: catalog-backed sources
+// must carry a non-empty source_path; 'custom' may omit it but MUST carry
+// an overrides blob with a non-empty `name` (there is no catalog fallback).
+export type AliasMetadata =
+  | {
+      source: Exclude<MetadataSource, 'custom'>;
+      source_path: string;
+      overrides?: MetadataOverrides;
+    }
+  | {
+      source: 'custom';
+      source_path?: string;
+      overrides: MetadataOverrides & { name: string };
+    };
 
 export interface Alias {
   id: string;
@@ -2306,7 +2368,7 @@ export const api = {
    * @param limit  - max results (default 50)
    */
   searchModelMetadata: async (
-    source: 'openrouter' | 'models.dev' | 'catwalk',
+    source: Exclude<MetadataSource, 'custom'>,
     query?: string,
     limit?: number
   ): Promise<{ data: { id: string; name: string }[]; count: number }> => {
@@ -2320,6 +2382,25 @@ export const api = {
       throw new Error(`Failed to search model metadata: ${res.statusText}`);
     }
     return res.json();
+  },
+
+  /**
+   * Look up full catalog metadata for a specific model. Returns null when the
+   * source has not loaded (503) or the source_path is not found (404) so callers
+   * can gracefully fall back to leaving the form blank.
+   */
+  getModelMetadata: async (
+    source: Exclude<MetadataSource, 'custom'>,
+    sourcePath: string
+  ): Promise<NormalizedModelMetadata | null> => {
+    const params = new URLSearchParams({ source, source_path: sourcePath });
+    const res = await fetch(`${API_BASE}/v1/metadata/lookup?${params}`);
+    if (res.status === 404 || res.status === 503) return null;
+    if (!res.ok) {
+      throw new Error(`Failed to look up model metadata: ${res.statusText}`);
+    }
+    const json = (await res.json()) as { data: NormalizedModelMetadata };
+    return json.data;
   },
 
   getOAuthProviderModels: async (

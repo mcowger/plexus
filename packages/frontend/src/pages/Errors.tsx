@@ -19,7 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const Errors: React.FC = () => {
   const location = useLocation();
-  const { isAdmin, isLimited, principal } = useAuth();
+  const { isAdmin, principal } = useAuth();
   const [errors, setErrors] = useState<InferenceError[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedError, setSelectedError] = useState<InferenceError | null>(null);
@@ -146,7 +146,7 @@ export const Errors: React.FC = () => {
             Inference Errors
           </h1>
           <p className="text-[15px] text-text-secondary m-0">
-            {isLimited && principal?.keyName
+            {principal?.role === 'limited' && principal.keyName
               ? `Errors for key "${principal.keyName}" only.`
               : 'Investigate failed requests and exceptions'}
           </p>

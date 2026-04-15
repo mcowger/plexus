@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getConfig } from '../../config';
 import { PricingManager } from '../../services/pricing-manager';
-import { ModelMetadataManager } from '../../services/model-metadata-manager';
+import { ModelMetadataManager, mergeOverrides } from '../../services/model-metadata-manager';
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
   /**
@@ -36,8 +36,20 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         return base;
       }
 
-      // Look up enriched metadata from the appropriate source
-      const enriched = metadataManager.getMetadata(metaConfig.source, metaConfig.source_path);
+      // Look up enriched metadata from the appropriate source. Custom sources
+      // skip the catalog entirely and derive everything from overrides. For
+      // catalog-backed sources, a missing catalog hit is treated as a miss —
+      // we don't silently synthesize a partial record from overrides alone,
+      // because that would hide typos in source_path or unloaded sources.
+      let enriched: ReturnType<typeof mergeOverrides> = undefined;
+      if (metaConfig.source === 'custom') {
+        enriched = mergeOverrides(undefined, metaConfig.overrides);
+      } else {
+        const catalog = metadataManager.getMetadata(metaConfig.source, metaConfig.source_path);
+        if (catalog) {
+          enriched = mergeOverrides(catalog, metaConfig.overrides);
+        }
+      }
       if (!enriched) {
         return base;
       }
@@ -80,6 +92,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
 
     const source = query.source as 'openrouter' | 'models.dev' | 'catwalk' | undefined;
     if (!source || !['openrouter', 'models.dev', 'catwalk'].includes(source)) {
+      // Note: 'custom' is intentionally rejected — there's no catalog to search.
       return reply.status(400).send({
         error: `Missing or invalid 'source' parameter. Must be one of: openrouter, models.dev, catwalk`,
       });
@@ -99,6 +112,50 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       data: results,
       count: results.length,
     });
+  });
+
+  /**
+   * GET /v1/metadata/lookup
+   * Return the full normalized metadata for a single model in a catalog source.
+   * Used by the frontend to auto-populate the override form when a user enables
+   * "Override catalog fields" — so the user sees the current values and can
+   * tweak them rather than starting blank.
+   *
+   * Query parameters:
+   *   - source (required): "openrouter" | "models.dev" | "catwalk"
+   *   - source_path (required): the model id within the source
+   *
+   * Returns: the NormalizedModelMetadata record, or 404 if not found.
+   */
+  fastify.get('/v1/metadata/lookup', async (request, reply) => {
+    const metadataManager = ModelMetadataManager.getInstance();
+    const query = request.query as { source?: string; source_path?: string };
+
+    const source = query.source as 'openrouter' | 'models.dev' | 'catwalk' | undefined;
+    if (!source || !['openrouter', 'models.dev', 'catwalk'].includes(source)) {
+      return reply.status(400).send({
+        error: `Missing or invalid 'source' parameter. Must be one of: openrouter, models.dev, catwalk`,
+      });
+    }
+
+    if (!query.source_path) {
+      return reply.status(400).send({ error: `Missing 'source_path' parameter` });
+    }
+
+    if (!metadataManager.isInitialized(source)) {
+      return reply.status(503).send({
+        error: `Metadata source '${source}' is not yet loaded or failed to load`,
+      });
+    }
+
+    const metadata = metadataManager.getMetadata(source, query.source_path);
+    if (!metadata) {
+      return reply.status(404).send({
+        error: `No metadata found for '${query.source_path}' in source '${source}'`,
+      });
+    }
+
+    return reply.send({ data: metadata });
   });
 
   /**

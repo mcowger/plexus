@@ -232,6 +232,13 @@
       "when": 1776284939165,
       "tag": "0032_fast_lethal_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1776289140510,
+      "tag": "0033_colossal_exiles",
+      "breakpoints": true
     }
   ]
 }
