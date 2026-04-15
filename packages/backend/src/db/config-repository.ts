@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDatabase, getSchema, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
 import {
@@ -473,14 +473,37 @@ export class ConfigRepository {
     const rows = await this.db().select().from(schema.modelAliases);
     const result: Record<string, ModelConfig> = {};
 
-    for (const row of rows) {
-      const targets = await this.db()
+    if (rows.length === 0) return result;
+
+    const aliasIds = rows.map((r: any) => r.id);
+
+    // Batch-fetch targets and override rows in parallel, keyed by aliasId —
+    // avoids the 1+2N round-trips a per-alias loop would incur.
+    const [allTargets, allOverrides] = await Promise.all([
+      this.db()
         .select()
         .from(schema.modelAliasTargets)
-        .where(eq(schema.modelAliasTargets.aliasId, row.id))
-        .orderBy(schema.modelAliasTargets.sortOrder);
+        .where(inArray(schema.modelAliasTargets.aliasId, aliasIds))
+        .orderBy(schema.modelAliasTargets.sortOrder),
+      this.db()
+        .select()
+        .from(schema.aliasMetadataOverrides)
+        .where(inArray(schema.aliasMetadataOverrides.aliasId, aliasIds)),
+    ]);
 
-      const overrideRow = await this.getMetadataOverrideRow(row.id);
+    const targetsByAliasId = new Map<number, any[]>();
+    for (const t of allTargets) {
+      const list = targetsByAliasId.get(t.aliasId);
+      if (list) list.push(t);
+      else targetsByAliasId.set(t.aliasId, [t]);
+    }
+
+    const overrideByAliasId = new Map<number, any>();
+    for (const o of allOverrides) overrideByAliasId.set(o.aliasId, o);
+
+    for (const row of rows) {
+      const targets = targetsByAliasId.get(row.id) ?? [];
+      const overrideRow = overrideByAliasId.get(row.id) ?? null;
       result[row.slug] = this.rowToModelConfig(row, targets, overrideRow);
     }
 
