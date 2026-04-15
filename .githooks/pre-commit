@@ -38,6 +38,14 @@ if [ -n "$workflow_files" ]; then
   done
 fi
 
+# --- Run Biome formatter on staged files ---
+staged_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.md' '*.yaml' '*.yml' || true)
+if [ -n "$staged_files" ]; then
+  echo "[pre-commit] Running Biome formatter on staged files..."
+  echo "$staged_files" | xargs bunx biome format --write
+  echo "$staged_files" | xargs git add
+fi
+
 echo "[pre-commit] Running backend tests..."
 cd packages/backend
 bun test
