@@ -18,7 +18,7 @@ import { registerRestartRoutes } from './management/restart';
 import { registerProviderRoutes } from './management/providers';
 import { registerMetricsRoutes } from './management/metrics';
 import { registerSelfRoutes } from './management/self';
-import { authenticate, requireAdmin } from './management/_principal';
+import { authenticate, requireAdmin, ManagementAuthError } from './management/_principal';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -32,6 +32,16 @@ export async function registerManagementRoutes(
   mcpUsageStorage?: McpUsageStorageService,
   quotaEnforcer?: QuotaEnforcer
 ) {
+  // Translate ManagementAuthError throws (from authenticate / requireAdmin) into
+  // correctly-shaped 401/403 responses. In Fastify v5, async hooks must throw
+  // rather than calling reply.send() to abort the hook chain.
+  fastify.setErrorHandler(async (error, _request, reply) => {
+    if (error instanceof ManagementAuthError) {
+      return reply.code(error.statusCode).send(error.authBody);
+    }
+    throw error;
+  });
+
   // Verify endpoint runs the authentication hook but has no further checks,
   // so the login page can call it with a candidate credential. Returns
   // principal info (role + key metadata for limited users) on success.

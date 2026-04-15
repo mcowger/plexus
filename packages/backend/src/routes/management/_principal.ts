@@ -4,6 +4,21 @@ import { logger } from '../../utils/logger';
 import { getConfig } from '../../config';
 
 /**
+ * Sentinel error thrown by authenticate/requireAdmin so that Fastify's error
+ * handler can send the correctly-shaped management auth response. In Fastify v5
+ * async hooks must throw (not call reply.send) to abort the hook chain.
+ */
+export class ManagementAuthError extends Error {
+  statusCode: number;
+  authBody: object;
+  constructor(statusCode: number, message: string, type: string) {
+    super(message);
+    this.statusCode = statusCode;
+    this.authBody = { error: { message, type, code: statusCode } };
+  }
+}
+
+/**
  * Authenticated identity for a management-API request.
  *
  * - admin   → full access (the ADMIN_KEY was presented)
@@ -100,12 +115,11 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
  * Fastify preHandler that authenticates a request and attaches the principal.
  * 401 if the credential is missing/invalid.
  */
-export async function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function authenticate(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   const principal = await resolvePrincipal(request);
   if (!principal) {
     logger.silly(`[ADMIN AUTH] Rejected request to ${request.url} - invalid or missing credential`);
-    reply.code(401).send({ error: { message: 'Unauthorized', type: 'auth_error', code: 401 } });
-    return;
+    throw new ManagementAuthError(401, 'Unauthorized', 'auth_error');
   }
   request.principal = principal;
   logger.silly(
@@ -119,20 +133,12 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
  * Fastify preHandler that requires the authenticated principal to be admin.
  * Must run AFTER `authenticate`. Returns 403 for limited users.
  */
-export async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function requireAdmin(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   if (!request.principal) {
-    reply.code(401).send({ error: { message: 'Unauthorized', type: 'auth_error', code: 401 } });
-    return;
+    throw new ManagementAuthError(401, 'Unauthorized', 'auth_error');
   }
   if (request.principal.role !== 'admin') {
-    reply.code(403).send({
-      error: {
-        message: 'Admin privileges required',
-        type: 'forbidden',
-        code: 403,
-      },
-    });
-    return;
+    throw new ManagementAuthError(403, 'Admin privileges required', 'forbidden');
   }
 }
 
