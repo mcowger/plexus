@@ -1,6 +1,9 @@
 # Stage 1: Build the application
 FROM oven/bun:1 AS builder
 
+# Install git (needed by the prepare script: git config core.hooksPath)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ARG APP_VERSION=dev
