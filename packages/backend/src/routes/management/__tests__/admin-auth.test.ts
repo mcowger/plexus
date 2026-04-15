@@ -87,7 +87,7 @@ describe('GET /v0/management/auth/verify', () => {
     await closeFastify(fastify);
   });
 
-  it('returns 200 with { ok: true } when the correct admin key is provided', async () => {
+  it('returns 200 with admin principal info when the correct admin key is provided', async () => {
     const res = await fastify.inject({
       method: 'GET',
       url: '/v0/management/auth/verify',
@@ -95,7 +95,29 @@ describe('GET /v0/management/auth/verify', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json() as unknown).toEqual({ ok: true });
+    const body = res.json() as { ok: boolean; role: string };
+    expect(body.ok).toBe(true);
+    expect(body.role).toBe('admin');
+  });
+
+  it('returns 200 with limited principal info when an api_keys secret is provided', async () => {
+    const res = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/auth/verify',
+      headers: { 'x-admin-key': 'sk-test-secret' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      ok: boolean;
+      role: string;
+      keyName: string;
+      allowedProviders: string[];
+      allowedModels: string[];
+    };
+    expect(body.ok).toBe(true);
+    expect(body.role).toBe('limited');
+    expect(body.keyName).toBe('test-key');
   });
 
   it('returns 401 when an incorrect admin key is provided', async () => {

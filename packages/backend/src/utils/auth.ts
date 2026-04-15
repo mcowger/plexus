@@ -1,6 +1,7 @@
 import { FastifyRequest } from 'fastify';
 import { getConfig } from '../config';
 import { logger } from './logger';
+import { enterRequestContext } from '../services/request-context';
 
 export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any> }>(
   request: FastifyRequest,
@@ -107,6 +108,9 @@ export function createAuthHook() {
           req.keyName = entry[0];
           req.attribution = attributionPart;
           req.keyConfig = entry[1];
+          // Seed the async-local request context so downstream code (notably
+          // DebugManager) can resolve the key name without explicit plumbing.
+          enterRequestContext({ keyName: entry[0] });
           return true;
         }
 
