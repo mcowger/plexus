@@ -30,4 +30,5 @@ export const quotaCheckerTypeEnum = pgEnum('quota_checker_type', [
   'antigravity',
   'novita',
   'ollama',
+  'neuralwatt',
 ]);

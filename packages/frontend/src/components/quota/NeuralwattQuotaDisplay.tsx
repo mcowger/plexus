@@ -30,10 +30,6 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
   const subscriptionWindow = windows.find((w) => w.windowType === 'subscription');
   const monthlyWindow = windows.find((w) => w.windowType === 'monthly');
 
-  const balance = subscriptionWindow?.remaining;
-  const total = subscriptionWindow?.limit;
-  const used = subscriptionWindow?.used;
-
   const statusColors: Record<QuotaStatus, string> = {
     ok: 'bg-success',
     warning: 'bg-warning',
@@ -49,12 +45,10 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
         {monthlyWindow && overallStatus !== 'ok' ? (
           <AlertTriangle
             size={18}
-            className={clsx(
-              overallStatus === 'warning' ? 'text-warning' : 'text-danger'
-            )}
+            className={clsx(overallStatus === 'warning' ? 'text-warning' : 'text-danger')}
           />
         ) : (
-          <Wallet size={18} className="text-info" />
+          <CheckCircle2 size={18} className="text-success" />
         )}
       </div>
     );
@@ -63,28 +57,26 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
   return (
     <div className="px-2 py-1 space-y-2">
       <div className="flex items-center gap-2 min-w-0">
-        <Wallet size={14} className="text-info" />
+        <Zap size={14} className="text-text" />
         <span className="text-xs font-semibold text-text whitespace-nowrap">Neuralwatt</span>
       </div>
-      {result.oauthAccountId && (
-        <div className="text-[10px] text-text-muted pl-5">Account: {result.oauthAccountId}</div>
-      )}
-      {balance !== undefined && (
+
+      {/* Balance section */}
+      {subscriptionWindow && subscriptionWindow.remaining !== undefined && (
         <div className="flex items-baseline gap-2">
+          <Wallet size={12} className="text-info" />
           <span className="text-xs font-semibold text-text-secondary">Credits</span>
-          <span className="text-xs font-semibold text-info ml-auto">{formatCost(balance)}</span>
+          <span className="text-xs font-semibold text-info ml-auto">
+            {formatCost(subscriptionWindow.remaining)}
+          </span>
         </div>
       )}
-      {total !== undefined && used !== undefined && (
-        <div className="text-[10px] text-text-muted pl-0">
-          {formatCost(used)} / {formatCost(total)} used
-        </div>
-      )}
+
+      {/* Monthly energy quota section */}
       {monthlyWindow && (
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Zap size={12} className="text-text-secondary" />
-            <span className="text-[11px] font-semibold text-text-secondary">Energy Quota</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold text-text-secondary">Energy Quota</span>
             {monthlyWindow.resetInSeconds !== undefined &&
               monthlyWindow.resetInSeconds !== null && (
                 <span className="text-[10px] text-text-muted ml-auto">
@@ -108,7 +100,7 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
               {Math.round(monthlyWindow.utilizationPercent)}%
             </div>
           </div>
-          {monthlyWindow.remaining !== undefined &&
+          {monthlyWindow.used !== undefined &&
             monthlyWindow.limit !== undefined &&
             monthlyWindow.unit === 'points' && (
               <div className="text-[10px] text-text-muted">

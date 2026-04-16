@@ -195,6 +195,8 @@ export const getTrackedWindowsForChecker = (category: string, windows: any[]): s
       return ['five_hour'].filter((t) => availableTypes.has(t));
     case 'ollama':
       return ['five_hour', 'weekly'].filter((t) => availableTypes.has(t));
+    case 'neuralwatt':
+      return ['monthly'].filter((t) => availableTypes.has(t));
     default:
       return Array.from(availableTypes)
         .filter((t) => t !== 'subscription')

@@ -241,8 +241,15 @@ export const Sidebar: React.FC = () => {
   };
 
   // Filter using the authoritative checkerCategory field from the backend.
+  // Balance checkers that also have rate-limit windows (e.g. neuralwatt has
+  // both a $ balance and a kWh quota) appear in both sections.
+  const BALANCE_CHECKERS_WITH_RATE_LIMIT = new Set(['neuralwatt']);
   const balanceQuotas = quotas.filter((quota) => quota.checkerCategory === 'balance');
-  const rateLimitQuotas = quotas.filter((quota) => quota.checkerCategory === 'rate-limit');
+  const rateLimitQuotas = quotas.filter(
+    (quota) =>
+      quota.checkerCategory === 'rate-limit' ||
+      BALANCE_CHECKERS_WITH_RATE_LIMIT.has(quota.checkerType || quota.checkerId)
+  );
 
   return (
     <aside

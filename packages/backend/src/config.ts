@@ -172,6 +172,10 @@ const ApertisQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const NeuralwattQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
@@ -316,6 +320,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: AntigravityQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('neuralwatt'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: NeuralwattQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('ollama'),
@@ -876,6 +887,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'antigravity',
   'novita',
   'ollama',
+  'neuralwatt',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];
