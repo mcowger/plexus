@@ -55,7 +55,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
           github_token: ${{ github.token }}
-          claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
+          claude_args: '--model ${{ vars.PLEXUS_MODEL }} --allowedTools mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)'
           settings: |
             {
               "permissions": {
