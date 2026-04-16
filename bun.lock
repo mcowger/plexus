@@ -40,7 +40,7 @@
         "eventsource-parser": "^3.0.6",
         "fastify": "^5.8.5",
         "parse-duration": "^2.1.6",
-        "pkce-challenge": "^5.0.1",
+        "pkce-challenge": "^6.0.0",
         "postgres": "^3.4.9",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",
@@ -1034,7 +1034,7 @@
 
     "pino-std-serializers": ["pino-std-serializers@7.1.0", "", {}, "sha512-BndPH67/JxGExRgiX1dX0w1FvZck5Wa4aal9198SrRhZjH3GxKQUKIBnYJTdj2HDN3UQAS06HlfcSbQj2OHmaw=="],
 
-    "pkce-challenge": ["pkce-challenge@5.0.1", "", {}, "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ=="],
+    "pkce-challenge": ["pkce-challenge@6.0.0", "", {}, "sha512-KrEAOa2aGlEyV+gN2jMXwSQhZ5gUR4WwivtPjSktYzh7srb70pYvVGV0uLfmoCx75fUQtqTairuoxayHLtvo9w=="],
 
     "plexus-backend": ["plexus-backend@workspace:packages/backend"],
 
