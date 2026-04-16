@@ -54,7 +54,7 @@ jobs:
           ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ vars.PLEXUS_MODEL }}
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ github.token }}
           claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
           settings: |
             {
