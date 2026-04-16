@@ -150,11 +150,19 @@ export async function registerGeminiRoute(
 
       logger.error('Error processing Gemini request', e);
       const statusCode = e.routingContext?.statusCode || 500;
+      const errorReason = e.routingContext?.code;
+      const status =
+        statusCode === 401
+          ? 'UNAUTHENTICATED'
+          : statusCode === 400
+            ? 'INVALID_ARGUMENT'
+            : 'INTERNAL';
       return reply.code(statusCode).send({
         error: {
           message: e.message,
           code: statusCode,
-          status: statusCode === 401 ? 'UNAUTHENTICATED' : 'INTERNAL',
+          status,
+          ...(errorReason && { reason: errorReason }),
         },
       });
     }

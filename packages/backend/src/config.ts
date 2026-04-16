@@ -490,6 +490,7 @@ export const ModelConfigSchema = z.object({
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
   use_image_fallthrough: z.boolean().default(false).optional(),
+  enforce_limits: z.boolean().default(false).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
   metadata: ModelMetadataSchema.optional(),

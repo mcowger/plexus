@@ -34,6 +34,7 @@ import {
   GripVertical,
   Save,
   Eye,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const Models = () => {
@@ -1438,6 +1439,35 @@ export const Models = () => {
                       onChange={(val) =>
                         setEditingAlias({ ...editingAlias, use_image_fallthrough: val })
                       }
+                      size="sm"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between py-1">
+                    <div>
+                      <span className="font-body text-[13px] text-text">Enforce Limits</span>
+                      <p className="font-body text-[11px] text-text-muted mt-0.5">
+                        Reject oversized prompts locally (400 context_length_exceeded) before
+                        dispatch. Uses a fast heuristic estimator with a 10% safety margin, and
+                        reserves the smaller of max_tokens and the model's max completion for the
+                        response. Requires a known context_length in metadata (override or catalog).
+                      </p>
+                      {editingAlias.enforce_limits &&
+                        !editingAlias.metadata?.overrides?.context_length &&
+                        !editingAlias.metadata?.overrides?.top_provider?.context_length && (
+                          <p
+                            className="font-body text-[11px] mt-1 flex items-center gap-1"
+                            style={{ color: 'var(--color-warning)' }}
+                          >
+                            <AlertTriangle size={12} />
+                            No context_length found in metadata — this toggle will have no effect
+                            until a metadata source with a known context_length is configured.
+                          </p>
+                        )}
+                    </div>
+                    <Switch
+                      checked={editingAlias.enforce_limits || false}
+                      onChange={(val) => setEditingAlias({ ...editingAlias, enforce_limits: val })}
                       size="sm"
                     />
                   </div>

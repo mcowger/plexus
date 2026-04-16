@@ -141,8 +141,20 @@ export async function registerChatRoute(
 
       logger.error('Error processing OpenAI request', e);
       const statusCode = e.routingContext?.statusCode || 500;
-      const errorType = statusCode === 401 ? 'authentication_error' : 'api_error';
-      return reply.code(statusCode).send({ error: { message: e.message, type: errorType } });
+      const errorType =
+        statusCode === 401
+          ? 'authentication_error'
+          : statusCode === 400
+            ? 'invalid_request_error'
+            : 'api_error';
+      const errorCode = e.routingContext?.code;
+      return reply.code(statusCode).send({
+        error: {
+          message: e.message,
+          type: errorType,
+          ...(errorCode && { code: errorCode }),
+        },
+      });
     }
   });
 }

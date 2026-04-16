@@ -140,10 +140,21 @@ export async function registerMessagesRoute(
 
       logger.error('Error processing Anthropic request', e);
       const statusCode = e.routingContext?.statusCode || 500;
-      const errorType = statusCode === 401 ? 'authentication_error' : 'api_error';
-      return reply
-        .code(statusCode)
-        .send({ type: 'error', error: { type: errorType, message: e.message } });
+      const errorType =
+        statusCode === 401
+          ? 'authentication_error'
+          : statusCode === 400
+            ? 'invalid_request_error'
+            : 'api_error';
+      const errorCode = e.routingContext?.code;
+      return reply.code(statusCode).send({
+        type: 'error',
+        error: {
+          type: errorType,
+          message: e.message,
+          ...(errorCode && { code: errorCode }),
+        },
+      });
     }
   });
 }

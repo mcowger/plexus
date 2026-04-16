@@ -610,6 +610,7 @@ export class ConfigRepository {
       useImageFallthrough: fromBool(config.use_image_fallthrough === true),
       // Model architecture override for inference energy calculation
       modelArchitecture: config.model_architecture ? toJson(config.model_architecture) : null,
+      enforceLimits: fromBool(config.enforce_limits === true),
       updatedAt: timestamp,
     };
 
@@ -712,6 +713,7 @@ export class ConfigRepository {
       targets,
       priority: row.priority ?? 'selector',
       use_image_fallthrough: toBool(row.useImageFallthrough),
+      enforce_limits: toBool(row.enforceLimits),
       ...(row.selector ? { selector: row.selector } : {}),
       ...(row.modelType ? { type: row.modelType } : {}),
       ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),

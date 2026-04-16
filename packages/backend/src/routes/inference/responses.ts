@@ -239,10 +239,12 @@ export async function registerResponsesRoute(
       logger.error('Error processing Responses API request', e);
 
       const statusCode = e.routingContext?.statusCode || 500;
+      const errorCode = e.routingContext?.code;
       return reply.code(statusCode).send({
         error: {
           message: e.message || 'Internal server error',
           type: statusCode >= 500 ? 'server_error' : 'invalid_request_error',
+          ...(errorCode && { code: errorCode }),
           ...(e.routingContext && {
             routing_context: {
               provider: e.routingContext.provider,
