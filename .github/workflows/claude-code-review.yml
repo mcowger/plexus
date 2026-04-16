@@ -14,6 +14,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      checks: write
 
     steps:
       - name: Get PR info from workflow run
@@ -30,6 +31,21 @@ jobs:
             core.setOutput('number', pr.number);
             core.setOutput('head_sha', context.payload.workflow_run.head_sha);
             core.setOutput('head_repo', context.payload.workflow_run.head_repository.full_name);
+
+      - name: Create in-progress check run on PR
+        id: check
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: check } = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Claude Code Review',
+              head_sha: '${{ steps.pr.outputs.head_sha }}',
+              status: 'in_progress',
+              details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            core.setOutput('check_id', check.id);
 
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -101,4 +117,18 @@ jobs:
             Be thorough but concise. Focus on actionable issues, not nitpicks.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
+
+      - name: Update check run result
+        if: always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const success = '${{ steps.claude-review.outcome }}' === 'success';
+            await github.rest.checks.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_run_id: ${{ steps.check.outputs.check_id }},
+              status: 'completed',
+              conclusion: success ? 'success' : 'failure',
+            });
 
