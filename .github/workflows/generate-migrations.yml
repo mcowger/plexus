@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'packages/backend/drizzle/schema/**/*.ts'
+  workflow_dispatch:
 
 concurrency:
   group: generate-migrations
