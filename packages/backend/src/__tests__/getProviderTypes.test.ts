@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { getProviderTypes, ProviderConfig } from '../config';
 
+// CI smoke test — verifies PR test workflow
+
 describe('getProviderTypes', () => {
   describe('string URL inference', () => {
     it('returns ["chat"] for OpenAI-compatible URLs', () => {
