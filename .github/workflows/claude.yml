@@ -29,9 +29,9 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
@@ -53,12 +53,31 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
           claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
+          allowed_tools: >
+            Bash(git push:*),
+            Bash(git status:*),
+            Bash(git diff:*),
+            Bash(git log:*),
+            Bash(git checkout:*),
+            Bash(git fetch:*),
+            Bash(git branch:*),
+            Bash(bun install:*),
+            Bash(bun run:*),
+            Bash(bun test:*),
+            Bash(npm run:*),
+            Bash(ls:*),
+            Bash(cat:*),
+            Bash(find:*),
+            Bash(grep:*),
+            Bash(head:*),
+            Bash(tail:*),
+            Bash(wc:*)
 
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
+          # Optional: Give a custom prompt to Claude. If this is not specifically, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
           # Optional: Add claude_args to customize behavior and configuration
