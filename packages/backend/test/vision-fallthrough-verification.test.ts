@@ -6,7 +6,7 @@ import { UnifiedMessage, UnifiedChatRequest, TextContent } from '../src/types/un
 describe('VisionDescriptorService Detailed Verification', () => {
   afterEach(() => {
     // Restore all spies to prevent polluting other tests
-    VisionDescriptorService.describeImage.mockRestore?.();
+    (VisionDescriptorService as any).describeImage.mockRestore?.();
   });
   test('injectDescriptions correctly replaces images with text', () => {
     const messages: UnifiedMessage[] = [

@@ -19,6 +19,7 @@ import multipart from '@fastify/multipart';
 import path from 'path';
 import indexHtmlPath from '../../frontend/dist/index.html' with { type: 'file' };
 import mainJsPath from '../../frontend/dist/main.js' with { type: 'file' };
+// @ts-expect-error — CSS import with type:'file' resolved at build time
 import mainCssPath from '../../frontend/dist/main.css' with { type: 'file' };
 import fs from 'fs';
 import yaml from 'yaml';
@@ -402,11 +403,14 @@ const mimeTypes: Record<string, string> = {
 // Map of known frontend assets to their embedded paths.
 // These are explicitly referenced here so Bun's bundler does not tree-shake
 // the `with { type: 'file' }` imports away during --compile.
-const frontendDistDir = path.dirname(indexHtmlPath);
+const frontendDistDir = path.dirname(indexHtmlPath as unknown as string);
+const indexHtmlStr = indexHtmlPath as unknown as string;
+const mainJsStr = mainJsPath as unknown as string;
+const mainCssStr = mainCssPath as unknown as string;
 const frontendAssetPaths: Record<string, string> = {
-  'index.html': indexHtmlPath,
-  'main.js': mainJsPath,
-  'main.css': mainCssPath,
+  'index.html': indexHtmlStr,
+  'main.js': mainJsStr,
+  'main.css': mainCssStr,
 };
 
 // For any other assets in the dist dir (favicons, images, etc.), fall back to
@@ -427,14 +431,14 @@ const serveAsset = async (reply: FastifyReply, filePath: string, ext: string) =>
     .send(Buffer.from(await Bun.file(filePath).arrayBuffer()));
 };
 
-fastify.get('/ui/', async (request, reply) => serveAsset(reply, indexHtmlPath, '.html'));
-fastify.get('/ui/index.html', async (request, reply) => serveAsset(reply, indexHtmlPath, '.html'));
+fastify.get('/ui/', async (request, reply) => serveAsset(reply, indexHtmlStr, '.html'));
+fastify.get('/ui/index.html', async (request, reply) => serveAsset(reply, indexHtmlStr, '.html'));
 fastify.get('/ui/:filename', async (request, reply) => {
   const { filename } = request.params as { filename: string };
   const ext = path.extname(filename);
   // SPA routes like /ui/logs should resolve to the frontend shell.
   if (!ext) {
-    return serveAsset(reply, indexHtmlPath, '.html');
+    return serveAsset(reply, indexHtmlStr, '.html');
   }
   // Known asset with an explicit embedded path
   const knownPath = frontendAssetPaths[filename];
@@ -470,7 +474,7 @@ fastify.setNotFoundHandler(async (request, reply) => {
   if (request.url.startsWith('/v1') || request.url.startsWith('/v0')) {
     reply.code(404).send({ error: 'Not Found' });
   } else if (request.url.startsWith('/ui/') || request.url === '/ui') {
-    return serveAsset(reply, indexHtmlPath, '.html');
+    return serveAsset(reply, indexHtmlStr, '.html');
   } else {
     reply.code(404).send({ error: 'Not Found' });
   }

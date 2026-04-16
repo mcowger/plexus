@@ -464,20 +464,7 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                       domain={[0, 100]}
                     />
                     <Tooltip
-                      content={({
-                        active,
-                        payload,
-                        label,
-                      }: {
-                        active?: boolean;
-                        payload?: ReadonlyArray<{
-                          dataKey: string;
-                          value: number;
-                          color: string;
-                          payload: Record<string, unknown>;
-                        }>;
-                        label?: string | number;
-                      }) => {
+                      content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
                           return (
                             <div className="bg-bg-card border border-border rounded-lg p-3 shadow-lg min-w-[180px]">
@@ -486,7 +473,7 @@ export const QuotaHistoryModal: React.FC<QuotaHistoryModalProps> = ({
                                 {payload
                                   .filter((p) => p.value !== null && p.value !== undefined)
                                   .map((p) => {
-                                    const windowType = p.dataKey;
+                                    const windowType = String(p.dataKey ?? '');
                                     const displayName = formatWindowType(windowType);
                                     return (
                                       <div key={windowType} className="flex items-center gap-2">

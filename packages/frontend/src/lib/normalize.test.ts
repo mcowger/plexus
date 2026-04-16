@@ -1,3 +1,4 @@
+// @ts-expect-error bun:test available at runtime but not in frontend tsconfig
 import { describe, expect, test } from 'bun:test';
 
 import { toBoolean, toEpochMs, toIsoString } from './normalize';

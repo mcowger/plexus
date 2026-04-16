@@ -88,7 +88,7 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
       if (!result.success) {
         return reply.code(400).send({
           error: { message: 'Validation failed', type: 'invalid_request_error' },
-          details: result.error.errors,
+          details: result.error.issues,
         });
       }
 
@@ -128,7 +128,7 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
         if (!result.success) {
           return reply.code(400).send({
             error: { message: 'Validation failed', type: 'invalid_request_error' },
-            details: result.error.errors,
+            details: result.error.issues,
           });
         }
 

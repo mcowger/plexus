@@ -50,7 +50,7 @@ export async function registerOAuthRoutes(
   fastify.post('/v0/management/oauth/sessions', async (request, reply) => {
     const parsed = startSessionSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
     }
 
     try {
@@ -69,7 +69,7 @@ export async function registerOAuthRoutes(
   fastify.delete('/v0/management/oauth/credentials', async (request, reply) => {
     const parsed = deleteCredentialsSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
     }
 
     const authManager = OAuthAuthManager.getInstance();
@@ -97,7 +97,7 @@ export async function registerOAuthRoutes(
     if (!parsed.success) {
       return reply
         .code(400)
-        .send({ error: 'Invalid query parameters', details: parsed.error.errors });
+        .send({ error: 'Invalid query parameters', details: parsed.error.issues });
     }
 
     const authManager = OAuthAuthManager.getInstance();
@@ -122,7 +122,7 @@ export async function registerOAuthRoutes(
     const sessionId = (request.params as { id: string }).id;
     const parsed = inputSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
     }
 
     try {
@@ -139,7 +139,7 @@ export async function registerOAuthRoutes(
     const sessionId = (request.params as { id: string }).id;
     const parsed = inputSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
     }
 
     try {
@@ -169,7 +169,7 @@ export async function registerOAuthRoutes(
     if (!parsed.success) {
       return reply
         .code(400)
-        .send({ error: 'Invalid query parameters', details: parsed.error.errors });
+        .send({ error: 'Invalid query parameters', details: parsed.error.issues });
     }
 
     try {

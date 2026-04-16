@@ -118,7 +118,7 @@ export async function registerSelfRoutes(fastify: FastifyInstance, quotaEnforcer
   fastify.patch('/v0/management/self/comment', async (request, reply) => {
     const parsed = commentSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid body', details: parsed.error.issues });
     }
 
     const target = resolveTarget(request);
@@ -153,7 +153,7 @@ export async function registerSelfRoutes(fastify: FastifyInstance, quotaEnforcer
   fastify.post('/v0/management/self/debug/toggle', async (request, reply) => {
     const parsed = toggleSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid body', details: parsed.error.issues });
     }
 
     const target = resolveTarget(request);

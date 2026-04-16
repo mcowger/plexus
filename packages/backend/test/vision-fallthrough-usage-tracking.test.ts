@@ -44,7 +44,7 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
 
     // Intercept VisionDescriptorService.process so we can check what it was called with
     // and tag the request the same way the real implementation does
-    registerSpy(VisionDescriptorService, 'process').mockImplementation(async (req) => {
+    registerSpy(VisionDescriptorService, 'process').mockImplementation(async (req: any) => {
       return { ...req, messages: [{ role: 'user', content: 'described' }] } as any;
     });
 
@@ -157,12 +157,12 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
 
 describe('VisionDescriptorService: child request usage logging', () => {
   beforeEach(() => {
-    VisionDescriptorService.process.mockRestore?.();
+    (VisionDescriptorService.process as any).mockRestore?.();
   });
 
   afterEach(() => {
-    VisionDescriptorService.process.mockRestore?.();
-    Dispatcher.prototype.dispatch.mockRestore?.();
+    (VisionDescriptorService.process as any).mockRestore?.();
+    (Dispatcher.prototype.dispatch as any).mockRestore?.();
   });
 
   const imageUrl =

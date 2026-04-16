@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events';
 import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord } from './debug-manager';
 import { getCurrentKeyName } from './request-context';
-import { estimateKwhUsed, getGpuParams } from './inference-energy';
+import { estimateKwhUsed } from './inference-energy';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { ModelArchitecture, GpuParams } from '@plexus/shared';
 

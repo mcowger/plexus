@@ -1,5 +1,22 @@
 // biome-ignore lint/style/noRestrictedImports: internal implementation of registerSpy
-import { spyOn, afterEach, type SpyInstance, type MockInstance } from 'bun:test';
+import { spyOn, afterEach, mock } from 'bun:test';
+
+// Minimal type definitions for spy instances used in this module
+// (bun:test exports these as interfaces but they aren't resolvable from our tsconfig)
+interface SpyInstance<T extends (...args: any[]) => any = (...args: any[]) => any, _R = any> {
+  mockRestore(): void;
+  mockReset(): void;
+  mockClear(): void;
+  mockImplementation(fn: T): SpyInstance<T, _R>;
+  mockReturnValue(value: ReturnType<T>): SpyInstance<T, _R>;
+  mockResolvedValue(value: Awaited<ReturnType<T>>): SpyInstance<T, _R>;
+  mockRejectedValue(value: unknown): SpyInstance<T, _R>;
+}
+
+type MockInstance<
+  T extends (...args: any[]) => any = (...args: any[]) => any,
+  _R = any,
+> = SpyInstance<T, _R>;
 
 /**
  * Global Spy Registry
@@ -36,7 +53,7 @@ const trackedSpies: TrackedSpy[] = [];
 export function registerSpy<T extends object, K extends keyof T>(
   target: T,
   methodName: K
-): SpyInstance<T[K], T[K]>;
+): SpyInstance<any, any>;
 export function registerSpy(target: any, methodName: string): SpyInstance<any, any>;
 export function registerSpy(target: any, methodName: string): SpyInstance<any, any> {
   const spy = spyOn(target, methodName);
@@ -89,9 +106,9 @@ afterEach(() => {
 export function createTrackedMock<T extends (...args: any[]) => any>(
   implementation: T
 ): MockInstance<T> {
-  const mock = vi.fn(implementation) as MockInstance<T>;
-  return mock;
+  const m = mock(implementation) as unknown as MockInstance<T>;
+  return m;
 }
 
 // Re-export common test utilities for convenience
-export { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+export { describe, test, expect, beforeEach, afterEach } from 'bun:test';
