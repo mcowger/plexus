@@ -26,7 +26,7 @@
     "eventsource-parser": "^3.0.6",
     "fastify": "^5.8.5",
     "parse-duration": "^2.1.6",
-    "pkce-challenge": "^5.0.1",
+    "pkce-challenge": "^6.0.0",
     "postgres": "^3.4.9",
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
