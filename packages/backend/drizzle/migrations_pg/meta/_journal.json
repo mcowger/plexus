@@ -208,8 +208,8 @@
     {
       "idx": 29,
       "version": "7",
-      "when": 1776037753706,
-      "tag": "0029_little_the_santerians",
+      "when": 1776026985342,
+      "tag": "0029_flat_black_cat",
       "breakpoints": true
     },
     {
@@ -229,8 +229,22 @@
     {
       "idx": 32,
       "version": "7",
-      "when": 1776215235737,
-      "tag": "0032_silly_dexter_bennett",
+      "when": 1776284939165,
+      "tag": "0032_fast_lethal_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1776289140510,
+      "tag": "0033_colossal_exiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1776300729180,
+      "tag": "0034_famous_vulture",
       "breakpoints": true
     }
   ]

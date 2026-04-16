@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "63bc0025-dd29-4a5a-9f4b-2bde8ded8107",
+  "id": "29e95ea2-8d40-4c6a-a0ec-b4e884976d55",
   "prevId": "24412ede-416b-460f-b830-7a8fab801b2c",
   "tables": {
     "request_usage": {
@@ -341,13 +341,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "provider_reported_cost": {
-          "name": "provider_reported_cost",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -376,6 +369,14 @@
           "name": "idx_request_usage_request_id",
           "columns": [
             "request_id"
+          ],
+          "isUnique": false
+        },
+        "idx_request_usage_api_key": {
+          "name": "idx_request_usage_api_key",
+          "columns": [
+            "api_key",
+            "start_time"
           ],
           "isUnique": false
         }
@@ -471,6 +472,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "api_key": {
+          "name": "api_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "raw_request": {
           "name": "raw_request",
           "type": "text",
@@ -535,6 +543,13 @@
             "created_at"
           ],
           "isUnique": false
+        },
+        "idx_debug_logs_api_key": {
+          "name": "idx_debug_logs_api_key",
+          "columns": [
+            "api_key"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -564,6 +579,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "api_key": {
+          "name": "api_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "error_message": {
@@ -607,6 +629,13 @@
           "name": "idx_errors_date",
           "columns": [
             "date"
+          ],
+          "isUnique": false
+        },
+        "idx_inference_errors_api_key": {
+          "name": "idx_inference_errors_api_key",
+          "columns": [
+            "api_key"
           ],
           "isUnique": false
         }
@@ -1743,41 +1772,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "gpu_profile": {
-          "name": "gpu_profile",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "gpu_ram_gb": {
-          "name": "gpu_ram_gb",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "gpu_bandwidth_tb_s": {
-          "name": "gpu_bandwidth_tb_s",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "gpu_flops_tflop": {
-          "name": "gpu_flops_tflop",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "gpu_power_draw_watts": {
-          "name": "gpu_power_draw_watts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1992,13 +1986,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
-        },
-        "model_architecture": {
-          "name": "model_architecture",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",

@@ -1,6 +1,6 @@
 {
-  "id": "8cc6f615-7b70-4151-81b7-ff1233166e94",
-  "prevId": "c08500c3-dce2-47e8-a7dc-e21b05a5b384",
+  "id": "802e3599-e72b-4de8-ad60-d5a8fe51e9c4",
+  "prevId": "7129653d-e547-4e89-bfb0-049a2ad1f0b9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -292,6 +292,12 @@
         },
         "kwh_used": {
           "name": "kwh_used",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_reported_cost": {
+          "name": "provider_reported_cost",
           "type": "real",
           "primaryKey": false,
           "notNull": false
@@ -1870,6 +1876,36 @@
           "primaryKey": false,
           "notNull": false
         },
+        "gpu_profile": {
+          "name": "gpu_profile",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_ram_gb": {
+          "name": "gpu_ram_gb",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_bandwidth_tb_s": {
+          "name": "gpu_bandwidth_tb_s",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_flops_tflop": {
+          "name": "gpu_flops_tflop",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gpu_power_draw_watts": {
+          "name": "gpu_power_draw_watts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "bigint",
@@ -2084,6 +2120,12 @@
           "notNull": true,
           "default": false
         },
+        "model_architecture": {
+          "name": "model_architecture",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "bigint",
@@ -2181,6 +2223,137 @@
             "alias_id",
             "provider_slug",
             "model_name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.alias_metadata_overrides": {
+      "name": "alias_metadata_overrides",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "alias_id": {
+          "name": "alias_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context_length": {
+          "name": "context_length",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pricing_prompt": {
+          "name": "pricing_prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pricing_completion": {
+          "name": "pricing_completion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pricing_input_cache_read": {
+          "name": "pricing_input_cache_read",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pricing_input_cache_write": {
+          "name": "pricing_input_cache_write",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "architecture_input_modalities": {
+          "name": "architecture_input_modalities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "architecture_output_modalities": {
+          "name": "architecture_output_modalities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "architecture_tokenizer": {
+          "name": "architecture_tokenizer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supported_parameters": {
+          "name": "supported_parameters",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_provider_context_length": {
+          "name": "top_provider_context_length",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_provider_max_completion_tokens": {
+          "name": "top_provider_max_completion_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "alias_metadata_overrides_alias_id_model_aliases_id_fk": {
+          "name": "alias_metadata_overrides_alias_id_model_aliases_id_fk",
+          "tableFrom": "alias_metadata_overrides",
+          "tableTo": "model_aliases",
+          "columnsFrom": [
+            "alias_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_alias_metadata_overrides": {
+          "name": "uq_alias_metadata_overrides",
+          "nullsNotDistinct": false,
+          "columns": [
+            "alias_id"
           ]
         }
       },
@@ -2586,7 +2759,8 @@
       "values": [
         "openrouter",
         "models.dev",
-        "catwalk"
+        "catwalk",
+        "custom"
       ]
     },
     "public.selector_strategy": {
