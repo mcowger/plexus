@@ -98,7 +98,7 @@ jobs:
 
       - name: Gather PR and commit info between tags
         id: pr_info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prevTag = '${{ steps.prev_tag.outputs.tag }}';
@@ -268,7 +268,7 @@ jobs:
 
       - name: Parse AI config from secret
         id: ai_config
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           AI_DATA: ${{ secrets.AI_DATA }}
         with:
@@ -295,7 +295,7 @@ jobs:
       - name: Extract release notes text
         id: extract_notes
         if: steps.release_notes.outputs.conclusion == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           result-encoding: string
           script: |
