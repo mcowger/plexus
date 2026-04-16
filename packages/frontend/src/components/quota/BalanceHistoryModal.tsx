@@ -327,18 +327,7 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
                       domain={['auto', 'auto']}
                     />
                     <Tooltip
-                      content={({
-                        active,
-                        payload,
-                        label,
-                      }: {
-                        active?: boolean;
-                        payload?: ReadonlyArray<{
-                          value: number;
-                          payload: Record<string, unknown>;
-                        }>;
-                        label?: string | number;
-                      }) => {
+                      content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
                           const balance = payload[0]?.value;
                           return (

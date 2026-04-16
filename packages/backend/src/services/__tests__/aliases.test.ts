@@ -99,7 +99,7 @@ describe('Router Direct Provider/Model Routing', () => {
     expect(result.canonicalModel).toBe('direct/stima/gemini-2.5-flash');
     expect(result.config).toBeDefined();
     expect(result.modelConfig).toBeDefined();
-    expect(result.modelConfig.pricing.input).toBe(0.5);
+    expect(result.modelConfig!.pricing).toMatchObject({ input: 0.5 });
   });
 
   test('resolves direct routing without model config', async () => {

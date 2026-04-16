@@ -1078,11 +1078,12 @@ export class Dispatcher {
       rawBaseUrl = route.config.api_base_url;
     } else {
       // It's a record/map
+      const urlMap = route.config.api_base_url;
       const typeKey = targetApiType.toLowerCase();
       // Check exact match first, then fallback to just looking for keys that might match?
       // Actually the config keys should probably match the api types (chat, messages, etc)
-      const specificUrl = route.config.api_base_url[typeKey];
-      const defaultUrl = route.config.api_base_url['default'];
+      const specificUrl = urlMap[typeKey];
+      const defaultUrl = urlMap['default'];
 
       if (specificUrl) {
         rawBaseUrl = specificUrl;
@@ -1093,10 +1094,10 @@ export class Dispatcher {
       } else {
         // If we can't find a specific URL for this type, and no default, fall back to the first one?
         // Or throw error.
-        const firstKey = Object.keys(route.config.api_base_url)[0];
+        const firstKey = Object.keys(urlMap)[0];
 
         if (firstKey) {
-          const firstUrl = route.config.api_base_url[firstKey];
+          const firstUrl = urlMap[firstKey];
           if (firstUrl) {
             rawBaseUrl = firstUrl;
             logger.warn(

@@ -105,7 +105,7 @@ export async function registerProviderRoutes(fastify: FastifyInstance) {
           message: 'Invalid request body',
           type: 'validation_error',
           code: 400,
-          details: parsed.error.errors,
+          details: parsed.error.issues,
         },
       });
     }

@@ -331,7 +331,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
             ? secondaryWindow
             : primaryWindow;
         const primaryPct = Math.round(displayWindow.utilizationPercent || 0);
-        const secondaryWindows = [];
+        const secondaryWindows: typeof trackedWindows = [];
 
         // All providers: name on row 1, bar(s) on row 2
         return (

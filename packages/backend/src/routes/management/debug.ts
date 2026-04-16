@@ -50,7 +50,7 @@ export async function registerDebugRoutes(
     }
     const parsed = patchDebugSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.errors });
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
     }
     const debugManager = DebugManager.getInstance();
 

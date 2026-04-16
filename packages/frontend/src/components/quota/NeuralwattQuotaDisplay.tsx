@@ -102,6 +102,7 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
           </div>
           {monthlyWindow.used !== undefined &&
             monthlyWindow.limit !== undefined &&
+            monthlyWindow.remaining !== undefined &&
             monthlyWindow.unit === 'points' && (
               <div className="text-[10px] text-text-muted">
                 {formatPoints(monthlyWindow.remaining)} / {formatPoints(monthlyWindow.limit)} kWh

@@ -6,7 +6,7 @@ import { setConfigForTesting } from '../src/config';
 
 describe('Vision Fallthrough Full Logic', () => {
   afterEach(() => {
-    VisionDescriptorService.process.mockRestore?.();
+    (VisionDescriptorService.process as any).mockRestore?.();
   });
 
   test('triggers for MiniMax-M2.5 with image payload', async () => {
@@ -35,7 +35,7 @@ describe('Vision Fallthrough Full Logic', () => {
     setConfigForTesting(mockConfig as any);
 
     // Track if process was called
-    registerSpy(VisionDescriptorService, 'process').mockImplementation(async (req) => {
+    registerSpy(VisionDescriptorService, 'process').mockImplementation(async (req: any) => {
       return {
         ...req,
         messages: [{ role: 'user', content: 'Description' }],

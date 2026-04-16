@@ -72,7 +72,11 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, isCollapsed })
 };
 
 export const Sidebar: React.FC = () => {
-  const appVersion = process.env.APP_VERSION || 'dev';
+  // process.env.APP_VERSION is replaced at build time by the bundler
+  // biome-ignore lint/security/noGlobalAssign: build-time constant injected by bundler
+  const appVersion: string =
+    // @ts-expect-error — replaced at build time by build.ts
+    process.env.APP_VERSION || 'dev';
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 

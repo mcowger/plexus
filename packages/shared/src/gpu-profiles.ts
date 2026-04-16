@@ -1,5 +1,5 @@
-import type { GpuParams, GpuProfileOption, ModelArchitecture } from './types';
-import { DTYPE_SIZES, DEFAULT_MODEL } from './model-params';
+import type { GpuParams, GpuProfileOption } from './types';
+// DTYPE_SIZES and DEFAULT_MODEL are re-exported directly from model-params below
 
 // ─── GPU Presets ──────────────────────────
 // GPU specifications based on official NVIDIA specs

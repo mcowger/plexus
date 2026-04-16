@@ -47,7 +47,7 @@ describe('Vision Fallthrough E2E', () => {
 
     // 2. Mock VisionDescriptorService.process to return a modified request
     const processSpy = registerSpy(VisionDescriptorService, 'process').mockImplementation(
-      async (req) => {
+      async (req: any) => {
         return {
           ...req,
           messages: [

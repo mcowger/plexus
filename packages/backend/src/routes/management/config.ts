@@ -135,7 +135,7 @@ export async function registerConfigRoutes(
     const slug = (request.params as { '*': string })['*'];
     const result = ProviderConfigSchema.safeParse(request.body);
     if (!result.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
+      return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
     try {
       await configService.saveProvider(slug, result.data);
@@ -163,7 +163,7 @@ export async function registerConfigRoutes(
       const merged = { ...existing, ...body };
       const result = ProviderConfigSchema.safeParse(merged);
       if (!result.success) {
-        return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
+        return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
       }
       await configService.saveProvider(slug, result.data);
       logger.info(`Provider '${slug}' updated via API (PATCH)`);
@@ -207,7 +207,7 @@ export async function registerConfigRoutes(
     const slug = (request.params as { '*': string })['*'];
     const result = ModelConfigSchema.safeParse(request.body);
     if (!result.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
+      return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
     try {
       await configService.saveAlias(slug, result.data);
@@ -243,7 +243,7 @@ export async function registerConfigRoutes(
       const merged = { ...existing, ...body };
       const result = ModelConfigSchema.safeParse(merged);
       if (!result.success) {
-        return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
+        return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
       }
       await configService.saveAlias(slug, result.data);
 
@@ -303,7 +303,7 @@ export async function registerConfigRoutes(
     const { name } = request.params as { name: string };
     const result = KeyConfigSchema.safeParse(request.body);
     if (!result.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
+      return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
     try {
       await configService.saveKey(name, result.data);
@@ -405,7 +405,7 @@ export async function registerConfigRoutes(
 
     const result = McpServerConfigSchema.safeParse(request.body);
     if (!result.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
+      return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
 
     try {

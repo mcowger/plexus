@@ -70,7 +70,7 @@ const ModelProviderConfigSchema = z.object({
   }),
   access_via: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
-  extraBody: z.record(z.any()).optional(),
+  extraBody: z.record(z.string(), z.any()).optional(),
 });
 
 const OAuthProviderSchema = z.enum([
@@ -344,7 +344,7 @@ export const ProviderConfigSchema = z
       z.string().refine((value) => isValidUrlOrOAuth(value), {
         message: 'api_base_url must be a valid URL or oauth://',
       }),
-      z.record(z.string()),
+      z.record(z.string(), z.string()),
     ]),
     api_key: z.string().optional(),
     oauth_provider: OAuthProviderSchema.optional(),
@@ -355,8 +355,8 @@ export const ProviderConfigSchema = z
     models: z
       .union([z.array(z.string()), z.record(z.string(), ModelProviderConfigSchema)])
       .optional(),
-    headers: z.record(z.string()).optional(),
-    extraBody: z.record(z.any()).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    extraBody: z.record(z.string(), z.any()).optional(),
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
@@ -541,13 +541,13 @@ const QuotaConfigSchema = z.object({
   provider: z.string(),
   enabled: z.boolean().default(true),
   intervalMinutes: z.number().min(1).default(30),
-  options: z.record(z.any()).default({}),
+  options: z.record(z.string(), z.any()).default({}),
 });
 
 export const McpServerConfigSchema = z.object({
   upstream_url: z.string().url(),
   enabled: z.boolean().default(true),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 const CooldownPolicySchema = z.object({
