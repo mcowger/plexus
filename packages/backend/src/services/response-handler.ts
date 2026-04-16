@@ -13,6 +13,8 @@ import { estimateKwhUsed } from './inference-energy';
 import { applyProviderReportedCost } from '../utils/provider-cost';
 import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 import type { GpuParams } from '@plexus/shared';
+import { QuotaEnforcer } from '../services/quota/quota-enforcer';
+import { recordQuotaUsage } from '../services/quota/quota-middleware';
 /**
  * handleResponse
  *
@@ -32,7 +34,9 @@ export async function handleResponse(
   startTime: number,
   apiType: 'chat' | 'messages' | 'gemini' | 'responses',
   shouldEstimateTokens: boolean = false,
-  originalRequest?: any
+  originalRequest?: any,
+  quotaEnforcer?: QuotaEnforcer,
+  keyName?: string
 ) {
   // Populate usage record with metadata from the dispatcher's selection
   usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
@@ -166,7 +170,9 @@ export async function handleResponse(
       apiType,
       originalRequest,
       unifiedResponse.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS,
-      unifiedResponse.plexus?.modelParams ?? DEFAULT_MODEL
+      unifiedResponse.plexus?.modelParams ?? DEFAULT_MODEL,
+      quotaEnforcer,
+      keyName
     );
 
     // Convert Web Stream to Node Stream for piping
@@ -211,7 +217,16 @@ export async function handleResponse(
     DebugManager.getInstance().flush(usageRecord.requestId!);
 
     // Record the usage.
-    finalizeUsage(usageRecord, unifiedResponse, usageStorage, startTime, pricing, providerDiscount);
+    finalizeUsage(
+      usageRecord,
+      unifiedResponse,
+      usageStorage,
+      startTime,
+      pricing,
+      providerDiscount,
+      quotaEnforcer,
+      keyName
+    );
 
     logger.debug(`Outgoing ${apiType} Response`, responseBody);
     return reply.send(responseBody);
@@ -230,7 +245,9 @@ async function finalizeUsage(
   usageStorage: UsageStorageService,
   startTime: number,
   pricing: any,
-  providerDiscount: any
+  providerDiscount: any,
+  quotaEnforcer?: QuotaEnforcer,
+  keyName?: string
 ) {
   // Capture token usage if available in the response
   if (unifiedResponse.usage) {
@@ -288,6 +305,22 @@ async function finalizeUsage(
       outputTokens > 0 ? outputTokens : null,
       usageRecord.durationMs,
       usageRecord.requestId!
+    );
+  }
+
+  // Record quota usage after costs are calculated
+  if (quotaEnforcer && keyName) {
+    await recordQuotaUsage(
+      keyName,
+      {
+        tokensInput: usageRecord.tokensInput,
+        tokensOutput: usageRecord.tokensOutput,
+        tokensCached: usageRecord.tokensCached,
+        tokensCacheWrite: usageRecord.tokensCacheWrite,
+        tokensReasoning: usageRecord.tokensReasoning,
+        costTotal: usageRecord.costTotal,
+      },
+      quotaEnforcer
     );
   }
 }
