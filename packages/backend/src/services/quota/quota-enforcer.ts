@@ -124,7 +124,7 @@ export class QuotaEnforcer {
       if (storedQuotaName !== quotaName) {
         logger.info(
           `[QuotaEnforcer] Quota name changed for ${keyName} from '${storedQuotaName}' to '${quotaName}'. ` +
-            `Resetting usage.`
+            `Resetting usage — persisting to DB.`
         );
         currentUsage = 0;
         lastUpdatedDate = nowDate;
@@ -146,11 +146,22 @@ export class QuotaEnforcer {
             windowStartDate = new Date(alignedStart);
           }
         }
+
+        // Persist the reset to DB
+        await this.db
+          .update(schema.quotaState)
+          .set({
+            quotaName,
+            currentUsage: 0,
+            windowStart: toDbTimestampMs(windowStartDate, this.dialect),
+            lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
+          })
+          .where(eq(schema.quotaState.keyName, keyName));
         // Check if quota definition has changed (e.g., requests -> tokens)
       } else if (storedLimitType !== quotaDef.limitType) {
         logger.info(
           `[QuotaEnforcer] Quota ${quotaName} limitType changed from ${storedLimitType} to ${quotaDef.limitType}. ` +
-            `Resetting usage for ${keyName}.`
+            `Resetting usage for ${keyName} — persisting to DB.`
         );
         currentUsage = 0;
         lastUpdatedDate = nowDate;
@@ -164,6 +175,17 @@ export class QuotaEnforcer {
         ) {
           windowStartDate = new Date(this.getWindowStart(quotaDef.type));
         }
+
+        // Persist the reset to DB
+        await this.db
+          .update(schema.quotaState)
+          .set({
+            limitType: quotaDef.limitType,
+            currentUsage: 0,
+            windowStart: toDbTimestampMs(windowStartDate, this.dialect),
+            lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
+          })
+          .where(eq(schema.quotaState.keyName, keyName));
       } else {
         // Quota definition unchanged, proceed normally
         currentUsage = state!.currentUsage;
@@ -181,11 +203,23 @@ export class QuotaEnforcer {
             `[QuotaEnforcer] checkQuota calendar check for ${keyName}: windowStartFromDB=${windowStartDate?.getTime()}, expectedWindowStart=${expectedWindowStart}, match=${windowStartDate?.getTime() === expectedWindowStart}`
           );
           if (!windowStartDate || windowStartDate.getTime() !== expectedWindowStart) {
-            // Window has reset
-            logger.debug(`[QuotaEnforcer] Calendar quota ${quotaName} for ${keyName} reset`);
+            // Window has reset — persist the reset to the DB so recordUsage
+            // doesn't keep accumulating on top of stale values
+            logger.info(
+              `[QuotaEnforcer] Calendar quota ${quotaName} for ${keyName} reset — persisting to DB`
+            );
             currentUsage = 0;
             windowStartDate = new Date(expectedWindowStart);
             lastUpdatedDate = nowDate;
+
+            await this.db
+              .update(schema.quotaState)
+              .set({
+                currentUsage: 0,
+                windowStart: toDbTimestampMs(windowStartDate, this.dialect)!,
+                lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
+              })
+              .where(eq(schema.quotaState.keyName, keyName));
           }
         } else if (quotaDef.type === 'rolling') {
           // Calculate leak for rolling quotas
@@ -206,15 +240,23 @@ export class QuotaEnforcer {
             // Check if the rolling window has expired
             // For cost, we track when the spending window started via windowStartDate
             if (!windowStartDate || elapsedMs >= durationMs) {
-              // Window expired or not set - reset
-              // Align window start to period boundary for predictable reset times
+              // Window expired or not set - reset and persist to DB
               const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
-              logger.debug(
-                `[QuotaEnforcer] Rolling cost quota ${quotaName} for ${keyName} reset (window expired), aligned to ${new Date(alignedStart).toISOString()}`
+              logger.info(
+                `[QuotaEnforcer] Rolling cost quota ${quotaName} for ${keyName} reset (window expired), aligned to ${new Date(alignedStart).toISOString()} — persisting to DB`
               );
               currentUsage = 0;
               windowStartDate = new Date(alignedStart);
               lastUpdatedDate = nowDate;
+
+              await this.db
+                .update(schema.quotaState)
+                .set({
+                  currentUsage: 0,
+                  windowStart: toDbTimestampMs(windowStartDate, this.dialect)!,
+                  lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
+                })
+                .where(eq(schema.quotaState.keyName, keyName));
             }
             // Otherwise keep accumulating - no leak for cost
           } else {
@@ -449,6 +491,18 @@ export class QuotaEnforcer {
           // Window expired or not set - set new window start aligned to period
           const alignedStart = durationMs ? this.alignToPeriodStart(nowMs, durationMs) : nowMs;
           updateValues.windowStart = toDbTimestampMs(new Date(alignedStart), this.dialect);
+        }
+      }
+
+      // For calendar quotas, update windowStart to current period if stale
+      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly' || quotaDef.type === 'monthly') {
+        const expectedWindowStart = this.getWindowStart(quotaDef.type);
+        const currentWindowStart = this.fromDbTimestamp(state.windowStart);
+        if (!currentWindowStart || currentWindowStart.getTime() !== expectedWindowStart) {
+          // Window has rolled over since last update
+          updateValues.windowStart = toDbTimestampMs(new Date(expectedWindowStart), this.dialect)!;
+          // Reset usage to just this request since the old window is done
+          updateValues.currentUsage = usageValue;
         }
       }
 
