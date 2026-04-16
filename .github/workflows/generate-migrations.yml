@@ -73,7 +73,7 @@ jobs:
       actions: write
     steps:
       - name: Dispatch dev-release workflow
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.actions.createWorkflowDispatch({
