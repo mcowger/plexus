@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^22.19.17",
+    "@types/node": "^25.6.0",
     "@types/winston": "^2.4.4",
     "drizzle-kit": "^0.31.10",
     "form-data": "^4.0.5"
