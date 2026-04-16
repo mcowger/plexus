@@ -1,4 +1,5 @@
 name: PR Tests
+run-name: "Tests: ${{ github.event.pull_request.title }}"
 
 on:
   pull_request_target:
