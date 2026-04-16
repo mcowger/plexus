@@ -503,7 +503,6 @@ export interface UsageSummaryResponse {
     totalKwhUsed: number;
     avgDurationMs: number;
     totalDurationMs: number;
-    totalActiveMs: number;
   };
   today: TodayMetrics;
 }
@@ -1202,8 +1201,8 @@ export const api = {
   },
 
   /**
-   * Fetch pre-aggregated energy stats (totalKwhUsed, totalDurationMs, totalActiveMs) from the backend.
-   * Uses the same /summary endpoint but returns only the stats object,
+   * Fetch pre-aggregated energy stats from the backend.
+   * Uses the same /summary endpoint but returns only totalKwhUsed,
    * avoiding the need to fetch 1000 individual records for energy calculations.
    */
   getEnergySummary: async (
@@ -1211,14 +1210,12 @@ export const api = {
     cache = true,
     startDate?: string,
     endDate?: string
-  ): Promise<{ totalKwhUsed: number; totalDurationMs: number; totalActiveMs: number } | null> => {
+  ): Promise<{ totalKwhUsed: number } | null> => {
     try {
       const summaryResponse = await fetchUsageSummary(range, cache, startDate, endDate);
       const stats = summaryResponse.stats;
       return {
         totalKwhUsed: stats.totalKwhUsed || 0,
-        totalDurationMs: stats.totalDurationMs || 0,
-        totalActiveMs: stats.totalActiveMs || 0,
       };
     } catch (e) {
       console.error('API Error getEnergySummary', e);

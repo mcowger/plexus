@@ -108,7 +108,7 @@ export class UsageInspector extends PassThrough {
           this.usageRecord.tokensEstimated = 1;
           logger.info(
             `[Inspector:Usage] Estimated tokens for ${this.usageRecord.requestId}: ` +
-            `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
+              `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
           );
           debugManager.discardEphemeral(this.usageRecord.requestId!);
         }
@@ -226,12 +226,12 @@ export class UsageInspector extends PassThrough {
       case 'messages':
         return reconstructed.usage
           ? {
-            inputTokens: reconstructed.usage.input_tokens || 0,
-            outputTokens: reconstructed.usage.output_tokens || 0,
-            cachedTokens: reconstructed.usage.cache_read_input_tokens || 0,
-            cacheWriteTokens: reconstructed.usage.cache_creation_input_tokens || 0,
-            reasoningTokens: 0,
-          }
+              inputTokens: reconstructed.usage.input_tokens || 0,
+              outputTokens: reconstructed.usage.output_tokens || 0,
+              cachedTokens: reconstructed.usage.cache_read_input_tokens || 0,
+              cacheWriteTokens: reconstructed.usage.cache_creation_input_tokens || 0,
+              reasoningTokens: 0,
+            }
           : null;
       case 'gemini':
         if (!reconstructed.usageMetadata) return null;
@@ -248,12 +248,12 @@ export class UsageInspector extends PassThrough {
       case 'oauth':
         return reconstructed.usage
           ? {
-            inputTokens: reconstructed.usage.input_tokens || 0,
-            outputTokens: reconstructed.usage.output_tokens || 0,
-            cachedTokens: reconstructed.usage.cached_tokens || 0,
-            cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
-            reasoningTokens: reconstructed.usage.reasoning_tokens || 0,
-          }
+              inputTokens: reconstructed.usage.input_tokens || 0,
+              outputTokens: reconstructed.usage.output_tokens || 0,
+              cachedTokens: reconstructed.usage.cached_tokens || 0,
+              cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
+              reasoningTokens: reconstructed.usage.reasoning_tokens || 0,
+            }
           : null;
       default:
         return null;

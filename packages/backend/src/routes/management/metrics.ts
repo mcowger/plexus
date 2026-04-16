@@ -19,7 +19,7 @@
  */
 
 import { FastifyInstance } from 'fastify';
-import { and, gte, isNull, isNotNull, sql } from 'drizzle-orm';
+import { and, gte, lte, isNull, isNotNull, sql } from 'drizzle-orm';
 import { getSchema } from '../../db/client';
 import { UsageStorageService } from '../../services/usage-storage';
 import { CooldownManager } from '../../services/cooldown-manager';
@@ -95,6 +95,63 @@ let cachedMetricsBody: string | null = null;
 let cacheExpiresAt = 0;
 
 // ---------------------------------------------------------------------------
+// Session-based active time calculation
+// ---------------------------------------------------------------------------
+
+/**
+ * Default gap threshold for session grouping (15 minutes),
+ * matching Google Analytics' session timeout model.
+ */
+const DEFAULT_SESSION_GAP_MS = 15 * 60 * 1000;
+
+/**
+ * A single request's time window used by {@link computeActiveTimeMs}.
+ */
+interface RequestTimeWindow {
+  startTime: number;
+  durationMs: number;
+}
+
+/**
+ * Compute total active time in milliseconds from a list of request time windows.
+ *
+ * Groups requests into "sessions" where consecutive requests have gaps shorter
+ * than `sessionGapMs`. The total active time is the sum of each session's span
+ * (first start → last end). Mirrors Google Analytics' session timeout model.
+ *
+ * @param requests  - Sorted by `startTime` ascending. Each entry must have
+ *                    non-negative `startTime` and `durationMs` values.
+ * @param sessionGapMs - Gap threshold in ms that splits sessions. Defaults to
+ *                    15 minutes (900 000 ms).
+ * @returns Total active time in milliseconds across all sessions.
+ */
+export function computeActiveTimeMs(
+  requests: RequestTimeWindow[],
+  sessionGapMs: number = DEFAULT_SESSION_GAP_MS
+): number {
+  if (requests.length === 0) return 0;
+
+  let totalActiveMs = 0;
+  let sessionStart = requests[0]!.startTime;
+  let sessionEnd = sessionStart + requests[0]!.durationMs;
+
+  for (let i = 1; i < requests.length; i++) {
+    const req = requests[i]!;
+    const reqEnd = req.startTime + req.durationMs;
+    const gap = req.startTime - sessionEnd;
+
+    if (gap > sessionGapMs) {
+      totalActiveMs += sessionEnd - sessionStart;
+      sessionStart = req.startTime;
+    }
+    sessionEnd = Math.max(sessionEnd, reqEnd);
+  }
+
+  totalActiveMs += sessionEnd - sessionStart;
+  return totalActiveMs;
+}
+
+// ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
 
@@ -128,6 +185,11 @@ export async function registerMetricsRoutes(
       // cleaner and equally fast on SQLite.
       // -----------------------------------------------------------------------
 
+      // -----------------------------------------------------------------------
+      // Convenience helpers
+      // -----------------------------------------------------------------------
+      const toNum = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
+
       // 1. All-time cumulative totals (full table scan; results cached above TTL)
       const totalsRow = await db
         .select({
@@ -137,6 +199,8 @@ export async function registerMetricsRoutes(
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
           kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
+          totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
+          avgDurationMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
           errorsTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
         })
         .from(schema.requestUsage);
@@ -151,6 +215,7 @@ export async function registerMetricsRoutes(
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
           kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
+          totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
           totalCost: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
           errors: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
         })
@@ -167,6 +232,8 @@ export async function registerMetricsRoutes(
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
           costTotal: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
+          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
+          totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
           errors: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
           avgLatencyMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
           avgTtftMs: sql<number>`COALESCE(AVG(${schema.requestUsage.ttftMs}), 0)`,
@@ -185,6 +252,8 @@ export async function registerMetricsRoutes(
           tokensOutput: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
+          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
+          totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
         })
         .from(schema.requestUsage)
         .where(isNotNull(schema.requestUsage.incomingModelAlias))
@@ -254,16 +323,28 @@ export async function registerMetricsRoutes(
         )
         .groupBy(schema.requestUsage.canonicalModelName);
 
+      // 8. Session-based active time calculation
+      //    Fetch request time windows and delegate to the pure function.
+      const requestTimestamps = await db
+        .select({
+          startTime: schema.requestUsage.startTime,
+          durationMs: schema.requestUsage.durationMs,
+        })
+        .from(schema.requestUsage)
+        .orderBy(schema.requestUsage.startTime);
+
+      const totalActiveMs = computeActiveTimeMs(
+        requestTimestamps.map((r) => ({
+          startTime: toNum(r.startTime),
+          durationMs: toNum(r.durationMs),
+        }))
+      );
+
       // 9. Provider performance aggregates (TTFT, throughput)
       const rawPerfRows = await usageStorage.getProviderPerformance();
 
       // Active cooldowns from in-memory CooldownManager (no DB query needed)
       const cooldowns = CooldownManager.getInstance().getCooldowns();
-
-      // -----------------------------------------------------------------------
-      // Convenience helpers
-      // -----------------------------------------------------------------------
-      const toNum = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
 
       // -----------------------------------------------------------------------
       // Deduplicate helpers
@@ -357,6 +438,8 @@ export async function registerMetricsRoutes(
         tokensCached: 0,
         tokensCacheWrite: 0,
         kwhUsed: 0,
+        totalDurationMs: 0,
+        avgDurationMs: 0,
         errorsTotal: 0,
       };
 
@@ -368,6 +451,7 @@ export async function registerMetricsRoutes(
         tokensCached: 0,
         tokensCacheWrite: 0,
         kwhUsed: 0,
+        totalDurationMs: 0,
         totalCost: 0,
         errors: 0,
       };
@@ -473,6 +557,42 @@ export async function registerMetricsRoutes(
         )
       );
 
+      blocks.push(
+        metricBlock(
+          'plexus_duration_ms_total',
+          'counter',
+          'Total inference duration in milliseconds across all requests since the database was created.',
+          [{ labels: {}, value: toNum(totals.totalDurationMs) }]
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_avg_duration_ms',
+          'gauge',
+          'All-time average end-to-end latency in milliseconds per request.',
+          [{ labels: {}, value: toNum(totals.avgDurationMs) }]
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_active_time_ms',
+          'gauge',
+          'Total active time in milliseconds, computed using a session-based model (15-min gap threshold, same as Google Analytics). This represents the wall-clock time during which at least one request was in-flight.',
+          [{ labels: {}, value: totalActiveMs }]
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_duration_ms_today',
+          'gauge',
+          'Total inference duration in milliseconds for requests since local midnight.',
+          [{ labels: {}, value: toNum(today.totalDurationMs) }]
+        )
+      );
+
       // --- Per-provider counters and gauges ---------------------------------
 
       blocks.push(
@@ -563,6 +683,30 @@ export async function registerMetricsRoutes(
         )
       );
 
+      blocks.push(
+        metricBlock(
+          'plexus_provider_energy_kwh_total',
+          'counter',
+          'Total estimated energy consumption in kilowatt-hours per provider.',
+          byProviderRows.map((r) => ({
+            labels: { provider: r.provider ?? 'unknown' },
+            value: toNum(r.kwhUsed),
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_provider_duration_ms_total',
+          'counter',
+          'Total inference duration in milliseconds per provider.',
+          byProviderRows.map((r) => ({
+            labels: { provider: r.provider ?? 'unknown' },
+            value: toNum(r.totalDurationMs),
+          }))
+        )
+      );
+
       // --- Per-model-alias counters -----------------------------------------
 
       blocks.push(
@@ -589,6 +733,30 @@ export async function registerMetricsRoutes(
               toNum(r.tokensOutput) +
               toNum(r.tokensCached) +
               toNum(r.tokensCacheWrite),
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_model_alias_energy_kwh_total',
+          'counter',
+          'Total estimated energy consumption in kilowatt-hours per incoming model alias.',
+          byModelAliasRows.map((r) => ({
+            labels: { model_alias: r.modelAlias ?? 'unknown' },
+            value: toNum(r.kwhUsed),
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_model_alias_duration_ms_total',
+          'counter',
+          'Total inference duration in milliseconds per incoming model alias.',
+          byModelAliasRows.map((r) => ({
+            labels: { model_alias: r.modelAlias ?? 'unknown' },
+            value: toNum(r.totalDurationMs),
           }))
         )
       );

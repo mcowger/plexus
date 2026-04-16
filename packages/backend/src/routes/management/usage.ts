@@ -288,51 +288,6 @@ export async function registerUsageRoutes(
           )
         );
 
-      // Fetch individual request timestamps for session-based active time calculation.
-      // Groups requests into "sessions" where consecutive requests have gaps
-      // shorter than the SESSION_GAP_THRESHOLD_MS (15 minutes). The total active
-      // time is the sum of each session's span (first start → last end).
-      // This mirrors Google Analytics' session timeout model.
-      const SESSION_GAP_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
-
-      const requestTimestamps = await db
-        .select({
-          startTime: schema.requestUsage.startTime,
-          durationMs: schema.requestUsage.durationMs,
-        })
-        .from(schema.requestUsage)
-        .where(
-          and(
-            gte(schema.requestUsage.startTime, rangeStartMs),
-            lte(schema.requestUsage.startTime, rangeEndMs)
-          )
-        )
-        .orderBy(schema.requestUsage.startTime);
-
-      let totalActiveMs = 0;
-      if (requestTimestamps.length > 0) {
-        let sessionStart = toNumber(requestTimestamps[0]!.startTime);
-        let sessionEnd = sessionStart + toNumber(requestTimestamps[0]!.durationMs);
-
-        for (let i = 1; i < requestTimestamps.length; i++) {
-          const req = requestTimestamps[i]!;
-          const reqStart = toNumber(req.startTime);
-          const reqEnd = reqStart + toNumber(req.durationMs);
-          const gap = reqStart - sessionEnd;
-
-          if (gap > SESSION_GAP_THRESHOLD_MS) {
-            // Gap exceeds threshold — close current session, start a new one
-            totalActiveMs += sessionEnd - sessionStart;
-            sessionStart = reqStart;
-          }
-          // Extend session end to the later of current sessionEnd or this request's end
-          sessionEnd = Math.max(sessionEnd, reqEnd);
-        }
-
-        // Close the final session
-        totalActiveMs += sessionEnd - sessionStart;
-      }
-
       const todayRows = await db
         .select({
           requests: sql<number>`COUNT(*)`,
@@ -401,7 +356,6 @@ export async function registerUsageRoutes(
           totalKwhUsed: toNumber(statsRow.kwhUsed),
           avgDurationMs: toNumber(statsRow.avgDurationMs),
           totalDurationMs: toNumber(statsRow.totalDurationMs),
-          totalActiveMs,
         },
         today: {
           requests: toNumber(todayRow.requests),

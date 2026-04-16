@@ -32,8 +32,6 @@ import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../.
 import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { TotalEnergyComparison } from '../../TotalEnergyComparison';
-import { EnergyTimeComparison } from '../../EnergyTimeComparison';
-import { EnergyOverTime } from '../../EnergyOverTime';
 import { TimeRangeSelector } from '../TimeRangeSelector';
 import type { CustomDateRange } from '../../../lib/date';
 import {
@@ -113,8 +111,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
   const [energySummary, setEnergySummary] = useState<{
     totalKwhUsed: number;
-    totalDurationMs: number;
-    totalActiveMs: number;
   } | null>(null);
 
   // ---------------------------------------------------------------------------
@@ -639,13 +635,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           </div>
         </Card>
 
-        {/* Energy Usage Over Time */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Usage">
-          <div style={{ height: 400, marginTop: '12px' }}>
-            <EnergyOverTime data={data} />
-          </div>
-        </Card>
-
         {/* Model Distribution - Requests */}
         <Card
           className="min-w-0"
@@ -701,16 +690,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Comparisons">
           <div style={{ marginTop: '12px', height: 300 }}>
             <TotalEnergyComparison totalKwh={energySummary?.totalKwhUsed} />
-          </div>
-        </Card>
-
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Usage Rate">
-          <div style={{ marginTop: '12px' }}>
-            <EnergyTimeComparison
-              totalKwh={energySummary?.totalKwhUsed}
-              totalDurationMs={energySummary?.totalDurationMs}
-              totalActiveMs={energySummary?.totalActiveMs}
-            />
           </div>
         </Card>
       </div>
