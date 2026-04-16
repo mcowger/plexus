@@ -8,7 +8,7 @@ import { handleResponse } from '../../services/response-handler';
 import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { checkQuotaMiddleware, recordQuotaUsage } from '../../services/quota/quota-middleware';
+import { checkQuotaMiddleware } from '../../services/quota/quota-middleware';
 import { attachKeyAccessPolicy } from '../../utils/auth';
 
 export async function registerGeminiRoute(
@@ -122,13 +122,10 @@ export async function registerGeminiRoute(
         startTime,
         'gemini',
         shouldEstimateTokens,
-        body
+        body,
+        quotaEnforcer,
+        (request as any).keyName
       );
-
-      // Record quota usage after request completes
-      if (quotaEnforcer) {
-        await recordQuotaUsage((request as any).keyName, usageRecord, quotaEnforcer);
-      }
 
       return result;
     } catch (e: any) {

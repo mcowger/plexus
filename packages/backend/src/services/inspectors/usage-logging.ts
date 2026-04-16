@@ -14,6 +14,7 @@ import {
 import { estimateKwhUsed } from '../inference-energy';
 import { applyProviderReportedCost } from '../../utils/provider-cost';
 import { DEFAULT_MODEL, DEFAULT_GPU_PARAMS } from '@plexus/shared';
+import { recordQuotaUsage } from '../quota/quota-middleware';
 
 export class UsageInspector extends PassThrough {
   private usageStorage: UsageStorageService;
@@ -26,6 +27,8 @@ export class UsageInspector extends PassThrough {
   private incomingApiType: string;
   private originalRequest?: any;
   private firstChunk = true;
+  private quotaEnforcer?: any;
+  private keyName?: string;
 
   private modelParams: ModelParams;
   private gpuParams: GpuParams;
@@ -42,7 +45,9 @@ export class UsageInspector extends PassThrough {
     incomingApiType?: string,
     originalRequest?: any,
     gpuParams: GpuParams = DEFAULT_GPU_PARAMS,
-    modelParams: ModelParams = DEFAULT_MODEL
+    modelParams: ModelParams = DEFAULT_MODEL,
+    quotaEnforcer?: any,
+    keyName?: string
   ) {
     super();
     this.usageStorage = usageStorage;
@@ -56,6 +61,8 @@ export class UsageInspector extends PassThrough {
     this.originalRequest = originalRequest;
     this.gpuParams = gpuParams;
     this.modelParams = modelParams;
+    this.quotaEnforcer = quotaEnforcer;
+    this.keyName = keyName;
   }
 
   override _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
@@ -159,6 +166,24 @@ export class UsageInspector extends PassThrough {
           err
         );
       });
+
+      // Record quota usage after costs are calculated (fire-and-forget)
+      if (this.quotaEnforcer && this.keyName) {
+        recordQuotaUsage(
+          this.keyName,
+          {
+            tokensInput: this.usageRecord.tokensInput,
+            tokensOutput: this.usageRecord.tokensOutput,
+            tokensCached: this.usageRecord.tokensCached,
+            tokensCacheWrite: this.usageRecord.tokensCacheWrite,
+            tokensReasoning: this.usageRecord.tokensReasoning,
+            costTotal: this.usageRecord.costTotal,
+          },
+          this.quotaEnforcer
+        ).catch((err) => {
+          logger.error(`[Inspector:Usage] Failed to record quota usage for ${this.keyName}:`, err);
+        });
+      }
 
       if (this.usageRecord.provider && this.usageRecord.selectedModelName) {
         // Fire-and-forget: updatePerformanceMetrics is async but _flush is synchronous
