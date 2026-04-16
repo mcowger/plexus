@@ -100,7 +100,7 @@ jobs:
             }
 
             const execResult = JSON.parse(fs.readFileSync(execFile, 'utf8'));
-            const permissionDenials = Number(execResult.permission_denials_count || 0);
+            const permissionDenials = Number(execResult.permission_denials_count ?? 0) || 0;
             const diagnostics = {
               is_error: Boolean(execResult.is_error),
               permission_denials_count: permissionDenials,
@@ -120,7 +120,7 @@ jobs:
               issues.push('Claude reported an error during execution');
             }
             if (permissionDenials > 0) {
-              issues.push(`Claude was denied permission ${permissionDenials} time(s) — missing tools in --allowedTools. Check the workflow's claude_args and diagnostics output.`);
+              issues.push(`Claude was denied permission ${permissionDenials} time(s) — missing tools in --allowedTools. Check the workflow configuration and diagnostics output.`);
             }
             if (!branchName) {
               issues.push('No branch was created — Claude may not have made any code changes');
