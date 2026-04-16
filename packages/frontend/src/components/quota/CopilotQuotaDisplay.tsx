@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { Github, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Bot, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatDuration } from '../../lib/format';
 import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
 
@@ -56,7 +56,7 @@ export const CopilotQuotaDisplay: React.FC<CopilotQuotaDisplayProps> = ({
   return (
     <div className="px-2 py-1 space-y-1">
       <div className="flex items-center gap-2 min-w-0">
-        <Github size={14} className="text-text" />
+        <Bot size={14} className="text-text" />
         <span className="text-xs font-semibold text-text whitespace-nowrap">Copilot</span>
         {result.oauthAccountId && (
           <span className="text-[10px] text-text-muted truncate">({result.oauthAccountId})</span>
