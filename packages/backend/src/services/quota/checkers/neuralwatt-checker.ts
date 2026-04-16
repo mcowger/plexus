@@ -2,7 +2,7 @@ import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../..
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 
-interface NeuralwattBalanceResponse {
+interface NeuralwattQuotaResponse {
   balance: {
     credits_remaining_usd: number;
     total_credits_usd: number;
@@ -74,34 +74,75 @@ export class NeuralwattQuotaChecker extends QuotaChecker {
         return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
       }
 
-      const data: NeuralwattBalanceResponse = await response.json();
+      const data: NeuralwattQuotaResponse = await response.json();
+      const windows: QuotaWindow[] = [];
 
-      logger.debug(
-        `[neuralwatt] balance: remaining=$${data.balance?.credits_remaining_usd} ` +
-          `total=$${data.balance?.total_credits_usd} used=$${data.balance?.credits_used_usd} ` +
-          `method=${data.balance?.accounting_method}`
-      );
-
+      // Balance window (always present)
       if (
-        !data.balance ||
-        typeof data.balance.credits_remaining_usd !== 'number' ||
-        !Number.isFinite(data.balance.credits_remaining_usd)
+        data.balance &&
+        typeof data.balance.credits_remaining_usd === 'number' &&
+        Number.isFinite(data.balance.credits_remaining_usd)
       ) {
-        return this.errorResult(new Error('Invalid balance data received from Neuralwatt API'));
+        logger.debug(
+          `[neuralwatt] balance: remaining=$${data.balance.credits_remaining_usd} ` +
+            `total=$${data.balance.total_credits_usd} used=$${data.balance.credits_used_usd} ` +
+            `method=${data.balance.accounting_method}`
+        );
+
+        windows.push(
+          this.createWindow(
+            'subscription',
+            data.balance.total_credits_usd,
+            data.balance.credits_used_usd,
+            data.balance.credits_remaining_usd,
+            'dollars',
+            undefined,
+            'Neuralwatt credit balance'
+          )
+        );
+      } else {
+        logger.debug(`[neuralwatt] No valid balance data in API response`);
       }
 
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
-        data.balance.total_credits_usd,
-        data.balance.credits_used_usd,
-        data.balance.credits_remaining_usd,
-        'dollars',
-        undefined,
-        'Neuralwatt credit balance'
-      );
+      // Subscription window (if present)
+      if (data.subscription) {
+        const sub = data.subscription;
+
+        logger.debug(
+          `[neuralwatt] subscription: plan=${sub.plan} status=${sub.status} ` +
+            `kwh_included=${sub.kwh_included} kwh_used=${sub.kwh_used} ` +
+            `kwh_remaining=${sub.kwh_remaining} in_overage=${sub.in_overage}`
+        );
+
+        if (
+          Number.isFinite(sub.kwh_included) &&
+          Number.isFinite(sub.kwh_used) &&
+          Number.isFinite(sub.kwh_remaining)
+        ) {
+          const resetsAt = new Date(sub.current_period_end);
+
+          windows.push(
+            this.createWindow(
+              'monthly',
+              sub.kwh_included,
+              sub.kwh_used,
+              sub.kwh_remaining,
+              'points',
+              resetsAt,
+              `Neuralwatt ${sub.plan} plan energy quota`
+            )
+          );
+        }
+      }
+
+      if (windows.length === 0) {
+        return this.errorResult(
+          new Error('No valid balance or subscription data received from Neuralwatt API')
+        );
+      }
 
       return {
-        ...this.successResult([window]),
+        ...this.successResult(windows),
         rawResponse: data,
       };
     } catch (error) {

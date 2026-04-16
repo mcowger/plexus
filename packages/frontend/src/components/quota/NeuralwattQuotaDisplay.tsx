@@ -1,8 +1,8 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { Wallet, AlertTriangle } from 'lucide-react';
-import { formatCost } from '../../lib/format';
-import type { QuotaCheckResult } from '../../types/quota';
+import { Wallet, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { formatCost, formatDuration, formatPoints } from '../../lib/format';
+import type { QuotaCheckResult, QuotaStatus } from '../../types/quota';
 
 interface NeuralwattQuotaDisplayProps {
   result: QuotaCheckResult;
@@ -28,20 +28,40 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
 
   const windows = result.windows || [];
   const subscriptionWindow = windows.find((w) => w.windowType === 'subscription');
+  const monthlyWindow = windows.find((w) => w.windowType === 'monthly');
+
   const balance = subscriptionWindow?.remaining;
   const total = subscriptionWindow?.limit;
   const used = subscriptionWindow?.used;
 
+  const statusColors: Record<QuotaStatus, string> = {
+    ok: 'bg-success',
+    warning: 'bg-warning',
+    critical: 'bg-danger',
+    exhausted: 'bg-danger',
+  };
+
+  const overallStatus = monthlyWindow?.status || 'ok';
+
   if (isCollapsed) {
     return (
       <div className="px-2 py-2 flex justify-center">
-        <Wallet size={18} className="text-info" />
+        {monthlyWindow && overallStatus !== 'ok' ? (
+          <AlertTriangle
+            size={18}
+            className={clsx(
+              overallStatus === 'warning' ? 'text-warning' : 'text-danger'
+            )}
+          />
+        ) : (
+          <Wallet size={18} className="text-info" />
+        )}
       </div>
     );
   }
 
   return (
-    <div className="px-2 py-1 space-y-1">
+    <div className="px-2 py-1 space-y-2">
       <div className="flex items-center gap-2 min-w-0">
         <Wallet size={14} className="text-info" />
         <span className="text-xs font-semibold text-text whitespace-nowrap">Neuralwatt</span>
@@ -56,8 +76,46 @@ export const NeuralwattQuotaDisplay: React.FC<NeuralwattQuotaDisplayProps> = ({
         </div>
       )}
       {total !== undefined && used !== undefined && (
-        <div className="text-[10px] text-text-muted">
+        <div className="text-[10px] text-text-muted pl-0">
           {formatCost(used)} / {formatCost(total)} used
+        </div>
+      )}
+      {monthlyWindow && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Zap size={12} className="text-text-secondary" />
+            <span className="text-[11px] font-semibold text-text-secondary">Energy Quota</span>
+            {monthlyWindow.resetInSeconds !== undefined &&
+              monthlyWindow.resetInSeconds !== null && (
+                <span className="text-[10px] text-text-muted ml-auto">
+                  {formatDuration(monthlyWindow.resetInSeconds)}
+                </span>
+              )}
+          </div>
+          <div className="relative h-2">
+            <div className="h-2 rounded-md bg-bg-hover overflow-hidden mr-7">
+              <div
+                className={clsx(
+                  'h-full rounded-md transition-all duration-500 ease-out',
+                  statusColors[monthlyWindow.status || 'ok']
+                )}
+                style={{
+                  width: `${Math.min(100, Math.max(0, monthlyWindow.utilizationPercent))}%`,
+                }}
+              />
+            </div>
+            <div className="absolute inset-y-0 right-0 flex items-center text-[10px] font-semibold text-text">
+              {Math.round(monthlyWindow.utilizationPercent)}%
+            </div>
+          </div>
+          {monthlyWindow.remaining !== undefined &&
+            monthlyWindow.limit !== undefined &&
+            monthlyWindow.unit === 'points' && (
+              <div className="text-[10px] text-text-muted">
+                {formatPoints(monthlyWindow.remaining)} / {formatPoints(monthlyWindow.limit)} kWh
+                remaining
+              </div>
+            )}
         </div>
       )}
     </div>
