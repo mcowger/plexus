@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, beforeAll, mock } from 'bun:test';
 import { QuotaEnforcer, QuotaCheckResult } from '../src/services/quota/quota-enforcer';
-import { setConfigForTesting, PlexusConfig } from '../src/config';
+import { setConfigForTesting, getConfig, PlexusConfig } from '../src/config';
 import { getDatabase } from '../src/db/client';
 import { runMigrations } from '../src/db/migrate';
 import * as sqliteSchema from '../drizzle/schema/sqlite';
@@ -51,8 +51,15 @@ describe('QuotaEnforcer', () => {
       }
     }
 
-    // Reset config
-    setConfigForTesting(createTestConfig());
+    // Reset config (defensive: verify it took effect to catch stale spies from other tests)
+    const config = createTestConfig();
+    setConfigForTesting(config);
+    const actualConfig = getConfig();
+    if (actualConfig.user_quotas !== config.user_quotas || actualConfig.keys !== config.keys) {
+      throw new Error(
+        '[quota-enforcer] setConfigForTesting did not take effect — possible stale getConfig spy from another test file'
+      );
+    }
 
     // Create fresh QuotaEnforcer instance
     quotaEnforcer = new QuotaEnforcer();

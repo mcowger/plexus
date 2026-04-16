@@ -2,12 +2,10 @@ import { expect, test, describe, afterEach } from 'bun:test';
 import { registerSpy } from './test-utils';
 import { Dispatcher } from '../src/services/dispatcher';
 import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
-import * as configModule from '../src/config';
+import { setConfigForTesting } from '../src/config';
 
 describe('Vision Fallthrough Full Logic', () => {
   afterEach(() => {
-    // Restore all spies to prevent polluting other tests
-    configModule.getConfig.mockRestore?.();
     VisionDescriptorService.process.mockRestore?.();
   });
 
@@ -34,7 +32,7 @@ describe('Vision Fallthrough Full Logic', () => {
       cooldown: { initialMinutes: 1, maxMinutes: 5 },
     };
 
-    registerSpy(configModule, 'getConfig').mockReturnValue(mockConfig as any);
+    setConfigForTesting(mockConfig as any);
 
     // Track if process was called
     registerSpy(VisionDescriptorService, 'process').mockImplementation(async (req) => {

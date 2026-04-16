@@ -8,7 +8,7 @@ import { registerSpy } from './test-utils';
 import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
 import { Dispatcher } from '../src/services/dispatcher';
 import { UsageStorageService } from '../src/services/usage-storage';
-import * as configModule from '../src/config';
+import { setConfigForTesting } from '../src/config';
 
 // ---------------------------------------------------------------------------
 // Bug 1: visionFallthroughModel not recorded on the parent request
@@ -40,7 +40,7 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
       cooldown: { initialMinutes: 1, maxMinutes: 5 },
     };
 
-    registerSpy(configModule, 'getConfig').mockReturnValue(mockConfig as any);
+    setConfigForTesting(mockConfig as any);
 
     // Intercept VisionDescriptorService.process so we can check what it was called with
     // and tag the request the same way the real implementation does
@@ -115,7 +115,7 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
       cooldown: { initialMinutes: 1, maxMinutes: 5 },
     };
 
-    registerSpy(configModule, 'getConfig').mockReturnValue(mockConfig as any);
+    setConfigForTesting(mockConfig as any);
 
     const dispatcher = new Dispatcher();
     const capturedMetadata: any[] = [];
