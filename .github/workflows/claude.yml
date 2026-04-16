@@ -100,13 +100,27 @@ jobs:
             }
 
             const execResult = JSON.parse(fs.readFileSync(execFile, 'utf8'));
+            const permissionDenials = Number(execResult.permission_denials_count || 0);
+            const diagnostics = {
+              is_error: Boolean(execResult.is_error),
+              permission_denials_count: permissionDenials,
+              permission_denials: execResult.permission_denials ?? null,
+              denied_tools: execResult.denied_tools ?? null,
+              stop_reason: execResult.stop_reason ?? null,
+              branch_name: branchName || null
+            };
+            core.info(`Claude execution diagnostics: ${JSON.stringify(diagnostics)}`);
+            await core.summary
+              .addHeading('Claude execution diagnostics')
+              .addCodeBlock(JSON.stringify(diagnostics, null, 2), 'json')
+              .write();
             const issues = [];
 
             if (execResult.is_error) {
               issues.push('Claude reported an error during execution');
             }
-            if (execResult.permission_denials_count > 0) {
-              issues.push(`Claude was denied permission ${exec.permission_denials_count} time(s) — missing tools in --allowedTools. Check the workflow's claude_args.`);
+            if (permissionDenials > 0) {
+              issues.push(`Claude was denied permission ${permissionDenials} time(s) — missing tools in --allowedTools. Check the workflow's claude_args and diagnostics output.`);
             }
             if (!branchName) {
               issues.push('No branch was created — Claude may not have made any code changes');
@@ -162,4 +176,3 @@ jobs:
             });
 
             core.setFailed(`Claude execution had issues: ${issues.join('; ')}`);
-
