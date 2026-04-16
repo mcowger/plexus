@@ -67,6 +67,8 @@ jobs:
             {
               "permissions": {
                 "allow": [
+                  "Write",
+                  "Edit",
                   "Bash(git push:*)",
                   "Bash(git status:*)",
                   "Bash(git diff:*)",
@@ -74,17 +76,32 @@ jobs:
                   "Bash(git checkout:*)",
                   "Bash(git fetch:*)",
                   "Bash(git branch:*)",
+                  "Bash(git rm:*)",
                   "Bash(bun install:*)",
                   "Bash(bun run:*)",
                   "Bash(bun test:*)",
+                  "Bash(bunx:*)",
                   "Bash(npm run:*)",
+                  "Bash(mkdir:*)",
+                  "Bash(mv:*)",
+                  "Bash(cp:*)",
+                  "Bash(rm:*)",
                   "Bash(ls:*)",
                   "Bash(cat:*)",
                   "Bash(find:*)",
                   "Bash(grep:*)",
                   "Bash(head:*)",
                   "Bash(tail:*)",
-                  "Bash(wc:*)"
+                  "Bash(wc:*)",
+                  "Bash(dirname:*)",
+                  "Bash(basename:*)",
+                  "Bash(sort:*)",
+                  "Bash(uniq:*)",
+                  "Bash(realpath:*)",
+                  "Bash(readlink:*)",
+                  "Bash(test:*)",
+                  "Bash(touch:*)",
+                  "Bash(chmod:*)"
                 ]
               }
             }
@@ -93,11 +110,82 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specifically, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+      - name: Report issues if Claude failed
+        if: always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const execFile = '${{ steps.claude.outputs.execution_file }}';
+            const branchName = '${{ steps.claude.outputs.branch_name }}';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
+            if (!execFile || !fs.existsSync(execFile)) {
+              core.info('No execution file found, skipping report');
+              return;
+            }
+
+            const exec = JSON.parse(fs.readFileSync(execFile, 'utf8'));
+            const issues = [];
+
+            if (exec.is_error) {
+              issues.push('Claude reported an error during execution');
+            }
+            if (exec.permission_denials_count > 0) {
+              issues.push(`Claude was denied permission ${exec.permission_denials_count} time(s) — likely missing tools in the allowed list. Add Write, Edit, etc. to the workflow settings.permissions.allow list.`);
+            }
+            if (!branchName) {
+              issues.push('No branch was created — Claude may not have made any code changes');
+            }
+
+            if (issues.length === 0) {
+              core.info('No issues detected, skipping report');
+              return;
+            }
+
+            // Find Claude's comment to update (by the claude[bot] user on this issue/PR)
+            const event = context.eventName;
+            let issueNumber;
+            if (event === 'issues') {
+              issueNumber = context.payload.issue.number;
+            } else if (event === 'issue_comment') {
+              issueNumber = context.payload.issue.number;
+            } else if (event === 'pull_request_review_comment') {
+              issueNumber = context.payload.pull_request.number;
+            } else if (event === 'pull_request_review') {
+              issueNumber = context.payload.pull_request.number;
+            }
+
+            if (!issueNumber) {
+              core.info('Could not determine issue/PR number, skipping report');
+              return;
+            }
+
+            // Find the most recent comment by claude[bot]
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              per_page: 100
+            });
+
+            const claudeComment = comments.data
+              .filter(c => c.user.login === 'claude[bot]')
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+            if (!claudeComment) {
+              core.info('No claude[bot] comment found to update');
+              return;
+            }
+
+            const warning = `\n\n---\n⚠️ **Issues detected:**\n${issues.map(i => '- ' + i).join('\n')}\n\n[View job run](${runUrl})`;
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: claudeComment.id,
+              body: claudeComment.body + warning
+            });
+
+            core.setFailed(`Claude execution had issues: ${issues.join('; ')}`);
 
