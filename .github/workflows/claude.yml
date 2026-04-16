@@ -99,13 +99,13 @@ jobs:
               return;
             }
 
-            const exec = JSON.parse(fs.readFileSync(execFile, 'utf8'));
+            const execResult = JSON.parse(fs.readFileSync(execFile, 'utf8'));
             const issues = [];
 
-            if (exec.is_error) {
+            if (execResult.is_error) {
               issues.push('Claude reported an error during execution');
             }
-            if (exec.permission_denials_count > 0) {
+            if (execResult.permission_denials_count > 0) {
               issues.push(`Claude was denied permission ${exec.permission_denials_count} time(s) — missing tools in --allowedTools. Check the workflow's claude_args.`);
             }
             if (!branchName) {
