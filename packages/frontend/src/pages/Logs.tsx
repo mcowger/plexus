@@ -567,7 +567,11 @@ export const Logs = () => {
                         })()}
                       </div>
                     </td>
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                    <td
+                      className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
+                      title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
+                      style={log.sourceIp ? { cursor: 'help' } : undefined}
+                    >
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontWeight: '500' }}>{log.apiKey || '-'}</span>
                         {log.attribution && (
