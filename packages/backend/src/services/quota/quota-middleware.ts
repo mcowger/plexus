@@ -63,11 +63,11 @@ export async function recordQuotaUsage(
   usageRecord: QuotaUsageRecord,
   quotaEnforcer: QuotaEnforcer
 ): Promise<void> {
-  logger.info(
+  logger.debug(
     `[QuotaMiddleware] recordQuotaUsage called: keyName=${keyName}, costTotal=${usageRecord.costTotal}, tokensInput=${usageRecord.tokensInput}`
   );
   if (!keyName) {
-    logger.info('[QuotaMiddleware] recordQuotaUsage: no keyName, skipping');
+    logger.debug('[QuotaMiddleware] recordQuotaUsage: no keyName, skipping');
     return;
   }
 

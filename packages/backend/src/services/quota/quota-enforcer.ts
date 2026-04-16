@@ -87,11 +87,11 @@ export class QuotaEnforcer {
 
     if (existingState.length > 0) {
       const s = existingState[0]!;
-      logger.info(
+      logger.debug(
         `[QuotaEnforcer] checkQuota DB state for ${keyName}: currentUsage=${s.currentUsage}, windowStart=${JSON.stringify(s.windowStart)}, lastUpdated=${JSON.stringify(s.lastUpdated)}, quotaName=${s.quotaName}, limitType=${s.limitType}`
       );
     } else {
-      logger.info(`[QuotaEnforcer] checkQuota: no DB state found for ${keyName}`);
+      logger.debug(`[QuotaEnforcer] checkQuota: no DB state found for ${keyName}`);
     }
 
     let currentUsage: number;
@@ -199,13 +199,13 @@ export class QuotaEnforcer {
           quotaDef.type === 'monthly'
         ) {
           const expectedWindowStart = this.getWindowStart(quotaDef.type);
-          logger.info(
+          logger.debug(
             `[QuotaEnforcer] checkQuota calendar check for ${keyName}: windowStartFromDB=${windowStartDate?.getTime()}, expectedWindowStart=${expectedWindowStart}, match=${windowStartDate?.getTime() === expectedWindowStart}`
           );
           if (!windowStartDate || windowStartDate.getTime() !== expectedWindowStart) {
             // Window has reset — persist the reset to the DB so recordUsage
             // doesn't keep accumulating on top of stale values
-            logger.info(
+            logger.debug(
               `[QuotaEnforcer] Calendar quota ${quotaName} for ${keyName} reset — persisting to DB`
             );
             currentUsage = 0;
@@ -242,7 +242,7 @@ export class QuotaEnforcer {
             if (!windowStartDate || elapsedMs >= durationMs) {
               // Window expired or not set - reset and persist to DB
               const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
-              logger.info(
+              logger.debug(
                 `[QuotaEnforcer] Rolling cost quota ${quotaName} for ${keyName} reset (window expired), aligned to ${new Date(alignedStart).toISOString()} — persisting to DB`
               );
               currentUsage = 0;
@@ -330,7 +330,7 @@ export class QuotaEnforcer {
       limitType: quotaDef.limitType,
     };
 
-    logger.info(
+    logger.debug(
       `[QuotaEnforcer] Quota check result for ${keyName}: currentUsage=${result.currentUsage}, remaining=${result.remaining}, allowed=${result.allowed}`
     );
     logger.debug(`[QuotaEnforcer] Quota check for ${keyName}:`, result);
@@ -344,21 +344,21 @@ export class QuotaEnforcer {
   async recordUsage(keyName: string, usageRecord: UsageRecord): Promise<void> {
     const config = getConfig();
 
-    logger.info(
+    logger.debug(
       `[QuotaEnforcer] recordUsage called for ${keyName}: costTotal=${usageRecord.costTotal}, tokensInput=${usageRecord.tokensInput}, tokensOutput=${usageRecord.tokensOutput}`
     );
 
     // Get key configuration
     const keyConfig = config.keys?.[keyName];
     if (!keyConfig?.quota) {
-      logger.info(`[QuotaEnforcer] recordUsage: no quota assigned for key ${keyName}, skipping`);
+      logger.debug(`[QuotaEnforcer] recordUsage: no quota assigned for key ${keyName}, skipping`);
       return; // No quota assigned, nothing to record
     }
 
     // Get quota definition
     const quotaDef = config.user_quotas?.[keyConfig.quota];
     if (!quotaDef) {
-      logger.info(
+      logger.debug(
         `[QuotaEnforcer] recordUsage: quota definition ${keyConfig.quota} not found for key ${keyName}, skipping`
       );
       return;
@@ -371,7 +371,7 @@ export class QuotaEnforcer {
     } else if (quotaDef.limitType === 'cost') {
       // cost: use costTotal directly
       usageValue = usageRecord.costTotal || 0;
-      logger.info(
+      logger.debug(
         `[QuotaEnforcer] recordUsage cost calculation: costTotal=${usageRecord.costTotal}, usageValue=${usageValue}`
       );
     } else {
