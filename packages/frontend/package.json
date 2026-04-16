@@ -26,7 +26,7 @@
     "@types/human-format": "^1.0.3",
     "clsx": "^2.1.1",
     "human-format": "^1.2.1",
-    "lucide-react": "^0.562.0",
+    "lucide-react": "^1.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.1",
