@@ -305,7 +305,7 @@ jobs:
             return executionLog[executionLog.length - 1].result;
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             plexus-linux
