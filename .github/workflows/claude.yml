@@ -64,7 +64,7 @@ jobs:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
           claude_args: >-
             --model ${{ vars.PLEXUS_MODEL }}
-            --allowedTools Bash(git push:*) Bash(git status:*) Bash(git diff:*) Bash(git log:*) Bash(git checkout:*) Bash(git fetch:*) Bash(git branch:*) Bash(bun install:*) Bash(bun run:*) Bash(bun test:*) Bash(npm run:*) Bash(ls:*) Bash(cat:*) Bash(find:*) Bash(grep:*) Bash(head:*) Bash(tail:*) Bash(wc:*)
+            --allowedTools Bash(git push:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git checkout:*),Bash(git fetch:*),Bash(git branch:*),Bash(bun install:*),Bash(bun run:*),Bash(bun test:*),Bash(npm run:*),Bash(ls:*),Bash(cat:*),Bash(find:*),Bash(grep:*),Bash(head:*),Bash(tail:*),Bash(wc:*)
 
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
