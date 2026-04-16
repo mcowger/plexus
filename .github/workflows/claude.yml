@@ -41,6 +41,7 @@ jobs:
             core.setOutput('base_url', ai.base_url);
             core.setOutput('model', ai.model_name);
             core.setOutput('small_model', ai.small_model_name);
+            core.setSecret(ai.api_key);
             core.setOutput('api_key', ai.api_key);
 
       - name: Run Claude Code
@@ -52,8 +53,8 @@ jobs:
           ANTHROPIC_DEFAULT_SONNET_MODEL: ${{ steps.ai_config.outputs.model }}
           ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ steps.ai_config.outputs.small_model }}
           ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ steps.ai_config.outputs.model }}
+          ANTHROPIC_API_KEY: ${{ steps.ai_config.outputs.api_key }}
         with:
-          anthropic_api_key: ${{ steps.ai_config.outputs.api_key }}
           claude_args: '--model ${{ steps.ai_config.outputs.model }}'
 
           # This is an optional setting that allows Claude to read CI results on PRs
