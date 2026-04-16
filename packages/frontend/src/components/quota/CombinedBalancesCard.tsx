@@ -23,6 +23,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   kilo: 'Kilo',
   poe: 'POE',
   apertis: 'Apertis',
+  neuralwatt: 'Neuralwatt',
 };
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({

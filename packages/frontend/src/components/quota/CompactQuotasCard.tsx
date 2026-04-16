@@ -52,6 +52,8 @@ export const getCheckerCategory = (quota: QuotaCheckerInfo): string => {
   if (id.includes('gemini-cli') || id.includes('gemini')) return 'gemini-cli';
   if (id.includes('poe')) return 'poe';
   if (id.includes('ollama')) return 'ollama';
+  if (id.includes('neuralwatt-subscription')) return 'neuralwatt-subscription';
+  if (id.includes('neuralwatt')) return 'neuralwatt';
   return 'default';
 };
 
@@ -72,6 +74,8 @@ const getTypeDisplayName = (category: string): string => {
     'gemini-cli': 'Gemini CLI',
     poe: 'POE',
     ollama: 'Ollama',
+    'neuralwatt-subscription': 'Neuralwatt',
+    neuralwatt: 'Neuralwatt',
   };
   return names[category] || toTitleCase(category);
 };
@@ -101,6 +105,7 @@ const formatCheckerDisplayName = (quota: QuotaCheckerInfo): string => {
     'poe-',
     'wisdomgate-',
     'ollama-',
+    'neuralwatt-',
   ];
   for (const prefix of prefixes) {
     if (displayPart.toLowerCase().startsWith(prefix)) {
@@ -153,6 +158,10 @@ const getCheckerIcon = (category: string) => {
       return <Wallet className={iconClass} />;
     case 'ollama':
       return <Bot className={iconClass} />;
+    case 'neuralwatt-subscription':
+      return <Zap className={iconClass} />;
+    case 'neuralwatt':
+      return <Wallet className={iconClass} />;
     default:
       return <Bot className={iconClass} />;
   }
@@ -190,6 +199,8 @@ export const getTrackedWindowsForChecker = (category: string, windows: any[]): s
       return ['five_hour'].filter((t) => availableTypes.has(t));
     case 'ollama':
       return ['five_hour', 'weekly'].filter((t) => availableTypes.has(t));
+    case 'neuralwatt-subscription':
+      return ['monthly'].filter((t) => availableTypes.has(t));
     default:
       return Array.from(availableTypes)
         .filter((t) => t !== 'subscription')
