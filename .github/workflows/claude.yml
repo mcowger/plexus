@@ -4,10 +4,10 @@ name: Claude Code
 # the Claude Code action uses. It must be a JSON object with this shape:
 #
 #   {
-#     "base_url": "<url>",    # Plexus proxy URL → ANTHROPIC_BASE_URL
-#     "model_name": "glm-5.1",                    # Main work model → --model, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_DEFAULT_OPUS_MODEL
-#     "small_model_name": "claude-haiku-4-5",      # Classification model → ANTHROPIC_SMALL_FAST_MODEL, ANTHROPIC_DEFAULT_HAIKU_MODEL
-#     "api_key": "sk-..."                          # API key → ANTHROPIC_API_KEY (auto-masked via core.setSecret)
+#     "base_url": "<url>",                            # Proxy URL → ANTHROPIC_BASE_URL
+#     "model_name": "glm-5.1",                        # Main work model → --model, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_DEFAULT_OPUS_MODEL
+#     "small_model_name": "claude-haiku-4-5",          # Classification model → ANTHROPIC_SMALL_FAST_MODEL, ANTHROPIC_DEFAULT_HAIKU_MODEL
+#     "api_key": "sk-..."                              # API key → ANTHROPIC_API_KEY (auto-masked via core.setSecret)
 #   }
 #
 on:
