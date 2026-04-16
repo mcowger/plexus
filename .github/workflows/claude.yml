@@ -62,46 +62,20 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
-          claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
+          # --allowedTools is the SDK hard allowlist (the only list that matters).
+          # settings.permissions.allow only controls auto-approval in ~/.claude/settings.json,
+          # which does NOT add tools to the SDK's allowedTools.
+          # The action auto-injects git/git-push tools; we add file editing and shell access.
+          claude_args: >-
+            --model ${{ vars.PLEXUS_MODEL }}
+            --allowedTools Write,Edit,"Bash(*)"
           settings: |
             {
               "permissions": {
                 "allow": [
                   "Write",
                   "Edit",
-                  "Bash(git push:*)",
-                  "Bash(git status:*)",
-                  "Bash(git diff:*)",
-                  "Bash(git log:*)",
-                  "Bash(git checkout:*)",
-                  "Bash(git fetch:*)",
-                  "Bash(git branch:*)",
-                  "Bash(git rm:*)",
-                  "Bash(bun install:*)",
-                  "Bash(bun run:*)",
-                  "Bash(bun test:*)",
-                  "Bash(bunx:*)",
-                  "Bash(npm run:*)",
-                  "Bash(mkdir:*)",
-                  "Bash(mv:*)",
-                  "Bash(cp:*)",
-                  "Bash(rm:*)",
-                  "Bash(ls:*)",
-                  "Bash(cat:*)",
-                  "Bash(find:*)",
-                  "Bash(grep:*)",
-                  "Bash(head:*)",
-                  "Bash(tail:*)",
-                  "Bash(wc:*)",
-                  "Bash(dirname:*)",
-                  "Bash(basename:*)",
-                  "Bash(sort:*)",
-                  "Bash(uniq:*)",
-                  "Bash(realpath:*)",
-                  "Bash(readlink:*)",
-                  "Bash(test:*)",
-                  "Bash(touch:*)",
-                  "Bash(chmod:*)"
+                  "Bash(*)"
                 ]
               }
             }
@@ -132,7 +106,7 @@ jobs:
               issues.push('Claude reported an error during execution');
             }
             if (exec.permission_denials_count > 0) {
-              issues.push(`Claude was denied permission ${exec.permission_denials_count} time(s) — likely missing tools in the allowed list. Add Write, Edit, etc. to the workflow settings.permissions.allow list.`);
+              issues.push(`Claude was denied permission ${exec.permission_denials_count} time(s) — missing tools in --allowedTools. Check the workflow's claude_args.`);
             }
             if (!branchName) {
               issues.push('No branch was created — Claude may not have made any code changes');
