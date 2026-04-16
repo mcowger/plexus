@@ -267,29 +267,29 @@ jobs:
           Output ONLY the release notes in markdown format. Do NOT include any explanatory text, metadata, introductory phrases, or concluding remarks. Start IMMEDIATELY with the version heading. Do not preface your response with any text whatsoever.
           PROMPT_EOF
 
-      - name: Parse AI config from secret
-        id: ai_config
+      - name: Register secrets for masking
         uses: actions/github-script@v9
-        env:
-          AI_DATA: ${{ secrets.AI_DATA }}
         with:
           script: |
-            const ai = JSON.parse(process.env.AI_DATA);
-            core.setOutput('base_url', ai.base_url);
-            core.setOutput('model', ai.model_name);
-            core.setOutput('api_key', ai.api_key);
+            core.setSecret(process.env.PLEXUS_API_KEY)
+            core.setSecret(process.env.PLEXUS_BASE_URL)
+        env:
+          PLEXUS_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PLEXUS_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
 
       - name: Generate Release Notes with Claude
         id: release_notes
         uses: anthropics/claude-code-base-action@beta
+        env:
+          ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          ANTHROPIC_SMALL_FAST_MODEL: ${{ vars.PLEXUS_SMALL_MODEL }}
+          ANTHROPIC_DEFAULT_SONNET_MODEL: ${{ vars.PLEXUS_MODEL }}
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ vars.PLEXUS_SMALL_MODEL }}
+          ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ vars.PLEXUS_MODEL }}
         with:
-          claude_env: |
-            ANTHROPIC_AUTH_TOKEN: ${{ steps.ai_config.outputs.api_key }}
-            ANTHROPIC_BASE_URL: ${{ steps.ai_config.outputs.base_url }}
-            ANTHROPIC_SMALL_FAST_MODEL: ${{ steps.ai_config.outputs.model }}
-          anthropic_api_key: ${{ steps.ai_config.outputs.api_key }}
-          api_base_url: ${{ steps.ai_config.outputs.base_url }}
-          model: ${{ steps.ai_config.outputs.model }}
+          anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
+          claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
           allowed_tools: "Bash(git:*),Read"
           prompt_file: /tmp/release_notes_prompt.md
 
