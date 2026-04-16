@@ -15,7 +15,7 @@
     "@types/react-dom": "^19.2.3",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "@plexus/shared": "workspace:*",
@@ -34,6 +34,6 @@
     "yaml": "^2.8.3"
   },
   "peerDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
