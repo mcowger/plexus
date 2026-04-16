@@ -85,6 +85,15 @@ export class QuotaEnforcer {
       .where(eq(schema.quotaState.keyName, keyName))
       .limit(1);
 
+    if (existingState.length > 0) {
+      const s = existingState[0]!;
+      logger.info(
+        `[QuotaEnforcer] checkQuota DB state for ${keyName}: currentUsage=${s.currentUsage}, windowStart=${JSON.stringify(s.windowStart)}, lastUpdated=${JSON.stringify(s.lastUpdated)}, quotaName=${s.quotaName}, limitType=${s.limitType}`
+      );
+    } else {
+      logger.info(`[QuotaEnforcer] checkQuota: no DB state found for ${keyName}`);
+    }
+
     let currentUsage: number;
     let windowStartDate: Date | null = null;
     let lastUpdatedDate: Date;
@@ -168,6 +177,9 @@ export class QuotaEnforcer {
           quotaDef.type === 'monthly'
         ) {
           const expectedWindowStart = this.getWindowStart(quotaDef.type);
+          logger.info(
+            `[QuotaEnforcer] checkQuota calendar check for ${keyName}: windowStartFromDB=${windowStartDate?.getTime()}, expectedWindowStart=${expectedWindowStart}, match=${windowStartDate?.getTime() === expectedWindowStart}`
+          );
           if (!windowStartDate || windowStartDate.getTime() !== expectedWindowStart) {
             // Window has reset
             logger.debug(`[QuotaEnforcer] Calendar quota ${quotaName} for ${keyName} reset`);
@@ -276,6 +288,9 @@ export class QuotaEnforcer {
       limitType: quotaDef.limitType,
     };
 
+    logger.info(
+      `[QuotaEnforcer] Quota check result for ${keyName}: currentUsage=${result.currentUsage}, remaining=${result.remaining}, allowed=${result.allowed}`
+    );
     logger.debug(`[QuotaEnforcer] Quota check for ${keyName}:`, result);
 
     return result;
@@ -287,15 +302,23 @@ export class QuotaEnforcer {
   async recordUsage(keyName: string, usageRecord: UsageRecord): Promise<void> {
     const config = getConfig();
 
+    logger.info(
+      `[QuotaEnforcer] recordUsage called for ${keyName}: costTotal=${usageRecord.costTotal}, tokensInput=${usageRecord.tokensInput}, tokensOutput=${usageRecord.tokensOutput}`
+    );
+
     // Get key configuration
     const keyConfig = config.keys?.[keyName];
     if (!keyConfig?.quota) {
+      logger.info(`[QuotaEnforcer] recordUsage: no quota assigned for key ${keyName}, skipping`);
       return; // No quota assigned, nothing to record
     }
 
     // Get quota definition
     const quotaDef = config.user_quotas?.[keyConfig.quota];
     if (!quotaDef) {
+      logger.info(
+        `[QuotaEnforcer] recordUsage: quota definition ${keyConfig.quota} not found for key ${keyName}, skipping`
+      );
       return;
     }
 
@@ -306,6 +329,9 @@ export class QuotaEnforcer {
     } else if (quotaDef.limitType === 'cost') {
       // cost: use costTotal directly
       usageValue = usageRecord.costTotal || 0;
+      logger.info(
+        `[QuotaEnforcer] recordUsage cost calculation: costTotal=${usageRecord.costTotal}, usageValue=${usageValue}`
+      );
     } else {
       // tokens: sum of input + output
       usageValue =
