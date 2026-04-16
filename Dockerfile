@@ -12,6 +12,7 @@ COPY package.json bun.lock ./
 # Copy package-specific package.json files
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/frontend/package.json ./packages/frontend/
+COPY packages/shared/package.json ./packages/shared/
 
 # Install dependencies
 RUN bun install --frozen-lockfile

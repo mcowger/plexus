@@ -20,6 +20,7 @@ import type {
   CooldownPolicy,
   MetadataOverrides,
 } from '../config';
+import { resolveGpuParams } from '@plexus/shared';
 
 // Helper to parse JSON from SQLite text columns (PG jsonb auto-deserializes)
 function parseJson<T>(value: unknown): T | null {
@@ -298,6 +299,12 @@ export class ConfigRepository {
       quotaCheckerOptions: config.quota_checker?.options
         ? encryptJsonField(config.quota_checker.options)
         : null,
+      // GPU Profile settings for inference energy calculation
+      gpuProfile: config.gpu_profile ?? null,
+      gpuRamGb: config.gpu_ram_gb ?? null,
+      gpuBandwidthTbS: config.gpu_bandwidth_tb_s ?? null,
+      gpuFlopsTflop: config.gpu_flops_tflop ?? null,
+      gpuPowerDrawWatts: config.gpu_power_draw_watts ?? null,
       updatedAt: timestamp,
     };
 
@@ -461,6 +468,52 @@ export class ConfigRepository {
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
       ...(quota_checker ? { quota_checker } : {}),
+      // GPU Profile settings — resolve named profiles to concrete values for
+      // backward compatibility with existing DB rows that may only have gpuProfile
+      // set without the numeric fields.
+      ...(() => {
+        const gpuProfile = row.gpuProfile;
+        if (!gpuProfile) {
+          // No profile set — include whatever numeric fields exist
+          return {
+            ...(row.gpuRamGb != null ? { gpu_ram_gb: row.gpuRamGb } : {}),
+            ...(row.gpuBandwidthTbS != null ? { gpu_bandwidth_tb_s: row.gpuBandwidthTbS } : {}),
+            ...(row.gpuFlopsTflop != null ? { gpu_flops_tflop: row.gpuFlopsTflop } : {}),
+            ...(row.gpuPowerDrawWatts != null
+              ? { gpu_power_draw_watts: row.gpuPowerDrawWatts }
+              : {}),
+          };
+        }
+        // Profile name exists — if any numeric field is missing, resolve from the profile name
+        if (row.gpuRamGb == null || row.gpuBandwidthTbS == null) {
+          const resolved = resolveGpuParams(
+            gpuProfile,
+            gpuProfile === 'custom'
+              ? {
+                  ram_gb: row.gpuRamGb ?? undefined,
+                  bandwidth_tb_s: row.gpuBandwidthTbS ?? undefined,
+                  flops_tflop: row.gpuFlopsTflop ?? undefined,
+                  power_draw_watts: row.gpuPowerDrawWatts ?? undefined,
+                }
+              : undefined
+          );
+          return {
+            gpu_profile: gpuProfile,
+            gpu_ram_gb: resolved.ram_gb,
+            gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+            gpu_flops_tflop: resolved.flops_tflop,
+            gpu_power_draw_watts: resolved.power_draw_watts,
+          };
+        }
+        // All numeric fields already present — just use them directly
+        return {
+          gpu_profile: gpuProfile,
+          gpu_ram_gb: row.gpuRamGb!,
+          gpu_bandwidth_tb_s: row.gpuBandwidthTbS!,
+          gpu_flops_tflop: row.gpuFlopsTflop!,
+          gpu_power_draw_watts: row.gpuPowerDrawWatts!,
+        };
+      })(),
     };
 
     return result as ProviderConfig;
@@ -555,6 +608,8 @@ export class ConfigRepository {
       metadataSource: config.metadata?.source ?? null,
       metadataSourcePath: config.metadata?.source_path ?? null,
       useImageFallthrough: fromBool(config.use_image_fallthrough === true),
+      // Model architecture override for inference energy calculation
+      modelArchitecture: config.model_architecture ? toJson(config.model_architecture) : null,
       updatedAt: timestamp,
     };
 
@@ -661,6 +716,8 @@ export class ConfigRepository {
       ...(row.modelType ? { type: row.modelType } : {}),
       ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),
       ...(row.advanced ? { advanced: parseJson(row.advanced) } : {}),
+      // Model architecture override for inference energy calculation
+      ...(row.modelArchitecture ? { model_architecture: parseJson(row.modelArchitecture) } : {}),
     };
 
     if (row.metadataSource) {

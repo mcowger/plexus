@@ -2,6 +2,8 @@ import { z } from 'zod';
 import yaml from 'yaml';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
+import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
+import type { ModelArchitecture } from '@plexus/shared';
 
 // --- Zod Schemas ---
 
@@ -347,6 +349,14 @@ export const ProviderConfigSchema = z
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
+    // GPU Profile settings — gpu_profile is a display hint (e.g. 'H100', 'custom').
+    // The 4 numeric fields are the source of truth; the frontend resolves named
+    // profiles to concrete values before saving. The backend never resolves.
+    gpu_profile: z.enum(VALID_GPU_PROFILES as unknown as [string, ...string[]]).optional(),
+    gpu_ram_gb: z.number().positive().optional(),
+    gpu_bandwidth_tb_s: z.number().positive().optional(),
+    gpu_flops_tflop: z.number().positive().optional(),
+    gpu_power_draw_watts: z.number().positive().optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",
@@ -483,6 +493,21 @@ export const ModelConfigSchema = z.object({
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   advanced: z.array(ModelBehaviorSchema).optional(),
   metadata: ModelMetadataSchema.optional(),
+  // Model architecture override for inference energy calculation
+  model_architecture: z
+    .object({
+      total_params: z.number().positive().optional(),
+      active_params: z.number().positive().optional(),
+      layers: z.number().int().positive().optional(),
+      heads: z.number().int().positive().optional(),
+      kv_lora_rank: z.number().int().positive().optional(),
+      qk_rope_head_dim: z.number().int().positive().optional(),
+      context_length: z.number().int().positive().optional(),
+      dtype: z
+        .enum(['fp16', 'bf16', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'nvfp4', 'int4', 'int8'])
+        .optional(),
+    })
+    .optional(),
 });
 
 export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
@@ -550,6 +575,7 @@ export type DatabaseConfig = {
   connectionString: string;
 };
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
+export type ModelProviderConfig = z.infer<typeof ModelProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
@@ -626,8 +652,39 @@ export function validateConfig(yamlContent: string): PlexusConfig {
 }
 
 function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
+  // Resolve GPU profiles for providers loaded from YAML.
+  // If a provider has gpu_profile set but the numeric fields aren't populated,
+  // resolve them now so the backend never needs to resolve at request time.
+  const resolvedProviders: Record<string, ProviderConfig> = {};
+  for (const [providerId, providerConfig] of Object.entries(config.providers)) {
+    const pc = providerConfig as ProviderConfig;
+    if (pc.gpu_profile && (pc.gpu_ram_gb == null || pc.gpu_bandwidth_tb_s == null)) {
+      const resolved = resolveGpuParams(
+        pc.gpu_profile,
+        pc.gpu_profile === 'custom'
+          ? {
+              ram_gb: pc.gpu_ram_gb,
+              bandwidth_tb_s: pc.gpu_bandwidth_tb_s,
+              flops_tflop: pc.gpu_flops_tflop,
+              power_draw_watts: pc.gpu_power_draw_watts,
+            }
+          : undefined
+      );
+      resolvedProviders[providerId] = {
+        ...pc,
+        gpu_ram_gb: resolved.ram_gb,
+        gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+        gpu_flops_tflop: resolved.flops_tflop,
+        gpu_power_draw_watts: resolved.power_draw_watts,
+      };
+    } else {
+      resolvedProviders[providerId] = pc;
+    }
+  }
+
   return {
     ...config,
+    providers: resolvedProviders,
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
     cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
     quotas: buildProviderQuotaConfigs(config),

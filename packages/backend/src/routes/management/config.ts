@@ -8,8 +8,66 @@ import {
   McpServerConfigSchema,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
+import { UsageStorageService } from '../../services/usage-storage';
+import type { GpuParams, ModelArchitecture } from '@plexus/shared';
+import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
 
-export async function registerConfigRoutes(fastify: FastifyInstance) {
+/**
+ * Build a map of provider slug -> resolved GpuParams from current config.
+ * Used by recalculateEnergyIfChanged to pass concrete GPU params
+ * instead of profile names.
+ */
+function buildProviderGpuParamsMap(
+  configService: ConfigService
+): Record<string, GpuParams> | undefined {
+  const config = configService.getConfig();
+  if (!config?.providers) return undefined;
+
+  const map: Record<string, GpuParams> = {};
+  let hasAny = false;
+  for (const [slug, provider] of Object.entries(config.providers)) {
+    if (provider.gpu_ram_gb != null || provider.gpu_bandwidth_tb_s != null) {
+      map[slug] = {
+        ram_gb: provider.gpu_ram_gb ?? DEFAULT_GPU_PARAMS.ram_gb,
+        bandwidth_tb_s: provider.gpu_bandwidth_tb_s ?? DEFAULT_GPU_PARAMS.bandwidth_tb_s,
+        flops_tflop: provider.gpu_flops_tflop ?? DEFAULT_GPU_PARAMS.flops_tflop,
+        power_draw_watts: provider.gpu_power_draw_watts ?? DEFAULT_GPU_PARAMS.power_draw_watts,
+      };
+      hasAny = true;
+    }
+  }
+  return hasAny ? map : undefined;
+}
+
+/**
+ * Shared helper: recalculate energy usage for an alias if model_architecture was provided.
+ * Used by both PUT and PATCH alias handlers to avoid duplication.
+ */
+async function recalculateEnergyIfChanged(
+  slug: string,
+  model_architecture: ModelArchitecture | undefined,
+  usageStorage?: UsageStorageService,
+  providerGpuParams?: Record<string, GpuParams>
+) {
+  if (model_architecture && usageStorage) {
+    try {
+      const updated = await usageStorage.recalculateEnergyForAlias(
+        slug,
+        model_architecture,
+        providerGpuParams
+      );
+      logger.info(`Recalculated energy for ${updated} requests for alias '${slug}'`);
+    } catch (recalcError) {
+      // Don't fail the save if recalculation fails, just log the error
+      logger.error(`Failed to recalculate energy for alias '${slug}'`, recalcError);
+    }
+  }
+}
+
+export async function registerConfigRoutes(
+  fastify: FastifyInstance,
+  usageStorage?: UsageStorageService
+) {
   const configService = ConfigService.getInstance();
 
   // ─── Config Status ────────────────────────────────────────────────
@@ -153,6 +211,14 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
     }
     try {
       await configService.saveAlias(slug, result.data);
+
+      await recalculateEnergyIfChanged(
+        slug,
+        result.data.model_architecture,
+        usageStorage,
+        buildProviderGpuParamsMap(configService)
+      );
+
       logger.info(`Model alias '${slug}' saved via API (PUT)`);
       return reply.send({ success: true, slug });
     } catch (e: any) {
@@ -180,6 +246,14 @@ export async function registerConfigRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.errors });
       }
       await configService.saveAlias(slug, result.data);
+
+      await recalculateEnergyIfChanged(
+        slug,
+        result.data.model_architecture,
+        usageStorage,
+        buildProviderGpuParamsMap(configService)
+      );
+
       logger.info(`Model alias '${slug}' updated via API (PATCH)`);
       return reply.send({ success: true, slug });
     } catch (e: any) {

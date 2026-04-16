@@ -19,6 +19,7 @@ import { registerProviderRoutes } from './management/providers';
 import { registerMetricsRoutes } from './management/metrics';
 import { registerSelfRoutes } from './management/self';
 import { authenticate, requireAdmin, ManagementAuthError } from './management/_principal';
+import { registerModelRoutes } from './management/models';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -48,25 +49,21 @@ export async function registerManagementRoutes(
     // Verify endpoint runs the authentication hook but has no further checks,
     // so the login page can call it with a candidate credential. Returns
     // principal info (role + key metadata for limited users) on success.
-    mgmt.get(
-      '/v0/management/auth/verify',
-      { preHandler: authenticate },
-      async (request, reply) => {
-        const p = request.principal!;
-        if (p.role === 'admin') {
-          return reply.send({ ok: true, role: 'admin' });
-        }
-        return reply.send({
-          ok: true,
-          role: 'limited',
-          keyName: p.keyName,
-          allowedProviders: p.allowedProviders,
-          allowedModels: p.allowedModels,
-          quotaName: p.quotaName ?? null,
-          comment: p.comment ?? null,
-        });
+    mgmt.get('/v0/management/auth/verify', { preHandler: authenticate }, async (request, reply) => {
+      const p = request.principal!;
+      if (p.role === 'admin') {
+        return reply.send({ ok: true, role: 'admin' });
       }
-    );
+      return reply.send({
+        ok: true,
+        role: 'limited',
+        keyName: p.keyName,
+        allowedProviders: p.allowedProviders,
+        allowedModels: p.allowedModels,
+        quotaName: p.quotaName ?? null,
+        comment: p.comment ?? null,
+      });
+    });
 
     // Limited-user routes: authenticated, but not admin-gated. Handlers must
     // enforce their own scoping (or use requireAdmin where appropriate).
@@ -92,7 +89,7 @@ export async function registerManagementRoutes(
       adminOnly.addHook('preHandler', authenticate);
       adminOnly.addHook('preHandler', requireAdmin);
 
-      await registerConfigRoutes(adminOnly);
+      await registerConfigRoutes(adminOnly, usageStorage);
       await registerSystemLogRoutes(adminOnly);
       await registerTestRoutes(adminOnly, dispatcher);
       await registerOAuthRoutes(adminOnly);
@@ -111,6 +108,8 @@ export async function registerManagementRoutes(
         await registerQuotaEnforcementRoutes(adminOnly, quotaEnforcer);
       }
       await registerUserQuotaRoutes(adminOnly);
+      // Model routes for AI energy calculations
+      await registerModelRoutes(adminOnly);
     });
   });
 }

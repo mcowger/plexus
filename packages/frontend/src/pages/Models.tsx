@@ -71,6 +71,11 @@ export const Models = () => {
   const [metadataQuery, setMetadataQuery] = useState('');
   const [metadataResults, setMetadataResults] = useState<{ id: string; name: string }[]>([]);
   const [isMetadataSearching, setIsMetadataSearching] = useState(false);
+
+  // HuggingFace model architecture fetch state
+  const [hfModelId, setHfModelId] = useState('');
+  const [isFetchingHfModel, setIsFetchingHfModel] = useState(false);
+  const [hfFetchError, setHfFetchError] = useState<string | null>(null);
   const [showMetadataDropdown, setShowMetadataDropdown] = useState(false);
   const metadataSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const metadataInputWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -808,6 +813,43 @@ export const Models = () => {
     return n;
   };
 
+  // Fetch model architecture from HuggingFace via backend API
+  const fetchHfModelArchitecture = async () => {
+    if (!hfModelId.trim()) {
+      setHfFetchError('Please enter a Hugging Face model ID');
+      return;
+    }
+
+    setIsFetchingHfModel(true);
+    setHfFetchError(null);
+
+    try {
+      const modelId = hfModelId.trim();
+
+      // Call backend API to fetch model architecture
+      const data = await api.fetchHuggingFaceModelArchitecture(modelId);
+      const arch = data.architecture;
+
+      setEditingAlias({
+        ...editingAlias,
+        model_architecture: {
+          total_params: arch.total_params,
+          active_params: arch.active_params,
+          layers: arch.layers,
+          heads: arch.heads,
+          kv_lora_rank: arch.kv_lora_rank,
+          qk_rope_head_dim: arch.qk_rope_head_dim,
+          context_length: arch.context_length,
+          dtype: arch.dtype as NonNullable<Alias['model_architecture']>['dtype'],
+        },
+      });
+    } catch (error) {
+      setHfFetchError(error instanceof Error ? error.message : 'Failed to fetch model config');
+    } finally {
+      setIsFetchingHfModel(false);
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
@@ -1079,6 +1121,260 @@ export const Models = () => {
           </p>
 
           <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+
+          {/* Model Architecture section for inference energy calculation */}
+          <div className="flex flex-col gap-2">
+            <label className="font-body text-[13px] font-medium text-text-secondary">
+              Model Architecture
+            </label>
+            <p className="text-[11px] text-text-muted">
+              Fetch model architecture from Hugging Face or enter manually. These values are used
+              for energy calculation.
+            </p>
+
+            {/* Display currently saved architecture values */}
+            {editingAlias.model_architecture?.total_params && (
+              <div className="px-3 py-2 bg-bg-subtle border border-border-glass rounded-md">
+                <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
+                  Currently Saved:
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text">
+                  {editingAlias.model_architecture.total_params && (
+                    <span>{editingAlias.model_architecture.total_params}B params</span>
+                  )}
+                  {editingAlias.model_architecture.active_params && (
+                    <span>({editingAlias.model_architecture.active_params}B active)</span>
+                  )}
+                  {editingAlias.model_architecture.layers && (
+                    <span>{editingAlias.model_architecture.layers} layers</span>
+                  )}
+                  {editingAlias.model_architecture.heads && (
+                    <span>{editingAlias.model_architecture.heads} heads</span>
+                  )}
+                  {editingAlias.model_architecture.dtype && (
+                    <span className="text-primary">
+                      {editingAlias.model_architecture.dtype.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* HuggingFace Model ID input and fetch button */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Hugging Face Model ID
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  value={hfModelId}
+                  onChange={(e) => setHfModelId(e.target.value)}
+                  placeholder="e.g. meta-llama/Llama-3.1-70B-Instruct"
+                  onKeyDown={(e) => e.key === 'Enter' && fetchHfModelArchitecture()}
+                />
+              </div>
+              <Button
+                onClick={fetchHfModelArchitecture}
+                isLoading={isFetchingHfModel}
+                disabled={isFetchingHfModel}
+                variant="secondary"
+              >
+                Fetch from HF
+              </Button>
+            </div>
+
+            {hfFetchError && (
+              <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
+                {hfFetchError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 p-3 border border-border-glass rounded-md bg-bg-subtle">
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Total Params (B)
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={editingAlias.model_architecture?.total_params || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        total_params: parseFloat(e.target.value) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 1.76"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Active Params (B)
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={editingAlias.model_architecture?.active_params || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        active_params: parseFloat(e.target.value) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 1.76"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Layers
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={editingAlias.model_architecture?.layers || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        layers: parseInt(e.target.value, 10) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 120"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Heads
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={editingAlias.model_architecture?.heads || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        heads: parseInt(e.target.value, 10) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 96"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  KV LoRA Rank
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={editingAlias.model_architecture?.kv_lora_rank || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        kv_lora_rank: parseInt(e.target.value, 10) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 128"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  RoPE Head Dim
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={editingAlias.model_architecture?.qk_rope_head_dim || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        qk_rope_head_dim: parseInt(e.target.value, 10) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 96"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Context Length
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={editingAlias.model_architecture?.context_length || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        context_length: parseInt(e.target.value, 10) || undefined,
+                      },
+                    })
+                  }
+                  placeholder="e.g. 128000"
+                />
+              </div>
+              <div>
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Data Type
+                </label>
+                <select
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  value={editingAlias.model_architecture?.dtype || ''}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      model_architecture: {
+                        ...editingAlias.model_architecture,
+                        dtype: (e.target.value as any) || undefined,
+                      },
+                    })
+                  }
+                >
+                  <option value="">Default (FP16)</option>
+                  <option value="fp16">FP16</option>
+                  <option value="bf16">BF16</option>
+                  <option value="fp8">FP8</option>
+                  <option value="fp8_e4m3">FP8 E4M3</option>
+                  <option value="fp8_e5m2">FP8 E5M2</option>
+                  <option value="nvfp4">NVFP4</option>
+                  <option value="int4">INT4</option>
+                  <option value="int8">INT8</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
           {/* Advanced accordion */}
           <div className="border border-border-glass rounded-sm overflow-hidden">
@@ -1780,10 +2076,10 @@ export const Models = () => {
               placeholder="Search models (e.g. 'gpt-4', 'claude')"
               value={substring}
               onChange={(e) => setSubstring(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearchModels()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchModels()}
               style={{ flex: 1 }}
             />
-            <Button onClick={handleSearchModels}>Search</Button>
+            <Button onClick={() => handleSearchModels()}>Search</Button>
           </div>
 
           {filteredModels.length > 0 ? (

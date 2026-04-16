@@ -31,7 +31,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
 import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
-import { SlicesToasted } from '../../SlicesToasted';
+import { TotalEnergyComparison } from '../../TotalEnergyComparison';
 import { TimeRangeSelector } from '../TimeRangeSelector';
 import type { CustomDateRange } from '../../../lib/date';
 import {
@@ -109,6 +109,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
    */
   const [concurrencyByProvider, setConcurrencyByProvider] = useState<ConcurrencyData[]>([]);
   const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
+  const [energySummary, setEnergySummary] = useState<{
+    totalKwhUsed: number;
+  } | null>(null);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -137,6 +140,28 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     if (timeRange === 'custom' && customDateRange) {
       startDate = customDateRange.start.toISOString();
       endDate = customDateRange.end.toISOString();
+    } else {
+      // Calculate date range for non-custom time ranges
+      const now = new Date();
+      const rangeStart = new Date(now);
+
+      switch (timeRange) {
+        case 'hour':
+          rangeStart.setHours(rangeStart.getHours() - 1);
+          break;
+        case 'day':
+          rangeStart.setHours(rangeStart.getHours() - 24);
+          break;
+        case 'week':
+          rangeStart.setDate(rangeStart.getDate() - 7);
+          break;
+        case 'month':
+          rangeStart.setDate(rangeStart.getDate() - 30);
+          break;
+      }
+
+      startDate = rangeStart.toISOString();
+      endDate = now.toISOString();
     }
 
     // Use summary endpoint for time-series data (much more efficient)
@@ -151,6 +176,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     api
       .getConcurrencyData(timeRange, 'timeline', 'model', startDate, endDate)
       .then(setConcurrencyByModel);
+    api
+      .getEnergySummary(timeRange, true, startDate, endDate)
+      .then((summary) => setEnergySummary(summary));
   }, [timeRange, customDateRange]);
 
   // ---------------------------------------------------------------------------
@@ -659,9 +687,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           <div style={{ height: 300, marginTop: '12px' }}>{renderPieChart('tokens', keyData)}</div>
         </Card>
 
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Slices of bread toasted">
+        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Comparisons">
           <div style={{ marginTop: '12px', height: 300 }}>
-            <SlicesToasted data={data} />
+            <TotalEnergyComparison totalKwh={energySummary?.totalKwhUsed} />
           </div>
         </Card>
       </div>

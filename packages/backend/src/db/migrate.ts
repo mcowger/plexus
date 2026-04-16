@@ -132,9 +132,9 @@ function attemptSQLiteAlreadyExistsRepair(
     );
     if (!refersToObject) continue;
 
-    const alreadyApplied = sqlite.query(
-      `SELECT id FROM ${DRIZZLE_MIGRATIONS_TABLE} WHERE hash = ?`
-    ).get(migration.hash);
+    const alreadyApplied = sqlite
+      .query(`SELECT id FROM ${DRIZZLE_MIGRATIONS_TABLE} WHERE hash = ?`)
+      .get(migration.hash);
     if (alreadyApplied) continue;
 
     logger.warn(

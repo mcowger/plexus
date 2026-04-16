@@ -1,44 +1,15 @@
 /**
  * Inference Energy Estimator
  *
- * Estimates the GPU cluster energy consumed for an LLM inference request
- * based on input/output token counts, model architecture parameters, and
- * GPU hardware specifications.
- *
- * The calculation models tensor parallelism, KV cache memory, prefill/decode
- * throughput, and applies a PUE-equivalent wall-power multiplier of 1.4x.
+ * Pure calculation module — takes fully-populated ModelParams and GpuParams,
+ * returns energy metrics. No defaults, no resolution, no merging.
+ * The caller is responsible for populating all fields before calling.
  */
 
-export interface ModelParams {
-  total_params: number;
-  active_params: number;
-  layers: number;
-  context_length: number;
-  kv_lora_rank: number;
-  qk_rope_head_dim: number;
-  dtype_size?: number;
-  heads: number;
-}
-
-export interface GpuParams {
-  ram_gb: number;
-  bandwidth_tb_s: number;
-  flops_tflop: number;
-  power_draw_watts: number;
-}
-
-export interface InferenceFootprint {
-  tensor_parallelism: number;
-  concurrent_users_limit: number;
-  prefill_tps: number;
-  decode_tps: number;
-  cluster_seconds_used: number;
-  energy_kwh_wall: number;
-  system_power_kw: number;
-}
+import type { GpuParams, ModelParams, InferenceFootprint } from '@plexus/shared';
 
 /**
- * Calculates the estimated inference energy footprint for a given number of
+ * Calculates the estimated inference energy footprint for a number of
  * input and output tokens using a specific model and GPU hardware profile.
  */
 export function calculateInferenceFootprint(
@@ -53,7 +24,7 @@ export function calculateInferenceFootprint(
   const TB = 1_000 * GB;
   const TFLOP = 1_000_000_000_000;
   // 1. Model Specifics
-  const dtypeSize = modelParams.dtype_size ?? 1;
+  const dtypeSize = modelParams.dtype_size ?? 1; // Default to FP8 (1 byte)
   const weightSize = modelParams.total_params * GB * dtypeSize;
   const activeSize = modelParams.active_params * GB * dtypeSize;
 
@@ -66,11 +37,11 @@ export function calculateInferenceFootprint(
   // 2. Hardware Topology (TP Calculation)
   const gpuRamTotal = gpuParams.ram_gb * GiB;
   const tpFloor = weightSize / gpuRamTotal;
-  const tp = 2 ** Math.ceil(Math.log2(tpFloor));
+  const tp = 2 ** Math.ceil(Math.log2(Math.max(1, tpFloor)));
 
   // 3. Concurrency (U_max)
   const totalUsableRam = tp * gpuRamTotal;
-  const uMax = Math.floor((totalUsableRam - weightSize) / kvCachePerUser);
+  const uMax = Math.max(1, Math.floor((totalUsableRam - weightSize) / kvCachePerUser));
 
   // 4. Throughput (TPS)
   const totalClusterFlops = gpuParams.flops_tflop * TFLOP * tp;
@@ -85,7 +56,8 @@ export function calculateInferenceFootprint(
   const clusterSeconds = inputTokens / prefillTps + outputTokens / decodeTps;
 
   // 6. Energy & Power
-  const systemWatts = gpuParams.power_draw_watts * (tp / 8);
+  // Total cluster power = per-GPU power × number of GPUs
+  const systemWatts = gpuParams.power_draw_watts * tp;
   const energyJoules = systemWatts * clusterSeconds;
   const energyKwhCluster = energyJoules / 3_600_000;
   // 1.4x wall-power multiplier (accounts for cooling / PUE overhead)
@@ -111,41 +83,49 @@ export function toastBreadEquivalent(kwh: number): number {
   return Math.round((kwh / kwhPerSlice) * 100) / 100;
 }
 
-// ----------------------------------------------------
-// Hardcoded hardware profile (DeepSeek R1 / H100-class cluster)
-// These constants intentionally remain fixed; swap them out when a better
-// profiling approach is in place.
-// --------------------------------------------
-
-const DEFAULT_MODEL: ModelParams = {
-  total_params: 1000,
-  active_params: 32,
-  layers: 61,
-  context_length: 256000,
-  kv_lora_rank: 512,
-  qk_rope_head_dim: 64,
-  dtype_size: 1,
-  heads: 64,
-};
-
-const DEFAULT_GPU: GpuParams = {
-  ram_gb: 192,
-  bandwidth_tb_s: 8.0,
-  flops_tflop: 9000,
-  power_draw_watts: 14300,
-};
-
 /**
- * Convenience wrapper: estimates wall-power kWh for a single request given
- * input and output token counts. Returns 0 for invalid/zero inputs.
+ * Convenience wrapper: estimates wall-power kWh for a single request.
+ * Returns 0 for invalid/zero inputs.
+ *
+ * Callers must provide fully-populated ModelParams and GpuParams.
+ * Use DEFAULT_MODEL and DEFAULT_GPU_PARAMS from @plexus/shared to
+ * fill in defaults before calling.
  */
-export function estimateKwhUsed(inputTokens: number, outputTokens: number): number {
+export function estimateKwhUsed(
+  inputTokens: number,
+  outputTokens: number,
+  modelParams: ModelParams,
+  gpuParams: GpuParams
+): number {
   if (inputTokens <= 0 && outputTokens <= 0) return 0;
+
   const footprint = calculateInferenceFootprint(
-    DEFAULT_MODEL,
-    DEFAULT_GPU,
+    modelParams,
+    gpuParams,
     Math.max(0, inputTokens),
     Math.max(0, outputTokens)
   );
   return footprint.energy_kwh_wall;
+}
+
+/**
+ * Get the full inference footprint with detailed metrics.
+ * Returns null for invalid/zero inputs.
+ *
+ * Callers must provide fully-populated ModelParams and GpuParams.
+ */
+export function getInferenceFootprint(
+  inputTokens: number,
+  outputTokens: number,
+  modelParams: ModelParams,
+  gpuParams: GpuParams
+): InferenceFootprint | null {
+  if (inputTokens <= 0 && outputTokens <= 0) return null;
+
+  return calculateInferenceFootprint(
+    modelParams,
+    gpuParams,
+    Math.max(0, inputTokens),
+    Math.max(0, outputTokens)
+  );
 }

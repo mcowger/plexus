@@ -86,19 +86,11 @@ import { runMigrations } from '../src/db/migrate';
 import path from 'node:path';
 import fs from 'node:fs';
 
-// Use a file-based database in CI to avoid in-memory database issues
-// The in-memory database can have issues with worker processes in some environments
-const testDbPath = path.join(process.cwd(), '.test-db.sqlite');
-const testDbUrl = process.env.PLEXUS_TEST_DB_URL || `sqlite://${testDbPath}`;
-
-// Clean up any existing test database before initializing
-try {
-  if (fs.existsSync(testDbPath)) {
-    fs.unlinkSync(testDbPath);
-  }
-} catch {
-  // Ignore cleanup errors
-}
+// Use an in-memory database for all tests. Each test that needs an isolated DB
+// calls initializeDatabase(':memory:') directly in its own beforeEach.
+// File-based test DBs were previously used to work around worker-process issues
+// that no longer apply with Bun's test runner.
+const testDbUrl = process.env.PLEXUS_TEST_DB_URL || 'sqlite://:memory:';
 
 const testConfig = `
 database:
@@ -112,6 +104,24 @@ keys: {}
 // Set the test config
 const { setConfigForTesting, validateConfig } = await import('../src/config');
 setConfigForTesting(validateConfig(testConfig));
+
+// Generate migration files from Drizzle schema so the test DB has all columns.
+// This is needed because migration SQL files are not committed (CI generates them
+// on merge to main). Without this step, test DB would be missing columns defined
+// in the schema but not yet present in any tracked migration file.
+import { execSync } from 'node:child_process';
+try {
+  execSync('bunx drizzle-kit generate --config=drizzle.config.ts', {
+    cwd: path.resolve(import.meta.dir, '..'),
+    stdio: 'pipe',
+  });
+  execSync('bunx drizzle-kit generate --config=drizzle.config.pg.ts', {
+    cwd: path.resolve(import.meta.dir, '..'),
+    stdio: 'pipe',
+  });
+} catch {
+  // Migration files may already exist; ignore errors from re-generation.
+}
 
 // Initialize database with the test config
 initializeDatabase(testDbUrl);

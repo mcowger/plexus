@@ -3,29 +3,12 @@ import {
   calculateInferenceFootprint,
   estimateKwhUsed,
   toastBreadEquivalent,
-  type ModelParams,
-  type GpuParams,
 } from '../src/services/inference-energy';
+import { DEFAULT_MODEL, GPU_PRESETS } from '@plexus/shared';
+import type { GpuParams, ModelParams } from '@plexus/shared';
 
-// Mirrors the hardcoded defaults inside inference-energy.ts so we can
-// cross-check the convenience wrapper against the raw function.
-const DEFAULT_MODEL: ModelParams = {
-  total_params: 1000,
-  active_params: 32,
-  layers: 61,
-  context_length: 256000,
-  kv_lora_rank: 512,
-  qk_rope_head_dim: 64,
-  dtype_size: 1,
-  heads: 64,
-};
-
-const DEFAULT_GPU: GpuParams = {
-  ram_gb: 192,
-  bandwidth_tb_s: 8.0,
-  flops_tflop: 9000,
-  power_draw_watts: 14300,
-};
+// Use B200 per-GPU specs from shared presets for test defaults
+const DEFAULT_GPU: GpuParams = GPU_PRESETS.B200!;
 
 describe('calculateInferenceFootprint', () => {
   test('returns a valid footprint shape for typical token counts', () => {
@@ -64,7 +47,9 @@ describe('calculateInferenceFootprint', () => {
   });
 
   test('energy_kwh_wall is positive for non-zero token counts', () => {
-    const result = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1000, 500);
+    // Use large token counts — B200 cluster is very powerful so small
+    // counts round to 0 at 4-decimal precision
+    const result = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1_000_000, 100_000);
 
     expect(result.energy_kwh_wall).toBeGreaterThan(0);
   });
@@ -77,15 +62,15 @@ describe('calculateInferenceFootprint', () => {
   });
 
   test('more output tokens increases energy proportionally to decode cost', () => {
-    const baseline = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1000, 100);
-    const moreOutput = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1000, 1000);
+    const baseline = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 100_000, 10_000);
+    const moreOutput = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 100_000, 100_000);
 
     expect(moreOutput.energy_kwh_wall).toBeGreaterThan(baseline.energy_kwh_wall);
   });
 
   test('more input tokens increases energy proportionally to prefill cost', () => {
-    const baseline = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1000, 100);
-    const moreInput = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 10000, 100);
+    const baseline = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 100_000, 10_000);
+    const moreInput = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1_000_000, 10_000);
 
     expect(moreInput.energy_kwh_wall).toBeGreaterThan(baseline.energy_kwh_wall);
   });
@@ -102,19 +87,19 @@ describe('calculateInferenceFootprint', () => {
     expect(result.system_power_kw).toBeGreaterThan(0);
   });
 
-  test('dtype_size defaults to 1 when omitted', () => {
+  test('dtype_size defaults to 1 (FP8) when omitted', () => {
     const withDefault: ModelParams = { ...DEFAULT_MODEL, dtype_size: undefined };
     const withExplicit: ModelParams = { ...DEFAULT_MODEL, dtype_size: 1 };
 
-    const a = calculateInferenceFootprint(withDefault, DEFAULT_GPU, 1000, 500);
-    const b = calculateInferenceFootprint(withExplicit, DEFAULT_GPU, 1000, 500);
+    const a = calculateInferenceFootprint(withDefault, DEFAULT_GPU, 1_000_000, 100_000);
+    const b = calculateInferenceFootprint(withExplicit, DEFAULT_GPU, 1_000_000, 100_000);
 
     expect(a.energy_kwh_wall).toBe(b.energy_kwh_wall);
   });
 
   test('wall energy is 1.4x the cluster energy (PUE multiplier)', () => {
     // Verify the 1.4x multiplier by reconstructing cluster energy from first principles.
-    const result = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1000, 500);
+    const result = calculateInferenceFootprint(DEFAULT_MODEL, DEFAULT_GPU, 1_000_000, 100_000);
     const systemWatts = result.system_power_kw * 1000;
     const energyJoules = systemWatts * result.cluster_seconds_used;
     const kwhCluster = energyJoules / 3_600_000;
@@ -135,44 +120,44 @@ describe('calculateInferenceFootprint', () => {
 
 describe('estimateKwhUsed', () => {
   test('returns a positive number for typical token counts', () => {
-    const kwh = estimateKwhUsed(1000, 500);
+    const kwh = estimateKwhUsed(1000, 500, DEFAULT_MODEL, DEFAULT_GPU);
 
     expect(kwh).toBeGreaterThan(0);
   });
 
   test('returns 0 for zero input and zero output tokens', () => {
-    const kwh = estimateKwhUsed(0, 0);
+    const kwh = estimateKwhUsed(0, 0, DEFAULT_MODEL, DEFAULT_GPU);
 
     expect(kwh).toBe(0);
   });
 
   test('returns 0 for negative token counts', () => {
-    expect(estimateKwhUsed(-100, -50)).toBe(0);
+    expect(estimateKwhUsed(-100, -50, DEFAULT_MODEL, DEFAULT_GPU)).toBe(0);
   });
 
   test('matches calculateInferenceFootprint with default hardware constants', () => {
     const expected = calculateInferenceFootprint(
       DEFAULT_MODEL,
       DEFAULT_GPU,
-      1000,
-      500
+      1_000_000,
+      100_000
     ).energy_kwh_wall;
-    const actual = estimateKwhUsed(1000, 500);
+    const actual = estimateKwhUsed(1_000_000, 100_000, DEFAULT_MODEL, DEFAULT_GPU);
 
     expect(actual).toBe(expected);
   });
 
   test('scales monotonically: more tokens → more energy', () => {
-    const a = estimateKwhUsed(100, 50);
-    const b = estimateKwhUsed(1000, 500);
-    const c = estimateKwhUsed(10000, 5000);
+    const a = estimateKwhUsed(100, 50, DEFAULT_MODEL, DEFAULT_GPU);
+    const b = estimateKwhUsed(1000, 500, DEFAULT_MODEL, DEFAULT_GPU);
+    const c = estimateKwhUsed(10000, 5000, DEFAULT_MODEL, DEFAULT_GPU);
 
     expect(b).toBeGreaterThan(a);
     expect(c).toBeGreaterThan(b);
   });
 
   test('output-only tokens still produce a positive estimate', () => {
-    const kwh = estimateKwhUsed(0, 500);
+    const kwh = estimateKwhUsed(0, 500, DEFAULT_MODEL, DEFAULT_GPU);
 
     expect(kwh).toBeGreaterThan(0);
   });
@@ -181,7 +166,7 @@ describe('estimateKwhUsed', () => {
     // Small input counts round to 0 cluster_seconds due to the high prefill_tps of
     // the default hardware profile (>1M TPS). Use a large count to exceed the
     // rounding threshold.
-    const kwh = estimateKwhUsed(1_000_000, 0);
+    const kwh = estimateKwhUsed(1_000_000, 0, DEFAULT_MODEL, DEFAULT_GPU);
 
     expect(kwh).toBeGreaterThan(0);
   });
@@ -211,7 +196,7 @@ describe('toastBreadEquivalent', () => {
   });
 
   test('produces a non-trivial value for a realistic request', () => {
-    const kwh = estimateKwhUsed(1000, 500);
+    const kwh = estimateKwhUsed(1000, 500, DEFAULT_MODEL, DEFAULT_GPU);
     const slices = toastBreadEquivalent(kwh);
 
     // We cannot predict the exact value, but it must be a finite positive number
