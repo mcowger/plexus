@@ -279,7 +279,7 @@ jobs:
 
       - name: Generate Release Notes with Claude
         id: release_notes
-        uses: anthropics/claude-code-base-action@beta
+        uses: anthropics/claude-code-base-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
