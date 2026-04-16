@@ -1,4 +1,3 @@
-// --- CLI Subcommand Routing ---
 // Check for subcommands (e.g. `./plexus rekey`) before starting the server.
 // This allows Docker users to run CLI tools without needing the source code.
 const subcommand = process.argv[2];
