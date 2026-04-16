@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { unifiedToContext } from '../oauth/type-mappers';
+import { unifiedToContext, normalizeContextMessages } from '../oauth/type-mappers';
 import type { UnifiedChatRequest } from '../../types/unified';
 
 // The full input_schema for OpenCode's `question` tool — the real-world trigger
@@ -434,5 +434,197 @@ describe('unifiedToContext — non-JSON tool call arguments (regression)', () =>
 
     expect(goodBlock.arguments).toEqual({ x: 1 });
     expect(badBlock.arguments).toEqual({ _raw: 'not json at all' });
+  });
+});
+
+/**
+ * Regression tests for assistant message content being a string instead of array.
+ *
+ * Bug: When OpenWebUI sends a second request with conversation history, the
+ * assistant message's content is a string (standard OpenAI format). pi-ai's
+ * transformMessages calls `assistantMsg.content.flatMap(...)` which throws
+ * "assistantMsg.content.flatMap is not a function" when content is a string.
+ *
+ * Fix:
+ * 1. unifiedMessageToAssistantMessage now always returns array content
+ *    (even for empty strings, which previously resulted in an empty content array)
+ * 2. normalizeContextMessages ensures any assistant message with string content
+ *    is converted to array format before being passed to pi-ai
+ */
+describe('unifiedToContext — assistant content always an array (regression)', () => {
+  test('assistant message with string content produces array in context', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-opus-4-5',
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'Hi there!' },
+        { role: 'user', content: 'how are you?' },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    expect(assistantMsg.role).toBe('assistant');
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+    expect(assistantMsg.content.length).toBeGreaterThan(0);
+    expect(assistantMsg.content[0].type).toBe('text');
+    expect(assistantMsg.content[0].text).toBe('Hi there!');
+  });
+
+  test('assistant message with empty string content produces array (not string)', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-opus-4-5',
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: '' },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    expect(assistantMsg.role).toBe('assistant');
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+    // Empty string still produces a text block so content is never an empty array
+    expect(assistantMsg.content.length).toBe(1);
+    expect(assistantMsg.content[0].type).toBe('text');
+  });
+
+  test('assistant message with null content and no tool_calls produces array', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-opus-4-5',
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: null as any },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    expect(assistantMsg.role).toBe('assistant');
+    // Even with null content and no tool_calls, content must be an array
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+  });
+
+  test('assistant message with null content but tool_calls still works', () => {
+    const request: UnifiedChatRequest = {
+      model: 'claude-opus-4-5',
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: null as any,
+          tool_calls: [
+            {
+              id: 'call_123',
+              type: 'function',
+              function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const context = unifiedToContext(request);
+    const assistantMsg = context.messages[1] as any;
+    expect(assistantMsg.role).toBe('assistant');
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+    expect(assistantMsg.content.some((b: any) => b.type === 'toolCall')).toBe(true);
+  });
+});
+
+describe('normalizeContextMessages — defensive normalization (regression)', () => {
+  test('converts assistant message with string content to array', () => {
+    const context = {
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: 'Hi there!' },
+        { role: 'user', content: 'how are you?' },
+      ],
+    };
+
+    const normalized = normalizeContextMessages(context as any);
+    const assistantMsg = normalized.messages[1] as any;
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+    expect(assistantMsg.content).toEqual([{ type: 'text', text: 'Hi there!' }]);
+  });
+
+  test('handles assistant message with empty string content', () => {
+    const context = {
+      messages: [{ role: 'assistant', content: '' }],
+    };
+
+    const normalized = normalizeContextMessages(context as any);
+    const assistantMsg = normalized.messages[0] as any;
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+    // Empty string produces empty array (no text block for empty text)
+    expect(assistantMsg.content).toEqual([]);
+  });
+
+  test('leaves already-array content unchanged', () => {
+    const context = {
+      messages: [
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Hello' },
+            { type: 'toolCall', id: 'call_1', name: 'test', arguments: {} },
+          ],
+        },
+      ],
+    };
+
+    const normalized = normalizeContextMessages(context as any);
+    const assistantMsg = normalized.messages[0] as any;
+    expect(assistantMsg.content).toHaveLength(2);
+    expect(assistantMsg.content[0].type).toBe('text');
+    expect(assistantMsg.content[1].type).toBe('toolCall');
+  });
+
+  test('leaves user messages unchanged', () => {
+    const context = {
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+      ],
+    };
+
+    const normalized = normalizeContextMessages(context as any);
+    expect((normalized.messages[0] as any).content).toBe('hello');
+    expect(Array.isArray((normalized.messages[1] as any).content)).toBe(true);
+  });
+
+  test('handles non-string, non-array content on assistant message', () => {
+    const context = {
+      messages: [{ role: 'assistant', content: null }],
+    };
+
+    const normalized = normalizeContextMessages(context as any);
+    const assistantMsg = normalized.messages[0] as any;
+    expect(Array.isArray(assistantMsg.content)).toBe(true);
+    expect(assistantMsg.content).toEqual([]);
+  });
+
+  test('preserves other message properties when normalizing', () => {
+    const context = {
+      messages: [
+        {
+          role: 'assistant',
+          content: 'response text',
+          api: 'anthropic-messages',
+          provider: 'anthropic',
+          model: 'claude-opus-4-5',
+          stopReason: 'stop',
+          usage: { input: 10, output: 20 },
+        },
+      ],
+    };
+
+    const normalized = normalizeContextMessages(context as any);
+    const assistantMsg = normalized.messages[0] as any;
+    expect(assistantMsg.api).toBe('anthropic-messages');
+    expect(assistantMsg.provider).toBe('anthropic');
+    expect(assistantMsg.model).toBe('claude-opus-4-5');
+    expect(assistantMsg.stopReason).toBe('stop');
+    expect(assistantMsg.usage).toEqual({ input: 10, output: 20 });
   });
 });

@@ -141,8 +141,14 @@ function unifiedMessageToAssistantMessage(
     } as any);
   }
 
-  if (typeof msg.content === 'string' && msg.content) {
-    content.push({ type: 'text', text: msg.content });
+  // Handle string content (including empty strings — still emit a text block
+  // so pi-ai's transformMessages always sees an array, never a string)
+  if (typeof msg.content === 'string') {
+    if (msg.content) {
+      content.push({ type: 'text', text: msg.content });
+    } else {
+      content.push({ type: 'text', text: '' });
+    }
   } else if (Array.isArray(msg.content)) {
     for (const block of msg.content) {
       if (block.type === 'text') {
@@ -624,4 +630,27 @@ function extractTextContent(content: string | null | MessageContent[]): string |
   }
 
   return null;
+}
+
+/**
+ * Normalize all messages in a Context to ensure pi-ai's transformMessages
+ * never encounters a non-array `content` on assistant messages.
+ *
+ * pi-ai calls `assistantMsg.content.flatMap(...)` which throws when `content`
+ * is a string (e.g. when OpenWebUI sends `{ role: "assistant", content: "text" }`
+ * in conversation history). This function converts any such messages to use
+ * the array format that pi-ai expects.
+ */
+export function normalizeContextMessages(context: Context): Context {
+  context.messages = context.messages.map((msg) => {
+    if (msg.role === 'assistant' && !Array.isArray(msg.content)) {
+      const text = typeof msg.content === 'string' ? msg.content : '';
+      return {
+        ...msg,
+        content: text ? [{ type: 'text' as const, text }] : [],
+      };
+    }
+    return msg;
+  });
+  return context;
 }

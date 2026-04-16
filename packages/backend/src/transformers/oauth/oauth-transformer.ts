@@ -17,6 +17,7 @@ import {
   piAiMessageToUnified,
   piAiEventToChunk,
   extractPiAiErrorMessage,
+  normalizeContextMessages,
 } from './type-mappers';
 import { logger } from '../../utils/logger';
 import {
@@ -539,6 +540,10 @@ export class OAuthTransformer implements Transformer {
       logger.info(`${this.name}: FULL-OUTGOING-PAYLOAD ${payloadStr}`);
       return payload;
     };
+
+    // Normalize messages to ensure pi-ai's transformMessages never encounters
+    // a non-array `content` on assistant messages (e.g. from OpenWebUI history).
+    normalizeContextMessages(context);
 
     logger.info(
       `${this.name}: Executing ${streaming ? 'streaming' : 'complete'} request { model: "${model.id}", provider: "${provider}", authMode: "${auth.authMode}"${auth.authMode === 'oauth' ? `, accountId: "${auth.accountId}"` : ''} }`
