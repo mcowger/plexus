@@ -1,22 +1,13 @@
 name: Claude Code Review
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+  workflow_run:
+    workflows: ["PR Tests"]
+    types: [completed]
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    if: github.event.workflow_run.conclusion == 'success'
 
     runs-on: ubuntu-latest
     permissions:
@@ -25,11 +16,26 @@ jobs:
       issues: write
 
     steps:
+      - name: Get PR info from workflow run
+        id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pulls = context.payload.workflow_run.pull_requests;
+            if (!pulls || pulls.length === 0) {
+              core.setFailed('No pull request found in workflow_run event');
+              return;
+            }
+            const pr = pulls[0];
+            core.setOutput('number', pr.number);
+            core.setOutput('head_sha', context.payload.workflow_run.head_sha);
+            core.setOutput('head_repo', context.payload.workflow_run.head_repository.full_name);
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 1
 
       - name: Register secrets for masking
@@ -85,7 +91,7 @@ jobs:
           # NOTE: The code-review plugin has a known bug (#1087) where it completes the review
           # but produces an empty result, posting nothing to the PR. Using a direct prompt instead.
           prompt: |
-            Review the pull request ${{ github.repository }}/pull/${{ github.event.pull_request.number }}.
+            Review the pull request ${{ github.repository }}/pull/${{ steps.pr.outputs.number }}.
 
             1. Read the PR diff using `git diff` and understand the changes.
             2. Analyze the code for bugs, security issues, performance problems, and style concerns.
