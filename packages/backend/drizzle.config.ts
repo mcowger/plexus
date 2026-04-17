@@ -1,3 +1,4 @@
+//Test
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
