@@ -352,7 +352,7 @@ export const Keys = () => {
       {/* Keys Tab */}
       {activeTab === 'keys' && (
         <Card title="Active Keys" className="mb-6">
-          <div className="overflow-x-auto -m-6">
+          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>
@@ -510,7 +510,7 @@ export const Keys = () => {
       {/* Quotas Tab */}
       {activeTab === 'quotas' && (
         <Card title="User Quotas" className="mb-6">
-          <div className="overflow-x-auto -m-6">
+          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>

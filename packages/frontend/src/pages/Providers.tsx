@@ -993,7 +993,7 @@ export const Providers = () => {
         }
       />
       <Card flush>
-        <div className="overflow-x-auto -m-6">
+        <div className="overflow-x-auto">
           <table className="w-full border-collapse font-body text-[13px]">
             <thead>
               <tr>

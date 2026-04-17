@@ -312,7 +312,7 @@ export const McpPage: React.FC = () => {
             No MCP servers configured. Click "Add MCP Server" to create one.
           </div>
         ) : (
-          <div className="overflow-x-auto -m-6">
+          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>
