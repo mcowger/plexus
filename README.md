@@ -140,12 +140,20 @@ bun run setup:hooks
 That configures `core.hooksPath` to `.githooks` and installs a `pre-commit` hook that runs:
 
 ```bash
-cd packages/backend && bun test
+cd packages/backend && bun run test
 ```
+
+> Note: `bun test` is intentionally blocked both at repo root and in `packages/backend`; use `cd packages/backend && bun run test` instead.
 
 If the tests fail, the commit is blocked.
 
----
+You can also run backend tests from the repo root with:
+
+```bash
+bun run test
+```
+
+> Note: `bun test` is intentionally blocked both at repo root and in `packages/backend`; use `bun run test` instead.
 
 ## Configuration Migration Details
 

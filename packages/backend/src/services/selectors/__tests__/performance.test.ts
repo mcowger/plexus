@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it, vi } from 'vitest';
 import { PerformanceSelector } from '../performance';
 import { UsageStorageService } from '../../usage-storage';
 import { ModelTarget, setConfigForTesting, PlexusConfig } from '../../../config';
@@ -6,7 +6,7 @@ import { ModelTarget, setConfigForTesting, PlexusConfig } from '../../../config'
 describe('PerformanceSelector', () => {
   // Mock usage storage
   // Explicitly type the mock return to allow any array of objects
-  const mockGetProviderPerformance = mock(
+  const mockGetProviderPerformance = vi.fn(
     (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
   );
   const mockStorage = {

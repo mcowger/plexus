@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'vitest';
 import { InOrderSelector } from '../in-order';
 import { ModelTarget } from '../../../config';
 

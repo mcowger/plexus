@@ -1,4 +1,4 @@
-import { expect, test, describe } from 'bun:test';
+import { expect, test, describe } from 'vitest';
 import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
 
 describe('Vision Detection Reproduction', () => {

@@ -1,11 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
 import { setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatcher';
 import { UsageStorageService } from '../../../services/usage-storage';
-import { mock } from 'bun:test';
 import { DebugManager } from '../../../services/debug-manager';
 import { SelectorFactory } from '../../../services/selectors/factory';
 import FormData from 'form-data';
@@ -94,7 +93,7 @@ describe('Transcriptions Endpoint', () => {
     });
 
     mockDispatcher = {
-      dispatch: mock(async () => ({
+      dispatch: vi.fn(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -108,13 +107,13 @@ describe('Transcriptions Endpoint', () => {
           cache_creation_tokens: 0,
         },
       })),
-      dispatchEmbeddings: mock(async () => ({
+      dispatchEmbeddings: vi.fn(async () => ({
         object: 'list',
         data: [],
         model: 'text-embedding-3-small',
         usage: { prompt_tokens: 8, total_tokens: 8 },
       })),
-      dispatchTranscription: mock(async () => ({
+      dispatchTranscription: vi.fn(async () => ({
         text: 'This is a test transcription.',
         usage: {
           input_tokens: 150,
@@ -132,12 +131,12 @@ describe('Transcriptions Endpoint', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: mock(),
-      saveError: mock(),
-      saveDebugLog: mock(),
-      updatePerformanceMetrics: mock(),
-      emitStartedAsync: mock(),
-      emitUpdatedAsync: mock(),
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      saveDebugLog: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);

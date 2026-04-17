@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test';
+import { test, expect, describe } from 'vitest';
 import { transformGeminiStream } from '../stream-transformer';
 import type { UnifiedChatStreamChunk } from '../../../types/unified';
 

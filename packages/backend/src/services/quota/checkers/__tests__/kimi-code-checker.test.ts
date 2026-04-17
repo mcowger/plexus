@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { KimiCodeQuotaChecker } from '../kimi-code-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
@@ -49,11 +49,11 @@ const makeSuccessResponse = (
 
 describe('KimiCodeQuotaChecker', () => {
   const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
-    global.fetch = mock(impl) as unknown as typeof fetch;
+    global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
   beforeEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   it('is registered under kimi-code', () => {
@@ -259,7 +259,7 @@ describe('KimiCodeQuotaChecker', () => {
     expect(result.error).toContain('network timeout');
   });
 
-  it('throws when apiKey option is missing', () => {
+  it('throws when apiKey option is missing', async () => {
     const checker = new KimiCodeQuotaChecker({
       id: 'no-key',
       provider: 'kimi',
@@ -269,7 +269,7 @@ describe('KimiCodeQuotaChecker', () => {
       options: {},
     });
 
-    expect(checker.checkQuota()).rejects.toThrow("Required option 'apiKey' not provided");
+    await expect(checker.checkQuota()).rejects.toThrow("Required option 'apiKey' not provided");
   });
 
   describe('windowTypeFromDuration', () => {

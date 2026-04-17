@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { PassThrough } from 'stream';
 import { UsageInspector } from '../inspectors/usage-logging';
@@ -12,8 +12,8 @@ describe('UsageInspector Metadata Robustness', () => {
 
   beforeEach(() => {
     mockStorage = {
-      saveRequest: mock(() => Promise.resolve()),
-      updatePerformanceMetrics: mock(() => Promise.resolve()),
+      saveRequest: vi.fn(() => Promise.resolve()),
+      updatePerformanceMetrics: vi.fn(() => Promise.resolve()),
     };
     mockPricing = {
       inputCostPerToken: 0,

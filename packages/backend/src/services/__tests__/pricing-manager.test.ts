@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll } from 'bun:test';
+import { describe, expect, test, beforeAll } from 'vitest';
 import { PricingManager } from '../pricing-manager';
 import path from 'path';
 

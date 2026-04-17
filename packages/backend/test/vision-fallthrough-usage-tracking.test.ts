@@ -1,9 +1,9 @@
+import { expect, test, describe, beforeEach, afterEach, vi } from 'vitest';
 /**
  * Tests that would have caught:
  * 1. visionFallthroughModel not being stored in the parent request's usage record
  * 2. The child descriptor request never being saved to usage storage
  */
-import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { registerSpy } from './test-utils';
 import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
 import { Dispatcher } from '../src/services/dispatcher';
@@ -203,7 +203,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest is called for the descriptor child request on success', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: mock(async (record: any) => {
+      saveRequest: vi.fn(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;
@@ -231,7 +231,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest records correct provider and model from the response', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: mock(async (record: any) => {
+      saveRequest: vi.fn(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;
@@ -253,7 +253,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest records token counts from the response', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: mock(async (record: any) => {
+      saveRequest: vi.fn(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;
@@ -275,7 +275,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest is called with error status when dispatch throws', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: mock(async (record: any) => {
+      saveRequest: vi.fn(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;

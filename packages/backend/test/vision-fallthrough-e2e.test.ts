@@ -1,4 +1,4 @@
-import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
+import { expect, test, describe, beforeEach, afterEach, vi } from 'vitest';
 import { registerSpy } from './test-utils';
 import { Dispatcher } from '../src/services/dispatcher';
 import { VisionDescriptorService } from '../src/services/vision-descriptor-service';

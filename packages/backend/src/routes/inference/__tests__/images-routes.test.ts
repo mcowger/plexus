@@ -1,4 +1,4 @@
-import { describe, it, expect, mock } from 'bun:test';
+import { describe, it, expect, vi } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { registerImagesRoute } from '../images';
 import { Dispatcher } from '../../../services/dispatcher';
@@ -47,7 +47,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageEdits = mock(async () => ({
+    const dispatchImageEdits = vi.fn(async () => ({
       created: 123,
       data: [{ url: 'https://example.com/edited.png' }],
       usage: { input_tokens: 50, output_tokens: 100, total_tokens: 150 },
@@ -64,14 +64,14 @@ describe('Images route telemetry', () => {
       dispatchImageEdits,
     } as unknown as Dispatcher;
 
-    const saveRequest = mock(() => new Promise<void>(() => {}));
-    const saveError = mock(async () => {});
+    const saveRequest = vi.fn(() => new Promise<void>(() => {}));
+    const saveError = vi.fn(async () => {});
 
     const mockUsageStorage = {
       saveRequest,
       saveError,
-      emitStartedAsync: mock(() => {}),
-      emitUpdatedAsync: mock(() => {}),
+      emitStartedAsync: vi.fn(() => {}),
+      emitUpdatedAsync: vi.fn(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -100,11 +100,11 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: mock((statusCode: number) => {
+      code: vi.fn((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: mock((payload: unknown) => {
+      send: vi.fn((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
@@ -134,7 +134,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageEdits = mock(async () => ({
+    const dispatchImageEdits = vi.fn(async () => ({
       created: 123,
       data: [{ url: 'https://example.com/edited.png' }],
       usage: { input_tokens: 50, output_tokens: 100, total_tokens: 150 },
@@ -151,8 +151,8 @@ describe('Images route telemetry', () => {
       dispatchImageEdits,
     } as unknown as Dispatcher;
 
-    const saveRequest = mock(async () => {});
-    const saveError = mock(async () => {});
+    const saveRequest = vi.fn(async () => {});
+    const saveError = vi.fn(async () => {});
 
     const startedEvents: Array<{ incomingApiType?: string }> = [];
     const updatedEvents: Array<{
@@ -164,10 +164,10 @@ describe('Images route telemetry', () => {
       canonicalModelName?: string;
     }> = [];
 
-    const emitStartedAsync = mock((record: { incomingApiType?: string }) => {
+    const emitStartedAsync = vi.fn((record: { incomingApiType?: string }) => {
       startedEvents.push(record);
     });
-    const emitUpdatedAsync = mock(
+    const emitUpdatedAsync = vi.fn(
       (record: {
         incomingModelAlias?: string;
         apiKey?: string;
@@ -214,11 +214,11 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: mock((statusCode: number) => {
+      code: vi.fn((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: mock((payload: unknown) => {
+      send: vi.fn((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),

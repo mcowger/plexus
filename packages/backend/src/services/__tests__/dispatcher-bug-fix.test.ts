@@ -1,11 +1,11 @@
-import { describe, expect, test, beforeEach, mock } from 'bun:test';
+import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 import { setConfigForTesting } from '../../config';
 import { UnifiedChatRequest } from '../../types/unified';
 import { logger } from '../../utils/logger';
 
 // Mock fetch to prevent actual network calls
-const fetchMock = mock(async (url: string, options: any) => {
+const fetchMock = vi.fn(async (url: string, options: any) => {
   return new Response(
     JSON.stringify({
       id: 'chatcmpl-123',

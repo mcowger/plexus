@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'vitest';
 import { validateConfig } from '../config';
 
 const makeConfigYaml = (quotaCheckerOptionsYaml: string): string => `

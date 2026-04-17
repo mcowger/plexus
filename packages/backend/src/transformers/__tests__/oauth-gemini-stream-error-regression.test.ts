@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { piAiEventToChunk } from '../oauth/type-mappers';
 import { formatGeminiStream } from '../gemini/stream-formatter';
 

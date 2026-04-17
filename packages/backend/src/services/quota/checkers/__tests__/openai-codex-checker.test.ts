@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerSpy } from '../../../../../test/test-utils';
 import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { OpenAICodexQuotaChecker } from '../openai-codex-checker';
@@ -30,11 +30,11 @@ const makeToken = (payload: unknown): string => {
 
 describe('OpenAICodexQuotaChecker', () => {
   const setFetchMock = (impl: () => Promise<Response>): void => {
-    global.fetch = mock(impl) as unknown as typeof fetch;
+    global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
   beforeEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

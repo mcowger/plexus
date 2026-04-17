@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { Router } from '../router';
 import { setConfigForTesting } from '../../config';

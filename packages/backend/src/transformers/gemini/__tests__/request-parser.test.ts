@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect } from 'vitest';
 import { parseGeminiRequest } from '../request-parser';
 
 // Helper to get first element with type narrowing

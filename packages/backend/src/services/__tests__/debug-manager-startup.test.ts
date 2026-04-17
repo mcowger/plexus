@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach } from 'vitest';
 import { DebugManager } from '../debug-manager';
 import { UsageStorageService } from '../usage-storage';
 

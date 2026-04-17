@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, afterEach } from 'bun:test';
+import { describe, expect, test, beforeAll, afterEach } from 'vitest';
 import path from 'path';
 import { ModelMetadataManager, mergeOverrides } from '../model-metadata-manager';
 import type { NormalizedModelMetadata } from '../model-metadata-manager';

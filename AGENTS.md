@@ -64,14 +64,17 @@ Drizzle ORM with SQLite (default) or Postgres. Tables: `request_usage`, `provide
 ## Development & Testing
 
 - **Dev server:** `bun run dev` (backend port 4000 + frontend watcher)
-- **Tests:** `bun test` from `packages/backend/`
+- **Tests:** `bun run test` from the repo root or from `packages/backend/` (`bun test` is intentionally blocked both at repo root and in `packages/backend` with a guidance message)
 - **Format:** `bun run format` / `bun run format:check`
 
 ### Test Isolation
 
-- **Global setup:** `bunfig.toml` preloads `packages/backend/test/setup.ts` which mocks Logger and initializes in-memory DB.
-- **Do NOT** use `mock.module` to globally mock `config.ts` — it pollutes other tests.
-- **Use `registerSpy`** from `test/test-utils.ts` instead of raw `spyOn` — automatic cleanup after each test.
+- Backend tests run on **Vitest** via `packages/backend/vitest.config.ts`.
+- **Global setup:** `packages/backend/test/vitest.global-setup.ts` creates a temporary file-backed SQLite DB, runs migrations once, and cleans it up automatically after the run.
+- **Per-worker setup:** `packages/backend/test/vitest.setup.ts` installs logger/debug test doubles.
+- `packages/backend/bunfig.toml` intentionally blocks raw `bun test` in `packages/backend` and directs contributors to `bun run test` / `bun run test:watch`.
+- Root `bunfig.toml` intentionally blocks raw `bun test` at the repo root and directs contributors to `cd packages/backend && bun run test`.
+- **Use `registerSpy`** from `test/test-utils.ts` instead of raw `spyOn` when you want automatic cleanup after each test.
 - If you must mock a module, implement its **full public interface**.
 
 ---

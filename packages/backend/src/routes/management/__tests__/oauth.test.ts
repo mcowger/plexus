@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import type { OAuthProviderInterface } from '@mariozechner/pi-ai/oauth';
 import { registerOAuthRoutes } from '../oauth';
 import { OAuthLoginSessionManager } from '../../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
 
-mock.module('@mariozechner/pi-ai', () => ({
+vi.mock('@mariozechner/pi-ai', () => ({
   getModels: (provider: string) => {
     if (provider === 'unknown-provider') {
       return [];

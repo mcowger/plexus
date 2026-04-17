@@ -3,7 +3,8 @@
   "module": "index.ts",
   "devDependencies": {
     "@biomejs/biome": "latest",
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "vitest": "^3.2.4"
   },
   "private": true,
   "scripts": {
@@ -17,6 +18,8 @@
     "build:bin": "bun run build:frontend && bun build packages/backend/src/index.ts packages/backend/drizzle/migrations/*.sql packages/backend/drizzle/migrations_pg/*.sql packages/frontend/dist/*.png packages/frontend/dist/*.ico packages/frontend/dist/*.svg packages/frontend/dist/*.webmanifest --compile --asset-naming=\"[name].[ext]\" --outfile plexus",
     "install:all": "bun install && (cd packages/backend && bun install) && (cd packages/frontend && bun install)",
     "typecheck": "bun run --workspaces typecheck",
+    "test": "cd packages/backend && bun run test",
+    "test:watch": "cd packages/backend && bun run test:watch",
     "release": "bun run scripts/release.ts",
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
