@@ -1,6 +1,5 @@
 import { spawn } from 'bun';
 import { createInterface } from 'node:readline';
-import pc from 'picocolors';
 
 const rl = createInterface({
   input: process.stdin,
@@ -8,9 +7,7 @@ const rl = createInterface({
 });
 
 const ask = (query: string, defaultVal?: string): Promise<string> => {
-  const promptText = defaultVal
-    ? `${pc.bold(pc.cyan(query))} ${pc.dim(`(${defaultVal})`)}: `
-    : `${pc.bold(pc.cyan(query))}: `;
+  const promptText = defaultVal ? `${query} (${defaultVal}): ` : `${query}: `;
 
   return new Promise((resolve) => {
     rl.question(promptText, (answer) => {
@@ -34,20 +31,20 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes('--help') || args.includes('-h')) {
-    console.log(`\n${pc.bold(pc.magenta('🚀 Plexus Release Script'))}`);
-    console.log(pc.dim('--------------------------'));
+    console.log('\n🚀 Plexus Release Script');
+    console.log('--------------------------');
     console.log('\nUsage:');
     console.log(`  bun scripts/release.ts [options]`);
     console.log('\nOptions:');
-    console.log(`  ${pc.cyan('--help, -h')} Show this help message`);
+    console.log('  --help, -h  Show this help message');
     console.log(
       '\nThis script tags the repo and pushes the tag. Release notes are handled by GitHub Actions.\n'
     );
     process.exit(0);
   }
 
-  console.log(`\n${pc.bold(pc.magenta('🚀 Plexus Release Process'))}`);
-  console.log(pc.dim('--------------------------\n'));
+  console.log('\n🚀 Plexus Release Process');
+  console.log('--------------------------\n');
 
   // 1. Get current version
   let currentVersion = 'v0.0.0';
@@ -92,19 +89,17 @@ async function main() {
   rl.close();
 
   // 3. Git Operations - tag and push
-  console.log(`\n${pc.bold(pc.magenta('📦 Performing Git operations...'))}`);
+  console.log('\n📦 Performing Git operations...');
   try {
     await run(['git', 'tag', version]);
-    console.log(`${pc.green('✅ Tagged')} ${pc.bold(version)}`);
+    console.log(`✅ Tagged ${version}`);
 
-    console.log(pc.dim('⬆️  Pushing tag...'));
+    console.log('⬆️  Pushing tag...');
     await run(['git', 'push', 'origin', version]);
-    console.log(`${pc.green('✅ Pushed tag')} ${pc.bold(version)}\n`);
-    console.log(
-      `${pc.bold(pc.magenta('🎊 Release tag created! GitHub Actions will handle the rest.'))}\n`
-    );
+    console.log(`✅ Pushed tag ${version}\n`);
+    console.log('🎊 Release tag created! GitHub Actions will handle the rest.\n');
   } catch (e) {
-    console.error(`\n${pc.red('❌ Git operation failed:')}`, e);
+    console.error('\n❌ Git operation failed:', e);
     process.exit(1);
   }
 }

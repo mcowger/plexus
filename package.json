@@ -3,13 +3,7 @@
   "module": "index.ts",
   "devDependencies": {
     "@biomejs/biome": "latest",
-    "biome": "latest",
-    "bun-types": "latest",
-    "drizzle-kit": "0.31.10",
-    "picocolors": "^1.1.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.3"
+    "bun-types": "latest"
   },
   "private": true,
   "scripts": {
@@ -33,10 +27,5 @@
   "workspaces": [
     "packages/*"
   ],
-  "dependencies": {
-    "@mariozechner/pi-ai": "latest",
-    "@sinclair/typebox": "^0.34.49",
-    "bun": "latest",
-    "parse-duration": "^2.1.6"
-  }
+  "dependencies": {}
 }
