@@ -208,3 +208,108 @@ describe('extractProviderCostFromSSEComments (via DebugLoggingInspector)', () =>
     expect(lastCost.request_cost_usd).toBe(0.001);
   });
 });
+
+describe('extractProviderEnergyFromSSEComments (via DebugLoggingInspector)', () => {
+  test('parses : energy SSE comment lines from raw SSE body', () => {
+    const rawBody = [
+      'data: {"id":"chatcmpl-123","choices":[{"delta":{"content":"Hello"}}]}',
+      '',
+      ': energy {"energy_joules": 190.46, "energy_kwh": 5.2904e-05, "avg_power_watts": 3109.0, "duration_seconds": 0.613}',
+      '',
+      'data: {"id":"chatcmpl-123","choices":[{"delta":{"content":" world"}}]}',
+      '',
+      'data: [DONE]',
+    ].join('\n');
+
+    // Use the same regex logic that DebugLoggingInspector uses
+    const lines = rawBody.split(/\r?\n/);
+    let lastEnergy: any = null;
+
+    for (const line of lines) {
+      const energyMatch = line.match(/^:\s*energy\s+(\{.+\})\s*$/);
+      if (energyMatch) {
+        lastEnergy = JSON.parse(energyMatch[1]!);
+      }
+    }
+
+    expect(lastEnergy).not.toBeNull();
+    expect(lastEnergy.energy_joules).toBe(190.46);
+    expect(lastEnergy.energy_kwh).toBe(5.2904e-05);
+    expect(lastEnergy.avg_power_watts).toBe(3109.0);
+    expect(lastEnergy.duration_seconds).toBe(0.613);
+  });
+
+  test('uses last energy line when multiple are present', () => {
+    const rawBody = [
+      ': energy {"energy_kwh": 0.0001}',
+      ': energy {"energy_kwh": 0.00052904}',
+    ].join('\n');
+
+    const lines = rawBody.split(/\r?\n/);
+    let lastEnergy: any = null;
+
+    for (const line of lines) {
+      const energyMatch = line.match(/^:\s*energy\s+(\{.+\})\s*$/);
+      if (energyMatch) {
+        lastEnergy = JSON.parse(energyMatch[1]!);
+      }
+    }
+
+    expect(lastEnergy.energy_kwh).toBe(0.00052904);
+  });
+
+  test('returns null when no energy lines present', () => {
+    const rawBody = [
+      'data: {"id":"chatcmpl-123","choices":[{"delta":{"content":"Hello"}}]}',
+      'data: [DONE]',
+    ].join('\n');
+
+    const lines = rawBody.split(/\r?\n/);
+    let lastEnergy: any = null;
+
+    for (const line of lines) {
+      const energyMatch = line.match(/^:\s*energy\s+(\{.+\})\s*$/);
+      if (energyMatch) {
+        lastEnergy = JSON.parse(energyMatch[1]!);
+      }
+    }
+
+    expect(lastEnergy).toBeNull();
+  });
+
+  test('skips malformed energy lines', () => {
+    const rawBody = [': energy not-json', ': energy {"energy_kwh": 0.0001}'].join('\n');
+
+    const lines = rawBody.split(/\r?\n/);
+    let lastEnergy: any = null;
+
+    for (const line of lines) {
+      const energyMatch = line.match(/^:\s*energy\s+(\{.+\})\s*$/);
+      if (energyMatch) {
+        try {
+          lastEnergy = JSON.parse(energyMatch[1]!);
+        } catch (e) {
+          // Skip
+        }
+      }
+    }
+
+    expect(lastEnergy.energy_kwh).toBe(0.0001);
+  });
+
+  test('handles scientific notation for energy_kwh', () => {
+    const rawBody = [': energy {"energy_kwh": 5.2904e-05}'].join('\n');
+
+    const lines = rawBody.split(/\r?\n/);
+    let lastEnergy: any = null;
+
+    for (const line of lines) {
+      const energyMatch = line.match(/^:\s*energy\s+(\{.+\})\s*$/);
+      if (energyMatch) {
+        lastEnergy = JSON.parse(energyMatch[1]!);
+      }
+    }
+
+    expect(lastEnergy.energy_kwh).toBe(5.2904e-05);
+  });
+});

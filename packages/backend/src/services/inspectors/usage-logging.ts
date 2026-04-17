@@ -150,13 +150,22 @@ export class UsageInspector extends PassThrough {
         applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
       }
 
-      // Estimate energy consumption using resolved GPU and model params
-      this.usageRecord.kwhUsed = estimateKwhUsed(
-        stats.inputTokens,
-        stats.outputTokens,
-        this.modelParams,
-        this.gpuParams
-      );
+      // Use provider-reported energy if available, otherwise estimate
+      // Some providers emit `: energy {"energy_kwh": ...}` as SSE comments
+      if (reconstructed?.providerReportedEnergy?.energy_kwh != null) {
+        const energyKwh = Number(reconstructed.providerReportedEnergy.energy_kwh);
+        if (!isNaN(energyKwh) && energyKwh >= 0) {
+          this.usageRecord.kwhUsed = Number(energyKwh.toFixed(10));
+        }
+      } else {
+        // Estimate energy consumption using resolved GPU and model params
+        this.usageRecord.kwhUsed = estimateKwhUsed(
+          stats.inputTokens,
+          stats.outputTokens,
+          this.modelParams,
+          this.gpuParams
+        );
+      }
 
       // Fire-and-forget: saveRequest is async but _flush is synchronous
       // Attach error handler to prevent unhandled promise rejections
