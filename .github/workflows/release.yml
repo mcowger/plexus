@@ -217,6 +217,7 @@ jobs:
 
       - name: Generate Release Notes with Claude
         id: release_notes
+        timeout-minutes: 5
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
@@ -228,6 +229,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
           github_token: ${{ github.token }}
+          show_full_output: true
           prompt: |
             You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
 
@@ -289,17 +291,38 @@ jobs:
             --model ${{ vars.PLEXUS_MODEL }}
             --allowedTools "Bash(git:*)",Read
 
+      - name: Debug claude-code-action outputs
+        if: always()
+        run: |
+          echo "release_notes outcome: ${{ steps.release_notes.outcome }}"
+          echo "release_notes conclusion: ${{ steps.release_notes.outputs.conclusion }}"
+          echo "execution_file: ${{ steps.release_notes.outputs.execution_file }}"
+          echo "All output names: $(echo '${{ toJson(steps.release_notes.outputs) }}' | jq -r 'keys[]')"
+
       - name: Extract release notes text
         id: extract_notes
-        if: steps.release_notes.outputs.conclusion == 'success'
+        if: steps.release_notes.outcome == 'success'
         uses: actions/github-script@v9
         with:
           result-encoding: string
           script: |
+            const executionFilePath = '${{ steps.release_notes.outputs.execution_file }}';
+            if (!executionFilePath) {
+              core.warning('No execution_file output from claude-code-action. Falling back to pr_summary.');
+              return '';
+            }
             const fs = require('fs');
-            const executionFile = '${{ steps.release_notes.outputs.execution_file }}';
-            const executionLog = JSON.parse(fs.readFileSync(executionFile, 'utf8'));
-            return executionLog[executionLog.length - 1].result;
+            if (!fs.existsSync(executionFilePath)) {
+              core.warning(`Execution file not found: ${executionFilePath}. Falling back to pr_summary.`);
+              return '';
+            }
+            const executionLog = JSON.parse(fs.readFileSync(executionFilePath, 'utf8'));
+            const result = executionLog[executionLog.length - 1].result;
+            if (!result || result.trim().length === 0) {
+              core.warning('Claude returned empty result. Falling back to pr_summary.');
+              return '';
+            }
+            return result;
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -311,4 +334,4 @@ jobs:
             plexus.exe
           draft: false
           prerelease: false
-          body: ${{ steps.extract_notes.outputs.result }}
+          body: ${{ steps.extract_notes.outputs.result || steps.pr_info.outputs.pr_summary }}
