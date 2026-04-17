@@ -38,6 +38,8 @@ The pre-commit hook prevents accidentally committing migration files. If it fire
 git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/
 ```
 
+Then commit again with only your schema `.ts` files.
+
 ## Drizzle Config Files
 
 The project uses separate Drizzle ORM config files for each database dialect:
@@ -46,8 +48,6 @@ The project uses separate Drizzle ORM config files for each database dialect:
 - `drizzle.config.postgres.ts` -- PostgreSQL configuration
 
 When running Drizzle Kit commands, specify the appropriate config file with `--config`.
-
-Then commit again with only your schema `.ts` files.
 
 ## Code Style
 
