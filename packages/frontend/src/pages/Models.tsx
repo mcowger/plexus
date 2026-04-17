@@ -19,6 +19,10 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
+import { SearchInput } from '../components/ui/SearchInput';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
+import { useToast } from '../contexts/ToastContext';
 import {
   Search,
   Plus,
@@ -39,6 +43,7 @@ import {
 } from 'lucide-react';
 
 export const Models = () => {
+  const toast = useToast();
   const {
     aliases,
     providers,
@@ -172,7 +177,7 @@ export const Models = () => {
     if (editingAlias.metadata?.source === 'custom') {
       const name = editingAlias.metadata.overrides?.name;
       if (!name || name.trim() === '') {
-        alert('Custom metadata requires a non-empty Name.');
+        toast.error('Custom metadata requires a non-empty Name.');
         return;
       }
     }
@@ -895,62 +900,46 @@ export const Models = () => {
   );
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
-      <div className="mb-6">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <h1 className="font-heading text-3xl font-bold text-text m-0">Models</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-bg-glass border border-border-glass">
-                <Eye size={14} className="text-text-secondary" />
-                <span className="text-xs font-medium text-text-secondary">
-                  Vision Fall Through Model:
-                </span>
-                <select
-                  className="bg-transparent border-none text-xs text-text outline-none focus:ring-0 cursor-pointer"
-                  value={globalDescriptorModel}
-                  onChange={(e) => setGlobalDescriptorModel(e.target.value)}
-                >
-                  <option value="">(None)</option>
-                  {sortedAliases.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.id}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleSaveDescriptor}
-                  disabled={isSavingDescriptor}
-                  className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
-                  title="Save descriptor model"
-                >
-                  {isSavingDescriptor ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Save size={14} />
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ position: 'relative', width: '280px' }}>
-              <Search
-                size={16}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              />
-              <Input
-                placeholder="Search models..."
-                style={{ paddingLeft: '36px' }}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+    <PageContainer>
+      <PageHeader
+        title="Models"
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-bg-glass border border-border-glass">
+              <Eye size={14} className="text-text-secondary" />
+              <span className="text-xs font-medium text-text-secondary">Vision Fall Through:</span>
+              <select
+                className="bg-transparent border-none text-xs text-text outline-none focus:ring-0 cursor-pointer max-w-[140px]"
+                value={globalDescriptorModel}
+                onChange={(e) => setGlobalDescriptorModel(e.target.value)}
+              >
+                <option value="">(None)</option>
+                {sortedAliases.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.id}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleSaveDescriptor}
+                disabled={isSavingDescriptor}
+                className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+                title="Save descriptor model"
+                type="button"
+              >
+                {isSavingDescriptor ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+              </button>
+            </span>
+          </span>
+        }
+        actions={
+          <>
+            <div className="w-full sm:w-64">
+              <SearchInput placeholder="Search models..." value={search} onChange={setSearch} />
             </div>
             <Button
               variant="danger"
@@ -958,17 +947,17 @@ export const Models = () => {
               onClick={() => setIsDeleteAllModalOpen(true)}
               disabled={aliases.length === 0}
             >
-              Delete All Models
+              Delete All
             </Button>
             <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
               Add Model
             </Button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <Card className="mb-6">
-        <div className="overflow-x-auto -m-6">
+        <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
           <table className="w-full border-collapse font-body text-[13px]">
             <thead>
               <tr>
@@ -2422,6 +2411,6 @@ export const Models = () => {
           </div>,
           document.body
         )}
-    </div>
+    </PageContainer>
   );
 };

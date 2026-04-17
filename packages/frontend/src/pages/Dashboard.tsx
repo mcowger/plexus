@@ -5,25 +5,23 @@ import { LiveTab } from '../components/dashboard/tabs/LiveTab';
 import { UsageTab } from '../components/dashboard/tabs/UsageTab';
 import { PerformanceTab } from '../components/dashboard/tabs/PerformanceTab';
 import { OverallTab } from '../components/dashboard/tabs/OverallTab';
+import { Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../contexts/AuthContext';
 import type { CustomDateRange } from '../lib/date';
 
 type TabId = 'overall' | 'live' | 'usage' | 'performance';
 type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
-type LiveWindowPeriod = 5 | 15 | 30 | 1440 | 10080 | 43200; // minutes: 5m, 15m, 30m, 1d, 7d, 30d
+type LiveWindowPeriod = 5 | 15 | 30 | 1440 | 10080 | 43200;
 
-// Tabs visible to every authenticated principal. Admins see only these; limited
-// users additionally see the `overall` tab prepended below.
-const BASE_TABS: { id: Exclude<TabId, 'overall'>; label: string; icon: React.ReactNode }[] = [
-  { id: 'live', label: 'Live Metrics', icon: <Zap size={15} /> },
-  { id: 'usage', label: 'Usage Analytics', icon: <BarChart2 size={15} /> },
-  { id: 'performance', label: 'Performance', icon: <Gauge size={15} /> },
+const BASE_TABS = [
+  { value: 'live' as const, label: <span className="inline-flex items-center gap-2"><Zap size={14} /> Live Metrics</span> },
+  { value: 'usage' as const, label: <span className="inline-flex items-center gap-2"><BarChart2 size={14} /> Usage Analytics</span> },
+  { value: 'performance' as const, label: <span className="inline-flex items-center gap-2"><Gauge size={14} /> Performance</span> },
 ];
 
-const OVERALL_TAB: { id: TabId; label: string; icon: React.ReactNode } = {
-  id: 'overall',
-  label: 'Overall',
-  icon: <LayoutDashboard size={15} />,
+const OVERALL_TAB = {
+  value: 'overall' as const,
+  label: <span className="inline-flex items-center gap-2"><LayoutDashboard size={14} /> Overall</span>,
 };
 
 const DEFAULT_POLL_INTERVAL = 10000;
@@ -34,17 +32,11 @@ export const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as TabId | null;
 
-  // Limited users get an extra "Overall" tab (their access + usage rollup).
-  // It's prepended so that for an api-key user the most relevant view is the
-  // first thing they see. Admins don't need it — they already have full
-  // cross-key analytics in the Usage tab.
   const tabs = useMemo(() => (isLimited ? [OVERALL_TAB, ...BASE_TABS] : BASE_TABS), [isLimited]);
 
-  // Default tab: 'overall' for limited users, 'live' for admins. Any invalid
-  // `?tab=` query param falls back to the default for this principal.
   const defaultTabId: TabId = isLimited ? 'overall' : 'live';
   const activeTab: TabId =
-    tabParam && tabs.some((t) => t.id === tabParam) ? tabParam : defaultTabId;
+    tabParam && tabs.some((t) => t.value === tabParam) ? tabParam : defaultTabId;
 
   const [usageTimeRange, setUsageTimeRange] = useState<TimeRange>('day');
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange | null>(null);
@@ -52,8 +44,6 @@ export const Dashboard = () => {
   const [liveWindowPeriod, setLiveWindowPeriod] = useState<LiveWindowPeriod>(DEFAULT_LIVE_WINDOW);
 
   const setTab = (id: TabId) => {
-    // The default tab is represented with no `?tab=` param (cleaner URLs).
-    // Everything else round-trips through the query string.
     setSearchParams(id === defaultTabId ? {} : { tab: id });
   };
 
@@ -62,31 +52,18 @@ export const Dashboard = () => {
   }, [activeTab]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-border-glass bg-bg-card/40 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex gap-0 px-4">
-          {tabs.map((tab) => {
-            const isActive = tab.id === activeTab;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setTab(tab.id)}
-                className={[
-                  'flex items-center gap-2 px-4 py-3 text-[13px] font-medium transition-all border-b-2 -mb-px',
-                  isActive
-                    ? 'border-accent text-text'
-                    : 'border-transparent text-text-muted hover:text-text hover:border-border-glass',
-                ].join(' ')}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+    <div className="flex flex-col min-h-full -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
+      <div className="sticky top-0 z-10 border-b border-border-glass bg-bg-surface/80 backdrop-blur-md px-2 sm:px-4">
+        <Tabs<TabId>
+          value={activeTab}
+          onChange={setTab}
+          items={tabs}
+          variant="underline"
+          aria-label="Dashboard sections"
+        />
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-8">
         {activeTab === 'overall' && isLimited && <OverallTab />}
         {activeTab === 'live' && (
           <LiveTab

@@ -4,6 +4,9 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
+import { useToast } from '../contexts/ToastContext';
 import {
   Plus,
   Trash2,
@@ -30,6 +33,7 @@ const EMPTY_SERVER: McpServer = {
 };
 
 export const McpPage: React.FC = () => {
+  const toast = useToast();
   const [servers, setServers] = useState<Record<string, McpServer>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -169,17 +173,17 @@ export const McpPage: React.FC = () => {
   const handleSave = async () => {
     const nameToSave = editingServerName || serverNameInput;
     if (!nameToSave || !nameToSave.trim()) {
-      alert('Server Name is required');
+      toast.error('Server Name is required');
       return;
     }
     if (!editingServerName && !isValidServerName(nameToSave)) {
-      alert(
+      toast.error(
         'Invalid server name. Use lowercase letters, numbers, hyphens, and underscores (2-63 characters, must start with letter or number)'
       );
       return;
     }
     if (!editingServer.upstream_url || !editingServer.upstream_url.trim()) {
-      alert('Upstream URL is required');
+      toast.error('Upstream URL is required');
       return;
     }
 
@@ -200,22 +204,27 @@ export const McpPage: React.FC = () => {
       setIsModalOpen(false);
     } catch (e) {
       console.error('Save error', e);
-      alert('Failed to save MCP server: ' + e);
+      toast.error(`Failed to save MCP server: ${e}`);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (serverName: string) => {
-    if (!confirm(`Are you sure you want to delete the MCP server "${serverName}"?`)) {
-      return;
-    }
+    const ok = await toast.confirm({
+      title: 'Delete MCP server?',
+      message: `Are you sure you want to delete the MCP server "${serverName}"?`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.deleteMcpServer(serverName);
       await loadData();
+      toast.success(`Deleted ${serverName}`);
     } catch (e) {
       console.error('Delete error', e);
-      alert('Failed to delete MCP server: ' + e);
+      toast.error(`Failed to delete MCP server: ${e}`);
     }
   };
 
@@ -231,7 +240,7 @@ export const McpPage: React.FC = () => {
       await loadData();
     } catch (e) {
       console.error('Toggle error', e);
-      alert('Failed to update MCP server: ' + e);
+      toast.error(`Failed to update MCP server: ${e}`);
     }
   };
 
@@ -283,7 +292,12 @@ export const McpPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface flex flex-col gap-6">
+    <PageContainer>
+      <PageHeader
+        title="MCP Servers"
+        subtitle="Configure Model Context Protocol upstream servers and review their call logs."
+      />
+      <div className="flex flex-col gap-6">
       {/* ── Servers Config Card ── */}
       <Card
         title="MCP Servers"
@@ -298,7 +312,7 @@ export const McpPage: React.FC = () => {
             No MCP servers configured. Click "Add MCP Server" to create one.
           </div>
         ) : (
-          <div className="overflow-x-auto -m-6">
+          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>
@@ -840,7 +854,8 @@ export const McpPage: React.FC = () => {
       >
         <p>Are you sure you want to delete this MCP log entry?</p>
       </Modal>
-    </div>
+      </div>
+    </PageContainer>
   );
 };
 

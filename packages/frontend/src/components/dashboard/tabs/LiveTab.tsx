@@ -105,6 +105,7 @@ import {
   formatTPS,
 } from '../../../lib/format';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useToast } from '../../../contexts/ToastContext';
 
 //
 // LOCAL TYPES
@@ -591,6 +592,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   onLiveWindowPeriodChange,
 }) => {
   const { isAdmin, principal } = useAuth();
+  const toast = useToast();
   const limitedAllowedProviders =
     principal?.role === 'limited' ? (principal.allowedProviders ?? []) : null;
   // ---------------------------------------------------------------------------
@@ -1535,54 +1537,47 @@ export const LiveTab: React.FC<LiveTabProps> = ({
 
   /** Prompts the user to confirm, then clears all active cooldowns via the API */
   const handleClearCooldowns = async () => {
-    if (
-      !confirm(
-        'Clear ALL provider cooldowns?\n\n' +
-          'Cooldowns are shared across all API keys. Clearing them affects traffic ' +
-          "for every key using those providers. If the underlying problem hasn't " +
-          'been resolved, cooldowns will simply re-establish on the next failure.'
-      )
-    ) {
-      return;
-    }
+    const ok = await toast.confirm({
+      title: 'Clear ALL provider cooldowns?',
+      message:
+        "Cooldowns are shared across all API keys. Clearing them affects traffic for every key using those providers. If the underlying problem hasn't been resolved, cooldowns will simply re-establish on the next failure.",
+      confirmLabel: 'Clear all',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.clearCooldown();
       await loadData();
     } catch (e) {
-      alert('Failed to clear cooldowns');
+      toast.error('Failed to clear cooldowns');
       console.error('Failed to clear cooldowns', e);
     }
   };
 
   /** Clears a specific provider/model cooldown */
   const handleClearSingleCooldown = async (provider: string, model?: string) => {
-    // Limited users whose allowedProviders list is set may only clear a
-    // cooldown for a provider they're permitted to use. The backend also
-    // enforces this; the client-side check is UX — surface a clear message.
     if (
       limitedAllowedProviders &&
       limitedAllowedProviders.length > 0 &&
       !limitedAllowedProviders.includes(provider)
     ) {
-      alert(`Your API key is not permitted to clear cooldowns for provider '${provider}'.`);
+      toast.error(`Your API key is not permitted to clear cooldowns for provider '${provider}'.`);
       return;
     }
-    if (
-      !confirm(
-        `Clear cooldown for ${provider}${model ? ':' + model : ''}?\n\n` +
-          'This affects traffic for every API key using that provider. The ' +
-          "cooldown will re-establish on the next failure if the issue isn't " +
-          'resolved.'
-      )
-    ) {
-      return;
-    }
+    const ok = await toast.confirm({
+      title: `Clear cooldown for ${provider}${model ? ':' + model : ''}?`,
+      message:
+        "This affects traffic for every API key using that provider. The cooldown will re-establish on the next failure if the issue isn't resolved.",
+      confirmLabel: 'Clear',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.clearCooldown(provider, model);
       await loadData();
     } catch (e) {
-      alert('Failed to clear cooldown');
+      toast.error('Failed to clear cooldown');
       console.error('Failed to clear cooldown', e);
     }
   };

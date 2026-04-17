@@ -19,6 +19,9 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
+import { useToast } from '../contexts/ToastContext';
 import {
   Plus,
   Edit2,
@@ -234,6 +237,7 @@ const ModelIdInput = ({ modelId, onCommit }: ModelIdInputProps) => {
 };
 
 export const Providers = () => {
+  const toast = useToast();
   const navigate = useNavigate();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -411,7 +415,7 @@ export const Providers = () => {
       await loadData();
       setDeleteModalProvider(null);
     } catch (e) {
-      alert('Failed to delete provider: ' + e);
+      toast.error('Failed to delete provider: ' + e);
     } finally {
       setDeleteModalLoading(false);
     }
@@ -419,7 +423,7 @@ export const Providers = () => {
 
   const handleSave = async () => {
     if (!editingProvider.id) {
-      alert('Provider ID is required');
+      toast.error('Provider ID is required');
       return;
     }
     setIsSaving(true);
@@ -429,7 +433,7 @@ export const Providers = () => {
         providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0].value };
       }
       if (isOAuthMode && !providerToSave.oauthAccount?.trim()) {
-        alert('OAuth account is required');
+        toast.error('OAuth account is required');
         return;
       }
       // Quota checker validation is handled by the backend - just pass through as-is
@@ -444,7 +448,7 @@ export const Providers = () => {
       setIsModalOpen(false);
     } catch (e) {
       console.error('Save error', e);
-      alert('Failed to save provider: ' + e);
+      toast.error('Failed to save provider: ' + e);
     } finally {
       setIsSaving(false);
     }
@@ -625,7 +629,7 @@ export const Providers = () => {
       await api.saveProvider(p, provider.id);
     } catch (e) {
       console.error('Toggle error', e);
-      alert('Failed to update provider status: ' + e);
+      toast.error('Failed to update provider status: ' + e);
       loadData();
     }
   };
@@ -978,16 +982,18 @@ export const Providers = () => {
   };
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
-      <Card
-        title="Configured Providers"
-        extra={
+    <PageContainer>
+      <PageHeader
+        title="Providers"
+        subtitle="Configure upstream inference providers, credentials, and quota checkers."
+        actions={
           <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
             Add Provider
           </Button>
         }
-      >
-        <div className="overflow-x-auto -m-6">
+      />
+      <Card flush>
+        <div className="overflow-x-auto">
           <table className="w-full border-collapse font-body text-[13px]">
             <thead>
               <tr>
@@ -3748,13 +3754,13 @@ export const Providers = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div className="flex justify-end">
             <Button variant="ghost" onClick={() => setDeleteModalProvider(null)}>
               Cancel
             </Button>
           </div>
         </div>
       </Modal>
-    </div>
+    </PageContainer>
   );
 };

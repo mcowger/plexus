@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { FormField } from '../components/ui/FormField';
 import logo from '../assets/plexus_logo_transparent.png';
 
 export const Login: React.FC = () => {
@@ -31,23 +32,22 @@ export const Login: React.FC = () => {
     if (!valid) {
       setError('Invalid key');
     }
-    // On success, navigation happens via the useEffect above once isAuthenticated becomes true
   };
 
   return (
-    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4">
-      <div className="w-full" style={{ maxWidth: '600px' }}>
+    <div className="min-h-screen bg-bg-deep flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src={logo} alt="Plexus" className="h-16 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-text">Sign in</h1>
-          <p className="text-text-muted">
+          <img src={logo} alt="Plexus" className="h-14 sm:h-16 mx-auto mb-4" />
+          <h1 className="font-heading text-h1 font-bold text-text m-0">Sign in</h1>
+          <p className="mt-2 text-sm text-text-secondary">
             Enter your admin key for full access, or an API key secret for a scoped view of your
             key's activity.
           </p>
         </div>
 
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <input
               type="text"
               name="username"
@@ -57,22 +57,20 @@ export const Login: React.FC = () => {
               tabIndex={-1}
               aria-hidden="true"
             />
-            <div>
-              <label htmlFor="adminKey" className="block text-sm font-medium text-text-muted mb-1">
-                Admin key or API key secret
-              </label>
+            <FormField label="Admin key or API key secret" htmlFor="adminKey" error={error || undefined}>
               <Input
                 id="adminKey"
                 type="password"
                 autoComplete="current-password"
                 value={key}
-                onChange={(e) => setKey(e.target.value)}
+                onChange={(e) => {
+                  setKey(e.target.value);
+                  if (error) setError('');
+                }}
                 placeholder="sk-admin-... or sk-..."
                 autoFocus
               />
-            </div>
-
-            {error && <p className="text-danger text-sm">{error}</p>}
+            </FormField>
 
             <Button type="submit" className="w-full">
               Access Dashboard

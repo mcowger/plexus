@@ -1,22 +1,31 @@
 import React from 'react';
 import { clsx } from 'clsx';
 
+type BadgeStatus = 'connected' | 'disconnected' | 'connecting' | 'error' | 'neutral' | 'warning';
+
 interface BadgeProps {
-  status: 'connected' | 'disconnected' | 'connecting' | 'error' | 'neutral' | 'warning';
+  status: BadgeStatus;
   children: React.ReactNode;
   secondaryText?: string;
   className?: string;
-  style?: React.CSSProperties;
   onClick?: (e: React.MouseEvent) => void;
   title?: string;
 }
+
+const statusClasses: Record<BadgeStatus, string> = {
+  connected: 'text-success border-success/30 bg-success/15',
+  connecting: 'text-info border-info/30 bg-info/15',
+  disconnected: 'text-danger border-danger/30 bg-danger/15',
+  error: 'text-danger border-danger/30 bg-danger/15',
+  warning: 'text-secondary border-secondary/30 bg-secondary/15',
+  neutral: 'text-text-secondary border-border bg-bg-hover',
+};
 
 export const Badge: React.FC<BadgeProps> = ({
   status,
   children,
   secondaryText,
   className,
-  style,
   onClick,
   title,
 }) => {
@@ -25,34 +34,17 @@ export const Badge: React.FC<BadgeProps> = ({
       onClick={onClick}
       title={title}
       className={clsx(
-        'inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium',
-        {
-          'text-success border border-success/30 bg-emerald-500/15': status === 'connected',
-          'text-danger border border-danger/30 bg-red-500/15':
-            status === 'disconnected' || status === 'error',
-          'text-secondary border border-secondary/30 bg-amber-500/15': status === 'warning',
-        },
+        'inline-flex items-center gap-2 rounded-full border text-xs font-medium whitespace-nowrap',
+        secondaryText ? 'px-3 py-1' : 'px-3 py-1.5',
+        onClick && 'cursor-pointer hover:opacity-80 transition-opacity duration-fast',
+        statusClasses[status],
         className
       )}
-      style={{
-        ...style,
-        height: secondaryText ? 'auto' : undefined,
-        padding: secondaryText ? '4px 12px' : undefined,
-      }}
     >
-      <span className="connection-dot w-1.5 h-1.5 rounded-full bg-current" />
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          lineHeight: 1.1,
-        }}
-      >
-        <span style={{ fontWeight: 600 }}>{children}</span>
-        {secondaryText && (
-          <span style={{ fontSize: '9px', opacity: 0.7, marginTop: '2px' }}>{secondaryText}</span>
-        )}
+      <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+      <div className="flex flex-col items-start leading-tight">
+        <span className="font-semibold">{children}</span>
+        {secondaryText && <span className="text-[9px] opacity-70 mt-0.5">{secondaryText}</span>}
       </div>
     </div>
   );

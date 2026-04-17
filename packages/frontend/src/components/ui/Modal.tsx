@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface ModalProps {
   isOpen: boolean;
@@ -20,50 +21,52 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   size = 'md',
 }) => {
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
+    if (!isOpen) return;
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
-    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center z-[1000] p-5 bg-black/70 backdrop-blur-md animate-[fadeIn_0.2s_ease]"
+      className="fixed inset-0 z-modal flex items-center justify-center p-4 sm:p-5 bg-black/70 backdrop-blur-md animate-[fadeIn_0.2s_ease]"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
     >
       <div
         className={clsx(
-          'bg-bg-surface border border-border-glass rounded-xl max-w-full max-h-[90vh] overflow-hidden flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.5)] animate-[slideUp_0.3s_ease]',
+          'bg-bg-surface border border-border-glass rounded-xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-modal animate-[slideUp_0.3s_ease]',
           {
-            'w-[400px]': size === 'sm',
-            'w-[600px]': size === 'md',
-            'w-[800px]': size === 'lg',
+            'max-w-[420px]': size === 'sm',
+            'max-w-[640px]': size === 'md',
+            'max-w-[960px]': size === 'lg',
           }
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-border-glass">
-          <h2 className="font-heading text-xl font-semibold text-text m-0">{title}</h2>
+        <div className="flex items-center justify-between gap-4 p-4 sm:p-5 md:p-6 border-b border-border-glass">
+          <h2 className="font-heading text-h2 font-semibold text-text m-0 truncate">{title}</h2>
           <button
-            className="bg-transparent border-0 text-text-muted cursor-pointer hover:text-text"
+            type="button"
+            className="flex-shrink-0 bg-transparent border-0 text-text-muted cursor-pointer rounded-md p-1 transition-colors duration-fast hover:text-text focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
             onClick={onClose}
+            aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="p-8 overflow-y-auto flex-1">{children}</div>
+        <div className="p-4 sm:p-5 md:p-6 lg:p-8 overflow-y-auto flex-1">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-5 border-t border-border-glass">
+          <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-4 sm:px-5 sm:py-5 md:px-6 border-t border-border-glass">
             {footer}
           </div>
         )}

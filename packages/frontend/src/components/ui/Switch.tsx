@@ -1,56 +1,55 @@
 import React from 'react';
+import { clsx } from 'clsx';
 
 interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   size?: 'sm' | 'md';
+  'aria-label'?: string;
 }
 
-export const Switch: React.FC<SwitchProps> = ({ checked, onChange, disabled, size = 'md' }) => {
-  const width = size === 'sm' ? 32 : 44;
-  const height = size === 'sm' ? 18 : 24;
-  const knobSize = size === 'sm' ? 14 : 20;
-  const padding = 2;
-
-  // Fallback colors if vars aren't available, but assuming they are based on index.css
-  const bgOn = 'var(--color-success, #10B981)'; // Using success color for ON state usually looks good
-  const bgOff = 'var(--color-bg-subtle, #334155)';
-
+export const Switch: React.FC<SwitchProps> = ({
+  checked,
+  onChange,
+  disabled,
+  size = 'md',
+  'aria-label': ariaLabel,
+}) => {
   return (
-    <div
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      data-checked={checked}
+      disabled={disabled}
       onClick={(e) => {
         e.stopPropagation();
         if (!disabled) onChange(!checked);
       }}
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        background: checked ? bgOn : bgOff,
-        borderRadius: '999px',
-        position: 'relative',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        transition: 'background 0.2s ease',
-        border: checked
-          ? '1px solid transparent'
-          : '1px solid var(--color-border-glass, rgba(255,255,255,0.1))',
-        flexShrink: 0,
-      }}
+      className={clsx(
+        'group relative inline-block flex-shrink-0 rounded-full border border-border-glass bg-border transition-colors duration-fast outline-none',
+        'data-[checked=true]:bg-success data-[checked=true]:border-transparent',
+        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        !disabled && 'cursor-pointer',
+        {
+          'h-[18px] w-8': size === 'sm',
+          'h-6 w-11': size === 'md',
+        }
+      )}
     >
-      <div
-        style={{
-          position: 'absolute',
-          top: `${padding - (checked ? 1 : 1)}px`, // Adjust for border offset if needed, simplified here
-          left: checked ? `${width - knobSize - padding - (checked ? 0 : 2)}px` : `${padding}px`,
-          width: `${knobSize}px`,
-          height: `${knobSize}px`,
-          background: 'white',
-          borderRadius: '50%',
-          transition: 'left 0.2s ease',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-        }}
+      <span
+        aria-hidden="true"
+        className={clsx(
+          'absolute left-0.5 top-0.5 inline-block rounded-full bg-white shadow-sm transition-transform duration-fast',
+          {
+            'h-3.5 w-3.5 group-data-[checked=true]:translate-x-[14px]': size === 'sm',
+            'h-5 w-5 group-data-[checked=true]:translate-x-5': size === 'md',
+          }
+        )}
       />
-    </div>
+    </button>
   );
 };

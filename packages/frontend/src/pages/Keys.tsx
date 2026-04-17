@@ -5,6 +5,10 @@ import { TagSelect } from '../components/ui/TagSelect';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { Tabs } from '../components/ui/Tabs';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
+import { useToast } from '../contexts/ToastContext';
 import {
   Search,
   Plus,
@@ -44,6 +48,7 @@ interface QuotaStatus {
 }
 
 export const Keys = () => {
+  const toast = useToast();
   const [keys, setKeys] = useState<KeyConfig[]>([]);
   const [quotas, setQuotas] = useState<Record<string, UserQuota>>({});
   const [quotaStatuses, setQuotaStatuses] = useState<Record<string, QuotaStatus>>({});
@@ -135,14 +140,15 @@ export const Keys = () => {
       setIsKeyModalOpen(false);
     } catch (e) {
       console.error('Failed to save key', e);
-      alert('Failed to save key');
+      toast.error('Failed to save key');
     } finally {
       setIsSavingKey(false);
     }
   };
 
   const handleDeleteKey = async (keyName: string) => {
-    if (!confirm(`Are you sure you want to delete key '${keyName}'? This cannot be undone.`))
+    const _ok = await toast.confirm({ title: 'Delete key?', message: `Are you sure you want to delete key '${keyName}'? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!_ok)
       return;
 
     try {
@@ -150,7 +156,7 @@ export const Keys = () => {
       await loadData();
     } catch (e) {
       console.error('Failed to delete key', e);
-      alert('Failed to delete key');
+      toast.error('Failed to delete key');
     }
   };
 
@@ -172,7 +178,7 @@ export const Keys = () => {
 
     // Validate based on type
     if (editingQuota.type === 'rolling' && !editingQuota.duration) {
-      alert('Rolling quotas require a duration');
+      toast.error('Rolling quotas require a duration');
       return;
     }
 
@@ -190,33 +196,35 @@ export const Keys = () => {
       setIsQuotaModalOpen(false);
     } catch (e: any) {
       console.error('Failed to save quota', e);
-      alert(e.message || 'Failed to save quota');
+      toast.error(e.message || 'Failed to save quota');
     } finally {
       setIsSavingQuota(false);
     }
   };
 
   const handleDeleteQuota = async (name: string) => {
-    if (!confirm(`Are you sure you want to delete quota '${name}'? This cannot be undone.`)) return;
+    const _okq = await toast.confirm({ title: 'Delete quota?', message: `Are you sure you want to delete quota '${name}'? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!_okq) return;
 
     try {
       await api.deleteUserQuota(name);
       await loadData();
     } catch (e: any) {
       console.error('Failed to delete quota', e);
-      alert(e.message || 'Failed to delete quota');
+      toast.error(e.message || 'Failed to delete quota');
     }
   };
 
   const handleClearQuota = async (keyName: string) => {
-    if (!confirm(`Reset quota usage for key '${keyName}'?`)) return;
+    const _okr = await toast.confirm({ title: 'Reset quota?', message: `Reset quota usage for key '${keyName}'?`, confirmLabel: 'Reset' });
+    if (!_okr) return;
 
     try {
       await api.clearQuota(keyName);
       await loadData();
     } catch (e) {
       console.error('Failed to clear quota', e);
-      alert('Failed to clear quota');
+      toast.error('Failed to clear quota');
     }
   };
 
@@ -265,31 +273,37 @@ export const Keys = () => {
   };
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
-      {/* Header */}
-      <div className="mb-8">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Access Control</h1>
-            <p className="text-[15px] text-text-secondary m-0">Manage API keys and user quotas.</p>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {activeTab === 'keys' ? (
-              <Button leftIcon={<Plus size={16} />} onClick={handleAddNewKey}>
-                Add Key
-              </Button>
-            ) : (
-              <Button leftIcon={<Plus size={16} />} onClick={handleAddNewQuota}>
-                Add Quota
-              </Button>
-            )}
-          </div>
-        </div>
+    <PageContainer>
+      <PageHeader
+        title="Access Control"
+        subtitle="Manage API keys and user quotas."
+        actions={
+          activeTab === 'keys' ? (
+            <Button leftIcon={<Plus size={16} />} onClick={handleAddNewKey}>
+              Add Key
+            </Button>
+          ) : (
+            <Button leftIcon={<Plus size={16} />} onClick={handleAddNewQuota}>
+              Add Quota
+            </Button>
+          )
+        }
+      />
+
+      <div className="mb-6">
+        <Tabs
+          value={activeTab}
+          onChange={(v) => setActiveTab(v as 'keys' | 'quotas')}
+          items={[
+            { value: 'keys', label: `API Keys (${keys.length})` },
+            { value: 'quotas', label: `Quotas (${Object.keys(quotas).length})` },
+          ]}
+        />
       </div>
 
-      {/* Tabs */}
-      <div className="mb-6 border-b border-border-glass">
-        <div style={{ display: 'flex', gap: '8px' }}>
+      {/* Hidden old tabs (to avoid further JSX restructuring) */}
+      <div className="hidden">
+        <div>
           <button
             className={`px-4 py-2 font-body text-sm font-medium transition-colors ${
               activeTab === 'keys'
@@ -338,7 +352,7 @@ export const Keys = () => {
       {/* Keys Tab */}
       {activeTab === 'keys' && (
         <Card title="Active Keys" className="mb-6">
-          <div className="overflow-x-auto -m-6">
+          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>
@@ -496,7 +510,7 @@ export const Keys = () => {
       {/* Quotas Tab */}
       {activeTab === 'quotas' && (
         <Card title="User Quotas" className="mb-6">
-          <div className="overflow-x-auto -m-6">
+          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
                 <tr>
@@ -926,6 +940,6 @@ export const Keys = () => {
           </div>
         )}
       </Modal>
-    </div>
+    </PageContainer>
   );
 };

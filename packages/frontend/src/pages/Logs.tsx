@@ -3,7 +3,10 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { SearchInput } from '../components/ui/SearchInput';
 import { CostToolTip } from '../components/ui/CostToolTip';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
 import {
   api,
   UsageRecord,
@@ -385,74 +388,46 @@ export const Logs = () => {
   const selectedRetryHistory = parseRetryHistory(selectedRetryLog?.retryHistory);
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
-      <div className="mb-4">
-        <h1 className="font-heading text-3xl font-bold text-text m-0">Logs</h1>
-        {principal?.role === 'limited' && principal.keyName && (
-          <p className="text-sm text-text-muted mt-1">Scoped to key "{principal.keyName}".</p>
-        )}
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Logs"
+        subtitle={
+          principal?.role === 'limited' && principal.keyName
+            ? `Scoped to key "${principal.keyName}".`
+            : undefined
+        }
+      />
 
-      <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
-        <div className="mb-4">
-          <form onSubmit={handleSearch} className="flex flex-wrap gap-3 mb-4 justify-between">
-            <div className="flex flex-wrap gap-2">
+      <Card flush>
+        <div className="p-3 sm:p-4 border-b border-border-glass">
+          <form
+            onSubmit={handleSearch}
+            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 justify-between"
+          >
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 min-w-0 flex-1">
               {/* The apiKey filter is redundant for limited users — backend
                   force-scopes results to their key. */}
               {!isLimited && (
-                <div className="relative w-62.5">
-                  <Search
-                    size={16}
-                    style={{
-                      position: 'absolute',
-                      left: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--color-text-secondary)',
-                    }}
-                  />
-                  <Input
+                <div className="w-full sm:w-60">
+                  <SearchInput
                     placeholder="Filter by Key..."
                     value={filters.apiKey}
-                    onChange={(e) => setFilters({ ...filters, apiKey: e.target.value })}
-                    style={{ paddingLeft: '32px' }}
+                    onChange={(v) => setFilters({ ...filters, apiKey: v })}
                   />
                 </div>
               )}
-              <div className="relative w-62.5">
-                <Search
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                />
-                <Input
+              <div className="w-full sm:w-60">
+                <SearchInput
                   placeholder="Filter by Model..."
                   value={filters.incomingModelAlias}
-                  onChange={(e) => setFilters({ ...filters, incomingModelAlias: e.target.value })}
-                  style={{ paddingLeft: '32px' }}
+                  onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
                 />
               </div>
-              <div className="relative w-50">
-                <Filter
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                />
-                <Input
+              <div className="w-full sm:w-48">
+                <SearchInput
                   placeholder="Filter by Provider..."
                   value={filters.provider}
-                  onChange={(e) => setFilters({ ...filters, provider: e.target.value })}
-                  style={{ paddingLeft: '32px' }}
+                  onChange={(v) => setFilters({ ...filters, provider: v })}
                 />
               </div>
               <Button type="submit" variant="primary">
@@ -463,11 +438,10 @@ export const Logs = () => {
               <Button
                 onClick={handleDeleteAll}
                 variant="danger"
-                className="flex items-center gap-2"
+                leftIcon={<Trash2 size={16} />}
                 disabled={logs.length === 0}
                 type="button"
               >
-                <Trash2 size={16} />
                 Delete All
               </Button>
             )}
@@ -1281,6 +1255,6 @@ export const Logs = () => {
           cannot be undone.
         </p>
       </Modal>
-    </div>
+    </PageContainer>
   );
 };
