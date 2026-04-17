@@ -5,13 +5,27 @@ import { VisionDescriptorService } from '../src/services/vision-descriptor-servi
 import { Router } from '../src/services/router';
 import * as configModule from '../src/config';
 
+const BASE_TEST_CONFIG = {
+  providers: {},
+  models: {},
+  keys: {},
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+  cooldown: { initialMinutes: 1, maxMinutes: 5 },
+};
+
 describe('Vision Fallthrough E2E', () => {
   // Store the original config to restore after tests
   let originalConfig: any;
 
   beforeEach(() => {
-    // Store original config (from setup.ts default)
-    originalConfig = configModule.getConfig();
+    // Ensure this worker always has a baseline config, even under parallel forks
+    configModule.setConfigForTesting(BASE_TEST_CONFIG as any);
+    originalConfig = BASE_TEST_CONFIG;
   });
 
   afterEach(() => {

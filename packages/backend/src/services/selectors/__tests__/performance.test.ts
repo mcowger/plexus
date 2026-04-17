@@ -1,7 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PerformanceSelector } from '../performance';
 import { UsageStorageService } from '../../usage-storage';
 import { ModelTarget, setConfigForTesting, PlexusConfig } from '../../../config';
+
+const makeConfig = (performanceExplorationRate = 0): PlexusConfig => ({
+  providers: {},
+  models: {},
+  keys: {},
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+  performanceExplorationRate,
+});
 
 describe('PerformanceSelector', () => {
   // Mock usage storage
@@ -15,6 +28,14 @@ describe('PerformanceSelector', () => {
 
   const selector = new PerformanceSelector(mockStorage);
 
+  beforeEach(() => {
+    setConfigForTesting(makeConfig(0));
+    mockGetProviderPerformance.mockReset();
+    mockGetProviderPerformance.mockImplementation(
+      (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
+    );
+  });
+
   it('should return null for empty targets', async () => {
     expect(await selector.select([])).toBeNull();
   });
@@ -25,19 +46,7 @@ describe('PerformanceSelector', () => {
   });
 
   it('should select fastest target based on avg_tokens_per_sec', async () => {
-    const config: PlexusConfig = {
-      providers: {},
-      models: {},
-      keys: {},
-      failover: {
-        enabled: false,
-        retryableStatusCodes: [429, 500, 502, 503, 504],
-        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
-      },
-      quotas: [],
-      performanceExplorationRate: 0,
-    };
-    setConfigForTesting(config);
+    setConfigForTesting(makeConfig(0));
 
     mockGetProviderPerformance.mockImplementation((provider, model) => {
       if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 10 }]);
@@ -86,19 +95,7 @@ describe('PerformanceSelector', () => {
 
   describe('Exploration rate feature', () => {
     it('should not explore when exploration rate is 0', async () => {
-      const config: PlexusConfig = {
-        providers: {},
-        models: {},
-        keys: {},
-        failover: {
-          enabled: false,
-          retryableStatusCodes: [429, 500, 502, 503, 504],
-          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
-        },
-        quotas: [],
-        performanceExplorationRate: 0,
-      };
-      setConfigForTesting(config);
+      setConfigForTesting(makeConfig(0));
 
       mockGetProviderPerformance.mockImplementation((provider, model) => {
         if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 100 }]); // Fastest
@@ -119,19 +116,7 @@ describe('PerformanceSelector', () => {
     });
 
     it('should explore non-best targets when exploration rate is 1', async () => {
-      const config: PlexusConfig = {
-        providers: {},
-        models: {},
-        keys: {},
-        failover: {
-          enabled: false,
-          retryableStatusCodes: [429, 500, 502, 503, 504],
-          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
-        },
-        quotas: [],
-        performanceExplorationRate: 1,
-      };
-      setConfigForTesting(config);
+      setConfigForTesting(makeConfig(1));
 
       mockGetProviderPerformance.mockImplementation((provider, model) => {
         if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 100 }]); // Fastest
@@ -156,15 +141,8 @@ describe('PerformanceSelector', () => {
 
     it('should use default 0.05 exploration rate when not configured', async () => {
       const config: PlexusConfig = {
-        providers: {},
-        models: {},
-        keys: {},
-        failover: {
-          enabled: false,
-          retryableStatusCodes: [429, 500, 502, 503, 504],
-          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
-        },
-        quotas: [],
+        ...makeConfig(0),
+        performanceExplorationRate: undefined,
       };
       setConfigForTesting(config);
 

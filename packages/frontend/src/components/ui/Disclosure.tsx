@@ -32,7 +32,12 @@ export const Disclosure: React.FC<DisclosureProps> = ({
   };
 
   return (
-    <div className={clsx('border border-border-glass rounded-md bg-bg-glass/50 overflow-hidden', className)}>
+    <div
+      className={clsx(
+        'border border-border-glass rounded-md bg-bg-glass/50 overflow-hidden',
+        className
+      )}
+    >
       <button
         type="button"
         onClick={toggle}

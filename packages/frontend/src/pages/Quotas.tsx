@@ -215,7 +215,10 @@ export const Quotas = () => {
           aria-label="Refresh"
           className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-bg-hover hover:text-text transition-colors duration-fast disabled:opacity-50"
         >
-          <RefreshCw size={14} className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')} />
+          <RefreshCw
+            size={14}
+            className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')}
+          />
         </button>
         <div className="pr-8">{children}</div>
       </div>
@@ -275,7 +278,12 @@ export const Quotas = () => {
         title="Quota Trackers"
         subtitle="Monitor provider quotas and rate limits."
         actions={
-          <Button variant="secondary" onClick={fetchQuotas} disabled={loading} leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}>
+          <Button
+            variant="secondary"
+            onClick={fetchQuotas}
+            disabled={loading}
+            leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}
+          >
             Refresh All
           </Button>
         }

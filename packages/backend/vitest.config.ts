@@ -15,16 +15,12 @@ export default defineConfig({
     setupFiles: ['./test/vitest.setup.ts'],
     globalSetup: ['./test/vitest.global-setup.ts'],
     environment: 'node',
+    reporters: ['dot'],
     globals: false,
     restoreMocks: true,
     clearMocks: true,
     mockReset: true,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
     server: {
       deps: {
         inline: ['zod', 'yaml', '@plexus/shared', '@mariozechner/pi-ai'],

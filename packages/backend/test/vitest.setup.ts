@@ -1,8 +1,30 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { vi } from 'vitest';
 
-const testDbUrl = process.env.PLEXUS_TEST_DB_URL;
-if (testDbUrl) {
-  process.env.DATABASE_URL = process.env.DATABASE_URL || testDbUrl;
+const sqliteUrlToPath = (url: string) =>
+  url.startsWith('sqlite://') ? url.slice('sqlite://'.length) : null;
+
+const templateDbUrl = process.env.PLEXUS_TEST_DB_TEMPLATE_URL;
+const tmpRoot = process.env.PLEXUS_TEST_DB_TMP_ROOT;
+const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? '0';
+
+if (templateDbUrl && tmpRoot) {
+  const templateDbPath = sqliteUrlToPath(templateDbUrl);
+  const workerDbPath = path.join(tmpRoot, `vitest-worker-${workerId}.sqlite`);
+
+  if (templateDbPath && !fs.existsSync(workerDbPath)) {
+    fs.copyFileSync(templateDbPath, workerDbPath);
+  }
+
+  const workerDbUrl = `sqlite://${workerDbPath}`;
+  process.env.PLEXUS_TEST_DB_URL = workerDbUrl;
+  process.env.DATABASE_URL = workerDbUrl;
+} else {
+  const testDbUrl = process.env.PLEXUS_TEST_DB_URL;
+  if (testDbUrl) {
+    process.env.DATABASE_URL = process.env.DATABASE_URL || testDbUrl;
+  }
 }
 
 const SUPPORTED_LOG_LEVELS = ['error', 'warn', 'info', 'debug', 'verbose', 'silly'] as const;

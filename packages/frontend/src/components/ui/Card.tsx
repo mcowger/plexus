@@ -40,7 +40,11 @@ export const Card: React.FC<CardProps> = ({
           {extra && <div className="flex-shrink-0">{extra}</div>}
         </div>
       )}
-      {!flush && <div className={clsx('max-w-full', dense ? 'p-3 sm:p-4' : 'p-4 sm:p-5 md:p-6')}>{children}</div>}
+      {!flush && (
+        <div className={clsx('max-w-full', dense ? 'p-3 sm:p-4' : 'p-4 sm:p-5 md:p-6')}>
+          {children}
+        </div>
+      )}
       {flush && <div className="max-w-full">{children}</div>}
     </div>
   );

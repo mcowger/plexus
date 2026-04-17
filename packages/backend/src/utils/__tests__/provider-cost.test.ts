@@ -234,16 +234,15 @@ describe('extractProviderEnergyFromSSEComments (via DebugLoggingInspector)', () 
 
     expect(lastEnergy).not.toBeNull();
     expect(lastEnergy.energy_joules).toBe(190.46);
-    expect(lastEnergy.energy_kwh).toBe(5.2904e-05);
+    expect(lastEnergy.energy_kwh).toBe(5.2904e-5);
     expect(lastEnergy.avg_power_watts).toBe(3109.0);
     expect(lastEnergy.duration_seconds).toBe(0.613);
   });
 
   test('uses last energy line when multiple are present', () => {
-    const rawBody = [
-      ': energy {"energy_kwh": 0.0001}',
-      ': energy {"energy_kwh": 0.00052904}',
-    ].join('\n');
+    const rawBody = [': energy {"energy_kwh": 0.0001}', ': energy {"energy_kwh": 0.00052904}'].join(
+      '\n'
+    );
 
     const lines = rawBody.split(/\r?\n/);
     let lastEnergy: any = null;
@@ -310,6 +309,6 @@ describe('extractProviderEnergyFromSSEComments (via DebugLoggingInspector)', () 
       }
     }
 
-    expect(lastEnergy.energy_kwh).toBe(5.2904e-05);
+    expect(lastEnergy.energy_kwh).toBe(5.2904e-5);
   });
 });

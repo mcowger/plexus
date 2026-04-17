@@ -243,7 +243,12 @@ export const MyKey: React.FC = () => {
               <Button variant="secondary" onClick={() => setShowRotate(false)} disabled={rotating}>
                 Cancel
               </Button>
-              <Button variant="danger" onClick={handleRotate} disabled={rotating} isLoading={rotating}>
+              <Button
+                variant="danger"
+                onClick={handleRotate}
+                disabled={rotating}
+                isLoading={rotating}
+              >
                 Rotate now
               </Button>
             </>

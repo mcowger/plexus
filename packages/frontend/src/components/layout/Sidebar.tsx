@@ -280,7 +280,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
               <span>{appVersion}</span>
               {isOutdated && (
                 <Tooltip content={`Update available: ${latestVersion}`} position="bottom">
-                  <span className="inline-flex text-primary" aria-label={`Outdated version. Latest is ${latestVersion}`}>
+                  <span
+                    className="inline-flex text-primary"
+                    aria-label={`Outdated version. Latest is ${latestVersion}`}
+                  >
                     <AlertTriangle size={11} />
                   </span>
                 </Tooltip>
@@ -336,8 +339,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
             <>
               <NavItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
               <NavItem to="/logs" icon={FileText} label="Logs" collapsed={collapsed} />
-              {isAdmin && <NavItem to="/quotas" icon={PieChart} label="Quotas" collapsed={collapsed} />}
-              {isLimited && <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />}
+              {isAdmin && (
+                <NavItem to="/quotas" icon={PieChart} label="Quotas" collapsed={collapsed} />
+              )}
+              {isLimited && (
+                <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />
+              )}
             </>
           )}
         </div>
@@ -373,7 +380,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                   collapsed && 'opacity-0 h-0 overflow-hidden'
                 )}
               >
-                <CompactBalancesCard balanceQuotas={balanceQuotas} getQuotaResult={getQuotaResult} />
+                <CompactBalancesCard
+                  balanceQuotas={balanceQuotas}
+                  getQuotaResult={getQuotaResult}
+                />
               </div>
             )}
           </div>
@@ -410,7 +420,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                   collapsed && 'opacity-0 h-0 overflow-hidden'
                 )}
               >
-                <CompactQuotasCard rateLimitQuotas={rateLimitQuotas} getQuotaResult={getQuotaResult} />
+                <CompactQuotasCard
+                  rateLimitQuotas={rateLimitQuotas}
+                  getQuotaResult={getQuotaResult}
+                />
               </div>
             )}
           </div>
@@ -495,7 +508,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
               </div>
               <NavItem to="/errors" icon={AlertTriangle} label="Errors" collapsed={collapsed} />
               {isAdmin && (
-                <NavItem to="/system-logs" icon={FileText} label="System Logs" collapsed={collapsed} />
+                <NavItem
+                  to="/system-logs"
+                  icon={FileText}
+                  label="System Logs"
+                  collapsed={collapsed}
+                />
               )}
             </>
           )}
@@ -527,7 +545,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                 )}
               >
                 <LogOut size={20} />
-                <span className={clsx('transition-opacity duration-fast', collapsed && 'opacity-0 w-0 overflow-hidden')}>
+                <span
+                  className={clsx(
+                    'transition-opacity duration-fast',
+                    collapsed && 'opacity-0 w-0 overflow-hidden'
+                  )}
+                >
                   Logout
                 </span>
               </button>

@@ -65,10 +65,16 @@ export function Tabs<V extends string = string>({
               'flex-shrink-0 inline-flex items-center gap-2 font-body text-sm font-medium transition-all duration-fast whitespace-nowrap focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
               variant === 'underline' && 'px-4 py-2.5 border-b-2 -mb-px',
               variant === 'underline' && active && 'text-primary border-primary',
-              variant === 'underline' && !active && 'text-text-secondary border-transparent hover:text-text',
+              variant === 'underline' &&
+                !active &&
+                'text-text-secondary border-transparent hover:text-text',
               variant === 'pills' && 'px-3.5 py-1.5 rounded-md',
-              variant === 'pills' && active && 'bg-bg-glass text-primary border border-border-glass',
-              variant === 'pills' && !active && 'text-text-secondary hover:bg-bg-hover hover:text-text'
+              variant === 'pills' &&
+                active &&
+                'bg-bg-glass text-primary border border-border-glass',
+              variant === 'pills' &&
+                !active &&
+                'text-text-secondary hover:bg-bg-hover hover:text-text'
             )}
           >
             {item.label}

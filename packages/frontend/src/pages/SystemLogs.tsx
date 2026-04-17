@@ -228,14 +228,20 @@ export const SystemLogs: React.FC = () => {
             >
               {isPaused ? 'Resume' : 'Pause'}
             </Button>
-            <Button variant="secondary" size="sm" onClick={clearLogs} leftIcon={<Trash2 size={14} />}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={clearLogs}
+              leftIcon={<Trash2 size={14} />}
+            >
               Clear
             </Button>
           </div>
         </div>
         <div className="px-4 py-2 text-xs text-text-secondary border-b border-border-glass">
-          Current level: <span className="text-text font-semibold">{currentLevel}</span> · Startup default:{' '}
-          <span className="text-text font-semibold">{startupLevel}</span> · Runtime changes reset on restart.
+          Current level: <span className="text-text font-semibold">{currentLevel}</span> · Startup
+          default: <span className="text-text font-semibold">{startupLevel}</span> · Runtime changes
+          reset on restart.
         </div>
 
         <div className="bg-terminal-bg p-3 overflow-y-auto font-mono text-xs text-terminal-fg h-[60vh] min-h-[320px] max-h-[700px]">
@@ -254,7 +260,8 @@ export const SystemLogs: React.FC = () => {
                 {log.level?.toUpperCase()}:
               </span>
               <span>{log.message}</span>
-              {Object.keys(log).filter((k) => !['level', 'message', 'timestamp'].includes(k)).length > 0 && (
+              {Object.keys(log).filter((k) => !['level', 'message', 'timestamp'].includes(k))
+                .length > 0 && (
                 <pre className="text-text-muted text-[11px] ml-8 mt-1 whitespace-pre-wrap">
                   {JSON.stringify(
                     Object.fromEntries(

@@ -89,7 +89,11 @@ export const Config = () => {
   };
 
   const handleExportLayout = () =>
-    triggerDownload(JSON.stringify(cardLayout, null, 2), 'plexus-card-layout.json', 'application/json');
+    triggerDownload(
+      JSON.stringify(cardLayout, null, 2),
+      'plexus-card-layout.json',
+      'application/json'
+    );
 
   const handleExportConfig = () =>
     triggerDownload(config, 'plexus-config-export.json', 'application/json');
@@ -164,7 +168,12 @@ export const Config = () => {
           flush
           extra={
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={loadConfig} leftIcon={<RotateCcw size={14} />}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadConfig}
+                leftIcon={<RotateCcw size={14} />}
+              >
                 Refresh
               </Button>
               <Button
@@ -211,10 +220,20 @@ export const Config = () => {
           title="Card Layout"
           extra={
             <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={handleExportLayout} leftIcon={<Download size={14} />}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportLayout}
+                leftIcon={<Download size={14} />}
+              >
                 Export
               </Button>
-              <Button variant="primary" size="sm" onClick={handleImportLayout} leftIcon={<Upload size={14} />}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleImportLayout}
+                leftIcon={<Upload size={14} />}
+              >
                 Import
               </Button>
             </div>
@@ -238,7 +257,9 @@ export const Config = () => {
             </h4>
             <div className="flex flex-wrap gap-2">
               {cardLayout.length === 0 && (
-                <p className="text-xs text-text-muted italic">Default layout — no customizations saved.</p>
+                <p className="text-xs text-text-muted italic">
+                  Default layout — no customizations saved.
+                </p>
               )}
               {cardLayout.map((card, index) => (
                 <div

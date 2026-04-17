@@ -8,9 +8,11 @@ export default async function globalSetup() {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const backendRoot = path.resolve(moduleDir, '..');
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plexus-vitest-'));
-  const defaultDbPath = path.join(tmpRoot, 'vitest.sqlite');
+  const defaultDbPath = path.join(tmpRoot, 'vitest-template.sqlite');
   const testDbUrl = process.env.PLEXUS_TEST_DB_URL || `sqlite://${defaultDbPath}`;
+  process.env.PLEXUS_TEST_DB_TEMPLATE_URL = testDbUrl;
   process.env.PLEXUS_TEST_DB_URL = testDbUrl;
+  process.env.PLEXUS_TEST_DB_TMP_ROOT = tmpRoot;
   process.env.DATABASE_URL = process.env.DATABASE_URL || testDbUrl;
 
   const originalLogLevel = process.env.LOG_LEVEL;
@@ -48,6 +50,7 @@ keys: {}
   configModule.setConfigForTesting(configModule.validateConfig(testConfig));
   initializeDatabase(testDbUrl);
   await runMigrations();
+  await closeDatabase();
 
   if (originalLogLevel === undefined) {
     delete process.env.LOG_LEVEL;
@@ -56,12 +59,13 @@ keys: {}
   }
 
   return async () => {
-    await closeDatabase();
     try {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
     } catch {
       // ignore temp cleanup errors
     }
+    delete process.env.PLEXUS_TEST_DB_TEMPLATE_URL;
     delete process.env.PLEXUS_TEST_DB_URL;
+    delete process.env.PLEXUS_TEST_DB_TMP_ROOT;
   };
 }

@@ -298,562 +298,571 @@ export const McpPage: React.FC = () => {
         subtitle="Configure Model Context Protocol upstream servers and review their call logs."
       />
       <div className="flex flex-col gap-6">
-      {/* ── Servers Config Card ── */}
-      <Card
-        title="MCP Servers"
-        extra={
-          <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
-            Add MCP Server
-          </Button>
-        }
-      >
-        {serverNames.length === 0 ? (
-          <div className="p-4 text-text-secondary text-center">
-            No MCP servers configured. Click "Add MCP Server" to create one.
+        {/* ── Servers Config Card ── */}
+        <Card
+          title="MCP Servers"
+          extra={
+            <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
+              Add MCP Server
+            </Button>
+          }
+        >
+          {serverNames.length === 0 ? (
+            <div className="p-4 text-text-secondary text-center">
+              No MCP servers configured. Click "Add MCP Server" to create one.
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
+              <table className="w-full border-collapse font-body text-[13px]">
+                <thead>
+                  <tr>
+                    <th
+                      className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                      style={{ paddingLeft: '24px' }}
+                    >
+                      Name
+                    </th>
+                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                      Upstream URL
+                    </th>
+                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                      Headers
+                    </th>
+                    <th
+                      className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                      style={{ paddingRight: '24px', textAlign: 'right' }}
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {serverNames.map((name) => {
+                    const server = servers[name];
+                    const headerCount = server.headers ? Object.keys(server.headers).length : 0;
+                    return (
+                      <tr
+                        key={name}
+                        onClick={() => handleEdit(name)}
+                        style={{ cursor: 'pointer' }}
+                        className="hover:bg-bg-hover"
+                      >
+                        <td
+                          className="px-4 py-3 text-left border-b border-border-glass text-text"
+                          style={{ paddingLeft: '24px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Edit2 size={12} style={{ opacity: 0.5 }} />
+                            <div style={{ fontWeight: 600 }}>{name}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                          <div
+                            style={{
+                              maxWidth: '400px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {server.upstream_url}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Switch
+                              checked={server.enabled !== false}
+                              onChange={(val) => handleToggleEnabled(name, val)}
+                              size="sm"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                          {headerCount > 0 ? `${headerCount} header(s)` : '-'}
+                        </td>
+                        <td
+                          className="px-4 py-3 text-left border-b border-border-glass text-text"
+                          style={{ paddingRight: '24px', textAlign: 'right' }}
+                        >
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(name);
+                              }}
+                              style={{ color: 'var(--color-danger)' }}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {/* ── Usage Logs Card ── */}
+        <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
+          <div className="mb-2">
+            <h2 className="font-heading text-lg font-semibold text-text m-0 mb-3">
+              MCP Usage Logs
+            </h2>
+            <form onSubmit={handleLogSearch} className="flex gap-2 justify-between">
+              <div className="flex gap-2">
+                <div className="relative w-50">
+                  <Search
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  />
+                  <Input
+                    placeholder="Filter by Server..."
+                    value={logsFilters.serverName}
+                    onChange={(e) => setLogsFilters({ ...logsFilters, serverName: e.target.value })}
+                    style={{ paddingLeft: '32px' }}
+                  />
+                </div>
+                <div className="relative w-44">
+                  <Filter
+                    size={16}
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  />
+                  <Input
+                    placeholder="Filter by Key..."
+                    value={logsFilters.apiKey}
+                    onChange={(e) => setLogsFilters({ ...logsFilters, apiKey: e.target.value })}
+                    style={{ paddingLeft: '32px' }}
+                  />
+                </div>
+                <Button type="submit" variant="primary">
+                  Search
+                </Button>
+              </div>
+              <Button
+                onClick={handleDeleteAllLogs}
+                variant="danger"
+                className="flex items-center gap-2"
+                disabled={logs.length === 0}
+                type="button"
+              >
+                <Trash2 size={16} />
+                Delete All
+              </Button>
+            </form>
           </div>
-        ) : (
-          <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
+
+          <div className="overflow-x-auto -mx-3 px-3">
             <table className="w-full border-collapse font-body text-[13px]">
               <thead>
-                <tr>
-                  <th
-                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                    style={{ paddingLeft: '24px' }}
-                  >
-                    Name
+                <tr className="text-center border-b border-border">
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    Date
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Upstream URL
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    Key
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    Server
+                  </th>
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    Method
+                  </th>
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    RPC Method
+                  </th>
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    Duration
+                  </th>
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Headers
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                    style={{ paddingRight: '24px', textAlign: 'right' }}
-                  >
-                    Actions
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex justify-center">
+                      <Trash2 size={12} />
+                    </div>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {serverNames.map((name) => {
-                  const server = servers[name];
-                  const headerCount = server.headers ? Object.keys(server.headers).length : 0;
-                  return (
+                {logsLoading ? (
+                  <tr>
+                    <td colSpan={8} className="p-5 text-center">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-5 text-center text-text-secondary">
+                      No MCP logs found
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => (
                     <tr
-                      key={name}
-                      onClick={() => handleEdit(name)}
-                      style={{ cursor: 'pointer' }}
-                      className="hover:bg-bg-hover"
+                      key={log.request_id}
+                      className="group border-b border-border-glass hover:bg-bg-hover"
                     >
-                      <td
-                        className="px-4 py-3 text-left border-b border-border-glass text-text"
-                        style={{ paddingLeft: '24px' }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Edit2 size={12} style={{ opacity: 0.5 }} />
-                          <div style={{ fontWeight: 600 }}>{name}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                        <div
-                          style={{
-                            maxWidth: '400px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {server.upstream_url}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Switch
-                            checked={server.enabled !== false}
-                            onChange={(val) => handleToggleEnabled(name, val)}
-                            size="sm"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                        {headerCount > 0 ? `${headerCount} header(s)` : '-'}
-                      </td>
-                      <td
-                        className="px-4 py-3 text-left border-b border-border-glass text-text"
-                        style={{ paddingRight: '24px', textAlign: 'right' }}
-                      >
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(name);
-                            }}
-                            style={{ color: 'var(--color-danger)' }}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      {/* ── Usage Logs Card ── */}
-      <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
-        <div className="mb-2">
-          <h2 className="font-heading text-lg font-semibold text-text m-0 mb-3">MCP Usage Logs</h2>
-          <form onSubmit={handleLogSearch} className="flex gap-2 justify-between">
-            <div className="flex gap-2">
-              <div className="relative w-50">
-                <Search
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                />
-                <Input
-                  placeholder="Filter by Server..."
-                  value={logsFilters.serverName}
-                  onChange={(e) => setLogsFilters({ ...logsFilters, serverName: e.target.value })}
-                  style={{ paddingLeft: '32px' }}
-                />
-              </div>
-              <div className="relative w-44">
-                <Filter
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                />
-                <Input
-                  placeholder="Filter by Key..."
-                  value={logsFilters.apiKey}
-                  onChange={(e) => setLogsFilters({ ...logsFilters, apiKey: e.target.value })}
-                  style={{ paddingLeft: '32px' }}
-                />
-              </div>
-              <Button type="submit" variant="primary">
-                Search
-              </Button>
-            </div>
-            <Button
-              onClick={handleDeleteAllLogs}
-              variant="danger"
-              className="flex items-center gap-2"
-              disabled={logs.length === 0}
-              type="button"
-            >
-              <Trash2 size={16} />
-              Delete All
-            </Button>
-          </form>
-        </div>
-
-        <div className="overflow-x-auto -mx-3 px-3">
-          <table className="w-full border-collapse font-body text-[13px]">
-            <thead>
-              <tr className="text-center border-b border-border">
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Date
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Key
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Server
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Method
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  RPC Method
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Duration
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  Status
-                </th>
-                <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                  <div className="flex justify-center">
-                    <Trash2 size={12} />
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {logsLoading ? (
-                <tr>
-                  <td colSpan={8} className="p-5 text-center">
-                    Loading...
-                  </td>
-                </tr>
-              ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-5 text-center text-text-secondary">
-                    No MCP logs found
-                  </td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr
-                    key={log.request_id}
-                    className="group border-b border-border-glass hover:bg-bg-hover"
-                  >
-                    {/* Date */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {new Date(log.created_at).toLocaleTimeString()}
-                        </span>
-                        <span className="text-text-secondary" style={{ fontSize: '0.85em' }}>
-                          {new Date(log.created_at).toISOString().split('T')[0]}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Key / Attribution */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{log.api_key || '-'}</span>
-                        {log.attribution && (
+                      {/* Date */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {new Date(log.created_at).toLocaleTimeString()}
+                          </span>
                           <span className="text-text-secondary" style={{ fontSize: '0.85em' }}>
-                            {log.attribution}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Server */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{log.server_name}</span>
-                        <span
-                          className="text-text-secondary"
-                          style={{
-                            fontSize: '0.85em',
-                            maxWidth: '200px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {log.upstream_url}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* HTTP Method */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                      <div className="flex flex-col gap-1">
-                        <span
-                          className={clsx(
-                            'text-xs font-semibold',
-                            log.method === 'GET'
-                              ? 'text-blue-400'
-                              : log.method === 'POST'
-                                ? 'text-green-400'
-                                : 'text-red-400'
-                          )}
-                        >
-                          {log.method}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {log.is_streamed ? (
-                            <Zap size={11} className="text-blue-400" />
-                          ) : (
-                            <ZapOff size={11} className="text-gray-400" />
-                          )}
-                          <span className="text-text-secondary" style={{ fontSize: '0.8em' }}>
-                            {log.is_streamed ? 'streamed' : 'buffered'}
+                            {new Date(log.created_at).toISOString().split('T')[0]}
                           </span>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* JSON-RPC Method + Tool Name */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-mono text-xs">
-                          {log.jsonrpc_method || <span className="text-text-secondary">-</span>}
-                        </span>
-                        {log.tool_name && (
-                          <span className="font-mono text-xs text-info" title={log.tool_name}>
-                            {log.tool_name}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Duration */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                      <span>{log.duration_ms != null ? formatMs(log.duration_ms) : '-'}</span>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                      <div className="flex flex-col gap-1">
-                        {log.error_code ? (
-                          <div
-                            className={clsx(
-                              'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                              'text-danger border-danger/30 bg-red-500/15'
-                            )}
-                            style={{ width: '52px' }}
-                          >
-                            <AlertTriangle size={12} />
-                            <span className="font-semibold">{log.response_status ?? '?'}</span>
-                          </div>
-                        ) : (
-                          <div
-                            className={clsx(
-                              'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                              log.response_status != null &&
-                                log.response_status >= 200 &&
-                                log.response_status < 300
-                                ? 'text-success border-success/30 bg-emerald-500/15'
-                                : 'text-danger border-danger/30 bg-red-500/15'
-                            )}
-                            style={{ width: '52px' }}
-                          >
-                            <CheckCircle size={12} />
-                            <span
-                              className={clsx('font-semibold', statusColor(log.response_status))}
-                            >
-                              {log.response_status ?? '?'}
+                      {/* Key / Attribution */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{log.api_key || '-'}</span>
+                          {log.attribution && (
+                            <span className="text-text-secondary" style={{ fontSize: '0.85em' }}>
+                              {log.attribution}
                             </span>
-                          </div>
-                        )}
-                        {log.error_message && (
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Server */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{log.server_name}</span>
                           <span
-                            className="text-danger"
+                            className="text-text-secondary"
                             style={{
-                              fontSize: '0.78em',
-                              maxWidth: '160px',
+                              fontSize: '0.85em',
+                              maxWidth: '200px',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              display: 'block',
                             }}
-                            title={log.error_message}
                           >
-                            {log.error_message}
+                            {log.upstream_url}
                           </span>
-                        )}
-                      </div>
-                    </td>
+                        </div>
+                      </td>
 
-                    {/* Delete */}
-                    <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                      <button
-                        onClick={() => handleDeleteLog(log.request_id)}
-                        className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
-                        title="Delete log"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      {/* HTTP Method */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={clsx(
+                              'text-xs font-semibold',
+                              log.method === 'GET'
+                                ? 'text-blue-400'
+                                : log.method === 'POST'
+                                  ? 'text-green-400'
+                                  : 'text-red-400'
+                            )}
+                          >
+                            {log.method}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {log.is_streamed ? (
+                              <Zap size={11} className="text-blue-400" />
+                            ) : (
+                              <ZapOff size={11} className="text-gray-400" />
+                            )}
+                            <span className="text-text-secondary" style={{ fontSize: '0.8em' }}>
+                              {log.is_streamed ? 'streamed' : 'buffered'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-        <div className="flex justify-end items-center mt-3 gap-3">
-          <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-            Page {logsCurrentPage} of {Math.max(1, logsTotalPages)}
-          </span>
-          <div className="flex gap-1">
-            <Button
-              variant="secondary"
-              disabled={logsOffset === 0}
-              onClick={() => setLogsOffset(Math.max(0, logsOffset - logsLimit))}
-            >
-              <ChevronLeft size={16} />
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={logsOffset + logsLimit >= logsTotal}
-              onClick={() => setLogsOffset(logsOffset + logsLimit)}
-            >
-              <ChevronRight size={16} />
-            </Button>
+                      {/* JSON-RPC Method + Tool Name */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono text-xs">
+                            {log.jsonrpc_method || <span className="text-text-secondary">-</span>}
+                          </span>
+                          {log.tool_name && (
+                            <span className="font-mono text-xs text-info" title={log.tool_name}>
+                              {log.tool_name}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Duration */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                        <span>{log.duration_ms != null ? formatMs(log.duration_ms) : '-'}</span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                        <div className="flex flex-col gap-1">
+                          {log.error_code ? (
+                            <div
+                              className={clsx(
+                                'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                                'text-danger border-danger/30 bg-red-500/15'
+                              )}
+                              style={{ width: '52px' }}
+                            >
+                              <AlertTriangle size={12} />
+                              <span className="font-semibold">{log.response_status ?? '?'}</span>
+                            </div>
+                          ) : (
+                            <div
+                              className={clsx(
+                                'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                                log.response_status != null &&
+                                  log.response_status >= 200 &&
+                                  log.response_status < 300
+                                  ? 'text-success border-success/30 bg-emerald-500/15'
+                                  : 'text-danger border-danger/30 bg-red-500/15'
+                              )}
+                              style={{ width: '52px' }}
+                            >
+                              <CheckCircle size={12} />
+                              <span
+                                className={clsx('font-semibold', statusColor(log.response_status))}
+                              >
+                                {log.response_status ?? '?'}
+                              </span>
+                            </div>
+                          )}
+                          {log.error_message && (
+                            <span
+                              className="text-danger"
+                              style={{
+                                fontSize: '0.78em',
+                                maxWidth: '160px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                display: 'block',
+                              }}
+                              title={log.error_message}
+                            >
+                              {log.error_message}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Delete */}
+                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                        <button
+                          onClick={() => handleDeleteLog(log.request_id)}
+                          className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
+                          title="Delete log"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
-      </Card>
 
-      {/* ── Server Edit/Add Modal ── */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingServerName ? `Edit ${editingServerName}` : 'Add MCP Server'}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          {!editingServerName && (
-            <Input
-              label="Server Name"
-              value={serverNameInput}
-              onChange={(e) =>
-                setServerNameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))
-              }
-              placeholder="my-mcp-server"
-            />
-          )}
+          <div className="flex justify-end items-center mt-3 gap-3">
+            <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+              Page {logsCurrentPage} of {Math.max(1, logsTotalPages)}
+            </span>
+            <div className="flex gap-1">
+              <Button
+                variant="secondary"
+                disabled={logsOffset === 0}
+                onClick={() => setLogsOffset(Math.max(0, logsOffset - logsLimit))}
+              >
+                <ChevronLeft size={16} />
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={logsOffset + logsLimit >= logsTotal}
+                onClick={() => setLogsOffset(logsOffset + logsLimit)}
+              >
+                <ChevronRight size={16} />
+              </Button>
+            </div>
+          </div>
+        </Card>
 
-          <Input
-            label="Upstream URL"
-            value={editingServer.upstream_url}
-            onChange={(e) => setEditingServer({ ...editingServer, upstream_url: e.target.value })}
-            placeholder="https://mcp.example.com/mcp"
-          />
-
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
+        {/* ── Server Edit/Add Modal ── */}
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={editingServerName ? `Edit ${editingServerName}` : 'Add MCP Server'}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            {!editingServerName && (
               <Input
-                label="Header Key"
-                value={headerKey}
-                onChange={(e) => setHeaderKey(e.target.value)}
-                placeholder="Authorization"
+                label="Server Name"
+                value={serverNameInput}
+                onChange={(e) =>
+                  setServerNameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))
+                }
+                placeholder="my-mcp-server"
               />
-            </div>
-            <div className="flex-1">
-              <Input
-                label="Header Value"
-                value={headerValue}
-                onChange={(e) => setHeaderValue(e.target.value)}
-                placeholder="Bearer token..."
-              />
-            </div>
-            <Button variant="secondary" size="sm" onClick={addHeader} style={{ marginTop: '20px' }}>
-              <PlusCircle size={16} />
-            </Button>
-          </div>
+            )}
 
-          {editingServer.headers && Object.keys(editingServer.headers).length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-secondary">Configured Headers</label>
-              {Object.entries(editingServer.headers).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2 p-2 bg-bg-hover rounded-md">
-                  <span className="flex-1 font-mono text-xs">{key}</span>
-                  <span className="flex-1 font-mono text-xs text-text-secondary truncate">
-                    {value}
-                  </span>
-                  <button
-                    onClick={() => removeHeader(key)}
-                    className="p-1 hover:bg-bg-surface rounded"
-                  >
-                    <MinusCircle size={14} className="text-danger" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      {/* ── Delete All Logs Modal ── */}
-      <Modal
-        isOpen={isDeleteLogsModalOpen}
-        onClose={() => setIsDeleteLogsModalOpen(false)}
-        title="Confirm Deletion"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsDeleteLogsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={confirmDeleteAllLogs} disabled={isDeletingLogs}>
-              {isDeletingLogs ? 'Deleting...' : 'Delete Logs'}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <p>Select which MCP logs you would like to delete:</p>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="radio"
-              id="mcp-delete-older"
-              name="deleteLogsMode"
-              checked={deleteLogsMode === 'older'}
-              onChange={() => setDeleteLogsMode('older')}
-            />
-            <label htmlFor="mcp-delete-older">Delete logs older than</label>
             <Input
-              type="number"
-              min="1"
-              value={olderThanDays}
-              onChange={(e) => setOlderThanDays(parseInt(e.target.value) || 1)}
-              style={{ width: '60px', padding: '4px 8px' }}
-              disabled={deleteLogsMode !== 'older'}
+              label="Upstream URL"
+              value={editingServer.upstream_url}
+              onChange={(e) => setEditingServer({ ...editingServer, upstream_url: e.target.value })}
+              placeholder="https://mcp.example.com/mcp"
             />
-            <span>days</span>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="radio"
-              id="mcp-delete-all"
-              name="deleteLogsMode"
-              checked={deleteLogsMode === 'all'}
-              onChange={() => setDeleteLogsMode('all')}
-            />
-            <label htmlFor="mcp-delete-all" style={{ color: 'var(--color-danger)' }}>
-              Delete ALL logs (Cannot be undone)
-            </label>
-          </div>
-        </div>
-      </Modal>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <Input
+                  label="Header Key"
+                  value={headerKey}
+                  onChange={(e) => setHeaderKey(e.target.value)}
+                  placeholder="Authorization"
+                />
+              </div>
+              <div className="flex-1">
+                <Input
+                  label="Header Value"
+                  value={headerValue}
+                  onChange={(e) => setHeaderValue(e.target.value)}
+                  placeholder="Bearer token..."
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={addHeader}
+                style={{ marginTop: '20px' }}
+              >
+                <PlusCircle size={16} />
+              </Button>
+            </div>
 
-      {/* ── Single Log Delete Modal ── */}
-      <Modal
-        isOpen={isSingleDeleteModalOpen}
-        onClose={() => setIsSingleDeleteModalOpen(false)}
-        title="Confirm Deletion"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={confirmDeleteSingleLog} disabled={isDeletingLogs}>
-              {isDeletingLogs ? 'Deleting...' : 'Delete Log'}
-            </Button>
-          </>
-        }
-      >
-        <p>Are you sure you want to delete this MCP log entry?</p>
-      </Modal>
+            {editingServer.headers && Object.keys(editingServer.headers).length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-text-secondary">
+                  Configured Headers
+                </label>
+                {Object.entries(editingServer.headers).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-2 p-2 bg-bg-hover rounded-md">
+                    <span className="flex-1 font-mono text-xs">{key}</span>
+                    <span className="flex-1 font-mono text-xs text-text-secondary truncate">
+                      {value}
+                    </span>
+                    <button
+                      onClick={() => removeHeader(key)}
+                      className="p-1 hover:bg-bg-surface rounded"
+                    >
+                      <MinusCircle size={14} className="text-danger" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        {/* ── Delete All Logs Modal ── */}
+        <Modal
+          isOpen={isDeleteLogsModalOpen}
+          onClose={() => setIsDeleteLogsModalOpen(false)}
+          title="Confirm Deletion"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setIsDeleteLogsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={confirmDeleteAllLogs} disabled={isDeletingLogs}>
+                {isDeletingLogs ? 'Deleting...' : 'Delete Logs'}
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <p>Select which MCP logs you would like to delete:</p>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                id="mcp-delete-older"
+                name="deleteLogsMode"
+                checked={deleteLogsMode === 'older'}
+                onChange={() => setDeleteLogsMode('older')}
+              />
+              <label htmlFor="mcp-delete-older">Delete logs older than</label>
+              <Input
+                type="number"
+                min="1"
+                value={olderThanDays}
+                onChange={(e) => setOlderThanDays(parseInt(e.target.value) || 1)}
+                style={{ width: '60px', padding: '4px 8px' }}
+                disabled={deleteLogsMode !== 'older'}
+              />
+              <span>days</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="radio"
+                id="mcp-delete-all"
+                name="deleteLogsMode"
+                checked={deleteLogsMode === 'all'}
+                onChange={() => setDeleteLogsMode('all')}
+              />
+              <label htmlFor="mcp-delete-all" style={{ color: 'var(--color-danger)' }}>
+                Delete ALL logs (Cannot be undone)
+              </label>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ── Single Log Delete Modal ── */}
+        <Modal
+          isOpen={isSingleDeleteModalOpen}
+          onClose={() => setIsSingleDeleteModalOpen(false)}
+          title="Confirm Deletion"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={confirmDeleteSingleLog} disabled={isDeletingLogs}>
+                {isDeletingLogs ? 'Deleting...' : 'Delete Log'}
+              </Button>
+            </>
+          }
+        >
+          <p>Are you sure you want to delete this MCP log entry?</p>
+        </Modal>
       </div>
     </PageContainer>
   );

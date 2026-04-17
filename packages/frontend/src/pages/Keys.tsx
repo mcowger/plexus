@@ -147,9 +147,13 @@ export const Keys = () => {
   };
 
   const handleDeleteKey = async (keyName: string) => {
-    const _ok = await toast.confirm({ title: 'Delete key?', message: `Are you sure you want to delete key '${keyName}'? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
-    if (!_ok)
-      return;
+    const _ok = await toast.confirm({
+      title: 'Delete key?',
+      message: `Are you sure you want to delete key '${keyName}'? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!_ok) return;
 
     try {
       await api.deleteKey(keyName);
@@ -203,7 +207,12 @@ export const Keys = () => {
   };
 
   const handleDeleteQuota = async (name: string) => {
-    const _okq = await toast.confirm({ title: 'Delete quota?', message: `Are you sure you want to delete quota '${name}'? This cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' });
+    const _okq = await toast.confirm({
+      title: 'Delete quota?',
+      message: `Are you sure you want to delete quota '${name}'? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
     if (!_okq) return;
 
     try {
@@ -216,7 +225,11 @@ export const Keys = () => {
   };
 
   const handleClearQuota = async (keyName: string) => {
-    const _okr = await toast.confirm({ title: 'Reset quota?', message: `Reset quota usage for key '${keyName}'?`, confirmLabel: 'Reset' });
+    const _okr = await toast.confirm({
+      title: 'Reset quota?',
+      message: `Reset quota usage for key '${keyName}'?`,
+      confirmLabel: 'Reset',
+    });
     if (!_okr) return;
 
     try {

@@ -1,7 +1,25 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LatencySelector } from '../latency';
 import { UsageStorageService } from '../../usage-storage';
-import { ModelTarget } from '../../../config';
+import { ModelTarget, PlexusConfig, setConfigForTesting } from '../../../config';
+
+const makeConfig = (
+  overrides: Partial<
+    Pick<PlexusConfig, 'latencyExplorationRate' | 'performanceExplorationRate'>
+  > = {}
+): PlexusConfig => ({
+  providers: {},
+  models: {},
+  keys: {},
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+  performanceExplorationRate: 0,
+  ...overrides,
+});
 
 describe('LatencySelector', () => {
   // Mock usage storage
@@ -14,6 +32,14 @@ describe('LatencySelector', () => {
   } as unknown as UsageStorageService;
 
   const selector = new LatencySelector(mockStorage);
+
+  beforeEach(() => {
+    setConfigForTesting(makeConfig());
+    mockGetProviderPerformance.mockReset();
+    mockGetProviderPerformance.mockImplementation(
+      (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
+    );
+  });
 
   it('should return null for empty targets', async () => {
     expect(await selector.select([])).toBeNull();
@@ -71,41 +97,36 @@ describe('LatencySelector', () => {
   });
 
   it('should explore alternative providers when latencyExplorationRate is set', async () => {
-    // Set up performance data where p1 is fastest
     mockGetProviderPerformance.mockImplementation((provider, model) => {
       if (provider === 'p1') return Promise.resolve([{ avg_ttft_ms: 50 }]);
       if (provider === 'p2') return Promise.resolve([{ avg_ttft_ms: 100 }]);
       return Promise.resolve([]);
     });
 
-    // Mock config to set exploration rate to 100% for deterministic testing
-    const mockConfig = {
-      latencyExplorationRate: 1.0,
-      performanceExplorationRate: 0.05,
-    } as any;
-
-    // Temporarily set config for testing
-    const { setConfigForTesting } = require('../../../config');
-    setConfigForTesting(mockConfig);
+    setConfigForTesting(
+      makeConfig({
+        latencyExplorationRate: 1,
+        performanceExplorationRate: 0.05,
+      })
+    );
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
       { provider: 'p2', model: 'm2' },
     ];
 
-    // With 100% exploration, we should randomly select between p1 and p2
-    // Run multiple times to ensure randomness
-    const selections = new Set<string>();
-    for (let i = 0; i < 50; i++) {
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0;
       const selected = await selector.select(targets);
-      if (selected) {
-        selections.add(selected.provider);
-      }
-    }
+      expect(selected).toEqual(targets[0]!);
 
-    // With 100% exploration rate over 50 iterations, we should see both providers selected
-    expect(selections.has('p1')).toBe(true);
-    expect(selections.has('p2')).toBe(true);
+      Math.random = () => 0.999999;
+      const explored = await selector.select(targets);
+      expect(explored).toEqual(targets[1]!);
+    } finally {
+      Math.random = originalRandom;
+    }
   });
 
   it('should use performanceExplorationRate as fallback when latencyExplorationRate is not set', async () => {
@@ -115,30 +136,30 @@ describe('LatencySelector', () => {
       return Promise.resolve([]);
     });
 
-    // Mock config with only performanceExplorationRate
-    const mockConfig = {
-      latencyExplorationRate: undefined,
-      performanceExplorationRate: 1.0,
-    } as any;
-
-    const { setConfigForTesting } = require('../../../config');
-    setConfigForTesting(mockConfig);
+    setConfigForTesting(
+      makeConfig({
+        latencyExplorationRate: undefined,
+        performanceExplorationRate: 1,
+      })
+    );
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },
       { provider: 'p2', model: 'm2' },
     ];
 
-    const selections = new Set<string>();
-    for (let i = 0; i < 50; i++) {
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0;
       const selected = await selector.select(targets);
-      if (selected) {
-        selections.add(selected.provider);
-      }
-    }
+      expect(selected).toEqual(targets[0]!);
 
-    expect(selections.has('p1')).toBe(true);
-    expect(selections.has('p2')).toBe(true);
+      Math.random = () => 0.999999;
+      const explored = await selector.select(targets);
+      expect(explored).toEqual(targets[1]!);
+    } finally {
+      Math.random = originalRandom;
+    }
   });
 
   it('should always select fastest when both exploration rates are 0', async () => {
@@ -148,13 +169,12 @@ describe('LatencySelector', () => {
       return Promise.resolve([]);
     });
 
-    const mockConfig = {
-      latencyExplorationRate: 0,
-      performanceExplorationRate: 0,
-    } as any;
-
-    const { setConfigForTesting } = require('../../../config');
-    setConfigForTesting(mockConfig);
+    setConfigForTesting(
+      makeConfig({
+        latencyExplorationRate: 0,
+        performanceExplorationRate: 0,
+      })
+    );
 
     const targets: ModelTarget[] = [
       { provider: 'p1', model: 'm1' },

@@ -25,10 +25,7 @@ export const Input: React.FC<InputProps> = ({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="font-body text-xs font-medium text-text-secondary"
-        >
+        <label htmlFor={inputId} className="font-body text-xs font-medium text-text-secondary">
           {label}
         </label>
       )}

@@ -114,7 +114,8 @@ export function ResponsiveTable<T>({
                 onClick={onRowClick ? () => onRowClick(row, rowIdx) : undefined}
                 className={clsx(
                   'glass-bg rounded-lg p-4 border border-border-glass flex flex-col gap-2',
-                  onRowClick && 'cursor-pointer hover:border-primary/40 transition-colors duration-fast'
+                  onRowClick &&
+                    'cursor-pointer hover:border-primary/40 transition-colors duration-fast'
                 )}
               >
                 {titleCol && (

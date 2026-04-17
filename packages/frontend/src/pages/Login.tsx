@@ -57,7 +57,11 @@ export const Login: React.FC = () => {
               tabIndex={-1}
               aria-hidden="true"
             />
-            <FormField label="Admin key or API key secret" htmlFor="adminKey" error={error || undefined}>
+            <FormField
+              label="Admin key or API key secret"
+              htmlFor="adminKey"
+              error={error || undefined}
+            >
               <Input
                 id="adminKey"
                 type="password"

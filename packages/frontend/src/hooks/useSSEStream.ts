@@ -22,7 +22,14 @@ export type SSEStatus = 'idle' | 'connecting' | 'connected' | 'error';
  * Handles event parsing, reconnection with backoff, and cleanup.
  */
 export function useSSEStream<T = unknown>(options: SSEOptions<T>): { status: SSEStatus } {
-  const { url, headers, onEvent, onDisconnect, reconnect = true, reconnectDelayMs = 2000 } = options;
+  const {
+    url,
+    headers,
+    onEvent,
+    onDisconnect,
+    reconnect = true,
+    reconnectDelayMs = 2000,
+  } = options;
   const [status, setStatus] = useState<SSEStatus>('idle');
 
   // Stable refs so effect doesn't restart when callbacks/headers change identity.

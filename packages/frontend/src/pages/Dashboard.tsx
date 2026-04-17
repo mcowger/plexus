@@ -14,14 +14,39 @@ type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
 type LiveWindowPeriod = 5 | 15 | 30 | 1440 | 10080 | 43200;
 
 const BASE_TABS = [
-  { value: 'live' as const, label: <span className="inline-flex items-center gap-2"><Zap size={14} /> Live Metrics</span> },
-  { value: 'usage' as const, label: <span className="inline-flex items-center gap-2"><BarChart2 size={14} /> Usage Analytics</span> },
-  { value: 'performance' as const, label: <span className="inline-flex items-center gap-2"><Gauge size={14} /> Performance</span> },
+  {
+    value: 'live' as const,
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <Zap size={14} /> Live Metrics
+      </span>
+    ),
+  },
+  {
+    value: 'usage' as const,
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <BarChart2 size={14} /> Usage Analytics
+      </span>
+    ),
+  },
+  {
+    value: 'performance' as const,
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <Gauge size={14} /> Performance
+      </span>
+    ),
+  },
 ];
 
 const OVERALL_TAB = {
   value: 'overall' as const,
-  label: <span className="inline-flex items-center gap-2"><LayoutDashboard size={14} /> Overall</span>,
+  label: (
+    <span className="inline-flex items-center gap-2">
+      <LayoutDashboard size={14} /> Overall
+    </span>
+  ),
 };
 
 const DEFAULT_POLL_INTERVAL = 10000;

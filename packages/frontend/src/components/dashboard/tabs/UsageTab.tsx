@@ -633,30 +633,21 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         </Card>
 
         {/* Model Distribution - Requests */}
-        <Card
-          className="min-w-0"
-          title="Usage by Model Alias (Requests)"
-        >
+        <Card className="min-w-0" title="Usage by Model Alias (Requests)">
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('requests', modelData)}
           </div>
         </Card>
 
         {/* Model Distribution - Tokens */}
-        <Card
-          className="min-w-0"
-          title="Usage by Model Alias (Tokens)"
-        >
+        <Card className="min-w-0" title="Usage by Model Alias (Tokens)">
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('tokens', modelData)}
           </div>
         </Card>
 
         {/* Provider Distribution - Requests */}
-        <Card
-          className="min-w-0"
-          title="Usage by Provider (Requests)"
-        >
+        <Card className="min-w-0" title="Usage by Provider (Requests)">
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('requests', providerData)}
           </div>

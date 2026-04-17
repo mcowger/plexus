@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach, vi } from 'vitest';
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 import { setConfigForTesting } from '../../config';
 import { UnifiedChatRequest } from '../../types/unified';
 import { logger } from '../../utils/logger';
+import { CooldownManager } from '../cooldown-manager';
 
 // Mock fetch to prevent actual network calls
 const fetchMock = vi.fn(async (url: string, options: any) => {
@@ -37,9 +38,14 @@ const fetchMock = vi.fn(async (url: string, options: any) => {
 global.fetch = fetchMock as any;
 
 describe('Dispatcher Bug Fixes', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset mocks
     fetchMock.mockClear();
+    await CooldownManager.getInstance().clearCooldown();
+  });
+
+  afterEach(async () => {
+    await CooldownManager.getInstance().clearCooldown();
   });
 
   test('Handles empty access_via by falling back to provider type', async () => {

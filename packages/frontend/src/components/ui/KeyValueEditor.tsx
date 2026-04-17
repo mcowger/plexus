@@ -96,7 +96,13 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
           </button>
         </div>
       ))}
-      <Button type="button" variant="secondary" size="sm" leftIcon={<Plus size={14} />} onClick={addEntry}>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        leftIcon={<Plus size={14} />}
+        onClick={addEntry}
+      >
         {addLabel}
       </Button>
     </div>

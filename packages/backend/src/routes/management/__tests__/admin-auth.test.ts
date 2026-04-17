@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import { setConfigForTesting } from '../../../config';
 import { registerManagementRoutes } from '../../management';
@@ -31,6 +31,14 @@ const BASE_CONFIG = {
 
 // Admin key is now read from process.env.ADMIN_KEY
 const originalAdminKey = process.env.ADMIN_KEY;
+
+beforeEach(() => {
+  process.env.ADMIN_KEY = originalAdminKey;
+});
+
+afterEach(() => {
+  process.env.ADMIN_KEY = originalAdminKey;
+});
 
 afterAll(() => {
   if (originalAdminKey === undefined) {
@@ -73,7 +81,7 @@ function makeMockDeps() {
 describe('GET /v0/management/auth/verify', () => {
   let fastify: FastifyInstance;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
@@ -82,7 +90,7 @@ describe('GET /v0/management/auth/verify', () => {
     await fastify.ready();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await closeFastify(fastify);
   });
 
@@ -170,7 +178,7 @@ describe('GET /v0/management/auth/verify', () => {
 describe('Management route protection', () => {
   let fastify: FastifyInstance;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
@@ -179,7 +187,7 @@ describe('Management route protection', () => {
     await fastify.ready();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await closeFastify(fastify);
   });
 
@@ -239,13 +247,17 @@ describe('Management route protection', () => {
 describe('Admin key env var change', () => {
   let fastify: FastifyInstance;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     process.env.ADMIN_KEY = 'original-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
     const { mockUsageStorage, mockDispatcher } = makeMockDeps();
     await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
     await fastify.ready();
+  });
+
+  afterEach(async () => {
+    await closeFastify(fastify);
   });
 
   it('accepts original key initially', async () => {
@@ -283,7 +295,7 @@ describe('Admin key env var change', () => {
 describe('v1 inference routes are unaffected by admin key auth', () => {
   let fastify: FastifyInstance;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
@@ -297,7 +309,7 @@ describe('v1 inference routes are unaffected by admin key auth', () => {
     await fastify.ready();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await closeFastify(fastify);
     // Clean up singletons to prevent test hangs
     SelectorFactory.setUsageStorage(null as any);

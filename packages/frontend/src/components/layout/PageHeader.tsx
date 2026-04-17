@@ -18,11 +18,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, actions
     >
       <div className="min-w-0 flex-1">
         <h1 className="font-heading text-h1 font-bold text-text m-0 leading-tight">{title}</h1>
-        {subtitle && (
-          <p className="mt-1 font-body text-sm text-text-secondary">{subtitle}</p>
-        )}
+        {subtitle && <p className="mt-1 font-body text-sm text-text-secondary">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-shrink-0">{actions}</div>}
+      {actions && (
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-shrink-0">{actions}</div>
+      )}
     </div>
   );
 };
