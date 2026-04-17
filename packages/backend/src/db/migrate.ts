@@ -3,6 +3,7 @@ import { getDatabase, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import sqliteJournal from '../../drizzle/migrations/meta/_journal.json';
 import pgJournal from '../../drizzle/migrations_pg/meta/_journal.json';
 
@@ -15,10 +16,12 @@ type EmbeddedFile = Blob & { name: string };
 // Populated at startup in a compiled binary; empty when running from source.
 const embedded = new Map((Bun.embeddedFiles as EmbeddedFile[]).map((f) => [f.name, f]));
 
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+
 // Filesystem paths used as a fallback in dev/source mode.
 const DEV_MIGRATIONS_DIR = {
-  sqlite: path.join(import.meta.dir, '../../drizzle/migrations'),
-  postgres: path.join(import.meta.dir, '../../drizzle/migrations_pg'),
+  sqlite: path.join(moduleDir, '../../drizzle/migrations'),
+  postgres: path.join(moduleDir, '../../drizzle/migrations_pg'),
 } as const;
 
 // Shape expected by db.dialect.migrate() — mirrors drizzle-orm's internal MigrationMeta.

@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
-import { mock } from 'bun:test';
 import { setConfigForTesting } from '../../../config';
 import { registerManagementRoutes } from '../../management';
 import { registerInferenceRoutes } from '../../inference';
@@ -47,15 +46,15 @@ afterAll(() => {
 
 function makeMockDeps() {
   const mockUsageStorage = {
-    saveRequest: mock(),
-    saveError: mock(),
-    updatePerformanceMetrics: mock(),
-    emitStartedAsync: mock(),
-    emitUpdatedAsync: mock(),
+    saveRequest: vi.fn(),
+    saveError: vi.fn(),
+    updatePerformanceMetrics: vi.fn(),
+    emitStartedAsync: vi.fn(),
+    emitUpdatedAsync: vi.fn(),
   } as unknown as UsageStorageService;
 
   const mockDispatcher = {
-    dispatch: mock(async () => ({
+    dispatch: vi.fn(async () => ({
       id: 'test-id',
       model: 'test-model',
       created: Date.now(),

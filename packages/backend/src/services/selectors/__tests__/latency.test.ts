@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it, vi } from 'vitest';
 import { LatencySelector } from '../latency';
 import { UsageStorageService } from '../../usage-storage';
 import { ModelTarget } from '../../../config';
@@ -6,7 +6,7 @@ import { ModelTarget } from '../../../config';
 describe('LatencySelector', () => {
   // Mock usage storage
   // Explicitly type the mock return to allow any array of objects
-  const mockGetProviderPerformance = mock(
+  const mockGetProviderPerformance = vi.fn(
     (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
   );
   const mockStorage = {

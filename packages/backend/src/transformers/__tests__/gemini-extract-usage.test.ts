@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test';
+import { test, expect, describe } from 'vitest';
 import { GeminiTransformer } from '../gemini';
 
 describe('GeminiTransformer extractUsage', () => {

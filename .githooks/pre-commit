@@ -55,4 +55,4 @@ fi
 
 echo "[pre-commit] Running backend tests..."
 cd packages/backend
-bun test
+bun run test

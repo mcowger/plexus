@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach } from 'vitest';
 import {
   encrypt,
   decrypt,
@@ -52,7 +52,7 @@ describe('encryption utility', () => {
       setEncryptionKey(TEST_KEY_HEX);
       const plaintext = 'sk-test-api-key-12345';
       const encrypted = encrypt(plaintext);
-      expect(encrypted).toStartWith('enc:v1:');
+      expect(encrypted).toMatch(/^enc:v1:/);
       expect(encrypted).not.toBe(plaintext);
       expect(decrypt(encrypted)).toBe(plaintext);
     });
@@ -61,14 +61,14 @@ describe('encryption utility', () => {
       setEncryptionKey(TEST_KEY_PASSPHRASE);
       const plaintext = 'oauth-refresh-token-xyz';
       const encrypted = encrypt(plaintext);
-      expect(encrypted).toStartWith('enc:v1:');
+      expect(encrypted).toMatch(/^enc:v1:/);
       expect(decrypt(encrypted)).toBe(plaintext);
     });
 
     test('handles empty string', () => {
       setEncryptionKey(TEST_KEY_HEX);
       const encrypted = encrypt('');
-      expect(encrypted).toStartWith('enc:v1:');
+      expect(encrypted).toMatch(/^enc:v1:/);
       expect(decrypt(encrypted)).toBe('');
     });
 

@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 /**
  * Regression tests for unifiedToContext / unifiedToolToPiAi schema conversion.
  *
@@ -11,7 +12,6 @@
  * tool calls that failed Zod validation.
  */
 
-import { describe, expect, test } from 'bun:test';
 import { unifiedToContext } from '../oauth/type-mappers';
 import type { UnifiedChatRequest } from '../../types/unified';
 

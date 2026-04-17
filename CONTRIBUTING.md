@@ -59,10 +59,20 @@ bun run format
 
 ## Running Tests
 
+From the repo root:
+
+```bash
+bun run test
+```
+
+Or from the backend package:
+
 ```bash
 cd packages/backend
-bun test
+bun run test
 ```
+
+> Note: `bun test` is intentionally blocked both at repo root and in `packages/backend`. Use `bun run test` instead.
 
 The pre-commit hook runs backend tests automatically.
 

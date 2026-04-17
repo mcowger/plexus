@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from 'bun:test';
+import { describe, expect, test, beforeEach } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 import { setConfigForTesting } from '../../config';
 import { CooldownManager } from '../cooldown-manager';

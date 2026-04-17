@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { registerLoggingRoutes } from '../logging';
 import {

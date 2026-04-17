@@ -1,2 +1,5 @@
+# Root tests are intentionally blocked.
+# Use `cd packages/backend && bun run test` for backend tests.
+
 [test]
-preload = ["./packages/backend/test/setup.ts"]
+root = "./test/bun-test-guard"

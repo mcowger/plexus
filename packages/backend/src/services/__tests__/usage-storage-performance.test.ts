@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { UsageStorageService } from '../usage-storage';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../db/client';

@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import { setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatcher';
 import { UsageStorageService } from '../../../services/usage-storage';
-import { mock } from 'bun:test';
 import { DebugManager } from '../../../services/debug-manager';
 import { SelectorFactory } from '../../../services/selectors/factory';
 
@@ -17,7 +16,7 @@ describe('Auth Middleware', () => {
 
     // Mock dependencies
     const mockDispatcher = {
-      dispatch: mock(async () => ({
+      dispatch: vi.fn(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -27,11 +26,11 @@ describe('Auth Middleware', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: mock(),
-      saveError: mock(),
-      updatePerformanceMetrics: mock(),
-      emitStartedAsync: mock(),
-      emitUpdatedAsync: mock(),
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
     } as unknown as UsageStorageService;
     // Initialize singletons to avoid errors
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -194,7 +193,7 @@ describe('Key Attribution', () => {
 
     // Mock dependencies
     const mockDispatcher = {
-      dispatch: mock(async () => ({
+      dispatch: vi.fn(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -204,11 +203,11 @@ describe('Key Attribution', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: mock(),
-      saveError: mock(),
-      updatePerformanceMetrics: mock(),
-      emitStartedAsync: mock(),
-      emitUpdatedAsync: mock(),
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
     } as unknown as UsageStorageService;
 
     // Initialize singletons
@@ -425,7 +424,7 @@ describe('Key Access Policy Propagation', () => {
     capturedRequest = null;
 
     const mockDispatcher = {
-      dispatch: mock(async (request: any) => {
+      dispatch: vi.fn(async (request: any) => {
         capturedRequest = request;
         return {
           id: '123',
@@ -438,11 +437,11 @@ describe('Key Access Policy Propagation', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: mock(),
-      saveError: mock(),
-      updatePerformanceMetrics: mock(),
-      emitStartedAsync: mock(),
-      emitUpdatedAsync: mock(),
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);

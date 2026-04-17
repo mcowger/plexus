@@ -1,8 +1,8 @@
-import { describe, expect, test, mock } from 'bun:test';
+import { describe, expect, test, vi } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 
 // Mock fetch to prevent actual network calls
-global.fetch = mock(async () => new Response('', { status: 200 })) as any;
+global.fetch = vi.fn(async () => new Response('', { status: 200 })) as any;
 
 describe('probeStreamingStart', () => {
   test('timeout path preserves the first chunk', async () => {

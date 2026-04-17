@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, beforeAll, mock } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
 import { QuotaEnforcer, QuotaCheckResult } from '../src/services/quota/quota-enforcer';
 import { setConfigForTesting, getConfig, PlexusConfig } from '../src/config';
 import { getDatabase } from '../src/db/client';

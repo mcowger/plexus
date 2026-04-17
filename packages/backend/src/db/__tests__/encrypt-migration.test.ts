@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, expect, it } from 'bun:test';
+import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
 import { runMigrations } from '../migrate';

@@ -1,10 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { CooldownManager } from '../cooldown-manager';
 
-const fetchMock: any = mock(async (): Promise<any> => {
+const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'vitest';
 import { CostSelector } from '../cost';
 import { EnrichedModelTarget } from '../base';
 

@@ -30,4 +30,4 @@ jobs:
         continue-on-error: true
 
       - name: Run backend tests
-        run: cd packages/backend && bun test
+        run: cd packages/backend && bun run test

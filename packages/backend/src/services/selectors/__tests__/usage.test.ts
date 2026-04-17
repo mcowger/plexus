@@ -1,10 +1,10 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it, vi } from 'vitest';
 import { UsageSelector } from '../usage';
 import { UsageStorageService } from '../../usage-storage';
 import { ModelTarget } from '../../../config';
 
 describe('UsageSelector', () => {
-  const mockGetUsage = mock(
+  const mockGetUsage = vi.fn(
     (filters: any, pagination: any): Promise<any> => Promise.resolve({ data: [], total: 0 })
   );
   const mockStorage = {
