@@ -12,8 +12,28 @@ export class OpenAITransformer implements Transformer {
   defaultEndpoint = '/chat/completions';
 
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
+    // Normalize assistant messages: map OpenAI-style `reasoning_content` to
+    // the internal `thinking` format so pi-ai can properly reconstruct
+    // thinking blocks in the context. Without this, reasoning from prior
+    // turns is silently dropped, which can cause flatMap crashes in pi-ai's
+    // transformMessages when the assistant message has mixed content types.
+    const messages = Array.isArray(input.messages)
+      ? input.messages.map((msg: any) => {
+          if (msg.role === 'assistant' && msg.reasoning_content && !msg.thinking) {
+            const { reasoning_content, ...rest } = msg;
+            return {
+              ...rest,
+              thinking: {
+                content: typeof reasoning_content === 'string' ? reasoning_content : '',
+              },
+            };
+          }
+          return msg;
+        })
+      : input.messages;
+
     return {
-      messages: input.messages,
+      messages,
       model: input.model,
       max_tokens: input.max_tokens,
       temperature: input.temperature,
@@ -106,6 +126,23 @@ export class OpenAITransformer implements Transformer {
   }
 
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
+    // When reasoning_content is present, return content as an array of parts
+    // so clients (e.g. OpenWebUI/Vercel AI SDK) that call content.flatMap()
+    // on subsequent turns don't crash. The OpenAI spec allows content to be
+    // either a string or an array of {type, text} parts.
+    const hasReasoningContent =
+      response.reasoning_content !== null && response.reasoning_content !== undefined;
+    const message: any = {
+      role: 'assistant',
+      content: hasReasoningContent
+        ? response.content
+          ? [{ type: 'text', text: response.content }]
+          : null
+        : response.content,
+      reasoning_content: response.reasoning_content,
+      tool_calls: response.tool_calls,
+    };
+
     return {
       id: response.id,
       object: 'chat.completion',
@@ -114,12 +151,7 @@ export class OpenAITransformer implements Transformer {
       choices: [
         {
           index: 0,
-          message: {
-            role: 'assistant',
-            content: response.content,
-            reasoning_content: response.reasoning_content,
-            tool_calls: response.tool_calls,
-          },
+          message,
           finish_reason: response.tool_calls ? 'tool_calls' : 'stop',
         },
       ],
