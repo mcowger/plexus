@@ -111,11 +111,11 @@ setConfigForTesting(validateConfig(testConfig));
 // in the schema but not yet present in any tracked migration file.
 import { execSync } from 'node:child_process';
 try {
-  execSync('bunx drizzle-kit generate --config=drizzle.config.ts', {
+  execSync('bunx drizzle-kit generate --config=drizzle.config.sqlite.ts', {
     cwd: path.resolve(import.meta.dir, '..'),
     stdio: 'pipe',
   });
-  execSync('bunx drizzle-kit generate --config=drizzle.config.pg.ts', {
+  execSync('bunx drizzle-kit generate --config=drizzle.config.postgres.ts', {
     cwd: path.resolve(import.meta.dir, '..'),
     stdio: 'pipe',
   });
