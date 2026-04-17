@@ -1,10 +1,16 @@
 name: Release
-run-name: Release ${{ github.ref_name }}
+run-name: Release ${{ inputs.version || github.ref_name }}
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to release (e.g. v1.2.3)'
+        required: true
+        type: string
 
 jobs:
   build-and-release:
@@ -15,10 +21,17 @@ jobs:
       packages: write
 
     steps:
+      - name: Resolve release tag
+        id: release_tag
+        run: |
+          TAG="${{ inputs.version || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ inputs.version || '' }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -59,7 +72,7 @@ jobs:
         # Note: Each compile script in package.json runs build:frontend. 
         # This is acceptable for correctness to ensure each binary is built with the latest assets.
         env:
-          APP_VERSION: ${{ github.ref_name }}
+          APP_VERSION: ${{ steps.release_tag.outputs.tag }}
         run: |
           bun run compile:linux
           bun run compile:macos
@@ -86,12 +99,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ github.ref_name }}
+            APP_VERSION=${{ steps.release_tag.outputs.tag }}
 
       - name: Get previous release tag
         id: prev_tag
         run: |
-          CURRENT_TAG="${GITHUB_REF##*/}"
+          CURRENT_TAG="${{ steps.release_tag.outputs.tag }}"
           PREV_TAG=$(git tag --sort=-version:refname --list "v*.*.*" | grep -A1 "^${CURRENT_TAG}$" | tail -1)
           echo "Previous release tag: $PREV_TAG"
           echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
@@ -289,6 +302,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
           files: |
             plexus-linux
             plexus-macos
