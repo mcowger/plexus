@@ -5,7 +5,21 @@ import { vi } from 'vitest';
 const sqliteUrlToPath = (url: string) =>
   url.startsWith('sqlite://') ? url.slice('sqlite://'.length) : null;
 
+function copyDirectory(sourceDir: string, targetDir: string) {
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirectory(sourcePath, targetPath);
+    } else {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+  }
+}
+
 const templateDbUrl = process.env.PLEXUS_TEST_DB_TEMPLATE_URL;
+const pgliteTemplateDir = process.env.PLEXUS_TEST_PGLITE_TEMPLATE_DIR;
 const tmpRoot = process.env.PLEXUS_TEST_DB_TMP_ROOT;
 const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? '0';
 
@@ -18,6 +32,19 @@ if (templateDbUrl && tmpRoot) {
   }
 
   const workerDbUrl = `sqlite://${workerDbPath}`;
+  process.env.PLEXUS_TEST_DB_URL = workerDbUrl;
+  process.env.DATABASE_URL = workerDbUrl;
+} else if (pgliteTemplateDir && tmpRoot) {
+  const workerDataDir = path.join(tmpRoot, `vitest-worker-${workerId}.pglite`);
+
+  if (!fs.existsSync(workerDataDir)) {
+    copyDirectory(pgliteTemplateDir, workerDataDir);
+  }
+
+  const workerDbUrl =
+    process.env.PLEXUS_TEST_DB_URL || 'postgres://postgres:postgres@localhost:5432/plexus_test';
+  process.env.PLEXUS_POSTGRES_DRIVER = 'pglite';
+  process.env.PLEXUS_PGLITE_DATA_DIR = workerDataDir;
   process.env.PLEXUS_TEST_DB_URL = workerDbUrl;
   process.env.DATABASE_URL = workerDbUrl;
 } else {

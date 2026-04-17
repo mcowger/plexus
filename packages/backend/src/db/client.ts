@@ -2,15 +2,20 @@ import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { getDatabaseConfig } from '../config';
 import { getCurrentLogLevel, logger } from '../utils/logger';
 import path from 'node:path';
 import fs from 'node:fs';
 
 type SupportedDialect = 'sqlite' | 'postgres';
+type PostgresDriver = 'postgres-js' | 'pglite';
 
-let dbInstance: ReturnType<typeof drizzle> | ReturnType<typeof drizzlePg> | null = null;
+type SqliteDb = ReturnType<typeof drizzle>;
+type PostgresJsDb = ReturnType<typeof drizzlePg>;
+type PgliteDb = any;
+
+let dbInstance: SqliteDb | PostgresJsDb | PgliteDb | null = null;
 let sqlClient: postgres.Sql | null = null;
+let pgliteClient: any = null;
 let currentDialect: SupportedDialect | null = null;
 let currentSchema: any = null;
 
@@ -43,6 +48,10 @@ function resolvePath(relPath: string): string {
   }
   const projectRoot = path.resolve(process.cwd(), '../../');
   return path.join(projectRoot, relPath);
+}
+
+function getPostgresDriver(): PostgresDriver {
+  return process.env.PLEXUS_POSTGRES_DRIVER === 'pglite' ? 'pglite' : 'postgres-js';
 }
 
 export function initializeDatabase(connectionString?: string) {
@@ -124,19 +133,7 @@ export function initializeDatabase(connectionString?: string) {
       logger: createDrizzleLogger(),
     });
   } else {
-    sqlClient = postgres(connStr, {
-      ssl: false,
-      max: 10,
-      idle_timeout: 20,
-      connect_timeout: 10,
-      onnotice: () => {},
-    });
-
-    // Set statement timeout to prevent long-running queries from blocking
-    sqlClient`SET statement_timeout = '30s'`.catch((err) => {
-      logger.silly(`Failed to set statement_timeout: ${err}`);
-    });
-
+    const postgresDriver = getPostgresDriver();
     const pgSchema = require('../../drizzle/schema/postgres/index');
     const {
       requestUsage,
@@ -157,26 +154,53 @@ export function initializeDatabase(connectionString?: string) {
     } = pgSchema;
 
     currentSchema = pgSchema;
-    dbInstance = drizzlePg(sqlClient, {
-      schema: {
-        requestUsage,
-        providerCooldowns,
-        debugLogs,
-        inferenceErrors,
-        providerPerformance,
-        quotaState,
-        providers: providersTable,
-        providerModels,
-        modelAliases,
-        modelAliasTargets,
-        apiKeys,
-        userQuotaDefinitions,
-        mcpServers,
-        systemSettings,
-        oauthCredentials,
-      },
-      logger: createDrizzleLogger(),
-    });
+
+    const schema = {
+      requestUsage,
+      providerCooldowns,
+      debugLogs,
+      inferenceErrors,
+      providerPerformance,
+      quotaState,
+      providers: providersTable,
+      providerModels,
+      modelAliases,
+      modelAliasTargets,
+      apiKeys,
+      userQuotaDefinitions,
+      mcpServers,
+      systemSettings,
+      oauthCredentials,
+    };
+
+    if (postgresDriver === 'pglite') {
+      const { PGlite } = require('@electric-sql/pglite');
+      const { drizzle: drizzlePglite } = require('drizzle-orm/pglite');
+      const dataDir = process.env.PLEXUS_PGLITE_DATA_DIR;
+      pgliteClient = dataDir ? new PGlite(dataDir) : new PGlite();
+      dbInstance = drizzlePglite(pgliteClient, {
+        schema,
+        logger: createDrizzleLogger(),
+      });
+    } else {
+      sqlClient = postgres(connStr, {
+        ssl: false,
+        max: 10,
+        idle_timeout: 20,
+        connect_timeout: 10,
+        onnotice: () => {},
+      });
+
+      // Set statement timeout to prevent long-running queries from blocking
+      sqlClient`SET statement_timeout = '30s'`.catch((err) => {
+        logger.silly(`Failed to set statement_timeout: ${err}`);
+      });
+
+      dbInstance = drizzlePg(sqlClient, {
+        schema,
+        logger: createDrizzleLogger(),
+      });
+    }
   }
 
   return dbInstance;
@@ -186,7 +210,7 @@ export function getDatabase() {
   if (!dbInstance) {
     initializeDatabase();
   }
-  return dbInstance as ReturnType<typeof drizzle>;
+  return dbInstance as SqliteDb | PostgresJsDb | PgliteDb;
 }
 
 export function getSchema() {
@@ -207,6 +231,10 @@ export async function closeDatabase() {
   if (sqlClient) {
     await sqlClient.end();
     sqlClient = null;
+  }
+  if (pgliteClient) {
+    await pgliteClient.close();
+    pgliteClient = null;
   }
   dbInstance = null;
 }
