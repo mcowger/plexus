@@ -227,6 +227,7 @@ jobs:
           ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ vars.PLEXUS_MODEL }}
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
+          github_token: ${{ github.token }}
           prompt: |
             You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
 
