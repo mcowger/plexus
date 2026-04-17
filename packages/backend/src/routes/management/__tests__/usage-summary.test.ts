@@ -12,7 +12,7 @@ describe('Usage summary route', () => {
 
   beforeEach(async () => {
     await closeDatabase();
-    process.env.DATABASE_URL = 'sqlite://:memory:';
+    process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
     initializeDatabase(process.env.DATABASE_URL);
     await runMigrations();
 

@@ -4,6 +4,7 @@ const isStructuredLoggerLine = (log: string) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:
 
 export default defineConfig({
   test: {
+    projects: ['./vitest.sqlite.config.ts', './vitest.postgres.config.ts'],
     include: ['src/**/*.{test,spec}.ts', 'test/**/*.{test,spec}.ts'],
     exclude: [
       '../frontend/**',
@@ -31,6 +32,7 @@ export default defineConfig({
         (type === 'stdout' || type === 'stderr') &&
         (isStructuredLoggerLine(log) ||
           log.includes('Running sqlite migrations...') ||
+          log.includes('Running postgres migrations...') ||
           log.includes('Loaded ') ||
           log.includes('Migrations completed successfully'))
       ) {

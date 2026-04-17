@@ -1,9 +1,16 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
+import {
+  closeDatabase,
+  getCurrentDialect,
+  getDatabase,
+  getSchema,
+  initializeDatabase,
+} from '../client';
 import { runMigrations } from '../migrate';
 import { runEncryptionMigration } from '../encrypt-migration';
 import { decrypt, hashSecret, isEncrypted, resetEncryptionKeyCache } from '../../utils/encryption';
+import { toDbBoolean } from '../../utils/normalize';
 
 const TEST_KEY = 'b'.repeat(64);
 
@@ -22,11 +29,15 @@ describe('encryption migration', () => {
 
   beforeEach(async () => {
     await closeDatabase();
-    process.env.DATABASE_URL = 'sqlite://:memory:';
+    process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
     initializeDatabase(process.env.DATABASE_URL);
     await runMigrations();
     db = getDatabase();
     schema = getSchema();
+    await db.delete(schema.providers);
+    await db.delete(schema.apiKeys);
+    await db.delete(schema.oauthCredentials);
+    await db.delete(schema.mcpServers);
   });
 
   afterEach(async () => {
@@ -100,11 +111,11 @@ describe('encryption migration', () => {
       slug: 'test-provider',
       apiBaseUrl: '"https://api.example.com"',
       apiKey: 'provider-api-key-123',
-      enabled: 1,
-      disableCooldown: 0,
-      estimateTokens: 0,
-      useClaudeMasking: 0,
-      quotaCheckerEnabled: 1,
+      enabled: toDbBoolean(true, getCurrentDialect()),
+      disableCooldown: toDbBoolean(false, getCurrentDialect()),
+      estimateTokens: toDbBoolean(false, getCurrentDialect()),
+      useClaudeMasking: toDbBoolean(false, getCurrentDialect()),
+      quotaCheckerEnabled: toDbBoolean(true, getCurrentDialect()),
       quotaCheckerInterval: 30,
       createdAt: ts,
       updatedAt: ts,
@@ -130,11 +141,11 @@ describe('encryption migration', () => {
       headers,
       extraBody,
       quotaCheckerOptions: quotaOpts,
-      enabled: 1,
-      disableCooldown: 0,
-      estimateTokens: 0,
-      useClaudeMasking: 0,
-      quotaCheckerEnabled: 1,
+      enabled: toDbBoolean(true, getCurrentDialect()),
+      disableCooldown: toDbBoolean(false, getCurrentDialect()),
+      estimateTokens: toDbBoolean(false, getCurrentDialect()),
+      useClaudeMasking: toDbBoolean(false, getCurrentDialect()),
+      quotaCheckerEnabled: toDbBoolean(true, getCurrentDialect()),
       quotaCheckerInterval: 30,
       createdAt: ts,
       updatedAt: ts,
@@ -164,7 +175,7 @@ describe('encryption migration', () => {
     await db.insert(schema.mcpServers).values({
       name: 'test-mcp',
       upstreamUrl: 'https://mcp.example.com/mcp',
-      enabled: 1,
+      enabled: toDbBoolean(true, getCurrentDialect()),
       headers,
       createdAt: ts,
       updatedAt: ts,

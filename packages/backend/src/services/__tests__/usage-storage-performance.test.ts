@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { sql, eq, and } from 'drizzle-orm';
 import { registerSpy } from '../../../test/test-utils';
 import { UsageStorageService } from '../usage-storage';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../db/client';
@@ -49,10 +50,15 @@ const createUsageRecord = (
 describe('UsageStorageService performance metrics', () => {
   beforeEach(async () => {
     await closeDatabase();
-    process.env.DATABASE_URL = 'sqlite://:memory:';
+    process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
     delete process.env.PLEXUS_PROVIDER_PERFORMANCE_RETENTION_LIMIT;
     initializeDatabase(process.env.DATABASE_URL);
     await runMigrations();
+
+    const db = getDatabase() as any;
+    const schema = getSchema() as any;
+    await db.delete(schema.providerPerformance);
+    await db.delete(schema.requestUsage);
   });
 
   afterEach(async () => {
@@ -86,12 +92,16 @@ describe('UsageStorageService performance metrics', () => {
       );
     }
 
-    const rows = storage
+    const schema = getSchema() as any;
+    const rows = await storage
       .getDb()
-      .$client.query(
-        'SELECT provider, model, COUNT(*) as count FROM provider_performance GROUP BY provider, model'
-      )
-      .all() as Array<{ provider: string; model: string; count: number }>;
+      .select({
+        provider: schema.providerPerformance.provider,
+        model: schema.providerPerformance.model,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(schema.providerPerformance)
+      .groupBy(schema.providerPerformance.provider, schema.providerPerformance.model);
 
     const a = rows.find((r) => r.provider === 'provider-a' && r.model === 'model-1');
     const b = rows.find((r) => r.provider === 'provider-b' && r.model === 'model-2');
@@ -230,12 +240,22 @@ describe('UsageStorageService performance metrics', () => {
       );
     }
 
-    const rows = storage
+    const schema = getSchema() as any;
+    const rows = await storage
       .getDb()
-      .$client.query(
-        'SELECT provider, model, COUNT(*) as count FROM provider_performance WHERE provider = ? AND model = ? GROUP BY provider, model'
+      .select({
+        provider: schema.providerPerformance.provider,
+        model: schema.providerPerformance.model,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(schema.providerPerformance)
+      .where(
+        and(
+          eq(schema.providerPerformance.provider, 'provider-c'),
+          eq(schema.providerPerformance.model, 'model-3')
+        )
       )
-      .all('provider-c', 'model-3') as Array<{ provider: string; model: string; count: number }>;
+      .groupBy(schema.providerPerformance.provider, schema.providerPerformance.model);
 
     expect(rows[0]?.count).toBe(5);
   });
