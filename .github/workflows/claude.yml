@@ -50,6 +50,10 @@ jobs:
           PLEXUS_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
           PLEXUS_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
 
+      - name: Save initial HEAD
+        id: initial-head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -92,6 +96,7 @@ jobs:
             const fs = require('fs');
             const execFile = '${{ steps.claude.outputs.execution_file }}';
             const branchName = '${{ steps.claude.outputs.branch_name }}';
+            const initialHead = '${{ steps.initial-head.outputs.sha }}';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
             if (!execFile || !fs.existsSync(execFile)) {
@@ -122,8 +127,20 @@ jobs:
             if (permissionDenials > 0) {
               issues.push(`Claude was denied permission ${permissionDenials} time(s) — missing tools in --allowedTools. Check the workflow configuration and diagnostics output.`);
             }
-            if (!branchName) {
-              issues.push('No branch was created — Claude may not have made any code changes');
+            // Check if Claude made any commits (works for both new branches and existing PR branches)
+            const { execSync } = require('child_process');
+            let currentHead = '';
+            try {
+              currentHead = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+            } catch (e) {
+              core.warning('Could not determine current HEAD SHA');
+            }
+            const madeCommits = currentHead && currentHead !== initialHead;
+
+            if (!branchName && !madeCommits) {
+              issues.push('No branch was created and no commits were made — Claude may not have made any code changes');
+            } else if (!branchName && madeCommits) {
+              core.info('Claude committed to an existing branch (expected for PR invocations)');
             }
 
             if (issues.length === 0) {
