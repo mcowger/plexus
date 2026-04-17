@@ -12,20 +12,34 @@ export class OpenAITransformer implements Transformer {
   defaultEndpoint = '/chat/completions';
 
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
-    // Normalize assistant messages: map OpenAI-style `reasoning_content` to
-    // the internal `thinking` format so pi-ai can properly reconstruct
-    // thinking blocks in the context. Without this, reasoning from prior
-    // turns is silently dropped, which can cause flatMap crashes in pi-ai's
-    // transformMessages when the assistant message has mixed content types.
+    // Normalize assistant messages that carry OpenAI-style `reasoning_content`:
+    // 1. Convert `reasoning_content` → `thinking` blocks (pi-ai internal format)
+    // 2. Convert string `content` → array of content parts so pi-ai's
+    //    `transformMessages` can safely call `flatMap` on it.
+    // Without this, the second request in a multi-turn conversation crashes
+    // with `assistantMsg.content.flatMap is not a function`.
     const messages = Array.isArray(input.messages)
       ? input.messages.map((msg: any) => {
-          if (msg.role === 'assistant' && msg.reasoning_content && !msg.thinking) {
+          if (
+            msg.role === 'assistant' &&
+            msg.reasoning_content !== undefined &&
+            msg.reasoning_content !== null
+          ) {
             const { reasoning_content, ...rest } = msg;
+            const reasoningText = typeof reasoning_content === 'string' ? reasoning_content : '';
+            // Ensure content is an array of content parts for pi-ai compatibility
+            const normalizedContent =
+              typeof rest.content === 'string'
+                ? rest.content
+                  ? [{ type: 'text' as const, text: rest.content }]
+                  : []
+                : Array.isArray(rest.content)
+                  ? rest.content
+                  : [];
             return {
               ...rest,
-              thinking: {
-                content: typeof reasoning_content === 'string' ? reasoning_content : '',
-              },
+              content: normalizedContent,
+              thinking: msg.thinking || { content: reasoningText },
             };
           }
           return msg;
@@ -126,19 +140,13 @@ export class OpenAITransformer implements Transformer {
   }
 
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
-    // When reasoning_content is present, return content as an array of parts
-    // so clients (e.g. OpenWebUI/Vercel AI SDK) that call content.flatMap()
-    // on subsequent turns don't crash. The OpenAI spec allows content to be
-    // either a string or an array of {type, text} parts.
-    const hasReasoningContent =
-      response.reasoning_content !== null && response.reasoning_content !== undefined;
+    // Return content as a plain string per the OpenAI Chat Completions spec:
+    // `content` is a string, `reasoning_content` is a separate top-level field.
+    // The `flatMap` crash on subsequent turns is handled in `parseRequest`,
+    // which normalizes incoming assistant messages into pi-ai's array format.
     const message: any = {
       role: 'assistant',
-      content: hasReasoningContent
-        ? response.content
-          ? [{ type: 'text', text: response.content }]
-          : null
-        : response.content,
+      content: response.content,
       reasoning_content: response.reasoning_content,
       tool_calls: response.tool_calls,
     };
