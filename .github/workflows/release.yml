@@ -50,7 +50,7 @@ jobs:
           # the last migration was committed — the release must wait for the
           # generate-migrations workflow to catch up.
           bunx drizzle-kit generate 2>&1 | tee /tmp/sqlite-migrate.log
-          bunx drizzle-kit generate --config drizzle.config.pg.ts 2>&1 | tee /tmp/pg-migrate.log
+          bunx drizzle-kit generate --config drizzle.config.postgres.ts 2>&1 | tee /tmp/pg-migrate.log
 
           if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard drizzle/migrations drizzle/migrations_pg)" ]; then
             echo "✅ No pending migrations — all schema changes have corresponding migration files."
