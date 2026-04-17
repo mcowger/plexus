@@ -8,11 +8,12 @@
 
 ## Critical Requirements
 
+- **NEVER** commit or push without explicit request.
 - **NEVER** search library type definitions for documentation. Use tavily and context7 MCP tools to search the web instead.
 - **NEVER** produce implementation or summary documents unless specifically requested.
 - **ALWAYS** run `bun run format` (Biome) before committing. CI will fail on unformatted code.
 - **NEVER** edit existing migration files or manually create SQL migrations. See [Migrations](#migrations) below.
-- **NEVER** pass secrets via `with:` inputs in GitHub Actions workflows. The `with:` block is printed in plain text in the job log before masking applies — even `${{ secrets.* }}` values can leak if `core.setSecret()` hasn't registered them yet. **Always:** (1) pass secrets via `env:` (automatically masked by GitHub), and (2) add a preceding `actions/github-script` step that calls `core.setSecret()` on every secret value before the action runs. See `claude.yml` and `claude-code-review.yml` for the current pattern.
+- **NEVER** pass secrets via `with:` inputs in GitHub Actions workflows without registering them as a secret first. The `with:` block is printed in plain text in the job log before masking applies — even `${{ secrets.* }}` values can leak if `core.setSecret()` hasn't registered them yet. **Always:** (1) pass secrets via `env:` (automatically masked by GitHub), and (2) add a preceding `actions/github-script` step that calls `core.setSecret()` on every secret value before the action runs. See `claude.yml` and `claude-code-review.yml` for the current pattern.
 
 ---
 

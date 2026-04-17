@@ -191,82 +191,6 @@ jobs:
 
             core.setOutput('pr_summary', summary);
 
-      - name: Build release notes prompt
-        id: build_prompt
-        run: |
-          PREV_TAG="${{ steps.prev_tag.outputs.tag }}"
-          CURRENT_TAG="${{ steps.prev_tag.outputs.current_tag }}"
-          REPO_URL="https://github.com/${{ github.repository }}"
-
-          cat > /tmp/release_notes_prompt.md << 'PROMPT_EOF'
-          You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
-
-          There are changes in the git repository between two releases:
-          PROMPT_EOF
-          echo "- From tag: ${PREV_TAG}" >> /tmp/release_notes_prompt.md
-          echo "- To tag: ${CURRENT_TAG}" >> /tmp/release_notes_prompt.md
-          echo "- Repository: ${REPO_URL}" >> /tmp/release_notes_prompt.md
-          echo "" >> /tmp/release_notes_prompt.md
-
-          # Append the PR summary gathered from the API
-          cat >> /tmp/release_notes_prompt.md << 'PROMPT_EOF'
-          ## Source Changes
-          PROMPT_EOF
-
-          # Write the PR summary safely (handle special characters)
-          cat >> /tmp/release_notes_prompt.md <<PRSUMMARY_EOF
-          ${{ steps.pr_info.outputs.pr_summary }}
-          PRSUMMARY_EOF
-
-          cat >> /tmp/release_notes_prompt.md << 'PROMPT_EOF'
-
-          ---
-
-          ## Instructions:
-
-          Generate release notes following this exact structure and style:
-
-          1. **Version heading**: Start with the version number as an `##` heading (e.g. `## v1.2.3`).
-
-          2. **New Features section**: If there are any notable new features or significant changes, add a `### New Features` section BEFORE the categorized changelog. Write this as narrative prose — 1-3 sentences per feature explaining what it does and why it matters, without PR numbers or author attribution. This is the "headline" that helps users quickly understand what's exciting in this release. Only include this section if there are genuinely noteworthy features — omit it entirely for small patch releases with only fixes.
-
-          3. **Categorized sections**: After the New Features section, group changes into these standard categories (only include sections that have items):
-             - `### Added` — New features and capabilities
-             - `### Changed` — Changes in existing functionality
-             - `### Deprecated` — Soon-to-be removed features
-             - `### Removed` — Removed features
-             - `### Fixed` — Bug fixes
-             - `### Security` — Security improvements
-
-          4. **Group by PR, not by commit**: If multiple commits came in via a single pull request, write only ONE bullet about the entire PR. Do NOT list each commit separately — use the PR title as the primary basis for the description, enriched by understanding the full set of commits.
-
-          5. **Format each bullet as**: A concise, user-focused description ending with the PR or commit reference:
-             - For PRs: `Added support for X (#123 by @username)` — always include the PR number and the `by @author` attribution.
-             - For standalone commits (no PR): `Fixed issue with X (abc1234)` — use the short SHA.
-             - If a change has no author info available, omit the `by @author` part.
-             - Use plain text for the PR/commit reference, NOT markdown links (the release page auto-links `#123`).
-
-          6. **Write clear, user-focused descriptions** that explain what changed and why it matters from a user's perspective. Start each bullet with an action verb when possible.
-
-          ### Example output:
-
-          ## v0.67.2
-
-          ### New Features
-          Support for multiple --append-system-prompt flags, each value is appended to the system prompt separated by double newlines.
-          Interactive keybinding support for Kitty super-modified shortcuts such as super+k, super+enter, and ctrl+super+k.
-
-          ### Added
-          Added support for multiple --append-system-prompt flags (#3171 by @aliou)
-          Added interactive keybinding support for Kitty super-modified shortcuts (#3111 by @sudosubin)
-
-          ### Fixed
-          Fixed streaming partial JSON buffers leaking into persisted tool calls (#3018 by @steipete)
-          Fixed Ctrl+Alt letter key matching in tmux (#2989 by @kaofelix)
-
-          Output ONLY the release notes in markdown format. Do NOT include any explanatory text, metadata, introductory phrases, or concluding remarks. Start IMMEDIATELY with the version heading. Do not preface your response with any text whatsoever.
-          PROMPT_EOF
-
       - name: Register secrets for masking
         uses: actions/github-script@v9
         with:
@@ -279,7 +203,7 @@ jobs:
 
       - name: Generate Release Notes with Claude
         id: release_notes
-        uses: anthropics/claude-code-base-action@v1
+        uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
@@ -289,9 +213,66 @@ jobs:
           ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ vars.PLEXUS_MODEL }}
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
-          claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
-          allowed_tools: "Bash(git:*),Read"
-          prompt_file: /tmp/release_notes_prompt.md
+          prompt: |
+            You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
+
+            There are changes in the git repository between two releases:
+            - From tag: ${{ steps.prev_tag.outputs.tag }}
+            - To tag: ${{ steps.prev_tag.outputs.current_tag }}
+            - Repository: https://github.com/${{ github.repository }}
+
+            ## Source Changes
+
+            ${{ steps.pr_info.outputs.pr_summary }}
+
+            ---
+
+            ## Instructions:
+
+            Generate release notes following this exact structure and style:
+
+            1. **Version heading**: Start with the version number as an `##` heading (e.g. `## v1.2.3`).
+
+            2. **New Features & Changes section**: If there are any notable new features or significant changes, add a `### New Features` section BEFORE the categorized changelog. Write this as narrative prose — 1-3 sentences per feature explaining what it does and why it matters, without PR numbers or author attribution. Place each core item on its own line with a ' - ' the cause it to be shown in a list.   This is the "headline" that helps users quickly understand what's exciting in this release. Only include this section if there are genuinely noteworthy features — omit it entirely for small patch releases with only fixes.
+
+            3. **Categorized sections**: After the New Features section, group changes into these standard categories (only include sections that have items):
+               - `### Added` — New features and capabilities
+               - `### Changed` — Changes in existing functionality
+               - `### Deprecated` — Soon-to-be removed features
+               - `### Removed` — Removed features
+               - `### Fixed` — Bug fixes
+               - `### Security` — Security improvements
+
+            4. **Group by PR, not by commit**: If multiple commits came in via a single pull request, write only ONE bullet about the entire PR. Do NOT list each commit separately — use the PR title as the primary basis for the description, enriched by understanding the full set of commits.
+
+            5. **Format each bullet as**: A concise, user-focused description ending with the PR or commit reference:
+               - For PRs: `Added support for X (#123 by @username)` — always include the PR number and the `by @author` attribution.
+               - For standalone commits (no PR): `Fixed issue with X (abc1234)` — use the short SHA.
+               - If a change has no author info available, omit the `by @author` part.
+               - Use plain text for the PR/commit reference, NOT markdown links (the release page auto-links `#123`).
+
+            6. **Write clear, user-focused descriptions** that explain what changed and why it matters from a user's perspective. Start each bullet with an action verb when possible.
+
+            ### Example output:
+
+            ## v0.67.2
+
+            ### New Features
+            Support for multiple --append-system-prompt flags, each value is appended to the system prompt separated by double newlines.
+            Interactive keybinding support for Kitty super-modified shortcuts such as super+k, super+enter, and ctrl+super+k.
+
+            ### Added
+            Added support for multiple --append-system-prompt flags (#3171 by @aliou)
+            Added interactive keybinding support for Kitty super-modified shortcuts (#3111 by @sudosubin)
+
+            ### Fixed
+            Fixed streaming partial JSON buffers leaking into persisted tool calls (#3018 by @steipete)
+            Fixed Ctrl+Alt letter key matching in tmux (#2989 by @kaofelix)
+
+            Output ONLY the release notes in markdown format. Do NOT include any explanatory text, metadata, introductory phrases, or concluding remarks. Start IMMEDIATELY with the version heading. Do not preface your response with any text whatsoever.
+          claude_args: |
+            --model ${{ vars.PLEXUS_MODEL }}
+            --allowedTools "Bash(git:*)",Read
 
       - name: Extract release notes text
         id: extract_notes
