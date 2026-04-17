@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, Alias, Provider, Model, Cooldown } from '../lib/api';
+import { useToast } from '../contexts/ToastContext';
 
 const EMPTY_ALIAS: Alias = {
   id: '',
@@ -10,6 +11,7 @@ const EMPTY_ALIAS: Alias = {
 };
 
 export const useModels = () => {
+  const toast = useToast();
   const [aliases, setAliases] = useState<Alias[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
@@ -77,7 +79,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to save alias', e);
-      alert('Failed to save alias');
+      toast.error('Failed to save alias');
       return false;
     } finally {
       setIsSaving(false);
@@ -91,7 +93,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to delete alias', e);
-      alert('Failed to delete alias');
+      toast.error('Failed to delete alias');
       return false;
     }
   };
@@ -103,7 +105,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to delete all aliases', e);
-      alert('Failed to delete all aliases');
+      toast.error('Failed to delete all aliases');
       return false;
     }
   };
@@ -118,7 +120,7 @@ export const useModels = () => {
       await api.saveAlias(updatedAlias, alias.id);
     } catch (e) {
       console.error('Toggle error', e);
-      alert('Failed to update target status: ' + e);
+      toast.error('Failed to update target status: ' + e);
       loadData();
     }
   };

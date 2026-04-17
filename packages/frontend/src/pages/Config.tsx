@@ -1,15 +1,16 @@
 import { Component, useEffect, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
-import { api } from '../lib/api';
-import { Button } from '../components/ui/Button';
 import { RotateCcw, AlertTriangle, Download, Upload, RefreshCw } from 'lucide-react';
+import { api } from '../lib/api';
+import { useToast } from '../contexts/ToastContext';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
 import type { CardLayout } from '../types/card';
 import { DEFAULT_CARD_ORDER, LAYOUT_STORAGE_KEY } from '../types/card';
 
-/**
- * Error boundary specifically for the Monaco Editor component.
- */
 class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
 
@@ -24,7 +25,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   render() {
     if (this.state.error) {
       return (
-        <div className="h-[500px] flex items-center justify-center bg-bg-subtle/30 text-text-secondary">
+        <div className="h-[400px] sm:h-[500px] flex items-center justify-center bg-bg-glass/30 text-text-secondary rounded-md">
           <div className="text-center p-6">
             <AlertTriangle className="mx-auto mb-3 text-warning" size={32} />
             <p className="text-sm font-semibold mb-1">Editor failed to load</p>
@@ -38,6 +39,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
 }
 
 export const Config = () => {
+  const toast = useToast();
   const [config, setConfig] = useState('');
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -50,17 +52,18 @@ export const Config = () => {
     } catch (e) {
       console.error('Failed to load config:', e);
       setIsConfigLoaded(false);
+      toast.error('Failed to load config');
     }
   };
 
   useEffect(() => {
     loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [cardLayout, setCardLayout] = useState<CardLayout>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load current card layout from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
     if (saved) {
@@ -73,35 +76,25 @@ export const Config = () => {
     }
   }, []);
 
-  const handleExportLayout = () => {
-    const dataStr = JSON.stringify(cardLayout, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
+  const triggerDownload = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'plexus-card-layout.json';
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  const handleExportConfig = () => {
-    const blob = new Blob([config], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'plexus-config-export.json';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  const handleExportLayout = () =>
+    triggerDownload(JSON.stringify(cardLayout, null, 2), 'plexus-card-layout.json', 'application/json');
 
-  // Import layout from JSON file
-  const handleImportLayout = () => {
-    fileInputRef.current?.click();
-  };
+  const handleExportConfig = () =>
+    triggerDownload(config, 'plexus-config-export.json', 'application/json');
+
+  const handleImportLayout = () => fileInputRef.current?.click();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -120,18 +113,18 @@ export const Config = () => {
           const validIds = new Set<string>(DEFAULT_CARD_ORDER);
           const allIdsValid = parsed.every((item: { id: string }) => validIds.has(item.id));
           if (!allIdsValid) {
-            alert('Invalid card layout: contains unknown card IDs');
+            toast.error('Invalid card layout: contains unknown card IDs');
             return;
           }
 
           localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(parsed));
           setCardLayout(parsed);
-          alert('Card layout imported successfully!');
+          toast.success('Card layout imported');
         } else {
-          alert('Invalid card layout format');
+          toast.error('Invalid card layout format');
         }
       } catch {
-        alert('Failed to import: Invalid JSON file');
+        toast.error('Failed to import: Invalid JSON file');
       }
     };
     reader.readAsText(file);
@@ -140,140 +133,126 @@ export const Config = () => {
   };
 
   const handleRestart = async () => {
-    if (
-      !confirm(
-        'Are you sure you want to restart Plexus? This will briefly interrupt all ongoing requests.'
-      )
-    ) {
-      return;
-    }
+    const ok = await toast.confirm({
+      title: 'Restart Plexus?',
+      message:
+        'This will briefly interrupt all ongoing requests. Are you sure you want to continue?',
+      confirmLabel: 'Restart',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setIsRestarting(true);
     try {
       await api.restart();
     } catch (e) {
-      const error = e as Error;
-      alert(`Restart failed:\n\n${error.message}`);
+      toast.error((e as Error).message, 'Restart failed');
       setIsRestarting(false);
     }
   };
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
-      <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Configuration</h1>
-        <p className="text-[15px] text-text-secondary m-0">
-          View current system configuration (read-only). Use the Providers, Models, and Keys pages
-          to make changes.
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Configuration"
+        subtitle="View current system configuration (read-only). Use the Providers, Models, and Keys pages to make changes."
+      />
 
-      <div className="glass-bg backdrop-blur-md border border-white/10 rounded-lg shadow-xl overflow-hidden transition-all duration-300 max-w-full shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border-glass">
-          <h3 className="font-heading text-lg font-semibold text-text m-0">Configuration Export</h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={loadConfig}
-              leftIcon={<RotateCcw size={14} />}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRestart}
-              isLoading={isRestarting}
-              leftIcon={<RefreshCw size={14} />}
-            >
-              Restart
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleExportConfig}
-              disabled={!isConfigLoaded}
-              leftIcon={<Download size={14} />}
-            >
-              Export JSON
-            </Button>
-          </div>
-        </div>
-        <div className="h-[500px] rounded-sm overflow-hidden">
-          <EditorErrorBoundary>
-            <Editor
-              height="100%"
-              defaultLanguage="json"
-              value={config}
-              theme="vs-dark"
-              options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                fontSize: 14,
-                fontFamily: '"Fira code", "Fira Mono", monospace',
-              }}
-            />
-          </EditorErrorBoundary>
-        </div>
-      </div>
-      {/* Card Layout Configuration */}
-      <div className="mt-8 glass-bg backdrop-blur-md border border-white/10 rounded-lg shadow-xl overflow-hidden transition-all duration-300 max-w-full shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border-glass">
-          <div>
-            <h3 className="font-heading text-lg font-semibold text-text m-0">Card Layout</h3>
-            <p className="text-sm text-text-secondary m-0 mt-1">
-              Import or export your Live Metrics card layout configuration.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExportLayout}
-              leftIcon={<Download size={14} />}
-            >
-              Export
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleImportLayout}
-              leftIcon={<Upload size={14} />}
-            >
-              Import
-            </Button>
-          </div>
-        </div>
-
-        {/* Hidden file input for import */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          style={{ display: 'none' }}
-          onChange={handleFileSelect}
-        />
-
-        {/* Current Layout Preview */}
-        <div className="px-6 py-4 bg-bg-subtle/30">
-          <h4 className="font-heading text-sm font-semibold text-text m-0 mb-3">
-            Current Card Order
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {cardLayout.map((card, index) => (
-              <div
-                key={card.id}
-                className="px-3 py-1.5 bg-bg-glass rounded-md border border-border-glass text-sm text-text"
+      <div className="flex flex-col gap-6">
+        <Card
+          title="Configuration Export"
+          flush
+          extra={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={loadConfig} leftIcon={<RotateCcw size={14} />}>
+                Refresh
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRestart}
+                isLoading={isRestarting}
+                leftIcon={<RefreshCw size={14} />}
               >
-                <span className="text-text-muted mr-2">{index + 1}.</span>
-                {card.id}
-              </div>
-            ))}
+                Restart
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleExportConfig}
+                disabled={!isConfigLoaded}
+                leftIcon={<Download size={14} />}
+              >
+                Export JSON
+              </Button>
+            </div>
+          }
+        >
+          <div className="h-[400px] sm:h-[500px] lg:h-[600px] rounded-sm overflow-hidden">
+            <EditorErrorBoundary>
+              <Editor
+                height="100%"
+                defaultLanguage="json"
+                value={config}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  fontFamily: '"Fira Code", "Fira Mono", monospace',
+                }}
+              />
+            </EditorErrorBoundary>
           </div>
-        </div>
+        </Card>
+
+        <Card
+          title="Card Layout"
+          extra={
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={handleExportLayout} leftIcon={<Download size={14} />}>
+                Export
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleImportLayout} leftIcon={<Upload size={14} />}>
+                Import
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-sm text-text-secondary mb-4">
+            Import or export your Live Metrics card layout configuration.
+          </p>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
+          <div>
+            <h4 className="font-heading text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Current Card Order
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {cardLayout.length === 0 && (
+                <p className="text-xs text-text-muted italic">Default layout — no customizations saved.</p>
+              )}
+              {cardLayout.map((card, index) => (
+                <div
+                  key={card.id}
+                  className="px-3 py-1.5 bg-bg-glass rounded-md border border-border-glass text-xs text-text"
+                >
+                  <span className="text-text-muted mr-2">{index + 1}.</span>
+                  {card.id}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 };

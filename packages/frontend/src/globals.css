@@ -26,22 +26,63 @@
   --color-border-glass: rgba(255, 255, 255, 0.1);
   --color-glow: rgba(245, 158, 11, 0.3);
 
+  --color-terminal-bg: #0F172A;
+  --color-terminal-fg: #E2E8F0;
+
   /* Fonts */
   --font-heading: 'Space Grotesk', sans-serif;
   --font-body: 'DM Sans', sans-serif;
 
   /* Spacing */
+  --spacing-xxs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 12px;
   --spacing-lg: 16px;
   --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
+  --spacing-4xl: 64px;
 
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 20px;
+
+  /* Typography scale (responsive via clamp) */
+  --text-caption: 0.75rem;
+  --text-body: 0.875rem;
+  --text-body-lg: 1rem;
+  --text-h4: clamp(0.95rem, 0.9rem + 0.25vw, 1.0625rem);
+  --text-h3: clamp(1.05rem, 0.95rem + 0.5vw, 1.25rem);
+  --text-h2: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+  --text-h1: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+  --text-display: clamp(2rem, 1.6rem + 2vw, 3rem);
+
+  /* Z-index scale — one source of truth. */
+  --z-dropdown: 100;
+  --z-sidebar: 200;
+  --z-drawer-backdrop: 300;
+  --z-drawer: 310;
+  --z-modal-backdrop: 400;
+  --z-modal: 410;
+  --z-tooltip: 500;
+  --z-toast: 600;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration: 250ms;
+  --duration-slow: 400ms;
+
+  /* Shadows — semantic names replace magic rgba values. */
+  --shadow-glow-primary: 0 6px 20px rgba(245, 158, 11, 0.4);
+  --shadow-glow-primary-sm: 0 4px 12px rgba(245, 158, 11, 0.3);
+  --shadow-glow-danger: 0 4px 12px rgba(239, 68, 68, 0.3);
+  --shadow-nav-active: 0 2px 8px rgba(245, 158, 11, 0.15);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 /* Custom Utilities based on variables */
@@ -67,7 +108,7 @@
 
   body {
     font-family: var(--font-body);
-    font-size: 0.875rem;
+    font-size: var(--text-body);
     line-height: 1.5;
     background-color: var(--color-bg-deep);
     color: var(--color-text);
@@ -133,6 +174,16 @@
   to {
     background-color: transparent;
   }
+}
+
+@keyframes drawerSlideLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes drawerSlideRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 /* Utility class for new log row animation */

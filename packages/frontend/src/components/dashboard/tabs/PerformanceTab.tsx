@@ -5,6 +5,7 @@ import { api, type ProviderPerformanceData } from '../../../lib/api';
 import { formatMs, formatNumber } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
+import { useToast } from '../../../contexts/ToastContext';
 
 const BAR_COLORS = [
   '#c26134',
@@ -124,6 +125,7 @@ const PerformanceBarChart = ({
 };
 
 export const PerformanceTab = () => {
+  const toast = useToast();
   const [rows, setRows] = useState<ProviderPerformanceData[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [loading, setLoading] = useState(false);
@@ -138,8 +140,13 @@ export const PerformanceTab = () => {
 
   const clearPerformance = async () => {
     if (!selectedModel) return;
-    if (!confirm(`Are you sure you want to clear all performance data for "${selectedModel}"?`))
-      return;
+    const ok = await toast.confirm({
+      title: 'Clear performance data?',
+      message: `Are you sure you want to clear all performance data for "${selectedModel}"?`,
+      confirmLabel: 'Clear',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setClearing(true);
     const success = await api.clearProviderPerformance(selectedModel);
@@ -236,13 +243,9 @@ export const PerformanceTab = () => {
         </div>
       </Card>
 
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))' }}
-      >
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         <Card
           className="min-w-0"
-          style={{ minWidth: '350px' }}
           title="Fastest Providers (tok/s)"
           extra={<Gauge size={16} className="text-primary" />}
         >
@@ -268,7 +271,6 @@ export const PerformanceTab = () => {
 
         <Card
           className="min-w-0"
-          style={{ minWidth: '350px' }}
           title="Fastest First Token (TTFT)"
           extra={<TimerReset size={16} className="text-primary" />}
         >
@@ -292,7 +294,6 @@ export const PerformanceTab = () => {
 
         <Card
           className="min-w-0"
-          style={{ minWidth: '350px' }}
           title="Selected Model"
           extra={<BarChart3 size={16} className="text-primary" />}
         >

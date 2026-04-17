@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Copy, Check, RotateCw, AlertTriangle } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
+import { CopyButton } from '../components/ui/CopyButton';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
+import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
 
 interface SelfInfo {
   role: 'admin' | 'limited';
@@ -20,13 +25,9 @@ interface SelfInfo {
   traceEnabledGlobal?: boolean;
 }
 
-/**
- * Self-service page for the currently authenticated api-key user.
- * Lets them view their key's metadata, edit the comment, toggle trace
- * capture for their key only, and rotate their secret.
- */
 export const MyKey: React.FC = () => {
   const { isLimited, isAdmin, login } = useAuth();
+  const toast = useToast();
   const [info, setInfo] = useState<SelfInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
@@ -35,8 +36,6 @@ export const MyKey: React.FC = () => {
   const [showRotate, setShowRotate] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,45 +46,52 @@ export const MyKey: React.FC = () => {
         setInfo(data);
         setComment(data.comment ?? '');
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => toast.error(String(e), 'Load failed'))
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Admins shouldn't land on this page via the nav — they have the full Keys
-  // management page. Redirect defensively if they hit the URL directly.
   if (isAdmin && !isLimited) {
     return <Navigate to="/keys" replace />;
   }
 
   if (loading) {
     return (
-      <div className="p-6">
-        <p className="text-text-muted">Loading...</p>
-      </div>
+      <PageContainer width="standard">
+        <PageHeader title="My Key" subtitle="Loading your key details..." />
+        <div className="flex flex-col gap-4">
+          <Skeleton height={140} />
+          <Skeleton height={120} />
+          <Skeleton height={120} />
+        </div>
+      </PageContainer>
     );
   }
 
   if (!info || info.role !== 'limited') {
     return (
-      <div className="p-6">
-        <p className="text-danger">{error || 'Unable to load key info.'}</p>
-      </div>
+      <PageContainer width="standard">
+        <PageHeader title="My Key" />
+        <Card>
+          <p className="text-danger">Unable to load key info.</p>
+        </Card>
+      </PageContainer>
     );
   }
 
   const handleSaveComment = async () => {
     setSavingComment(true);
-    setError(null);
     try {
       await api.updateSelfComment(comment.trim() || null);
       setInfo({ ...info, comment: comment.trim() || null });
+      toast.success('Comment saved');
     } catch (e: any) {
-      setError(e?.message || 'Failed to save comment');
+      toast.error(e?.message || 'Failed to save comment');
     } finally {
       setSavingComment(false);
     }
@@ -93,12 +99,11 @@ export const MyKey: React.FC = () => {
 
   const handleToggleTrace = async (enabled: boolean) => {
     setTogglingTrace(true);
-    setError(null);
     try {
       const res = await api.toggleSelfDebug(enabled);
       setInfo({ ...info, traceEnabled: res.enabled, traceEnabledGlobal: res.enabledGlobal });
     } catch (e: any) {
-      setError(e?.message || 'Failed to toggle trace');
+      toast.error(e?.message || 'Failed to toggle trace');
     } finally {
       setTogglingTrace(false);
     }
@@ -106,137 +111,115 @@ export const MyKey: React.FC = () => {
 
   const handleRotate = async () => {
     setRotating(true);
-    setError(null);
     try {
       const res = await api.rotateSelfSecret();
-      // Persist the new secret into the active session BEFORE revealing it.
-      // The old secret stops working server-side the moment rotateSelfSecret
-      // returns, so any subsequent fetchWithAuth call that still carries the
-      // old credential would 401 and evict the session — locking the user
-      // out of the very modal that's showing their new secret. login() does:
-      // fetch /auth/verify with the new secret → update localStorage →
-      // setAdminKey + setPrincipal, so every later request uses it.
       const ok = await login(res.secret);
       setNewSecret(res.secret);
       if (!ok) {
-        // Highly unlikely — the new secret just came from the server — but
-        // surface something useful instead of silently drifting.
-        setError('Secret rotated, but session refresh failed. Re-login with the new secret.');
+        toast.warning('Secret rotated, but session refresh failed. Re-login with the new secret.');
       }
     } catch (e: any) {
-      setError(e?.message || 'Rotation failed');
+      toast.error(e?.message || 'Rotation failed');
     } finally {
       setRotating(false);
     }
-  };
-
-  const handleCopy = () => {
-    if (!newSecret) return;
-    navigator.clipboard.writeText(newSecret);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
   };
 
   const allowedProviders = info.allowedProviders ?? [];
   const allowedModels = info.allowedModels ?? [];
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-text">My Key</h1>
-        <p className="text-text-muted">
-          Details for <span className="font-medium">{info.keyName}</span>. All logs, traces, and
-          dashboard data in this session are scoped to this key.
-        </p>
-      </header>
+    <PageContainer width="standard">
+      <PageHeader
+        title="My Key"
+        subtitle={
+          <>
+            Details for <span className="font-medium text-text">{info.keyName}</span>. All logs,
+            traces, and dashboard data in this session are scoped to this key.
+          </>
+        }
+      />
 
-      {error && (
-        <div className="flex items-center gap-2 p-3 bg-danger/10 border border-danger/30 rounded-md text-danger text-sm">
-          <AlertTriangle size={16} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <Card title="Identity">
-        <dl className="grid grid-cols-1 gap-3 text-sm">
-          <div className="flex">
-            <dt className="w-40 text-text-muted">Key name</dt>
-            <dd className="font-mono text-text">{info.keyName}</dd>
-          </div>
-          <div className="flex">
-            <dt className="w-40 text-text-muted">Quota</dt>
+      <div className="flex flex-col gap-4 sm:gap-6">
+        <Card title="Identity">
+          <dl className="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
+            <dt className="text-text-muted">Key name</dt>
+            <dd className="font-mono text-text break-all">{info.keyName}</dd>
+            <dt className="text-text-muted">Quota</dt>
             <dd className="text-text">{info.quotaName || '—'}</dd>
-          </div>
-          <div className="flex">
-            <dt className="w-40 text-text-muted">Allowed providers</dt>
-            <dd className="text-text">
+            <dt className="text-text-muted">Allowed providers</dt>
+            <dd className="text-text break-words">
               {allowedProviders.length > 0 ? allowedProviders.join(', ') : 'Any (unrestricted)'}
             </dd>
-          </div>
-          <div className="flex">
-            <dt className="w-40 text-text-muted">Allowed models</dt>
-            <dd className="text-text">
+            <dt className="text-text-muted">Allowed models</dt>
+            <dd className="text-text break-words">
               {allowedModels.length > 0 ? allowedModels.join(', ') : 'Any (unrestricted)'}
             </dd>
-          </div>
-        </dl>
-      </Card>
+          </dl>
+        </Card>
 
-      <Card title="Comment">
-        <div className="space-y-3">
-          <Input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Free-text note about this key (optional)"
-          />
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSaveComment}
-              disabled={savingComment || (comment.trim() || null) === (info.comment ?? null)}
-            >
-              {savingComment ? 'Saving…' : 'Save'}
-            </Button>
+        <Card title="Comment">
+          <div className="flex flex-col gap-3">
+            <Input
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Free-text note about this key (optional)"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveComment}
+                disabled={savingComment || (comment.trim() || null) === (info.comment ?? null)}
+                isLoading={savingComment}
+              >
+                Save
+              </Button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      <Card title="Trace capture">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-text">
-              Capture full request/response payloads for this key only.
+        <Card title="Trace capture">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-text">
+                Capture full request/response payloads for this key only.
+              </p>
+              <p className="text-xs text-text-muted mt-1">
+                {info.traceEnabledGlobal
+                  ? 'Global tracing is ON (admin) — all requests are captured regardless of this toggle.'
+                  : info.traceEnabled
+                    ? 'Currently capturing traces for this key.'
+                    : 'Tracing is off for this key.'}
+              </p>
+            </div>
+            <Switch
+              checked={!!info.traceEnabled}
+              onChange={handleToggleTrace}
+              disabled={togglingTrace || !!info.traceEnabledGlobal}
+              aria-label="Toggle trace capture"
+            />
+          </div>
+        </Card>
+
+        <Card title="Rotate secret">
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text-secondary">
+              Generates a new secret for this key. The old secret stops working immediately. Your
+              historical logs, traces, and errors are preserved (they're indexed by key name, not
+              secret).
             </p>
-            <p className="text-xs text-text-muted mt-1">
-              {info.traceEnabledGlobal
-                ? 'Global tracing is ON (admin) — all requests are captured regardless of this toggle.'
-                : info.traceEnabled
-                  ? 'Currently capturing traces for this key.'
-                  : 'Tracing is off for this key.'}
-            </p>
+            <div className="flex justify-end">
+              <Button
+                variant="danger"
+                onClick={() => setShowRotate(true)}
+                disabled={rotating}
+                leftIcon={<RotateCw size={16} />}
+              >
+                Rotate secret
+              </Button>
+            </div>
           </div>
-          <Switch
-            checked={!!info.traceEnabled}
-            onChange={handleToggleTrace}
-            disabled={togglingTrace || !!info.traceEnabledGlobal}
-          />
-        </div>
-      </Card>
-
-      <Card title="Rotate secret">
-        <div className="space-y-3">
-          <p className="text-sm text-text-muted">
-            Generates a new secret for this key. The old secret stops working immediately. Your
-            historical logs, traces, and errors are preserved (they're indexed by key name, not
-            secret).
-          </p>
-          <div className="flex justify-end">
-            <Button variant="danger" onClick={() => setShowRotate(true)} disabled={rotating}>
-              <RotateCw size={16} />
-              Rotate secret
-            </Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       <Modal
         isOpen={showRotate}
@@ -260,32 +243,30 @@ export const MyKey: React.FC = () => {
               <Button variant="secondary" onClick={() => setShowRotate(false)} disabled={rotating}>
                 Cancel
               </Button>
-              <Button variant="danger" onClick={handleRotate} disabled={rotating}>
-                {rotating ? 'Rotating…' : 'Rotate now'}
+              <Button variant="danger" onClick={handleRotate} disabled={rotating} isLoading={rotating}>
+                Rotate now
               </Button>
             </>
           )
         }
       >
         {newSecret ? (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <p className="text-sm text-text">Copy this secret now — it will not be shown again.</p>
             <div className="flex gap-2 items-center">
-              <code className="flex-1 p-2 bg-bg-card border border-border rounded text-xs font-mono break-all">
+              <code className="flex-1 min-w-0 p-2 bg-bg-card border border-border rounded-md text-xs font-mono break-all">
                 {newSecret}
               </code>
-              <Button variant="secondary" onClick={handleCopy}>
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-              </Button>
+              <CopyButton value={newSecret} variant="icon" />
             </div>
           </div>
         ) : (
-          <p className="text-sm">
+          <p className="text-sm text-text-secondary">
             The old secret will stop working immediately. Any clients using it will receive 401
             errors until they are updated with the new secret.
           </p>
         )}
       </Modal>
-    </div>
+    </PageContainer>
   );
 };

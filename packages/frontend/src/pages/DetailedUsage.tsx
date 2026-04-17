@@ -66,6 +66,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/layout/PageHeader';
 import { TimeRangeSelector } from '../components/dashboard/TimeRangeSelector';
 import { api, type UsageRecord } from '../lib/api';
 import { formatCost, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
@@ -1110,20 +1111,18 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
             onBack callback is provided.
           - "Live Data" badge showing time since last auto-refresh
       ------------------------------------------------------------------- */}
-      <div className="mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Detailed Usage</h1>
-            <p className="text-text-secondary">Advanced analytics with customizable chart types</p>
-          </div>
-          <div className="flex items-center gap-3">
+      <PageHeader
+        title="Detailed Usage"
+        subtitle="Advanced analytics with customizable chart types"
+        actions={
+          <>
             {(onBack || !embedded) && (
               <Button
                 size="sm"
                 variant="secondary"
+                leftIcon={<ArrowLeft size={16} />}
                 onClick={() => (onBack ? onBack() : (window.location.href = '/ui/live-metrics'))}
               >
-                <ArrowLeft size={16} className="mr-1" />
                 {onBack ? 'Back to Live Card' : 'Return to Live Metrics'}
               </Button>
             )}
@@ -1133,9 +1132,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
             >
               Live Data
             </Badge>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* -------------------------------------------------------------------
           KPI Summary Cards Section
@@ -1143,14 +1142,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           in the current time window. Each card shows a label, value, and icon.
           Errors are highlighted in red when count > 0.
       ------------------------------------------------------------------- */}
-      <div
-        className="mb-6"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: '12px',
-        }}
-      >
+      <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
         {stats.map((stat, i) => (
           <div key={i} className="glass-bg rounded-lg p-3 flex flex-col gap-1">
             <div className="flex justify-between items-start">

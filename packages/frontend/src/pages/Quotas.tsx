@@ -1,9 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
+import { RefreshCw, Cpu, Gauge } from 'lucide-react';
+import { clsx } from 'clsx';
 import { api } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { RefreshCw, Cpu } from 'lucide-react';
-import { clsx } from 'clsx';
+import { EmptyState } from '../components/ui/EmptyState';
+import { PageHeader } from '../components/layout/PageHeader';
+import { PageContainer } from '../components/layout/PageContainer';
 import type { QuotaCheckerInfo, QuotaCheckResult } from '../types/quota';
 import { toBoolean, toIsoString } from '../lib/normalize';
 import {
@@ -32,7 +35,6 @@ import {
   BalanceHistoryModal,
 } from '../components/quota';
 
-// Checker display names
 const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   openrouter: 'OpenRouter',
   minimax: 'MiniMax',
@@ -66,9 +68,8 @@ export const Quotas = () => {
   const [selectedDisplayName, setSelectedDisplayName] = useState('');
   const [isBalanceModal, setIsBalanceModal] = useState(false);
 
-  const isBalanceChecker = (quota: QuotaCheckerInfo): boolean => {
-    return quota.checkerCategory === 'balance';
-  };
+  const isBalanceChecker = (quota: QuotaCheckerInfo): boolean =>
+    quota.checkerCategory === 'balance';
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -79,7 +80,6 @@ export const Quotas = () => {
 
   useEffect(() => {
     fetchQuotas();
-    // Refresh quotas every 30 seconds
     const interval = setInterval(fetchQuotas, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -95,7 +95,6 @@ export const Quotas = () => {
     });
   };
 
-  // Convert QuotaSnapshot to QuotaCheckResult format for display
   const getQuotaResult = (quota: QuotaCheckerInfo): QuotaCheckResult => {
     if (!quota.latest || quota.latest.length === 0) {
       return {
@@ -110,8 +109,6 @@ export const Quotas = () => {
       };
     }
 
-    // Get unique windows (in case of duplicates, take the most recent)
-    // Key on windowType+description to support checkers with multiple windows of the same type
     const windowsByType = new Map<string, (typeof quota.latest)[0]>();
     for (const snapshot of quota.latest) {
       const key = snapshot.description
@@ -154,8 +151,6 @@ export const Quotas = () => {
     };
   };
 
-  // Group quotas by their exact checkerType (e.g. 'apertis-coding-plan').
-  // Fall back to checkerId if checkerType is not set.
   const groupedQuotas = useMemo(() => {
     const groups: Record<string, QuotaCheckerInfo[]> = {};
     for (const quota of quotas) {
@@ -166,12 +161,8 @@ export const Quotas = () => {
     return groups;
   }, [quotas]);
 
-  // Checkers that are categorized as 'balance' but also have rate-limit windows
-  // (e.g. neuralwatt has a subscription/$ balance AND a monthly/kWh quota).
-  // These should appear in BOTH the balance card and the rate-limit display.
   const BALANCE_CHECKERS_WITH_RATE_LIMIT = new Set(['neuralwatt']);
 
-  // Separate into balance and rate-limit categories using the authoritative checkerCategory field.
   const balanceGroups = useMemo(() => {
     return Object.entries(groupedQuotas)
       .filter(([, quotasList]) => quotasList.some((q) => q.checkerCategory === 'balance'))
@@ -204,39 +195,32 @@ export const Quotas = () => {
     setIsBalanceModal(false);
   };
 
-  // Render the appropriate quota display component based on checker type
   const renderQuotaDisplay = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
     const result = getQuotaResult(quota);
     const checkerType = quota.checkerType || quota.checkerId;
 
-    // Add refresh button wrapper
     const wrapper = (children: React.ReactNode) => (
       <div
         key={quota.checkerId}
         onClick={() => handleCardClick(quota, groupDisplayName)}
-        className="bg-bg-card border border-border rounded-lg p-4 relative cursor-pointer hover:border-primary/50 transition-colors"
+        className="relative cursor-pointer rounded-lg border border-border-glass bg-bg-card/60 p-4 transition-colors duration-fast hover:border-primary/40"
       >
-        <div className="absolute top-2 right-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRefresh(quota.checkerId);
-            }}
-            disabled={refreshing.has(quota.checkerId)}
-          >
-            <RefreshCw
-              size={14}
-              className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')}
-            />
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRefresh(quota.checkerId);
+          }}
+          disabled={refreshing.has(quota.checkerId)}
+          aria-label="Refresh"
+          className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-bg-hover hover:text-text transition-colors duration-fast disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')} />
+        </button>
         <div className="pr-8">{children}</div>
       </div>
     );
 
-    // Exact-match on checkerType to select the display component.
     const DISPLAY_MAP: Record<string, React.ReactNode> = {
       synthetic: <SyntheticQuotaDisplay result={result} isCollapsed={false} />,
       'claude-code': <ClaudeCodeQuotaDisplay result={result} isCollapsed={false} />,
@@ -263,70 +247,55 @@ export const Quotas = () => {
     const display = DISPLAY_MAP[checkerType];
     if (display) return wrapper(display);
 
-    // Fallback: generic display
     console.warn(`Unknown quota checker type: ${checkerType}`);
     return wrapper(<SyntheticQuotaDisplay result={result} isCollapsed={false} />);
   };
 
-  // Render columns for checker types (responsive grid)
-  const renderQuotaColumns = (groups: [string, QuotaCheckerInfo[]][]) => {
-    return (
-      <div
-        className="grid gap-4"
-        style={{
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        }}
-      >
-        {groups.map(([checkerType, quotasList]) => {
-          const displayName = CHECKER_DISPLAY_NAMES[checkerType] || checkerType;
-
-          return (
-            <div key={checkerType} className="flex flex-col gap-3">
-              <h3 className="font-heading text-sm font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border pb-2">
-                {displayName}
-              </h3>
-              <div className="flex flex-col gap-3">
-                {quotasList.map((quota) => renderQuotaDisplay(quota, displayName))}
-              </div>
+  const renderQuotaColumns = (groups: [string, QuotaCheckerInfo[]][]) => (
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {groups.map(([checkerType, quotasList]) => {
+        const displayName = CHECKER_DISPLAY_NAMES[checkerType] || checkerType;
+        return (
+          <div key={checkerType} className="flex flex-col gap-3">
+            <h3 className="font-heading text-xs font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border-glass pb-2">
+              {displayName}
+            </h3>
+            <div className="flex flex-col gap-3">
+              {quotasList.map((quota) => renderQuotaDisplay(quota, displayName))}
             </div>
-          );
-        })}
-      </div>
-    );
-  };
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Quota Trackers</h1>
-          <p className="text-[15px] text-text-secondary m-0">
-            Monitor provider quotas and rate limits.
-          </p>
-        </div>
-        <Button variant="secondary" onClick={fetchQuotas} disabled={loading}>
-          <RefreshCw size={16} className={clsx('mr-2', loading && 'animate-spin')} />
-          Refresh All
-        </Button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Quota Trackers"
+        subtitle="Monitor provider quotas and rate limits."
+        actions={
+          <Button variant="secondary" onClick={fetchQuotas} disabled={loading} leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}>
+            Refresh All
+          </Button>
+        }
+      />
 
       {loading && quotas.length === 0 ? (
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw size={24} className="animate-spin text-primary mr-2" />
+        <div className="flex items-center justify-center h-64 gap-3">
+          <RefreshCw size={20} className="animate-spin text-primary" />
           <span className="text-text-secondary">Loading quotas...</span>
         </div>
       ) : quotas.length === 0 ? (
         <Card>
-          <div className="text-center py-12">
-            <p className="text-text-secondary">No quota checkers configured</p>
-            <p className="text-text-muted text-sm mt-2">
-              Configure quota checkers in your provider settings to monitor usage.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Gauge />}
+            title="No quota checkers configured"
+            description="Configure quota checkers in your provider settings to monitor usage."
+          />
         </Card>
       ) : (
-        <div className="space-y-8">
-          {/* Combined Balances Card */}
+        <div className="flex flex-col gap-8">
           {balanceGroups.length > 0 && (
             <section>
               <CombinedBalancesCard
@@ -338,12 +307,11 @@ export const Quotas = () => {
             </section>
           )}
 
-          {/* Rate Limit Section */}
           {rateLimitGroups.length > 0 && (
             <section>
-              <div className="flex items-center gap-2 mb-6 pb-2 border-b border-border">
-                <Cpu size={20} className="text-primary" />
-                <h2 className="font-heading text-xl font-semibold text-text">Rate Limits</h2>
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border-glass">
+                <Cpu size={18} className="text-primary" />
+                <h2 className="font-heading text-h2 font-semibold text-text">Rate Limits</h2>
               </div>
               {renderQuotaColumns(rateLimitGroups)}
             </section>
@@ -366,6 +334,6 @@ export const Quotas = () => {
           displayName={selectedDisplayName}
         />
       )}
-    </div>
+    </PageContainer>
   );
 };

@@ -16,6 +16,7 @@ import { Login } from './pages/Login';
 import { MyKey } from './pages/MyKey';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SidebarProvider } from './contexts/SidebarContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -128,11 +129,13 @@ const AppRoutes = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <SidebarProvider>
-        <AppRoutes />
-      </SidebarProvider>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <SidebarProvider>
+          <AppRoutes />
+        </SidebarProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 };
 

@@ -425,12 +425,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       </div>
 
       {/* All Charts in 4-Column Grid */}
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))' }}
-      >
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {/* Time Series - Requests */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Requests over Time">
+        <Card className="min-w-0" title="Requests over Time">
           <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -481,7 +478,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
          * The x-axis uses the pre-formatted `label` field ("HH:MM") rather
          * than raw timestamps to keep tick labels compact.
          */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Concurrency by Provider">
+        <Card className="min-w-0" title="Concurrency by Provider">
           <div style={{ height: 300, marginTop: '12px' }}>
             {concurrencyByProviderTimeline.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary text-sm">
@@ -535,7 +532,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
          * highest-traffic model at the bottom of the stack (matching the
          * sort order from `modelKeys`).
          */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Concurrency by Model">
+        <Card className="min-w-0" title="Concurrency by Model">
           <div style={{ height: 300, marginTop: '12px' }}>
             {concurrencyByModelTimeline.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary text-sm">
@@ -574,7 +571,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         </Card>
 
         {/* Time Series - Tokens */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Token Usage">
+        <Card className="min-w-0" title="Token Usage">
           <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -638,7 +635,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         {/* Model Distribution - Requests */}
         <Card
           className="min-w-0"
-          style={{ minWidth: '350px' }}
           title="Usage by Model Alias (Requests)"
         >
           <div style={{ height: 300, marginTop: '12px' }}>
@@ -649,7 +645,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         {/* Model Distribution - Tokens */}
         <Card
           className="min-w-0"
-          style={{ minWidth: '350px' }}
           title="Usage by Model Alias (Tokens)"
         >
           <div style={{ height: 300, marginTop: '12px' }}>
@@ -660,7 +655,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         {/* Provider Distribution - Requests */}
         <Card
           className="min-w-0"
-          style={{ minWidth: '350px' }}
           title="Usage by Provider (Requests)"
         >
           <div style={{ height: 300, marginTop: '12px' }}>
@@ -669,25 +663,25 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         </Card>
 
         {/* Provider Distribution - Tokens */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by Provider (Tokens)">
+        <Card className="min-w-0" title="Usage by Provider (Tokens)">
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('tokens', providerData)}
           </div>
         </Card>
 
         {/* API Key Distribution - Requests */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by API Key (Requests)">
+        <Card className="min-w-0" title="Usage by API Key (Requests)">
           <div style={{ height: 300, marginTop: '12px' }}>
             {renderPieChart('requests', keyData)}
           </div>
         </Card>
 
         {/* API Key Distribution - Tokens */}
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Usage by API Key (Tokens)">
+        <Card className="min-w-0" title="Usage by API Key (Tokens)">
           <div style={{ height: 300, marginTop: '12px' }}>{renderPieChart('tokens', keyData)}</div>
         </Card>
 
-        <Card className="min-w-0" style={{ minWidth: '350px' }} title="Energy Comparisons">
+        <Card className="min-w-0" title="Energy Comparisons">
           <div style={{ marginTop: '12px', height: 300 }}>
             <TotalEnergyComparison totalKwh={energySummary?.totalKwhUsed} />
           </div>

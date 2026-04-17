@@ -4,30 +4,60 @@ import { clsx } from 'clsx';
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
+  leadingIcon?: React.ReactNode;
+  trailingAction?: React.ReactNode;
 }
 
-export const Input: React.FC<InputProps> = ({ label, error, className, id, ...props }) => {
-  const inputId = id || props.name || Math.random().toString(36).substr(2, 9);
+export const Input: React.FC<InputProps> = ({
+  label,
+  error,
+  hint,
+  leadingIcon,
+  trailingAction,
+  className,
+  id,
+  ...props
+}) => {
+  const generatedId = React.useId();
+  const inputId = id || props.name || generatedId;
 
   return (
-    <div className={clsx('flex flex-col gap-2', { 'input-has-error': !!error })}>
+    <div className="flex flex-col gap-1.5">
       {label && (
         <label
           htmlFor={inputId}
-          className="font-body text-[13px] font-medium text-text-secondary whitespace-nowrap"
+          className="font-body text-xs font-medium text-text-secondary"
         >
           {label}
         </label>
       )}
-      <input
-        id={inputId}
-        className={clsx(
-          'w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]',
-          className
+      <div className="relative flex items-center">
+        {leadingIcon && (
+          <span className="pointer-events-none absolute left-3 flex items-center text-text-muted">
+            {leadingIcon}
+          </span>
         )}
-        {...props}
-      />
-      {error && <span className="text-danger text-xs mt-1">{error}</span>}
+        <input
+          id={inputId}
+          aria-invalid={!!error}
+          className={clsx(
+            'w-full py-2.5 font-body text-sm text-text bg-bg-glass border rounded-md outline-none transition-all duration-fast backdrop-blur-md placeholder:text-text-muted',
+            'focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            leadingIcon ? 'pl-10' : 'pl-3.5',
+            trailingAction ? 'pr-10' : 'pr-3.5',
+            error ? 'border-danger' : 'border-border-glass',
+            className
+          )}
+          {...props}
+        />
+        {trailingAction && (
+          <span className="absolute right-2 flex items-center">{trailingAction}</span>
+        )}
+      </div>
+      {error && <span className="text-danger text-xs">{error}</span>}
+      {!error && hint && <span className="text-text-muted text-xs">{hint}</span>}
     </div>
   );
 };

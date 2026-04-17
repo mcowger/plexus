@@ -286,7 +286,7 @@ export const OverallTab: React.FC = () => {
       {/* -------- Row 1: Identity + Quota ------------------------------- */}
       <div
         className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
       >
         <Card title="Key" extra={<Key size={16} className="text-text-muted" />} className="min-w-0">
           <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -373,7 +373,7 @@ export const OverallTab: React.FC = () => {
       {/* -------- Row 2: Access (providers / models) -------------------- */}
       <div
         className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
       >
         <Card
           title="Allowed providers"
@@ -435,7 +435,7 @@ export const OverallTab: React.FC = () => {
         ) : (
           <div
             className="grid gap-6"
-            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))' }}
           >
             <Metric label="Requests" value={formatNumber(summary.totalRequests, 0)} />
             <Metric label="Total tokens" value={formatTokens(summary.totalTokens)} />
@@ -463,7 +463,7 @@ export const OverallTab: React.FC = () => {
       {/* -------- Row 4: Per-provider + per-model breakdown ------------- */}
       <div
         className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
       >
         <Card title="Requests by provider" className="min-w-0">
           {loading && !providerData.length ? (

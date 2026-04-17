@@ -17,6 +17,7 @@ import {
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { PageHeader } from '../components/layout/PageHeader';
 import { useLocation } from 'react-router-dom';
 import type { Provider } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -261,17 +262,17 @@ export const Debug: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
-      <header className="flex justify-between items-center p-6 shrink-0">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Debug Traces</h1>
-          <p className="text-[15px] text-text-secondary m-0">
-            {principal?.role === 'limited' && principal.keyName
+    <div className="flex flex-col min-h-[calc(100vh-8rem)] -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-3 shrink-0">
+        <PageHeader
+          title="Debug Traces"
+          subtitle={
+            principal?.role === 'limited' && principal.keyName
               ? `Traces for key "${principal.keyName}" only. Toggle capture in My Key.`
-              : 'Inspect full request/response lifecycles'}
-          </p>
-        </div>
-        <div className="flex gap-2 items-center">
+              : 'Inspect full request/response lifecycles.'
+          }
+          actions={
+            <>
           {/* Provider Filter — admin-only: the global filter affects all users. */}
           {isAdmin && (
             <div className="relative provider-filter-dropdown">
@@ -379,16 +380,17 @@ export const Debug: React.FC = () => {
               Delete All
             </Button>
           )}
-          <Button onClick={fetchLogs} variant="secondary" className="flex items-center gap-2">
-            <RefreshCw size={16} className={clsx(loading && 'animate-spin')} />
+          <Button onClick={fetchLogs} variant="secondary" leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}>
             Refresh
           </Button>
-        </div>
-      </header>
+            </>
+          }
+        />
+      </div>
 
-      <div className="flex flex-1 overflow-hidden border-t border-border-glass">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden border-t border-border-glass">
         {/* Left Pane: Request List */}
-        <div className="w-[320px] border-r border-border-glass bg-bg-surface flex flex-col shrink-0">
+        <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-border-glass bg-bg-surface flex flex-col shrink-0 max-h-[40vh] md:max-h-none">
           <div className="p-4 border-b border-border-glass">
             <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
               Recent Requests
