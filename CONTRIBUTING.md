@@ -40,6 +40,15 @@ git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/
 
 Then commit again with only your schema `.ts` files.
 
+## Drizzle Config Files
+
+The project uses separate Drizzle ORM config files for each database dialect:
+
+- `drizzle.config.sqlite.ts` -- SQLite configuration
+- `drizzle.config.postgres.ts` -- PostgreSQL configuration
+
+When running Drizzle Kit commands, specify the appropriate config file with `--config`.
+
 ## Code Style
 
 All code must be formatted with Biome before committing:

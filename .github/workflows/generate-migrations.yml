@@ -42,7 +42,7 @@ jobs:
 
       - name: Generate PostgreSQL migrations
         working-directory: packages/backend
-        run: bunx drizzle-kit generate --config drizzle.config.pg.ts
+        run: bunx drizzle-kit generate --config drizzle.config.postgres.ts
 
       - name: Check for new migrations
         id: check
