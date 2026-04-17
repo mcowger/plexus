@@ -93,7 +93,6 @@ jobs:
                   "Bash(git log:*)",
                   "Bash(bun install:*)",
                   "Bash(bun run:*)",
-                  "Bash(bun test:*)",
                   "Bash(npm run:*)",
                   "Bash(ls:*)",
                   "Bash(cat:*)",

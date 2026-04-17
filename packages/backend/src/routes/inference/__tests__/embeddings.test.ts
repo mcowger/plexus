@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import { setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatcher';
 import { UsageStorageService } from '../../../services/usage-storage';
-import { mock } from 'bun:test';
 import { DebugManager } from '../../../services/debug-manager';
 import { SelectorFactory } from '../../../services/selectors/factory';
 
@@ -52,7 +51,7 @@ describe('Embeddings Endpoint', () => {
     fastify = Fastify();
 
     mockDispatcher = {
-      dispatch: mock(async () => ({
+      dispatch: vi.fn(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -66,7 +65,7 @@ describe('Embeddings Endpoint', () => {
           cache_creation_tokens: 0,
         },
       })),
-      dispatchEmbeddings: mock(async () => ({
+      dispatchEmbeddings: vi.fn(async () => ({
         object: 'list',
         data: [
           {
@@ -90,12 +89,12 @@ describe('Embeddings Endpoint', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: mock(),
-      saveError: mock(),
-      saveDebugLog: mock(),
-      updatePerformanceMetrics: mock(),
-      emitStartedAsync: mock(),
-      emitUpdatedAsync: mock(),
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      saveDebugLog: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -126,9 +125,9 @@ describe('Embeddings Endpoint', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.object).toBe('list');
-    expect(body.data).toBeArray();
+    expect(Array.isArray(body.data)).toBe(true);
     expect(body.data[0].object).toBe('embedding');
-    expect(body.data[0].embedding).toBeArray();
+    expect(Array.isArray(body.data[0].embedding)).toBe(true);
     expect(body.model).toBe('text-embedding-3-small');
     expect(body.usage).toBeDefined();
     expect(body.usage.prompt_tokens).toBe(8);

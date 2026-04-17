@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { WisdomGateQuotaChecker } from '../wisdomgate-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
@@ -16,11 +16,11 @@ const makeConfig = (session = 'test_session_token'): QuotaCheckerConfig => ({
 
 describe('WisdomGateQuotaChecker', () => {
   const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
-    global.fetch = mock(impl) as unknown as typeof fetch;
+    global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
   beforeEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   it('is registered under wisdomgate', () => {
@@ -150,7 +150,6 @@ describe('WisdomGateQuotaChecker', () => {
       options: {},
     });
 
-    // requireOption should throw
-    expect(() => checker.checkQuota()).toThrow();
+    await expect(checker.checkQuota()).rejects.toThrow();
   });
 });

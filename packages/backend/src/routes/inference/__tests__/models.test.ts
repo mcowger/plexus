@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import Fastify from 'fastify';
 import { registerModelsRoute } from '../models';

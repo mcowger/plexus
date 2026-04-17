@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { isValidThoughtSignature, sanitizeThoughtSignature } from '../utils/thought-signature';
 
 describe('Thought Signature Validation', () => {

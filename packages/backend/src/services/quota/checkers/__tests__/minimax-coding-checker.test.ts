@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { MiniMaxCodingQuotaChecker } from '../minimax-coding-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
@@ -41,11 +41,11 @@ const makeSuccessResponse = (
 
 describe('MiniMaxCodingQuotaChecker', () => {
   const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
-    global.fetch = mock(impl) as unknown as typeof fetch;
+    global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
   beforeEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   it('is registered under minimax-coding', () => {

@@ -1,14 +1,16 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, vi, test } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
-import * as actualPiAi from '@mariozechner/pi-ai';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 
-mock.module('@mariozechner/pi-ai', () => ({
-  ...actualPiAi,
-  getModel: (provider: any, modelId: string) => ({ id: modelId, provider }),
-  complete: async () => ({ ok: true }),
-  stream: async () => ({ ok: true }),
-}));
+vi.mock('@mariozechner/pi-ai', async (importOriginal) => {
+  const actualPiAi = await importOriginal<typeof import('@mariozechner/pi-ai')>();
+  return {
+    ...actualPiAi,
+    getModel: (provider: any, modelId: string) => ({ id: modelId, provider }),
+    complete: async () => ({ ok: true }),
+    stream: async () => ({ ok: true }),
+  };
+});
 
 const { OAuthTransformer } = await import('../oauth/oauth-transformer');
 
@@ -18,7 +20,7 @@ describe('OAuthTransformer', () => {
   });
 
   afterEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

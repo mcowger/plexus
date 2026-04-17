@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { SyntheticQuotaChecker } from '../synthetic-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
@@ -17,11 +17,11 @@ const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig =
 
 describe('SyntheticQuotaChecker', () => {
   const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
-    global.fetch = mock(impl) as unknown as typeof fetch;
+    global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
   beforeEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   it('is registered under synthetic', () => {

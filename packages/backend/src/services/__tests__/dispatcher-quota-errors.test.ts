@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
@@ -7,7 +7,7 @@ import { QUOTA_ERROR_PATTERNS } from '../../utils/constants';
 import { Router } from '../router';
 import { TransformerFactory } from '../transformer-factory';
 
-mock.module('@mariozechner/pi-ai', () => ({
+vi.mock('@mariozechner/pi-ai', () => ({
   getModels: (provider: string) => {
     if (provider === 'unknown-provider') {
       return [];
@@ -39,7 +39,7 @@ mock.module('@mariozechner/pi-ai', () => ({
   stream: async () => ({ ok: true }),
 }));
 
-const fetchMock: any = mock(async (): Promise<any> => {
+const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
 

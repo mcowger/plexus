@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuotaCheckerConfig } from '../../../../types/quota';
 import { ApertisCodingPlanQuotaChecker } from '../apertis-coding-plan-checker';
 import { QuotaCheckerFactory } from '../../quota-checker-factory';
@@ -45,11 +45,11 @@ const makeSubscriptionResponse = (
 
 describe('ApertisCodingPlanQuotaChecker', () => {
   const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
-    global.fetch = mock(impl) as unknown as typeof fetch;
+    global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
   beforeEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   it('is registered under apertis-coding-plan', () => {

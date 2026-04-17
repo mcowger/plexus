@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test';
+import { test, expect, describe } from 'vitest';
 import { OllamaTransformer } from '../ollama';
 import { UnifiedChatRequest, UnifiedChatStreamChunk } from '../../types/unified';
 

@@ -1,10 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 
 // Mock @mariozechner/pi-ai BEFORE importing anything that transitively imports it.
 // This ensures the Dispatcher and OAuthTransformer pick up the mock.
-const completeMock = mock(async (_model: any, _context: any, _options?: any) => ({
+const completeMock = vi.fn(async (_model: any, _context: any, _options?: any) => ({
   content: [{ type: 'text', text: 'ok' }],
   stopReason: 'stop',
   usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
@@ -12,16 +12,16 @@ const completeMock = mock(async (_model: any, _context: any, _options?: any) => 
   model: 'claude-test',
 }));
 
-mock.module('@mariozechner/pi-ai', () => ({
+vi.mock('@mariozechner/pi-ai', () => ({
   getModels: (_provider: string) => [{ id: 'claude-test', provider: 'anthropic' }],
   getModel: (_provider: string, modelId: string) => ({ id: modelId, provider: 'anthropic' }),
   complete: completeMock,
-  stream: mock(async () => ({ ok: true })),
+  stream: vi.fn(async () => ({ ok: true })),
 }));
 
 const { Dispatcher } = await import('../dispatcher');
 
-const fetchMock: any = mock(async (): Promise<any> => {
+const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch should not be called in pi-ai masking path');
 });
 global.fetch = fetchMock as any;
@@ -89,7 +89,7 @@ describe('Dispatcher Claude Masking routing', () => {
   });
 
   afterEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   test('useClaudeMasking:true routes through pi-ai (complete called, fetch not called)', async () => {

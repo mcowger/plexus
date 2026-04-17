@@ -1,4 +1,4 @@
-import { describe, expect, test, mock } from 'bun:test';
+import { describe, expect, test, vi } from 'vitest';
 import { getClientIp } from '../ip';
 import { FastifyRequest } from 'fastify';
 

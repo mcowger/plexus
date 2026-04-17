@@ -1,4 +1,4 @@
-import { test, expect, describe } from 'bun:test';
+import { test, expect, describe } from 'vitest';
 import { formatGeminiStream } from '../stream-formatter';
 import { UnifiedChatStreamChunk } from '../../../types/unified';
 import { createParser, EventSourceMessage } from 'eventsource-parser';

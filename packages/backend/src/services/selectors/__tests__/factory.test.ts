@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, beforeEach } from 'bun:test';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { SelectorFactory } from '../factory';
 import { RandomSelector } from '../random';
 import { CostSelector } from '../cost';

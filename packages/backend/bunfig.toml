@@ -1,2 +1,5 @@
+# Backend tests run via Vitest using `bun run test`.
+# `bun test` is intentionally blocked by test/bun-test-guard/no-bun-test.test.ts.
+
 [test]
-preload = ["./test/setup.ts"]
+root = "./test/bun-test-guard"

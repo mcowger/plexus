@@ -6,8 +6,8 @@
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
     "typecheck": "bun x tsc --noEmit",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
+    "test": "bunx --bun vitest run --config vitest.config.ts",
+    "test:watch": "bunx --bun vitest --config vitest.config.ts",
     "rekey": "bun run src/cli/rekey.ts"
   },
   "dependencies": {

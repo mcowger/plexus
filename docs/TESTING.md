@@ -18,28 +18,30 @@ The E2E tests are split by API type:
 
 ## Global Test Setup
 
-To ensure test isolation and prevent "mock pollution" in Bun's shared-worker environment, this project uses a global setup script.
+Backend tests run on **Vitest**.
 
-### `bunfig.toml` and `test/setup.ts`
+### `vitest.config.ts`, `test/vitest.global-setup.ts`, and `test/vitest.setup.ts`
 
-The root `bunfig.toml` is configured to preload `packages/backend/test/setup.ts` before any tests run. This script establishes "Gold Standard" mocks for global dependencies like the **Logger**.
+- `packages/backend/vitest.config.ts` is the single backend test-runner config.
+- `packages/backend/test/vitest.global-setup.ts` creates a temporary file-backed SQLite database, generates Drizzle metadata if needed, runs migrations once, and removes the temp directory after the run.
+- `packages/backend/test/vitest.setup.ts` installs stable logger/debug test doubles for each worker.
+- Root `bunfig.toml` intentionally blocks raw `bun test` at the repo root and points contributors to `cd packages/backend && bun run test`.
+- `packages/backend/bunfig.toml` intentionally blocks raw `bun test` in `packages/backend` and points contributors to `bun run test`.
 
 ### Mocking Pattern: Shared Dependencies
 
-Bun's `mock.module` is a process-global operation. Once a module is mocked, it remains mocked for the duration of that worker thread, and `mock.restore()` does **not** reset it.
+Vitest restores mocks reliably, but shared dependencies should still follow these rules:
 
-To prevent crashes in other tests (e.g., `TypeError: logger.info is not a function`), follow these rules:
-
-1.  **Use the Global Setup:** Common modules like `src/utils/logger` should be mocked once in `setup.ts`.
-2.  **Robust Mocking:** If you must mock a module in a specific test file, your mock **MUST** implement the entire public interface of that module (including all log levels like `silly`, `debug`, etc.).
-3.  **Prefer Spying:** If you need to assert that a global dependency was called, use `spyOn` on the already-mocked global instance rather than re-mocking the module.
+1. **Use the shared setup:** Common modules like `src/utils/logger` are mocked once in `vitest.setup.ts`.
+2. **Robust Mocking:** If you mock a module in a specific test file, your mock **MUST** implement the relevant public interface of that module.
+3. **Prefer Spying:** If you need to assert that a shared dependency was called, use `vi.spyOn` or `registerSpy` rather than replacing the whole module repeatedly.
 
 ```typescript
 import { logger } from "src/utils/logger";
-import { spyOn, expect, test } from "bun:test";
+import { expect, test, vi } from "vitest";
 
 test("my test", () => {
-    const infoSpy = spyOn(logger, "info");
+    const infoSpy = vi.spyOn(logger, "info");
     // ... run code ...
     expect(infoSpy).toHaveBeenCalled();
 });
@@ -47,12 +49,36 @@ test("my test", () => {
 
 ## Running Tests
 
-### 1. Standard Run (Replay Mode)
-Uses existing cassettes. No API keys or network access are required.
+### 1. Standard Run
+
+From the repo root:
+
+```bash
+bun run test
+```
+
+Or from the backend package:
 
 ```bash
 cd packages/backend
-bun test
+bun run test
+```
+
+> Note: `bun test` is intentionally blocked both at repo root and in `packages/backend`. Use `bun run test` instead.
+
+### 2. Watch Mode
+
+From the repo root:
+
+```bash
+bun run test:watch
+```
+
+Or from the backend package:
+
+```bash
+cd packages/backend
+bun run test:watch
 ```
 *Tip: You can also run this via the VS Code task `Bun: Backend Tests`.*
 
@@ -88,10 +114,4 @@ The following environment variables are used during **Record Mode**:
 | `PLEXUS_TEST_ANTHROPIC_API_KEY` | Messages API Key. | `scrubbed_key` |
 | `PLEXUS_TEST_BASE_URL` | Base URL for Chat provider. | `https://api.upstream.mock/openai/v1` |
 | `PLEXUS_TEST_ANTHROPIC_BASE_URL` | Base URL for Messages provider. | `https://api.anthropic.com/v1` |
-
-## Adding New Test Cases
-
-1.  Add a new JSON request body to `cases/chat/` (for Chat-like) or `cases/messages/` (for Messages-like).
-2.  Run the **Record Mode** command above to capture the network interaction.
-3.  Commit the new case and its corresponding cassette in `__cassettes__/`.
 

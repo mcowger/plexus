@@ -1,4 +1,4 @@
-import { describe, expect, test, mock } from 'bun:test';
+import { describe, expect, test, vi } from 'vitest';
 import { handleResponse } from '../../services/response-handler';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { UsageStorageService } from '../../services/usage-storage';
@@ -8,28 +8,28 @@ import { UsageRecord } from '../../types/usage';
 
 describe('handleResponse - Pricing Calculation', () => {
   const mockStorage = {
-    saveRequest: mock(),
-    updatePerformanceMetrics: mock(),
+    saveRequest: vi.fn(),
+    updatePerformanceMetrics: vi.fn(),
   } as unknown as UsageStorageService;
 
   const mockTransformer: Transformer = {
     name: 'test-transformer',
     defaultEndpoint: '/test',
-    parseRequest: mock(),
-    transformRequest: mock(),
-    transformResponse: mock(),
-    extractUsage: mock(),
-    formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
+    parseRequest: vi.fn(),
+    transformRequest: vi.fn(),
+    transformResponse: vi.fn(),
+    extractUsage: vi.fn(),
+    formatResponse: vi.fn((r) => Promise.resolve({ formatted: true, ...r })),
   };
 
   const mockReply = {
-    send: mock(function (this: any, data) {
+    send: vi.fn(function (this: any, data) {
       return this;
     }),
-    header: mock(function (this: any) {
+    header: vi.fn(function (this: any) {
       return this;
     }),
-    code: mock(function (this: any) {
+    code: vi.fn(function (this: any) {
       return this;
     }),
   } as unknown as FastifyReply;
