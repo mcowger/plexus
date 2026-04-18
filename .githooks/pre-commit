@@ -4,6 +4,26 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+# --- Require bun install for Vitest transition (2025-04-18 cutoff) ---
+BUN_LOCKFILE="$repo_root/bun.lockb"
+CUTOFF_DATE="2025-04-18"
+
+if [ -f "$BUN_LOCKFILE" ]; then
+  BUN_LOCK_MTIME=$(stat -f "%Sm" -t "%Y-%m-%d" "$BUN_LOCKFILE" 2>/dev/null || stat -c "%y" "$BUN_LOCKFILE" 2>/dev/null | cut -d' ' -f1 || echo "1970-01-01")
+  if [ "$BUN_LOCK_MTIME" \< "$CUTOFF_DATE" ]; then
+    echo ""
+    echo "[pre-commit] ERROR: bun.lockb is from $BUN_LOCK_MTIME, before $CUTOFF_DATE."
+    echo ""
+    echo "The project switched to Vitest for testing. You need to run:"
+    echo ""
+    echo "    bun install"
+    echo ""
+    echo "This updates git hooks and installs Vitest."
+    echo ""
+    exit 1
+  fi
+fi
+
 # --- Block migration file commits (CI auto-generates these) ---
 if [ "${CI:-}" != "true" ] && [ "${ALLOW_MIGRATIONS:-}" != "1" ]; then
   migration_files=$(git diff --cached --name-only -- \
