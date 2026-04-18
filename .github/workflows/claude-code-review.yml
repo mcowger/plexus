@@ -78,6 +78,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
           github_token: ${{ github.token }}
+          show_full_output: true
           claude_args: '--model ${{ vars.PLEXUS_MODEL }}'
           settings: |
             {
