@@ -1726,7 +1726,11 @@ export class Dispatcher {
       return false;
     }
 
-    if (this.isClaudeMaskingApiKeyRoute(route, targetApiType)) {
+    // pi-ai routes (OAuth + Claude-masking) require pi-ai Context format built by
+    // the OAuth transformer's transformRequest. Pass-through would hand the raw
+    // client body straight to pi-ai, and its transformMessages() would crash on
+    // string-valued assistant content (issue #162).
+    if (this.isPiAiRoute(route, targetApiType)) {
       return false;
     }
 
