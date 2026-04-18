@@ -27,6 +27,26 @@ async function run(cmd: string[]) {
   return text.trim();
 }
 
+interface CalVerTag {
+  year: number;
+  month: number;
+  day: number;
+  counter: number;
+  raw: string;
+}
+
+function parseCalVer(tag: string): CalVerTag | null {
+  const match = tag.match(/^(\d{4})\.(\d{2})\.(\d{2})\.(\d+)$/);
+  if (!match) return null;
+  return {
+    year: parseInt(match[1]!),
+    month: parseInt(match[2]!),
+    day: parseInt(match[3]!),
+    counter: parseInt(match[4]!),
+    raw: tag,
+  };
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
@@ -38,7 +58,7 @@ async function main() {
     console.log('\nOptions:');
     console.log('  --help, -h  Show this help message');
     console.log(
-      '\nThis script tags the repo and pushes the tag. Release notes are handled by GitHub Actions.\n'
+      '\nUses CalVer (YYYY.MM.DD.N) format. Release notes are handled by GitHub Actions.\n'
     );
     process.exit(0);
   }
@@ -46,44 +66,54 @@ async function main() {
   console.log('\n🚀 Plexus Release Process');
   console.log('--------------------------\n');
 
-  // 1. Get current version
-  let currentVersion = 'v0.0.0';
+  // 1. Get current version tags
+  let currentTag: CalVerTag | null = null;
   try {
     const tags = await run(['git', 'tag', '--list']);
-    const versionRegex = /^v?(\d+)\.(\d+)\.(\d+)$/;
-    const sortedTags = tags
+    const calverTags = tags
       .split('\n')
-      .filter((tag) => versionRegex.test(tag))
-      .sort((a, b) => {
-        const matchA = a.match(versionRegex)!;
-        const matchB = b.match(versionRegex)!;
-        for (let i = 1; i <= 3; i++) {
-          const numA = parseInt(matchA[i]!);
-          const numB = parseInt(matchB[i]!);
-          if (numA !== numB) return numA - numB;
-        }
-        return 0;
+      .map((t) => parseCalVer(t))
+      .filter((t): t is CalVerTag => t !== null);
+
+    if (calverTags.length > 0) {
+      // Sort: newest date first, then highest counter
+      calverTags.sort((a, b) => {
+        const dateA = a.year * 10000 + a.month * 100 + a.day;
+        const dateB = b.year * 10000 + b.month * 100 + b.day;
+        if (dateB !== dateA) return dateB - dateA;
+        return b.counter - a.counter;
       });
-    if (sortedTags.length > 0) {
-      currentVersion = sortedTags[sortedTags.length - 1]!;
+      currentTag = calverTags[0]!;
     }
   } catch (e) {
     // No tags found, start fresh
   }
 
   // Calculate next version
-  let nextVersion = currentVersion;
-  const match = currentVersion.match(/^v?(\d+)\.(\d+)\.(\d+)$/);
-  if (match) {
-    nextVersion = `v${match[1]}.${match[2]}.${parseInt(match[3]!) + 1}`;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+
+  let nextVersion: string;
+
+  if (currentTag) {
+    const currentDateStr = `${currentTag.year}.${String(currentTag.month).padStart(2, '0')}.${String(currentTag.day).padStart(2, '0')}`;
+    if (currentDateStr === todayStr) {
+      // Same day, increment counter
+      nextVersion = `${todayStr}.${currentTag.counter + 1}`;
+    } else {
+      // New day, start at .1
+      nextVersion = `${todayStr}.1`;
+    }
   } else {
-    nextVersion = 'v0.0.1';
+    // No tags yet
+    nextVersion = `${todayStr}.1`;
   }
 
   // 2. Ask for version
   let version = await ask('New Version', nextVersion);
-  if (!version.startsWith('v')) {
-    version = `v${version}`;
+  if (!version.match(/^\d{4}\.\d{2}\.\d{2}\.\d+$/)) {
+    console.error('Invalid version format. Use CalVer: YYYY.MM.DD.N');
+    process.exit(1);
   }
 
   rl.close();
@@ -104,4 +134,4 @@ async function main() {
   }
 }
 
-main();
+main().catch(console.error);

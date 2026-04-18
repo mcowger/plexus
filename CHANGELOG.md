@@ -1,12 +1,12 @@
 # Changelog
 
-## v0.20.0 - 2026-04-14
+## 2026.04.14.1 - 2026-04-14
 
 ### Add Support for Neuralwatt cost data, support for the new Synthetic quota system, Added provider access allowlists and improved log filtering
 
 ## New Features
 
-## v0.19.9 - 2026-04-14
+## 2026.04.04.2 - 2026-04-14
 
 ### v0.19.9 provider quota/config hardening and usage telemetry
 
@@ -35,9 +35,9 @@ This release strengthens quota configuration correctness, improves visibility in
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.19.11 - 2026-04-12
+## 2026.04.12.1 - 2026-04-12
 
-### v0.19.11: key allowlists, vision fallthrough usage tracking, and logs UI updates
+### 2026.04.12.1: key allowlists, vision fallthrough usage tracking, and logs UI updates
 
 ## New Features
 - Added key access allowlists and improved log filtering to support more granular key policy control and easier audit review ([319011d](https://github.com/mcowger/plexus/commit/319011d)).
@@ -55,12 +55,12 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - Removed the GEMINI file as part of repository cleanup ([039ca33](https://github.com/mcowger/plexus/commit/039ca33)).
 
 ## Release / Packaging
-- Release tagged as v0.19.11.
+- Release tagged as 2026.04.12.1.
 - Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest.
 
-## v0.19.10 - 2026-04-11
+## 2026.04.10.1 - 2026-04-11
 
-### v0.19.10: Vision Fallthrough Tracking, Synthetic Quotas, Config Database Migration, and Quota System Enhancements
+### 2026.04.10.1: Vision Fallthrough Tracking, Synthetic Quotas, Config Database Migration, and Quota System Enhancements
 
 - **New Features**
   - Added comprehensive tracking and logging for vision fallthrough descriptor models, including usage recording and enhanced Logs UI display ([bcede85](https://github.com/mcowger/plexus/commit/bcede85), [8f8665b](https://github.com/mcowger/plexus/commit/8f8665b), [3203f04](https://github.com/mcowger/plexus/commit/3203f04)). This improves insight into image processing fallback behavior.
@@ -97,15 +97,15 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 **Additional Notes:** The docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.19.9 - 2026-04-05
+## 2026.04.04.2 - 2026-04-05
 
-### v0.19.9: Quota Checker: Implicit Quotas Removed for OAuth providers
+### 2026.04.04.2: Quota Checker: Implicit Quotas Removed for OAuth providers
 
 Eliminated implicit OAuth quota checker injection from provider configuration pipeline
 
-## v0.19.8 - 2026-04-05
+## 2026.04.04.1 - 2026-04-05
 
-### v0.19.8: Per-Model Configuration and Docker Operability
+### 2026.04.04.1: Per-Model Configuration and Docker Operability
 
 ## New Features
 
@@ -127,15 +127,15 @@ Eliminated implicit OAuth quota checker injection from provider configuration pi
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.19.7 - 2026-03-25
+## 2026.03.25.1 - 2026-03-25
 
 ### Ollama quota card account name display fix
 
 - Fixed provider account name display on Ollama quota cards ([be509c7](https://github.com/mcowger/plexus/commit/be509c7)) Fixes: #142
 
-## v0.19.6 - 2026-03-24
+## 2026.03.24.1 - 2026-03-24
 
-### v0.19.6: Ollama Quota Management and Database-Level Encryption
+### 2026.03.24.1: Ollama Quota Management and Database-Level Encryption
 
 ## New Features
 
@@ -151,9 +151,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image for this release has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.19.5 - 2026-03-22
+## 2026.03.22.1 - 2026-03-22
 
-### v0.19.5: Configuration resolution fixes, Prometheus monitoring, and dependency updates
+### 2026.03.22.1: Configuration resolution fixes, Prometheus monitoring, and dependency updates
 
 ## New Features
 
@@ -175,7 +175,7 @@ The Docker image for this release has been updated and can be found at `ghcr.io/
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.19.4 - 2026-03-19
+## 2026.03.19.2 - 2026-03-19
 
 ### Provider Quota Tracking and novita.ai Integration
 
@@ -188,7 +188,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.19.3 - 2026-03-19
+## 2026.03.19.1 - 2026-03-19
 
 ### Path parameter encoding fixes for provider and model alias endpoints
 
@@ -203,7 +203,7 @@ These fixes improve URL path parameter handling to properly support special char
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.19.2 - 2026-03-19
+## 2026.03.18.2 - 2026-03-19
 
 ### Streaming Chunk Preservation and OAuth Transformer Enhancements
 
@@ -221,9 +221,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.19.1 - 2026-03-19
+## 2026.03.18.1 - 2026-03-19
 
-### v0.19.1: Cost-based quotas, Ollama native routing, and CORS proxy support
+### 2026.03.18.1: Cost-based quotas, Ollama native routing, and CORS proxy support
 
 ## New Features
 
@@ -240,13 +240,13 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.19.0 - 2026-03-17
+## 2026.03.17.1 - 2026-03-17
 
 ### Update Apertis Quota & Balance Checking
 
 **Provider Updates:** Updated the Apertis quota checker to support new endpoints and data shapes ([a160a62](https://github.com/mcowger/plexus/commit/a160a62), [1f5b446](https://github.com/mcowger/plexus/commit/1f5b446)).
 
-## v0.9.9 - 2026-03-16
+## 2026.03.16.1 - 2026-03-16
 
 ### Plexus v0.9.9: Migration to Database-Backed Configuration and Management API Refactor
 
@@ -269,9 +269,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ---
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.13 - 2026-03-12
+## 2026.03.12.2 - 2026-03-12
 
-### v0.18.13: Enhanced Provider Quota Management and Cooldown Logic
+### 2026.03.12.2: Enhanced Provider Quota Management and Cooldown Logic
 
 ### New Features & Improvements
 
@@ -280,9 +280,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.12 - 2026-03-12
+## 2026.03.12.1 - 2026-03-12
 
-### v0.18.12: Enhanced POE Quota Visualization and State Management
+### 2026.03.12.1: Enhanced POE Quota Visualization and State Management
 
 ### New Features
 
@@ -296,15 +296,15 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.11 - 2026-03-12
+## 2026.03.11.1 - 2026-03-12
 
 ### Update Gemini Streaming Protocol Compatability
 
 Preserved tool call finish reason in streams when converting to openai-completions.   Also addressed missing function id, which caused problems for some clients like Open WebUI
 
-## v0.18.10 - 2026-03-08
+## 2026.03.07.1 - 2026-03-08
 
-### v0.18.10: CRITICAL Security Fix for Admin Key
+### 2026.03.07.1: CRITICAL Security Fix for Admin Key
 
 ## Bug Fixes / Security
 
@@ -314,7 +314,7 @@ Preserved tool call finish reason in streams when converting to openai-completio
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.18.9 - 2026-03-08
+## 2026.03.07.5 - 2026-03-08
 
 ### Custom Date Range Filtering and Build Path Configuration
 
@@ -330,7 +330,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image for this release has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.18.8 - 2026-03-07
+## 2026.03.07.4 - 2026-03-07
 
 ### Configurable Live Window Period with Performance Optimizations
 
@@ -340,15 +340,15 @@ The Docker image for this release has been updated and is available at `ghcr.io/
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.18.7 - 2026-03-07
+## 2026.03.07.3 - 2026-03-07
 
 ### Cache Write Cost Tracking and Configuration UI Enhancements
 
 ## New Features
 
-## v0.18.6 - 2026-03-07
+## 2026.03.07.2 - 2026-03-07
 
-### v0.18.6: OAuth Probe Bookkeeping Buffer Fix
+### 2026.03.07.2: OAuth Probe Bookkeeping Buffer Fix
 
 ## Bug Fixes
 
@@ -360,9 +360,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 - The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.5 - 2026-03-07
+## 2026.03.06.2 - 2026-03-07
 
-### v0.18.5: Enhanced Dispatcher Resilience and UI Interaction Logic
+### 2026.03.06.2: Enhanced Dispatcher Resilience and UI Interaction Logic
 
 ### New Features
 - **Restart Functionality:** Added a new manual restart button to the interface ([370a087](https://github.com/mcowger/plexus/commit/370a087)).
@@ -379,9 +379,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ---
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.4 - 2026-03-06
+## 2026.03.06.1 - 2026-03-06
 
-### v0.18.4: Copilot GPT-5.4 Integration and OpenAI Codex Cooldown Management
+### 2026.03.06.1: Copilot GPT-5.4 Integration and OpenAI Codex Cooldown Management
 
 ### New Features
 
@@ -396,9 +396,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.3 - 2026-03-06
+## 2026.03.05.2 - 2026-03-06
 
-### v0.18.3: Copilot/Codex Model Filtering and OAuth Subpath Migration
+### 2026.03.05.2: Copilot/Codex Model Filtering and OAuth Subpath Migration
 
 ## New Features
 
@@ -412,9 +412,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.2 - 2026-03-06
+## 2026.03.05.1 - 2026-03-06
 
-### v0.18.2: API Alias Filtering and Stream Formatting Fixes
+### 2026.03.05.1: API Alias Filtering and Stream Formatting Fixes
 
 ### Main Features
 
@@ -427,7 +427,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.18.1 - 2026-03-04
+## 2026.03.04.1 - 2026-03-04
 
 ### In-flight Request Tracking and Concurrency Optimizations
 
@@ -453,9 +453,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.18.0 - 2026-03-02
+## 2026.03.01.3 - 2026-03-02
 
-### v0.18.0: Vision Descriptor Service and Image Processing Integration
+### 2026.03.01.3: Vision Descriptor Service and Image Processing Integration
 
 ### Main Features
 
@@ -468,9 +468,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.15 - 2026-03-01
+## 2026.03.01.2 - 2026-03-01
 
-### v0.17.15: Enhanced Live Dashboard Cooldown Management and UI Formatting
+### 2026.03.01.2: Enhanced Live Dashboard Cooldown Management and UI Formatting
 
 ## v0.17.15
 
@@ -484,9 +484,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.14 - 2026-03-01
+## 2026.03.01.1 - 2026-03-01
 
-### v0.17.14: Analytics Drill-downs, Concurrency Management, and DND Card Reordering
+### 2026.03.01.1: Analytics Drill-downs, Concurrency Management, and DND Card Reordering
 
 ### Main Features
 - **Advanced Analytics**: Introduced a comprehensive `DetailedUsage` analytics page and drill-down capabilities via the new `AnalyzeButton` component and API utilities. ([4f5f6dc](https://github.com/mcowger/plexus/commit/4f5f6dc), [49cf506](https://github.com/mcowger/plexus/commit/49cf506))
@@ -501,9 +501,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.13 - 2026-03-01
+## 2026.02.28.4 - 2026-03-01
 
-### v0.17.13: Assistant Message Thinking Block Ordering Fix and Regression Tests
+### 2026.02.28.4: Assistant Message Thinking Block Ordering Fix and Regression Tests
 
 ### Main Features
 
@@ -517,7 +517,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.12 - 2026-03-01
+## 2026.02.28.3 - 2026-03-01
 
 ### Plexus v0.17.12: Copilot Integration Maintenance
 
@@ -530,9 +530,9 @@ This release addresses functional issues discovered in the Copilot subsystem to 
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.11 - 2026-03-01
+## 2026.02.28.2 - 2026-03-01
 
-### v0.17.11: Enhanced Copilot Quota Metrics and Fallback Logic
+### 2026.02.28.2: Enhanced Copilot Quota Metrics and Fallback Logic
 
 ## New Features
 
@@ -545,9 +545,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ---
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.10 - 2026-03-01
+## 2026.02.28.1 - 2026-03-01
 
-### v0.17.10: Enhanced Reasoning Options, Gemini 3 Integration, and Antigravity Quota Management
+### 2026.02.28.1: Enhanced Reasoning Options, Gemini 3 Integration, and Antigravity Quota Management
 
 ## Main Features
 
@@ -562,9 +562,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.9 - 2026-02-28
+## 2026.02.27.1 - 2026-02-28
 
-### v0.17.9: Quota Checker Enhancements and Codebase Refactoring
+### 2026.02.27.1: Quota Checker Enhancements and Codebase Refactoring
 
 ### Release Notes - v0.17.9
 
@@ -579,9 +579,9 @@ This release introduces improvements to quota management implementations and gen
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.8 - 2026-02-27
+## 2026.02.26.1 - 2026-02-27
 
-### v0.17.8: Gemini Stream Optimization, Token Accounting, and Anthropic Header Isolation
+### 2026.02.26.1: Gemini Stream Optimization, Token Accounting, and Anthropic Header Isolation
 
 ### Main Features
 
@@ -604,9 +604,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.7 - 2026-02-26
+## 2026.02.25.1 - 2026-02-26
 
-### v0.17.7: JSON Schema Normalization, Enhanced Gemini Support, and Authentication Updates
+### 2026.02.25.1: JSON Schema Normalization, Enhanced Gemini Support, and Authentication Updates
 
 ## Main Features
 
@@ -631,9 +631,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The Docker image for this release has been updated and is available at `ghcr.io/mcowger/plexus:latest`
 
-## v0.17.6 - 2026-02-25
+## 2026.02.24.3 - 2026-02-25
 
-### v0.17.6: Enhanced Provider Cooldown Management and Dashboard Consolidation
+### 2026.02.24.3: Enhanced Provider Cooldown Management and Dashboard Consolidation
 
 ## Major Features
 
@@ -654,7 +654,7 @@ The Docker image for this release has been updated and is available at `ghcr.io/
 
 The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`
 
-## v0.17.5 - 2026-02-24
+## 2026.02.24.2 - 2026-02-24
 
 ### Quota handling improvements and dispatcher cooldown enhancements
 
@@ -670,7 +670,7 @@ The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:la
 ### Docker Image
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.17.4 - 2026-02-24
+## 2026.02.24.1 - 2026-02-24
 
 ### Dispatcher cooldown logic and failover error classification improvements
 
@@ -686,9 +686,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.17.3 - 2026-02-24
+## 2026.02.23.3 - 2026-02-24
 
-### v0.17.3: POE Point Value Display Fix
+### 2026.02.23.3: POE Point Value Display Fix
 
 ## Bug Fixes
 - Fixed display of full POE point values instead of abbreviated k/M suffixes ([6ecd2c5](https://github.com/mcowger/plexus/commit/6ecd2c5))
@@ -696,7 +696,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ---
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.17.2 - 2026-02-24
+## 2026.02.23.2 - 2026-02-24
 
 ### POE quota checker integration and export utilities
 
@@ -713,7 +713,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.17.1 - 2026-02-24
+## 2026.02.23.1 - 2026-02-24
 
 ### Live metrics dashboard with cooldown honor and frontend enhancements
 
@@ -739,9 +739,9 @@ The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 **Docker Image**: The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.17.0 - 2026-02-22
+## 2026.02.21.6 - 2026-02-22
 
-### v0.17.0: Extended quota checker integrations and model metadata enrichment
+### 2026.02.21.6: Extended quota checker integrations and model metadata enrichment
 
 ## New Features
 
@@ -755,7 +755,7 @@ The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ## Docker Image
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.10 - 2026-02-22
+## 2026.02.21.1 - 2026-02-22
 
 ### Energy consumption tracking and quota history timestamp normalization
 
@@ -770,7 +770,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ### Docker Image
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.9 - 2026-02-21
+## 2026.02.21.5 - 2026-02-21
 
 ### Per-request flat-fee pricing and documentation overhaul
 
@@ -788,9 +788,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.8 - 2026-02-21
+## 2026.02.21.4 - 2026-02-21
 
-### v0.16.8: Provider cooldown controls and frontend UI reorganization
+### 2026.02.21.4: Provider cooldown controls and frontend UI reorganization
 
 ## New Features
 
@@ -802,9 +802,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.7 - 2026-02-21
+## 2026.02.21.3 - 2026-02-21
 
-### v0.16.7: Advanced model alias behaviors and adaptive thinking controls
+### 2026.02.21.3: Advanced model alias behaviors and adaptive thinking controls
 
 ## New Features
 
@@ -814,7 +814,7 @@ The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.6 - 2026-02-21
+## 2026.02.21.2 - 2026-02-21
 
 ### Fix Naga maximum value boundary condition
 
@@ -824,15 +824,15 @@ The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.5 - 2026-02-20
+## 2026.02.20.2 - 2026-02-20
 
 ### Live Logging Adjustments
 
 Added selector to system logs page enabling dynamic changing of logging levels.
 
-## v0.16.4 - 2026-02-20
+## 2026.02.20.1 - 2026-02-20
 
-### v0.16.4 - OAuth schema preservation and bug fixes
+### 2026.02.20.1 - OAuth schema preservation and bug fixes
 
 ## New Features
 
@@ -846,7 +846,7 @@ No major new features in this release.
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.3 - 2026-02-20
+## 2026.02.19.2 - 2026-02-20
 
 ### Add Apertis and Wisdom Gate Provider Support with Debug Logging
 
@@ -864,7 +864,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.16.2 - 2026-02-20
+## 2026.02.19.1 - 2026-02-20
 
 ### Add GitHub Copilot quota checker and exponential backoff cooldown system
 
@@ -888,15 +888,15 @@ The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.16.1 - 2026-02-19
+## 2026.02.18.3 - 2026-02-19
 
-### v0.16.1: Quota and Balance History Display
+### 2026.02.18.3: Quota and Balance History Display
 
 Show popups of quota usage history and balance history when clicking a quota card
 
-## v0.16.0 - 2026-02-18
+## 2026.02.18.2 - 2026-02-18
 
-### v0.16.0: User Quota Management UI and Enforcement System with Anthropic Stream Handling Fix
+### 2026.02.18.2: User Quota Management UI and Enforcement System with Anthropic Stream Handling Fix
 
 ## New Features
 
@@ -912,9 +912,9 @@ Show popups of quota usage history and balance history when clicking a quota car
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.15.5 - 2026-02-18
+## 2026.02.18.1 - 2026-02-18
 
-### v0.15.5: Synthetic quota checker API update and streaming log improvements
+### 2026.02.18.1: Synthetic quota checker API update and streaming log improvements
 
 ## New Features
 
@@ -930,9 +930,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.15.4 - 2026-02-17
+## 2026.02.17.5 - 2026-02-17
 
-### v0.15.4 - Dependency Updates and Log Level Adjustments
+### 2026.02.17.5 - Dependency Updates and Log Level Adjustments
 
 ## Highlights
 
@@ -947,9 +947,9 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 Docker image updated and available at ghcr.io/mcowger/plexus:latest
 
-## v0.15.3 - 2026-02-17
+## 2026.02.17.4 - 2026-02-17
 
-### v0.15.3: Extend Claude Code OAuth model support with claude-sonnet-4-6
+### 2026.02.17.4: Extend Claude Code OAuth model support with claude-sonnet-4-6
 
 ## Main changes
 
@@ -961,7 +961,7 @@ Docker image updated and available at ghcr.io/mcowger/plexus:latest
 
 Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.15.2 - 2026-02-17
+## 2026.02.17.3 - 2026-02-17
 
 ### v0.15.2 MCP tool tracking and streaming fixes
 
@@ -972,7 +972,7 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.15.1 - 2026-02-17
+## 2026.02.17.2 - 2026-02-17
 
 ### v0.15.1 database timestamp fix
 
@@ -980,7 +980,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 Docker image updated and available at ghcr.io/mcowger/plexus:latest
 
-## v0.15.0 - 2026-02-17
+## 2026.02.17.1 - 2026-02-17
 
 ### v0.15.0 MCP proxy and management UI
 
@@ -998,7 +998,7 @@ Docker image updated and available at ghcr.io/mcowger/plexus:latest
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.14.10 - 2026-02-17
+## 2026.02.16.1 - 2026-02-17
 
 ### Compact quota cards and responsive quotas page
 
@@ -1011,9 +1011,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
-## v0.14.9 - 2026-02-17
+## 2026.02.16.2 - 2026-02-17
 
-### v0.14.9: Add Kilo Quota Checker and New Skills
+### 2026.02.16.2: Add Kilo Quota Checker and New Skills
 
 ### New Features
 
@@ -1030,7 +1030,7 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.14.8 - 2026-02-16
+## 2026.02.15.1 - 2026-02-16
 
 ### Debug Trace Downloads and Token Accounting Improvements
 
@@ -1047,9 +1047,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.14.7 - 2026-02-14
+## 2026.02.14.2 - 2026-02-14
 
-### v0.14.7: Move Quotas trackers to dedicated page
+### 2026.02.14.2: Move Quotas trackers to dedicated page
 
 ## Main feature
 
@@ -1061,9 +1061,9 @@ The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:la
 
 Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.14.6 - 2026-02-14
+## 2026.02.14.1 - 2026-02-14
 
-### v0.14.6: Expand provider model/quota support (Claude Opus 4.6, OpenAI Codex, Claude Code)
+### 2026.02.14.1: Expand provider model/quota support (Claude Opus 4.6, OpenAI Codex, Claude Code)
 
 ## Main changes
 
@@ -1077,9 +1077,9 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
 
 Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.14.5 - 2026-02-13
+## 2026.02.13.2 - 2026-02-13
 
-### v0.14.5: OAuth cooldown registration fix
+### 2026.02.13.2: OAuth cooldown registration fix
 
 ### Main change
 - Fixed OAuth cooldown registration behavior to ensure cooldown is correctly recorded during OAuth flows ([e437515](https://github.com/mcowger/plexus/commit/e437515)).
@@ -1089,9 +1089,9 @@ Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest
 
 Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.14.4 - 2026-02-13
+## 2026.02.13.1 - 2026-02-13
 
-### v0.14.4: failover alias retries, expanded quota checker support, and OpenAI Codex model updates
+### 2026.02.13.1: failover alias retries, expanded quota checker support, and OpenAI Codex model updates
 
 ## Main features
 - Added an internal retry mechanism for failover model aliases with multiple targets, improving resilience when upstream targets fail ([78841ba](https://github.com/mcowger/plexus/commit/78841ba)).
@@ -1117,7 +1117,7 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
 
 Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.14.3 - 2026-02-13
+## 2026.02.12.4 - 2026-02-13
 
 ### Performance: Add clear button and canonical model grouping with improved chart labels
 
@@ -1133,9 +1133,9 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.14.2 - 2026-02-12
+## 2026.02.12.3 - 2026-02-12
 
-### v0.14.2: Quota checker UI and Naga quota fixes
+### 2026.02.12.3: Quota checker UI and Naga quota fixes
 
 ## New Features
 
@@ -1156,9 +1156,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 Docker image updated and available at ghcr.io/mcowger/plexus:latest
 
-## v0.14.1 - 2026-02-12
+## 2026.02.12.2 - 2026-02-12
 
-### v0.14.1: Option for Cascade Provider Deletions, and small bugs
+### 2026.02.12.2: Option for Cascade Provider Deletions, and small bugs
 
 ## Changes
 
@@ -1173,9 +1173,9 @@ Docker image updated and available at ghcr.io/mcowger/plexus:latest
 
 The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.14.0 - 2026-02-12
+## 2026.02.12.1 - 2026-02-12
 
-### v0.14.0 - NanoGPT quota checker, OAuth credential status, and provider UI enhancements
+### 2026.02.12.1 - NanoGPT quota checker, OAuth credential status, and provider UI enhancements
 
 ## New Features
 
@@ -1198,9 +1198,9 @@ The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.13.5 - 2026-02-11
+## 2026.02.11.1 - 2026-02-11
 
-### v0.13.5: Performance page multi-target bar rendering fix
+### 2026.02.11.1: Performance page multi-target bar rendering fix
 
 ### Main change
 - Fixed performance visualization for providers with multiple targets so each target now renders as a separate bar ([db98e18](https://github.com/mcowger/plexus/commit/db98e18)).
@@ -1210,9 +1210,9 @@ The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.13.4 - 2026-02-11
+## 2026.02.10.1 - 2026-02-11
 
-### v0.13.4: Quotas UI integration, implicit OAuth quota visibility, and model alias deletion APIs
+### 2026.02.10.1: Quotas UI integration, implicit OAuth quota visibility, and model alias deletion APIs
 
 ## Main features
 
@@ -1227,7 +1227,7 @@ Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
 Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.13.3 - 2026-02-09
+## 2026.02.09.1 - 2026-02-09
 
 ### Normalize quota snapshot types across dialects
 
@@ -1238,7 +1238,7 @@ Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.13.2 - 2026-02-09
+## 2026.02.08.3 - 2026-02-09
 
 ### Add exploration mechanism to selectors
 
@@ -1249,15 +1249,15 @@ This release introduces an exploration mechanism to the performance and latency 
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.13.1 - 2026-02-09
+## 2026.02.08.2 - 2026-02-09
 
 ### Per-model metrics for provider performance
 
 **Added a canonical performance dashboard**
 
-## v0.13.0 - 2026-02-08
+## 2026.02.08.1 - 2026-02-08
 
-### v0.13.0: Multi-account OAuth quota management and Codex/Claude quota checker enhancements
+### 2026.02.08.1: Multi-account OAuth quota management and Codex/Claude quota checker enhancements
 
 ## Main features
 
@@ -1286,9 +1286,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest`.
 
-## v0.12.5 - 2026-02-06
+## 2026.02.06.1 - 2026-02-06
 
-### v0.12.5: Sidebar UI Enhancements and Tool Proxy Adjustments
+### 2026.02.06.1: Sidebar UI Enhancements and Tool Proxy Adjustments
 
 ### New Features
 * Surface app version and update status in sidebar ([f5fe214](https://github.com/mcowger/plexus/commit/f5fe214))
@@ -1299,7 +1299,7 @@ Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.12.4 - 2026-02-05
+## 2026.02.05.4 - 2026-02-05
 
 ### FInalized support for GPT 5.3 Codex
 
@@ -1316,9 +1316,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.12.3 - 2026-02-05
+## 2026.02.05.3 - 2026-02-05
 
-### v0.12.3: OAuth model validation update for gpt-5.3-codex
+### 2026.02.05.3: OAuth model validation update for gpt-5.3-codex
 
 ### Bug Fixes
 
@@ -1328,9 +1328,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.12.2 - 2026-02-05
+## 2026.02.05.2 - 2026-02-05
 
-### v0.12.2: GPT 5.3 Codex Support and Dependency Updates
+### 2026.02.05.2: GPT 5.3 Codex Support and Dependency Updates
 
 ## New Features
 
@@ -1344,9 +1344,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.12.1 - 2026-02-05
+## 2026.02.05.1 - 2026-02-05
 
-### v0.12.1: Reduce Query Weight for Homepage.
+### 2026.02.05.1: Reduce Query Weight for Homepage.
 
 ### New Features
 
@@ -1360,9 +1360,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.12.0 - 2026-02-05
+## 2026.02.04.1 - 2026-02-05
 
-### v0.12.0: Support Oauth/Subscription Providers:  Codex, Claude Pro, Antigravity, GeminiCLI, Github Copilot
+### 2026.02.04.1: Support Oauth/Subscription Providers:  Codex, Claude Pro, Antigravity, GeminiCLI, Github Copilot
 
 ## Main Features
 
@@ -1390,9 +1390,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.11.1 - 2026-02-04
+## 2026.02.03.2 - 2026-02-04
 
-### v0.11.1: Implementation of Server-Side Quota Forecasting and Database Resiliency Fixes
+### 2026.02.03.2: Implementation of Server-Side Quota Forecasting and Database Resiliency Fixes
 
 ### Main New Features
 
@@ -1407,9 +1407,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.11.0 - 2026-02-04
+## 2026.02.03.1 - 2026-02-04
 
-### v0.11.0: OpenAI-Compatible Responses API and Enhanced Model Test Suite
+### 2026.02.03.1: OpenAI-Compatible Responses API and Enhanced Model Test Suite
 
 ### Main Features
 
@@ -1423,9 +1423,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.10.3 - 2026-02-03
+## 2026.02.02.4 - 2026-02-03
 
-### v0.10.3: UI Enhancements for Model Alias Management
+### 2026.02.02.4: UI Enhancements for Model Alias Management
 
 ### New Features
 
@@ -1433,9 +1433,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.10.2 - 2026-02-03
+## 2026.02.02.3 - 2026-02-03
 
-### v0.10.2: Implementation of Quota Tracking System and Sidebar UI Redesign
+### 2026.02.02.3: Implementation of Quota Tracking System and Sidebar UI Redesign
 
 ## v0.10.2 Release Notes
 
@@ -1453,9 +1453,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.10.1 - 2026-02-03
+## 2026.02.02.2 - 2026-02-03
 
-### v0.10.1: OpenAI-Compatible Image APIs, Usage-Based Load Balancing, and Enhanced Metadata Logging
+### 2026.02.02.2: OpenAI-Compatible Image APIs, Usage-Based Load Balancing, and Enhanced Metadata Logging
 
 ## New Features
 
@@ -1481,9 +1481,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.12.0 - 2026-02-02
+## 2026.02.04.1 - 2026-02-02
 
-### v0.12.0: OpenAI-Compatible Image Generation and Editing APIs
+### 2026.02.04.1: OpenAI-Compatible Image Generation and Editing APIs
 
 ### Main Features
 
@@ -1545,9 +1545,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
   - Updated API.md documentation with new endpoints
   - Updated CONFIGURATION.md with image model configuration examples
 
-## v0.10.0 - 2026-02-02
+## 2026.02.02.1 - 2026-02-02
 
-### v0.10.0: Support for OpenAI-Compatible Audio APIs and Improved Persistence Logic
+### 2026.02.02.1: Support for OpenAI-Compatible Audio APIs and Improved Persistence Logic
 
 ### Main New Features
 
@@ -1563,9 +1563,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.11.0 - 2026-02-02
+## 2026.02.03.1 - 2026-02-02
 
-### v0.11.0: OpenAI-Compatible Audio Speech Support
+### 2026.02.03.1: OpenAI-Compatible Audio Speech Support
 
 ### Main Features
 
@@ -1626,7 +1626,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 All existing backend tests continue to pass. Frontend builds successfully.
 
-### v0.10.0: OpenAI-Compatible Audio Transcriptions Support
+### 2026.02.02.1: OpenAI-Compatible Audio Transcriptions Support
 
 ### Main Features
 
@@ -1685,9 +1685,9 @@ All existing backend tests continue to pass. Frontend builds successfully.
 
 All 185 backend tests continue to pass. Frontend builds successfully.
 
-## v0.9.0 - 2026-02-02
+## 2026.02.02.5 - 2026-02-02
 
-### v0.9.0: OpenAI-Compatible Embeddings Support, Drizzle ORM Migration, and Token Estimation Improvements
+### 2026.02.02.5: OpenAI-Compatible Embeddings Support, Drizzle ORM Migration, and Token Estimation Improvements
 
 ### New Features
 
@@ -1709,9 +1709,9 @@ All 185 backend tests continue to pass. Frontend builds successfully.
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.9.0 - 2026-02-02
+## 2026.02.02.5 - 2026-02-02
 
-### v0.9.0: OpenAI-Compatible Embeddings API Support
+### 2026.02.02.5: OpenAI-Compatible Embeddings API Support
 
 ### Main Features
 
@@ -1805,9 +1805,9 @@ All 185 backend tests passing ✓
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.8.5 - 2026-01-19
+## 2026.01.19.1 - 2026-01-19
 
-### v0.8.5: Bulk Model Import and Enhanced Provider Interface Capabilities
+### 2026.01.19.1: Bulk Model Import and Enhanced Provider Interface Capabilities
 
 ### New Features
 
@@ -1824,9 +1824,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.8.0 - 2026-01-18
+## 2026.01.17.1 - 2026-01-18
 
-### v0.8.0: Direct Model Routing and Granular Cooldown Management
+### 2026.01.17.1: Direct Model Routing and Granular Cooldown Management
 
 ## Main Features
 
@@ -1853,13 +1853,13 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.7.7 - 2026-01-08
+## 2026.01.08.2 - 2026-01-08
 
 ### Release v0.7.7: OAuth Refresh Token Rotation
 
 ## v0.7.7 Release Notes \n **OAuth Refresh Token Rotation**: Added support for refresh token rotation to enhance security and session persistence. ([ee187f2](https://github.com/mcowger/plexus/commit/ee187f2))
 
-## v0.7.6 - 2026-01-08
+## 2026.01.08.1 - 2026-01-08
 
 ### Hotfix: Fix selector validation when using in-order selector
 
@@ -1876,7 +1876,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.7.5 - 2026-01-08
+## 2026.01.07.3 - 2026-01-08
 
 ### Plexus v0.7.5: InOrder Selector, Usage Analytics, and Sidebar UI Refinement
 
@@ -1899,9 +1899,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.7.1 - 2026-01-07
+## 2026.01.07.2 - 2026-01-07
 
-### v0.7.1: Manual OAuth Flow Implementation and Client Restriction Bypass
+### 2026.01.07.2: Manual OAuth Flow Implementation and Client Restriction Bypass
 
 ## Main Features
 
@@ -1915,9 +1915,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.7.0 - 2026-01-07
+## 2026.01.07.1 - 2026-01-07
 
-### v0.7.0: Claude Code OAuth Integration
+### 2026.01.07.1: Claude Code OAuth Integration
 
 ### ✨ New Features
 
@@ -1925,9 +1925,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.6.6 - 2026-01-07
+## 2026.01.06.4 - 2026-01-07
 
-### v0.6.6: Corrected TPS Calculation and Documentation Updates
+### 2026.01.06.4: Corrected TPS Calculation and Documentation Updates
 
 ### Changes and Improvements
 
@@ -1936,15 +1936,15 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.6.5 - 2026-01-07
+## 2026.01.06.3 - 2026-01-07
 
-### v0.6.5: OAuth Multi-Account Scoping Fix and Logs UI Improvements
+### 2026.01.06.3: OAuth Multi-Account Scoping Fix and Logs UI Improvements
 
 Introduce Multi-Oauth account balancing & Logs UI Improvements
 
-## v0.6.0 - 2026-01-06
+## 2026.01.06.2 - 2026-01-06
 
-### v0.6.0: Google Antigravity Authentication Support
+### 2026.01.06.2: Google Antigravity Authentication Support
 
 ### New Features
 
@@ -1954,13 +1954,13 @@ Introduce Multi-Oauth account balancing & Logs UI Improvements
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.5.2 - 2026-01-06
+## 2026.01.06.1 - 2026-01-06
 
 ### Hotfix: Fix dispatcher when access_via[] is empty.
 
 Hotfix: Fix dispatcher when access_via[] is empty.
 
-## v0.5.1 - 2026-01-06
+## 2026.01.05.2 - 2026-01-06
 
 ### v0.5.1 Release - Anthropic API Improvements and Enhanced Test Coverage
 
@@ -1978,9 +1978,9 @@ Hotfix: Fix dispatcher when access_via[] is empty.
 
 **Docker Image Updated**: The latest release is available at `ghcr.io/mcowger/plexus:latest`
 
-## v0.5.0 - 2026-01-06
+## 2026.01.05.1 - 2026-01-06
 
-### v0.5.0: Multi-Protocol API Routing, Provider/Model Management UI, and Gemini Integration
+### 2026.01.05.1: Multi-Protocol API Routing, Provider/Model Management UI, and Gemini Integration
 
 ## Major Features
 
@@ -2040,9 +2040,9 @@ Completely refactored the frontend styling with Tailwind CSS integration and upd
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
-## v0.3.2 - 2026-01-04
+## 2026.01.03.3 - 2026-01-04
 
-### v0.3.2 - SSE Ping Events for Log Streaming
+### 2026.01.03.3 - SSE Ping Events for Log Streaming
 
 # Plexus Release v0.3.2
 
@@ -2060,7 +2060,7 @@ This release introduces Server-Sent Events (SSE) ping events to prevent timeouts
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest.
 
-## v0.3.1 - 2026-01-04
+## 2026.01.03.2 - 2026-01-04
 
 ### Update to re-add /v1/models endpoint lost in refactor
 
@@ -2075,7 +2075,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **Tooling**: Implemented a new dev builder for streamlined local development (`58ca61f`).
 - **Maintenance**: Cleaned up the repository by removing broken tests and applying general fixes to the test suite (`68bb84f`, `9ddfdec`, `e7d6369`).
 
-## v0.3.0 - 2026-01-04
+## 2026.01.03.1 - 2026-01-04
 
 ### Smooth Streams and Refined Stability
 
@@ -2089,7 +2089,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **Documentation**: Updated project documentation for better clarity and alignment with recent changes (`1b6bc5b`).
 - **Housekeeping**: Refined project configuration by updating `.gitignore` (`c2b8c4c`).
 
-## v0.2.5 - 2026-01-03
+## 2026.01.02.11 - 2026-01-03
 
 ### Precision Performance: New Latency & Speed Selectors
 
@@ -2100,7 +2100,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **Configuration Updates:** Refined configuration logic to support the new performance parameters (`994c13c`).
 - **Test Suite Enhancements:** Updated existing tests to ensure reliability across all new selector functionalities (`994c13c`).
 
-## v0.2.2 - 2026-01-03
+## 2026.01.02.10 - 2026-01-03
 
 ### Precision Performance: Smarter Metrics & Smoother Releases
 
@@ -2112,7 +2112,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - Resolve logic in TPS counting metrics (`fabdf55`)
 - Update internal testing suite in `test.ts` (`dd784c8`)
 
-## 0.2.1 - 2026-01-03
+## 2026.01.02.2 - 2026-01-03
 
 ### Precision Streams & Performance Insights
 
@@ -2129,7 +2129,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **Connectivity**: Improved stability through better disconnect handling ([f599009](https://github.com/example/repo/commit/f599009)).
 - **CI/CD**: Switched to using `CHANGELOG.md` for release notes generation ([258e9c4](https://github.com/example/repo/commit/258e9c4)).
 
-## 0.2.0 - 2026-01-03
+## 2026.01.02.1 - 2026-01-03
 
 ### Performance Unleashed: Smart Streams & Cost-Aware Routing
 
@@ -2146,7 +2146,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **CI/CD Optimization**: Switched to using `CHANGELOG.md` for release notes generation to ensure better documentation accuracy (`258e9c4`).
 - **Debug Logging**: Enhanced logging capabilities for better stream observability (`fdf2457`).
 
-## 0.2.0 - 2026-01-03
+## 2026.01.02.1 - 2026-01-03
 
 ### Performance & Precision: Smart Routing and Stream Stability
 
@@ -2161,7 +2161,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **Multi-Stage Token Counting**: Updated the token counting logic to support multi-stage processing for higher accuracy (`429782b`).
 - **Stability Enhancements**: Improved disconnect handling to ensure more resilient connections (`f599009`).
 
-## v0.1.6 - 2026-01-03
+## 2026.01.02.9 - 2026-01-03
 
 ### Fortified Foundations
 
@@ -2173,7 +2173,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 *   Removed legacy testing bypasses in the auth layer to prevent unauthorized access in production-like environments (129e18b).
 
-## v0.1.5 - 2026-01-02
+## 2026.01.02.8 - 2026-01-02
 
 ### Smarter Response Flow
 
@@ -2184,18 +2184,18 @@ This release focuses on refining the internal communication layer to improve dat
 ### Minor Changes
 - **Adjust response handling** (`dae0008`): Refined the logic for processing system responses to ensure more consistent data delivery.
 
-## v0.1.4 - 2026-01-02
+## 2026.01.02.7 - 2026-01-02
 
 ### 
 
-## v0.1.3 - 2026-01-02
+## 2026.01.02.6 - 2026-01-02
 
 ### Under-the-Hood Polish
 
 ### 🛠 Smaller Changes
 - Performed minor script adjustments and maintenance. (`1512b09`)
 
-## v0.1.2 - 2026-01-02
+## 2026.01.02.5 - 2026-01-02
 
 ### Minor Release
 
@@ -2209,7 +2209,7 @@ Based on the provided commit log, here are the release notes:
 #### **Improvements & Bug Fixes**
 *   **CI/CD Enhancements:** Updated the internal release script to improve the deployment process. ([d6c533e](d6c533e))
 
-## v0.1.1 - 2026-01-02
+## 2026.01.02.4 - 2026-01-02
 
 ### Add Live System Logs
 

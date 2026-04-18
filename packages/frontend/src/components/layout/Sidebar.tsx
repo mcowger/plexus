@@ -124,17 +124,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const parseSemverTag = (tag: string): [number, number, number] | null => {
-    const match = tag.match(/^v(\d+)\.(\d+)\.(\d+)$/);
-    if (!match) return null;
-    return [parseInt(match[1]!, 10), parseInt(match[2]!, 10), parseInt(match[3]!, 10)];
+  // Parse CalVer tag: YYYY.MM.DD.N or vX.Y.Z (legacy semver)
+  // Returns [year, month, day, counter] for CalVer, null for invalid
+  const parseVersionTag = (tag: string): [number, number, number, number] | null => {
+    // Try CalVer: YYYY.MM.DD.N
+    const calverMatch = tag.match(/^(\d{4})\.(\d{2})\.(\d{2})\.(\d+)$/);
+    if (calverMatch) {
+      return [
+        parseInt(calverMatch[1]!, 10), // year
+        parseInt(calverMatch[2]!, 10), // month
+        parseInt(calverMatch[3]!, 10), // day
+        parseInt(calverMatch[4]!, 10), // counter
+      ];
+    }
+    // Try legacy semver: vX.Y.Z (convert to CalVer-like for comparison)
+    const semverMatch = tag.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    if (semverMatch) {
+      // Treat as 0.0.0 with special counter for backward compatibility
+      // This ensures old semver tags always compare as older than CalVer
+      return [0, 0, 0, parseInt(semverMatch[1] + semverMatch[2] + semverMatch[3]!, 10)];
+    }
+    return null;
   };
 
-  const compareSemverTags = (a: string, b: string): number => {
-    const parsedA = parseSemverTag(a);
-    const parsedB = parseSemverTag(b);
+  const compareVersionTags = (a: string, b: string): number => {
+    const parsedA = parseVersionTag(a);
+    const parsedB = parseVersionTag(b);
     if (!parsedA || !parsedB) return 0;
-    for (let i = 0; i < 3; i++) {
+    // Compare year, month, day, then counter
+    for (let i = 0; i < 4; i++) {
       if (parsedA[i]! !== parsedB[i]!) {
         return parsedA[i]! - parsedB[i]!;
       }
@@ -155,7 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
         );
         if (!response.ok) return;
         const latestRelease = (await response.json()) as { tag_name?: string };
-        if (latestRelease.tag_name && parseSemverTag(latestRelease.tag_name)) {
+        if (latestRelease.tag_name && parseVersionTag(latestRelease.tag_name)) {
           setLatestVersion(latestRelease.tag_name);
         }
       } catch (error) {
@@ -169,7 +187,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   }, []);
 
   const isOutdated = Boolean(
-    latestVersion && parseSemverTag(appVersion) && compareSemverTags(appVersion, latestVersion) < 0
+    latestVersion &&
+      parseVersionTag(appVersion) &&
+      compareVersionTags(appVersion, latestVersion) < 0
   );
 
   const handleToggleClick = () => setShowConfirm(true);

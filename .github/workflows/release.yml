@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag to release (e.g. v1.2.3)'
+        description: 'Version tag to release (e.g. 2026.04.18.1)'
         required: true
         type: string
 
@@ -107,7 +107,8 @@ jobs:
         id: prev_tag
         run: |
           CURRENT_TAG="${{ steps.release_tag.outputs.tag }}"
-          PREV_TAG=$(git tag --sort=-version:refname --list "v*.*.*" | grep -A1 "^${CURRENT_TAG}$" | tail -1)
+          # Get all CalVer tags: YYYY.MM.DD.N
+          PREV_TAG=$(git tag --sort=-version:refname --list "[0-9]*.[0-9]*.[0-9]*.[0-9]*" "v*.*.*" 2>/dev/null | grep -A1 "^${CURRENT_TAG}$" | tail -1)
           echo "Previous release tag: $PREV_TAG"
           echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
           echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
@@ -249,7 +250,7 @@ jobs:
 
             Generate release notes following this exact structure and style:
 
-            1. **Version heading**: Start with the version number as an `##` heading (e.g. `## v1.2.3`).
+            1. **Version heading**: Start with the version number as an `##` heading (e.g. `## 2026.04.18.1`).
 
             2. **New Features & Changes section**: If there are any notable new features or significant changes, add a `### New Features` section BEFORE the categorized changelog. Write this as narrative prose — 1-3 sentences per feature explaining what it does and why it matters, without PR numbers or author attribution. Place each core item on its own line with a ' - ' the cause it to be shown in a list.   This is the "headline" that helps users quickly understand what's exciting in this release. Only include this section if there are genuinely noteworthy features — omit it entirely for small patch releases with only fixes.
 
@@ -273,7 +274,7 @@ jobs:
 
             ### Example output:
 
-            ## v0.67.2
+            ## 2026.04.18.1
 
             ### New Features
             Support for multiple --append-system-prompt flags, each value is appended to the system prompt separated by double newlines.
