@@ -66,6 +66,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
         with:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
+          exclude_co_authored_by: 'true'
           # --allowedTools is the SDK hard allowlist (the only list that matters).
           # settings.permissions.allow only controls auto-approval in ~/.claude/settings.json,
           # which does NOT add tools to the SDK's allowedTools.
