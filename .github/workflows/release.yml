@@ -107,11 +107,35 @@ jobs:
         id: prev_tag
         run: |
           CURRENT_TAG="${{ steps.release_tag.outputs.tag }}"
-          # Get all CalVer tags: YYYY.MM.DD.N
-          PREV_TAG=$(git tag --sort=-version:refname --list "[0-9]*.[0-9]*.[0-9]*.[0-9]*" "v*.*.*" 2>/dev/null | grep -A1 "^${CURRENT_TAG}$" | tail -1)
+          CURRENT_SHA=$(git rev-parse "${CURRENT_TAG}^{}")
+
+          # Find the previous tag that is an actual ancestor of the current tag
+          # This handles cases where tags may not be chronologically ordered in git history
+          PREV_TAG=""
+          for tag in $(git tag --sort=-version:refname --list "[0-9]*.[0-9]*.[0-9]*.[0-9]*" "v*.*.*" 2>/dev/null); do
+            if [ "$tag" = "$CURRENT_TAG" ]; then
+              continue
+            fi
+            tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || true)
+            if [ -z "$tag_sha" ]; then
+              continue
+            fi
+            # Check if this tag's commit is an ancestor of the current tag
+            if git merge-base --is-ancestor "$tag_sha" "$CURRENT_SHA" 2>/dev/null; then
+              PREV_TAG="$tag"
+              echo "Found ancestor tag: $PREV_TAG ($tag_sha)"
+              break
+            fi
+          done
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "Warning: No ancestor tag found, using empty string"
+          fi
+
           echo "Previous release tag: $PREV_TAG"
           echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
           echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+          echo "current_sha=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Gather PR and commit info between tags
         id: pr_info
