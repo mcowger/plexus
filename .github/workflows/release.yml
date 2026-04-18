@@ -1,17 +1,14 @@
 name: Release
-run-name: Release ${{ inputs.version || github.ref_name }}
+run-name: Release ${{ github.ref_name }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag to release (e.g. 2026.04.18.1)'
-        required: true
-        type: string
+  push:
+    tags:
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].[0-9]+'  # CalVer: YYYY.MM.DD.N
 
-# NOTE: claude-code-action does not support the 'push' event type.
-# To auto-trigger on tag push, use the release-trigger.yml bridge workflow
-# which converts tag pushes into workflow_dispatch calls.
+# NOTE: This workflow now uses our forked claude-code-action which supports
+# the 'push' event. Previously, we needed release-trigger.yml to convert
+# tag pushes to workflow_dispatch events due to upstream's event restrictions.
 
 jobs:
   build-and-release:
@@ -23,17 +20,16 @@ jobs:
       id-token: write
 
     steps:
-      - name: Resolve release tag
+      - name: Get tag from ref
         id: release_tag
         run: |
-          TAG="${{ inputs.version || github.ref_name }}"
+          TAG="${{ github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ inputs.version || '' }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -47,32 +43,17 @@ jobs:
         working-directory: packages/backend
         run: |
           # Run drizzle-kit generate in dry-run mode to detect schema drift.
-          # If any migration files are produced, the schema has changed since
-          # the last migration was committed — the release must wait for the
-          # generate-migrations workflow to catch up.
           bunx drizzle-kit generate 2>&1 | tee /tmp/sqlite-migrate.log
           bunx drizzle-kit generate --config drizzle.config.postgres.ts 2>&1 | tee /tmp/pg-migrate.log
 
           if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard drizzle/migrations drizzle/migrations_pg)" ]; then
-            echo "✅ No pending migrations — all schema changes have corresponding migration files."
+            echo "✅ No pending migrations"
           else
-            echo "::error::Pending migrations detected! The schema has changed but migration files have not been generated yet."
-            echo ""
-            echo "This usually means the generate-migrations workflow has not finished running on main."
-            echo "Wait for it to complete and merge, then re-tag the release."
-            echo ""
-            echo "Uncommitted migration files:"
-            git ls-files --others --exclude-standard drizzle/migrations drizzle/migrations_pg
-            echo ""
-            echo "Modified migration files:"
-            git diff --name-only
+            echo "::error::Pending migrations detected! Wait for generate-migrations workflow."
             exit 1
           fi
 
       - name: Compile Binaries
-        # compiling each platform separately
-        # Note: Each compile script in package.json runs build:frontend. 
-        # This is acceptable for correctness to ensure each binary is built with the latest assets.
         env:
           APP_VERSION: ${{ steps.release_tag.outputs.tag }}
         run: |
@@ -109,28 +90,17 @@ jobs:
           CURRENT_TAG="${{ steps.release_tag.outputs.tag }}"
           CURRENT_SHA=$(git rev-parse "${CURRENT_TAG}^{}")
 
-          # Find the previous tag that is an actual ancestor of the current tag
-          # This handles cases where tags may not be chronologically ordered in git history
+          # Find the previous tag that is an actual ancestor
           PREV_TAG=""
           for tag in $(git tag --sort=-version:refname --list "[0-9]*.[0-9]*.[0-9]*.[0-9]*" "v*.*.*" 2>/dev/null); do
-            if [ "$tag" = "$CURRENT_TAG" ]; then
-              continue
-            fi
+            if [ "$tag" = "$CURRENT_TAG" ]; then continue; fi
             tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || true)
-            if [ -z "$tag_sha" ]; then
-              continue
-            fi
-            # Check if this tag's commit is an ancestor of the current tag
+            [ -z "$tag_sha" ] && continue
             if git merge-base --is-ancestor "$tag_sha" "$CURRENT_SHA" 2>/dev/null; then
               PREV_TAG="$tag"
-              echo "Found ancestor tag: $PREV_TAG ($tag_sha)"
               break
             fi
           done
-
-          if [ -z "$PREV_TAG" ]; then
-            echo "Warning: No ancestor tag found, using empty string"
-          fi
 
           echo "Previous release tag: $PREV_TAG"
           echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
@@ -147,7 +117,6 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Get the commit SHAs between the two tags
             const { execSync } = require('child_process');
             let commits;
             try {
@@ -161,8 +130,7 @@ jobs:
               return;
             }
 
-            // Find associated PRs for each commit
-            const prMap = new Map(); // pr number -> { title, url, author, commits: [] }
+            const prMap = new Map();
             const standaloneCommits = [];
 
             for (const sha of commits) {
@@ -171,7 +139,7 @@ jobs:
                   owner, repo, commit_sha: sha
                 });
                 if (prs.length > 0) {
-                  const pr = prs[0]; // Use the first (most relevant) PR
+                  const pr = prs[0];
                   if (!prMap.has(pr.number)) {
                     prMap.set(pr.number, {
                       number: pr.number,
@@ -179,29 +147,24 @@ jobs:
                       url: pr.html_url,
                       author: pr.user?.login || '',
                       authorUrl: pr.user?.html_url || '',
-                      mergedAt: pr.merged_at,
                       commits: []
                     });
                   }
                   prMap.get(pr.number).commits.push(sha.substring(0, 7));
                 } else {
-                  // Standalone commit (not from a PR)
                   const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
                   const author = execSync(`git log -1 --pretty=format:'%an' ${sha}`, { encoding: 'utf8' }).trim();
                   standaloneCommits.push({
                     sha: sha.substring(0, 7),
-                    shaFull: sha,
                     message: msg,
                     author: author,
                     url: `https://github.com/${owner}/${repo}/commit/${sha}`
                   });
                 }
               } catch (e) {
-                // API rate limit or other error, treat as standalone
                 const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
                 standaloneCommits.push({
                   sha: sha.substring(0, 7),
-                  shaFull: sha,
                   message: msg,
                   author: '',
                   url: `https://github.com/${owner}/${repo}/commit/${sha}`
@@ -209,14 +172,11 @@ jobs:
               }
             }
 
-            // Build the summary text for the prompt
             let summary = '';
             if (prMap.size > 0) {
               summary += '## Pull Requests\n\n';
               for (const [number, pr] of prMap) {
-                summary += `- PR #${number}: ${pr.title} (${pr.url}) by @${pr.author}`;
-                if (pr.authorUrl) summary += ` (${pr.authorUrl})`;
-                summary += ` [${pr.commits.length} commit(s): ${pr.commits.join(', ')}]\n`;
+                summary += `- PR #${number}: ${pr.title} (${pr.url}) by @${pr.author} [${pr.commits.length} commit(s): ${pr.commits.join(', ')}]\n`;
               }
               summary += '\n';
             }
@@ -244,7 +204,7 @@ jobs:
       - name: Generate Release Notes with Claude
         id: release_notes
         timeout-minutes: 5
-        uses: anthropics/claude-code-action@v1
+        uses: mcowger/claude-code-action@v1-plexus
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
@@ -256,15 +216,8 @@ jobs:
           anthropic_api_key: ${{ secrets.PLEXUS_API_KEY }}
           github_token: ${{ github.token }}
           show_full_output: true
-          # Allow github-actions bot since this workflow is triggered by release-trigger.yml
-          allowed_bots: 'github-actions'
           prompt: |
             You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
-
-            There are changes in the git repository between two releases:
-            - From tag: ${{ steps.prev_tag.outputs.tag }}
-            - To tag: ${{ steps.prev_tag.outputs.current_tag }}
-            - Repository: https://github.com/${{ github.repository }}
 
             ## Source Changes
 
@@ -274,47 +227,16 @@ jobs:
 
             ## Instructions:
 
-            Generate release notes following this exact structure and style:
+            Generate release notes following this exact structure. Start IMMEDIATELY with the version heading:
 
-            1. **Version heading**: Start with the version number as an `##` heading (e.g. `## 2026.04.18.1`).
+            ## ${{ steps.release_tag.outputs.tag }}
 
-            2. **New Features & Changes section**: If there are any notable new features or significant changes, add a `### New Features` section BEFORE the categorized changelog. Write this as narrative prose — 1-3 sentences per feature explaining what it does and why it matters, without PR numbers or author attribution. Place each core item on its own line with a ' - ' the cause it to be shown in a list.   This is the "headline" that helps users quickly understand what's exciting in this release. Only include this section if there are genuinely noteworthy features — omit it entirely for small patch releases with only fixes.
+            ### New Features (if any)
+            [Narrative prose about notable features]
 
-            3. **Categorized sections**: After the New Features section, group changes into these standard categories (only include sections that have items):
-               - `### Added` — New features and capabilities
-               - `### Changed` — Changes in existing functionality
-               - `### Deprecated` — Soon-to-be removed features
-               - `### Removed` — Removed features
-               - `### Fixed` — Bug fixes
-               - `### Security` — Security improvements
+            ### Added / Changed / Fixed / Security
+            [Categorized bullets with PR references]
 
-            4. **Group by PR, not by commit**: If multiple commits came in via a single pull request, write only ONE bullet about the entire PR. Do NOT list each commit separately — use the PR title as the primary basis for the description, enriched by understanding the full set of commits.
-
-            5. **Format each bullet as**: A concise, user-focused description ending with the PR or commit reference:
-               - For PRs: `Added support for X (#123 by @username)` — always include the PR number and the `by @author` attribution.
-               - For standalone commits (no PR): `Fixed issue with X (abc1234)` — use the short SHA.
-               - If a change has no author info available, omit the `by @author` part.
-               - Use plain text for the PR/commit reference, NOT markdown links (the release page auto-links `#123`).
-
-            6. **Write clear, user-focused descriptions** that explain what changed and why it matters from a user's perspective. Start each bullet with an action verb when possible.
-
-            ### Example output:
-
-            ## 2026.04.18.1
-
-            ### New Features
-            Support for multiple --append-system-prompt flags, each value is appended to the system prompt separated by double newlines.
-            Interactive keybinding support for Kitty super-modified shortcuts such as super+k, super+enter, and ctrl+super+k.
-
-            ### Added
-            Added support for multiple --append-system-prompt flags (#3171 by @aliou)
-            Added interactive keybinding support for Kitty super-modified shortcuts (#3111 by @sudosubin)
-
-            ### Fixed
-            Fixed streaming partial JSON buffers leaking into persisted tool calls (#3018 by @steipete)
-            Fixed Ctrl+Alt letter key matching in tmux (#2989 by @kaofelix)
-
-            Output ONLY the release notes in markdown format. Do NOT include any explanatory text, metadata, introductory phrases, or concluding remarks. Start IMMEDIATELY with the version heading. Do not preface your response with any text whatsoever.
           claude_args: |
             --model ${{ vars.PLEXUS_MODEL }}
             --allowedTools "Bash(git:*)",Read
@@ -323,9 +245,7 @@ jobs:
         if: always()
         run: |
           echo "release_notes outcome: ${{ steps.release_notes.outcome }}"
-          echo "release_notes conclusion: ${{ steps.release_notes.outputs.conclusion }}"
           echo "execution_file: ${{ steps.release_notes.outputs.execution_file }}"
-          echo "All output names: $(echo '${{ toJson(steps.release_notes.outputs) }}' | jq -r 'keys[]')"
 
       - name: Extract release notes text
         id: extract_notes
@@ -336,21 +256,17 @@ jobs:
           script: |
             const executionFilePath = '${{ steps.release_notes.outputs.execution_file }}';
             if (!executionFilePath) {
-              core.warning('No execution_file output from claude-code-action. Falling back to pr_summary.');
+              core.warning('No execution_file output');
               return '';
             }
             const fs = require('fs');
             if (!fs.existsSync(executionFilePath)) {
-              core.warning(`Execution file not found: ${executionFilePath}. Falling back to pr_summary.`);
+              core.warning('Execution file not found: ' + executionFilePath);
               return '';
             }
             const executionLog = JSON.parse(fs.readFileSync(executionFilePath, 'utf8'));
             const result = executionLog[executionLog.length - 1].result;
-            if (!result || result.trim().length === 0) {
-              core.warning('Claude returned empty result. Falling back to pr_summary.');
-              return '';
-            }
-            return result;
+            return result || '';
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
