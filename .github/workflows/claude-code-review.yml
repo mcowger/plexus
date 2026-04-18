@@ -86,22 +86,7 @@ jobs:
                 "allow": [
                   "mcp__github_inline_comment__*",
                   "mcp__github_comment__*",
-                  "Bash(gh pr comment:*)",
-                  "Bash(gh pr diff:*)",
-                  "Bash(gh pr view:*)",
-                  "Bash(git status:*)",
-                  "Bash(git diff:*)",
-                  "Bash(git log:*)",
-                  "Bash(bun install:*)",
-                  "Bash(bun run:*)",
-                  "Bash(npm run:*)",
-                  "Bash(ls:*)",
-                  "Bash(cat:*)",
-                  "Bash(find:*)",
-                  "Bash(grep:*)",
-                  "Bash(head:*)",
-                  "Bash(tail:*)",
-                  "Bash(wc:*)"
+                  "Bash(*)"
                 ]
               }
             }
