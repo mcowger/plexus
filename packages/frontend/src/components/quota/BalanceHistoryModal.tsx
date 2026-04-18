@@ -148,13 +148,15 @@ export const BalanceHistoryModal: React.FC<BalanceHistoryModalProps> = ({
     return { current, min, max, change, percentChange };
   }, [chartData]);
 
-  // Determine if this checker uses points (not dollars)
-  const isPointsUnit = useMemo(() => {
-    return history.some((s) => s.unit === 'points');
+  // Determine the unit type from history
+  const unitType = useMemo(() => {
+    const snapshot = history.find((s) => s.unit);
+    return snapshot?.unit || 'dollars';
   }, [history]);
 
   const formatValue = (value: number) => {
-    if (isPointsUnit) return `${formatPointsFull(value)} pts`;
+    if (unitType === 'points') return `${formatPointsFull(value)} pts`;
+    if (unitType === 'kwh') return `${value.toFixed(6)} kWh`;
     return formatCost(value);
   };
 

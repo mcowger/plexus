@@ -71,6 +71,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
 
     const formatBalance = (value: number) => {
       if (unit === 'points') return `${formatPointsFull(value)} pts`;
+      if (unit === 'kwh') return `${value.toFixed(6)} kWh`;
       return formatCost(value);
     };
 

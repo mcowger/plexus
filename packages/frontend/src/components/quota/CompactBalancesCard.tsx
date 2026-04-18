@@ -49,7 +49,9 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
           balance !== undefined
             ? unit === 'points'
               ? `${formatPoints(balance)} pts`
-              : formatCost(balance)
+              : unit === 'kwh'
+                ? `${balance.toFixed(6)} kWh`
+                : formatCost(balance)
             : undefined;
 
         return (

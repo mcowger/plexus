@@ -11,7 +11,7 @@ export type QuotaWindowType =
   | 'monthly'
   | 'custom';
 
-export type QuotaUnit = 'dollars' | 'requests' | 'tokens' | 'percentage' | 'points';
+export type QuotaUnit = 'dollars' | 'requests' | 'tokens' | 'percentage' | 'points' | 'kwh';
 
 export type QuotaStatus = 'ok' | 'warning' | 'critical' | 'exhausted';
 

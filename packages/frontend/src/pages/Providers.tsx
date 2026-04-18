@@ -940,15 +940,21 @@ export const Providers = () => {
       navigate('/quotas');
     };
 
-    // Balance-type checkers: show remaining dollars or points
+    // Balance-type checkers: show remaining dollars, points, or kwh
     const subscriptionWindow = quota.latest.find(
-      (w) => w.windowType === 'subscription' && (w.unit === 'dollars' || w.unit === 'points')
+      (w) =>
+        w.windowType === 'subscription' &&
+        (w.unit === 'dollars' || w.unit === 'points' || w.unit === 'kwh')
     );
     if (subscriptionWindow?.remaining != null) {
-      const formatted =
-        subscriptionWindow.unit === 'points'
-          ? `${formatPoints(subscriptionWindow.remaining)} pts`
-          : `$${subscriptionWindow.remaining.toFixed(2)}`;
+      let formatted: string;
+      if (subscriptionWindow.unit === 'points') {
+        formatted = `${formatPoints(subscriptionWindow.remaining)} pts`;
+      } else if (subscriptionWindow.unit === 'kwh') {
+        formatted = `${subscriptionWindow.remaining.toFixed(6)} kWh`;
+      } else {
+        formatted = `$${subscriptionWindow.remaining.toFixed(2)}`;
+      }
       return (
         <Badge
           status="neutral"
