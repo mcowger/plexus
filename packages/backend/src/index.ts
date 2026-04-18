@@ -519,3 +519,4 @@ export default {
   port,
   server: fastify,
 };
+// Testing the consolidated PR workflow
