@@ -204,7 +204,7 @@ jobs:
       - name: Generate Release Notes with Claude
         id: release_notes
         timeout-minutes: 5
-        uses: mcowger/claude-code-action@v1-plexus
+        uses: mcowger/claude-code-expanded@main
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.PLEXUS_API_KEY }}

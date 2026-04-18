@@ -56,7 +56,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: mcowger/claude-code-expanded@main
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           ANTHROPIC_SMALL_FAST_MODEL: ${{ vars.PLEXUS_SMALL_MODEL }}
