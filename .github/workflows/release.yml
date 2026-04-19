@@ -258,16 +258,19 @@ jobs:
         timeout-minutes: 5
         uses: shaftoe/pi-coding-agent-action@v2
         env:
-          PLEXUS_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
-          PLEXUS_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
+          PI_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_PROVIDER_NAME: plexus-custom
+          PI_MODEL_ID: ${{ vars.PLEXUS_MODEL }}
+          PI_MODEL_NAME: ${{ vars.PLEXUS_MODEL }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          provider: openrouter
+          provider: plexus-custom
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.PLEXUS_API_KEY }}
           thinking_level: medium
           extensions: |
-            .github/pi-extensions/plexus-override
+            git:github.com/mcowger/pi-env-var-provider
           prompt: |
             You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
 

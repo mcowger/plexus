@@ -82,16 +82,19 @@ jobs:
         id: pi
         uses: shaftoe/pi-coding-agent-action@v2
         env:
-          PLEXUS_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
-          PLEXUS_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
+          PI_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_PROVIDER_NAME: plexus-custom
+          PI_MODEL_ID: ${{ vars.PLEXUS_MODEL }}
+          PI_MODEL_NAME: ${{ vars.PLEXUS_MODEL }}
         with:
           github_token: ${{ github.token }}
-          provider: openrouter
+          provider: plexus-custom
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.PLEXUS_API_KEY }}
           thinking_level: high
           extensions: |
-            .github/pi-extensions/plexus-override
+            git:github.com/mcowger/pi-env-var-provider
           load_builtin_extensions: true
           prompt: |
             Review the pull request ${{ github.repository }}/pull/${{ github.event.pull_request.number }}.
