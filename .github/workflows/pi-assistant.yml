@@ -59,7 +59,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'pi-pr-review.yml',
-              ref: context.ref,
+              ref: 'main',
               inputs: {
                 pr_number: '${{ steps.pi-action.outputs.pr_number }}'
               }
@@ -74,7 +74,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'pr-tests.yml',
-              ref: context.ref,
+              ref: 'main',
               inputs: {
                 pr_number: '${{ steps.pi-action.outputs.pr_number }}'
               }
