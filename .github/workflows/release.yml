@@ -6,280 +6,48 @@ on:
     tags:
       - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].[0-9]+'  # CalVer: YYYY.MM.DD.N
 
-
-
 jobs:
-  build-and-release:
-    name: Build and Release
-    runs-on: ubuntu-latest
+  setup:
+    name: Setup
+    uses: ./.github/workflows/release/setup.yml
+
+  quality-gates:
+    name: Quality Gates
+    needs: setup
+    uses: ./.github/workflows/release/quality-gates.yml
+
+  build-binaries:
+    name: Build Binaries
+    needs: [setup, quality-gates]
+    uses: ./.github/workflows/release/build-binaries.yml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
+
+  build-docker:
+    name: Build Docker Image
+    needs: [setup, quality-gates]
+    uses: ./.github/workflows/release/build-docker.yml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
     permissions:
-      contents: write
+      contents: read
       packages: write
       id-token: write
 
-    steps:
-      - name: Get tag from ref
-        id: release_tag
-        run: |
-          TAG="${{ github.ref_name }}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+  generate-notes:
+    name: Generate Release Notes
+    needs: setup
+    uses: ./.github/workflows/release/generate-notes.yml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
 
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build frontend
-        run: bun run build:frontend
-
-      - name: Typecheck all workspaces
-        run: bun run typecheck
-        continue-on-error: true
-
-      - name: Run backend tests
-        run: cd packages/backend && bun run test
-
-      - name: Check for pending migrations
-        working-directory: packages/backend
-        run: |
-          # Run drizzle-kit generate in dry-run mode to detect schema drift.
-          bunx drizzle-kit generate 2>&1 | tee /tmp/sqlite-migrate.log
-          bunx drizzle-kit generate --config drizzle.config.postgres.ts 2>&1 | tee /tmp/pg-migrate.log
-
-          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard drizzle/migrations drizzle/migrations_pg)" ]; then
-            echo "✅ No pending migrations"
-          else
-            echo "::error::Pending migrations detected! Wait for generate-migrations workflow."
-            exit 1
-          fi
-
-      - name: Compile Binaries
-        env:
-          APP_VERSION: ${{ steps.release_tag.outputs.tag }}
-        run: |
-          bun run compile:linux
-          bun run compile:macos
-          bun run compile:windows
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            APP_VERSION=${{ steps.release_tag.outputs.tag }}
-
-      - name: Smoke test Docker image
-        timeout-minutes: 1
-        run: |
-          echo "Starting smoke test for Docker image..."
-          TEST_ADMIN_KEY="test-admin-key-$(openssl rand -hex 8)"
-          
-          # Run container in background
-          docker run -d \
-            --name plexus-smoke-test \
-            -p 4000:4000 \
-            -e DATABASE_URL="sqlite://:memory:" \
-            -e ADMIN_KEY="$TEST_ADMIN_KEY" \
-            ghcr.io/${{ github.repository }}:${{ steps.release_tag.outputs.tag }}
-          
-          echo "Waiting for container to be healthy (30s timeout)..."
-          SECONDS=0
-          MAX_WAIT=30
-          
-          while [ $SECONDS -lt $MAX_WAIT ]; do
-            if curl -sf http://localhost:4000/health 2>/dev/null || \
-               curl -sf http://localhost:4000/v1/models 2>/dev/null; then
-              echo "✅ Container started successfully and responded on port 4000"
-              docker stop plexus-smoke-test
-              docker rm plexus-smoke-test
-              exit 0
-            fi
-            
-            # Check if container is still running
-            if ! docker ps -q -f name=plexus-smoke-test | grep -q .; then
-              echo "❌ Container crashed or exited unexpectedly"
-              docker logs plexus-smoke-test 2>/dev/null || true
-              docker rm plexus-smoke-test 2>/dev/null || true
-              exit 1
-            fi
-            
-            sleep 1
-          done
-          
-          echo "❌ Container failed to start within 30 seconds"
-          docker logs plexus-smoke-test 2>/dev/null || true
-          docker stop plexus-smoke-test 2>/dev/null || true
-          docker rm plexus-smoke-test 2>/dev/null || true
-          exit 1
-
-      - name: Get previous release tag
-        id: prev_tag
-        run: |
-          CURRENT_TAG="${{ steps.release_tag.outputs.tag }}"
-          CURRENT_SHA=$(git rev-parse "${CURRENT_TAG}^{}")
-
-          # Find the previous tag that is an actual ancestor
-          PREV_TAG=""
-          for tag in $(git tag --sort=-version:refname --list "[0-9]*.[0-9]*.[0-9]*.[0-9]*" "v*.*.*" 2>/dev/null); do
-            if [ "$tag" = "$CURRENT_TAG" ]; then continue; fi
-            tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || true)
-            [ -z "$tag_sha" ] && continue
-            if git merge-base --is-ancestor "$tag_sha" "$CURRENT_SHA" 2>/dev/null; then
-              PREV_TAG="$tag"
-              break
-            fi
-          done
-
-          echo "Previous release tag: $PREV_TAG"
-          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
-          echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
-          echo "current_sha=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Gather PR and commit info between tags
-        id: pr_info
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const prevTag = '${{ steps.prev_tag.outputs.tag }}';
-            const currentTag = '${{ steps.prev_tag.outputs.current_tag }}';
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            const { execSync } = require('child_process');
-            let commits;
-            try {
-              commits = execSync(`git log ${prevTag}..${currentTag} --pretty=format:'%H'`, { encoding: 'utf8' }).trim().split('\n');
-            } catch (e) {
-              commits = [];
-            }
-
-            if (commits.length === 0 || (commits.length === 1 && commits[0] === '')) {
-              core.setOutput('pr_summary', 'No commits found between tags.');
-              return;
-            }
-
-            const prMap = new Map();
-            const standaloneCommits = [];
-
-            for (const sha of commits) {
-              try {
-                const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                  owner, repo, commit_sha: sha
-                });
-                if (prs.length > 0) {
-                  const pr = prs[0];
-                  if (!prMap.has(pr.number)) {
-                    prMap.set(pr.number, {
-                      number: pr.number,
-                      title: pr.title,
-                      url: pr.html_url,
-                      author: pr.user?.login || '',
-                      authorUrl: pr.user?.html_url || '',
-                      commits: []
-                    });
-                  }
-                  prMap.get(pr.number).commits.push(sha.substring(0, 7));
-                } else {
-                  const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
-                  const author = execSync(`git log -1 --pretty=format:'%an' ${sha}`, { encoding: 'utf8' }).trim();
-                  standaloneCommits.push({
-                    sha: sha.substring(0, 7),
-                    message: msg,
-                    author: author,
-                    url: `https://github.com/${owner}/${repo}/commit/${sha}`
-                  });
-                }
-              } catch (e) {
-                const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
-                standaloneCommits.push({
-                  sha: sha.substring(0, 7),
-                  message: msg,
-                  author: '',
-                  url: `https://github.com/${owner}/${repo}/commit/${sha}`
-                });
-              }
-            }
-
-            let summary = '';
-            if (prMap.size > 0) {
-              summary += '## Pull Requests\n\n';
-              for (const [number, pr] of prMap) {
-                summary += `- PR #${number}: ${pr.title} (${pr.url}) by @${pr.author} [${pr.commits.length} commit(s): ${pr.commits.join(', ')}]\n`;
-              }
-              summary += '\n';
-            }
-            if (standaloneCommits.length > 0) {
-              summary += '## Direct Commits (no associated PR)\n\n';
-              for (const c of standaloneCommits) {
-                summary += `- ${c.sha}: ${c.message} (${c.url})`;
-                if (c.author) summary += ` by ${c.author}`;
-                summary += '\n';
-              }
-            }
-
-            core.setOutput('pr_summary', summary);
-
-      - name: Register secrets for masking
-        uses: actions/github-script@v9
-        with:
-          script: |
-            core.setSecret(process.env.PI_MODELS_JSON)
-        env:
-          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
-
-      - name: Generate release notes with pi
-        id: release_notes
-        uses: mcowger/pi-action@main
-        env:
-          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          gist_token: ${{ secrets.PI_GIST_TOKEN }}
-          pi_models_json: ${{ secrets.PI_MODELS_JSON }}
-          provider: openrouter
-          model: ${{ vars.PLEXUS_MODEL }}
-          output_mode: output
-          share_session: true
-          prompt_template_file: '.github/pi-prompts/release-notes.md'
-          prompt: |
-            Version: ${{ steps.release_tag.outputs.tag }}
-
-            ## Source Changes
-
-            ${{ steps.pr_info.outputs.pr_summary }}
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
-          files: |
-            plexus-linux
-            plexus-macos
-            plexus.exe
-          draft: false
-          prerelease: false
-          body: ${{ steps.release_notes.outputs.response || steps.pr_info.outputs.pr_summary }}
+  release:
+    name: Create Release
+    needs: [setup, build-binaries, build-docker, generate-notes]
+    uses: ./.github/workflows/release/publish.yml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
+      pr_summary: ${{ needs.generate-notes.outputs.pr_summary }}
+      release_notes_response: ${{ needs.generate-notes.outputs.response }}
+    permissions:
+      contents: write

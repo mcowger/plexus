@@ -1,0 +1,103 @@
+name: Build Docker Image
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The release tag"
+
+jobs:
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: workspace
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/bun.lock') }}
+
+      - name: Build frontend
+        run: bun run build:frontend
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ inputs.tag }}
+
+      - name: Smoke test Docker image
+        timeout-minutes: 1
+        run: |
+          echo "Starting smoke test for Docker image..."
+          TEST_ADMIN_KEY="test-admin-key-$(openssl rand -hex 8)"
+
+          # Run container in background
+          docker run -d \
+            --name plexus-smoke-test \
+            -p 4000:4000 \
+            -e DATABASE_URL="sqlite://:memory:" \
+            -e ADMIN_KEY="$TEST_ADMIN_KEY" \
+            ghcr.io/${{ github.repository }}:${{ inputs.tag }}
+
+          echo "Waiting for container to be healthy (30s timeout)..."
+          SECONDS=0
+          MAX_WAIT=30
+
+          while [ $SECONDS -lt $MAX_WAIT ]; do
+            if curl -sf http://localhost:4000/health 2>/dev/null || \
+               curl -sf http://localhost:4000/v1/models 2>/dev/null; then
+              echo "✅ Container started successfully and responded on port 4000"
+              docker stop plexus-smoke-test
+              docker rm plexus-smoke-test
+              exit 0
+            fi
+
+            # Check if container is still running
+            if ! docker ps -q -f name=plexus-smoke-test | grep -q .; then
+              echo "❌ Container crashed or exited unexpectedly"
+              docker logs plexus-smoke-test 2>/dev/null || true
+              docker rm plexus-smoke-test 2>/dev/null || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "❌ Container failed to start within 30 seconds"
+          docker logs plexus-smoke-test 2>/dev/null || true
+          docker stop plexus-smoke-test 2>/dev/null || true
+          docker rm plexus-smoke-test 2>/dev/null || true
+          exit 1

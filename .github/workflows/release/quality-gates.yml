@@ -1,0 +1,48 @@
+name: Quality Gates
+on:
+  workflow_call:
+
+jobs:
+  quality-gates:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: workspace
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/bun.lock') }}
+
+      - name: Build frontend
+        run: bun run build:frontend
+
+      - name: Typecheck all workspaces
+        run: bun run typecheck
+        continue-on-error: true
+
+      - name: Run backend tests
+        run: cd packages/backend && bun run test
+
+      - name: Check for pending migrations
+        working-directory: packages/backend
+        run: |
+          # Run drizzle-kit generate in dry-run mode to detect schema drift.
+          bunx drizzle-kit generate 2>&1 | tee /tmp/sqlite-migrate.log
+          bunx drizzle-kit generate --config drizzle.config.postgres.ts 2>&1 | tee /tmp/pg-migrate.log
+
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard drizzle/migrations drizzle/migrations_pg)" ]; then
+            echo "✅ No pending migrations"
+          else
+            echo "::error::Pending migrations detected! Wait for generate-migrations workflow."
+            exit 1
+          fi

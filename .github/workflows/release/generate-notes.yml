@@ -1,0 +1,164 @@
+name: Generate Release Notes
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The release tag"
+    outputs:
+      pr_summary:
+        value: ${{ jobs.generate-notes.outputs.pr_summary }}
+      response:
+        value: ${{ jobs.generate-notes.outputs.response }}
+
+jobs:
+  generate-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      pr_summary: ${{ steps.pr_info.outputs.pr_summary }}
+      response: ${{ steps.release_notes.outputs.response }}
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: workspace
+
+      - name: Get previous release tag
+        id: prev_tag
+        run: |
+          CURRENT_TAG="${{ inputs.tag }}"
+          CURRENT_SHA=$(git rev-parse "${CURRENT_TAG}^{}")
+
+          # Find the previous tag that is an actual ancestor
+          PREV_TAG=""
+          for tag in $(git tag --sort=-version:refname --list "[0-9]*.[0-9]*.[0-9]*.[0-9]*" "v*.*.*" 2>/dev/null); do
+            if [ "$tag" = "$CURRENT_TAG" ]; then continue; fi
+            tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || true)
+            [ -z "$tag_sha" ] && continue
+            if git merge-base --is-ancestor "$tag_sha" "$CURRENT_SHA" 2>/dev/null; then
+              PREV_TAG="$tag"
+              break
+            fi
+          done
+
+          echo "Previous release tag: $PREV_TAG"
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+          echo "current_sha=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Gather PR and commit info between tags
+        id: pr_info
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const prevTag = '${{ steps.prev_tag.outputs.tag }}';
+            const currentTag = '${{ steps.prev_tag.outputs.current_tag }}';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { execSync } = require('child_process');
+            let commits;
+            try {
+              commits = execSync(`git log ${prevTag}..${currentTag} --pretty=format:'%H'`, { encoding: 'utf8' }).trim().split('\n');
+            } catch (e) {
+              commits = [];
+            }
+
+            if (commits.length === 0 || (commits.length === 1 && commits[0] === '')) {
+              core.setOutput('pr_summary', 'No commits found between tags.');
+              return;
+            }
+
+            const prMap = new Map();
+            const standaloneCommits = [];
+
+            for (const sha of commits) {
+              try {
+                const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  owner, repo, commit_sha: sha
+                });
+                if (prs.length > 0) {
+                  const pr = prs[0];
+                  if (!prMap.has(pr.number)) {
+                    prMap.set(pr.number, {
+                      number: pr.number,
+                      title: pr.title,
+                      url: pr.html_url,
+                      author: pr.user?.login || '',
+                      authorUrl: pr.user?.html_url || '',
+                      commits: []
+                    });
+                  }
+                  prMap.get(pr.number).commits.push(sha.substring(0, 7));
+                } else {
+                  const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
+                  const author = execSync(`git log -1 --pretty=format:'%an' ${sha}`, { encoding: 'utf8' }).trim();
+                  standaloneCommits.push({
+                    sha: sha.substring(0, 7),
+                    message: msg,
+                    author: author,
+                    url: `https://github.com/${owner}/${repo}/commit/${sha}`
+                  });
+                }
+              } catch (e) {
+                const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
+                standaloneCommits.push({
+                  sha: sha.substring(0, 7),
+                  message: msg,
+                  author: '',
+                  url: `https://github.com/${owner}/${repo}/commit/${sha}`
+                });
+              }
+            }
+
+            let summary = '';
+            if (prMap.size > 0) {
+              summary += '## Pull Requests\n\n';
+              for (const [number, pr] of prMap) {
+                summary += `- PR #${number}: ${pr.title} (${pr.url}) by @${pr.author} [${pr.commits.length} commit(s): ${pr.commits.join(', ')}]\n`;
+              }
+              summary += '\n';
+            }
+            if (standaloneCommits.length > 0) {
+              summary += '## Direct Commits (no associated PR)\n\n';
+              for (const c of standaloneCommits) {
+                summary += `- ${c.sha}: ${c.message} (${c.url})`;
+                if (c.author) summary += ` by ${c.author}`;
+                summary += '\n';
+              }
+            }
+
+            core.setOutput('pr_summary', summary);
+
+      - name: Register secrets for masking
+        uses: actions/github-script@v9
+        with:
+          script: |
+            core.setSecret(process.env.PI_MODELS_JSON)
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+
+      - name: Generate release notes with pi
+        id: release_notes
+        uses: mcowger/pi-action@main
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gist_token: ${{ secrets.PI_GIST_TOKEN }}
+          pi_models_json: ${{ secrets.PI_MODELS_JSON }}
+          provider: openrouter
+          model: ${{ vars.PLEXUS_MODEL }}
+          output_mode: output
+          share_session: true
+          prompt_template_file: '.github/pi-prompts/release-notes.md'
+          prompt: |
+            Version: ${{ inputs.tag }}
+
+            ## Source Changes
+
+            ${{ steps.pr_info.outputs.pr_summary }}
