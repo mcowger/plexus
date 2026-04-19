@@ -1,4 +1,5 @@
 name: Pi Assistant
+run-name: ${{ github.event.issue.title || github.event.pull_request.title || 'Pi Assistant' }}
 
 on:
   issues:
