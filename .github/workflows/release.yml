@@ -263,36 +263,13 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           output_mode: output
           share_session: false
+          prompt_template_file: '.github/pi-prompts/release-notes.md'
           prompt: |
-            You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
-
-            IMPORTANT: Do NOT use any tools. Do NOT read any files or run any commands. You must respond with your full output in a single turn using only the information provided below.
+            Version: ${{ steps.release_tag.outputs.tag }}
 
             ## Source Changes
 
             ${{ steps.pr_info.outputs.pr_summary }}
-
-            ---
-
-            ## Instructions:
-
-            Generate release notes following this exact structure. Start IMMEDIATELY with the version heading:
-
-            ## ${{ steps.release_tag.outputs.tag }}
-
-            ### New Features (if any)
-            [Narrative prose about notable features]
-
-            ### Added / Changed / Fixed / Security
-            [Categorized bullets with PR and author references]
-
-            ## Formatting Rules
-
-            - For pull request references, use `#NNN` (e.g., #218) — GitHub auto-links these. Do NOT wrap them in markdown links like `[#218](url)`.
-            - For author/contributor mentions, use `@username` (e.g., @supermeap123) — GitHub auto-links and notifies the user. Do NOT wrap in markdown links.
-            - Every bullet that came from a PR MUST include `#NNN` and `@username`.
-            - Every bullet that came from a direct commit MUST include the short SHA and the author name.
-            - Example bullet: `- Added configurable utilization thresholds to quota checker (#218 by @supermeap123)`
 
       - name: Create Release
         uses: softprops/action-gh-release@v3

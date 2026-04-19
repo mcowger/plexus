@@ -75,23 +75,7 @@ jobs:
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
           share_session: false
           pr_number: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number || '' }}
-          prompt: |
-            You are reviewing a pull request for **Plexus**, a unified LLM API gateway built on Bun + Fastify.
-
-            Perform a thorough code review. Focus on:
-
-            - **Correctness:** Logic errors, off-by-ones, race conditions, unhandled edge cases
-            - **Security:** Injection vectors, secret leaks, unsafe input handling
-            - **Performance:** Unnecessary allocations, N+1 queries, blocking calls in async paths
-            - **Design:** Proper separation of concerns, consistent patterns with the rest of the codebase
-            - **Project conventions:**
-              - Bun runtime (not Node.js-specific APIs)
-              - Zod for validation, Drizzle ORM for DB
-              - Frontend uses Tailwind v4 (never import CSS into TS/TSX files)
-              - Use centralized formatters
-            - **Testing:** Missing test coverage for new logic, proper use of `registerSpy` from test utils
-
-            Include inline comments using the pr-review code block format.
+          prompt_template_file: '.github/pi-prompts/pr-review.md'
 
       - name: Update PR check to complete
         if: github.event_name == 'workflow_dispatch' && always()
