@@ -8,12 +8,14 @@ name: Pi Coding Agent
 #
 #   Variables:
 #     PLEXUS_MODEL       — Main work model; must be a name known to the
-#                          overridden provider (openai), e.g. gpt-4o-mini
+#                          overridden provider (openrouter), e.g.
+#                          anthropic/claude-sonnet-4-5 or z-ai/glm-4.6
 #     PLEXUS_SMALL_MODEL — Fast/classification model (same constraint)
 #
 # The pi-env-var-provider extension is used in Mode 2 (override): it rewires
-# the built-in "openai" provider's baseUrl to PLEXUS_BASE_URL so requests are
-# routed through the Plexus proxy while keeping openai's built-in model list.
+# the built-in "openrouter" provider's baseUrl to PLEXUS_BASE_URL so requests
+# are routed through the Plexus proxy while keeping openrouter's built-in
+# model list.
 # Mode 1 (new provider) does not work here because pi-coding-agent-action
 # resolves the model in the Agent constructor BEFORE extensions are loaded.
 #
@@ -67,10 +69,10 @@ jobs:
         env:
           PI_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           PI_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
-          PI_OVERRIDE_PROVIDER: openai
+          PI_OVERRIDE_PROVIDER: openrouter
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          provider: openai
+          provider: openrouter
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.PLEXUS_API_KEY }}
           thinking_level: low
@@ -108,10 +110,10 @@ jobs:
         env:
           PI_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
           PI_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
-          PI_OVERRIDE_PROVIDER: openai
+          PI_OVERRIDE_PROVIDER: openrouter
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          provider: openai
+          provider: openrouter
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.PLEXUS_API_KEY }}
           thinking_level: high
