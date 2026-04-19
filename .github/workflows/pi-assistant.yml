@@ -44,7 +44,17 @@ jobs:
                 "openrouter": {
                   "baseUrl": "PLEXUS_BASE_URL",
                   "apiKey": "PLEXUS_API_KEY",
-                  "api": "openai-completions"
+                  "api": "openai-completions",
+                  "models": [
+                    {
+                      "id": "moonshotai/kimi-k2.5",
+                      "name": "Kimi K2.5",
+                      "reasoning": true,
+                      "input": ["text", "image"],
+                      "contextWindow": 262144,
+                      "maxTokens": 65536
+                    }
+                  ]
                 }
               }
             }
