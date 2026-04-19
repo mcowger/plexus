@@ -6,6 +6,7 @@ import { logger } from './logger';
  *
  * @param text - The text to estimate tokens for
  * @returns Estimated token count
+ * sdf
  */
 export function estimateTokens(text: string): number {
   if (!text || text.length === 0) return 0;
