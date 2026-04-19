@@ -284,7 +284,15 @@ jobs:
             [Narrative prose about notable features]
 
             ### Added / Changed / Fixed / Security
-            [Categorized bullets with PR references]
+            [Categorized bullets with PR and author references]
+
+            ## Formatting Rules
+
+            - For pull request references, use `#NNN` (e.g., #218) — GitHub auto-links these. Do NOT wrap them in markdown links like `[#218](url)`.
+            - For author/contributor mentions, use `@username` (e.g., @supermeap123) — GitHub auto-links and notifies the user. Do NOT wrap in markdown links.
+            - Every bullet that came from a PR MUST include `#NNN` and `@username`.
+            - Every bullet that came from a direct commit MUST include the short SHA and the author name.
+            - Example bullet: `- Added configurable utilization thresholds to quota checker (#218 by @supermeap123)`
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
