@@ -35,6 +35,8 @@ jobs:
 
       - name: Run pi-action
         uses: mcowger/pi-action@main
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
