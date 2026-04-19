@@ -48,43 +48,9 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
           share_session: false
-        # Note: pi-action may have created a PR. We need to find it and dispatch
-        # review/test workflows since GITHUB_TOKEN-created PRs don't trigger
-        # pull_request_target events automatically.
-
-      - name: Find created PR
-        id: find-pr
-        if: github.event_name == 'issue_comment' || github.event_name == 'issues'
-        uses: actions/github-script@v9
-        with:
-          script: |
-            // Search for PRs created by github-actions[bot] in the last few minutes
-            // associated with this issue/comment
-            const { data: pulls } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              sort: 'created',
-              direction: 'desc',
-              per_page: 5
-            });
-
-            // Look for a PR created very recently by github-actions[bot]
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-            const botPr = pulls.find(pr =>
-              pr.user.login === 'github-actions[bot]' &&
-              new Date(pr.created_at) > fiveMinutesAgo
-            );
-
-            if (botPr) {
-              core.setOutput('pr_number', botPr.number);
-              core.info(`Found bot-created PR #${botPr.number}`);
-            } else {
-              core.info('No recently created bot PR found');
-            }
 
       - name: Dispatch PR review workflow
-        if: steps.find-pr.outputs.pr_number != ''
+        if: steps.pi-action.outputs.pr_created == 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -94,13 +60,12 @@ jobs:
               workflow_id: 'pi-pr-review.yml',
               ref: context.ref,
               inputs: {
-                pr_number: '${{ steps.find-pr.outputs.pr_number }}',
-                requested_by: 'pi-assistant'
+                pr_number: '${{ steps.pi-action.outputs.pr_number }}'
               }
             });
 
       - name: Dispatch PR tests workflow
-        if: steps.find-pr.outputs.pr_number != ''
+        if: steps.pi-action.outputs.pr_created == 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -110,7 +75,6 @@ jobs:
               workflow_id: 'pr-tests.yml',
               ref: context.ref,
               inputs: {
-                pr_number: '${{ steps.find-pr.outputs.pr_number }}',
-                requested_by: 'pi-assistant'
+                pr_number: '${{ steps.pi-action.outputs.pr_number }}'
               }
             });
