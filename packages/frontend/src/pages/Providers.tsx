@@ -1049,7 +1049,7 @@ export const Providers = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                    <td className="px-4 py-3 text-left border-b border-border-glass text-text align-middle">
                       <div onClick={(e) => e.stopPropagation()}>
                         <Switch
                           checked={p.enabled !== false}
