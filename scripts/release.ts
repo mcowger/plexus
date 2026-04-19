@@ -66,6 +66,29 @@ async function main() {
   console.log('\n🚀 Plexus Release Process');
   console.log('--------------------------\n');
 
+  // 0. Check if we need to pull
+  try {
+    console.log('🔍 Checking remote for updates...');
+    await run(['git', 'fetch', 'origin']);
+    const branch = (await run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])).trim();
+    if (branch) {
+      const ahead = (await run(['git', 'rev-list', '--count', `HEAD..origin/${branch}`])).trim();
+      if (parseInt(ahead) > 0) {
+        console.log(`⚠️  Local branch is ${ahead} commit(s) behind origin/${branch}.`);
+        console.log('   Run `git pull` and then re-run this script.');
+        process.exit(1);
+      }
+      const behind = (await run(['git', 'rev-list', '--count', `origin/${branch}..HEAD`])).trim();
+      if (parseInt(behind) > 0) {
+        console.log(`ℹ️  Local branch is ${behind} commit(s) ahead of origin/${branch}.`);
+      } else {
+        console.log('✅ Local is up to date with remote.\n');
+      }
+    }
+  } catch (e) {
+    console.log('⚠️  Could not check remote status, continuing anyway...\n');
+  }
+
   // 1. Get current version tags
   let currentTag: CalVerTag | null = null;
   try {
