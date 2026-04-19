@@ -12,14 +12,12 @@ name: Pi Coding Agent
 #                          anthropic/claude-sonnet-4-5 or z-ai/glm-4.6
 #     PLEXUS_SMALL_MODEL — Fast/classification model (same constraint)
 #
-# The local plexus-override extension (.github/pi-extensions/plexus-override)
-# mutates the pi-ai built-in openrouter model objects in place so their baseUrl
-# points at PLEXUS_BASE_URL. This is required because pi-coding-agent-action's
-# Agent constructor caches the resolved Model reference BEFORE extensions load;
-# calling pi.registerProvider() in override mode replaces the registry's model
-# objects via .map() and leaves the cached reference stale. In-place mutation
-# of the source-of-truth objects updates every reference, including the
-# Agent's, so requests are routed to the Plexus proxy with the Plexus API key.
+# The pi-env-var-provider extension is used in Mode 2 (override): it rewires
+# the built-in "openrouter" provider's baseUrl to PLEXUS_BASE_URL so requests
+# are routed through the Plexus proxy while keeping openrouter's built-in
+# model list.
+# Mode 1 (new provider) does not work here because pi-coding-agent-action
+# resolves the model in the Agent constructor BEFORE extensions are loaded.
 #
 # Trigger with: @pi in comments, PR reviews, or issue bodies
 #
@@ -69,8 +67,9 @@ jobs:
         id: pi
         uses: shaftoe/pi-coding-agent-action@v2
         env:
-          PLEXUS_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
-          PLEXUS_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
+          PI_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_OVERRIDE_PROVIDER: openrouter
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
@@ -79,7 +78,7 @@ jobs:
           thinking_level: low
           trigger: '@pi'
           extensions: |
-            .github/pi-extensions/plexus-override
+            git:github.com/mcowger/pi-env-var-provider
           load_builtin_extensions: true
 
   # Automated PR code review (no trigger required)
@@ -110,8 +109,9 @@ jobs:
         id: pi-review
         uses: shaftoe/pi-coding-agent-action@v2
         env:
-          PLEXUS_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
-          PLEXUS_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_BASE_URL: ${{ secrets.PLEXUS_BASE_URL }}
+          PI_API_KEY: ${{ secrets.PLEXUS_API_KEY }}
+          PI_OVERRIDE_PROVIDER: openrouter
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
@@ -120,5 +120,5 @@ jobs:
           thinking_level: high
           prompt: 'Review this pull request for code quality, security issues, potential bugs, and provide constructive feedback. Focus on the changes introduced in this PR.'
           extensions: |
-            .github/pi-extensions/plexus-override
+            git:github.com/mcowger/pi-env-var-provider
           load_builtin_extensions: true
