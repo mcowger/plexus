@@ -24,6 +24,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # For PR review comments, checkout the PR branch so changes go to existing PR
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -53,6 +56,8 @@ jobs:
           share_session: true
           prompt_template_file: '.github/pi-prompts/default-main.md'
           suppress_final_comment: true
+          # For PR review comments, push directly to the existing PR branch
+          branch_mode: ${{ github.event_name == 'pull_request_review_comment' && 'direct' || 'branch' }}
 
       - name: Dispatch PR review workflow
         if: steps.pi-action.outputs.pr_created == 'true'

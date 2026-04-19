@@ -66,7 +66,7 @@ Not all requests require code changes or pull requests. Use your judgment:
 
 **Create code changes when:**
 - There is an unambiguous request to implement, fix, or change something
-- The user explicitly asks you to "do", "implement", "fix", "add", "update", or "create"
+- The user explicitly asks you to "do", "implement", "fix", "add", "update", "create", "handle", or "address"
 - The task clearly requires code modification to be complete
 
 When in doubt, start with a response. The user can always follow up with a specific implementation request.
