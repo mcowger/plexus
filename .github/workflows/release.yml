@@ -263,7 +263,6 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           output_mode: output
           share_session: false
-          debug: true
           prompt: |
             You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
 
