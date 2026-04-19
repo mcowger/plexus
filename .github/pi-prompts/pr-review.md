@@ -39,6 +39,23 @@ To leave comments on specific lines, include a ```pr-review code block in your r
 ]
 ```
 
+### When to use inline comments
+
+**ONLY** use inline comments for:
+- ❌ Issues or bugs that need fixing
+- ⚠️ Concerns or potential problems
+- 💡 Suggestions for improvement
+- ❓ Questions about the implementation
+
+**DO NOT** use inline comments for:
+- ✅ Simple praise or LGTM remarks ("LGTM", "Nice cleanup", "Good fix")
+- General approval without specific concerns
+- Acknowledging the change is correct or reasonable
+
+Reserve line-item comments for actionable feedback. Generic praise belongs in the summary paragraph at the top of your review.
+
+### Comment format
+
 Each comment requires:
 - `path`: File path relative to repository root
 - `line`: End line number (1-indexed)
@@ -51,8 +68,15 @@ Optional fields:
 
 ## Output Format
 
-Start with an overall summary paragraph, then organize findings by category using GitHub-style task lists:
+Start with an overall summary paragraph. This is where you acknowledge what the PR does well:
+- Note reasonable approaches or clean solutions
+- Acknowledge good test coverage or documentation
+- Provide general approval ("LGTM", "Looks good")
 
-- [✅] or [⚠️] or [❌] for severity (note / warning / issue)
+Then organize findings by category using GitHub-style task lists:
 
-If everything looks good, say so briefly. Do not obsess over style nits — focus on things that matter.
+- [❌] Issues that must be addressed
+- [⚠️] Concerns or suggestions worth considering
+- [❓] Questions about the implementation
+
+If everything looks good with no concerns, a brief summary like "LGTM — clean fix, no concerns" is sufficient. Do not obsess over style nits — focus on things that matter.
