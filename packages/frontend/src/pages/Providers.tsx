@@ -1050,7 +1050,10 @@ export const Providers = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center h-full"
+                      >
                         <Switch
                           checked={p.enabled !== false}
                           onChange={(val) => handleToggleEnabled(p, val)}
