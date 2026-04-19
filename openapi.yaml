@@ -1,0 +1,3276 @@
+# Plexus API OpenAPI 3.1.0 Specification
+# https://github.com/mcowger/plexus
+
+openapi: 3.1.0
+info:
+  title: Plexus API
+  description: |
+    Plexus is a unified API gateway for LLMs. It exposes OpenAI- and Anthropic-compatible endpoints
+    and routes requests to any backend provider, handling request/response transformation automatically.
+    
+    ## Authentication
+    
+    **Inference APIs (`/v1/*`, `/v1beta/*`):**
+    Require a Plexus API key passed via one of the following methods (checked in order):
+    - `Authorization: Bearer sk-my-key`
+    - `Authorization: sk-my-key`
+    - `x-api-key: sk-my-key`
+    - `x-goog-api-key: sk-my-key`
+    - Query parameter: `?key=sk-my-key`
+    
+    **Dynamic Key Attribution:**
+    Append `:label` to the key for usage tracking:
+    - `Authorization: Bearer sk-my-key:copilot`
+    
+    **Management APIs (`/v0/management/*`, `/v0/quotas/*`):**
+    Require the `x-admin-key` header matching the `ADMIN_KEY` environment variable.
+    
+    **Public Endpoints (No Auth Required):**
+    - `GET /health`
+    - `GET /v1/models`
+    - `GET /v1/openrouter/models`
+    - `GET /v1/metadata/search`
+    - All `/.well-known/*` endpoints
+    - `POST /register`
+  version: '1.0.0'
+  contact:
+    name: Plexus
+    url: https://github.com/mcowger/plexus
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+
+# Security Schemes
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API Key authentication for inference endpoints. Use your Plexus API key as the bearer token.
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Alternative API key authentication via header
+    apiKeyGoog:
+      type: apiKey
+      in: header
+      name: x-goog-api-key
+      description: Google-compatible API key authentication via header
+    apiKeyQuery:
+      type: apiKey
+      in: query
+      name: key
+      description: API key authentication via query parameter
+    adminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+      description: Admin key authentication for management endpoints
+
+# Reusable Components
+  schemas:
+    # Error Schemas
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            code:
+              type: integer
+          required:
+            - message
+            - type
+
+    ConflictError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Quota is assigned to one or more keys
+            type:
+              type: string
+              enum: [conflict]
+            code:
+              type: integer
+              example: 409
+          required:
+            - message
+            - type
+            - code
+
+    AuthError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+              enum: [auth_error]
+            code:
+              type: integer
+              example: 401
+          required:
+            - message
+            - type
+            - code
+
+    # Model Schemas
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          example: model
+        created:
+          type: integer
+          description: Unix timestamp
+        owned_by:
+          type: string
+          example: plexus
+        name:
+          type: string
+          description: Present when metadata is configured
+        description:
+          type: string
+        context_length:
+          type: integer
+        architecture:
+          type: object
+          properties:
+            input_modalities:
+              type: array
+              items:
+                type: string
+            output_modalities:
+              type: array
+              items:
+                type: string
+            tokenizer:
+              type: string
+        pricing:
+          type: object
+          properties:
+            prompt:
+              type: string
+            completion:
+              type: string
+            input_cache_read:
+              type: string
+        supported_parameters:
+          type: array
+          items:
+            type: string
+        top_provider:
+          type: object
+          properties:
+            context_length:
+              type: integer
+            max_completion_tokens:
+              type: integer
+      required:
+        - id
+        - object
+        - created
+        - owned_by
+
+    ModelsList:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Model'
+      required:
+        - object
+        - data
+
+    MetadataSearchResult:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        count:
+          type: integer
+      required:
+        - data
+        - count
+
+    # Chat Completions Schemas
+    ChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system, tool]
+        content:
+          oneOf:
+            - type: string
+            - type: null
+            - type: array
+              items:
+                type: object
+        name:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
+        tool_call_id:
+          type: string
+      required:
+        - role
+        - content
+
+    ToolDefinition:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            parameters:
+              type: object
+          required:
+            - name
+            - parameters
+      required:
+        - type
+        - function
+
+    ChatCompletionRequest:
+      type: object
+      properties:
+        model:
+          type: string
+          description: The model identifier or alias
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        max_tokens:
+          type: integer
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        stream:
+          type: boolean
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolDefinition'
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [auto, none, required]
+            - type: object
+        response_format:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [text, json_object, json_schema]
+            json_schema:
+              type: object
+        parallel_tool_calls:
+          type: boolean
+        top_p:
+          type: number
+        frequency_penalty:
+          type: number
+        presence_penalty:
+          type: number
+        user:
+          type: string
+      required:
+        - model
+        - messages
+
+    ChatCompletionChoice:
+      type: object
+      properties:
+        index:
+          type: integer
+        message:
+          $ref: '#/components/schemas/ChatMessage'
+        finish_reason:
+          type: string
+      required:
+        - index
+        - message
+
+    UsageInfo:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+        prompt_tokens_details:
+          type: object
+        completion_tokens_details:
+          type: object
+      required:
+        - prompt_tokens
+        - completion_tokens
+        - total_tokens
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [chat.completion]
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatCompletionChoice'
+        usage:
+          $ref: '#/components/schemas/UsageInfo'
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+
+    ChatCompletionStreamChunk:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [chat.completion.chunk]
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              delta:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  content:
+                    type: string
+                  tool_calls:
+                    type: array
+              finish_reason:
+                type: string
+
+    # Embeddings Schemas
+    EmbeddingsRequest:
+      type: object
+      properties:
+        model:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        encoding_format:
+          type: string
+          enum: [float, base64]
+        dimensions:
+          type: integer
+        user:
+          type: string
+      required:
+        - model
+        - input
+
+    Embedding:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [embedding]
+        embedding:
+          type: array
+          items:
+            type: number
+        index:
+          type: integer
+      required:
+        - object
+        - embedding
+        - index
+
+    EmbeddingsResponse:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Embedding'
+        model:
+          type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+      required:
+        - object
+        - data
+        - model
+
+    # Audio/Speech Schemas
+    SpeechRequest:
+      type: object
+      properties:
+        model:
+          type: string
+        input:
+          type: string
+          maxLength: 4096
+        voice:
+          type: string
+          enum:
+            [alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse, marin, cedar]
+        instructions:
+          type: string
+        response_format:
+          type: string
+          enum: [mp3, opus, aac, flac, wav, pcm]
+        speed:
+          type: number
+          minimum: 0.25
+          maximum: 4.0
+        stream_format:
+          type: string
+          enum: [sse, audio]
+      required:
+        - model
+        - input
+        - voice
+
+    TranscriptionRequest:
+      type: object
+      properties:
+        model:
+          type: string
+        file:
+          type: string
+          format: binary
+        language:
+          type: string
+        prompt:
+          type: string
+        response_format:
+          type: string
+          enum: [json, text, verbose_json]
+        temperature:
+          type: number
+      required:
+        - model
+        - file
+
+    TranscriptionResponse:
+      type: object
+      properties:
+        text:
+          type: string
+        language:
+          type: string
+        duration:
+          type: number
+        segments:
+          type: array
+          items:
+            type: object
+        usage:
+          type: object
+          properties:
+            input_tokens:
+              type: integer
+            output_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    # Images Schemas
+    ImagesGenerationRequest:
+      type: object
+      properties:
+        model:
+          type: string
+        prompt:
+          type: string
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+        size:
+          type: string
+          enum: ['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792']
+        response_format:
+          type: string
+          enum: [url, b64_json]
+        quality:
+          type: string
+          enum: [standard, hd, high, medium, low]
+        style:
+          type: string
+          enum: [vivid, natural]
+        user:
+          type: string
+      required:
+        - model
+        - prompt
+
+    ImagesResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+              b64_json:
+                type: string
+              revised_prompt:
+                type: string
+
+    # Responses API Schemas (OpenAI Compatible)
+    ResponsesInputItem:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [message, function_call, function_call_output, reasoning]
+        id:
+          type: string
+
+    ResponsesMessageItem:
+      allOf:
+        - $ref: '#/components/schemas/ResponsesInputItem'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [message]
+            role:
+              type: string
+              enum: [user, assistant, system, developer]
+            content:
+              type: array
+
+    ResponsesRequest:
+      type: object
+      properties:
+        model:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: '#/components/schemas/ResponsesInputItem'
+        instructions:
+          type: string
+        tools:
+          type: array
+          items:
+            type: object
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [none, auto, required]
+            - type: object
+        parallel_tool_calls:
+          type: boolean
+        temperature:
+          type: number
+        top_p:
+          type: number
+        max_output_tokens:
+          type: integer
+        reasoning:
+          type: object
+          properties:
+            effort:
+              type: string
+              enum: [low, medium, high, minimal, xhigh]
+            summary:
+              type: string
+            max_tokens:
+              type: integer
+        stream:
+          type: boolean
+        store:
+          type: boolean
+        previous_response_id:
+          type: string
+        conversation:
+          oneOf:
+            - type: string
+            - type: object
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - model
+        - input
+
+    ResponsesResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          example: response
+        created_at:
+          type: integer
+        status:
+          type: string
+          enum: [completed, failed, in_progress, cancelled, queued, incomplete]
+        model:
+          type: string
+        output:
+          type: array
+        usage:
+          $ref: '#/components/schemas/UsageInfo'
+        previous_response_id:
+          type: string
+        incomplete_details:
+          type: object
+        error:
+          $ref: '#/components/schemas/Error'
+      required:
+        - id
+        - object
+        - created_at
+        - status
+        - model
+
+    # Usage Record Schema
+    UsageRecord:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+        sourceIp:
+          type: string
+          nullable: true
+        apiKey:
+          type: string
+          nullable: true
+        attribution:
+          type: string
+          nullable: true
+        incomingApiType:
+          type: string
+        provider:
+          type: string
+          nullable: true
+        attemptCount:
+          type: integer
+        incomingModelAlias:
+          type: string
+          nullable: true
+        canonicalModelName:
+          type: string
+          nullable: true
+        selectedModelName:
+          type: string
+          nullable: true
+        outgoingApiType:
+          type: string
+          nullable: true
+        tokensInput:
+          type: integer
+          nullable: true
+        tokensOutput:
+          type: integer
+          nullable: true
+        tokensReasoning:
+          type: integer
+          nullable: true
+        tokensCached:
+          type: integer
+          nullable: true
+        tokensCacheWrite:
+          type: integer
+          nullable: true
+        costTotal:
+          type: number
+          nullable: true
+        costSource:
+          type: string
+          nullable: true
+        durationMs:
+          type: integer
+        ttftMs:
+          type: integer
+          nullable: true
+        tokensPerSec:
+          type: number
+          nullable: true
+        isStreamed:
+          type: boolean
+        responseStatus:
+          type: string
+          enum: [success, error]
+        finishReason:
+          type: string
+          nullable: true
+        hasDebug:
+          type: boolean
+        hasError:
+          type: boolean
+
+    UsageListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageRecord'
+        total:
+          type: integer
+
+    UsageSummaryResponse:
+      type: object
+      properties:
+        range:
+          type: string
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              bucketStartMs:
+                type: integer
+              requests:
+                type: integer
+              inputTokens:
+                type: integer
+              outputTokens:
+                type: integer
+              cachedTokens:
+                type: integer
+              cacheWriteTokens:
+                type: integer
+              tokens:
+                type: integer
+              kwhUsed:
+                type: number
+        stats:
+          type: object
+          properties:
+            totalRequests:
+              type: integer
+            totalTokens:
+              type: integer
+            totalKwhUsed:
+              type: number
+            avgDurationMs:
+              type: number
+            totalDurationMs:
+              type: integer
+        today:
+          type: object
+          properties:
+            requests:
+              type: integer
+            inputTokens:
+              type: integer
+            outputTokens:
+              type: integer
+            reasoningTokens:
+              type: integer
+            cachedTokens:
+              type: integer
+            cacheWriteTokens:
+              type: integer
+            totalCost:
+              type: number
+            kwhUsed:
+              type: number
+
+    # Provider Config Schemas
+    ProviderConfig:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+          format: uri
+        apiKey:
+          type: string
+        models:
+          type: object
+          additionalProperties:
+            type: object
+        extraHeaders:
+          type: object
+        disableCooldown:
+          type: boolean
+        quotaChecker:
+          type: object
+        gpu_ram_gb:
+          type: number
+        gpu_bandwidth_tb_s:
+          type: number
+
+    ModelAliasConfig:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              model:
+                type: string
+        metadata:
+          type: object
+          properties:
+            source:
+              type: string
+            source_path:
+              type: string
+            overrides:
+              type: object
+        model_architecture:
+          type: object
+
+    APIKeyConfig:
+      type: object
+      properties:
+        name:
+          type: string
+        secret:
+          type: string
+        allowedProviders:
+          type: array
+          items:
+            type: string
+        allowedModels:
+          type: array
+          items:
+            type: string
+        quota:
+          type: string
+        comment:
+          type: string
+
+    # Quota Schemas
+    QuotaCheckResult:
+      type: object
+      properties:
+        provider:
+          type: string
+        checkerId:
+          type: string
+        windowType:
+          type: string
+        limit:
+          type: number
+        used:
+          type: number
+        remaining:
+          type: number
+        utilizationPercent:
+          type: number
+        unit:
+          type: string
+        status:
+          type: string
+          enum: [ok, warning, critical, exhausted]
+
+    # MCP Schemas
+    McpServerConfig:
+      type: object
+      properties:
+        upstream_url:
+          type: string
+          format: uri
+        enabled:
+          type: boolean
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - upstream_url
+
+    # OAuth Schemas
+    OAuthAuthorizationServer:
+      type: object
+      properties:
+        issuer:
+          type: string
+        authorization_endpoint:
+          type: string
+        token_endpoint:
+          type: string
+        grant_types_supported:
+          type: array
+          items:
+            type: string
+        token_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+        resource_supported:
+          type: boolean
+
+    OAuthProtectedResource:
+      type: object
+      properties:
+        resource:
+          type: string
+        authorization_servers:
+          type: array
+          items:
+            type: string
+        scopes_supported:
+          type: array
+          items:
+            type: string
+        bearer_methods_supported:
+          type: array
+          items:
+            type: string
+
+    OpenIDConfiguration:
+      type: object
+      properties:
+        issuer:
+          type: string
+        authorization_endpoint:
+          type: string
+        token_endpoint:
+          type: string
+        jwks_uri:
+          type: string
+        response_types_supported:
+          type: array
+          items:
+            type: string
+        id_token_signing_alg_values_supported:
+          type: array
+          items:
+            type: string
+
+    DynamicClientRegistration:
+      type: object
+      properties:
+        client_id:
+          type: string
+        client_id_issued_at:
+          type: integer
+        client_secret:
+          type: string
+        grant_types:
+          type: array
+          items:
+            type: string
+        token_endpoint_auth_method:
+          type: string
+
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+      description: Number of records to return
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+      description: Number of records to skip
+
+# Tags
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Inference
+    description: OpenAI/Anthropic-compatible inference endpoints
+  - name: Models
+    description: Model listing and metadata endpoints
+  - name: Management
+    description: Administrative management endpoints (requires admin key)
+  - name: Quotas
+    description: Provider quota monitoring endpoints
+  - name: MCP
+    description: Model Context Protocol proxy endpoints
+  - name: Discovery
+    description: OAuth and discovery endpoints
+
+# API Paths
+paths:
+  # Health
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns OK if the server is running
+      security: []
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  # Models
+  /v1/models:
+    get:
+      tags: [Models]
+      summary: List models
+      description: Returns all configured model aliases with optional enriched metadata
+      security: []
+      responses:
+        '200':
+          description: List of models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelsList'
+
+  /v1/openrouter/models:
+    get:
+      tags: [Models]
+      summary: List OpenRouter models
+      description: Returns models fetched from OpenRouter (requires OpenRouter provider configured)
+      security: []
+      responses:
+        '200':
+          description: List of OpenRouter models
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '503':
+          description: OpenRouter pricing data not yet loaded
+
+  /v1/metadata/search:
+    get:
+      tags: [Models]
+      summary: Search metadata catalog
+      description: Search a loaded metadata catalog for use in admin UI autocomplete
+      security: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [openrouter, models.dev, catwalk]
+          description: Metadata source
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Substring search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+          description: Maximum results to return
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataSearchResult'
+        '400':
+          description: Missing or invalid source parameter
+        '503':
+          description: Requested source not loaded
+
+  /v1/metadata/lookup:
+    get:
+      tags: [Models]
+      summary: Lookup metadata by ID
+      description: Return full metadata for a single model in a catalog source
+      security: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [openrouter, models.dev, catwalk]
+        - name: source_path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metadata found
+        '400':
+          description: Missing or invalid parameters
+        '404':
+          description: Metadata not found
+        '503':
+          description: Source not loaded
+
+  # Chat Completions
+  /v1/chat/completions:
+    post:
+      tags: [Inference]
+      summary: Create chat completion
+      description: OpenAI-compatible chat completions endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionStreamChunk'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Embeddings
+  /v1/embeddings:
+    post:
+      tags: [Inference]
+      summary: Create embeddings
+      description: OpenAI-compatible embeddings endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingsRequest'
+      responses:
+        '200':
+          description: Embeddings response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingsResponse'
+        '401':
+          description: Authentication failed
+
+  # Audio Transcriptions
+  /v1/audio/transcriptions:
+    post:
+      tags: [Inference]
+      summary: Create transcription
+      description: OpenAI-compatible audio transcription endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                model:
+                  type: string
+                language:
+                  type: string
+                prompt:
+                  type: string
+                response_format:
+                  type: string
+                  enum: [json, text]
+                temperature:
+                  type: number
+              required:
+                - file
+                - model
+      responses:
+        '200':
+          description: Transcription response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResponse'
+        '401':
+          description: Authentication failed
+
+  # Audio Speech
+  /v1/audio/speech:
+    post:
+      tags: [Inference]
+      summary: Create speech
+      description: OpenAI-compatible text-to-speech endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpeechRequest'
+      responses:
+        '200':
+          description: Audio data or SSE stream
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            text/event-stream:
+              schema:
+                type: object
+        '401':
+          description: Authentication failed
+
+  # Images
+  /v1/images/generations:
+    post:
+      tags: [Inference]
+      summary: Create image
+      description: OpenAI-compatible image generation endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImagesGenerationRequest'
+      responses:
+        '200':
+          description: Image generation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImagesResponse'
+        '401':
+          description: Authentication failed
+
+  /v1/images/edits:
+    post:
+      tags: [Inference]
+      summary: Edit image
+      description: OpenAI-compatible image edit endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                mask:
+                  type: string
+                  format: binary
+                prompt:
+                  type: string
+                model:
+                  type: string
+                n:
+                  type: integer
+                size:
+                  type: string
+                response_format:
+                  type: string
+                quality:
+                  type: string
+                user:
+                  type: string
+              required:
+                - image
+                - prompt
+      responses:
+        '200':
+          description: Image edit response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImagesResponse'
+        '401':
+          description: Authentication failed
+
+  # Responses API
+  /v1/responses:
+    post:
+      tags: [Inference]
+      summary: Create response
+      description: |
+        OpenAI Responses API compatible endpoint. Supports multi-turn conversations, tool use, and reasoning.
+        State management allows server-side storage of conversation history via `previous_response_id`.
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResponsesRequest'
+      responses:
+        '200':
+          description: Response created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsesResponse'
+            text/event-stream:
+              schema:
+                type: object
+        '401':
+          description: Authentication failed
+        '404':
+          description: Previous response or conversation not found
+
+  /v1/responses/{response_id}:
+    get:
+      tags: [Inference]
+      summary: Get response
+      description: Retrieve a previously stored response by ID
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Response data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsesResponse'
+        '404':
+          description: Response not found
+
+    delete:
+      tags: [Inference]
+      summary: Delete response
+      description: Delete a stored response
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Response deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  id:
+                    type: string
+        '404':
+          description: Response not found
+
+  /v1/conversations/{conversation_id}:
+    get:
+      tags: [Inference]
+      summary: Get conversation
+      description: Retrieve all items in a conversation thread
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation data
+        '404':
+          description: Conversation not found
+
+  # Gemini API
+  /v1beta/models/{model}:{action}:
+    post:
+      tags: [Inference]
+      summary: Gemini API
+      description: Google Generative Language API compatible endpoint
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: model
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [generateContent, streamGenerateContent]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Gemini response
+        '401':
+          description: Authentication failed
+
+  # Management - Auth
+  /v0/management/auth/verify:
+    get:
+      tags: [Management]
+      summary: Verify admin key
+      description: Validates the provided x-admin-key header to confirm it matches ADMIN_KEY
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Key is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  role:
+                    type: string
+                    enum: [admin, limited]
+        '401':
+          description: Invalid or missing admin key
+
+  # Management - Config
+  /v0/management/config:
+    get:
+      tags: [Management]
+      summary: Get configuration
+      description: Returns the current configuration from the database
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Configuration data
+          content:
+            application/x-yaml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+
+    post:
+      tags: [Management]
+      summary: Update configuration
+      description: Replaces the configuration file with validation
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/x-yaml:
+            schema:
+              type: string
+          text/plain:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Config updated
+        '400':
+          description: Schema validation failed
+
+  /v0/management/config/status:
+    get:
+      tags: [Management]
+      summary: Get config status
+      description: Returns configuration status including deprecation warnings
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Config status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  adminKeyFromYaml:
+                    type: boolean
+
+  /v0/management/config/export:
+    get:
+      tags: [Management]
+      summary: Export configuration
+      description: Export full configuration
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Exported configuration
+
+  /v0/management/config/vision-fallthrough:
+    get:
+      tags: [Management]
+      summary: Get vision fallthrough config
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Vision fallthrough configuration
+
+    patch:
+      tags: [Management]
+      summary: Update vision fallthrough config
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Configuration updated
+        '400':
+          description: Invalid request
+
+  # Management - Providers
+  /v0/management/providers:
+    get:
+      tags: [Management]
+      summary: List providers
+      description: Returns all configured providers
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderConfig'
+
+  /v0/management/providers/{providerId}:
+    get:
+      tags: [Management]
+      summary: Get provider
+      description: Get a specific provider configuration
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Provider configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderConfig'
+        '404':
+          description: Provider not found
+
+    put:
+      tags: [Management]
+      summary: Create/update provider
+      description: Full create or replace of provider configuration
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderConfig'
+      responses:
+        '200':
+          description: Provider saved
+        '400':
+          description: Validation failed
+
+    patch:
+      tags: [Management]
+      summary: Patch provider
+      description: Partial update of provider configuration
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Provider updated
+        '404':
+          description: Provider not found
+
+    delete:
+      tags: [Management]
+      summary: Delete provider
+      description: Delete a provider and optionally cascade delete model targets
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cascade
+          in: query
+          schema:
+            type: boolean
+          description: Also remove all model targets that reference this provider
+      responses:
+        '200':
+          description: Provider deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  provider:
+                    type: string
+                  removedTargets:
+                    type: integer
+                  affectedAliases:
+                    type: array
+                    items:
+                      type: string
+        '404':
+          description: Provider not found
+
+  # Management - Aliases
+  /v0/management/aliases:
+    get:
+      tags: [Management]
+      summary: List model aliases
+      description: Returns all configured model aliases
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of aliases
+
+  /v0/management/aliases/{aliasId}:
+    put:
+      tags: [Management]
+      summary: Create/update alias
+      description: Full create or replace of model alias
+      security:
+        - adminKey: []
+      parameters:
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelAliasConfig'
+      responses:
+        '200':
+          description: Alias saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  slug:
+                    type: string
+        '400':
+          description: Validation failed
+
+    patch:
+      tags: [Management]
+      summary: Patch alias
+      description: Partial update of model alias
+      security:
+        - adminKey: []
+      parameters:
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Alias updated
+        '404':
+          description: Alias not found
+
+  /v0/management/models/{aliasId}:
+    delete:
+      tags: [Management]
+      summary: Delete alias
+      description: Delete a model alias
+      security:
+        - adminKey: []
+      parameters:
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alias deleted
+
+  /v0/management/models:
+    delete:
+      tags: [Management]
+      summary: Delete all aliases
+      description: Delete all model aliases
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: All aliases deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deletedCount:
+                    type: integer
+
+  # Management - API Keys
+  /v0/management/keys:
+    get:
+      tags: [Management]
+      summary: List API keys
+      description: Returns all configured API keys
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/APIKeyConfig'
+
+  /v0/management/keys/{name}:
+    put:
+      tags: [Management]
+      summary: Create/update API key
+      description: Full create or replace of API key
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIKeyConfig'
+      responses:
+        '200':
+          description: Key saved
+        '400':
+          description: Validation failed
+
+    delete:
+      tags: [Management]
+      summary: Delete API key
+      description: Delete an API key
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key deleted
+
+  # Management - System Settings
+  /v0/management/system-settings:
+    get:
+      tags: [Management]
+      summary: Get system settings
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: System settings
+
+    patch:
+      tags: [Management]
+      summary: Update system settings
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Settings updated
+
+  # Management - Quota Checker Types
+  /v0/management/quota-checker-types:
+    get:
+      tags: [Management]
+      summary: List quota checker types
+      description: Returns valid quota checker type strings
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of checker types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer
+
+  # Management - Usage
+  /v0/management/usage:
+    get:
+      tags: [Management]
+      summary: List usage records
+      description: Returns usage records with filtering and pagination
+      security:
+        - adminKey: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: apiKey
+          in: query
+          schema:
+            type: string
+        - name: attribution
+          in: query
+          schema:
+            type: string
+        - name: incomingApiType
+          in: query
+          schema:
+            type: string
+            enum: [chat, messages, responses, embeddings, transcriptions, speech, images]
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: incomingModelAlias
+          in: query
+          schema:
+            type: string
+        - name: responseStatus
+          in: query
+          schema:
+            type: string
+            enum: [success, error]
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of field names to return
+      responses:
+        '200':
+          description: Usage records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageListResponse'
+
+    delete:
+      tags: [Management]
+      summary: Delete usage records
+      description: Delete all usage records, optionally filtered by age
+      security:
+        - adminKey: []
+      parameters:
+        - name: olderThanDays
+          in: query
+          schema:
+            type: integer
+          description: Only delete records older than this many days
+      responses:
+        '200':
+          description: Records deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/usage/summary:
+    get:
+      tags: [Management]
+      summary: Get usage summary
+      description: Returns aggregated time-series data and totals
+      security:
+        - adminKey: []
+      parameters:
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Usage summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageSummaryResponse'
+
+  /v0/management/usage/{requestId}:
+    delete:
+      tags: [Management]
+      summary: Delete single usage record
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Record deleted
+        '404':
+          description: Record not found
+
+  # Management - Events
+  /v0/management/events:
+    get:
+      tags: [Management]
+      summary: Live usage events
+      description: Server-sent events stream of completed inference requests
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                description: Server-sent event stream with log events
+
+  # Management - Concurrency
+  /v0/management/concurrency:
+    get:
+      tags: [Management]
+      summary: Get concurrency data
+      description: Returns in-flight requests or historical timeline
+      security:
+        - adminKey: []
+      parameters:
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [live, timeline]
+            default: live
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+            enum: [provider, model]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+          description: Start date for custom range
+        - name: endDate
+          in: query
+          schema:
+            type: string
+          description: End date for custom range
+      responses:
+        '200':
+          description: Concurrency data
+
+  # Management - Cooldowns
+  /v0/management/cooldowns:
+    get:
+      tags: [Management]
+      summary: List active cooldowns
+      description: Returns all currently active provider cooldowns
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Active cooldowns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    provider:
+                      type: string
+                    model:
+                      type: string
+                    expiry:
+                      type: integer
+                    timeRemainingMs:
+                      type: integer
+                    consecutiveFailures:
+                      type: integer
+
+    delete:
+      tags: [Management]
+      summary: Clear all cooldowns
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Cooldowns cleared
+
+  /v0/management/cooldowns/{provider}:
+    delete:
+      tags: [Management]
+      summary: Clear provider cooldowns
+      security:
+        - adminKey: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+          description: Limit clear to a specific model
+      responses:
+        '200':
+          description: Cooldowns cleared
+
+  # Management - Performance
+  /v0/management/performance:
+    get:
+      tags: [Management]
+      summary: Get performance metrics
+      description: Returns provider performance aggregates (TTFT, throughput)
+      security:
+        - adminKey: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Performance metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    provider:
+                      type: string
+                    model:
+                      type: string
+                    avg_ttft_ms:
+                      type: number
+                    avg_tokens_per_sec:
+                      type: number
+
+  # Management - Metrics (Prometheus)
+  /v0/management/metrics:
+    get:
+      tags: [Management]
+      summary: Prometheus metrics
+      description: Returns Prometheus-formatted metrics
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # Management - Debug
+  /v0/management/debug:
+    get:
+      tags: [Management]
+      summary: Get debug status
+      description: Returns debug logging status
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Debug status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  providers:
+                    type: array
+                    items:
+                      type: string
+
+    post:
+      tags: [Management]
+      summary: Set debug mode
+      description: Enable/disable debug logging
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                providers:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Debug mode updated
+
+  /v0/management/debug/logs:
+    get:
+      tags: [Management]
+      summary: List debug logs
+      security:
+        - adminKey: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Debug log list
+
+    delete:
+      tags: [Management]
+      summary: Delete all debug logs
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logs deleted
+
+  /v0/management/debug/logs/{requestId}:
+    get:
+      tags: [Management]
+      summary: Get debug log detail
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Debug log detail
+        '404':
+          description: Log not found
+
+    delete:
+      tags: [Management]
+      summary: Delete debug log
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log deleted
+
+  # Management - Logging Level
+  /v0/management/logging/level:
+    get:
+      tags: [Management]
+      summary: Get logging level
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logging level info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  level:
+                    type: string
+                  startupLevel:
+                    type: string
+                  supportedLevels:
+                    type: array
+                    items:
+                      type: string
+                  ephemeral:
+                    type: boolean
+
+    post:
+      tags: [Management]
+      summary: Set logging level
+      description: Set runtime log verbosity
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  type: string
+                  enum: [error, warn, info, debug, verbose, silly]
+              required:
+                - level
+      responses:
+        '200':
+          description: Logging level set
+
+    delete:
+      tags: [Management]
+      summary: Reset logging level
+      description: Reset to startup default
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logging level reset
+
+  # Management - System Logs
+  /v0/system/logs/stream:
+    get:
+      tags: [Management]
+      summary: System log stream
+      description: Server-sent events stream of all backend log entries
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                description: Server-sent event stream with syslog events
+
+  # Management - Test
+  /v0/management/test:
+    post:
+      tags: [Management]
+      summary: Test provider
+      description: Run a lightweight test inference request
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                model:
+                  type: string
+                apiType:
+                  type: string
+                  enum: [chat, messages, gemini, responses, embeddings, images, speech, oauth]
+              required:
+                - provider
+                - model
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  durationMs:
+                    type: integer
+                  apiType:
+                    type: string
+                  response:
+                    type: string
+
+  # Management - MCP Servers
+  /v0/management/mcp-servers:
+    get:
+      tags: [Management]
+      summary: List MCP servers
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of MCP servers
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/McpServerConfig'
+
+  /v0/management/mcp-servers/{serverName}:
+    put:
+      tags: [Management]
+      summary: Create/update MCP server
+      security:
+        - adminKey: []
+      parameters:
+        - name: serverName
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9-_]{1,62}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpServerConfig'
+      responses:
+        '200':
+          description: Server saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  name:
+                    type: string
+        '400':
+          description: Invalid server name or missing upstream_url
+
+    delete:
+      tags: [Management]
+      summary: Delete MCP server
+      security:
+        - adminKey: []
+      parameters:
+        - name: serverName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Server deleted
+        '404':
+          description: Server not found
+
+  # Management - MCP Logs
+  /v0/management/mcp-logs:
+    get:
+      tags: [Management]
+      summary: List MCP logs
+      security:
+        - adminKey: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: serverName
+          in: query
+          schema:
+            type: string
+        - name: apiKey
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: MCP logs
+
+    delete:
+      tags: [Management]
+      summary: Delete MCP logs
+      security:
+        - adminKey: []
+      parameters:
+        - name: olderThanDays
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Logs deleted
+
+  /v0/management/mcp-logs/{requestId}:
+    delete:
+      tags: [Management]
+      summary: Delete single MCP log
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log deleted
+        '404':
+          description: Log not found
+
+  # Management - Errors
+  /v0/management/errors:
+    get:
+      tags: [Management]
+      summary: List error logs
+      description: Returns inference error records
+      security:
+        - adminKey: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Error logs
+
+    delete:
+      tags: [Management]
+      summary: Delete all error logs
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logs deleted
+
+  /v0/management/errors/{requestId}:
+    delete:
+      tags: [Management]
+      summary: Delete single error log
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log deleted
+        '404':
+          description: Log not found
+
+  # Management - User Quotas
+  /v0/management/user-quotas:
+    get:
+      tags: [Management]
+      summary: List user quota definitions
+      description: Returns all per-key quota definitions
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Quota definitions
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/management/user-quotas/{name}:
+    get:
+      tags: [Management]
+      summary: Get quota definition
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota definition
+        '404':
+          description: Quota not found
+
+    post:
+      tags: [Management]
+      summary: Create/replace quota definition
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [rolling, daily, weekly]
+                limitType:
+                  type: string
+                  enum: [requests, tokens]
+                limit:
+                  type: integer
+                duration:
+                  type: string
+              required:
+                - type
+                - limitType
+                - limit
+      responses:
+        '200':
+          description: Quota created
+        '400':
+          description: Validation failed
+
+    patch:
+      tags: [Management]
+      summary: Partial update quota definition
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Quota updated
+        '404':
+          description: Quota not found
+
+    delete:
+      tags: [Management]
+      summary: Delete quota definition
+      description: Cannot delete quota assigned to keys
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota deleted
+        '404':
+          description: Quota not found
+        '409':
+          description: Quota assigned to keys
+
+  # Management - Quota Enforcement
+  /v0/management/quota/clear:
+    post:
+      tags: [Management]
+      summary: Clear quota usage
+      description: Reset quota usage counters for an API key
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+              required:
+                - key
+      responses:
+        '200':
+          description: Quota cleared
+
+  /v0/management/quota/status/{key}:
+    get:
+      tags: [Management]
+      summary: Get quota status
+      description: Returns quota usage status for an API key
+      security:
+        - adminKey: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  quota_name:
+                    type: string
+                    nullable: true
+                  allowed:
+                    type: boolean
+                  current_usage:
+                    type: integer
+                  limit:
+                    type: integer
+                    nullable: true
+                  remaining:
+                    type: integer
+                    nullable: true
+                  resets_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  # Management - Models (AI Energy)
+  /v0/management/models:
+    get:
+      tags: [Management]
+      summary: List models for energy calculations
+      description: Returns models with architecture for energy estimation
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Model list
+
+  # Quota Routes
+  /v0/quotas:
+    get:
+      tags: [Quotas]
+      summary: List all quota checkers
+      description: Returns provider-level rate limits and account quotas
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of quota checkers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    checkerId:
+                      type: string
+                    checkerType:
+                      type: string
+                    checkerCategory:
+                      type: string
+                    latest:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/QuotaCheckResult'
+
+  /v0/quotas/{checkerId}:
+    get:
+      tags: [Quotas]
+      summary: Get quota for checker
+      description: Returns latest quota for a specific checker
+      security:
+        - adminKey: []
+      parameters:
+        - name: checkerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkerId:
+                    type: string
+                  checkerType:
+                    type: string
+                  latest:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuotaCheckResult'
+
+  /v0/quotas/{checkerId}/history:
+    get:
+      tags: [Quotas]
+      summary: Get quota history
+      description: Returns historical quota data
+      security:
+        - adminKey: []
+      parameters:
+        - name: checkerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: windowType
+          in: query
+          schema:
+            type: string
+          description: Filter by window type
+        - name: since
+          in: query
+          schema:
+            type: string
+          description: ISO timestamp or relative format (e.g., '7d', '30d')
+      responses:
+        '200':
+          description: Quota history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkerId:
+                    type: string
+                  windowType:
+                    type: string
+                  since:
+                    type: string
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuotaCheckResult'
+
+  /v0/quotas/{checkerId}/check:
+    post:
+      tags: [Quotas]
+      summary: Trigger quota check
+      description: Force immediate quota check outside normal polling
+      security:
+        - adminKey: []
+      parameters:
+        - name: checkerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaCheckResult'
+
+  # MCP Proxy Routes
+  /mcp/{name}:
+    post:
+      tags: [MCP]
+      summary: MCP JSON-RPC message
+      description: Proxy JSON-RPC message to MCP server
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: MCP response
+        '400':
+          description: Invalid server name
+        '404':
+          description: MCP server not found
+        '502':
+          description: Upstream error
+        '504':
+          description: Upstream timeout
+
+    get:
+      tags: [MCP]
+      summary: MCP SSE stream
+      description: Server-sent events stream from MCP server
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: object
+
+    delete:
+      tags: [MCP]
+      summary: MCP session termination
+      description: Terminate MCP session
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session terminated
+
+  # OAuth Discovery Routes
+  /.well-known/oauth-authorization-server:
+    get:
+      tags: [Discovery]
+      summary: OAuth authorization server metadata
+      description: Returns OAuth 2.0 authorization server metadata
+      security: []
+      responses:
+        '200':
+          description: Authorization server metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthAuthorizationServer'
+
+  /.well-known/oauth-protected-resource:
+    get:
+      tags: [Discovery]
+      summary: OAuth protected resource metadata
+      description: Returns OAuth 2.0 protected resource metadata
+      security: []
+      responses:
+        '200':
+          description: Protected resource metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProtectedResource'
+
+  /.well-known/openid-configuration:
+    get:
+      tags: [Discovery]
+      summary: OpenID Connect configuration
+      description: Returns OIDC discovery configuration
+      security: []
+      responses:
+        '200':
+          description: OIDC configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenIDConfiguration'
+
+  /register:
+    post:
+      tags: [Discovery]
+      summary: Dynamic client registration
+      description: OAuth 2.0 dynamic client registration endpoint
+      security: []
+      responses:
+        '201':
+          description: Client registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicClientRegistration'
+
+  # Responses API (Codex alias)
+  /v1/codex/responses:
+    post:
+      tags: [Inference]
+      summary: Create response (Codex)
+      description: |
+        OpenAI Responses API compatible endpoint for Codex CLI.
+        Alias for /v1/responses.
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResponsesRequest'
+      responses:
+        '200':
+          description: Response created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsesResponse'
+        '401':
+          description: Authentication failed
+
+  # Anthropic Messages
+  /v1/messages:
+    post:
+      tags: [Inference]
+      summary: Create message
+      description: |
+        Anthropic-compatible Messages API endpoint.
+        Supports Claude models with streaming and tool use.
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+        - apiKeyGoog: []
+        - apiKeyQuery: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                messages:
+                  type: array
+                max_tokens:
+                  type: integer
+                temperature:
+                  type: number
+                stream:
+                  type: boolean
+                system:
+                  oneOf:
+                    - type: string
+                    - type: array
+                tools:
+                  type: array
+                tool_choice:
+                  type: object
+                thinking:
+                  type: object
+              required:
+                - model
+                - messages
+                - max_tokens
+      responses:
+        '200':
+          description: Message response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: Authentication failed
+
+  # UI Routes (Static)
+  /ui:
+    get:
+      tags: [UI]
+      summary: Dashboard UI
+      description: Serves the Plexus web dashboard
+      security: []
+      responses:
+        '200':
+          description: Dashboard HTML
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /ui/{filename}:
+    get:
+      tags: [UI]
+      summary: Static UI assets
+      description: Serves dashboard static files
+      security: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Static asset
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
