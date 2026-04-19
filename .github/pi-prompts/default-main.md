@@ -117,11 +117,7 @@ The git repository is already initialized and configured for you:
 
 3. **Commit and push all work** - Always end your work by committing and pushing changes to ensure they persist beyond the GitHub Action execution.
 
-**NEVER push directly to the main/default branch.** You are working on a dedicated branch (already checked out). After committing and pushing your changes, use the `create_pull_request` tool to open a pull request. Do NOT use `gh pr create` or any other shell command.
-
-If this task is related to an issue, reference it in the PR body (e.g., "Fixes #123").
-
-Do NOT merge the PR yourself — let the reviewer handle that.
+{{branchModeInstructions}}
 
 ## Trigger Downstream Workflows After PR Creation
 
