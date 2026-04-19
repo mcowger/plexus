@@ -26,7 +26,7 @@ jobs:
             artifact_name: plexus.exe
     steps:
       - name: Download workspace
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: workspace
 
@@ -36,7 +36,7 @@ jobs:
           bun-version: latest
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/bun.lock') }}
@@ -50,7 +50,7 @@ jobs:
           ${{ matrix.compile_cmd }}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.target }}
           path: ${{ matrix.artifact_name }}
