@@ -3,23 +3,53 @@ name: Pi PR Review
 on:
   pull_request_target:
     types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review (for bot-created PRs)'
+        required: true
+        type: string
+      requested_by:
+        description: 'Workflow that requested this run'
+        required: false
+        type: string
+        default: ''
 
 concurrency:
-  group: pi-pr-review-${{ github.event.pull_request.number }}
+  group: pi-pr-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
   review:
-    # PRs must have a body description — reject empty ones
-    if: github.event.pull_request.draft == false
+    # PRs must have a body description; workflow_dispatch is checked in the steps
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
 
     steps:
+      - name: Get PR info for workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        id: get-pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt('${{ github.event.inputs.pr_number }}')
+            });
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_repo_full_name', pr.head.repo.full_name);
+            core.setOutput('body', pr.body || '');
+            core.setOutput('draft', pr.draft);
+
       - name: Require PR body
-        if: github.event.pull_request.body == ''
+        if: |
+          (github.event_name == 'pull_request_target' && github.event.pull_request.body == '') ||
+          (github.event_name == 'workflow_dispatch' && steps.get-pr.outputs.body == '')
         run: |
           echo "::error::Pull requests must include a description. Please add a body to this PR."
           exit 1
@@ -27,8 +57,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || steps.get-pr.outputs.head_repo_full_name }}
+          ref: ${{ github.event.pull_request.head.sha || steps.get-pr.outputs.head_sha }}
 
       - name: Register secrets for masking
         uses: actions/github-script@v9

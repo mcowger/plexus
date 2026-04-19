@@ -1,9 +1,20 @@
 name: PR Tests
-run-name: "PR: ${{ github.event.pull_request.title }}"
+run-name: "PR: ${{ github.event.pull_request.title || format('PR #{0}', github.event.inputs.pr_number) }}"
 
 on:
   pull_request_target:
     types: [opened, synchronize, ready_for_review, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to test (for bot-created PRs)'
+        required: true
+        type: string
+      requested_by:
+        description: 'Workflow that requested this run'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -13,11 +24,25 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Get PR info for workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        id: get-pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt('${{ github.event.inputs.pr_number }}')
+            });
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_repo_full_name', pr.head.repo.full_name);
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || steps.get-pr.outputs.head_repo_full_name }}
+          ref: ${{ github.event.pull_request.head.sha || steps.get-pr.outputs.head_sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

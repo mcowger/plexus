@@ -17,6 +17,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      actions: write  # Needed for workflow_dispatch to trigger review/test workflows
 
     steps:
       - name: Checkout repository
@@ -37,6 +38,7 @@ jobs:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
 
       - name: Run pi-action
+        id: pi-action
         uses: mcowger/pi-action@main
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
@@ -46,3 +48,40 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
           share_session: false
+          # We need the PR number output so we can trigger subsequent workflows
+          # (GITHUB_TOKEN-created PRs don't trigger pull_request_target events)
+
+      - name: Dispatch PR review workflow
+        if: steps.pi-action.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // Trigger workflow_dispatch for pi-pr-review to run on the newly created PR
+            // This is needed because GITHUB_TOKEN-created PRs don't trigger pull_request_target
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pi-pr-review.yml',
+              ref: context.ref,
+              inputs: {
+                pr_number: '${{ steps.pi-action.outputs.pr_number }}',
+                requested_by: 'pi-assistant'
+              }
+            });
+
+      - name: Dispatch PR tests workflow
+        if: steps.pi-action.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // Trigger workflow_dispatch for pr-tests to run on the newly created PR
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pr-tests.yml',
+              ref: context.ref,
+              inputs: {
+                pr_number: '${{ steps.pi-action.outputs.pr_number }}',
+                requested_by: 'pi-assistant'
+              }
+            });
