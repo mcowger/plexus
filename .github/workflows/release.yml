@@ -9,24 +9,24 @@ on:
 jobs:
   setup:
     name: Setup
-    uses: ./.github/workflows/release/setup.yml
+    uses: ./.github/workflows/release-setup.yml
 
   quality-gates:
     name: Quality Gates
     needs: setup
-    uses: ./.github/workflows/release/quality-gates.yml
+    uses: ./.github/workflows/release-quality-gates.yml
 
   build-binaries:
     name: Build Binaries
     needs: [setup, quality-gates]
-    uses: ./.github/workflows/release/build-binaries.yml
+    uses: ./.github/workflows/release-build-binaries.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
 
   build-docker:
     name: Build Docker Image
     needs: [setup, quality-gates]
-    uses: ./.github/workflows/release/build-docker.yml
+    uses: ./.github/workflows/release-build-docker.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
     permissions:
@@ -37,14 +37,14 @@ jobs:
   generate-notes:
     name: Generate Release Notes
     needs: setup
-    uses: ./.github/workflows/release/generate-notes.yml
+    uses: ./.github/workflows/release-generate-notes.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
 
   release:
     name: Create Release
     needs: [setup, build-binaries, build-docker, generate-notes]
-    uses: ./.github/workflows/release/publish.yml
+    uses: ./.github/workflows/release-publish.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
       pr_summary: ${{ needs.generate-notes.outputs.pr_summary }}
