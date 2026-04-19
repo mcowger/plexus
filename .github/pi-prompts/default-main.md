@@ -9,6 +9,23 @@
 ## Task
 {{task}}
 
+## Important: Response vs. Action
+
+Not all requests require code changes or pull requests. Use your judgment:
+
+**Respond with text only when:**
+- Asked for a review, analysis, or explanation
+- Requested to discuss options or trade-offs
+- Asked how something works or why something is done a certain way
+- The user is brainstorming or gathering information
+
+**Create code changes when:**
+- There is an unambiguous request to implement, fix, or change something
+- The user explicitly asks you to "do", "implement", "fix", "add", "update", or "create"
+- The task clearly requires code modification to be complete
+
+When in doubt, start with a response. The user can always follow up with a specific implementation request.
+
 ## Important: Environment Setup (DO NOT reconfigure)
 
 The git repository is already initialized and configured for you:
