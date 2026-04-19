@@ -243,6 +243,49 @@ jobs:
 
             core.setOutput('pr_summary', summary);
 
+      - name: Register secrets for masking
+        uses: actions/github-script@v9
+        with:
+          script: |
+            core.setSecret(process.env.PI_MODELS_JSON)
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+
+      - name: Generate release notes with pi
+        id: release_notes
+        uses: mcowger/pi-action@main
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pi_models_json: ${{ secrets.PI_MODELS_JSON }}
+          provider: openrouter
+          model: ${{ vars.PLEXUS_MODEL }}
+          output_mode: output
+          share_session: false
+          prompt: |
+            You are a technical writer creating release notes for a software project called Plexus, an LLM API gateway.
+
+            IMPORTANT: Do NOT use any tools. Do NOT read any files or run any commands. You must respond with your full output in a single turn using only the information provided below.
+
+            ## Source Changes
+
+            ${{ steps.pr_info.outputs.pr_summary }}
+
+            ---
+
+            ## Instructions:
+
+            Generate release notes following this exact structure. Start IMMEDIATELY with the version heading:
+
+            ## ${{ steps.release_tag.outputs.tag }}
+
+            ### New Features (if any)
+            [Narrative prose about notable features]
+
+            ### Added / Changed / Fixed / Security
+            [Categorized bullets with PR references]
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
@@ -253,4 +296,4 @@ jobs:
             plexus.exe
           draft: false
           prerelease: false
-          body: ${{ steps.pr_info.outputs.pr_summary }}
+          body: ${{ steps.release_notes.outputs.response || steps.pr_info.outputs.pr_summary }}

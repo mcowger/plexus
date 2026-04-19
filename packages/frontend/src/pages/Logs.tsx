@@ -22,6 +22,7 @@ import {
   formatSlices,
   formatTPS,
 } from '../lib/format';
+import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import {
   ChevronLeft,
   ChevronRight,
@@ -680,11 +681,17 @@ export const Logs = () => {
                           <span>{log.incomingModelAlias || '-'}</span>
                           {log.incomingModelAlias && log.incomingModelAlias !== '-' && (
                             <button
-                              onClick={() =>
-                                navigator.clipboard.writeText(log.incomingModelAlias || '')
+                              onClick={async () => {
+                                if (!isClipboardAvailable()) return;
+                                await copyToClipboard(log.incomingModelAlias || '');
+                              }}
+                              className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                              title={
+                                isClipboardAvailable()
+                                  ? 'Copy incoming model alias'
+                                  : 'Copy requires HTTPS'
                               }
-                              className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
-                              title="Copy incoming model alias"
+                              disabled={!isClipboardAvailable()}
                             >
                               <Copy size={12} className="text-text-secondary hover:text-text" />
                             </button>
@@ -696,11 +703,17 @@ export const Logs = () => {
                           </span>
                           {log.selectedModelName && log.selectedModelName !== '-' && (
                             <button
-                              onClick={() =>
-                                navigator.clipboard.writeText(log.selectedModelName || '')
+                              onClick={async () => {
+                                if (!isClipboardAvailable()) return;
+                                await copyToClipboard(log.selectedModelName || '');
+                              }}
+                              className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                              title={
+                                isClipboardAvailable()
+                                  ? 'Copy selected model name'
+                                  : 'Copy requires HTTPS'
                               }
-                              className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
-                              title="Copy selected model name"
+                              disabled={!isClipboardAvailable()}
                             >
                               <Copy size={10} className="text-text-secondary hover:text-text" />
                             </button>
@@ -718,11 +731,17 @@ export const Logs = () => {
                               {log.visionFallthroughModel}
                             </span>
                             <button
-                              onClick={() =>
-                                navigator.clipboard.writeText(log.visionFallthroughModel || '')
+                              onClick={async () => {
+                                if (!isClipboardAvailable()) return;
+                                await copyToClipboard(log.visionFallthroughModel || '');
+                              }}
+                              className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                              title={
+                                isClipboardAvailable()
+                                  ? 'Copy fallthrough model name'
+                                  : 'Copy requires HTTPS'
                               }
-                              className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center"
-                              title="Copy fallthrough model name"
+                              disabled={!isClipboardAvailable()}
                             >
                               <Copy size={10} className="text-text-secondary hover:text-text" />
                             </button>

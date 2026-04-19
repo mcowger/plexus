@@ -20,6 +20,7 @@ import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useLocation } from 'react-router-dom';
 import type { Provider } from '../lib/api';
+import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import { useAuth } from '../contexts/AuthContext';
 
 interface DebugLogMeta {
@@ -243,10 +244,12 @@ export const Debug: React.FC = () => {
   }, [detail]);
 
   const handleCopyAll = async () => {
-    if (!exportContent) return;
-    await navigator.clipboard.writeText(exportContent);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
+    if (!exportContent || !isClipboardAvailable()) return;
+    const success = await copyToClipboard(exportContent);
+    if (success) {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    }
   };
 
   const handleDownloadAll = () => {
@@ -558,11 +561,14 @@ const AccordionPanel: React.FC<{
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!isClipboardAvailable()) return;
+    const success = await copyToClipboard(content);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

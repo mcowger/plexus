@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -431,11 +432,14 @@ const AccordionPanel: React.FC<{
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!isClipboardAvailable()) return;
+    const success = await copyToClipboard(content);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

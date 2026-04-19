@@ -1,0 +1,110 @@
+name: Pi PR Review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, ready_for_review]
+
+concurrency:
+  group: pi-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # PRs must have a body description — reject empty ones
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Require PR body
+        if: github.event.pull_request.body == ''
+        run: |
+          echo "::error::Pull requests must include a description. Please add a body to this PR."
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Register secrets for masking
+        uses: actions/github-script@v9
+        with:
+          script: |
+            core.setSecret(process.env.PI_MODELS_JSON)
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+
+      - name: Run pi PR review
+        uses: mcowger/pi-action@main
+        env:
+          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          provider: openrouter
+          model: ${{ vars.PLEXUS_MODEL }}
+          pi_models_json: ${{ secrets.PI_MODELS_JSON }}
+          share_session: false
+          trigger_phrase: ""
+          prompt_template: |
+            # Code Review for {{type_display}} #{{number}}
+
+            **Title:** {{title}}
+
+            ## Description
+            {{body}}
+
+            ## Diff
+            ```diff
+            {{diff}}
+            ```
+
+            ## Instructions
+
+            You are reviewing a pull request for **Plexus**, a unified LLM API gateway built on Bun + Fastify.
+
+            Perform a thorough code review. Focus on:
+
+            - **Correctness:** Logic errors, off-by-ones, race conditions, unhandled edge cases
+            - **Security:** Injection vectors, secret leaks, unsafe input handling
+            - **Performance:** Unnecessary allocations, N+1 queries, blocking calls in async paths
+            - **Design:** Proper separation of concerns, consistent patterns with the rest of the codebase
+            - **Project conventions:**
+              - Bun runtime (not Node.js-specific APIs)
+              - Zod for validation, Drizzle ORM for DB
+              - Frontend uses Tailwind v4 (never import CSS into TS/TSX files)
+              - Use centralized formatters from `packages/frontend/src/lib/format.ts` (never `.toFixed()` or `.toLocaleString()`)
+              - Never commit migration files — only schema `.ts` changes
+            - **Testing:** Missing test coverage for new logic, proper use of `registerSpy` from test utils
+
+            ## Inline Comments
+
+            To leave comments on specific lines, include a ```pr-review code block in your response:
+
+            ```pr-review
+            [
+              { "path": "src/file.ts", "line": 10, "body": "Consider using const here" },
+              { "path": "src/other.ts", "line": 25, "start_line": 20, "body": "This block could be simplified" }
+            ]
+            ```
+
+            Each comment requires:
+            - `path`: File path relative to repository root
+            - `line`: End line number (1-indexed)
+            - `body`: Comment text in Markdown
+
+            Optional fields:
+            - `side`: "LEFT" (old code) or "RIGHT" (new code, default)
+            - `start_line`: Start line for multi-line comments
+            - `start_side`: Side for start_line (defaults to `side`)
+
+            ## Output Format
+
+            Start with an overall summary paragraph, then organize findings by category using GitHub-style task lists:
+
+            - [✅] or [⚠️] or [❌] for severity (note / warning / issue)
+
+            If everything looks good, say so briefly. Do not obsess over style nits — focus on things that matter.

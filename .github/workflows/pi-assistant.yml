@@ -1,6 +1,8 @@
 name: Pi Assistant
 
 on:
+  issues:
+    types: [opened]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -8,8 +10,8 @@ on:
 
 jobs:
   pi-response:
-    # Only trigger when the comment mentions @pi
-    if: contains(github.event.comment.body, '@pi')
+    # Only trigger when the comment or issue/PR body mentions @pi
+    if: contains(github.event.comment.body || github.event.issue.body || github.event.pull_request.body || '', '@pi')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,11 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Register secrets for masking
         uses: actions/github-script@v9

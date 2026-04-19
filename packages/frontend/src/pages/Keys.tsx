@@ -22,6 +22,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { formatNumber, formatCost } from '../lib/format';
+import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
 
 const EMPTY_KEY: KeyConfig = {
   key: '',
@@ -251,14 +252,17 @@ export const Keys = () => {
   };
 
   const generateKey = () => {
-    const uuid = crypto.randomUUID();
+    const uuid = generateUUID();
     setEditingKey({ ...editingKey, secret: `sk-${uuid}` });
   };
 
-  const copyToClipboard = (text: string, keyId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(keyId);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const handleCopy = async (text: string, keyId: string) => {
+    if (!isClipboardAvailable()) return;
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedKey(keyId);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
   };
 
   const filteredKeys = keys.filter(
@@ -422,7 +426,7 @@ export const Keys = () => {
                           </span>
                           <button
                             className="bg-transparent border-0 text-text-muted p-1.5 rounded-sm cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-bg-hover hover:text-primary active:scale-95"
-                            onClick={() => copyToClipboard(key.secret, key.key)}
+                            onClick={() => handleCopy(key.secret, key.key)}
                             title="Copy Secret"
                             style={copiedKey === key.key ? { color: 'var(--color-success)' } : {}}
                           >
