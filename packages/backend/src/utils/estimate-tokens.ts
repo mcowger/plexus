@@ -12,9 +12,10 @@ export function estimateTokens(text: string): number {
 
   // Base character count
   const charCount = text.length;
+  const charRatio = parseFloat(process.env.TOKEN_CHAR_RATIO as string);
 
   // Start with character-based estimate (roughly 4 chars per token)
-  let tokenEstimate = charCount / 4;
+  let tokenEstimate = charCount / (charRatio || 4);
 
   // Adjust for whitespace density
   const whitespaceCount = (text.match(/\s/g) || []).length;
@@ -34,32 +35,35 @@ export function estimateTokens(text: string): number {
   const numbers = (text.match(/\d+/g) || []).length;
   const urls = (text.match(/https?:\/\/[^\s]+/g) || []).length;
 
-  // Adjust for these patterns
-  tokenEstimate += jsonBrackets * 0.5; // Brackets often tokenize separately
-  tokenEstimate += punctuation * 0.3; // Punctuation can be separate tokens
-  tokenEstimate += numbers * 0.2; // Numbers vary widely
-  tokenEstimate += urls * 2; // URLs are token-dense
+  tokenEstimate += jsonBrackets * 0.5;
+  tokenEstimate += punctuation * 0.3;
+  tokenEstimate += numbers * 0.2;
+  tokenEstimate += urls * 2;
 
-  // Count code patterns
+  // Code pattern detection
   const codeIndicators =
-    (text.match(/[=<>!&|]{2}/g) || []).length + // ==, <=, >=, !=, &&, ||
-    (text.match(/\w+\(/g) || []).length + // function calls
-    (text.match(/\n {2,}/g) || []).length; // indentation
+    (text.match(/[=<>!&|]{2}/g) || []).length +
+    (text.match(/\w+\(/g) || []).length +
+    (text.match(/\n {2,}/g) || []).length;
 
   if (codeIndicators > charCount / 100) {
     tokenEstimate *= 1.08; // Code is more token-dense
   }
 
-  // Count rare/special characters
+  // Special characters
   const specialChars = (text.match(/[^\w\s.,;:!?'"()\[\]{}<>\/\\-]/g) || []).length;
-  tokenEstimate += specialChars * 0.4; // Unicode, emojis tokenize inefficiently
+  tokenEstimate += specialChars * 0.4;
 
-  // Adjust for repeated patterns (compression-friendly)
+  // Repetition detection
   const uniqueChars = new Set(text).size;
-  const repetitionRatio = uniqueChars / charCount;
-  if (repetitionRatio < 0.05) {
-    tokenEstimate *= 0.9; // Very repetitive text
+  if (uniqueChars / charCount < 0.05) {
+    tokenEstimate *= 0.9;
   }
+
+  // Log the estimate for monitoring
+  console.log(
+    `Token estimate: ${Math.round(tokenEstimate)} for ${charCount} chars, ratio: ${(tokenEstimate / charCount).toFixed(4)}`
+  );
 
   return Math.round(tokenEstimate);
 }
