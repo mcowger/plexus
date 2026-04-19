@@ -22,6 +22,25 @@ The first line of the task above contains the version (e.g., "Version: 2024.04.1
 ### Added / Changed / Fixed / Security
 [Categorized bullets with PR and author references]
 
+## Suppress Internal Changes
+
+**DO NOT include** changes that are internal to the development process:
+
+- GitHub Actions workflows (e.g., `.github/workflows/*.yml`)
+- CI/CD configuration (e.g., `.circleci/`, `.travis.yml`,Dockerfile changes for CI)
+- Internal tooling, linter configs, or development scripts
+- Documentation-only changes (ref actors, typo fixes)
+
+These are implementation details, not user-facing changes. If a PR only touches these files, list it as "Internal" but prefer to omit it entirely.
+
+## Excluded Paths
+
+Skip any PRs that only modify:
+- `.github/`
+- `.circleci/`
+- `ci/`
+- `*.dockerfile` (if used for CI)
+
 ## Formatting Rules
 
 - For pull request references, use `#NNN` (e.g., #218) — GitHub auto-links these. Do NOT wrap them in markdown links like `[#218](url)`.
