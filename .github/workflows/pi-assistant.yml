@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # For PR review comments, checkout the PR branch so changes go to existing PR
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
