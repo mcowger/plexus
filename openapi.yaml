@@ -1070,6 +1070,8 @@ tags:
     description: Model Context Protocol proxy endpoints
   - name: Discovery
     description: OAuth and discovery endpoints
+  - name: UI
+    description: Static UI and dashboard endpoints
 
 # API Paths
 paths:
@@ -3231,11 +3233,16 @@ paths:
                 - max_tokens
       responses:
         '200':
-          description: Message response
+          description: Message response (non-streaming) or SSE stream (when stream=true)
           content:
             application/json:
               schema:
                 type: object
+            text/event-stream:
+              schema:
+                type: string
+                format: binary
+              description: Server-Sent Events stream when stream=true
         '401':
           description: Authentication failed
 
