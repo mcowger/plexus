@@ -42,6 +42,17 @@ jobs:
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
 
+      - name: Determine branch mode
+        id: branch-config
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
+            echo "mode=direct" >> $GITHUB_OUTPUT
+            echo "For PR review comments: using direct mode to push to existing PR branch"
+          else
+            echo "mode=branch" >> $GITHUB_OUTPUT
+            echo "For other events: using branch mode to create new PR"
+          fi
+
       - name: Run pi-action
         id: pi-action
         uses: mcowger/pi-action@main
@@ -56,8 +67,7 @@ jobs:
           share_session: true
           prompt_template_file: '.github/pi-prompts/default-main.md'
           suppress_final_comment: true
-          # For PR review comments, push directly to the existing PR branch
-          branch_mode: ${{ github.event_name == 'pull_request_review_comment' && 'direct' || 'branch' }}
+          branch_mode: ${{ steps.branch-config.outputs.mode }}
 
       - name: Dispatch PR review workflow
         if: steps.pi-action.outputs.pr_created == 'true'
