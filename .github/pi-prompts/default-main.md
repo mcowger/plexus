@@ -123,6 +123,19 @@ If this task is related to an issue, reference it in the PR body (e.g., "Fixes #
 
 Do NOT merge the PR yourself — let the reviewer handle that.
 
+## Trigger Downstream Workflows After PR Creation
+
+After creating a PR with `create_pull_request`, trigger the PR review workflow so automated checks can run:
+
+```javascript
+trigger_workflow_dispatch({
+  workflowFile: "pi-pr-review.yml",
+  inputs: { pr_number: String(prNumber) }
+})
+```
+
+This ensures the PR gets reviewed by the bot. The PR number comes from the `details` of the `create_pull_request` tool response.
+
 ## Important: Final Response Requirement
 
 **You MUST end your response with a plain-text summary of what you did.** This summary is posted as a comment on the issue/PR, so it must be informative and stand alone without any tool output context. Do NOT assume the reader can see tool execution logs.
