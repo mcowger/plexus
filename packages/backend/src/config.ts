@@ -89,6 +89,16 @@ const NagaQuotaCheckerOptionsSchema = z.object({
 
 const SyntheticQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
+  maxUtilizationPercent: z
+    .number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe(
+      'Maximum utilization percentage before the provider is placed on cooldown (default: 99). ' +
+        'Set lower to reserve quota — e.g. 30 means the provider is treated as exhausted at 30% usage, ' +
+        'preserving 70% of remaining quota. Minimum 1 (use enabled: false to fully disable a provider).'
+    ),
 });
 
 const NanoGPTQuotaCheckerOptionsSchema = z.object({

@@ -34,6 +34,16 @@ export abstract class QuotaChecker {
   /** Whether this checker tracks a prepaid account balance or a time-windowed rate limit. */
   abstract readonly category: 'balance' | 'rate-limit';
 
+  /**
+   * Maximum utilization percentage at which this checker considers a provider exhausted.
+   * Reads from `options.maxUtilizationPercent` if set (and valid), otherwise defaults to 99.
+   * Subclasses can override for checker-specific behavior.
+   */
+  get exhaustionThreshold(): number {
+    const val = this.config.options.maxUtilizationPercent;
+    return typeof val === 'number' && val > 0 ? val : 99;
+  }
+
   abstract checkQuota(): Promise<QuotaCheckResult>;
 
   protected getOAuthMetadata(): { oauthAccountId?: string; oauthProvider?: string } {
