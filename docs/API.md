@@ -20,7 +20,7 @@ Plexus accepts a key via any of the following, checked in this order:
 | `x-goog-api-key` header | `x-goog-api-key: sk-my-key` |
 | `?key=` query parameter | `GET /v1/models?key=sk-my-key` |
 
-Keys are matched against the `secret` field of entries in the `keys` section of `plexus.yaml`. See [CONFIGURATION.md](./CONFIGURATION.md) for how to define keys.
+Keys are matched against the `secret` field of entries in the database `keys` table. See [CONFIGURATION.md](./CONFIGURATION.md) for how to define keys.
 
 ### Dynamic Key Attribution
 
@@ -88,7 +88,7 @@ Use `GET /v0/management/auth/verify` to test a candidate key before storing it (
 
 ## Standard Inference APIs
 
-All inference endpoints below require authentication (see above). Requests are routed to a backend provider based on the `model` field and `plexus.yaml` configuration.
+All inference endpoints below require authentication (see above). Requests are routed to a backend provider based on the `model` field and database configuration.
 
 ### Chat Completions (OpenAI-compatible)
 
@@ -225,7 +225,7 @@ All inference endpoints below require authentication (see above). Requests are r
 #### GET /v1/models
 
 - **Auth:** Not required
-- **Description:** Returns all configured model aliases. When an alias has a `metadata` block in `plexus.yaml`, the response includes enriched fields following the OpenRouter model format.
+- **Description:** Returns all configured model aliases. When an alias has metadata configured in the database, the response includes enriched fields following the OpenRouter model format.
 
 - **Response:**
   ```json
@@ -271,7 +271,7 @@ All inference endpoints below require authentication (see above). Requests are r
 #### GET /v1/openrouter/models
 
 - **Auth:** Not required
-- **Description:** Returns models fetched from OpenRouter (requires an OpenRouter provider configured in `plexus.yaml`).
+- **Description:** Returns models fetched from OpenRouter (requires an OpenRouter provider configured in the database).
 
 #### GET /v1/metadata/search
 
@@ -313,7 +313,7 @@ All management endpoints require the `x-admin-key` header (see [Admin Key Authen
 
 #### Get Configuration
 - **Endpoint:** `GET /v0/management/config`
-- **Description:** Returns the raw `plexus.yaml` configuration file.
+- **Description:** Returns the current configuration from the database (originally imported from `plexus.yaml`).
 - **Response Header:** `Content-Type: application/x-yaml`
 - **Response Body:** Raw YAML content.
 
@@ -765,7 +765,7 @@ Usage records for requests proxied through the MCP proxy.
 
 ### MCP Server Configuration
 
-Manage MCP server entries in `plexus.yaml` via the API.
+Manage MCP server entries in the database via the Management API.
 
 #### List MCP Servers
 - **Endpoint:** `GET /v0/management/mcp-servers`
@@ -803,7 +803,7 @@ Manage MCP server entries in `plexus.yaml` via the API.
 
 ### User Quota Definitions
 
-CRUD for per-key quota definitions stored in `plexus.yaml`. These define *what* a quota is — to assign a quota to a key, set `quota: <name>` on the key in config. See [CONFIGURATION.md — User Quotas](./CONFIGURATION.md#user-quotas).
+CRUD for per-key quota definitions stored in the database. These define *what* a quota is — to assign a quota to a key, set `quota: <name>` on the key via the Management API or Admin UI. See [CONFIGURATION.md — User Quotas](./CONFIGURATION.md#user-quotas).
 
 #### List All Quota Definitions
 - **Endpoint:** `GET /v0/management/user-quotas`
@@ -861,7 +861,7 @@ CRUD for per-key quota definitions stored in `plexus.yaml`. These define *what* 
 
 #### List Valid Quota Checker Types
 - **Endpoint:** `GET /v0/management/quota-checker-types`
-- **Description:** Returns the list of built-in quota checker type strings that can be used in `plexus.yaml`.
+- **Description:** Returns the list of built-in quota checker type strings that can be used in provider configurations.
 - **Response:**
   ```json
   {
@@ -1029,7 +1029,7 @@ These endpoints use `text/event-stream` (SSE) for real-time data. Connect with a
 
 ## MCP Proxy (`/mcp/:name`)
 
-Plexus can proxy MCP (Model Context Protocol) servers configured under `mcp_servers` in `plexus.yaml`.
+Plexus can proxy MCP (Model Context Protocol) servers configured in the database.
 
 ### MCP Endpoints
 
@@ -1053,7 +1053,7 @@ curl -X POST http://localhost:4000/mcp/my-server \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{...},"id":0}'
 ```
 
-**Important:** Client `Authorization` and `x-api-key` headers are **not** forwarded to the upstream MCP server. Only static headers from `plexus.yaml` are used for upstream authentication.
+**Important:** Client `Authorization` and `x-api-key` headers are **not** forwarded to the upstream MCP server. Only static headers from the database configuration are used for upstream authentication.
 
 ### OAuth Discovery Endpoints
 

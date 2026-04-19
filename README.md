@@ -202,7 +202,7 @@ Use AI services you already have subscriptions to without managing API keys. Ple
 - Google Gemini CLI
 - Google Antigravity
 
-OAuth credentials are stored in `auth.json` and managed through the Admin UI.
+OAuth credentials are stored in the database and managed through the Admin UI.
 
 → See [Configuration: OAuth Providers](docs/CONFIGURATION.md#oauth-providers-pi-ai)
 
