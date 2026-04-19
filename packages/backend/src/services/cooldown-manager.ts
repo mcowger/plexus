@@ -236,7 +236,7 @@ export class CooldownManager {
 
   public async isProviderHealthy(provider: string, model: string): Promise<boolean> {
     // First check for a provider-wide cooldown (keyed with empty model string).
-    // This is set by the quota scheduler when any checker detects ≥99% utilization,
+    // This is set by the quota scheduler when any checker detects utilization at or above its threshold,
     // and blocks all models under the provider until the quota window resets.
     if (model !== '') {
       const providerWideHealthy = await this.isProviderHealthy(provider, '');
