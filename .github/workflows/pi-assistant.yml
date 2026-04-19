@@ -49,6 +49,7 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
           share_session: false
+          prompt_template_file: '.github/pi-prompts/default-main.md'
 
       - name: Dispatch PR review workflow
         if: steps.pi-action.outputs.pr_created == 'true'
