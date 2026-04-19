@@ -147,7 +147,9 @@ export function TotalEnergyComparison({ totalKwh = 0 }: TotalEnergyComparisonPro
   const renderSlicesView = () => (
     <div className="space-y-4 flex flex-col items-center justify-center py-2">
       <div className="text-center space-y-1">
-        <div className="text-xs text-text-secondary">With this energy, you could toast</div>
+        <div className="text-xs text-text-secondary">
+          With {formatEnergy(totalKwh)}, you could toast
+        </div>
         <div className="text-2xl font-bold text-text-primary">
           {slicesEquivalent} slice{totalSlices !== 1 ? 's' : ''} of bread
         </div>
@@ -190,8 +192,6 @@ export function TotalEnergyComparison({ totalKwh = 0 }: TotalEnergyComparisonPro
 
       <div className="flex items-center gap-3 text-xs text-text-tertiary">
         <span>Toaster uses ~800 W</span>
-        <span className="text-border-glass">|</span>
-        <span>{formatEnergy(totalKwh)} total</span>
       </div>
     </div>
   );
@@ -205,7 +205,7 @@ export function TotalEnergyComparison({ totalKwh = 0 }: TotalEnergyComparisonPro
       <div className="space-y-4 flex flex-col items-center justify-center py-2">
         <div className="text-center space-y-1">
           <div className="text-xs text-text-secondary">
-            With this energy, you could {comparison.verb} {comparison.noun} for
+            With {formatEnergy(totalKwh)}, you could {comparison.verb} {comparison.noun} for
           </div>
           <div className="text-2xl font-bold text-text-primary">{comparisonDisplay}</div>
         </div>
@@ -216,8 +216,6 @@ export function TotalEnergyComparison({ totalKwh = 0 }: TotalEnergyComparisonPro
           <span>
             {comparison.label} uses {watts.toFixed(0)} W
           </span>
-          <span className="text-border-glass">|</span>
-          <span>{formatEnergy(totalKwh)} total</span>
         </div>
       </div>
     );
