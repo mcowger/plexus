@@ -111,9 +111,8 @@ When running Plexus, you can use the following environment variables to control 
     - Default: `info`.
     - Note: `silly` logs all request/response/transformations.
     - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
-- **`AUTH_JSON`** (Optional): Path to the OAuth credentials file used by OAuth-backed providers (Anthropic, GitHub Copilot, OpenAI Codex, etc.).
-    - Default: `./auth.json` (relative to server working directory).
-    - Only required if you have providers configured with `api_base_url: oauth://`.
+- **`AUTH_JSON`** (Deprecated): Previously used to specify a path to OAuth credentials file. OAuth credentials are now stored in the database and managed through the Admin UI.
+    - This environment variable is no longer used and will be ignored.
 
 ### Example Usage
 

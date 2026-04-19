@@ -330,24 +330,11 @@ providers:
       - claude-3-5-sonnet-20241022
 ```
 
-#### OAuth Credentials (`auth.json`)
+#### OAuth Credentials
 
-OAuth credentials are stored in `auth.json` (default path: `./auth.json`). The file is created and updated automatically when you log in via the Admin UI. If no file exists at startup, Plexus logs a warning and OAuth providers remain unavailable until credentials are added.
+OAuth credentials are stored in the database. They are created and managed through the Admin UI when you log in to OAuth-backed providers.
 
-- **Override path** with the `AUTH_JSON` environment variable (absolute or relative to the server working directory).
-- An example file is provided at `auth.json.example`.
-- Credentials are keyed by provider and account ID:
-
-```json
-{
-  "openai-codex": {
-    "accounts": {
-      "work": { "type": "oauth", "accessToken": "...", "refreshToken": "...", "expiresAt": 1738627200000 },
-      "personal": { "type": "oauth", "accessToken": "...", "refreshToken": "...", "expiresAt": 1738627200000 }
-    }
-  }
-}
-```
+Once authenticated via the Admin UI, Plexus stores OAuth tokens encrypted at rest (when `ENCRYPTION_KEY` is configured) and handles automatic refresh when tokens expire.
 
 #### `providers.<provider>.quota_checker` (Optional)
 
@@ -382,8 +369,8 @@ providers:
 - `synthetic`: Derives `options.apiKey` from provider `api_key` by default.
 - `naga`: Balance-based checker.
 - `nanogpt`: NanoGPT usage checker.
-- `openai-codex`: OAuth-backed; reads token from `auth.json`.
-- `claude-code`: OAuth-backed; reads token from `auth.json`.
+- `openai-codex`: OAuth-backed; reads token from the database.
+- `claude-code`: OAuth-backed; reads token from the database.
 - `zai`: ZAI balance-based checker.
 - `moonshot`: Moonshot balance-based checker.
 - `novita`: Novita balance-based checker.
