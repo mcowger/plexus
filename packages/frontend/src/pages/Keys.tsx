@@ -22,7 +22,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { formatNumber, formatCost } from '../lib/format';
-import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
+import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
 
 const EMPTY_KEY: KeyConfig = {
   key: '',
@@ -252,7 +252,7 @@ export const Keys = () => {
   };
 
   const generateKey = () => {
-    const uuid = crypto.randomUUID();
+    const uuid = generateUUID();
     setEditingKey({ ...editingKey, secret: `sk-${uuid}` });
   };
 
