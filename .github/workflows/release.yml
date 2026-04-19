@@ -258,11 +258,12 @@ jobs:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          gist_token: ${{ secrets.PI_GIST_TOKEN }}
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
           provider: openrouter
           model: ${{ vars.PLEXUS_MODEL }}
           output_mode: output
-          share_session: false
+          share_session: true
           prompt_template_file: '.github/pi-prompts/release-notes.md'
           prompt: |
             Version: ${{ steps.release_tag.outputs.tag }}

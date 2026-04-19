@@ -70,10 +70,11 @@ jobs:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          gist_token: ${{ secrets.PI_GIST_TOKEN }}
           provider: openrouter
           model: ${{ vars.PLEXUS_MODEL }}
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
-          share_session: false
+          share_session: true
           pr_number: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number || '' }}
           prompt_template_file: '.github/pi-prompts/pr-review.md'
 
