@@ -46,10 +46,11 @@ jobs:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          gist_token: ${{ secrets.PI_GIST_TOKEN }}
           provider: openrouter
           model: ${{ vars.PLEXUS_MODEL }}
           pi_models_json: ${{ secrets.PI_MODELS_JSON }}
-          share_session: false
+          share_session: true
           prompt_template_file: '.github/pi-prompts/default-main.md'
           suppress_final_comment: true
 
