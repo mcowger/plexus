@@ -298,11 +298,7 @@ jobs:
           echo "release_notes outcome: ${{ steps.release_notes.outcome }}"
 
       # Note: The Pi action posts results as comments, which doesn't work on tag pushes
-      # (no issue/PR context). Using raw summary for release body.
-      - name: Set release notes fallback
-        id: extract_notes
-        run: |
-          echo "result=${{ steps.pr_info.outputs.pr_summary }}" >> "$GITHUB_OUTPUT"
+      # (no issue/PR context). Using raw summary directly for release body.
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -314,4 +310,4 @@ jobs:
             plexus.exe
           draft: false
           prerelease: false
-          body: ${{ steps.extract_notes.outputs.result || steps.pr_info.outputs.pr_summary }}
+          body: ${{ steps.pr_info.outputs.pr_summary }}
