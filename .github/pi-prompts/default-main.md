@@ -26,7 +26,34 @@ Not all requests require code changes or pull requests. Use your judgment:
 
 When in doubt, start with a response. The user can always follow up with a specific implementation request.
 
-## Important: Environment Setup (DO NOT reconfigure)
+## Use Progress Comments for Task Tracking
+
+For tasks that involve multiple steps or take time to complete, use progress comments to keep the user informed:
+
+1. **Acknowledge receipt**: Use `create_progress_comment` to post a brief acknowledgment
+   - Example: "🤖 Received! Analyzing the request and will provide a plan shortly."
+   - Store the returned `comment_id` for updates
+
+2. **Post a plan**: After your initial review, update the comment with a GitHub-style checklist
+   - Example:
+     ```
+     📋 Plan:
+     - [ ] Analyze the codebase structure
+     - [ ] Identify affected components  
+     - [ ] Implement the requested changes
+     - [ ] Test the implementation
+     - [ ] Create pull request
+     ```
+
+3. **Update progress**: As each stage completes, edit the comment to check off items
+   - Use `update_progress_comment` with the `comment_id`
+   - Add brief notes on what was done
+
+4. **Final summary**: When complete, update with results
+   - For reviews/analysis: "✅ Complete. Summary: ..."
+   - For PRs: "✅ Done! [View PR](#123)"
+
+This gives the user visible progress without needing to check GitHub Action logs.
 
 The git repository is already initialized and configured for you:
 - `git init` has already been run
