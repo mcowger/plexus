@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   review:
-    # Skip draft PRs
+    # PRs must have a body description — reject empty ones
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
@@ -18,6 +18,12 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Require PR body
+        if: github.event.pull_request.body == ''
+        run: |
+          echo "::error::Pull requests must include a description. Please add a body to this PR."
+          exit 1
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
