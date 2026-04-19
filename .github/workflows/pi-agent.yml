@@ -76,6 +76,7 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.PLEXUS_API_KEY }}
           thinking_level: low
+          trigger: '@pi'
           extensions: |
             git:github.com/mcowger/pi-env-var-provider
           load_builtin_extensions: true
