@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   test:
@@ -37,6 +38,22 @@ jobs:
             });
             core.setOutput('head_sha', pr.head.sha);
             core.setOutput('head_repo_full_name', pr.head.repo.full_name);
+
+      - name: Create PR check for workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        id: create-check
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: check } = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'PR Tests',
+              head_sha: '${{ steps.get-pr.outputs.head_sha }}',
+              status: 'in_progress',
+              started_at: new Date().toISOString()
+            });
+            core.setOutput('check_id', check.id);
 
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -59,5 +76,20 @@ jobs:
 
       - name: Run backend tests
         run: cd packages/backend && bun run test
+
+      - name: Update PR check to complete
+        if: github.event_name == 'workflow_dispatch' && always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const conclusion = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.checks.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_run_id: '${{ steps.create-check.outputs.check_id }}',
+              status: 'completed',
+              conclusion: conclusion,
+              completed_at: new Date().toISOString()
+            });
 
 

@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      checks: write
 
     steps:
       - name: Get PR info for workflow_dispatch
@@ -45,6 +46,22 @@ jobs:
             core.setOutput('head_repo_full_name', pr.head.repo.full_name);
             core.setOutput('body', pr.body || '');
             core.setOutput('draft', pr.draft);
+
+      - name: Create PR check for workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        id: create-check
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: check } = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Pi PR Review',
+              head_sha: '${{ steps.get-pr.outputs.head_sha }}',
+              status: 'in_progress',
+              started_at: new Date().toISOString()
+            });
+            core.setOutput('check_id', check.id);
 
       - name: Require PR body
         if: |
@@ -67,6 +84,21 @@ jobs:
             core.setSecret(process.env.PI_MODELS_JSON)
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+
+      - name: Update PR check to complete
+        if: github.event_name == 'workflow_dispatch' && always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const conclusion = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.checks.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_run_id: '${{ steps.create-check.outputs.check_id }}',
+              status: 'completed',
+              conclusion: conclusion,
+              completed_at: new Date().toISOString()
+            });
 
       - name: Run pi PR review
         uses: mcowger/pi-action@main
