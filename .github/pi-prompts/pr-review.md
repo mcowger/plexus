@@ -12,6 +12,15 @@ You are reviewing Pull Request #{{number}}: **{{title}}**
 ```
 
 {{/if}}
+## Efficiency Guidelines
+
+When planning your next step, think ahead and batch operations for efficiency:
+
+- **Read multiple files at once.** If you need to examine several files to understand a problem, read them all in a single tool call rather than one at a time.
+- **Make multiple edits at once.** When you need to change several locations in a file, batch them into a single edit call with multiple entries. When changing multiple files, make all independent edits in parallel.
+- **Batch independent tool calls.** Any tool calls that don't depend on each other's results should be made in the same turn.
+- **Plan before acting.** Before calling a tool, consider what else you'll need and whether you can combine it with the current call. A little planning upfront avoids many round-trips.
+
 ## Review Guidelines
 
 Perform a thorough code review for **Plexus**, a unified LLM API gateway built on Bun + Fastify. Focus on:
