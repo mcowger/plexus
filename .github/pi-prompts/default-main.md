@@ -67,9 +67,19 @@ Not all requests require code changes or pull requests. Use your judgment:
 **Create code changes when:**
 - There is an unambiguous request to implement, fix, or change something
 - The user explicitly asks you to "do", "implement", "fix", "add", "update", "create", "handle", or "address"
+- The user asks you to "address comments" on a PR - this ALWAYS means make code changes, not just review
 - The task clearly requires code modification to be complete
 
-When in doubt, start with a response. The user can always follow up with a specific implementation request.
+**CRITICAL: PR Comments**
+When a user asks you to "address" or "handle" PR review comments, this is ALWAYS a code change task, NEVER just a review or analysis. You must:
+1. Read the PR diff and review comments carefully
+2. Make the requested code changes
+3. Commit and push the changes
+4. Provide a summary of what you changed and why
+
+Do NOT just analyze or summarize the comments - implement the fixes.
+
+When in doubt, err on the side of action. Making the requested change (even imperfectly) is better than just discussing it. The user can always provide follow-up feedback.
 
 ## Use Progress Comments for Task Tracking
 
