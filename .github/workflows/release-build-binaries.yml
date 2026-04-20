@@ -25,21 +25,16 @@ jobs:
             compile_cmd: bun run compile:windows
             artifact_name: plexus.exe
     steps:
-      - name: Download workspace
-        uses: actions/download-artifact@v8
-        with:
-          name: workspace
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Restore node_modules
-        uses: actions/cache@v5
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/bun.lock') }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Compile binary
         env:

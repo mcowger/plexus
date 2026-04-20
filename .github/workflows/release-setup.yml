@@ -23,26 +23,3 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Cache node_modules
-        uses: actions/cache@v5
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/bun.lock') }}
-
-      - name: Upload workspace
-        uses: actions/upload-artifact@v7
-        with:
-          name: workspace
-          path: |
-            .
-            !.git
-          retention-days: 1

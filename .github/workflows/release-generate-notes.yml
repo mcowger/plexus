@@ -22,10 +22,10 @@ jobs:
       pr_summary: ${{ steps.pr_info.outputs.pr_summary }}
       response: ${{ steps.release_notes.outputs.response }}
     steps:
-      - name: Download workspace
-        uses: actions/download-artifact@v8
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
-          name: workspace
+          fetch-depth: 0
 
       - name: Get previous release tag
         id: prev_tag
