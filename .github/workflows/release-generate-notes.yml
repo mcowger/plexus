@@ -162,3 +162,17 @@ jobs:
             ## Source Changes
 
             ${{ steps.pr_info.outputs.pr_summary }}
+
+      - name: Write release notes to file
+        env:
+          NOTES: ${{ steps.release_notes.outputs.response }}
+        run: |
+          mkdir -p ${{ runner.temp }}/release-notes
+          node -e "require('fs').writeFileSync('${{ runner.temp }}/release-notes/notes.md', process.env.NOTES)"
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes/notes.md
+          retention-days: 1

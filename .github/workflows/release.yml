@@ -48,7 +48,5 @@ jobs:
     uses: ./.github/workflows/release-publish.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
-      pr_summary: ${{ needs.generate-notes.outputs.pr_summary }}
-      release_notes_response: ${{ needs.generate-notes.outputs.response }}
     permissions:
       contents: write
