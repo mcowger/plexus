@@ -157,7 +157,14 @@ jobs:
           share_session: true
           prompt_template: release-notes
           prompt: |
-            Version: ${{ inputs.tag }}
+            Generate release notes for version ${{ inputs.tag }}.
+
+            IMPORTANT RULES:
+            - Use ONLY the Source Changes listed below. Do NOT look up additional commits, PRs, issues, or repository history.
+            - Do NOT include changes that are not listed below.
+            - Do NOT mention features, fixes, or PRs from previous releases.
+            - If a change is a CI/workflow/internal tooling change (like GitHub Actions, release scripts, or prompt updates), omit it entirely unless it directly affects end users.
+            - Keep the tone concise and factual.
 
             ## Source Changes
 
