@@ -131,23 +131,39 @@ jobs:
 
             core.setOutput('pr_summary', summary);
 
-      - name: Extract OpenRouter API key
-        id: api_key
+      - name: Extract OpenRouter config
+        id: openrouter
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         run: |
           API_KEY=$(echo "$PI_MODELS_JSON" | jq -r '.providers.openrouter.apiKey // empty')
+          ENDPOINT=$(echo "$PI_MODELS_JSON" | jq -r '
+            .providers.openrouter.endpoint //
+            .providers.openrouter.baseUrl //
+            .providers.openrouter.baseURL //
+            .providers.openrouter.baseurl //
+            .providers.openrouter.base_url //
+            .providers.openrouter.apiUrl //
+            .providers.openrouter.api_url //
+            empty
+          ')
           if [ -z "$API_KEY" ]; then
             echo "Error: OpenRouter API key not found in PI_MODELS_JSON" >&2
             exit 1
           fi
+          if [ -z "$ENDPOINT" ]; then
+            echo "Error: OpenRouter endpoint not found in PI_MODELS_JSON" >&2
+            exit 1
+          fi
           echo "::add-mask::$API_KEY"
           echo "key=$API_KEY" >> "$GITHUB_OUTPUT"
+          echo "endpoint=$ENDPOINT" >> "$GITHUB_OUTPUT"
 
-      - name: Generate release notes via OpenRouter
+      - name: Generate release notes via LLM
         id: release_notes
         env:
-          OPENROUTER_API_KEY: ${{ steps.api_key.outputs.key }}
+          LLM_API_KEY: ${{ steps.openrouter.outputs.key }}
+          LLM_ENDPOINT: ${{ steps.openrouter.outputs.endpoint }}/v1/chat/completions
           MODEL: ${{ vars.PLEXUS_MODEL }}
           PROMPT: |
             Generate release notes for version ${{ inputs.tag }}.
@@ -167,10 +183,11 @@ jobs:
           const fs = require('fs');
           const prompt = process.env.PROMPT;
           const model = process.env.MODEL;
-          const apiKey = process.env.OPENROUTER_API_KEY;
+          const apiKey = process.env.LLM_API_KEY;
+          const endpoint = process.env.LLM_ENDPOINT;
 
           async function main() {
-            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            const res = await fetch(endpoint, {
               method: 'POST',
               headers: {
                 'Authorization': 'Bearer ' + apiKey,
@@ -188,7 +205,7 @@ jobs:
 
             if (!res.ok) {
               const text = await res.text();
-              console.error('OpenRouter error:', res.status, text);
+              console.error('LLM error:', res.status, text);
               process.exit(1);
             }
 
