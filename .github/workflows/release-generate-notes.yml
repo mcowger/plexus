@@ -9,8 +9,6 @@ on:
     outputs:
       pr_summary:
         value: ${{ jobs.generate-notes.outputs.pr_summary }}
-      response:
-        value: ${{ jobs.generate-notes.outputs.response }}
 
 jobs:
   generate-notes:
@@ -20,7 +18,6 @@ jobs:
       contents: read
     outputs:
       pr_summary: ${{ steps.pr_info.outputs.pr_summary }}
-      response: ${{ steps.release_notes.outputs.response }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -134,29 +131,25 @@ jobs:
 
             core.setOutput('pr_summary', summary);
 
-      - name: Register secrets for masking
-        uses: actions/github-script@v9
-        with:
-          script: |
-            core.setSecret(process.env.PI_MODELS_JSON)
+      - name: Extract OpenRouter API key
+        id: api_key
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
+        run: |
+          API_KEY=$(echo "$PI_MODELS_JSON" | jq -r '.providers.openrouter.apiKey // empty')
+          if [ -z "$API_KEY" ]; then
+            echo "Error: OpenRouter API key not found in PI_MODELS_JSON" >&2
+            exit 1
+          fi
+          echo "::add-mask::$API_KEY"
+          echo "key=$API_KEY" >> "$GITHUB_OUTPUT"
 
-      - name: Generate release notes with pi
+      - name: Generate release notes via OpenRouter
         id: release_notes
-        uses: mcowger/pi-action@v1
         env:
-          PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          gist_token: ${{ secrets.PI_GIST_TOKEN }}
-          pi_models_json: ${{ secrets.PI_MODELS_JSON }}
-          provider: openrouter
-          model: ${{ vars.PLEXUS_MODEL }}
-          output_mode: output
-          share_session: true
-          prompt_template: release-notes
-          prompt: |
+          OPENROUTER_API_KEY: ${{ steps.api_key.outputs.key }}
+          MODEL: ${{ vars.PLEXUS_MODEL }}
+          PROMPT: |
             Generate release notes for version ${{ inputs.tag }}.
 
             IMPORTANT RULES:
@@ -169,6 +162,49 @@ jobs:
             ## Source Changes
 
             ${{ steps.pr_info.outputs.pr_summary }}
+        run: |
+          node -e "
+          const fs = require('fs');
+          const prompt = process.env.PROMPT;
+          const model = process.env.MODEL;
+          const apiKey = process.env.OPENROUTER_API_KEY;
+
+          async function main() {
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Bearer ' + apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: model,
+                messages: [
+                  { role: 'system', content: 'You are a technical writer drafting concise, factual release notes for a software project. Only use the information provided in the user message. Do not look up external data.' },
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.3,
+              }),
+            });
+
+            if (!res.ok) {
+              const text = await res.text();
+              console.error('OpenRouter error:', res.status, text);
+              process.exit(1);
+            }
+
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+
+            // Write to GITHUB_OUTPUT
+            const output = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(output, 'response<<EOF\n' + content + '\nEOF\n');
+          }
+
+          main().catch(err => {
+            console.error(err);
+            process.exit(1);
+          });
+          "
 
       - name: Write release notes to file
         env:
