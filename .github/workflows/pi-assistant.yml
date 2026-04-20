@@ -25,8 +25,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          # For PR review comments, checkout the PR branch so changes go to existing PR
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          # For PR comments, checkout the PR branch; otherwise checkout default
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -45,9 +45,14 @@ jobs:
       - name: Determine branch mode
         id: branch-config
         run: |
+          # Check if this is a PR-related comment (review comment or issue comment on PR)
+          # github.head_ref is only set for PR-related events
           if [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
             echo "mode=direct" >> $GITHUB_OUTPUT
             echo "For PR review comments: using direct mode to push to existing PR branch"
+          elif [ -n "${{ github.head_ref }}" ]; then
+            echo "mode=direct" >> $GITHUB_OUTPUT
+            echo "For PR comments: using direct mode to push to existing PR branch (head: ${{ github.head_ref }})"
           else
             echo "mode=branch" >> $GITHUB_OUTPUT
             echo "For other events: using branch mode to create new PR"
