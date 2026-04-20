@@ -4,7 +4,7 @@
   "devDependencies": {
     "@biomejs/biome": "latest",
     "bun-types": "latest",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.4"
   },
   "private": true,
   "scripts": {
