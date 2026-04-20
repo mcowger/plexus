@@ -163,7 +163,7 @@ jobs:
         id: release_notes
         env:
           LLM_API_KEY: ${{ steps.openrouter.outputs.key }}
-          LLM_ENDPOINT: ${{ steps.openrouter.outputs.endpoint }}/v1/chat/completions
+          LLM_ENDPOINT: ${{ steps.openrouter.outputs.endpoint }}/chat/completions
           MODEL: ${{ vars.PLEXUS_MODEL }}
           PROMPT: |
             Generate release notes for version ${{ inputs.tag }}.
