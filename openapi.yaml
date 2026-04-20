@@ -1070,6 +1070,8 @@ tags:
     description: Model Context Protocol proxy endpoints
   - name: Discovery
     description: OAuth and discovery endpoints
+  - name: UI
+    description: Dashboard and static asset endpoints
 
 # API Paths
 paths:
@@ -1458,6 +1460,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         '200':
           description: Response data
@@ -1483,6 +1486,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         '200':
           description: Response deleted
@@ -2169,8 +2173,9 @@ paths:
           content:
             text/event-stream:
               schema:
-                type: object
-                description: Server-sent event stream with log events
+                type: string
+                description: Server-sent event stream with event, data, and id fields
+                example: "event: message\ndata: [{\"requestId\":\"uuid\",...}]\n\n"
 
   # Management - Concurrency
   /v0/management/concurrency:
@@ -2496,8 +2501,9 @@ paths:
           content:
             text/event-stream:
               schema:
-                type: object
+                type: string
                 description: Server-sent event stream with syslog events
+                example: "event: log\ndata: {\"level\":\"info\",\"message\":\"...\"}\n\n"
 
   # Management - Test
   /v0/management/test:
@@ -2570,7 +2576,7 @@ paths:
           required: true
           schema:
             type: string
-            pattern: '^[a-z0-9][a-z0-9-_]{1,62}$'
+            pattern: '^[a-z0-9][a-z0-9-_]{0,62}$'
       requestBody:
         required: true
         content:
@@ -3078,7 +3084,9 @@ paths:
           content:
             text/event-stream:
               schema:
-                type: object
+                type: string
+                description: Server-sent event stream for MCP server events
+                example: "event: message\ndata: {\"jsonrpc\":\"2.0\",...}\n\n"
 
     delete:
       tags: [MCP]
@@ -3231,11 +3239,15 @@ paths:
                 - max_tokens
       responses:
         '200':
-          description: Message response
+          description: Message response or SSE stream for streaming
           content:
             application/json:
               schema:
                 type: object
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-sent event stream for streaming responses
         '401':
           description: Authentication failed
 
