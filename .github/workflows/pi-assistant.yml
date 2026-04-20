@@ -99,7 +99,8 @@ jobs:
           branch_mode: ${{ steps.detect-context.outputs.mode }}
 
       - name: Dispatch PR review workflow
-        if: steps.pi-action.outputs.pr_created == 'true'
+        # Trigger for newly created PRs OR direct mode on existing PRs
+        if: steps.pi-action.outputs.pr_number != ''
         uses: actions/github-script@v9
         with:
           script: |
@@ -114,7 +115,8 @@ jobs:
             });
 
       - name: Dispatch PR tests workflow
-        if: steps.pi-action.outputs.pr_created == 'true'
+        # Trigger for newly created PRs OR direct mode on existing PRs
+        if: steps.pi-action.outputs.pr_number != ''
         uses: actions/github-script@v9
         with:
           script: |
