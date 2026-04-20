@@ -144,7 +144,7 @@ jobs:
 
       - name: Generate release notes with pi
         id: release_notes
-        uses: mcowger/pi-action@main
+        uses: mcowger/pi-action@v1
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         with:

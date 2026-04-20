@@ -65,7 +65,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || steps.get-pr.outputs.head_sha }}
 
       - name: Run pi PR review
-        uses: mcowger/pi-action@main
+        uses: mcowger/pi-action@v1
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
         with:
