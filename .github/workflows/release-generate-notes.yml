@@ -156,6 +156,7 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$API_KEY"
+          echo "::add-mask::$ENDPOINT"
           echo "key=$API_KEY" >> "$GITHUB_OUTPUT"
           echo "endpoint=$ENDPOINT" >> "$GITHUB_OUTPUT"
 
