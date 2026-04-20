@@ -1,0 +1,3496 @@
+openapi: 3.1.0
+info:
+  title: Plexus API
+  description: |
+    Plexus is a unified API gateway for LLMs. Built on Bun + Fastify, it exposes
+    OpenAI- and Anthropic-compatible endpoints and routes requests to any backend
+    provider, handling request/response transformation automatically.
+
+    ## Authentication
+
+    All inference endpoints (`/v1/*`, `/v1beta/*`) require a Plexus API key.
+    Management endpoints (`/v0/*`) require a separate **Admin Key** passed via `x-admin-key`.
+
+    ### Accepted Credentials (Inference APIs)
+
+    Plexus accepts a key via any of the following, checked in this order:
+
+    | Method | Example |
+    |--------|---------|
+    | `Authorization` header | `Authorization: Bearer sk-my-key` |
+    | `Authorization` header (no prefix) | `Authorization: sk-my-key` |
+    | `x-api-key` header | `x-api-key: sk-my-key` |
+    | `x-goog-api-key` header | `x-goog-api-key: sk-my-key` |
+    | `?key=` query parameter | `GET /v1/models?key=sk-my-key` |
+
+    ### Dynamic Key Attribution
+
+    To tag a request with an attribution label for usage tracking, append `:label` to the key:
+    `Authorization: Bearer sk-my-key:copilot`
+
+    ### Public Endpoints (No Auth Required)
+
+    - `GET /health`
+    - `GET /v1/models`
+    - `GET /v1/openrouter/models`
+    - `GET /v1/metadata/search`
+    - All `/.well-known/*` and `/register` MCP discovery endpoints
+  version: 1.0.0
+  contact:
+    name: Plexus
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+
+security:
+  - bearerAuth: []
+  - apiKeyHeader: []
+  - googleApiKeyHeader: []
+  - apiKeyQuery: []
+
+tags:
+  - name: Health & Discovery
+    description: Health checks and OAuth/OIDC discovery
+  - name: Inference
+    description: OpenAI, Anthropic, and Gemini-compatible inference endpoints
+  - name: Model Management
+    description: List and search available models
+  - name: Management
+    description: Administrative API for configuration, usage, and monitoring
+  - name: Quotas
+    description: Provider-level quota monitoring
+  - name: MCP Proxy
+    description: Model Context Protocol server proxying
+
+paths:
+  # ─── Health & Discovery ─────────────────────────────────────────────────
+  /health:
+    get:
+      tags:
+        - Health & Discovery
+      summary: Health check
+      description: Returns `OK` if the server is running.
+      security: []
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /.well-known/oauth-authorization-server:
+    get:
+      tags:
+        - Health & Discovery
+      summary: OAuth authorization server metadata
+      description: Returns OAuth 2.0 authorization server metadata
+      security: []
+      responses:
+        '200':
+          description: OAuth server metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer:
+                    type: string
+                  authorization_endpoint:
+                    type: string
+                  token_endpoint:
+                    type: string
+                  grant_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  token_endpoint_auth_methods_supported:
+                    type: array
+                    items:
+                      type: string
+                  resource_supported:
+                    type: boolean
+
+  /.well-known/oauth-protected-resource:
+    get:
+      tags:
+        - Health & Discovery
+      summary: OAuth protected resource metadata
+      description: Returns OAuth 2.0 protected resource metadata
+      security: []
+      responses:
+        '200':
+          description: Protected resource metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resource:
+                    type: string
+                  authorization_servers:
+                    type: array
+                    items:
+                      type: string
+                  scopes_supported:
+                    type: array
+                    items:
+                      type: string
+                  bearer_methods_supported:
+                    type: array
+                    items:
+                      type: string
+
+  /.well-known/openid-configuration:
+    get:
+      tags:
+        - Health & Discovery
+      summary: OpenID Connect configuration
+      description: Returns OpenID Connect discovery metadata
+      security: []
+      responses:
+        '200':
+          description: OpenID configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer:
+                    type: string
+                  authorization_endpoint:
+                    type: string
+                  token_endpoint:
+                    type: string
+                  jwks_uri:
+                    type: string
+                  response_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  id_token_signing_alg_values_supported:
+                    type: array
+                    items:
+                      type: string
+
+  /register:
+    post:
+      tags:
+        - Health & Discovery
+      summary: Dynamic client registration
+      description: OAuth dynamic client registration endpoint
+      security: []
+      responses:
+        '201':
+          description: Client registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  client_id:
+                    type: string
+                  client_id_issued_at:
+                    type: integer
+                  client_secret:
+                    type: string
+                  grant_types:
+                    type: array
+                    items:
+                      type: string
+                  token_endpoint_auth_method:
+                    type: string
+
+  # ─── Inference APIs ──────────────────────────────────────────────────
+  /v1/chat/completions:
+    post:
+      tags:
+        - Inference
+      summary: Chat completions (OpenAI-compatible)
+      description: |
+        Compatible with the OpenAI Chat Completions API. Supports streaming via
+        `stream: true` in the request body.
+
+        See [OpenAI Chat Completions Reference](https://platform.openai.com/docs/api-reference/chat)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Successful completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-sent events for streaming responses
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/messages:
+    post:
+      tags:
+        - Inference
+      summary: Messages (Anthropic-compatible)
+      description: |
+        Compatible with the Anthropic Messages API.
+
+        See [Anthropic Messages Reference](https://docs.anthropic.com/en/api/messages)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Successful message response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/responses:
+    post:
+      tags:
+        - Inference
+      summary: Responses (OpenAI Responses API)
+      description: |
+        Compatible with the OpenAI Responses API. Supports multi-turn conversations
+        via `previous_response_id`, tool use, and reasoning. Plexus stores response
+        state server-side so clients only need to send new input and a reference to
+        the previous response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/responses/{response_id}:
+    get:
+      tags:
+        - Inference
+      summary: Retrieve a stored response
+      description: Retrieves a previously stored response by ID.
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Retrieved response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Response not found
+
+    delete:
+      tags:
+        - Inference
+      summary: Delete a stored response
+      description: Deletes a stored response.
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Response deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  id:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Response not found
+
+  /v1/codex/responses:
+    post:
+      tags:
+        - Inference
+      summary: Codex Responses
+      description: |
+        Codex CLI sends requests to `/v1/codex/responses` — this is an alias to
+        the same handler as `/v1/responses`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/conversations/{conversation_id}:
+    get:
+      tags:
+        - Inference
+      summary: Get conversation
+      description: Retrieves all items in a stored conversation thread.
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Retrieved conversation
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Conversation not found
+
+  /v1beta/models/{modelWithAction}:
+    post:
+      tags:
+        - Inference
+      summary: Gemini-compatible endpoint
+      description: |
+        Compatible with the Google Generative Language API (Gemini).
+        Supported Actions: `generateContent`, `streamGenerateContent`
+
+        See [Gemini API Reference](https://ai.google.dev/api/rest/v1beta/models/generateContent)
+      parameters:
+        - name: modelWithAction
+          in: path
+          required: true
+          schema:
+            type: string
+            example: gemini-pro:generateContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/embeddings:
+    post:
+      tags:
+        - Inference
+      summary: Create embeddings
+      description: |
+        Compatible with the OpenAI Embeddings API. Works with any provider that
+        supports OpenAI-compatible embeddings.
+
+        Models must be configured with `type: embeddings`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingsRequest'
+      responses:
+        '200':
+          description: Embeddings generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingsResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/audio/transcriptions:
+    post:
+      tags:
+        - Inference
+      summary: Create transcription
+      description: |
+        Compatible with the OpenAI Audio Transcriptions API. Accepts `multipart/form-data`
+        with audio files.
+
+        Supported Formats: mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm (max 25 MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                model:
+                  type: string
+                language:
+                  type: string
+                prompt:
+                  type: string
+                response_format:
+                  type: string
+                  enum: [json, text, verbose_json]
+                  default: json
+                temperature:
+                  type: number
+      responses:
+        '200':
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                type: object
+            text/plain:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/audio/speech:
+    post:
+      tags:
+        - Inference
+      summary: Create speech
+      description: |
+        Compatible with the OpenAI Audio Speech API. Generates audio from text.
+
+        Voices: alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer,
+        verse, marin, cedar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpeechRequest'
+      responses:
+        '200':
+          description: Audio response
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/images/generations:
+    post:
+      tags:
+        - Inference
+      summary: Create image
+      description: Compatible with the OpenAI Images Generation API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageGenerationRequest'
+      responses:
+        '200':
+          description: Generated image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageGenerationResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /v1/images/edits:
+    post:
+      tags:
+        - Inference
+      summary: Edit image
+      description: |
+        Compatible with the OpenAI Images Edit API. Accepts `multipart/form-data`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: PNG file, < 4 MB
+                prompt:
+                  type: string
+                mask:
+                  type: string
+                  format: binary
+                  description: PNG mask (transparent = edit here)
+                model:
+                  type: string
+                n:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                size:
+                  type: string
+                  enum: ['256x256', '512x512', '1024x1024']
+                response_format:
+                  type: string
+                  enum: [url, b64_json]
+                quality:
+                  type: string
+                  enum: [standard, high, medium, low]
+                user:
+                  type: string
+      responses:
+        '200':
+          description: Edited image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageGenerationResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ─── Model Management ────────────────────────────────────────────────
+  /v1/models:
+    get:
+      tags:
+        - Model Management
+      summary: List models
+      description: |
+        Returns all configured model aliases. When an alias has metadata configured
+        in the database, the response includes enriched fields following the
+        OpenRouter model format.
+      security: []
+      responses:
+        '200':
+          description: List of models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelList'
+
+  /v1/openrouter/models:
+    get:
+      tags:
+        - Model Management
+      summary: List OpenRouter models
+      description: Returns models fetched from OpenRouter.
+      security: []
+      responses:
+        '200':
+          description: List of OpenRouter model slugs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer
+
+  /v1/metadata/search:
+    get:
+      tags:
+        - Model Management
+      summary: Search model metadata
+      description: |
+        Search a loaded metadata catalog for use in the admin UI autocomplete when
+        assigning metadata to an alias.
+      security: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [openrouter, models.dev, catwalk]
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Substring search string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                  count:
+                    type: integer
+        '400':
+          description: Invalid source parameter
+        '503':
+          description: Source not loaded
+
+  /v1/metadata/lookup:
+    get:
+      tags:
+        - Model Management
+      summary: Lookup model metadata
+      description: Return the full normalized metadata for a single model in a catalog source.
+      security: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [openrouter, models.dev, catwalk]
+        - name: source_path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Invalid parameters
+        '404':
+          description: Model not found
+        '503':
+          description: Source not loaded
+
+  # ─── Management Auth ─────────────────────────────────────────────────
+  /v0/management/auth/verify:
+    get:
+      tags:
+        - Management
+      summary: Verify admin key
+      description: Validates the provided `x-admin-key` against `ADMIN_KEY`.
+      security:
+        - adminKey: []
+      parameters:
+        - name: x-admin-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key is valid
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      ok:
+                        type: boolean
+                      role:
+                        type: string
+                        enum: [admin]
+                  - type: object
+                    properties:
+                      ok:
+                        type: boolean
+                      role:
+                        type: string
+                        enum: [limited]
+                      keyName:
+                        type: string
+                      allowedProviders:
+                        type: array
+                        items:
+                          type: string
+                      allowedModels:
+                        type: array
+                        items:
+                          type: string
+                      quotaName:
+                        type: string
+                        nullable: true
+                      comment:
+                        type: string
+                        nullable: true
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ─── Configuration Management ────────────────────────────────────────
+  /v0/management/config:
+    get:
+      tags:
+        - Management
+      summary: Get current configuration
+      description: Returns the current configuration from the database (originally imported from `plexus.yaml`).
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Current configuration
+
+  /v0/management/config/export:
+    get:
+      tags:
+        - Management
+      summary: Export configuration as JSON
+      description: Returns the configuration as JSON.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Configuration JSON
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/management/config/status:
+    get:
+      tags:
+        - Management
+      summary: Get config status
+      description: Returns configuration status including whether ADMIN_KEY was loaded from YAML.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Config status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  adminKeyFromYaml:
+                    type: boolean
+
+  /v0/management/providers:
+    get:
+      tags:
+        - Management
+      summary: List all providers
+      description: Returns all configured providers.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of providers
+
+  /v0/management/providers/{providerId}:
+    get:
+      tags:
+        - Management
+      summary: Get provider by ID
+      description: Returns a specific provider configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Provider configuration
+        '404':
+          description: Provider not found
+
+    put:
+      tags:
+        - Management
+      summary: Create or replace provider
+      description: Creates or replaces a provider configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderConfig'
+      responses:
+        '200':
+          description: Provider saved
+        '400':
+          description: Validation failed
+
+    patch:
+      tags:
+        - Management
+      summary: Partially update provider
+      description: Partially updates a provider configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Provider updated
+        '400':
+          description: Validation failed
+        '404':
+          description: Provider not found
+
+    delete:
+      tags:
+        - Management
+      summary: Delete provider
+      description: Deletes a provider configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cascade
+          in: query
+          schema:
+            type: boolean
+          description: Also remove all model targets that reference this provider
+      responses:
+        '200':
+          description: Provider deleted
+        '404':
+          description: Provider not found
+
+  /v0/management/aliases:
+    get:
+      tags:
+        - Management
+      summary: List all model aliases
+      description: Returns all configured model aliases.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of aliases
+
+  /v0/management/aliases/{aliasId}:
+    put:
+      tags:
+        - Management
+      summary: Create or replace model alias
+      description: Creates or replaces a model alias configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelConfig'
+      responses:
+        '200':
+          description: Alias saved
+        '400':
+          description: Validation failed
+
+    patch:
+      tags:
+        - Management
+      summary: Partially update model alias
+      description: Partially updates a model alias configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Alias updated
+        '400':
+          description: Validation failed
+        '404':
+          description: Alias not found
+
+  /v0/management/models/{aliasId}:
+    delete:
+      tags:
+        - Management
+      summary: Delete model alias
+      description: Deletes a model alias configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alias deleted
+        '404':
+          description: Alias not found
+
+  /v0/management/models:
+    delete:
+      tags:
+        - Management
+      summary: Delete all model aliases
+      description: Deletes all model aliases.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Aliases deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deletedCount:
+                    type: integer
+
+  /v0/management/keys:
+    get:
+      tags:
+        - Management
+      summary: List all API keys
+      description: Returns all configured API keys.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of keys
+
+  /v0/management/keys/{name}:
+    put:
+      tags:
+        - Management
+      summary: Create or replace API key
+      description: Creates or replaces an API key configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyConfig'
+      responses:
+        '200':
+          description: Key saved
+        '400':
+          description: Validation failed
+
+    delete:
+      tags:
+        - Management
+      summary: Delete API key
+      description: Deletes an API key.
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key deleted
+        '404':
+          description: Key not found
+
+  /v0/management/system-settings:
+    get:
+      tags:
+        - Management
+      summary: Get system settings
+      description: Returns all system settings.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: System settings
+
+    patch:
+      tags:
+        - Management
+      summary: Update system settings
+      description: Updates system settings with the provided values.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Settings updated
+        '400':
+          description: Invalid request
+
+  /v0/management/config/vision-fallthrough:
+    get:
+      tags:
+        - Management
+      summary: Get vision fallthrough settings
+      description: Returns the vision fallthrough configuration.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Vision fallthrough settings
+
+    patch:
+      tags:
+        - Management
+      summary: Update vision fallthrough settings
+      description: Updates vision fallthrough configuration.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Settings updated
+
+  # ─── Usage & Logging ─────────────────────────────────────────────────
+  /v0/management/usage:
+    get:
+      tags:
+        - Management
+      summary: List usage records
+      description: Returns usage records with filtering and pagination.
+      security:
+        - adminKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: apiKey
+          in: query
+          schema:
+            type: string
+        - name: attribution
+          in: query
+          schema:
+            type: string
+        - name: incomingApiType
+          in: query
+          schema:
+            type: string
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: incomingModelAlias
+          in: query
+          schema:
+            type: string
+        - name: responseStatus
+          in: query
+          schema:
+            type: string
+            enum: [success, error]
+      responses:
+        '200':
+          description: Usage records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageRecordsResponse'
+
+    delete:
+      tags:
+        - Management
+      summary: Delete usage records
+      description: Deletes usage records, optionally older than a specified number of days.
+      security:
+        - adminKey: []
+      parameters:
+        - name: olderThanDays
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Records deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/usage/summary:
+    get:
+      tags:
+        - Management
+      summary: Usage summary
+      description: Returns aggregated time-series data and totals for a time range.
+      security:
+        - adminKey: []
+      parameters:
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month, custom]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageSummary'
+
+  /v0/management/usage/{requestId}:
+    delete:
+      tags:
+        - Management
+      summary: Delete single usage record
+      description: Deletes a specific usage record by ID.
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Record deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Record not found
+
+  /v0/management/events:
+    get:
+      tags:
+        - Management
+      summary: Live usage events (SSE)
+      description: |
+        Streams a `log` event for every completed inference request as it is
+        saved to the database. Uses Server-Sent Events (SSE).
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: SSE stream of usage events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /v0/management/concurrency:
+    get:
+      tags:
+        - Management
+      summary: Concurrency metrics
+      description: Returns currently in-flight requests or historical concurrency data.
+      security:
+        - adminKey: []
+      parameters:
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [live, timeline]
+            default: live
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+            enum: [provider, model]
+      responses:
+        '200':
+          description: Concurrency data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+
+  # ─── Debug Logs ──────────────────────────────────────────────────────
+  /v0/management/debug:
+    get:
+      tags:
+        - Management
+      summary: Get debug status
+      description: Returns the global debug state and enabled providers.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Debug status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  enabledGlobal:
+                    type: boolean
+                  enabledKeys:
+                    type: array
+                    items:
+                      type: string
+                  providers:
+                    type: array
+                    items:
+                      type: string
+
+    patch:
+      tags:
+        - Management
+      summary: Set debug mode
+      description: Updates the global debug logging configuration.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                providers:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Debug mode updated
+
+  /v0/management/debug/logs:
+    get:
+      tags:
+        - Management
+      summary: List debug logs
+      description: Returns debug logs with pagination.
+      security:
+        - adminKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Debug logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+    delete:
+      tags:
+        - Management
+      summary: Delete all debug logs
+      description: Deletes all debug logs.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logs deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/debug/logs/{requestId}:
+    get:
+      tags:
+        - Management
+      summary: Get debug log detail
+      description: Returns detailed debug log for a specific request.
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Debug log details
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Log not found
+
+    delete:
+      tags:
+        - Management
+      summary: Delete debug log
+      description: Deletes a specific debug log.
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Log not found
+
+  # ─── Error Logs ──────────────────────────────────────────────────────
+  /v0/management/errors:
+    get:
+      tags:
+        - Management
+      summary: List error logs
+      description: Returns inference error logs.
+      security:
+        - adminKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Error logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+    delete:
+      tags:
+        - Management
+      summary: Delete all error logs
+      description: Deletes all error logs.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logs deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/errors/{requestId}:
+    delete:
+      tags:
+        - Management
+      summary: Delete single error log
+      description: Deletes a specific error log.
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Log not found
+
+  # ─── Logging Level ───────────────────────────────────────────────────
+  /v0/management/logging/level:
+    get:
+      tags:
+        - Management
+      summary: Get logging level
+      description: Returns current logging level and startup configuration.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Logging level
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  level:
+                    type: string
+                  startupLevel:
+                    type: string
+                  supportedLevels:
+                    type: array
+                    items:
+                      type: string
+                  ephemeral:
+                    type: boolean
+
+    post:
+      tags:
+        - Management
+      summary: Set logging level
+      description: Changes the runtime logging level.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  type: string
+                  enum: [error, warn, info, debug, verbose, silly]
+      responses:
+        '200':
+          description: Level set
+          content:
+            application/json:
+              schema:
+                type: object
+
+    delete:
+      tags:
+        - Management
+      summary: Reset logging level
+      description: Resets logging level to startup default.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Level reset
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ─── Cooldowns ───────────────────────────────────────────────────────
+  /v0/management/cooldowns:
+    get:
+      tags:
+        - Management
+      summary: List active cooldowns
+      description: Returns all currently active cooldowns for providers.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Active cooldowns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cooldown'
+
+    delete:
+      tags:
+        - Management
+      summary: Clear all cooldowns
+      description: Clears all provider cooldowns.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Cooldowns cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/cooldowns/{provider}:
+    delete:
+      tags:
+        - Management
+      summary: Clear provider cooldowns
+      description: Clears cooldowns for a specific provider.
+      security:
+        - adminKey: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+          description: Limit clear to a specific model
+      responses:
+        '200':
+          description: Cooldown cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # ─── Performance Metrics ─────────────────────────────────────────────
+  /v0/management/performance:
+    get:
+      tags:
+        - Management
+      summary: Get performance metrics
+      description: Returns performance metrics for providers and models.
+      security:
+        - adminKey: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Performance metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    provider:
+                      type: string
+                    model:
+                      type: string
+                    avg_ttft_ms:
+                      type: number
+                    min_ttft_ms:
+                      type: number
+                    max_ttft_ms:
+                      type: number
+                    avg_tokens_per_sec:
+                      type: number
+                    min_tokens_per_sec:
+                      type: number
+                    max_tokens_per_sec:
+                      type: number
+                    sample_count:
+                      type: integer
+                    last_updated:
+                      type: integer
+
+  # ─── Provider Testing ────────────────────────────────────────────────
+  /v0/management/test:
+    post:
+      tags:
+        - Management
+      summary: Test provider
+      description: Runs a lightweight test inference request to verify a provider/model pair.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                model:
+                  type: string
+                apiType:
+                  type: string
+                  enum: [chat, messages, gemini, responses, embeddings, images, speech, oauth]
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  durationMs:
+                    type: integer
+                  apiType:
+                    type: string
+                  response:
+                    type: string
+
+  # ─── System Logs ─────────────────────────────────────────────────────
+  /v0/system/logs/stream:
+    get:
+      tags:
+        - Management
+      summary: System log stream (SSE)
+      description: Streams all backend log entries in real-time.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: SSE stream of system logs
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  # ─── OAuth Management ────────────────────────────────────────────────
+  /v0/management/oauth/providers:
+    get:
+      tags:
+        - Management
+      summary: List OAuth providers
+      description: Returns available OAuth providers.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: OAuth providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        usesCallbackServer:
+                          type: boolean
+                  total:
+                    type: integer
+
+  /v0/management/oauth/sessions:
+    post:
+      tags:
+        - Management
+      summary: Start OAuth session
+      description: Creates a new OAuth login session.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                providerId:
+                  type: string
+                accountId:
+                  type: string
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /v0/management/oauth/sessions/{id}:
+    get:
+      tags:
+        - Management
+      summary: Get OAuth session
+      description: Returns the current state of an OAuth session.
+      security:
+        - adminKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Session not found
+
+  /v0/management/oauth/sessions/{id}/prompt:
+    post:
+      tags:
+        - Management
+      summary: Submit OAuth prompt
+      description: Submits a prompt response for an OAuth session.
+      security:
+        - adminKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
+      responses:
+        '200':
+          description: Prompt submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /v0/management/oauth/sessions/{id}/manual-code:
+    post:
+      tags:
+        - Management
+      summary: Submit OAuth manual code
+      description: Submits a manual authorization code for an OAuth session.
+      security:
+        - adminKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
+      responses:
+        '200':
+          description: Code submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /v0/management/oauth/sessions/{id}/cancel:
+    post:
+      tags:
+        - Management
+      summary: Cancel OAuth session
+      description: Cancels an OAuth session.
+      security:
+        - adminKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /v0/management/oauth/credentials:
+    delete:
+      tags:
+        - Management
+      summary: Delete OAuth credentials
+      description: Deletes OAuth credentials for a provider and account.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                providerId:
+                  type: string
+                accountId:
+                  type: string
+      responses:
+        '200':
+          description: Credentials deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+
+  /v0/management/oauth/credentials/status:
+    get:
+      tags:
+        - Management
+      summary: Get OAuth credentials status
+      description: Checks if OAuth credentials are ready for a provider and account.
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: accountId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ready:
+                        type: boolean
+
+  /v0/management/oauth/models:
+    get:
+      tags:
+        - Management
+      summary: Get OAuth provider models
+      description: Returns available models from an OAuth provider.
+      security:
+        - adminKey: []
+      parameters:
+        - name: providerId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Models list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+
+  # ─── MCP Server Management ───────────────────────────────────────────
+  /v0/management/mcp-servers:
+    get:
+      tags:
+        - Management
+      summary: List MCP servers
+      description: Returns all configured MCP servers.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: MCP servers
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/management/mcp-servers/{serverName}:
+    put:
+      tags:
+        - Management
+      summary: Create or update MCP server
+      description: Creates or replaces an MCP server configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: serverName
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9-_]{1,62}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpServerConfig'
+      responses:
+        '200':
+          description: Server saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  name:
+                    type: string
+                  upstream_url:
+                    type: string
+                  enabled:
+                    type: boolean
+                  headers:
+                    type: object
+        '400':
+          description: Invalid server name
+
+    delete:
+      tags:
+        - Management
+      summary: Delete MCP server
+      description: Deletes an MCP server configuration.
+      security:
+        - adminKey: []
+      parameters:
+        - name: serverName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Server deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/mcp-logs:
+    get:
+      tags:
+        - Management
+      summary: List MCP logs
+      description: Returns MCP proxy usage logs.
+      security:
+        - adminKey: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: serverName
+          in: query
+          schema:
+            type: string
+        - name: apiKey
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: MCP logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+
+    delete:
+      tags:
+        - Management
+      summary: Delete MCP logs
+      description: Deletes MCP proxy logs.
+      security:
+        - adminKey: []
+      parameters:
+        - name: olderThanDays
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Logs deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /v0/management/mcp-logs/{requestId}:
+    delete:
+      tags:
+        - Management
+      summary: Delete MCP log
+      description: Deletes a specific MCP log.
+      security:
+        - adminKey: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Log not found
+
+  # ─── User Quotas ─────────────────────────────────────────────────────
+  /v0/management/user-quotas:
+    get:
+      tags:
+        - Management
+      summary: List user quota definitions
+      description: Returns all user quota definitions.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Quota definitions
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/management/user-quotas/{name}:
+    get:
+      tags:
+        - Management
+      summary: Get user quota definition
+      description: Returns a specific user quota definition.
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota definition
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+        '404':
+          description: Quota not found
+
+    put:
+      tags:
+        - Management
+      summary: Create or replace user quota
+      description: Creates or replaces a user quota definition.
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9-_]{1,62}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserQuotaDefinition'
+      responses:
+        '200':
+          description: Quota saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  name:
+                    type: string
+                  quota:
+                    type: object
+        '400':
+          description: Validation failed
+
+    patch:
+      tags:
+        - Management
+      summary: Update user quota
+      description: Partially updates a user quota definition.
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Quota updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  name:
+                    type: string
+                  quota:
+                    type: object
+        '404':
+          description: Quota not found
+
+    delete:
+      tags:
+        - Management
+      summary: Delete user quota
+      description: Deletes a user quota definition.
+      security:
+        - adminKey: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  name:
+                    type: string
+                  message:
+                    type: string
+        '404':
+          description: Quota not found
+        '409':
+          description: Quota is assigned to keys
+
+  # ─── Quota Enforcement ───────────────────────────────────────────────
+  /v0/management/quota/clear:
+    post:
+      tags:
+        - Management
+      summary: Clear quota usage
+      description: Resets quota usage counters to zero for a specific API key.
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+      responses:
+        '200':
+          description: Quota cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  key:
+                    type: string
+                  message:
+                    type: string
+
+  /v0/management/quota/status/{key}:
+    get:
+      tags:
+        - Management
+      summary: Get quota status
+      description: Returns the current quota status for an API key.
+      security:
+        - adminKey: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  quota_name:
+                    type: string
+                    nullable: true
+                  allowed:
+                    type: boolean
+                  current_usage:
+                    type: integer
+                  limit:
+                    type: integer
+                    nullable: true
+                  remaining:
+                    type: integer
+                    nullable: true
+                  resets_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  /v0/management/quota-checker-types:
+    get:
+      tags:
+        - Management
+      summary: List valid quota checker types
+      description: Returns the list of built-in quota checker type strings.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: Quota checker types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer
+
+  # ─── Provider Quota Management ───────────────────────────────────────
+  /v0/quotas:
+    get:
+      tags:
+        - Quotas
+      summary: List all quota checkers
+      description: Returns all configured quota checkers with their latest snapshots.
+      security:
+        - adminKey: []
+      responses:
+        '200':
+          description: List of quota checkers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuotaCheckerSummary'
+
+  /v0/quotas/{checkerId}:
+    get:
+      tags:
+        - Quotas
+      summary: Get quota checker
+      description: Returns the latest quota data for a specific checker.
+      security:
+        - adminKey: []
+      parameters:
+        - name: checkerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota checker data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaCheckerSummary'
+        '404':
+          description: Checker not found
+
+  /v0/quotas/{checkerId}/history:
+    get:
+      tags:
+        - Quotas
+      summary: Get quota history
+      description: Returns historical quota data for a checker.
+      security:
+        - adminKey: []
+      parameters:
+        - name: checkerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: windowType
+          in: query
+          schema:
+            type: string
+          description: Filter by window type
+        - name: since
+          in: query
+          schema:
+            type: string
+          description: Start date (ISO timestamp or relative like '7d', '30d')
+      responses:
+        '200':
+          description: Quota history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkerId:
+                    type: string
+                  windowType:
+                    type: string
+                  since:
+                    type: string
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuotaSnapshot'
+
+  /v0/quotas/{checkerId}/check:
+    post:
+      tags:
+        - Quotas
+      summary: Trigger quota check
+      description: Forces an immediate quota check outside the normal polling interval.
+      security:
+        - adminKey: []
+      parameters:
+        - name: checkerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota check result
+        '404':
+          description: Checker not found
+
+  # ─── MCP Proxy ───────────────────────────────────────────────────────
+  /mcp/{name}:
+    post:
+      tags:
+        - MCP Proxy
+      summary: MCP JSON-RPC proxy
+      description: Proxies JSON-RPC messages to the specified MCP server.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Proxy response
+
+    get:
+      tags:
+        - MCP Proxy
+      summary: MCP SSE stream
+      description: Server-sent events stream for MCP server.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+    delete:
+      tags:
+        - MCP Proxy
+      summary: MCP session termination
+      description: Terminates the MCP session.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session terminated
+
+  # ─── Self-Service (Limited User) ─────────────────────────────────────
+  /v0/management/self/me:
+    get:
+      tags:
+        - Management
+      summary: Get current user info
+      description: Returns information about the current API key holder.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+        - apiKeyQuery: []
+        - googleApiKeyHeader: []
+      responses:
+        '200':
+          description: User info
+
+  /v0/management/self/rotate:
+    post:
+      tags:
+        - Management
+      summary: Rotate API key
+      description: Rotates the current API key secret.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+        - apiKeyQuery: []
+        - googleApiKeyHeader: []
+      responses:
+        '200':
+          description: Key rotated
+
+  /v0/management/self/comment:
+    put:
+      tags:
+        - Management
+      summary: Update key comment
+      description: Updates the comment for the current API key.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+        - apiKeyQuery: []
+        - googleApiKeyHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Comment updated
+
+  /v0/management/self/debug/toggle:
+    post:
+      tags:
+        - Management
+      summary: Toggle debug for key
+      description: Toggles debug logging for the current API key.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+        - apiKeyQuery: []
+        - googleApiKeyHeader: []
+      responses:
+        '200':
+          description: Debug toggled
+
+  /v0/management/self/quota:
+    get:
+      tags:
+        - Management
+      summary: Get own quota status
+      description: Returns quota status for the current API key.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+        - apiKeyQuery: []
+        - googleApiKeyHeader: []
+      responses:
+        '200':
+          description: Quota status
+
+  # ─── Metrics ─────────────────────────────────────────────────────────
+  /metrics:
+    get:
+      tags:
+        - Management
+      summary: Prometheus metrics
+      description: Returns Prometheus-compatible metrics.
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token (Plexus API key)
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Plexus API key via x-api-key header
+    googleApiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-goog-api-key
+      description: Plexus API key via x-goog-api-key header
+    apiKeyQuery:
+      type: apiKey
+      in: query
+      name: key
+      description: Plexus API key via query parameter
+    adminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+      description: Admin key for management endpoints
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            code:
+              type: integer
+
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+          description: Model alias to use
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [system, user, assistant, tool]
+              content:
+                oneOf:
+                  - type: string
+                  - type: array
+              tool_calls:
+                type: array
+              tool_call_id:
+                type: string
+        stream:
+          type: boolean
+          default: false
+        max_tokens:
+          type: integer
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        top_p:
+          type: number
+        n:
+          type: integer
+          default: 1
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        presence_penalty:
+          type: number
+        frequency_penalty:
+          type: number
+        tools:
+          type: array
+          items:
+            type: object
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [auto, none, required]
+            - type: object
+        user:
+          type: string
+        response_format:
+          type: object
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  content:
+                    type: string
+                  tool_calls:
+                    type: array
+              finish_reason:
+                type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    EmbeddingsRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        encoding_format:
+          type: string
+          enum: [float, base64]
+          default: float
+        dimensions:
+          type: integer
+        user:
+          type: string
+
+    EmbeddingsResponse:
+      type: object
+      properties:
+        object:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              object:
+                type: string
+              embedding:
+                type: array
+                items:
+                  type: number
+              index:
+                type: integer
+        model:
+          type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    SpeechRequest:
+      type: object
+      required:
+        - model
+        - input
+        - voice
+      properties:
+        model:
+          type: string
+        input:
+          type: string
+          maxLength: 4096
+        voice:
+          type: string
+          enum: [alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse, marin, cedar]
+        instructions:
+          type: string
+        response_format:
+          type: string
+          enum: [mp3, opus, aac, flac, wav, pcm]
+          default: mp3
+        speed:
+          type: number
+          minimum: 0.25
+          maximum: 4.0
+          default: 1.0
+        stream_format:
+          type: string
+          enum: [sse, audio]
+
+    ImageGenerationRequest:
+      type: object
+      required:
+        - model
+        - prompt
+      properties:
+        model:
+          type: string
+        prompt:
+          type: string
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          enum: ['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792']
+        response_format:
+          type: string
+          enum: [url, b64_json]
+          default: url
+        quality:
+          type: string
+          enum: [standard, hd, high, medium, low]
+        style:
+          type: string
+          enum: [vivid, natural]
+        user:
+          type: string
+
+    ImageGenerationResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+              b64_json:
+                type: string
+              revised_prompt:
+                type: string
+
+    ModelList:
+      type: object
+      properties:
+        object:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              object:
+                type: string
+              created:
+                type: integer
+              owned_by:
+                type: string
+              name:
+                type: string
+              description:
+                type: string
+              context_length:
+                type: integer
+              architecture:
+                type: object
+              pricing:
+                type: object
+              supported_parameters:
+                type: array
+                items:
+                  type: string
+              top_provider:
+                type: object
+
+    ProviderConfig:
+      type: object
+      required:
+        - api_base_url
+      properties:
+        display_name:
+          type: string
+        api_base_url:
+          oneOf:
+            - type: string
+            - type: object
+        api_key:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+        disable_cooldown:
+          type: boolean
+          default: false
+        discount:
+          type: number
+          minimum: 0
+          maximum: 1
+        models:
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: object
+        headers:
+          type: object
+        estimateTokens:
+          type: boolean
+          default: false
+        useClaudeMasking:
+          type: boolean
+          default: false
+        gpu_profile:
+          type: string
+        gpu_ram_gb:
+          type: number
+        gpu_bandwidth_tb_s:
+          type: number
+        gpu_flops_tflop:
+          type: number
+        gpu_power_draw_watts:
+          type: number
+
+    ModelConfig:
+      type: object
+      properties:
+        targets:
+          type: array
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              model:
+                type: string
+              enabled:
+                type: boolean
+                default: true
+        fail_policy:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            retryableStatusCodes:
+              type: array
+              items:
+                type: integer
+            retryableErrors:
+              type: array
+              items:
+                type: string
+        metadata:
+          type: object
+          properties:
+            source:
+              type: string
+              enum: [openrouter, models.dev, catwalk, custom]
+            source_path:
+              type: string
+            overrides:
+              type: object
+        model_architecture:
+          type: object
+
+    KeyConfig:
+      type: object
+      required:
+        - secret
+      properties:
+        secret:
+          type: string
+        comment:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+        role:
+          type: string
+          enum: [admin, limited]
+          default: limited
+        allowedProviders:
+          type: array
+          items:
+            type: string
+        allowedModels:
+          type: array
+          items:
+            type: string
+        quota:
+          type: string
+
+    UserQuotaDefinition:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [rolling]
+            limitType:
+              type: string
+              enum: [requests, tokens, cost]
+            limit:
+              type: integer
+              minimum: 1
+            duration:
+              type: string
+        - type: object
+          properties:
+            type:
+              type: string
+              enum: [daily, weekly, monthly]
+            limitType:
+              type: string
+              enum: [requests, tokens, cost]
+            limit:
+              type: integer
+              minimum: 1
+
+    Cooldown:
+      type: object
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+        expiry:
+          type: integer
+        timeRemainingMs:
+          type: integer
+        consecutiveFailures:
+          type: integer
+
+    QuotaWindow:
+      type: object
+      properties:
+        windowType:
+          type: string
+        windowLabel:
+          type: string
+        description:
+          type: string
+        limit:
+          type: number
+        used:
+          type: number
+        remaining:
+          type: number
+        utilizationPercent:
+          type: number
+        unit:
+          type: string
+        resetsAt:
+          type: string
+          format: date-time
+        resetInSeconds:
+          type: integer
+        status:
+          type: string
+          enum: [ok, warning, critical, exhausted]
+        estimation:
+          type: object
+
+    QuotaSnapshot:
+      type: object
+      properties:
+        id:
+          type: integer
+        provider:
+          type: string
+        checkerId:
+          type: string
+        groupId:
+          type: string
+          nullable: true
+        windowType:
+          type: string
+        checkedAt:
+          type: string
+          format: date-time
+        limit:
+          type: number
+          nullable: true
+        used:
+          type: number
+          nullable: true
+        remaining:
+          type: number
+          nullable: true
+        utilizationPercent:
+          type: number
+          nullable: true
+        unit:
+          type: string
+          nullable: true
+        resetsAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        success:
+          type: boolean
+        errorMessage:
+          type: string
+          nullable: true
+
+    QuotaCheckerSummary:
+      type: object
+      properties:
+        checkerId:
+          type: string
+        checkerType:
+          type: string
+        checkerCategory:
+          type: string
+          enum: [balance, rate-limit]
+        latest:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotaWindow'
+        oauthAccountId:
+          type: string
+        oauthProvider:
+          type: string
+        error:
+          type: string
+
+    UsageRecord:
+      type: object
+      properties:
+        requestId:
+          type: string
+        date:
+          type: string
+          format: date-time
+        sourceIp:
+          type: string
+          nullable: true
+        apiKey:
+          type: string
+          nullable: true
+        attribution:
+          type: string
+          nullable: true
+        incomingApiType:
+          type: string
+        provider:
+          type: string
+          nullable: true
+        incomingModelAlias:
+          type: string
+          nullable: true
+        selectedModelName:
+          type: string
+          nullable: true
+        outgoingApiType:
+          type: string
+          nullable: true
+        tokensInput:
+          type: integer
+          nullable: true
+        tokensOutput:
+          type: integer
+          nullable: true
+        tokensReasoning:
+          type: integer
+          nullable: true
+        tokensCached:
+          type: integer
+          nullable: true
+        tokensCacheWrite:
+          type: integer
+          nullable: true
+        costInput:
+          type: number
+          nullable: true
+        costOutput:
+          type: number
+          nullable: true
+        costCached:
+          type: number
+          nullable: true
+        costTotal:
+          type: number
+          nullable: true
+        durationMs:
+          type: integer
+        isStreamed:
+          type: boolean
+        responseStatus:
+          type: string
+        hasDebug:
+          type: boolean
+        hasError:
+          type: boolean
+
+    UsageRecordsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageRecord'
+        total:
+          type: integer
+
+    UsageSummary:
+      type: object
+      properties:
+        range:
+          type: string
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              bucketStartMs:
+                type: integer
+              requests:
+                type: integer
+              inputTokens:
+                type: integer
+              outputTokens:
+                type: integer
+              cachedTokens:
+                type: integer
+              cacheWriteTokens:
+                type: integer
+              tokens:
+                type: integer
+        stats:
+          type: object
+          properties:
+            totalRequests:
+              type: integer
+            totalTokens:
+              type: integer
+            totalKwhUsed:
+              type: number
+            avgDurationMs:
+              type: number
+            totalDurationMs:
+              type: integer
+        today:
+          type: object
+          properties:
+            requests:
+              type: integer
+            inputTokens:
+              type: integer
+            outputTokens:
+              type: integer
+            reasoningTokens:
+              type: integer
+            cachedTokens:
+              type: integer
+            cacheWriteTokens:
+              type: integer
+            kwhUsed:
+              type: number
+            totalCost:
+              type: number
+
+    McpServerConfig:
+      type: object
+      required:
+        - upstream_url
+      properties:
+        upstream_url:
+          type: string
+          format: uri
+        enabled:
+          type: boolean
+          default: true
+        headers:
+          type: object
+
+  responses:
+    UnauthorizedError:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
