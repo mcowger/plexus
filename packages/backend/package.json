@@ -23,7 +23,7 @@
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "eventsource-encoder": "^1.0.1",
-    "eventsource-parser": "^3.0.6",
+    "eventsource-parser": "^3.0.8",
     "fastify": "^5.8.5",
     "parse-duration": "^2.1.6",
     "pkce-challenge": "^6.0.0",
