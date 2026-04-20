@@ -22,11 +22,51 @@ jobs:
       actions: write  # Needed for workflow_dispatch to trigger review/test workflows
 
     steps:
+      - name: Detect PR context
+        id: detect-context
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const eventName = '${{ github.event_name }}';
+            
+            // For pull_request_review_comment, we have direct access to PR
+            if (eventName === 'pull_request_review_comment') {
+              const pr = context.payload.pull_request;
+              core.setOutput('is_pr', 'true');
+              core.setOutput('branch', pr.head.ref);
+              core.setOutput('mode', 'direct');
+              core.info(`PR review comment on PR #${pr.number}, branch: ${pr.head.ref}`);
+              return;
+            }
+            
+            // For issue_comment, check if it's on a PR
+            if (eventName === 'issue_comment') {
+              const issue = context.payload.issue;
+              if (issue.pull_request) {
+                // This is a PR comment - fetch PR details
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: issue.number
+                });
+                core.setOutput('is_pr', 'true');
+                core.setOutput('branch', pr.head.ref);
+                core.setOutput('mode', 'direct');
+                core.info(`PR issue comment on PR #${issue.number}, branch: ${pr.head.ref}`);
+                return;
+              }
+            }
+            
+            // Not a PR comment
+            core.setOutput('is_pr', 'false');
+            core.setOutput('branch', '');
+            core.setOutput('mode', 'branch');
+            core.info('Not a PR comment, using branch mode');
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          # For PR comments, checkout the PR branch; otherwise checkout default
-          ref: ${{ github.head_ref || github.ref }}
+          ref: ${{ steps.detect-context.outputs.branch || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -42,22 +82,6 @@ jobs:
         env:
           PI_MODELS_JSON: ${{ secrets.PI_MODELS_JSON }}
 
-      - name: Determine branch mode
-        id: branch-config
-        run: |
-          # Check if this is a PR-related comment (review comment or issue comment on PR)
-          # github.head_ref is only set for PR-related events
-          if [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
-            echo "mode=direct" >> $GITHUB_OUTPUT
-            echo "For PR review comments: using direct mode to push to existing PR branch"
-          elif [ -n "${{ github.head_ref }}" ]; then
-            echo "mode=direct" >> $GITHUB_OUTPUT
-            echo "For PR comments: using direct mode to push to existing PR branch (head: ${{ github.head_ref }})"
-          else
-            echo "mode=branch" >> $GITHUB_OUTPUT
-            echo "For other events: using branch mode to create new PR"
-          fi
-
       - name: Run pi-action
         id: pi-action
         uses: mcowger/pi-action@main
@@ -72,7 +96,7 @@ jobs:
           share_session: true
           prompt_template_file: '.github/pi-prompts/default-main.md'
           suppress_final_comment: true
-          branch_mode: ${{ steps.branch-config.outputs.mode }}
+          branch_mode: ${{ steps.detect-context.outputs.mode }}
 
       - name: Dispatch PR review workflow
         if: steps.pi-action.outputs.pr_created == 'true'
