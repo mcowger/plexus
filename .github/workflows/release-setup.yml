@@ -1,6 +1,11 @@
 name: Setup
 on:
   workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+        description: "The release tag (defaults to github.ref_name)"
     outputs:
       tag:
         description: "The release tag"
@@ -21,5 +26,5 @@ jobs:
       - name: Get tag from ref
         id: release_tag
         run: |
-          TAG="${{ github.ref_name }}"
+          TAG="${{ inputs.tag || github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"

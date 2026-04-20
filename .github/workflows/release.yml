@@ -1,15 +1,23 @@
 name: Release
-run-name: Release ${{ github.ref_name }}
+run-name: Release ${{ inputs.tag || github.ref_name }}
 
 on:
   push:
     tags:
       - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].[0-9]+'  # CalVer: YYYY.MM.DD.N
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The release tag to publish (must already exist)"
 
 jobs:
   setup:
     name: Setup
     uses: ./.github/workflows/release-setup.yml
+    with:
+      tag: ${{ inputs.tag }}
 
   quality-gates:
     name: Quality Gates
