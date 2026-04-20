@@ -40,6 +40,7 @@ jobs:
     uses: ./.github/workflows/release-generate-notes.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
+    secrets: inherit
 
   release:
     name: Create Release
