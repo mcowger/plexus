@@ -1,0 +1,57 @@
+name: Build Binaries
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The release tag"
+
+jobs:
+  build-binaries:
+    name: Build Binary (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux
+            compile_cmd: bun run compile:linux
+            artifact_name: plexus-linux
+          - target: macos
+            compile_cmd: bun run compile:macos
+            artifact_name: plexus-macos
+          - target: windows
+            compile_cmd: bun run compile:windows
+            artifact_name: plexus.exe
+    steps:
+      - name: Download workspace
+        uses: actions/download-artifact@v8
+        with:
+          name: workspace
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore node_modules
+        uses: actions/cache@v5
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/bun.lock') }}
+
+      - name: Compile binary
+        env:
+          APP_VERSION: ${{ inputs.tag }}
+        run: |
+          # Build frontend first for embedding
+          bun run build:frontend
+          ${{ matrix.compile_cmd }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.target }}
+          path: ${{ matrix.artifact_name }}
+          retention-days: 1

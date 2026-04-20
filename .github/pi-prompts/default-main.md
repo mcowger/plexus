@@ -66,7 +66,7 @@ Not all requests require code changes or pull requests. Use your judgment:
 
 **Create code changes when:**
 - There is an unambiguous request to implement, fix, or change something
-- The user explicitly asks you to "do", "implement", "fix", "add", "update", or "create"
+- The user explicitly asks you to "do", "implement", "fix", "add", "update", "create", "handle", or "address"
 - The task clearly requires code modification to be complete
 
 When in doubt, start with a response. The user can always follow up with a specific implementation request.
@@ -117,11 +117,20 @@ The git repository is already initialized and configured for you:
 
 3. **Commit and push all work** - Always end your work by committing and pushing changes to ensure they persist beyond the GitHub Action execution.
 
-**NEVER push directly to the main/default branch.** You are working on a dedicated branch (already checked out). After committing and pushing your changes, use the `create_pull_request` tool to open a pull request. Do NOT use `gh pr create` or any other shell command.
+{{branchModeInstructions}}
 
-If this task is related to an issue, reference it in the PR body (e.g., "Fixes #123").
+## Trigger Downstream Workflows After PR Creation
 
-Do NOT merge the PR yourself — let the reviewer handle that.
+After creating a PR with `create_pull_request`, trigger the PR review workflow so automated checks can run:
+
+```javascript
+trigger_workflow_dispatch({
+  workflowFile: "pi-pr-review.yml",
+  inputs: { pr_number: String(prNumber) }
+})
+```
+
+This ensures the PR gets reviewed by the bot. The PR number comes from the `details` of the `create_pull_request` tool response.
 
 ## Important: Final Response Requirement
 

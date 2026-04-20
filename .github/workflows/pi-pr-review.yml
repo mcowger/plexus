@@ -59,7 +59,7 @@ jobs:
           exit 1
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || steps.get-pr.outputs.head_repo_full_name }}
           ref: ${{ github.event.pull_request.head.sha || steps.get-pr.outputs.head_sha }}

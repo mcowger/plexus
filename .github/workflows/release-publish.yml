@@ -1,0 +1,47 @@
+name: Publish Release
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The release tag"
+      pr_summary:
+        required: true
+        type: string
+        description: "PR summary for release notes fallback"
+      release_notes_response:
+        required: true
+        type: string
+        description: "Generated release notes from pi"
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Organize binaries
+        run: |
+          mkdir -p release
+          cp artifacts/binary-linux/plexus-linux release/
+          cp artifacts/binary-macos/plexus-macos release/
+          cp artifacts/binary-windows/plexus.exe release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: |
+            release/plexus-linux
+            release/plexus-macos
+            release/plexus.exe
+          draft: false
+          prerelease: false
+          body: ${{ inputs.release_notes_response || inputs.pr_summary }}
