@@ -11,13 +11,13 @@
     "rekey": "bun run src/cli/rekey.ts"
   },
   "dependencies": {
-    "@plexus/shared": "workspace:*",
     "@fastify/bearer-auth": "^10.1.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.1.1",
     "@google/genai": "^1.50.1",
-    "@mariozechner/pi-ai": "latest",
+    "@mariozechner/pi-ai": "^0.68.0",
+    "@plexus/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
