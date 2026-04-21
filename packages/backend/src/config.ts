@@ -190,6 +190,11 @@ const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const ZenmuxQuotaCheckerOptionsSchema = z.object({
+  apiKey: z.string().min(1, 'Zenmux management API key is required'),
+  endpoint: z.string().url().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -344,6 +349,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: OllamaQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('zenmux'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ZenmuxQuotaCheckerOptionsSchema,
   }),
 ]);
 
@@ -898,6 +910,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'novita',
   'ollama',
   'neuralwatt',
+  'zenmux',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

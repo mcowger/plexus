@@ -40,6 +40,8 @@ export { AntigravityQuotaDisplay } from './AntigravityQuotaDisplay';
 export { AntigravityQuotaConfig } from './AntigravityQuotaConfig';
 export { NeuralwattQuotaDisplay } from './NeuralwattQuotaDisplay';
 export { NeuralwattQuotaConfig } from './NeuralwattQuotaConfig';
+export { ZenmuxQuotaDisplay } from './ZenmuxQuotaDisplay';
+export { ZenmuxQuotaConfig } from './ZenmuxQuotaConfig';
 export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';

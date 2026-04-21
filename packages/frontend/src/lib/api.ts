@@ -569,6 +569,7 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'antigravity',
   'ollama',
   'neuralwatt',
+  'zenmux',
 ]);
 
 /**

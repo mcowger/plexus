@@ -55,6 +55,7 @@ import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
 import { OllamaQuotaConfig } from '../components/quota/OllamaQuotaConfig';
 import { NeuralwattQuotaConfig } from '../components/quota/NeuralwattQuotaConfig';
+import { ZenmuxQuotaConfig } from '../components/quota/ZenmuxQuotaConfig';
 
 const KNOWN_APIS = [
   'chat',
@@ -100,6 +101,7 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'antigravity',
   'ollama',
   'neuralwatt',
+  'zenmux',
 ] as const;
 
 /** Maps an oauth_provider value to the one checker type relevant for it, or null. */
@@ -320,6 +322,12 @@ export const Providers = () => {
     if (quotaType === 'wisdomgate') {
       if (!options.session || !(options.session as string).trim()) {
         return 'Session cookie is required for Wisdom Gate quota checker';
+      }
+    }
+
+    if (quotaType === 'zenmux') {
+      if (!options.apiKey || !(options.apiKey as string).trim()) {
+        return 'Management API Key is required for Zenmux quota checker';
       }
     }
 
@@ -2041,6 +2049,23 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'neuralwatt' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <NeuralwattQuotaConfig
+                    options={editingProvider.quotaChecker?.options || {}}
+                    onChange={(options) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        quotaChecker: {
+                          ...editingProvider.quotaChecker,
+                          options,
+                        } as Provider['quotaChecker'],
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'zenmux' && (
+                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <ZenmuxQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({
