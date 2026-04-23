@@ -30,6 +30,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # IntelliJ based IDEs
 .idea
 
+# pi-lens AI coding agent
+.pi-lens/
+
 # Finder (MacOS) folder config
 .DS_Store
 config/plexus.yaml

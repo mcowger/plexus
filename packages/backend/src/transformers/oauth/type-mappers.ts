@@ -17,6 +17,7 @@ import type {
   MessageContent,
   UnifiedUsage,
 } from '../../types/unified';
+import type { ClaudeOAuthContext } from './oauth-claude';
 export function unifiedToContext(
   request: UnifiedChatRequest,
   provider?: string,
@@ -314,7 +315,8 @@ function unifiedToolToPiAi(tool: UnifiedTool): PiAiTool {
 export function piAiMessageToUnified(
   message: AssistantMessage,
   provider: string,
-  model: string
+  model: string,
+  oauthContext?: ClaudeOAuthContext
 ): UnifiedChatResponse {
   const stripProxyPrefix = (name?: string) => {
     if (!name || provider !== 'anthropic') return name;
@@ -322,8 +324,13 @@ export function piAiMessageToUnified(
   };
 
   // Reverse OAuth tool name remapping (TitleCase -> lowercase)
+  // Only apply if tool names were actually remapped in the request (not for Claude Code clients)
   const reverseOauthToolName = (name?: string): string | undefined => {
     if (!name) return name;
+    // Skip reverse mapping if we're not in OAuth mode or if tool remapping wasn't done
+    if (!oauthContext?.isOAuth || !oauthContext?.toolNamesRemapped) {
+      return name;
+    }
     // Map of TitleCase Claude Code tool names to lowercase
     const reverseMap: Record<string, string> = {
       Bash: 'bash',
@@ -406,7 +413,8 @@ export function piAiMessageToUnified(
 export function piAiEventToChunk(
   event: AssistantMessageEvent,
   model: string,
-  provider?: string
+  provider?: string,
+  oauthContext?: ClaudeOAuthContext
 ): UnifiedChatStreamChunk | null {
   const stripProxyPrefix = (name?: string) => {
     if (!name || provider !== 'anthropic') return name;
@@ -414,8 +422,13 @@ export function piAiEventToChunk(
   };
 
   // Reverse OAuth tool name remapping (TitleCase -> lowercase)
+  // Only apply if tool names were actually remapped in the request (not for Claude Code clients)
   const reverseOauthToolName = (name?: string): string | undefined => {
     if (!name) return name;
+    // Skip reverse mapping if we're not in OAuth mode or if tool remapping wasn't done
+    if (!oauthContext?.isOAuth || !oauthContext?.toolNamesRemapped) {
+      return name;
+    }
     const reverseMap: Record<string, string> = {
       Bash: 'bash',
       Read: 'read',
