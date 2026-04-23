@@ -1,3 +1,4 @@
 [tools]
 act = "latest"
+"aqua:vercel-labs/agent-browser" = "latest"
 bun = "latest"
