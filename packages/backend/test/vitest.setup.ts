@@ -86,6 +86,81 @@ const mockLogger = {
   silly: vi.fn(),
 };
 
+// ---------------------------------------------------------------------------
+// @mariozechner/pi-ai — single authoritative mock for the whole worker.
+//
+// With isolate: false every test file shares one module registry.  Letting
+// individual test files each register their own vi.mock factory creates a
+// last-writer-wins race that breaks whichever file loses.  Registering once
+// here (in setupFiles, which runs before any test file) guarantees a stable,
+// consistent mock for all consumers.
+//
+// Rules that every test file must respect:
+//   • complete/stream are vi.fn() — use vi.mocked(piAi.complete) to assert on
+//     them; re-apply implementations in beforeEach because mockReset: true
+//     wipes vi.fn() state between tests.
+//   • getModels returns all known test models so quota-error assertions that
+//     validate gpt-5.4 is valid for openai-codex always pass.
+//   • getModel always includes the `api` field — OAuthTransformer.executeRequest
+//     dispatches on model.api and crashes with "No API provider registered"
+//     if it is missing.
+// ---------------------------------------------------------------------------
+vi.mock('@mariozechner/pi-ai', () => ({
+  getModels: (provider: string) => {
+    if (provider === 'unknown-provider') return [];
+    if (provider === 'openai-codex') {
+      return [
+        {
+          id: 'gpt-5.4',
+          name: 'GPT-5.4',
+          contextWindow: 128000,
+          provider: 'openai-codex',
+          api: 'openai-codex-responses',
+        },
+      ];
+    }
+    return [
+      {
+        id: 'claude-opus-4',
+        name: 'Claude Opus 4',
+        contextWindow: 200000,
+        provider: 'anthropic',
+        api: 'anthropic-messages',
+      },
+      {
+        id: 'claude-sonnet-4',
+        name: 'Claude Sonnet 4',
+        contextWindow: 200000,
+        provider: 'anthropic',
+        api: 'anthropic-messages',
+      },
+      {
+        id: 'claude-test',
+        name: 'Claude Test',
+        contextWindow: 200000,
+        provider: 'anthropic',
+        api: 'anthropic-messages',
+      },
+    ];
+  },
+  getModel: (provider: string, modelId: string) => ({
+    id: modelId,
+    name: modelId,
+    contextWindow: 200000,
+    provider,
+    api: provider === 'openai-codex' ? 'openai-codex-responses' : 'anthropic-messages',
+  }),
+  complete: vi.fn(async () => ({
+    content: [{ type: 'text', text: 'ok' }],
+    stopReason: 'stop',
+    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+    provider: 'anthropic',
+    model: 'claude-test',
+    timestamp: Date.now(),
+  })),
+  stream: vi.fn(async () => ({ ok: true })),
+}));
+
 vi.mock('../src/utils/logger', () => ({
   logger: mockLogger,
   logEmitter: { emit: vi.fn(), on: vi.fn(), off: vi.fn() },

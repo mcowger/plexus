@@ -1,5 +1,5 @@
 import { expect, test, describe } from 'vitest';
-import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
+import { VisionDescriptorService } from '../vision-descriptor-service';
 
 describe('Vision Detection Reproduction', () => {
   test("detects images in the user's specific payload", () => {

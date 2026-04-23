@@ -3,7 +3,7 @@ import {
   calculateInferenceFootprint,
   estimateKwhUsed,
   toastBreadEquivalent,
-} from '../src/services/inference-energy';
+} from '../inference-energy';
 import { DEFAULT_MODEL, GPU_PRESETS } from '@plexus/shared';
 import type { GpuParams, ModelParams } from '@plexus/shared';
 

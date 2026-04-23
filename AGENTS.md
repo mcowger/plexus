@@ -67,15 +67,119 @@ Drizzle ORM with SQLite (default) or Postgres. Tables: `request_usage`, `provide
 - **Tests:** `bun run test` from the repo root or from `packages/backend/` (`bun test` is intentionally blocked both at repo root and in `packages/backend` with a guidance message)
 - **Format:** `bun run format` / `bun run format:check`
 
-### Test Isolation
+### Test File Organization
 
-- Backend tests run on **Vitest** via `packages/backend/vitest.config.ts`.
-- **Global setup:** `packages/backend/test/vitest.global-setup.ts` creates a temporary file-backed SQLite DB, runs migrations once, and cleans it up automatically after the run.
-- **Per-worker setup:** `packages/backend/test/vitest.setup.ts` installs logger/debug test doubles.
-- `packages/backend/bunfig.toml` intentionally blocks raw `bun test` in `packages/backend` and directs contributors to `bun run test` / `bun run test:watch`.
-- Root `bunfig.toml` intentionally blocks raw `bun test` at the repo root and directs contributors to `cd packages/backend && bun run test`.
-- **Use `registerSpy`** from `test/test-utils.ts` instead of raw `spyOn` when you want automatic cleanup after each test.
-- If you must mock a module, implement its **full public interface**.
+```
+packages/backend/
+├── src/
+│   └── <module>/
+│       ├── foo.ts                   # source file
+│       └── __tests__/
+│           └── foo.test.ts          # unit test — lives next to the source it tests
+└── test/
+    ├── vitest.setup.ts              # per-file setup (mocks, doubles)
+    ├── vitest.global-setup.ts       # once-per-run setup (DB creation, migrations)
+    ├── test-utils.ts                # shared spy/mock helpers
+    ├── bun-test-guard/              # meta guard — excluded from Vitest
+    └── integration/
+        └── vision-*.test.ts         # multi-component / cross-service tests
+```
+
+**Rules:**
+- **Unit tests** go in a `__tests__/` subdirectory alongside the source file they test. All imports use relative paths within `src/`.
+- **Integration tests** (tests that exercise multiple services/components together) go in `test/integration/`.
+- **Infrastructure** (setup files, shared utilities) stays in `test/` directly.
+- **Never** put unit tests in the top-level `test/` folder, and never put integration tests inside `src/`.
+- The Vitest `include` globs (`src/**/*.test.ts` and `test/**/*.test.ts`) cover both locations automatically.
+
+### Test Architecture
+
+Backend tests run on **Vitest** with two parallel projects (sqlite + postgres) defined in `vitest.config.ts`. Key settings that shape every testing decision:
+
+| Setting | Value | Effect |
+|---------|-------|--------|
+| `pool` | `forks` | Each test file runs in a child process fork |
+| `isolate` | `false` | All files in one worker share the **same module registry** — no reset between files |
+| `maxWorkers` | `1` | One fork at a time (sequential files within each project) |
+| `mockReset` | `true` | `vi.resetAllMocks()` before every test — clears `vi.fn()` call history and resets implementations to original |
+| `clearMocks` | `true` | Clears call history (redundant with mockReset but explicit) |
+| `restoreMocks` | `true` | Restores `vi.spyOn` mocks to originals after every test |
+
+**Global setup:** `packages/backend/test/vitest.global-setup.ts` — creates a temporary DB, runs migrations once, cleans up after the run. Runs once total.
+
+**Per-file setup:** `packages/backend/test/vitest.setup.ts` — **runs once per test file** (even with `isolate: false`). Installs the logger mock and the `@mariozechner/pi-ai` mock.
+
+### The `isolate: false` Module Registry Contract
+
+`isolate: false` is intentional — it gives a ~3× speed improvement over `isolate: true` (≈11s vs ≈33s). But it creates a **shared module registry** with strict rules every test must follow:
+
+**Rule 1 — `setupFiles` re-runs per file, creating new `vi.fn()` instances each time.**
+Even though the module registry is shared between files, `vitest.setup.ts` is re-executed before each test file. Any `vi.fn()` created inside `vitest.setup.ts` (e.g., `complete: vi.fn(...)`) is a *new* spy instance for each file's execution. A module loaded in File A holds File A's spy; File B gets a different spy instance. **Never assert on `vi.mocked(x).toHaveBeenCalledTimes()` across file boundaries for mocks defined in setup.**
+
+**Rule 2 — Only one `vi.mock(path, factory)` per module path across the whole worker.**
+With a shared registry, the last `vi.mock` factory to register for a given path wins. Files that each register their own factory for the same module create non-deterministic last-writer-wins races. **All authoritative mocks live in `vitest.setup.ts`. Individual test files must NOT add `vi.mock` factories for modules already mocked there.**
+
+**Rule 3 — `process.env` mutations must restore in-place, not by reference replacement.**
+Closures in `vitest.setup.ts` (e.g., `getStartupLogLevel`) read from the live `process.env` object. If a test does `process.env = {...savedEnv}` it replaces the object reference but leaves the old object (still held by closures) dirty. Always restore individual keys:
+```ts
+// WRONG — replaces reference, leaves closures reading stale object
+process.env = originalEnv;
+
+// CORRECT — mutates the live object in place
+if (originalLogLevel === undefined) delete process.env.LOG_LEVEL;
+else process.env.LOG_LEVEL = originalLogLevel;
+```
+
+**Rule 4 — Test shared mutable state through the system under test, not through direct mutation.**
+The `utils/logger` mock in `vitest.setup.ts` closes over a `currentLogLevel` variable that both the mock functions and route handlers share. Adding a competing `vi.mock` for the same path in a test file can bind different closures to different variables, causing silent mismatches. Tests for stateful behaviour (e.g., logging routes) must interact exclusively through the API/HTTP layer — never by calling `setCurrentLogLevel` or `getCurrentLogLevel` directly from test code.
+
+### Mocking Rules
+
+**Globally mocked modules** (registered in `vitest.setup.ts` — do NOT re-mock in test files):
+- `../src/utils/logger` — logger, logEmitter, level helpers
+- `@mariozechner/pi-ai` — getModels, getModel, complete (vi.fn), stream (vi.fn)
+
+**`@mariozechner/pi-ai` specifics:**
+- `getModels` covers all providers tests need including `openai-codex` (gpt-5.4) and `anthropic` (claude-test etc.)
+- `getModel` always returns the `api` field — `OAuthTransformer.executeRequest` dispatches on `model.api` and throws "No API provider registered" without it
+- `complete` and `stream` are `vi.fn()`. Because `mockReset: true` wipes them between tests, any test that needs a specific return value must call `vi.mocked(piAi.complete).mockResolvedValue(...)` in `beforeEach`
+- Because `vitest.setup.ts` re-runs per file, the `vi.fn()` spy in File A's namespace is a **different object** than in File B's namespace. Never assert `piAi.complete` call counts from a file that didn't fully own the dispatch call chain. Prefer asserting on observable outcomes (response values, HTTP status codes, absence of throws) over spy call counts for cross-file scenarios
+
+**For spy-count assertions on pi-ai calls:** put them in unit tests of the transformer layer (e.g., `oauth-transformer.test.ts`) where the test owns the full call chain within a single file.
+
+**For new module mocks:** if a test needs to mock a module NOT already in `vitest.setup.ts`, it may add its own `vi.mock` factory. That mock will be active only for that file's execution. Do not duplicate a mock already registered globally.
+
+### Using `registerSpy`
+
+Always use `registerSpy` from `test/test-utils.ts` instead of raw `vi.spyOn`. It registers the spy in a global tracker that the `test-utils` global `afterEach` automatically restores after every test, preventing leaks across files:
+
+```ts
+import { registerSpy } from '../../../test/test-utils';
+
+// Instead of:
+const spy = vi.spyOn(authManager, 'getApiKey');
+
+// Use:
+const spy = registerSpy(authManager, 'getApiKey').mockResolvedValue('token');
+```
+
+### `mockReset: true` and `vi.fn()` implementations
+
+`mockReset: true` resets all `vi.fn()` instances before every test:
+- `vi.fn()` (no impl) → implementation becomes `undefined` (returns undefined)
+- `vi.fn(impl)` → implementation resets to the original `impl`
+
+This means the global mock's `complete: vi.fn(async () => ({...}))` is safe — after reset it still works. But any `mockResolvedValue`/`mockImplementation` applied during a test is wiped before the next. Always re-apply overrides in `beforeEach`.
+
+### Singletons and test isolation
+
+Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `DebugManager`). Always reset them in `beforeEach`/`afterEach` using their provided `resetForTesting()` or equivalent methods. With `isolate: false`, a singleton left in a non-default state in one test leaks into every subsequent test in the same worker.
+
+### Other rules
+- `packages/backend/bunfig.toml` blocks raw `bun test` — use `bun run test` / `bun run test:watch`
+- Root `bunfig.toml` blocks raw `bun test` at repo root — use `cd packages/backend && bun run test`
+- If you must mock a module, implement its **full public interface**
+- Do not use `__mocks__` directories for node_modules mocks — they are not reliably loaded with `isolate: false` when the real module may already be cached
 
 ---
 

@@ -4,11 +4,11 @@ import { expect, test, describe, beforeEach, afterEach, vi } from 'vitest';
  * 1. visionFallthroughModel not being stored in the parent request's usage record
  * 2. The child descriptor request never being saved to usage storage
  */
-import { registerSpy } from './test-utils';
-import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
-import { Dispatcher } from '../src/services/dispatcher';
-import { UsageStorageService } from '../src/services/usage-storage';
-import { setConfigForTesting } from '../src/config';
+import { registerSpy } from '../test-utils';
+import { VisionDescriptorService } from '../../src/services/vision-descriptor-service';
+import { Dispatcher } from '../../src/services/dispatcher';
+import { UsageStorageService } from '../../src/services/usage-storage';
+import { setConfigForTesting } from '../../src/config';
 
 // ---------------------------------------------------------------------------
 // Bug 1: visionFallthroughModel not recorded on the parent request

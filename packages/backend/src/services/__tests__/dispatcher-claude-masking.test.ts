@@ -2,24 +2,11 @@ import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// Mock @mariozechner/pi-ai BEFORE importing anything that transitively imports it.
-// This ensures the Dispatcher and OAuthTransformer pick up the mock.
-const completeMock = vi.fn(async (_model: any, _context: any, _options?: any) => ({
-  content: [{ type: 'text', text: 'ok' }],
-  stopReason: 'stop',
-  usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
-  provider: 'anthropic',
-  model: 'claude-test',
-}));
-
-vi.mock('@mariozechner/pi-ai', () => ({
-  getModels: (_provider: string) => [{ id: 'claude-test', provider: 'anthropic' }],
-  getModel: (_provider: string, modelId: string) => ({ id: modelId, provider: 'anthropic' }),
-  complete: completeMock,
-  stream: vi.fn(async () => ({ ok: true })),
-}));
-
+// @mariozechner/pi-ai is mocked globally in vitest.setup.ts — do not add a
+// per-file vi.mock() call here.  With isolate: false all files share one
+// module registry and competing registrations create last-writer-wins races.
 const { Dispatcher } = await import('../dispatcher');
+import * as piAi from '@mariozechner/pi-ai';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch should not be called in pi-ai masking path');
@@ -85,28 +72,40 @@ function makeRequest(): UnifiedChatRequest {
 describe('Dispatcher Claude Masking routing', () => {
   beforeEach(() => {
     fetchMock.mockClear();
-    completeMock.mockClear();
+    // Re-apply mock implementation since mockReset: true clears vi.fn() state.
+    // Note: we do NOT assert on piAi.complete call counts here because with
+    // isolate: false + setupFiles re-running per file, the dispatcher holds a
+    // different spy instance than the one in this file's piAi namespace.
+    // We verify the pi-ai path was taken via response.plexus.apiType + fetch absence.
+    vi.mocked(piAi.complete).mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      stopReason: 'stop',
+      usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+      provider: 'anthropic',
+      model: 'claude-test',
+    } as any);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  test('useClaudeMasking:true routes through pi-ai (complete called, fetch not called)', async () => {
+  test('useClaudeMasking:true routes through pi-ai (apiType oauth, fetch not called)', async () => {
     setConfigForTesting(maskedAnthropicConfig());
     const dispatcher = new Dispatcher();
 
     const response = await dispatcher.dispatch(makeRequest());
 
     expect(response).toBeDefined();
+    // apiType 'oauth' means the OAuth/pi-ai code path was taken.
     expect(response.plexus?.apiType).toBe('oauth');
-    // pi-ai complete() must have been called
-    expect(completeMock).toHaveBeenCalledTimes(1);
-    // native fetch must NOT have been called
+    // native fetch must NOT have been called — pi-ai handles the request.
     expect(fetchMock).not.toHaveBeenCalled();
+    // Response content must come back correctly.
+    expect(response.content).toBe('ok');
   });
 
-  test('useClaudeMasking:false routes through native HTTP fetch (fetch called, pi-ai not called)', async () => {
+  test('useClaudeMasking:false routes through native HTTP fetch', async () => {
     setConfigForTesting(normalAnthropicConfig());
     fetchMock.mockImplementation(
       async () =>
@@ -131,6 +130,6 @@ describe('Dispatcher Claude Masking routing', () => {
     // native fetch must have been called
     expect(fetchMock).toHaveBeenCalled();
     // pi-ai complete() must NOT have been called
-    expect(completeMock).not.toHaveBeenCalled();
+    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
   });
 });

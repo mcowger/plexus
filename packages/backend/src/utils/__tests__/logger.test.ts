@@ -12,16 +12,28 @@ function getLogLevel(): string {
 }
 
 describe('getLogLevel', () => {
-  let originalEnv: NodeJS.ProcessEnv;
+  let originalLogLevel: string | undefined;
+  let originalDebug: string | undefined;
 
   beforeEach(() => {
-    // Save original environment variables
-    originalEnv = { ...process.env };
+    // Save only the specific env vars we mutate, so we restore in-place
+    // rather than replacing the process.env reference (which leaks to shared
+    // closures in vitest.setup.ts under isolate: false).
+    originalLogLevel = process.env.LOG_LEVEL;
+    originalDebug = process.env.DEBUG;
   });
 
   afterEach(() => {
-    // Restore original environment variables
-    process.env = originalEnv;
+    if (originalLogLevel === undefined) {
+      delete process.env.LOG_LEVEL;
+    } else {
+      process.env.LOG_LEVEL = originalLogLevel;
+    }
+    if (originalDebug === undefined) {
+      delete process.env.DEBUG;
+    } else {
+      process.env.DEBUG = originalDebug;
+    }
   });
 
   test("should return 'info' when no environment variables are set", () => {

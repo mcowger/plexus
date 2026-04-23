@@ -1,40 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import type { OAuthProviderInterface } from '@mariozechner/pi-ai/oauth';
 import { registerOAuthRoutes } from '../oauth';
 import { OAuthLoginSessionManager } from '../../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
 
-vi.mock('@mariozechner/pi-ai', () => ({
-  getModels: (provider: string) => {
-    if (provider === 'unknown-provider') {
-      return [];
-    }
-    return [
-      { id: 'claude-opus-4', name: 'Claude Opus 4', contextWindow: 200000, provider: 'anthropic' },
-      {
-        id: 'claude-sonnet-4',
-        name: 'Claude Sonnet 4',
-        contextWindow: 200000,
-        provider: 'anthropic',
-      },
-    ];
-  },
-  getModel: (provider: string, modelId: string) => ({
-    id: modelId,
-    name: modelId,
-    contextWindow: 200000,
-    provider,
-  }),
-  complete: async () => ({
-    content: [{ type: 'text', text: 'ok' }],
-    stopReason: 'stop',
-    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
-    provider: 'anthropic',
-    model: 'claude-test',
-  }),
-  stream: async () => ({ ok: true }),
-}));
+// @mariozechner/pi-ai is mocked globally in vitest.setup.ts — do not add a
+// per-file vi.mock() call here.  With isolate: false all files share one
+// module registry and competing registrations create last-writer-wins races.
 
 const waitForStatus = async (
   fastify: ReturnType<typeof Fastify>,

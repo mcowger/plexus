@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
-import { QuotaEnforcer, QuotaCheckResult } from '../src/services/quota/quota-enforcer';
-import { setConfigForTesting, getConfig, PlexusConfig } from '../src/config';
-import { getDatabase } from '../src/db/client';
-import { runMigrations } from '../src/db/migrate';
-import * as sqliteSchema from '../drizzle/schema/sqlite';
+import { QuotaEnforcer, QuotaCheckResult } from '../quota-enforcer';
+import { setConfigForTesting, getConfig, PlexusConfig } from '../../../config';
+import { getDatabase } from '../../../db/client';
+import { runMigrations } from '../../../db/migrate';
+import * as sqliteSchema from '../../../../drizzle/schema/sqlite';
 import { eq } from 'drizzle-orm';
 
 // Test configuration

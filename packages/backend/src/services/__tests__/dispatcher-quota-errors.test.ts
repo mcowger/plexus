@@ -7,37 +7,9 @@ import { QUOTA_ERROR_PATTERNS } from '../../utils/constants';
 import { Router } from '../router';
 import { TransformerFactory } from '../transformer-factory';
 
-vi.mock('@mariozechner/pi-ai', () => ({
-  getModels: (provider: string) => {
-    if (provider === 'unknown-provider') {
-      return [];
-    }
-    return [
-      { id: 'claude-opus-4', name: 'Claude Opus 4', contextWindow: 200000, provider: 'anthropic' },
-      {
-        id: 'claude-sonnet-4',
-        name: 'Claude Sonnet 4',
-        contextWindow: 200000,
-        provider: 'anthropic',
-      },
-      { id: 'gpt-5.4', name: 'GPT-5.4', contextWindow: 128000, provider: 'openai-codex' },
-    ];
-  },
-  getModel: (provider: string, modelId: string) => ({
-    id: modelId,
-    name: modelId,
-    contextWindow: 200000,
-    provider,
-  }),
-  complete: async () => ({
-    content: [{ type: 'text', text: 'ok' }],
-    stopReason: 'stop',
-    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
-    provider: 'anthropic',
-    model: 'claude-test',
-  }),
-  stream: async () => ({ ok: true }),
-}));
+// @mariozechner/pi-ai is mocked globally in vitest.setup.ts — do not add a
+// per-file vi.mock() call here.  With isolate: false all files share one
+// module registry and competing registrations create last-writer-wins races.
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
@@ -179,7 +151,7 @@ describe('Dispatcher Quota Error Detection', () => {
       .mockImplementationOnce(async () => successChatResponse('model-2'));
 
     const dispatcher = new Dispatcher();
-    const response = await dispatcher.dispatch(makeChatRequest());
+    await dispatcher.dispatch(makeChatRequest());
 
     // Verify cooldown was set for p1
     const isHealthy = await CooldownManager.getInstance().isProviderHealthy('p1', 'model-1');

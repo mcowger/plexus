@@ -1,13 +1,23 @@
+/**
+ * Tests for the logging level management routes.
+ *
+ * Reliability design (isolate: false):
+ *   - No vi.mock for utils/logger in this file.  vitest.setup.ts owns that
+ *     mock globally.  Per-file overrides race against the setup mock and lose
+ *     intermittently because the route handler captures whichever binding was
+ *     active at module-load time.
+ *
+ *   - All state is set and read exclusively through HTTP requests to the
+ *     Fastify instance under test.  The test never calls setCurrentLogLevel()
+ *     or getCurrentLogLevel() directly, so there is nothing shared to race on.
+ *
+ *   - beforeEach/afterEach both reset via the DELETE route so every test
+ *     starts and leaves the level at 'info' (the startup default).
+ */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { registerLoggingRoutes } from '../logging';
-import {
-  getCurrentLogLevel,
-  getStartupLogLevel,
-  resetCurrentLogLevel,
-  setCurrentLogLevel,
-  SUPPORTED_LOG_LEVELS,
-} from '../../../utils/logger';
+import { SUPPORTED_LOG_LEVELS } from '../../../utils/logger';
 
 describe('Logging management routes', () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -15,74 +25,89 @@ describe('Logging management routes', () => {
   beforeEach(async () => {
     fastify = Fastify();
     await registerLoggingRoutes(fastify);
-    resetCurrentLogLevel();
+    // Ensure we start from the startup default each test.
+    await fastify.inject({ method: 'DELETE', url: '/v0/management/logging/level' });
   });
 
   afterEach(async () => {
-    resetCurrentLogLevel();
+    // Leave level clean for other tests in the shared module registry.
+    await fastify.inject({ method: 'DELETE', url: '/v0/management/logging/level' });
     await fastify.close();
   });
 
-  it('returns current logging level state', async () => {
-    const response = await fastify.inject({
-      method: 'GET',
-      url: '/v0/management/logging/level',
-    });
+  it('GET returns current level, startup level, supported levels, and ephemeral flag', async () => {
+    const res = await fastify.inject({ method: 'GET', url: '/v0/management/logging/level' });
 
-    expect(response.statusCode).toBe(200);
-    const json = response.json() as {
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
       level: string;
       startupLevel: string;
       supportedLevels: string[];
       ephemeral: boolean;
     };
-
-    expect(json.level).toBe(getCurrentLogLevel());
-    expect(json.startupLevel).toBe(getStartupLogLevel());
-    expect(json.supportedLevels).toEqual([...SUPPORTED_LOG_LEVELS]);
-    expect(json.ephemeral).toBe(true);
+    expect(body.startupLevel).toBe('info');
+    expect(body.level).toBe('info');
+    expect(body.supportedLevels).toEqual([...SUPPORTED_LOG_LEVELS]);
+    expect(body.ephemeral).toBe(true);
   });
 
-  it('updates logging level via PUT', async () => {
-    const response = await fastify.inject({
+  it('PUT changes the level and the change is visible on subsequent GET', async () => {
+    const putRes = await fastify.inject({
       method: 'PUT',
       url: '/v0/management/logging/level',
       payload: { level: 'debug' },
     });
 
-    expect(response.statusCode).toBe(200);
-    const json = response.json() as { level: string };
-    expect(json.level).toBe('debug');
-    expect(getCurrentLogLevel()).toBe('debug');
+    expect(putRes.statusCode).toBe(200);
+    expect((putRes.json() as { level: string }).level).toBe('debug');
+
+    // A subsequent GET must reflect the new level.
+    const getRes = await fastify.inject({ method: 'GET', url: '/v0/management/logging/level' });
+    expect((getRes.json() as { level: string }).level).toBe('debug');
   });
 
-  it('rejects invalid logging levels', async () => {
-    const response = await fastify.inject({
+  it('PUT rejects unknown levels with 400 and leaves the level unchanged', async () => {
+    const res = await fastify.inject({
       method: 'PUT',
       url: '/v0/management/logging/level',
       payload: { level: 'trace' },
     });
 
-    expect(response.statusCode).toBe(400);
-    const json = response.json() as { error: string; supportedLevels: string[] };
-    expect(json.error).toContain('Invalid log level');
-    expect(json.supportedLevels).toEqual([...SUPPORTED_LOG_LEVELS]);
-    expect(getCurrentLogLevel()).toBe(getStartupLogLevel());
+    expect(res.statusCode).toBe(400);
+    const body = res.json() as { error: string; supportedLevels: string[] };
+    expect(body.error).toContain('Invalid log level');
+    expect(body.supportedLevels).toEqual([...SUPPORTED_LOG_LEVELS]);
+
+    // Level must be unchanged after a rejected PUT.
+    const getRes = await fastify.inject({ method: 'GET', url: '/v0/management/logging/level' });
+    const getBody = getRes.json() as { level: string; startupLevel: string };
+    expect(getBody.level).toBe(getBody.startupLevel);
   });
 
-  it('resets logging level to startup default via DELETE', async () => {
-    setCurrentLogLevel('silly');
-    expect(getCurrentLogLevel()).toBe('silly');
+  it('DELETE resets a non-default level back to the startup default', async () => {
+    // Use PUT to set a non-default level first (no direct logger calls).
+    await fastify.inject({
+      method: 'PUT',
+      url: '/v0/management/logging/level',
+      payload: { level: 'silly' },
+    });
+    expect(
+      (
+        (await fastify.inject({ method: 'GET', url: '/v0/management/logging/level' })).json() as {
+          level: string;
+        }
+      ).level
+    ).toBe('silly');
 
-    const response = await fastify.inject({
+    const deleteRes = await fastify.inject({
       method: 'DELETE',
       url: '/v0/management/logging/level',
     });
 
-    expect(response.statusCode).toBe(200);
-    const json = response.json() as { level: string; startupLevel: string };
-    expect(json.level).toBe(getStartupLogLevel());
-    expect(json.startupLevel).toBe(getStartupLogLevel());
-    expect(getCurrentLogLevel()).toBe(getStartupLogLevel());
+    expect(deleteRes.statusCode).toBe(200);
+    const body = deleteRes.json() as { level: string; startupLevel: string };
+    expect(body.level).toBe('info');
+    expect(body.startupLevel).toBe('info');
+    expect(body.level).toBe(body.startupLevel);
   });
 });

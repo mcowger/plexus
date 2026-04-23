@@ -1,7 +1,7 @@
 import { expect, test, describe, afterEach } from 'vitest';
-import { registerSpy } from './test-utils';
-import { VisionDescriptorService } from '../src/services/vision-descriptor-service';
-import { UnifiedMessage, UnifiedChatRequest, TextContent } from '../src/types/unified';
+import { registerSpy } from '../test-utils';
+import { VisionDescriptorService } from '../../src/services/vision-descriptor-service';
+import { UnifiedMessage, UnifiedChatRequest, TextContent } from '../../src/types/unified';
 
 describe('VisionDescriptorService Detailed Verification', () => {
   afterEach(() => {
