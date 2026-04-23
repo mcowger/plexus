@@ -26,8 +26,7 @@ export default defineConfig({
     clearMocks: true,
     mockReset: true,
     pool: 'forks',
-    isolate: false,
-    maxWorkers: 1,
+    isolate: true,
     server: {
       deps: {
         inline: ['zod', 'yaml', '@plexus/shared', '@mariozechner/pi-ai'],
