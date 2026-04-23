@@ -419,8 +419,10 @@ describe('Dispatcher Failover', () => {
     const response = await dispatcher.dispatch({
       ...makeChatRequest(),
       metadata: {
-        plexus_key_policy: {
-          allowedProviders: ['p2'],
+        plexus_metadata: {
+          plexus_key_policy: {
+            allowedProviders: ['p2'],
+          },
         },
       },
     });
@@ -441,8 +443,10 @@ describe('Dispatcher Failover', () => {
       dispatcher.dispatch({
         ...makeChatRequest(),
         metadata: {
-          plexus_key_policy: {
-            allowedModels: ['other-alias'],
+          plexus_metadata: {
+            plexus_key_policy: {
+              allowedModels: ['other-alias'],
+            },
           },
         },
       })

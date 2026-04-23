@@ -865,10 +865,12 @@ export class Dispatcher {
 
   private getKeyAccessPolicy(request: {
     metadata?: {
-      plexus_key_policy?: KeyAccessPolicy;
+      plexus_metadata?: {
+        plexus_key_policy?: KeyAccessPolicy;
+      };
     };
   }): KeyAccessPolicy | null {
-    const policy = request.metadata?.plexus_key_policy;
+    const policy = request.metadata?.plexus_metadata?.plexus_key_policy;
     if (!policy) return null;
 
     // Normalization (trim/filter) is already performed by attachKeyAccessPolicy()
@@ -888,7 +890,9 @@ export class Dispatcher {
     request: {
       model: string;
       metadata?: {
-        plexus_key_policy?: KeyAccessPolicy;
+        plexus_metadata?: {
+          plexus_key_policy?: KeyAccessPolicy;
+        };
       };
     },
     candidates: RouteResult[],

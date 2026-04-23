@@ -32,9 +32,12 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
     ...unifiedRequest,
     metadata: {
       ...(unifiedRequest.metadata || {}),
-      plexus_key_policy: {
-        ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
-        ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
+      plexus_metadata: {
+        ...(unifiedRequest.metadata?.plexus_metadata || {}),
+        plexus_key_policy: {
+          ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
+          ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
+        },
       },
     },
   };

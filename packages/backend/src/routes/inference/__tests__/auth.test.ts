@@ -489,7 +489,7 @@ describe('Key Access Policy Propagation', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(capturedRequest?.metadata?.plexus_key_policy).toEqual({
+    expect(capturedRequest?.metadata?.plexus_metadata?.plexus_key_policy).toEqual({
       allowedModels: ['gpt-4', 'gpt-4-mini'],
       allowedProviders: ['openai', 'azure-openai'],
     });
@@ -516,7 +516,7 @@ describe('Key Access Policy Propagation', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(capturedRequest?.metadata?.plexus_key_policy).toEqual({
+    expect(capturedRequest?.metadata?.plexus_metadata?.plexus_key_policy).toEqual({
       allowedModels: ['gpt-4', 'gpt-4-mini'],
       allowedProviders: ['openai', 'azure-openai'],
     });

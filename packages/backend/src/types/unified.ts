@@ -83,6 +83,13 @@ export interface KeyAccessPolicy {
 
 // Unified Request
 
+export interface PlexusMetadata {
+  oauthProvider?: string;
+  oauthAccount?: string;
+  clientHeaders?: Record<string, unknown>;
+  plexus_key_policy?: KeyAccessPolicy;
+}
+
 export interface UnifiedChatRequest {
   requestId?: string;
   messages: UnifiedMessage[];
@@ -125,10 +132,7 @@ export interface UnifiedChatRequest {
   };
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: {
-    [key: string]: any;
-    plexus_key_policy?: KeyAccessPolicy;
-  };
+  metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
 }
 
 // Unified Response
@@ -258,7 +262,7 @@ export interface UnifiedEmbeddingsRequest {
   user?: string;
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
+  metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
 }
 
 // Unified Embeddings Response
@@ -303,7 +307,7 @@ export interface UnifiedTranscriptionRequest {
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
+  metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
 }
 
 // Unified Transcription Response
@@ -360,7 +364,7 @@ export interface UnifiedSpeechRequest {
   stream_format?: 'sse' | 'audio';
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
+  metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
 }
 
 // Unified Speech Response
@@ -399,7 +403,7 @@ export interface UnifiedImageGenerationRequest {
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
+  metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
 }
 
 // Unified Image Generation Response
@@ -446,7 +450,7 @@ export interface UnifiedImageEditRequest {
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;
-  metadata?: Record<string, any> & { plexus_key_policy?: KeyAccessPolicy };
+  metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
 }
 
 // Unified Image Edit Response
