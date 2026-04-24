@@ -4,10 +4,27 @@ parameters:
     required: true
     schema:
       type: string
+    description: Session ID (UUID).
 post:
   tags:
     - Management — OAuth
   summary: Cancel an OAuth session (admin only)
+  description: |
+    Cancels an in-progress OAuth session.
+
+    ## Effect
+
+    The session status changes to `cancelled`. Any pending authentication
+    is terminated. You can create a new session with a fresh
+    `POST /v0/management/oauth/sessions`.
+
+    ## When to use
+
+    - User quit the auth flow
+    - Wrong account selected, need to start over
+    - Auth URL expired or is no longer valid
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

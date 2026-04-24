@@ -4,10 +4,39 @@ parameters:
     required: true
     schema:
       type: string
+    description: Session ID (UUID) returned from POST /sessions.
 get:
   tags:
     - Management — OAuth
   summary: Poll an OAuth session (admin only)
+  description: |
+    Returns the current state of an OAuth session.
+
+    ## Response fields
+
+    - `authInfo` — Populated when `status: waiting`. Contains the OAuth URL.
+    - `prompt` — Populated when `status: prompt`. Contains the provider's
+      question/confirmation.
+    - `progress` — Array of status updates from the auth flow.
+    - `updatedAt` — Timestamp of the last update.
+
+    ## Polling pattern
+
+    Poll this endpoint in a loop until `status` reaches `complete`,
+    `failed`, or `cancelled`.
+
+    ## Session states
+
+    | State | Meaning | Next action |
+    |-------|---------|-------------|
+    | waiting | Auth URL ready | Open `authInfo.url` in browser |
+    | prompt | Provider needs confirmation | POST to `/prompt` |
+    | manual-code | Provider returns code manually | POST to `/manual-code` |
+    | complete | Credentials saved | Provider ready to use |
+    | failed | Auth error occurred | Check `progress` for error details |
+    | cancelled | User cancelled | Start new session |
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
