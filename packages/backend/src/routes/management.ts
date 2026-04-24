@@ -24,6 +24,7 @@ import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage';
+import { registerOpenApiRoute } from './openapi';
 
 export async function registerManagementRoutes(
   fastify: FastifyInstance,
@@ -112,4 +113,7 @@ export async function registerManagementRoutes(
       await registerModelRoutes(adminOnly);
     });
   });
+
+  // OpenAPI spec (public, no auth)
+  await registerOpenApiRoute(fastify);
 }
