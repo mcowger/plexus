@@ -68,9 +68,10 @@ jobs:
             BEFORE pushing your branch or creating a PR, you MUST run these
             validation commands and ensure they pass:
 
-              1. `bun run typecheck` — TypeScript type checking across all packages
-              2. `bun run format` — Biome formatting (this will auto-fix issues)
-              3. `bun run test` — Run the test suite
+              1. `bun run build:frontend` — Build the frontend first (required for typecheck)
+              2. `bun run typecheck` — TypeScript type checking across all packages
+              3. `bun run format` — Biome formatting (this will auto-fix issues)
+              4. `bun run test` — Run the test suite
 
             If `bun run format` makes changes, stage them with `git add` before
             committing. Do NOT create a PR if these checks fail — fix the issues first.
