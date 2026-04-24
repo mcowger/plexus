@@ -29,6 +29,7 @@ jobs:
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.OPENROUTER_API_KEY }}
           base_url: ${{ secrets.PLEXUS_URL }}
+          thinking_level: medium
           prompt: >
             Review this pull request. Check for bugs, logic errors, security issues,
             and missing test coverage. Note any style or documentation concerns but
