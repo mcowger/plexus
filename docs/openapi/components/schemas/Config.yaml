@@ -1,32 +1,42 @@
 type: object
-description: Full in-memory Plexus configuration. Mirrors the `plexus.yaml` schema.
+description: >
+  Full in-memory Plexus configuration. Mirrors the `plexus.yaml` file format
+  used for configuration. This is the authoritative reference for all runtime
+  settings.
 additionalProperties: true
 properties:
   providers:
     type: object
     additionalProperties:
       $ref: ./ProviderConfig.yaml
+    description: Map of provider slug to provider configuration.
   models:
     type: object
     additionalProperties:
       $ref: ./AliasConfig.yaml
+    description: Map of model alias slug to alias configuration.
   keys:
     type: object
     additionalProperties:
       $ref: ./KeyConfig.yaml
+    description: Map of API key name to key configuration.
   mcp_servers:
     type: object
     additionalProperties:
       $ref: ./McpServerConfig.yaml
+    description: Map of MCP server name to server configuration.
   user_quotas:
     type: object
     additionalProperties:
       $ref: ./UserQuotaDefinition.yaml
+    description: Map of quota definition name to quota configuration.
   quotas:
     type: array
     items:
       type: object
       additionalProperties: true
+    description: Array of provider quota checker configurations.
   system_settings:
     type: object
     additionalProperties: true
+    description: Global system settings and feature flags.

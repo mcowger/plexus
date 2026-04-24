@@ -645,6 +645,7 @@ green; rendered `preview-docs` reads as the primary reference.
 |  3 | Model discovery & metadata              | ✅ done        | + openrouter startup req, schema property docs |
 |  4 | Usage & observability schemas           | ✅ done        | All schemas fully documented (40+ fields) |
 |  5 | Usage / debug / errors / MCP-logs       | ✅ done        | Endpoint descriptions, scoping, retention, params |
+|  6 | Configuration CRUD                      | ✅ done        | Config schemas + all CRUD operations documented |
 |  4 | Usage & observability schemas           | ⬜ not started |       |
 |  5 | Usage / debug / errors / MCP-logs       | ⬜ not started |       |
 |  6 | Configuration CRUD                      | ⬜ not started |       |

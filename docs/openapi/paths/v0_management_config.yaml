@@ -3,9 +3,27 @@ get:
     - Management — Config
   summary: Get the full in-memory configuration (admin only)
   description: |
-    Returns the Plexus configuration object as JSON — the same structure
-    that backs `plexus.yaml`. For the raw YAML export form see
-    `GET /v0/management/config/export`.
+    Returns the full Plexus configuration object as JSON. This is the
+    same structure that backs `plexus.yaml`.
+
+    ## JSON vs YAML
+
+    - **This endpoint** — Returns the in-memory configuration as JSON
+    - **`GET /v0/management/config/export`** — Returns the raw YAML as stored on disk
+
+    Both contain the same data; the JSON form is easier for programmatic access.
+
+    ## What's included
+
+    - `providers` — All configured provider configs
+    - `models` — All model alias configs
+    - `keys` — All API key configs
+    - `mcp_servers` — All MCP server configs
+    - `user_quotas` — All user quota definitions
+    - `quotas` — Provider quota checker configs
+    - `system_settings` — Global system settings
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

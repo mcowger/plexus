@@ -4,10 +4,27 @@ parameters:
     required: true
     schema:
       type: string
+    description: The alias ID (numeric or slug) to delete.
 delete:
   tags:
     - Management — Config
   summary: Delete a single model alias (admin only)
+  description: |
+    Removes an alias from the configuration.
+
+    ## Cascade behavior
+
+    Deleting an alias removes it completely. Any requests using this alias
+    will fail with a routing error. Ensure you update any client code or
+    dependent aliases before deletion.
+
+    ## Note
+
+    This is an alias deletion, not a provider deletion. For providers, use
+    `/providers/{slug}`. Deleting an alias does not affect the underlying
+    provider configuration.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

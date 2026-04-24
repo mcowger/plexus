@@ -2,6 +2,17 @@ get:
   tags:
     - Management — Config
   summary: List all model aliases (admin only)
+  description: |
+    Returns a map of all model aliases keyed by slug.
+
+    Each entry contains:
+    - `targets` — Array of provider/model targets to route to
+    - `type` — Inference API type (chat, messages, responses, etc.)
+    - `model_architecture` — Used for energy estimation (kWh calculation)
+    - `metadata` — Optional enriched data from external catalogs
+    - `pricing` — Optional pricing configuration
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

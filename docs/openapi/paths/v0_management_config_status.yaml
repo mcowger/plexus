@@ -2,6 +2,18 @@ get:
   tags:
     - Management — Config
   summary: Configuration deployment status (admin only)
+  description: |
+    Returns status flags about the current configuration state.
+
+    ## adminKeyFromYaml
+
+    - **true** — Server is still using `ADMIN_KEY` from `plexus.yaml` (deprecated legacy mode)
+    - **false** — Server is using the configured `ADMIN_KEY` from environment variables
+
+    This flag helps diagnose authentication issues during migrations from
+    file-based to env-based admin keys.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -14,9 +26,9 @@ get:
             properties:
               adminKeyFromYaml:
                 type: boolean
-                description: >-
-                  True when the server is still bootstrapping `ADMIN_KEY` from
-                  `plexus.yaml` (deprecated).
+                description: >
+                  True when the server is still bootstrapping ADMIN_KEY from
+                  plexus.yaml (deprecated). False when using env-based key.
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0ManagementConfigStatus

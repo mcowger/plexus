@@ -1,12 +1,18 @@
 type: object
 additionalProperties: true
-description: Model alias. See `CONFIGURATION.md`.
+description: >
+  Model alias configuration. Maps a client-facing model name to one or
+  more provider targets. Corresponds to entries in `plexus.yaml` `models`
+  section.
 properties:
   targets:
     type: array
     items:
       type: object
       additionalProperties: true
+    description: >
+      Array of provider/model targets. The dispatcher tries them in order
+      for failover. Each target is a {provider, model} pair.
   type:
     type: string
     enum:
@@ -18,7 +24,7 @@ properties:
       - transcriptions
       - speech
       - image
-    description: >-
+    description: >
       Inference API type this alias targets.
 
       - **chat** — OpenAI Chat Completions.
@@ -32,17 +38,37 @@ properties:
   metadata:
     type: object
     additionalProperties: true
+    description: >
+      Optional enriched model data fetched from external catalogs
+      (OpenRouter, models.dev, catwalk). Used to pre-fill override forms
+      in the admin UI.
   model_architecture:
     type: object
     additionalProperties: true
+    description: >
+      Model architecture details used for energy estimation. Contains
+      input/output modalities, tokenizer info, and token throughput
+      estimates. When modified, triggers recalculation of kWh for
+      historical usage records.
   input_price_per_million:
     type: number
+    description: >
+      Simple pricing: input price per million tokens. Used when
+      pricing.source is 'simple'.
   output_price_per_million:
     type: number
+    description: >
+      Simple pricing: output price per million tokens.
   pricing:
     type: object
     additionalProperties: true
+    description: >
+      Advanced pricing configuration. Can reference OpenRouter pricing,
+      define custom ranges, or set per-request flat fees.
   additional_aliases:
     type: array
     items:
       type: string
+    description: >
+      Additional names this alias is known by. Useful for aliases that
+      map to multiple client-facing model names.

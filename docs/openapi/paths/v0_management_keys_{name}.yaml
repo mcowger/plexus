@@ -4,10 +4,32 @@ parameters:
     required: true
     schema:
       type: string
+    description: API key name (e.g. "sk-prod", "sk-dev").
 put:
   tags:
     - Management — Config
   summary: Create or replace an API key (admin only)
+  description: |
+    Creates a new API key or replaces an existing one.
+
+    ## Required fields
+
+    - `secret` — The API key secret (e.g. `sk-...`). This is encrypted
+      at rest in the database.
+
+    ## Optional fields
+
+    - `comment` — Freeform description (max 500 chars)
+    - `allowedProviders` — Array of provider slugs to restrict this key to
+    - `allowedModels` — Array of model aliases to restrict this key to
+    - `quota` — Name of a user quota definition to assign
+
+    ## Secret encryption
+
+    The secret is encrypted using the `ENCRYPTION_KEY` environment variable
+    before storage. Keys are decrypted only when needed for authentication.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -36,6 +58,16 @@ delete:
   tags:
     - Management — Config
   summary: Delete an API key (admin only)
+  description: |
+    Permanently removes an API key.
+
+    ## Impact
+
+    All requests using this key will immediately fail with 401. Usage
+    history for this key is preserved (attached to the key name), but
+    new requests are impossible until the key is recreated.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

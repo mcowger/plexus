@@ -2,6 +2,20 @@ get:
   tags:
     - Management — Config
   summary: Get vision fallthrough settings (admin only)
+  description: |
+    Returns the current vision fallthrough configuration.
+
+    ## What is vision fallthrough?
+
+    Vision fallthrough is a dispatch-time fallback mechanism for handling
+    image inputs. When a request comes in with an unknown or unsupported
+    vision model, the dispatcher can automatically route it to a configured
+    fallback model (e.g., GPT-4o for vision).
+
+    This happens at request transformation time, before the request is
+    sent to the upstream provider.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -19,6 +33,21 @@ patch:
   tags:
     - Management — Config
   summary: Merge updates into vision fallthrough settings (admin only)
+  description: |
+    Merges the provided JSON into the existing vision fallthrough settings.
+
+    ## Merge behavior
+
+    This performs a shallow merge — top-level keys are overwritten, but
+    existing keys not in the request are preserved.
+
+    ## What to configure
+
+    - `fallback_model` — Model alias to use as fallback
+    - `enabled` — Whether fallthrough is active
+    - `provider_filter` — Optional list of providers to apply fallthrough to
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:

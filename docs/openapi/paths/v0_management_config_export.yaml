@@ -2,6 +2,19 @@ get:
   tags:
     - Management — Config
   summary: Export the configuration as YAML (admin only)
+  description: |
+    Exports the full configuration as YAML — the same format used in
+    `plexus.yaml`.
+
+    ## JSON vs YAML
+
+    - **`GET /v0/management/config`** — Returns configuration as JSON
+    - **This endpoint** — Returns configuration as YAML (same as on disk)
+
+    Both contain the same data; the YAML form is suitable for saving
+    back to the config file.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

@@ -2,6 +2,23 @@ get:
   tags:
     - Management — Config
   summary: List all API keys (admin only)
+  description: |
+    Returns a map of all API keys keyed by name.
+
+    ## Secret handling
+
+    The `secret` field is stored encrypted at rest in the database. It is
+    decrypted for this response. Treat these values carefully — they grant
+    access to your Plexus instance.
+
+    ## Rotation
+
+    When you rotate a key via `POST /v0/management/self/rotate`, a new secret
+    is generated and the old one is invalidated. Historical usage data stays
+    attached to the key **name**, not the secret value, so you don't lose
+    attribution history.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

@@ -2,6 +2,15 @@ get:
   tags:
     - Management — Config
   summary: Get all system settings (admin only)
+  description: |
+    Returns all system settings as a key-value map.
+
+    System settings control various runtime behaviors including feature
+    flags, timeouts, and operational parameters.
+
+    See `docs/CONFIGURATION.md` for the full list of available settings.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -19,6 +28,26 @@ patch:
   tags:
     - Management — Config
   summary: Bulk upsert system settings (admin only)
+  description: |
+    Merges the provided settings into the existing system settings.
+
+    ## Bulk merge semantics
+
+    This performs a shallow merge — each top-level key is set/overwritten.
+    Keys not in the request are preserved (not deleted).
+
+    ## Example
+
+    ```
+    PATCH /v0/management/system-settings
+    {"max_concurrent_requests": 1000, "feature_vision_fallthrough": true}
+    ```
+
+    This adds/updates those two settings while preserving all others.
+
+    See `docs/CONFIGURATION.md` for available settings and their meaning.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:

@@ -2,22 +2,38 @@ type: object
 required:
   - secret
 additionalProperties: true
+description: >
+  API key configuration. Controls access to Plexus inference endpoints.
+  Corresponds to entries in `plexus.yaml` `keys` section.
 properties:
   secret:
     type: string
     example: sk-0123...
+    description: >
+      The API key secret. Stored encrypted at rest. Format is typically
+      `sk-...` but any string is accepted.
   comment:
     type: string
+    description: >
+      Freeform description or notes about this key. Max 500 characters.
   allowedProviders:
     type: array
     items:
       type: string
+    description: >
+      Restrict this key to specific providers only. If empty, the key
+      can be used with any provider.
   allowedModels:
     type: array
     items:
       type: string
+    description: >
+      Restrict this key to specific model aliases only. If empty, the
+      key can be used with any model.
   quota:
     type:
       - string
       - 'null'
-    description: User-quota definition name.
+    description: >
+      Name of a user quota definition to enforce. If null, no quota
+      is enforced for this key.

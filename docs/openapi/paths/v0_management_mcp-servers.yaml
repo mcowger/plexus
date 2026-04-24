@@ -2,6 +2,25 @@ get:
   tags:
     - Management — Config
   summary: List configured MCP servers (admin only)
+  description: |
+    Returns a map of all configured MCP servers keyed by name.
+
+    Each server configuration includes:
+    - `upstream_url` — The MCP server endpoint
+    - `enabled` — Whether the server is active
+    - `headers` — Custom headers to include in proxy requests
+    - Auth fields (`auth_type`, `auth_header_value`, etc.)
+
+    ## Auth and the proxy
+
+    These fields affect how Plexus authenticates to the upstream MCP server:
+    - `auth_type` — none, bearer, basic, header
+    - `auth_header_value` — static value for custom auth
+
+    When proxying, Plexus strips the client's `Authorization` and `x-api-key`
+    headers and uses the configured static auth instead.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

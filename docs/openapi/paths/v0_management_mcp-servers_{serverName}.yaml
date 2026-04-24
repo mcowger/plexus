@@ -5,10 +5,32 @@ parameters:
     schema:
       type: string
       pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
+    description: >
+      Server name (lowercase alphanumeric, max 64 chars). Must match pattern
+      `^[a-z0-9][a-z0-9-_]{1,62}$`.
 put:
   tags:
     - Management — Config
   summary: Create or replace an MCP server entry (admin only)
+  description: |
+    Creates or replaces an MCP server configuration.
+
+    ## Server name constraints
+
+    - Must start with alphanumeric (not underscore)
+    - Max 64 characters
+    - Can contain lowercase letters, numbers, and hyphens/underscores
+
+    ## Proxy auth fields
+
+    These fields affect how the MCP proxy authenticates to the upstream:
+    - `auth_type` — Authentication type (none, bearer, basic, header)
+    - `auth_header_value` — Static value for custom auth headers
+
+    The proxy strips incoming `Authorization` / `x-api-key` headers and
+    uses the configured static auth instead.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -37,6 +59,15 @@ delete:
   tags:
     - Management — Config
   summary: Delete an MCP server entry (admin only)
+  description: |
+    Removes an MCP server configuration.
+
+    ## Impact
+
+    The `/mcp/{serverName}` endpoints will return 404 for this server.
+    Any in-flight proxy requests will fail.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

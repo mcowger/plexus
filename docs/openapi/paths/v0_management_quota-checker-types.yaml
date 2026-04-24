@@ -2,7 +2,27 @@ get:
   tags:
     - Management — Config
   summary: Valid built-in quota-checker type strings (admin only)
-  description: The enum used in `providers[*].quota.type`.
+  description: |
+    Returns the list of valid quota checker types.
+
+    ## Relationship to ProviderConfig
+
+    These types are used in `providers[*].quota.type`. When you configure
+    a provider with a quota block:
+
+    ```yaml
+    providers:
+      my-provider:
+        quota:
+          type: naga  # <-- must be one of these types
+          options:
+            apiKey: ...
+    ```
+
+    Each type corresponds to a specific quota checker implementation that
+    monitors a particular provider's quota/API limits.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

@@ -1,26 +1,49 @@
 type: object
 additionalProperties: true
-description: See `CONFIGURATION.md` for the full provider schema.
+description: >
+  Provider configuration. Used to define upstream LLM providers that Plexus
+  can route requests to. Corresponds to entries in `plexus.yaml`
+  `providers` section.
 properties:
   type:
     type: string
-    description: e.g. openai, anthropic, gemini, openrouter, oauth/…
+    description: >
+      Provider type identifier (e.g. openai, anthropic, gemini, openrouter,
+      oauth/anthropic). Determines the transformer and API format used.
   base_url:
     type: string
     format: uri
+    description: >
+      Optional override URL. When set, requests to this provider use this
+      URL instead of the default provider endpoint. Useful for proxies or
+      custom endpoints.
   api_key:
     type: string
+    description: >
+      API key for the provider. Can be a literal string or
+      `$env:VARIABLE_NAME` to reference an environment variable.
   disable_cooldown:
     type: boolean
+    description: >
+      When true, disables automatic cooldown for this provider. Failed
+      requests won't trigger exponential backoff. Use with caution.
   quota:
     type: object
-    description: Optional provider-level quota checker config.
+    description: >
+      Optional provider-level quota checker configuration. References a
+      quota checker type from `GET /v0/management/quota-checker-types`.
     additionalProperties: true
   gpu_ram_gb:
     type: number
+    description: >
+      GPU RAM in GB. Used for energy estimation when combined with
+      model_architecture.
   gpu_bandwidth_tb_s:
     type: number
+    description: GPU memory bandwidth in TB/s. Used for energy estimation.
   gpu_flops_tflop:
     type: number
+    description: GPU peak FLOPs in teraflops. Used for energy estimation.
   gpu_power_draw_watts:
     type: number
+    description: GPU TDP in watts. Used for energy estimation.
