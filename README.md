@@ -8,33 +8,6 @@
 
 Plexus is a high-performance API gateway that unifies access to multiple AI providers (OpenAI, Anthropic, Google, GitHub Copilot, and more) under a single endpoint. Switch models and providers without rewriting client code.
 
----
-
-## ⚠️ Breaking Change: Configuration Migration to Database
-
-**All configuration has moved from YAML files to the database.** This change is now live and affects all users upgrading from previous versions.
-
-### What You Need to Know
-
-- **Automatic Migration:** On first launch after upgrading, Plexus will automatically import your existing `plexus.yaml` and `auth.json` into the database
-- **Backward Compatibility:** If `ADMIN_KEY` is not set as an environment variable, Plexus will attempt to read it from `plexus.yaml` and display a prominent warning banner
-- **Action Required:** You should set `ADMIN_KEY` as an environment variable before the next restart to avoid the deprecation warning
-
-**Required Environment Variables:**
-
-```bash
-export ADMIN_KEY="your-secure-admin-password"  # Recommended - will use plexus.yaml as fallback with warning
-export DATABASE_URL="sqlite:///app/data/plexus.db"  # Optional (default shown)
-export ENCRYPTION_KEY="your-generated-hex-key"   # Optional - encrypts sensitive data at rest (generate once: openssl rand -hex 32)
-export PORT="4000"  # Optional
-```
-
-> **Note:** While the application will start without `ADMIN_KEY` set (by reading from `plexus.yaml`), a large deprecation warning will be displayed at startup and in the dashboard. Set `ADMIN_KEY` as an environment variable to suppress this warning.
-
-See [Configuration Migration Details](#configuration-migration-details) below for full documentation.
-
----
-
 ## What is Plexus?
 
 Plexus sits in front of your LLM providers and handles protocol translation, load balancing, failover, and usage tracking — transparently. Send any supported request format to Plexus and it routes to the right provider, transforms as needed, and returns the response in the format your client expects.
@@ -155,12 +128,6 @@ bun run test
 
 > Note: `bun test` is intentionally blocked both at repo root and in `packages/backend`; use `bun run test` instead.
 
-## Configuration Migration Details
-
-For complete documentation on the configuration migration from YAML to database, including all breaking changes, migration steps, and post-migration cleanup, see [config-to-database.md](config-to-database.md).
-
----
-
 ## Features
 
 ### Routing & Load Balancing
@@ -239,12 +206,6 @@ export ENCRYPTION_KEY="your-generated-hex-key"
 ```
 
 On first startup with `ENCRYPTION_KEY` set, existing plaintext values are automatically encrypted. Without the key, the system operates in plaintext mode (backward compatible). See [Configuration: Encryption](docs/CONFIGURATION.md#encryption-at-rest-optional) for details.
-
-### Responses API
-
-Full support for OpenAI's `/v1/responses` endpoint including stateful multi-turn conversations via `previous_response_id`, response storage with 7-day TTL, and function calling.
-
-→ See [Responses API Reference](docs/RESPONSES_API.md)
 
 ---
 
