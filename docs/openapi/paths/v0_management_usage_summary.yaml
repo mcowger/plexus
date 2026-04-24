@@ -4,7 +4,29 @@ get:
   summary: Aggregated usage time-series and totals
   description: |
     Returns bucketed series plus 7-day and since-midnight rollups.
-    Limited principals see only their own key's data.
+
+    ## Scoping
+
+    Limited principals see only their own key's data; admins see global data.
+
+    ## Bucket algorithm
+
+    The endpoint uses adaptive bucketing to ensure meaningful visualizations:
+    - `hour` — returns hourly buckets for the last 24 hours
+    - `day` — returns daily buckets for the last 30 days
+    - `week` — returns weekly buckets for the last 12 weeks
+    - `month` — returns monthly buckets for the last 12 months
+    - `custom` — requires `startDate` and `endDate`; buckets are auto-sized
+      based on the range duration
+
+    ## Response structure
+
+    - **series** — Time-bucketed data, where each bucket contains aggregated
+      counts and token sums
+    - **stats** — Fixed 7-day rolling window (always the last 7 days, regardless
+      of `range`)
+    - **today** — Aggregation since local midnight (not UTC), giving a
+      "day-so-far" view
   security:
     - AdminKey: []
   parameters:

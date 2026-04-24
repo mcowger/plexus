@@ -2,7 +2,29 @@ get:
   tags:
     - Management — Debug
   summary: List captured debug logs
-  description: Limited principals see only logs attributed to their own key.
+  description: |
+    Returns an index of captured debug logs (request/response snapshots).
+
+    ## Scoping
+
+    Limited principals see only logs for their own API key.
+    Admins see all logs.
+
+    ## Capture lifecycle
+
+    Debug logs are captured when:
+    1. Debug is enabled (globally via `/debug` PATCH, or per-key via
+       `/self/debug/toggle`)
+    2. A request is made with that key/provider combination
+    3. The request completes (success or error)
+
+    Logs contain raw request, transformed request, raw response,
+    transformed response, and snapshots at each stage.
+
+    ## Retention
+
+    Debug logs are auto-cleaned by a background job (typically 7 days).
+    Use the 7-day cleanup job or manual DELETE to manage retention.
   security:
     - AdminKey: []
   parameters:
@@ -11,11 +33,13 @@ get:
       schema:
         type: integer
         default: 50
+      description: Maximum records to return.
     - in: query
       name: offset
       schema:
         type: integer
         default: 0
+      description: Pagination offset.
   responses:
     '200':
       description: Log index.
@@ -39,6 +63,12 @@ delete:
   tags:
     - Management — Debug
   summary: Delete all debug logs (admin only)
+  description: |
+    Bulk delete all debug logs from the `debug_logs` table.
+
+    **Admin only** — limited principals receive 403.
+
+    Use with caution — this cannot be undone.
   security:
     - AdminKey: []
   responses:

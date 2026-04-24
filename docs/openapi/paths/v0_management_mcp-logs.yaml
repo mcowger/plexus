@@ -2,6 +2,23 @@ get:
   tags:
     - Management — MCP Logs
   summary: List MCP proxy request logs (admin only)
+  description: |
+    Returns paginated MCP proxy request logs from the `mcp_request_usage` table.
+
+    ## Scoping
+
+    **Admin only** — limited principals receive 403.
+
+    ## Filters
+
+    - **serverName** — Filter by MCP server name. Use to see traffic for
+      a specific server.
+    - **apiKey** — Filter by Plexus API key that made the request.
+
+    ## Retention
+
+    MCP logs are auto-cleaned by a background job (typically 7 days).
+    Use the `olderThanDays` parameter on DELETE to manage retention.
   security:
     - AdminKey: []
   parameters:
@@ -10,19 +27,23 @@ get:
       schema:
         type: integer
         default: 20
+      description: Maximum records to return.
     - in: query
       name: offset
       schema:
         type: integer
         default: 0
+      description: Pagination offset.
     - in: query
       name: serverName
       schema:
         type: string
+      description: Filter by MCP server name.
     - in: query
       name: apiKey
       schema:
         type: string
+      description: Filter by Plexus API key.
   responses:
     '200':
       description: Paginated logs.
@@ -44,6 +65,15 @@ delete:
   tags:
     - Management — MCP Logs
   summary: Delete MCP logs (admin only)
+  description: |
+    Bulk delete MCP logs from the `mcp_request_usage` table.
+
+    **Admin only** — limited principals receive 403.
+
+    - **olderThanDays** — Only delete logs older than N days.
+      Omit to delete all logs.
+
+    Use with caution — this cannot be undone.
   security:
     - AdminKey: []
   parameters:
@@ -51,6 +81,7 @@ delete:
       name: olderThanDays
       schema:
         type: integer
+      description: Only delete logs older than N days. Omit to delete everything.
   responses:
     '200':
       $ref: ../components/responses/SuccessTrue.yaml
