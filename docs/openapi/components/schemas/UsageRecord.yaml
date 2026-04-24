@@ -155,6 +155,8 @@ properties:
         config.
       - **per_request** — Flat fee per call; full amount in `costInput`,
         others zero.
+      - **null** — Cost source not yet resolved; record is still in-flight
+        or pricing information was unavailable at recording time.
   costMetadata:
     type:
       - string
