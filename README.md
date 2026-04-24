@@ -8,6 +8,8 @@
 
 Plexus is a high-performance API gateway that unifies access to multiple AI providers (OpenAI, Anthropic, Google, GitHub Copilot, and more) under a single endpoint. Switch models and providers without rewriting client code.
 
+> **Note:** Plexus is a self-hosted application and does **not** use Vercel. It runs on [Fastify](https://fastify.dev/) under [Bun](https://bun.sh/) and can be deployed via Docker, standalone binary, or any hosting environment that supports Bun runtimes.
+
 ---
 
 ## ⚠️ Breaking Change: Configuration Migration to Database
