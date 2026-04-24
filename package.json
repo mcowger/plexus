@@ -24,7 +24,9 @@
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
     "format": "bunx biome format --write .",
-    "format:check": "bunx biome format ."
+    "format:check": "bunx biome format .",
+    "lint": "bunx biome lint --write .",
+    "lint:check": "bunx biome lint ."
   },
   "type": "module",
   "workspaces": [

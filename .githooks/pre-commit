@@ -66,6 +66,14 @@ if [ -n "$staged_files" ]; then
   echo "$staged_files" | xargs git add
 fi
 
+# --- Run Biome linter on all source files ---
+echo "[pre-commit] Running Biome linter..."
+bunx biome lint . || { echo "[pre-commit] Linting errors - fix with: bun run format"; exit 1; }
+
+# --- Run TypeScript type check on all packages ---
+echo "[pre-commit] Running TypeScript type check..."
+bun run typecheck || { echo "[pre-commit] Type errors - fix with: bun run typecheck"; exit 1; }
+
 # --- Build frontend (catches invalid imports, missing exports, broken builds) ---
 frontend_files=$(git diff --cached --name-only --diff-filter=ACM -- 'packages/frontend/src/**' || true)
 if [ -n "$frontend_files" ]; then
