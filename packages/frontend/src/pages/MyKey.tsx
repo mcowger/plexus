@@ -12,7 +12,7 @@ import { Switch } from '../components/ui/Switch';
 import { CopyButton } from '../components/ui/CopyButton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
-import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
+import { Skeleton } from '../components/ui/Skeleton';
 
 interface SelfInfo {
   role: 'admin' | 'limited';

@@ -26,8 +26,6 @@ import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import {
   ChevronLeft,
   ChevronRight,
-  Search,
-  Filter,
   Trash2,
   Bug,
   Zap,

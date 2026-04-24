@@ -10,8 +10,13 @@ export const SyntheticQuotaConfig: React.FC<SyntheticQuotaConfigProps> = ({
   options,
   onChange,
 }) => {
-  const handleChange = (key: string, value: string | number) => {
-    onChange({ ...options, [key]: value });
+  const handleChange = (key: string, value: string | number | undefined) => {
+    if (value !== undefined) {
+      onChange({ ...options, [key]: value });
+    } else {
+      const { [key]: _, ...rest } = options;
+      onChange(rest);
+    }
   };
 
   return (
