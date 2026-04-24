@@ -26,7 +26,7 @@ export const WisdomGateQuotaDisplay: React.FC<WisdomGateQuotaDisplayProps> = ({
   }
 
   const windows = result.windows || [];
-  const window = windows.find((w) => w.windowType === 'monthly');
+  const window = windows.find((w) => w.windowType === 'subscription');
   const remaining = window?.remaining ?? 0;
   const limit = window?.limit ?? 0;
   const used = window?.used ?? 0;
@@ -51,7 +51,7 @@ export const WisdomGateQuotaDisplay: React.FC<WisdomGateQuotaDisplayProps> = ({
         <span className="text-xs font-semibold text-text whitespace-nowrap">Wisdom Gate</span>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-xs font-semibold text-text-secondary">Monthly Credits</span>
+        <span className="text-xs font-semibold text-text-secondary">Subscription</span>
       </div>
       <div className="flex items-baseline gap-2">
         <span className="text-xs text-text-secondary">
