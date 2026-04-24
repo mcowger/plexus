@@ -49,6 +49,7 @@ jobs:
 
               - [ ] Analyze the request
               - [ ] Implement the changes
+              - [ ] Validate with typecheck, format, and tests
               - [ ] Create a pull request
 
             Do NOT post a separate acknowledgment comment followed by a plan
@@ -63,6 +64,16 @@ jobs:
             `create_pull_request` tool. Changes that are not committed and
             submitted as a PR will be lost when this CI run ends. Never leave
             modified files uncommitted.
+
+            BEFORE pushing your branch or creating a PR, you MUST run these
+            validation commands and ensure they pass:
+
+              1. `bun run typecheck` — TypeScript type checking across all packages
+              2. `bun run format` — Biome formatting (this will auto-fix issues)
+              3. `bun run test` — Run the test suite
+
+            If `bun run format` makes changes, stage them with `git add` before
+            committing. Do NOT create a PR if these checks fail — fix the issues first.
 
             When you create a pull request, update your progress comment to
             clearly announce it — include the PR number and link so the requester
