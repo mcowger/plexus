@@ -3,6 +3,7 @@
   "module": "index.ts",
   "devDependencies": {
     "@biomejs/biome": "latest",
+    "@redocly/cli": "^2.30.0",
     "bun-types": "latest",
     "vitest": "^4.1.5"
   },
@@ -26,7 +27,8 @@
     "format": "bunx biome format --write .",
     "format:check": "bunx biome format .",
     "lint": "bunx biome lint --write .",
-    "lint:check": "bunx biome lint ."
+    "lint:check": "bunx biome lint .",
+    "lint:openapi": "npx @redocly/cli lint docs/openapi.yaml"
   },
   "type": "module",
   "workspaces": [
