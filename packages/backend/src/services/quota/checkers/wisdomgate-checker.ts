@@ -1,4 +1,4 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
+import type { QuotaCheckResult, QuotaWindow } from '../../../types/quota';
 import { QuotaChecker } from '../quota-checker';
 import { logger } from '../../../utils/logger';
 
@@ -7,16 +7,6 @@ interface WisdomGateUsageResponse {
   total_usage: number;
   total_available: number;
   regular_amount: number;
-  package_details: Array<{
-    package_id: string;
-    title: string;
-    amount: number;
-    total_amount: number;
-    expiry_time: number;
-    expiry_date: string;
-    begin_time: number;
-    begin_date: string;
-  }>;
 }
 
 export class WisdomGateQuotaChecker extends QuotaChecker {
@@ -49,24 +39,18 @@ export class WisdomGateQuotaChecker extends QuotaChecker {
 
       logger.silly(`[wisdomgate] Response: ${JSON.stringify(data)}`);
 
-      const packageDetail = data.package_details?.[0];
-      if (!packageDetail) {
-        return this.errorResult(new Error('No package details found in response'));
-      }
-
-      const limit = packageDetail.total_amount;
-      const remaining = packageDetail.amount;
-      const used = packageDetail.total_amount - packageDetail.amount;
-      const resetsAt = new Date(packageDetail.expiry_time * 1000);
+      const used = data.total_usage;
+      const remaining = data.total_available;
+      const limit = used + remaining;
 
       const window: QuotaWindow = this.createWindow(
-        'monthly',
+        'subscription',
         limit,
         used,
         remaining,
         'dollars',
-        resetsAt,
-        'Wisdom Gate monthly subscription'
+        undefined,
+        'Wisdom Gate subscription'
       );
 
       return this.successResult([window]);
