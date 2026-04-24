@@ -100,7 +100,7 @@ const mockLogger = {
 //     them; re-apply implementations in beforeEach because mockReset: true
 //     wipes vi.fn() state between tests.
 //   • getModels returns all known test models so quota-error assertions that
-//     validate gpt-5.4 is valid for openai-codex always pass.
+//     validate gpt-5.4/gpt-5.5 are valid for openai-codex always pass.
 //   • getModel always includes the `api` field — OAuthTransformer.executeRequest
 //     dispatches on model.api and crashes with "No API provider registered"
 //     if it is missing.
@@ -113,6 +113,13 @@ vi.mock('@mariozechner/pi-ai', () => ({
         {
           id: 'gpt-5.4',
           name: 'GPT-5.4',
+          contextWindow: 128000,
+          provider: 'openai-codex',
+          api: 'openai-codex-responses',
+        },
+        {
+          id: 'gpt-5.5',
+          name: 'GPT-5.5',
           contextWindow: 128000,
           provider: 'openai-codex',
           api: 'openai-codex-responses',
