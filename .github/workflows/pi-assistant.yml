@@ -26,9 +26,10 @@ jobs:
         with:
           node-version: 24
 
-      - uses: shaftoe/pi-coding-agent-action@v2.12.0
+      - uses: mcowger/pi-coding-agent-action@mcowger/baseurl
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
           model: ${{ vars.PLEXUS_MODEL }}
           token: ${{ secrets.OPENROUTER_API_KEY }}
+          base_url: ${{ secrets.PLEXUS_URL }}
