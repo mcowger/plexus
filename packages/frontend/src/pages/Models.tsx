@@ -24,7 +24,6 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
 import {
-  Search,
   Plus,
   Trash2,
   Loader2,

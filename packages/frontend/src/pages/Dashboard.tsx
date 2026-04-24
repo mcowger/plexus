@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Zap, BarChart2, Gauge, LayoutDashboard } from 'lucide-react';
 import { LiveTab } from '../components/dashboard/tabs/LiveTab';

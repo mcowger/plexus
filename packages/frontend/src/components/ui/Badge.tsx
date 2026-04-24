@@ -10,6 +10,7 @@ interface BadgeProps {
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
   title?: string;
+  style?: React.CSSProperties;
 }
 
 const statusClasses: Record<BadgeStatus, string> = {
@@ -28,11 +29,13 @@ export const Badge: React.FC<BadgeProps> = ({
   className,
   onClick,
   title,
+  style,
 }) => {
   return (
     <div
       onClick={onClick}
       title={title}
+      style={style}
       className={clsx(
         'inline-flex items-center gap-2 rounded-full border text-xs font-medium whitespace-nowrap',
         secondaryText ? 'px-3 py-1' : 'px-3 py-1.5',
