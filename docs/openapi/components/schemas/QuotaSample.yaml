@@ -20,6 +20,16 @@ properties:
       - weekly
       - monthly
       - custom
+    description: >-
+      Time window that the quota measurement covers.
+
+      - **subscription** — Monthly/billing-cycle quota or prepaid balance.
+      - **hourly** — Hourly rolling window.
+      - **five_hour** — 5-hour rolling window (common across multiple providers).
+      - **daily** — Daily reset quota.
+      - **weekly** — 7-day rolling window (common across multiple providers).
+      - **monthly** — Calendar month quota.
+      - **custom** — Provider-specific window.
   checkedAt:
     type: string
     format: date-time
@@ -46,6 +56,13 @@ properties:
       - warning
       - critical
       - exhausted
+    description: >-
+      Utilisation severity level.
+
+      - **ok** — 0–75% utilisation. Healthy, plenty of quota remaining.
+      - **warning** — 75–90% utilisation. Approaching exhaustion.
+      - **critical** — 90–100% utilisation. Near exhaustion, take action soon.
+      - **exhausted** — 100% utilisation. Quota fully consumed, requests will fail.
   success:
     type: boolean
   errorMessage:

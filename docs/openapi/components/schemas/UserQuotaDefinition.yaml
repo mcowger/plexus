@@ -10,11 +10,24 @@ properties:
       - rolling
       - daily
       - weekly
+    description: >-
+      Quota window type.
+
+      - **rolling** — Sliding window of `duration` length (e.g. `1h`, `30m`,
+        `1d`). Requires the `duration` field.
+      - **daily** — Resets at midnight local time each day.
+      - **weekly** — 7-day rolling window starting from first request.
   limitType:
     type: string
     enum:
       - requests
       - tokens
+    description: >-
+      What the quota counts.
+
+      - **requests** — Number of inference requests.
+      - **tokens** — Sum of all token fields (`tokensInput` +
+        `tokensOutput` + `tokensCached` + `tokensCacheWrite`).
   limit:
     type: number
     minimum: 0

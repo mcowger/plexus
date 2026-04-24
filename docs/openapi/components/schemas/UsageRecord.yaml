@@ -36,6 +36,18 @@ properties:
       - speech
       - images
       - oauth
+    description: >-
+      API format received from the client.
+
+      - **chat** — OpenAI Chat Completions (`/v1/chat/completions`).
+      - **messages** — Anthropic Messages (`/v1/messages`).
+      - **responses** — OpenAI Responses API (`/v1/responses`).
+      - **gemini** — Google Gemini (`/v1beta/models/*`).
+      - **embeddings** — OpenAI Embeddings (`/v1/embeddings`).
+      - **transcriptions** — OpenAI Audio Transcriptions (`/v1/audio/transcriptions`).
+      - **speech** — OpenAI Audio Speech (`/v1/audio/speech`).
+      - **images** — OpenAI Images (`/v1/images/*`).
+      - **oauth** — OAuth-authenticated provider session.
   provider:
     type:
       - string
@@ -132,6 +144,19 @@ properties:
       - defined
       - per_request
       - null
+    description: >-
+      Pricing method used to calculate cost fields.
+
+      - **default** — No pricing configured; all cost fields are zero.
+      - **simple** — Per-token pricing from `input_price_per_million` /
+        `output_price_per_million` on the model.
+      - **openrouter** — Pricing fetched from OpenRouter at request time.
+      - **defined** — Explicit pricing ranges from `pricing.range` in model
+        config.
+      - **per_request** — Flat fee per call; full amount in `costInput`,
+        others zero.
+      - **null** — Cost source not yet resolved; record is still in-flight
+        or pricing information was unavailable at recording time.
   costMetadata:
     type:
       - string
@@ -163,6 +188,12 @@ properties:
       - success
       - error
       - pending
+    description: >-
+      Outcome of the request.
+
+      - **success** — Upstream returned a successful response.
+      - **error** — Upstream returned an error or the request failed.
+      - **pending** — Request is in-flight (used for async tracking).
   toolsDefined:
     type:
       - integer

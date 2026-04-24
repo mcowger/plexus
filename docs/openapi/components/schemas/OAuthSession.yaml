@@ -16,6 +16,18 @@ properties:
       - complete
       - failed
       - cancelled
+    description: >-
+      Session lifecycle state.
+
+      - **waiting** — Session created; the user should open the auth URL from
+        `authInfo.url`.
+      - **prompt** — Provider requires a user confirmation (e.g. typing
+        "yes"). Submit via the `prompt` endpoint.
+      - **manual-code** — Provider requires a manually pasted authorization
+        code (Codex CLI, Claude Code). Submit via the `manual-code` endpoint.
+      - **complete** — Credentials stored on disk, provider ready.
+      - **failed** — Authentication error occurred.
+      - **cancelled** — User cancelled the session.
   authInfo:
     type: object
     additionalProperties: true

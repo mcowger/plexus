@@ -70,38 +70,38 @@ annotate all shared enums with per-value semantics.
 
 ### Checklist
 
-- [ ] `info.description` — reorganize into sections, keep the existing
+- [x] `info.description` — reorganize into sections, keep the existing
       auth/public endpoint content, plus:
-  - [ ] Attribution suffix (`:label`) behaviour and where it surfaces
+  - [x] Attribution suffix (`:label`) behaviour and where it surfaces
         (`usage.attribution`, `api_key_attribution_*` metrics).
-  - [ ] Principal model — `admin` vs `limited`, what each can see,
+  - [x] Principal model — `admin` vs `limited`, what each can see,
         `?keyName=` override on `/self/*` routes.
-  - [ ] Environment variables that affect behaviour: `ADMIN_KEY`,
+  - [x] Environment variables that affect behaviour: `ADMIN_KEY`,
         `CONFIG_FILE`, `LOG_LEVEL`, `DEBUG`, `PLEXUS_METRICS_CACHE_TTL_MS`,
         `DATABASE_URL`, encryption env. Point to `docs/CONFIGURATION.md`
         for the full list.
-  - [ ] Header forwarding — which client headers get forwarded, stripped,
+  - [x] Header forwarding — which client headers get forwarded, stripped,
         echoed into `plexus_metadata.clientHeaders` (`x-app`, `session_id`,
         `x-client-request-id`).
-- [ ] Document every enum value for the following schemas (add to the
+- [x] Document every enum value for the following schemas (add to the
       enum's `description`, one bullet per value):
-  - [ ] `UsageRecord.costSource` — `default | simple | openrouter | defined | per_request`
-  - [ ] `UsageRecord.responseStatus` — `success | error | pending`
-  - [ ] `UsageRecord.incomingApiType` — `chat | messages | responses | gemini | embeddings | transcriptions | speech | images | oauth`
-  - [ ] `QuotaSample.windowType` — `subscription | hourly | five_hour | daily | weekly | monthly | custom`
-  - [ ] `QuotaSample.status` — `ok | warning | critical | exhausted` (include utilisation thresholds from API.md)
-  - [ ] `UserQuotaDefinition.type` — `rolling | daily | weekly`
-  - [ ] `UserQuotaDefinition.limitType` — `requests | tokens`
-  - [ ] `AliasConfig.type` — `chat | messages | responses | gemini | embeddings | transcriptions | speech | image`
-  - [ ] `OAuthSession.status` — `waiting | prompt | manual-code | complete | failed | cancelled`
-  - [ ] `SpeechRequest.voice` — list every voice and which models each is compatible with
-  - [ ] `SpeechRequest.response_format` / `stream_format`
-  - [ ] `McpUsageRecord.method` — `GET | POST | DELETE` plus what each means for the MCP proxy
-- [ ] Add reference tables (Markdown) inside tag descriptions for:
-  - [ ] Tag `Management — Quotas (Provider)` → window types and status
+  - [x] `UsageRecord.costSource` — `default | simple | openrouter | defined | per_request`
+  - [x] `UsageRecord.responseStatus` — `success | error | pending`
+  - [x] `UsageRecord.incomingApiType` — `chat | messages | responses | gemini | embeddings | transcriptions | speech | images | oauth`
+  - [x] `QuotaSample.windowType` — `subscription | hourly | five_hour | daily | weekly | monthly | custom`
+  - [x] `QuotaSample.status` — `ok | warning | critical | exhausted` (include utilisation thresholds from API.md)
+  - [x] `UserQuotaDefinition.type` — `rolling | daily | weekly`
+  - [x] `UserQuotaDefinition.limitType` — `requests | tokens`
+  - [x] `AliasConfig.type` — `chat | messages | responses | gemini | embeddings | transcriptions | speech | image`
+  - [x] `OAuthSession.status` — `waiting | prompt | manual-code | complete | failed | cancelled`
+  - [x] `SpeechRequest.voice` — list every voice and which models each is compatible with
+  - [x] `SpeechRequest.response_format` / `stream_format`
+  - [x] `McpUsageRecord.method` — `GET | POST | DELETE` plus what each means for the MCP proxy
+- [x] Add reference tables (Markdown) inside tag descriptions for:
+  - [x] Tag `Management — Quotas (Provider)` → window types and status
         thresholds (port from API.md "Reference Tables").
-  - [ ] Tag `Management — Usage` → cost-source semantics.
-  - [ ] Tag `Inference — Chat` (or a new overview tag) → retry/cooldown
+  - [x] Tag `Management — Usage` → cost-source semantics.
+  - [x] Tag `Inference — Chat` (or a new overview tag) → retry/cooldown
         model one-paragraph summary with link to the Usage tag.
 
 ### Source material
@@ -640,7 +640,7 @@ green; rendered `preview-docs` reads as the primary reference.
 
 | #  | Phase                                  | Status       | Notes |
 |---:|----------------------------------------|--------------|-------|
-|  1 | Shared vocabulary (enums + info.desc)  | ⬜ not started |       |
+|  1 | Shared vocabulary (enums + info.desc)  | ✅ done        | 14 enums annotated, info.description rewritten |
 |  2 | Core inference endpoints                | ⬜ not started |       |
 |  3 | Model discovery & metadata              | ⬜ not started |       |
 |  4 | Usage & observability schemas           | ⬜ not started |       |

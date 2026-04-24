@@ -25,6 +25,22 @@ properties:
       - verse
       - marin
       - cedar
+    description: >-
+      Voice to use for speech synthesis.
+
+      - **alloy** — Neutral, versatile voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **ash** — Warm, conversational voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **ballad** — Expressive, narrative voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **coral** — Friendly, upbeat voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **echo** — Deep, resonant voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **fable** — Animated, story-telling voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **onyx** — Deep, authoritative voice (all models).
+      - **nova** — Bright, energetic voice (all models).
+      - **sage** — Calm, measured voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **shimmer** — Soft, gentle voice (all models).
+      - **verse** — Clear, articulate voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **marin** — Natural, relaxed voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
+      - **cedar** — Rich, grounded voice (gpt-4o-mini-tts, gpt-4o-audio-preview).
   instructions:
     type: string
     description: Voice style; not supported on tts-1 / tts-1-hd.
@@ -38,6 +54,15 @@ properties:
       - wav
       - pcm
     default: mp3
+    description: >-
+      Audio output format.
+
+      - **mp3** — MPEG Layer 3 (default).
+      - **opus** — Opus compressed audio.
+      - **aac** — Advanced Audio Coding.
+      - **flac** — Free Lossless Audio Codec.
+      - **wav** — Waveform Audio File Format.
+      - **pcm** — Raw PCM samples.
   speed:
     type: number
     minimum: 0.25
@@ -49,4 +74,9 @@ properties:
       - sse
       - audio
     default: audio
-    description: Not supported on tts-1 / tts-1-hd.
+    description: >-
+      Streaming format. Not supported on tts-1 / tts-1-hd.
+
+      - **sse** — Stream audio chunks as Server-Sent Events
+        (`speech.audio.delta` / `speech.audio.done`).
+      - **audio** — Return complete binary audio (default).

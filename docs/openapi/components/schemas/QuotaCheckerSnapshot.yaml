@@ -10,6 +10,14 @@ properties:
     enum:
       - balance
       - rate-limit
+    description: >-
+      Whether the checker tracks a prepaid account balance or a time-windowed
+      rate limit.
+
+      - **balance** — Tracks a prepaid subscription balance (unit: `dollars`).
+        Renders as a wallet icon in the UI.
+      - **rate-limit** — Tracks a time-windowed rate limit (unit: `requests`,
+        `tokens`, or `percentage`). Renders as a progress bar in the UI.
   oauthAccountId:
     type: string
   oauthProvider:
