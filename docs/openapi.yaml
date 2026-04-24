@@ -1,0 +1,2077 @@
+openapi: "3.1.0"
+info:
+  title: Plexus API
+  description: >-
+    Plexus is a unified API gateway for LLMs. It exposes OpenAI- and
+    Anthropic-compatible endpoints and routes requests to any backend provider,
+    handling request/response transformation automatically.
+  version: "1.0.0"
+  contact:
+    name: Plexus
+    url: https://github.com/mcowger/plexus
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+
+security:
+  - BearerAuth: []
+  - ApiKeyHeader: []
+
+tags:
+  - name: Health
+    description: Server health checks
+  - name: Models
+    description: Model listing and metadata
+  - name: Chat
+    description: OpenAI-compatible Chat Completions API
+  - name: Messages
+    description: Anthropic-compatible Messages API
+  - name: Responses
+    description: OpenAI Responses API
+  - name: Embeddings
+    description: OpenAI-compatible Embeddings API
+  - name: Audio
+    description: OpenAI-compatible Audio (Speech & Transcription) APIs
+  - name: Images
+    description: OpenAI-compatible Image Generation and Editing APIs
+  - name: Gemini
+    description: Google Gemini-compatible API
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns OK if the server is running. No authentication required.
+      tags: [Health]
+      security: []
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  # ── Models ──────────────────────────────────────────────────────────────────
+
+  /v1/models:
+    get:
+      operationId: listModels
+      summary: List available models
+      description: >-
+        Returns all configured model aliases. When an alias has metadata
+        configured, the response includes enriched fields following the OpenRouter
+        model format. No authentication required.
+      tags: [Models]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ModelKeyParam"
+      responses:
+        "200":
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelListResponse"
+
+  /v1/metadata/search:
+    get:
+      operationId: searchModelMetadata
+      summary: Search model metadata catalog
+      description: >-
+        Search a loaded metadata catalog (OpenRouter, models.dev, or catwalk) for
+        use in the admin UI autocomplete when assigning metadata to an alias.
+      tags: [Models]
+      security: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [openrouter, models.dev, catwalk]
+          description: Metadata catalog source
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Substring search query. Omit to return all models.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+          description: Maximum number of results to return
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetadataSearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /v1/metadata/lookup:
+    get:
+      operationId: lookupModelMetadata
+      summary: Look up model metadata
+      description: >-
+        Returns the full normalized metadata for a single model in a catalog
+        source. Used by the frontend to auto-populate the override form.
+      tags: [Models]
+      security: []
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [openrouter, models.dev, catwalk]
+        - name: source_path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The model id within the source catalog
+      responses:
+        "200":
+          description: Model metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: Normalized model metadata
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /v1/openrouter/models:
+    get:
+      operationId: listOpenRouterModels
+      summary: List OpenRouter model slugs
+      description: >-
+        Returns model slugs fetched from OpenRouter. Requires an OpenRouter
+        provider configured in the database.
+      tags: [Models]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Optional substring search filter
+      responses:
+        "200":
+          description: Matching model slugs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # ── Chat Completions ────────────────────────────────────────────────────────
+
+  /v1/chat/completions:
+    post:
+      operationId: createChatCompletion
+      summary: Create chat completion
+      description: >-
+        OpenAI-compatible Chat Completions endpoint. Translates requests to the
+        internal unified format, dispatches to the configured backend provider,
+        and translates the response back.
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionChunk"
+              description: Server-sent events stream (when `stream: true`)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Anthropic Messages ──────────────────────────────────────────────────────
+
+  /v1/messages:
+    post:
+      operationId: createMessage
+      summary: Create message (Anthropic)
+      description: >-
+        Anthropic-compatible Messages endpoint. Translates Anthropic format to
+        the internal unified format, dispatches to the configured backend
+        provider, and translates the response back.
+      tags: [Messages]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessageRequest"
+      responses:
+        "200":
+          description: Anthropic message response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessageResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessageStreamEvent"
+              description: Server-sent events stream (when `stream: true`)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Responses API ───────────────────────────────────────────────────────────
+
+  /v1/responses:
+    post:
+      operationId: createResponse
+      summary: Create response (OpenAI Responses API)
+      description: >-
+        OpenAI Responses API compatible endpoint. Supports multi-turn
+        conversations via `previous_response_id`, tool use, and reasoning.
+        Plexus stores response state server-side so clients only need to send
+        new input and a reference to the previous response.
+      tags: [Responses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses API result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ResponsesStreamEvent"
+              description: Server-sent events stream (when `stream: true`)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/codex/responses:
+    post:
+      operationId: createCodexResponse
+      summary: Create response (Codex CLI alias)
+      description: >-
+        Alias for `/v1/responses`. Codex CLI sends requests to this path.
+        Behaves identically to the `/v1/responses` endpoint.
+      tags: [Responses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses API result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+
+  /v1/responses/{response_id}:
+    get:
+      operationId: getResponse
+      summary: Retrieve a stored response
+      description: Retrieves a previously stored response by its ID.
+      tags: [Responses]
+      parameters:
+        - $ref: "#/components/parameters/ResponseIdParam"
+      responses:
+        "200":
+          description: Stored response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteResponse
+      summary: Delete a stored response
+      description: Deletes a stored response by its ID.
+      tags: [Responses]
+      parameters:
+        - $ref: "#/components/parameters/ResponseIdParam"
+      responses:
+        "200":
+          description: Response deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    example: true
+                  id:
+                    type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/conversations/{conversation_id}:
+    get:
+      operationId: getConversation
+      summary: Retrieve a conversation
+      description: Retrieves all items in a stored conversation thread.
+      tags: [Responses]
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conversation ID
+      responses:
+        "200":
+          description: Conversation data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  items:
+                    type: string
+                    description: JSON-serialized array of conversation items
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Embeddings ──────────────────────────────────────────────────────────────
+
+  /v1/embeddings:
+    post:
+      operationId: createEmbedding
+      summary: Create embeddings
+      description: >-
+        OpenAI-compatible Embeddings endpoint. Always pass-through (no protocol
+        transformation).
+      tags: [Embeddings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbeddingsRequest"
+      responses:
+        "200":
+          description: Embeddings response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbeddingsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Audio ───────────────────────────────────────────────────────────────────
+
+  /v1/audio/speech:
+    post:
+      operationId: createSpeech
+      summary: Text to speech
+      description: >-
+        OpenAI-compatible Text-to-Speech endpoint. Generates audio from text.
+        Always pass-through.
+      tags: [Audio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeechRequest"
+      responses:
+        "200":
+          description: Generated audio
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/opus:
+              schema:
+                type: string
+                format: binary
+            audio/aac:
+              schema:
+                type: string
+                format: binary
+            audio/flac:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/basic:
+              schema:
+                type: string
+                format: binary
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SpeechStreamEvent"
+              description: SSE stream (when `stream_format: "sse"`)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/audio/transcriptions:
+    post:
+      operationId: createTranscription
+      summary: Audio transcription
+      description: >-
+        OpenAI-compatible Audio Transcriptions endpoint. Accepts
+        multipart/form-data with audio files up to 25 MB. Always pass-through.
+      tags: [Audio]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/TranscriptionRequest"
+      responses:
+        "200":
+          description: Transcription result (JSON or text)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionResponse"
+            text/plain:
+              schema:
+                type: string
+                description: Transcription text (when `response_format: "text"`)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Images ──────────────────────────────────────────────────────────────────
+
+  /v1/images/generations:
+    post:
+      operationId: createImageGeneration
+      summary: Generate images
+      description: >-
+        OpenAI-compatible Image Generation endpoint. Always pass-through.
+      tags: [Images]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenerationRequest"
+      responses:
+        "200":
+          description: Generated images
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/images/edits:
+    post:
+      operationId: createImageEdit
+      summary: Edit an image
+      description: >-
+        OpenAI-compatible Image Editing endpoint. Accepts multipart/form-data.
+        Always pass-through.
+      tags: [Images]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageEditRequest"
+      responses:
+        "200":
+          description: Edited images
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Gemini ──────────────────────────────────────────────────────────────────
+
+  /v1beta/models/{modelWithAction}:
+    post:
+      operationId: generateGeminiContent
+      summary: Generate content (Gemini)
+      description: >-
+        Google Gemini-compatible endpoint. The `{modelWithAction}` path parameter
+        should be in the format `{model}:{action}` (e.g.,
+        `gemini-2.0-flash:generateContent` or
+        `gemini-2.0-flash:streamGenerateContent`).
+      tags: [Gemini]
+      parameters:
+        - name: modelWithAction
+          in: path
+          required: true
+          schema:
+            type: string
+          description: >-
+            Model name with action, e.g. `gemini-2.0-flash:generateContent`
+            or `gemini-2.0-flash:streamGenerateContent`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiRequest"
+      responses:
+        "200":
+          description: Gemini response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/GeminiStreamEvent"
+              description: Server-sent events stream (when using streamGenerateContent)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  # ── Security Schemes ──────────────────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Plexus API key via `Authorization: Bearer sk-your-key`.
+        Supports `Authorization: sk-your-key` (auto-prefixed).
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Plexus API key via `x-api-key` header
+    GoogleApiKey:
+      type: apiKey
+      in: header
+      name: x-goog-api-key
+      description: Plexus API key via `x-goog-api-key` header (Gemini clients)
+
+  # ── Parameters ────────────────────────────────────────────────────────────
+  parameters:
+    ModelKeyParam:
+      name: key
+      in: query
+      schema:
+        type: string
+      description: API key passed as a query parameter (alternative to header auth)
+    ResponseIdParam:
+      name: response_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Unique response identifier
+
+  # ── Responses ──────────────────────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Bad request — validation error or missing required fields
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized — missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limited or quota exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: Service unavailable (e.g. metadata source not loaded)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Schemas ────────────────────────────────────────────────────────────────
+  schemas:
+    # ── Common ─────────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+              enum:
+                - invalid_request_error
+                - authentication_error
+                - api_error
+                - server_error
+                - quota_exceeded
+                - auth_error
+            code:
+              type: string
+            param:
+              type: string
+          required: [message, type]
+
+    # ── Chat Completions ───────────────────────────────────────────────────
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          description: Model alias or direct provider/model identifier
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+          description: Array of message objects
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: Maximum tokens to generate
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Sampling temperature
+        stream:
+          type: boolean
+          default: false
+          description: Enable server-sent events streaming
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatTool"
+          description: Tool definitions
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [auto, none, required]
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum: [function]
+                function:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+          description: Controls which tool is called
+        parallel_tool_calls:
+          type: boolean
+          description: Enable parallel tool calling
+        reasoning:
+          type: object
+          properties:
+            effort:
+              type: string
+              enum: [none, minimal, low, medium, high, xhigh]
+            max_tokens:
+              type: integer
+            enabled:
+              type: boolean
+            summary:
+              type: string
+          description: Extended thinking / reasoning configuration
+        response_format:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [text, json_object, json_schema]
+            json_schema:
+              type: object
+              description: JSON Schema for structured output
+          description: Output format constraint
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Arbitrary metadata (key-value pairs)
+
+    ChatMessage:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          oneOf:
+            - type: string
+            - type: "null"
+            - type: array
+              items:
+                oneOf:
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [text]
+                      text:
+                        type: string
+                    required: [type, text]
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [image_url]
+                      image_url:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                        required: [url]
+                    required: [type, image_url]
+          description: Message content (string, null, or array of content parts)
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+          description: Tool calls made by the assistant
+        tool_call_id:
+          type: string
+          description: ID of the tool call this message responds to (for role=tool)
+        name:
+          type: string
+        reasoning_content:
+          type: string
+          nullable: true
+          description: Assistant reasoning/thinking content
+        thinking:
+          type: object
+          properties:
+            content:
+              type: string
+            signature:
+              type: string
+          description: Extended thinking block
+
+    ToolCall:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          properties:
+            name:
+              type: string
+            arguments:
+              type: string
+              description: JSON-encoded function arguments
+          required: [name, arguments]
+      required: [id, type, function]
+
+    ChatTool:
+      type: object
+      required: [type, function]
+      properties:
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            parameters:
+              type: object
+              description: JSON Schema for the function parameters
+          required: [name]
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [chat.completion]
+        created:
+          type: integer
+          description: Unix timestamp
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                $ref: "#/components/schemas/ChatMessage"
+              finish_reason:
+                type: string
+                nullable: true
+                enum: [stop, tool_calls, length, content_filter]
+        usage:
+          $ref: "#/components/schemas/Usage"
+
+    ChatCompletionChunk:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [chat.completion.chunk]
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              delta:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  content:
+                    type: string
+                  reasoning_content:
+                    type: string
+                    nullable: true
+                  tool_calls:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        id:
+                          type: string
+                        type:
+                          type: string
+                          enum: [function]
+                        function:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            arguments:
+                              type: string
+              finish_reason:
+                type: string
+                nullable: true
+        usage:
+          $ref: "#/components/schemas/Usage"
+
+    Usage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+        prompt_tokens_details:
+          type: object
+          nullable: true
+          properties:
+            cached_tokens:
+              type: integer
+        reasoning_tokens:
+          type: integer
+          description: Tokens used for reasoning/thinking
+
+    # ── Anthropic Messages ─────────────────────────────────────────────────
+    AnthropicMessageRequest:
+      type: object
+      required: [model, max_tokens]
+      properties:
+        model:
+          type: string
+        max_tokens:
+          type: integer
+          minimum: 1
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnthropicMessage"
+        system:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [text]
+                  text:
+                    type: string
+                  cache_control:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+          description: System prompt (string or array of text blocks)
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 1
+        stream:
+          type: boolean
+          default: false
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnthropicTool"
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [auto, any, none]
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum: [tool]
+                name:
+                  type: string
+          description: Controls tool usage
+        thinking:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [enabled, disabled]
+            budget_tokens:
+              type: integer
+              description: >-
+                Token budget for thinking. Use 'none', 'minimal', 'low',
+                'medium', 'high', or 'xhigh' mapped to specific token counts.
+          description: Extended thinking configuration
+
+    AnthropicMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                oneOf:
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [text]
+                      text:
+                        type: string
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [image]
+                      source:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                            enum: [base64, url]
+                          media_type:
+                            type: string
+                          data:
+                            type: string
+                          url:
+                            type: string
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [tool_use]
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      input:
+                        type: object
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [tool_result]
+                      tool_use_id:
+                        type: string
+                      content:
+                        oneOf:
+                          - type: string
+                          - type: array
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [thinking]
+                      thinking:
+                        type: string
+                      signature:
+                        type: string
+
+    AnthropicTool:
+      type: object
+      required: [name, input_schema]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        input_schema:
+          type: object
+          description: JSON Schema for tool input
+
+    AnthropicMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [message]
+        role:
+          type: string
+          enum: [assistant]
+        model:
+          type: string
+        content:
+          type: array
+          items:
+            oneOf:
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [text]
+                  text:
+                    type: string
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [thinking]
+                  thinking:
+                    type: string
+                  signature:
+                    type: string
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [tool_use]
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  input:
+                    type: object
+        stop_reason:
+          type: string
+          enum: [end_turn, tool_use, max_tokens]
+        stop_sequence:
+          type: string
+          nullable: true
+        usage:
+          type: object
+          properties:
+            input_tokens:
+              type: integer
+            output_tokens:
+              type: integer
+            thinkingTokens:
+              type: integer
+            cache_read_input_tokens:
+              type: integer
+            cache_creation_input_tokens:
+              type: integer
+
+    AnthropicMessageStreamEvent:
+      type: object
+      description: Anthropic streaming event
+      properties:
+        type:
+          type: string
+          enum:
+            - message_start
+            - content_block_start
+            - content_block_delta
+            - content_block_stop
+            - message_delta
+            - message_stop
+        delta:
+          type: object
+        index:
+          type: integer
+        message:
+          $ref: "#/components/schemas/AnthropicMessageResponse"
+
+    # ── Responses API ──────────────────────────────────────────────────────
+    ResponsesRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model:
+          type: string
+          description: Model alias or direct provider/model identifier
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                oneOf:
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [message]
+                      role:
+                        type: string
+                        enum: [user, assistant, system, developer]
+                      content:
+                        type: array
+                        items:
+                          oneOf:
+                            - type: object
+                              properties:
+                                type:
+                                  type: string
+                                  enum: [input_text]
+                                text:
+                                  type: string
+                            - type: object
+                              properties:
+                                type:
+                                  type: string
+                                  enum: [input_image]
+                                image_url:
+                                  type: string
+                                detail:
+                                  type: string
+                                  enum: [low, high, auto]
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [function_call]
+                      call_id:
+                        type: string
+                      name:
+                        type: string
+                      arguments:
+                        type: string
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [function_call_output]
+                      call_id:
+                        type: string
+                      output:
+                        description: Output value (can be any JSON)
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [reasoning]
+                      content:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              enum: [reasoning_text]
+                            text:
+                              type: string
+                      summary:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              enum: [summary_text]
+                            text:
+                              type: string
+          description: >-
+            Input text string or array of input items (messages, function calls,
+            function call outputs, reasoning items)
+        instructions:
+          type: string
+          description: System instructions prepended as a system message
+        tools:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/ResponsesFunctionTool"
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [web_search]
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [code_interpreter]
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [file_search]
+                  vector_store_ids:
+                    type: array
+                    items:
+                      type: string
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [image_generation]
+                  model:
+                    type: string
+                  size:
+                    type: string
+                  quality:
+                    type: string
+                    enum: [standard, hd]
+          description: Tool definitions
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [none, auto, required]
+            - type: object
+              properties:
+                type:
+                  type: string
+                mode:
+                  type: string
+                  enum: [required, auto]
+                name:
+                  type: string
+        parallel_tool_calls:
+          type: boolean
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        max_output_tokens:
+          type: integer
+          description: Maximum tokens to generate
+        stream:
+          type: boolean
+          default: false
+        store:
+          type: boolean
+          description: Whether to store the response for later retrieval
+        previous_response_id:
+          type: string
+          description: >-
+            ID of a previous response to use as context for multi-turn
+            conversations
+        conversation:
+          oneOf:
+            - type: string
+            - type: object
+              properties:
+                id:
+                  type: string
+          description: Conversation ID for thread-based multi-turn
+        reasoning:
+          type: object
+          properties:
+            effort:
+              type: string
+              enum: [low, medium, high, minimal, xhigh]
+            summary:
+              type: string
+              enum: [auto, concise, detailed]
+            max_tokens:
+              type: integer
+        text:
+          type: object
+          properties:
+            format:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [text, json_object, json_schema]
+                name:
+                  type: string
+                schema:
+                  type: object
+            verbosity:
+              type: string
+              enum: [low, medium, high]
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        service_tier:
+          type: string
+          enum: [auto, default, flex, priority]
+        truncation:
+          type: string
+          enum: [auto, disabled]
+        include:
+          type: array
+          items:
+            type: string
+
+    ResponsesFunctionTool:
+      type: object
+      required: [type, name, parameters]
+      properties:
+        type:
+          type: string
+          enum: [function]
+        name:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: object
+          description: JSON Schema for the function parameters
+        strict:
+          type: boolean
+
+    ResponsesResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [response]
+        created_at:
+          type: integer
+          description: Unix timestamp
+        completed_at:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [completed, failed, in_progress, cancelled, queued, incomplete]
+        model:
+          type: string
+        output:
+          type: array
+          items:
+            oneOf:
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [message]
+                  id:
+                    type: string
+                  role:
+                    type: string
+                    enum: [assistant]
+                  content:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [output_text]
+                        text:
+                          type: string
+                        annotations:
+                          type: array
+                  status:
+                    type: string
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [function_call]
+                  id:
+                    type: string
+                  call_id:
+                    type: string
+                  name:
+                    type: string
+                  arguments:
+                    type: string
+                  status:
+                    type: string
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [function_call_output]
+                  id:
+                    type: string
+                  call_id:
+                    type: string
+                  output:
+                    description: Tool output value
+                  status:
+                    type: string
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [reasoning]
+                  id:
+                    type: string
+                  summary:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [summary_text]
+                        text:
+                          type: string
+                  status:
+                    type: string
+        instructions:
+          type: string
+        temperature:
+          type: number
+        usage:
+          type: object
+          properties:
+            input_tokens:
+              type: integer
+            input_tokens_details:
+              type: object
+              properties:
+                cached_tokens:
+                  type: integer
+            output_tokens:
+              type: integer
+            output_tokens_details:
+              type: object
+              properties:
+                reasoning_tokens:
+                  type: integer
+            total_tokens:
+              type: integer
+        error:
+          type: object
+          nullable: true
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            code:
+              type: string
+            param:
+              type: string
+        previous_response_id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    ResponsesStreamEvent:
+      type: object
+      description: Streaming event from the Responses API
+      properties:
+        type:
+          type: string
+          enum:
+            - response.created
+            - response.in_progress
+            - response.output_item.added
+            - response.output_item.done
+            - response.content_part.added
+            - response.content_part.done
+            - response.output_text.delta
+            - response.output_text.done
+            - response.function_call_arguments.delta
+            - response.function_call_arguments.done
+            - response.reasoning_summary_text.delta
+            - response.reasoning_summary_text.done
+            - response.completed
+            - response.failed
+            - response.incomplete
+        sequence_number:
+          type: integer
+        delta:
+          type: string
+          description: Text delta for delta events
+        response:
+          $ref: "#/components/schemas/ResponsesResponse"
+        item:
+          type: object
+          description: Output item for item events
+
+    # ── Embeddings ─────────────────────────────────────────────────────────
+    EmbeddingsRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model:
+          type: string
+          description: Embedding model identifier
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Text(s) to embed
+        encoding_format:
+          type: string
+          enum: [float, base64]
+          default: float
+        dimensions:
+          type: integer
+          description: Target dimensionality for truncated embeddings
+        user:
+          type: string
+          description: End-user tracking ID
+
+    EmbeddingsResponse:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              object:
+                type: string
+                enum: [embedding]
+              embedding:
+                type: array
+                items:
+                  type: number
+              index:
+                type: integer
+        model:
+          type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    # ── Audio ──────────────────────────────────────────────────────────────
+    SpeechRequest:
+      type: object
+      required: [model, input, voice]
+      properties:
+        model:
+          type: string
+          description: TTS model identifier
+        input:
+          type: string
+          maxLength: 4096
+          description: Text to convert to audio
+        voice:
+          type: string
+          enum:
+            - alloy
+            - ash
+            - ballad
+            - coral
+            - echo
+            - fable
+            - onyx
+            - nova
+            - sage
+            - shimmer
+            - verse
+            - marin
+            - cedar
+          description: Voice to use for generation
+        instructions:
+          type: string
+          description: >-
+            Voice style control instructions (not supported on tts-1 / tts-1-hd)
+        response_format:
+          type: string
+          enum: [mp3, opus, aac, flac, wav, pcm]
+          default: mp3
+          description: Audio output format
+        speed:
+          type: number
+          minimum: 0.25
+          maximum: 4
+          default: 1.0
+          description: Playback speed
+        stream_format:
+          type: string
+          enum: [sse, audio]
+          default: audio
+          description: >-
+            Streaming format. `sse` returns events; `audio` returns raw bytes.
+            Not supported on tts-1 / tts-1-hd.
+
+    SpeechStreamEvent:
+      type: object
+      description: SSE event when `stream_format: "sse"`
+      properties:
+        type:
+          type: string
+          enum: [speech.audio.delta, speech.audio.done]
+        delta:
+          type: string
+          description: Base64-encoded audio chunk
+        usage:
+          type: object
+          properties:
+            input_tokens:
+              type: integer
+            output_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    TranscriptionRequest:
+      type: object
+      required: [file, model]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: >-
+            Audio file (mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm — max 25 MB)
+        model:
+          type: string
+          description: Transcription model identifier
+        language:
+          type: string
+          description: ISO-639-1 language code (e.g., "en")
+        prompt:
+          type: string
+          description: Optional prompt to guide transcription
+        response_format:
+          type: string
+          enum: [json, text, verbose_json]
+          default: json
+          description: Response format
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Sampling temperature
+
+    TranscriptionResponse:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Transcribed text
+        language:
+          type: string
+          description: Detected language (verbose_json format)
+        duration:
+          type: number
+          description: Audio duration in seconds (verbose_json format)
+        segments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              start:
+                type: number
+              end:
+                type: number
+              text:
+                type: string
+              tokens:
+                type: array
+                items:
+                  type: integer
+              temperature:
+                type: number
+              avg_logprob:
+                type: number
+              compression_ratio:
+                type: number
+              no_speech_prob:
+                type: number
+          description: Segment-level detail (verbose_json format)
+        usage:
+          type: object
+          properties:
+            input_tokens:
+              type: integer
+            output_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    # ── Images ─────────────────────────────────────────────────────────────
+    ImageGenerationRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model:
+          type: string
+          description: Image generation model identifier
+        prompt:
+          type: string
+          description: Text description of the desired image
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+          description: Number of images to generate
+        size:
+          type: string
+          enum: ["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"]
+          default: "1024x1024"
+        response_format:
+          type: string
+          enum: [url, b64_json]
+          default: url
+        quality:
+          type: string
+          enum: [standard, hd, high, medium, low]
+        style:
+          type: string
+          enum: [vivid, natural]
+          description: DALL-E 3 style control
+        user:
+          type: string
+          description: End-user tracking ID
+
+    ImageEditRequest:
+      type: object
+      required: [image, prompt]
+      properties:
+        image:
+          type: string
+          format: binary
+          description: PNG file to edit (< 4 MB)
+        prompt:
+          type: string
+          description: Description of the desired edit
+        mask:
+          type: string
+          format: binary
+          description: PNG mask — transparent areas will be edited
+        model:
+          type: string
+          description: Model identifier
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          enum: ["256x256", "512x512", "1024x1024"]
+          default: "1024x1024"
+        response_format:
+          type: string
+          enum: [url, b64_json]
+          default: url
+        quality:
+          type: string
+          enum: [standard, high, medium, low]
+        user:
+          type: string
+          description: End-user tracking ID
+
+    ImageGenerationResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+          description: Unix timestamp
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                description: URL of the generated image (when `response_format: "url"`)
+              b64_json:
+                type: string
+                description: Base64-encoded image data (when `response_format: "b64_json"`)
+              revised_prompt:
+                type: string
+                description: The prompt after DALL-E revisions
+
+    # ── Gemini ─────────────────────────────────────────────────────────────
+    GeminiRequest:
+      type: object
+      properties:
+        contents:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeminiContent"
+        system_instruction:
+          $ref: "#/components/schemas/GeminiContent"
+        tools:
+          type: array
+          items:
+            type: object
+            properties:
+              function_declarations:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    description:
+                      type: string
+                    parameters:
+                      type: object
+        tool_config:
+          type: object
+          properties:
+            function_calling_config:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [AUTO, ANY, NONE]
+                allowed_function_names:
+                  type: array
+                  items:
+                    type: string
+        generation_config:
+          type: object
+          properties:
+            temperature:
+              type: number
+            top_p:
+              type: number
+            top_k:
+              type: integer
+            max_output_tokens:
+              type: integer
+            response_mime_type:
+              type: string
+              enum: [text/plain, application/json]
+            response_schema:
+              type: object
+            stop_sequences:
+              type: array
+              items:
+                type: string
+            candidate_count:
+              type: integer
+            presence_penalty:
+              type: number
+            frequency_penalty:
+              type: number
+
+    GeminiContent:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, model]
+        parts:
+          type: array
+          items:
+            oneOf:
+              - type: object
+                properties:
+                  text:
+                    type: string
+              - type: object
+                properties:
+                  inline_data:
+                    type: object
+                    properties:
+                      mime_type:
+                        type: string
+                      data:
+                        type: string
+                        description: Base64-encoded data
+
+    GeminiResponse:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+            properties:
+              content:
+                $ref: "#/components/schemas/GeminiContent"
+              finish_reason:
+                type: string
+                enum: [STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER]
+              index:
+                type: integer
+              safety_ratings:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    category:
+                      type: string
+                    probability:
+                      type: string
+        usage_metadata:
+          type: object
+          properties:
+            prompt_token_count:
+              type: integer
+            candidates_token_count:
+              type: integer
+            total_token_count:
+              type: integer
+
+    GeminiStreamEvent:
+      type: object
+      description: Streaming event from Gemini API
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+        usage_metadata:
+          type: object
+          properties:
+            prompt_token_count:
+              type: integer
+            candidates_token_count:
+              type: integer
+            total_token_count:
+              type: integer

@@ -381,6 +381,75 @@ await registerManagementRoutes(
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));
 
+// --- API Documentation ---
+
+/**
+ * GET /docs/openapi.yaml
+ * Serves the raw OpenAPI 3.1 specification.
+ */
+const openApiSpecPath = path.resolve(__dirname, '../../docs/openapi.yaml');
+fastify.get('/docs/openapi.yaml', async (request, reply) => {
+  const specFile = Bun.file(openApiSpecPath);
+  if (await specFile.exists()) {
+    return reply
+      .header('Cache-Control', 'public, max-age=300')
+      .type('application/yaml')
+      .send(Buffer.from(await specFile.arrayBuffer()));
+  }
+  return reply.code(404).send({ error: 'OpenAPI spec not found' });
+});
+
+/**
+ * GET /docs/openapi.json
+ * Serves the OpenAPI spec as JSON.
+ */
+fastify.get('/docs/openapi.json', async (request, reply) => {
+  const specFile = Bun.file(openApiSpecPath);
+  if (await specFile.exists()) {
+    const yaml = await import('yaml');
+    const content = await specFile.text();
+    const parsed = yaml.parse(content);
+    return reply
+      .header('Cache-Control', 'public, max-age=300')
+      .type('application/json')
+      .send(parsed);
+  }
+  return reply.code(404).send({ error: 'OpenAPI spec not found' });
+});
+
+/**
+ * GET /docs
+ * Swagger UI — interactive API documentation.
+ */
+const SWAGGER_UI_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plexus API Docs</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/docs/openapi.json',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'StandaloneLayout',
+    });
+  </script>
+</body>
+</html>`;
+
+fastify.get('/docs', async (request, reply) => {
+  return reply.type('text/html; charset=utf-8').send(SWAGGER_UI_HTML);
+});
+
 // --- Static File Serving ---
 // `indexHtmlPath` is a string path — the filesystem path in dev, or a $bunfs/ path in a
 // compiled binary. Bun embeds index.html and all assets it references (JS, CSS, images, SVGs)
