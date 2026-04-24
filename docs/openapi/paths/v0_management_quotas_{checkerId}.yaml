@@ -1,0 +1,22 @@
+parameters:
+  - in: path
+    name: checkerId
+    required: true
+    schema:
+      type: string
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Latest quota for one checker (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Snapshot.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/QuotaCheckerSnapshot.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotasBycheckerId

@@ -1,0 +1,29 @@
+parameters:
+  - in: path
+    name: conversation_id
+    required: true
+    schema:
+      type: string
+get:
+  tags:
+    - Inference — Responses
+  summary: Retrieve a stored conversation
+  responses:
+    '200':
+      description: Conversation with its stored items.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+            properties:
+              id:
+                type: string
+              items:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+    '404':
+      $ref: ../components/responses/NotFoundOpenAI.yaml
+  operationId: getV1ConversationsByconversationid

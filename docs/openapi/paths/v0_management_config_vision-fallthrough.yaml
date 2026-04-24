@@ -1,0 +1,41 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get vision fallthrough settings (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Current vision fallthrough config object.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigVisionfallthrough
+patch:
+  tags:
+    - Management — Config
+  summary: Merge updates into vision fallthrough settings (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Merged result.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigVisionfallthrough

@@ -1,0 +1,26 @@
+type: object
+additionalProperties: true
+properties:
+  requestId:
+    type: string
+    format: uuid
+  rawRequest:
+    type: object
+    additionalProperties: true
+  transformedRequest:
+    type: object
+    additionalProperties: true
+  rawResponse:
+    type: object
+    additionalProperties: true
+  transformedResponse:
+    type: object
+    additionalProperties: true
+  rawResponseSnapshot:
+    type: object
+    additionalProperties: true
+  transformedResponseSnapshot:
+    type: object
+    additionalProperties: true
+  createdAt:
+    type: integer

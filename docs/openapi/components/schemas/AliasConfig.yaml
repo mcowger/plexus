@@ -1,0 +1,37 @@
+type: object
+additionalProperties: true
+description: Model alias. See `CONFIGURATION.md`.
+properties:
+  targets:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+  type:
+    type: string
+    enum:
+      - chat
+      - messages
+      - responses
+      - gemini
+      - embeddings
+      - transcriptions
+      - speech
+      - image
+  metadata:
+    type: object
+    additionalProperties: true
+  model_architecture:
+    type: object
+    additionalProperties: true
+  input_price_per_million:
+    type: number
+  output_price_per_million:
+    type: number
+  pricing:
+    type: object
+    additionalProperties: true
+  additional_aliases:
+    type: array
+    items:
+      type: string

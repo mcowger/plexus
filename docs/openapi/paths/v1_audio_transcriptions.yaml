@@ -1,0 +1,32 @@
+post:
+  tags:
+    - Inference — Audio
+  summary: OpenAI-compatible audio transcription
+  description: |
+    `multipart/form-data`. Max upload 25 MB. Supported MIME types include
+    `audio/mpeg`, `audio/mp4`, `audio/wav`, `audio/ogg`, `audio/webm`,
+    `audio/flac`. Pass-through to the provider.
+  requestBody:
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          $ref: ../components/schemas/TranscriptionRequest.yaml
+  responses:
+    '200':
+      description: Transcription in `json` or `text` format.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              text:
+                type: string
+            required:
+              - text
+        text/plain:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV1AudioTranscriptions

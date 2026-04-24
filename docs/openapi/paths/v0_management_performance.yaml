@@ -1,0 +1,55 @@
+get:
+  tags:
+    - Management — Performance
+  summary: Per (provider, model) TTFT / throughput aggregates (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: provider
+      schema:
+        type: string
+    - in: query
+      name: model
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Rows.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: ../components/schemas/PerformanceRow.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementPerformance
+delete:
+  tags:
+    - Management — Performance
+  summary: Delete aggregated performance data for a model (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: model
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Success.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              model:
+                type: string
+    '400':
+      description: Missing `model`.
+  operationId: deleteV0ManagementPerformance

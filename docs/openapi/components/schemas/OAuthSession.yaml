@@ -1,0 +1,41 @@
+type: object
+additionalProperties: true
+properties:
+  id:
+    type: string
+  providerId:
+    type: string
+  accountId:
+    type: string
+  status:
+    type: string
+    enum:
+      - waiting
+      - prompt
+      - manual-code
+      - complete
+      - failed
+      - cancelled
+  authInfo:
+    type: object
+    additionalProperties: true
+    properties:
+      url:
+        type: string
+        format: uri
+      instructions:
+        type: string
+  prompt:
+    type:
+      - object
+      - 'null'
+    additionalProperties: true
+  progress:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+  createdAt:
+    type: integer
+  updatedAt:
+    type: integer

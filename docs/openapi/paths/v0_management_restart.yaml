@@ -1,0 +1,26 @@
+post:
+  tags:
+    - Management — Restart
+  summary: Gracefully restart the process (admin only)
+  description: |
+    Closes Fastify and exits with status 0. The process manager (systemd,
+    Docker, PM2, etc.) is responsible for restarting the binary. The
+    response is sent before the shutdown begins.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Restart acknowledged.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              message:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementRestart

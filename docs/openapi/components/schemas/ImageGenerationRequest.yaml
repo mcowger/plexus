@@ -1,0 +1,43 @@
+type: object
+required:
+  - model
+  - prompt
+properties:
+  model:
+    type: string
+  prompt:
+    type: string
+  'n':
+    type: integer
+    minimum: 1
+    maximum: 10
+    default: 1
+  size:
+    type: string
+    enum:
+      - 256x256
+      - 512x512
+      - 1024x1024
+      - 1792x1024
+      - 1024x1792
+  response_format:
+    type: string
+    enum:
+      - url
+      - b64_json
+    default: url
+  quality:
+    type: string
+    enum:
+      - standard
+      - hd
+      - high
+      - medium
+      - low
+  style:
+    type: string
+    enum:
+      - vivid
+      - natural
+  user:
+    type: string

@@ -1,0 +1,40 @@
+post:
+  tags:
+    - Management — Auth
+  summary: Enable or disable debug capture for the current principal's key
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: keyName
+      schema:
+        type: string
+      description: Required for admin callers.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+          required:
+            - enabled
+  responses:
+    '200':
+      description: New per-key state.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              keyName:
+                type: string
+              enabled:
+                type: boolean
+              enabledGlobal:
+                type: boolean
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementSelfDebugToggle

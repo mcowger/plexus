@@ -1,0 +1,43 @@
+post:
+  tags:
+    - Management — Config
+  summary: Fetch `/v1/models` from an external URL (admin only)
+  description: |
+    Helper used by the admin UI when adding a new provider. Fetches the
+    target URL (with optional Bearer apiKey), normalizes OpenAI- and
+    Ollama-style responses into `{ data: [...] }`, and returns it.
+    Blocks localhost and cloud metadata addresses to mitigate SSRF.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
+            apiKey:
+              type: string
+          required:
+            - url
+  responses:
+    '200':
+      description: Normalized model list.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+    '400':
+      description: Invalid URL, SSRF block, or upstream parse error.
+    '504':
+      description: Upstream fetch timed out (10s).
+  operationId: postV0ManagementProvidersFetchmodels

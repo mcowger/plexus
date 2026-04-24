@@ -1,0 +1,39 @@
+parameters:
+  - $ref: ../components/parameters/ResponseId.yaml
+get:
+  tags:
+    - Inference — Responses
+  summary: Retrieve a stored response
+  responses:
+    '200':
+      description: Stored response.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ResponsesResponse.yaml
+    '404':
+      $ref: ../components/responses/NotFoundOpenAI.yaml
+  operationId: getV1ResponsesByresponseid
+delete:
+  tags:
+    - Inference — Responses
+  summary: Delete a stored response
+  responses:
+    '200':
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              deleted:
+                type: boolean
+                const: true
+              id:
+                type: string
+            required:
+              - deleted
+              - id
+    '404':
+      $ref: ../components/responses/NotFoundOpenAI.yaml
+  operationId: deleteV1ResponsesByresponseid

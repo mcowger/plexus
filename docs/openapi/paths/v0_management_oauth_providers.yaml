@@ -1,0 +1,30 @@
+get:
+  tags:
+    - Management — OAuth
+  summary: List OAuth providers (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Providers.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    usesCallbackServer:
+                      type: boolean
+              total:
+                type: integer
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementOauthProviders

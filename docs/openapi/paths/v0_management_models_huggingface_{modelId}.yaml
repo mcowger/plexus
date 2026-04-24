@@ -1,0 +1,53 @@
+parameters:
+  - in: path
+    name: modelId
+    required: true
+    schema:
+      type: string
+    description: HuggingFace repo id, URL-encoded (e.g. `mistralai%2FMixtral-8x7B`).
+get:
+  tags:
+    - Management — Models
+  summary: Fetch model architecture from HuggingFace (admin only)
+  description: Used by the energy-usage estimator to populate layer/head counts.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Architecture params.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              model_id:
+                type: string
+              architecture:
+                type: object
+                properties:
+                  total_params:
+                    type: integer
+                  active_params:
+                    type: integer
+                  layers:
+                    type: integer
+                  heads:
+                    type: integer
+                  kv_lora_rank:
+                    type:
+                      - integer
+                      - 'null'
+                  qk_rope_head_dim:
+                    type:
+                      - integer
+                      - 'null'
+                  context_length:
+                    type: integer
+                  dtype:
+                    type: string
+    '404':
+      description: Model not found on HuggingFace.
+  operationId: getV0ManagementModelsHuggingfaceBymodelId

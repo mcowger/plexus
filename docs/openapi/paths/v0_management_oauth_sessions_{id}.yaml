@@ -1,0 +1,25 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema:
+      type: string
+get:
+  tags:
+    - Management — OAuth
+  summary: Poll an OAuth session (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Session.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: ../components/schemas/OAuthSession.yaml
+    '404':
+      description: Session not found.
+  operationId: getV0ManagementOauthSessionsByid

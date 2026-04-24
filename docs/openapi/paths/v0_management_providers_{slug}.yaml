@@ -1,0 +1,107 @@
+parameters:
+  - in: path
+    name: slug
+    required: true
+    schema:
+      type: string
+    description: >-
+      Provider key. May contain `/` (e.g. `provider/model`) — wildcard routing
+      is used server-side.
+get:
+  tags:
+    - Management — Config
+  summary: Get a single provider (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Provider.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProviderConfig.yaml
+    '404':
+      description: Not found.
+  operationId: getV0ManagementProvidersByslug
+put:
+  tags:
+    - Management — Config
+  summary: Create or replace a provider (admin only)
+  description: Validated against the full provider schema.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ProviderConfig.yaml
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SaveSlugResult.yaml
+    '400':
+      $ref: ../components/responses/ValidationError.yaml
+  operationId: putV0ManagementProvidersByslug
+patch:
+  tags:
+    - Management — Config
+  summary: Merge updates into an existing provider (admin only)
+  description: Merges the body into the existing row, then validates.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SaveSlugResult.yaml
+    '400':
+      $ref: ../components/responses/ValidationError.yaml
+    '404':
+      description: Provider not found.
+  operationId: patchV0ManagementProvidersByslug
+delete:
+  tags:
+    - Management — Config
+  summary: Delete a provider (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: cascade
+      schema:
+        type: string
+        enum:
+          - 'true'
+          - 'false'
+      description: >-
+        When `true`, also removes all alias targets that reference this
+        provider.
+  responses:
+    '200':
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              provider:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementProvidersByslug

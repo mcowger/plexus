@@ -1,0 +1,20 @@
+type: object
+properties:
+  created:
+    type: integer
+  data:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      properties:
+        url:
+          type: string
+          format: uri
+        b64_json:
+          type: string
+        revised_prompt:
+          type: string
+required:
+  - created
+  - data

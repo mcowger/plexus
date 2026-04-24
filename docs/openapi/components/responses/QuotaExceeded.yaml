@@ -1,0 +1,31 @@
+description: User quota exceeded.
+content:
+  application/json:
+    schema:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+              const: quota_exceeded
+            quota_name:
+              type: string
+            current_usage:
+              type: number
+            limit:
+              type: number
+            resets_at:
+              type: string
+              format: date-time
+    example:
+      error:
+        message: 'Quota exceeded: premium_hourly limit of 100000 reached'
+        type: quota_exceeded
+        quota_name: premium_hourly
+        current_usage: 125671
+        limit: 100000
+        resets_at: '2026-02-19T01:00:00.000Z'

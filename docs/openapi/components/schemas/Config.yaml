@@ -1,0 +1,32 @@
+type: object
+description: Full in-memory Plexus configuration. Mirrors the `plexus.yaml` schema.
+additionalProperties: true
+properties:
+  providers:
+    type: object
+    additionalProperties:
+      $ref: ./ProviderConfig.yaml
+  models:
+    type: object
+    additionalProperties:
+      $ref: ./AliasConfig.yaml
+  keys:
+    type: object
+    additionalProperties:
+      $ref: ./KeyConfig.yaml
+  mcp_servers:
+    type: object
+    additionalProperties:
+      $ref: ./McpServerConfig.yaml
+  user_quotas:
+    type: object
+    additionalProperties:
+      $ref: ./UserQuotaDefinition.yaml
+  quotas:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+  system_settings:
+    type: object
+    additionalProperties: true

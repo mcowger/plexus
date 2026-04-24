@@ -28,7 +28,9 @@
     "format:check": "bunx biome format .",
     "lint": "bunx biome lint --write .",
     "lint:check": "bunx biome lint .",
-    "lint:openapi": "npx @redocly/cli lint docs/openapi.yaml"
+    "lint:openapi": "npx @redocly/cli lint docs/openapi/openapi.yaml",
+    "bundle:openapi": "npx @redocly/cli bundle docs/openapi/openapi.yaml -o docs/openapi.yaml",
+    "preview:openapi": "npx @redocly/cli preview-docs docs/openapi/openapi.yaml"
   },
   "type": "module",
   "workspaces": [

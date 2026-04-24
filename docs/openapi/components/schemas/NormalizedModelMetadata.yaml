@@ -1,0 +1,22 @@
+type: object
+additionalProperties: true
+properties:
+  name:
+    type: string
+  description:
+    type: string
+  context_length:
+    type: integer
+  architecture:
+    type: object
+    additionalProperties: true
+  pricing:
+    type: object
+    additionalProperties: true
+  supported_parameters:
+    type: array
+    items:
+      type: string
+  top_provider:
+    type: object
+    additionalProperties: true

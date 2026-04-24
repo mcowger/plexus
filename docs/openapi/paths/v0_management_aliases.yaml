@@ -1,0 +1,18 @@
+get:
+  tags:
+    - Management — Config
+  summary: List all model aliases (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Alias map.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              $ref: ../components/schemas/AliasConfig.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementAliases

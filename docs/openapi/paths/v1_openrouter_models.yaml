@@ -1,0 +1,34 @@
+get:
+  tags:
+    - Inference — Models
+  summary: OpenRouter model slugs known to Plexus (public)
+  description: Requires that the OpenRouter pricing catalog has been loaded at startup.
+  security: []
+  parameters:
+    - in: query
+      name: q
+      schema:
+        type: string
+      description: Optional substring filter applied to slug names.
+  responses:
+    '200':
+      description: Slug list.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: string
+              count:
+                type: integer
+            required:
+              - data
+              - count
+    '400':
+      description: Bad request.
+    '503':
+      description: Pricing catalog has not loaded yet.
+  operationId: getV1OpenrouterModels

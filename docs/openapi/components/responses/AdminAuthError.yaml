@@ -1,0 +1,5 @@
+description: Missing or invalid `x-admin-key`.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/AuthErrorBody.yaml

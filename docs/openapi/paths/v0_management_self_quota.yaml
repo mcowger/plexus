@@ -1,0 +1,23 @@
+get:
+  tags:
+    - Management — Auth
+  summary: Current principal's quota status
+  description: Same shape as `GET /v0/management/quota/status/:key`.
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: keyName
+      schema:
+        type: string
+      description: Required for admin callers.
+  responses:
+    '200':
+      description: Quota status.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/QuotaStatusSelf.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementSelfQuota

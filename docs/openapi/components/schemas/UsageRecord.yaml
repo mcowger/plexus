@@ -1,0 +1,189 @@
+type: object
+description: >-
+  Per-request usage record stored in `request_usage`. Fields with `[null]` may
+  be missing on error paths.
+properties:
+  requestId:
+    type: string
+    format: uuid
+  date:
+    type: string
+    format: date-time
+  startTime:
+    type: integer
+    description: Epoch ms.
+  sourceIp:
+    type:
+      - string
+      - 'null'
+  apiKey:
+    type:
+      - string
+      - 'null'
+  attribution:
+    type:
+      - string
+      - 'null'
+  incomingApiType:
+    type: string
+    enum:
+      - chat
+      - messages
+      - responses
+      - gemini
+      - embeddings
+      - transcriptions
+      - speech
+      - images
+      - oauth
+  provider:
+    type:
+      - string
+      - 'null'
+  attemptCount:
+    type: integer
+  retryHistory:
+    type:
+      - string
+      - 'null'
+    description: JSON-encoded retry chain.
+  incomingModelAlias:
+    type:
+      - string
+      - 'null'
+  canonicalModelName:
+    type:
+      - string
+      - 'null'
+  selectedModelName:
+    type:
+      - string
+      - 'null'
+  finalAttemptProvider:
+    type:
+      - string
+      - 'null'
+  finalAttemptModel:
+    type:
+      - string
+      - 'null'
+  allAttemptedProviders:
+    type:
+      - string
+      - 'null'
+    description: JSON array string.
+  outgoingApiType:
+    type:
+      - string
+      - 'null'
+  tokensInput:
+    type:
+      - integer
+      - 'null'
+  tokensOutput:
+    type:
+      - integer
+      - 'null'
+  tokensReasoning:
+    type:
+      - integer
+      - 'null'
+  tokensCached:
+    type:
+      - integer
+      - 'null'
+  tokensCacheWrite:
+    type:
+      - integer
+      - 'null'
+  tokensEstimated:
+    type:
+      - integer
+      - 'null'
+    description: 1 when token counts were estimated.
+  costInput:
+    type:
+      - number
+      - 'null'
+  costOutput:
+    type:
+      - number
+      - 'null'
+  costCached:
+    type:
+      - number
+      - 'null'
+  costCacheWrite:
+    type:
+      - number
+      - 'null'
+  costTotal:
+    type:
+      - number
+      - 'null'
+  costSource:
+    type:
+      - string
+      - 'null'
+    enum:
+      - default
+      - simple
+      - openrouter
+      - defined
+      - per_request
+      - null
+  costMetadata:
+    type:
+      - string
+      - 'null'
+    description: JSON-encoded pricing detail.
+  durationMs:
+    type:
+      - integer
+      - 'null'
+  ttftMs:
+    type:
+      - integer
+      - 'null'
+  tokensPerSec:
+    type:
+      - number
+      - 'null'
+  kwhUsed:
+    type:
+      - number
+      - 'null'
+  isStreamed:
+    type: boolean
+  isPassthrough:
+    type: boolean
+  responseStatus:
+    type: string
+    enum:
+      - success
+      - error
+      - pending
+  toolsDefined:
+    type:
+      - integer
+      - 'null'
+  messageCount:
+    type:
+      - integer
+      - 'null'
+  parallelToolCallsEnabled:
+    type:
+      - boolean
+      - 'null'
+  toolCallsCount:
+    type:
+      - integer
+      - 'null'
+  finishReason:
+    type:
+      - string
+      - 'null'
+  hasDebug:
+    type: boolean
+  hasError:
+    type: boolean

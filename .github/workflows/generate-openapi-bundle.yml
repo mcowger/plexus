@@ -1,0 +1,56 @@
+name: Generate OpenAPI Bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/openapi/**'
+  workflow_dispatch:
+
+concurrency:
+  group: generate-openapi-bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: Bundle OpenAPI spec
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint split spec
+        run: bun run lint:openapi
+
+      - name: Bundle into docs/openapi.yaml
+        run: bun run bundle:openapi
+
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet docs/openapi.yaml; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push bundle
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/openapi.yaml
+          git commit --no-verify -m "chore: regenerate OpenAPI bundle"
+          git push

@@ -1,0 +1,59 @@
+get:
+  tags:
+    - Management — MCP Logs
+  summary: List MCP proxy request logs (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: limit
+      schema:
+        type: integer
+        default: 20
+    - in: query
+      name: offset
+      schema:
+        type: integer
+        default: 0
+    - in: query
+      name: serverName
+      schema:
+        type: string
+    - in: query
+      name: apiKey
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Paginated logs.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: ../components/schemas/McpUsageRecord.yaml
+              total:
+                type: integer
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementMcplogs
+delete:
+  tags:
+    - Management — MCP Logs
+  summary: Delete MCP logs (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: olderThanDays
+      schema:
+        type: integer
+  responses:
+    '200':
+      $ref: ../components/responses/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementMcplogs

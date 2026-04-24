@@ -1,0 +1,16 @@
+get:
+  tags:
+    - MCP Proxy
+  summary: OAuth 2.0 authorization server metadata (public)
+  security: []
+  responses:
+    '200':
+      description: Metadata indicating bearer auth.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '400':
+      description: Bad request.
+  operationId: getWellknownOauthauthorizationserver

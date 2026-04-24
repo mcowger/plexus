@@ -1,0 +1,19 @@
+parameters:
+  - in: path
+    name: requestId
+    required: true
+    schema:
+      type: string
+      format: uuid
+delete:
+  tags:
+    - Management — Usage
+  summary: Delete a single usage record (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      $ref: ../components/responses/SuccessTrue.yaml
+    '404':
+      description: Not found.
+  operationId: deleteV0ManagementUsageByrequestId

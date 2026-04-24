@@ -1,0 +1,22 @@
+type: object
+required:
+  - file
+  - model
+properties:
+  file:
+    type: string
+    format: binary
+  model:
+    type: string
+  language:
+    type: string
+  prompt:
+    type: string
+  response_format:
+    type: string
+    enum:
+      - json
+      - text
+    default: json
+  temperature:
+    type: number

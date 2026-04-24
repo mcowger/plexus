@@ -1,0 +1,44 @@
+type: object
+required:
+  - image
+  - prompt
+properties:
+  image:
+    type: string
+    format: binary
+    description: PNG file < 4 MB.
+  prompt:
+    type: string
+  mask:
+    type: string
+    format: binary
+    description: PNG where transparent pixels mark editable regions.
+  model:
+    type: string
+  'n':
+    type: integer
+    minimum: 1
+    maximum: 10
+    default: 1
+  size:
+    type: string
+    enum:
+      - 256x256
+      - 512x512
+      - 1024x1024
+    default: 1024x1024
+  response_format:
+    type: string
+    enum:
+      - url
+      - b64_json
+    default: url
+  quality:
+    type: string
+    enum:
+      - standard
+      - high
+      - medium
+      - low
+  user:
+    type: string

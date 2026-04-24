@@ -1,0 +1,25 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema:
+      type: string
+post:
+  tags:
+    - Management — OAuth
+  summary: Cancel an OAuth session (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Cancelled session.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: ../components/schemas/OAuthSession.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementOauthSessionsByidCancel

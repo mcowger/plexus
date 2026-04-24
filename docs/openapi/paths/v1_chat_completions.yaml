@@ -1,0 +1,57 @@
+post:
+  tags:
+    - Inference — Chat
+  summary: OpenAI-compatible chat completion
+  description: |
+    Drop-in replacement for `POST https://api.openai.com/v1/chat/completions`.
+    The full OpenAI request schema is accepted as-is; routing to the
+    configured upstream provider is driven by the `model` field.
+    Forwarded client headers of note: `x-app` (optional, echoed into usage
+    `plexus_metadata.clientHeaders`).
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ChatCompletionRequest.yaml
+        examples:
+          simple:
+            summary: Minimal non-streaming call
+            value:
+              model: fast-model
+              messages:
+                - role: user
+                  content: Say hello.
+          streaming:
+            summary: Streaming call
+            value:
+              model: smart-model
+              stream: true
+              messages:
+                - role: system
+                  content: You are terse.
+                - role: user
+                  content: List 3 primes.
+  responses:
+    '200':
+      description: |
+        A non-streamed JSON response or, when `stream: true`,
+        a `text/event-stream` of `data: {...}` frames terminated by
+        `data: [DONE]`.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ChatCompletionResponse.yaml
+        text/event-stream:
+          schema:
+            type: string
+            description: SSE frames of Chat Completions deltas.
+    '400':
+      $ref: ../components/responses/BadRequestOpenAI.yaml
+    '401':
+      $ref: ../components/responses/AuthError.yaml
+    '429':
+      $ref: ../components/responses/QuotaExceeded.yaml
+    5XX:
+      $ref: ../components/responses/ProviderError.yaml
+  operationId: postV1ChatCompletions

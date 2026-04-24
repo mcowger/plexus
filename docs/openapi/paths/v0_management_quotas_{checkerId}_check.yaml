@@ -1,0 +1,23 @@
+parameters:
+  - in: path
+    name: checkerId
+    required: true
+    schema:
+      type: string
+post:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Force an immediate quota check (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: The checker's result.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '404':
+      description: Checker not found.
+  operationId: postV0ManagementQuotasBycheckerIdCheck

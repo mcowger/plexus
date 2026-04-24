@@ -1,0 +1,25 @@
+type: object
+properties:
+  key:
+    type: string
+  quota_name:
+    type:
+      - string
+      - 'null'
+  allowed:
+    type: boolean
+  current_usage:
+    type: number
+  limit:
+    type:
+      - number
+      - 'null'
+  remaining:
+    type:
+      - number
+      - 'null'
+  resets_at:
+    type:
+      - string
+      - 'null'
+    format: date-time

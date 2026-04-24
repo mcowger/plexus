@@ -1,0 +1,6 @@
+in: path
+name: response_id
+required: true
+schema:
+  type: string
+  example: resp_01HXYZ...

@@ -1,0 +1,24 @@
+get:
+  tags:
+    - Events
+  summary: Live backend log stream (admin only)
+  description: |
+    All backend log lines are serialized into `syslog` events, plus a
+    `ping` every 10s.
+
+    ```
+    event: syslog
+    data: { "level": "info", "message": "...", "timestamp": "..." }
+    ```
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: SSE stream.
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0SystemLogsStream

@@ -1,0 +1,18 @@
+get:
+  tags:
+    - Management — Config
+  summary: List all providers (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Provider map.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              $ref: ../components/schemas/ProviderConfig.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementProviders

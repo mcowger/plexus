@@ -1,0 +1,26 @@
+get:
+  tags:
+    - Events
+  summary: Live usage event stream
+  description: |
+    Emits `started`, `updated`, `completed` (and legacy `created`) events
+    as requests progress through the dispatcher. Sends `ping` every 10s.
+    Limited principals see only events for their own key.
+
+    ```
+    event: completed
+    data: { ...UsageRecord... }
+    id: 1735689599000
+    ```
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: SSE stream.
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementEvents

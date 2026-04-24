@@ -1,0 +1,19 @@
+get:
+  tags:
+    - Management — Config
+  summary: Export the configuration as YAML (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: YAML export.
+      content:
+        application/x-yaml:
+          schema:
+            type: string
+        text/yaml:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigExport

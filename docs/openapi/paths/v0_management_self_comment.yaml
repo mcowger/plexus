@@ -1,0 +1,43 @@
+patch:
+  tags:
+    - Management — Auth
+  summary: Update the current principal's key comment
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: keyName
+      schema:
+        type: string
+      description: Required for admin callers.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            comment:
+              type:
+                - string
+                - 'null'
+  responses:
+    '200':
+      description: Updated.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              keyName:
+                type: string
+              comment:
+                type:
+                  - string
+                  - 'null'
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementSelfComment

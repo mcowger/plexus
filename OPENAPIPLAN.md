@@ -1,6 +1,6 @@
 # OpenAPI Documentation Plan
 
-Goal: bring `docs/openapi.yaml` to full parity with `docs/API.md` (and beyond),
+Goal: bring `docs/openapi/openapi.yaml` (the multi-file split entry point) to full parity with `docs/API.md` (and beyond),
 then delete `docs/API.md`. The target is **Option C** from the audit: every
 operation, schema property, parameter, and enum is documented, plus global
 narrative sections that replace the reference tables currently in API.md.
@@ -11,7 +11,7 @@ phase has an explicit scope, a checklist, and a "done" test.
 
 ## Current coverage snapshot (baseline)
 
-Measured on the committed `docs/openapi.yaml`:
+Measured on `docs/openapi/openapi.yaml` (split entry point — individual paths live in `docs/openapi/paths/`, schemas in `docs/openapi/components/schemas/`):
 
 | Artifact             | Total | Documented | Gap  |
 |----------------------|------:|-----------:|-----:|
@@ -25,7 +25,8 @@ Re-run the audit any time with:
 ```bash
 bun -e '
 import yaml from "yaml"; import fs from "fs";
-const doc = yaml.parse(fs.readFileSync("docs/openapi.yaml","utf8"));
+// Bundle first so $refs are resolved, then parse
+const doc = yaml.parse(require("child_process").execSync("npx @redocly/cli bundle docs/openapi/openapi.yaml --format yaml 2>/dev/null").toString());
 let ops=0,opsNoDesc=0; for(const[p,pi]of Object.entries(doc.paths))for(const m of["get","post","put","delete","patch"])if(pi[m]){ops++;if(!pi[m].description)opsNoDesc++}
 let props=0,propsNoDesc=0; for(const s of Object.values(doc.components.schemas))for(const p of Object.values(s.properties||{})){props++;if(!p.description)propsNoDesc++}
 console.log({opsNoDesc,ops,propsNoDesc,props})
@@ -35,11 +36,9 @@ console.log({opsNoDesc,ops,propsNoDesc,props})
 ## Working process per phase
 
 1. Read the relevant source files listed under **Source material**.
-2. Edit `docs/openapi.yaml` — descriptions only, never touch the endpoint
-   list, schema structure, or lint config.
-3. Run `bun run lint:openapi` — must pass with 0 warnings.
-4. Optional: `npx @redocly/cli preview-docs docs/openapi.yaml` to visually
-   confirm before committing.
+2. Edit the relevant file under `docs/openapi/` (`paths/` for operations, `components/schemas/` for schemas) — descriptions only, never touch the endpoint list, schema structure, or lint config.
+3. Run `bun run lint:openapi` (lints `docs/openapi/openapi.yaml`) — must pass with 0 warnings.
+4. Optional: `bun run preview:openapi` (`npx @redocly/cli preview-docs docs/openapi/openapi.yaml`) to visually confirm before committing.
 5. Tick the phase off in the checklist at the bottom of this file.
 
 ## Global invariants (enforced by every phase)
@@ -616,15 +615,17 @@ Final plumbing to retire `docs/API.md` without information loss.
 - [ ] Grep API.md for any facts not yet in the spec and port the
       remaining ones (final diff).
 - [ ] Add a `docs/` README section or top-of-file comment in
-      `docs/openapi.yaml` linking the rendered spec preview command
-      (`npx @redocly/cli preview-docs docs/openapi.yaml`) and build
-      command (`npx @redocly/cli build-docs docs/openapi.yaml -o
-      docs/api.html`).
+      `docs/openapi/openapi.yaml` linking the rendered spec preview command
+      (`bun run preview:openapi`) and build
+      command (`npx @redocly/cli build-docs docs/openapi.yaml -o docs/api.html`
+      — note: `docs/openapi.yaml` is CI-generated; run `bun run bundle:openapi` locally first).
 - [ ] Update top-level `README.md` and `AGENTS.md` — any links to
-      `docs/API.md` become links to `docs/openapi.yaml` (or the rendered
+      `docs/API.md` become links to `docs/openapi/openapi.yaml` (or the rendered
       HTML).
-- [ ] Add a CI step (GitHub Actions) that runs `bun run lint:openapi`
-      on every PR touching `docs/openapi.yaml` or the route source files.
+- [x] Add a CI step (GitHub Actions) that runs `bun run lint:openapi` and
+      regenerates `docs/openapi.yaml` on every merge to `main` touching `docs/openapi/`
+      (`generate-openapi-bundle.yml`). PRs that touch the generated bundle are
+      blocked by `check-no-openapi-bundle-in-pr.yml`.
 - [ ] Delete `docs/API.md`.
 - [ ] Update any CHANGELOG entries or migration notes.
 

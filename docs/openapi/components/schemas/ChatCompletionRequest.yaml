@@ -1,0 +1,60 @@
+description: OpenAI Chat Completions request (pass-through; full OpenAI schema accepted).
+type: object
+additionalProperties: true
+required:
+  - model
+  - messages
+properties:
+  model:
+    type: string
+  messages:
+    type: array
+    items:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+            - system
+            - user
+            - assistant
+            - tool
+            - function
+        content: {}
+        name:
+          type: string
+        tool_call_id:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+  stream:
+    type: boolean
+    default: false
+  temperature:
+    type: number
+  top_p:
+    type: number
+  max_tokens:
+    type: integer
+  tools:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+  tool_choice:
+    oneOf:
+      - type: string
+      - type: object
+        additionalProperties: true
+  parallel_tool_calls:
+    type: boolean
+  response_format:
+    type: object
+    additionalProperties: true
+  seed:
+    type: integer
+  user:
+    type: string

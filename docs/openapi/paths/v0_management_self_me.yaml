@@ -1,0 +1,56 @@
+get:
+  tags:
+    - Management — Auth
+  summary: Current principal's identity and scoping
+  description: >-
+    Limited users receive their key metadata and trace toggle state; admins just
+    get `{ role: admin }`.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Principal details.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                properties:
+                  role:
+                    type: string
+                    const: admin
+              - type: object
+                properties:
+                  role:
+                    type: string
+                    const: limited
+                  keyName:
+                    type: string
+                  allowedProviders:
+                    type: array
+                    items:
+                      type: string
+                  allowedModels:
+                    type: array
+                    items:
+                      type: string
+                  quotaName:
+                    type:
+                      - string
+                      - 'null'
+                  comment:
+                    type:
+                      - string
+                      - 'null'
+                  traceEnabled:
+                    type: boolean
+                  traceEnabledGlobal:
+                    type: boolean
+                required:
+                  - role
+                  - keyName
+                  - traceEnabled
+                  - traceEnabledGlobal
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementSelfMe

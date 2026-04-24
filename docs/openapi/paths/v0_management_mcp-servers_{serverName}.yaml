@@ -1,0 +1,51 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+      pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
+put:
+  tags:
+    - Management — Config
+  summary: Create or replace an MCP server entry (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/McpServerConfig.yaml
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+    '400':
+      description: Invalid server name or body.
+  operationId: putV0ManagementMcpserversByserverName
+delete:
+  tags:
+    - Management — Config
+  summary: Delete an MCP server entry (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementMcpserversByserverName

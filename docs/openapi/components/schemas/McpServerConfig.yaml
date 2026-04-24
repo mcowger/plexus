@@ -1,0 +1,15 @@
+type: object
+required:
+  - upstream_url
+properties:
+  upstream_url:
+    type: string
+    format: uri
+  enabled:
+    type: boolean
+    default: true
+  headers:
+    type: object
+    additionalProperties:
+      type: string
+    description: Static headers forwarded upstream.

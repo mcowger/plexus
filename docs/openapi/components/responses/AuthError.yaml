@@ -1,0 +1,5 @@
+description: Missing or invalid Plexus API key.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/AuthErrorBody.yaml

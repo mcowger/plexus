@@ -1,0 +1,29 @@
+type: object
+additionalProperties: true
+properties:
+  object:
+    type: string
+    const: list
+  data:
+    type: array
+    items:
+      type: object
+      properties:
+        object:
+          type: string
+          const: embedding
+        index:
+          type: integer
+        embedding:
+          type: array
+          items:
+            type: number
+  model:
+    type: string
+  usage:
+    type: object
+    properties:
+      prompt_tokens:
+        type: integer
+      total_tokens:
+        type: integer

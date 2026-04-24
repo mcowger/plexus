@@ -1,0 +1,20 @@
+post:
+  tags:
+    - Inference — Images
+  summary: OpenAI-compatible image edit (multipart)
+  requestBody:
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          $ref: ../components/schemas/ImageEditRequest.yaml
+  responses:
+    '200':
+      description: Edited images.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ImageResponse.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV1ImagesEdits

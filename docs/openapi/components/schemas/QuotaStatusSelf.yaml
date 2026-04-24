@@ -1,0 +1,34 @@
+type: object
+description: Self-service form of QuotaStatus (camelCase, always 200).
+properties:
+  key:
+    type: string
+  quotaName:
+    type:
+      - string
+      - 'null'
+  allowed:
+    type: boolean
+  currentUsage:
+    type: number
+  limit:
+    type:
+      - number
+      - 'null'
+  remaining:
+    type:
+      - number
+      - 'null'
+  resetsAt:
+    type:
+      - string
+      - 'null'
+    format: date-time
+  limitType:
+    type:
+      - string
+      - 'null'
+    enum:
+      - requests
+      - tokens
+      - null

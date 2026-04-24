@@ -1,0 +1,16 @@
+get:
+  tags:
+    - MCP Proxy
+  summary: OpenID Connect discovery (public)
+  security: []
+  responses:
+    '200':
+      description: OIDC discovery document.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '400':
+      description: Bad request.
+  operationId: getWellknownOpenidconfiguration

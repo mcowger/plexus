@@ -1,0 +1,31 @@
+get:
+  tags:
+    - Management — Cooldowns
+  summary: List active cooldowns
+  description: Providers configured with disable_cooldown=true never appear here.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Active cooldowns.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: ../components/schemas/Cooldown.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementCooldowns
+delete:
+  tags:
+    - Management — Cooldowns
+  summary: Clear all cooldowns (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      $ref: ../components/responses/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementCooldowns

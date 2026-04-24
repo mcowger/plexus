@@ -1,0 +1,41 @@
+get:
+  tags:
+    - Management — OAuth
+  summary: List models known to an OAuth provider (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: providerId
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Model list (pi-ai static catalog).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    context_length:
+                      type: integer
+                    pricing:
+                      type: object
+                      properties:
+                        prompt:
+                          type: string
+                        completion:
+                          type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementOauthModels

@@ -1,0 +1,36 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema:
+      type: string
+post:
+  tags:
+    - Management — OAuth
+  summary: Submit a manual authorization code (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            value:
+              type: string
+          required:
+            - value
+  responses:
+    '200':
+      description: Updated session.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: ../components/schemas/OAuthSession.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementOauthSessionsByidManualcode

@@ -1,0 +1,44 @@
+parameters:
+  - in: path
+    name: modelWithAction
+    required: true
+    schema:
+      type: string
+      example: gemini-2.5-flash:generateContent
+    description: |
+      Google-style `{model}:{action}` path parameter. `action` must be one
+      of `generateContent` or `streamGenerateContent`. Example:
+      `gemini-2.5-flash:streamGenerateContent`.
+post:
+  tags:
+    - Inference — Gemini
+  summary: Gemini `generateContent` / `streamGenerateContent`
+  description: >-
+    Accepts Google's Generative Language API request body; Plexus transforms to
+    the upstream provider and back.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/GeminiGenerateContentRequest.yaml
+        examples:
+          basic:
+            value:
+              contents:
+                - role: user
+                  parts:
+                    - text: Summarize photosynthesis.
+  responses:
+    '200':
+      description: Gemini response (JSON or SSE).
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/GeminiGenerateContentResponse.yaml
+        text/event-stream:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV1betaModelsBymodelWithAction

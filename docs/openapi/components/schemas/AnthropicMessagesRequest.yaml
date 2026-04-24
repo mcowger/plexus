@@ -1,0 +1,33 @@
+description: Anthropic Messages request (pass-through; full Anthropic schema accepted).
+type: object
+additionalProperties: true
+required:
+  - model
+  - messages
+  - max_tokens
+properties:
+  model:
+    type: string
+  max_tokens:
+    type: integer
+  system: {}
+  messages:
+    type: array
+    items:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+        content: {}
+  stream:
+    type: boolean
+  temperature:
+    type: number
+  tools:
+    type: array
+    items:
+      type: object
+      additionalProperties: true

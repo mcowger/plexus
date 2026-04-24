@@ -1,0 +1,35 @@
+parameters:
+  - in: path
+    name: requestId
+    required: true
+    schema:
+      type: string
+      format: uuid
+get:
+  tags:
+    - Management — Debug
+  summary: Full debug log detail
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Log record.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/DebugLog.yaml
+    '404':
+      description: Not found (or not visible to this principal).
+  operationId: getV0ManagementDebugLogsByrequestId
+delete:
+  tags:
+    - Management — Debug
+  summary: Delete a single debug log
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      $ref: ../components/responses/SuccessTrue.yaml
+    '404':
+      description: Not found.
+  operationId: deleteV0ManagementDebugLogsByrequestId

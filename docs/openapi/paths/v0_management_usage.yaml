@@ -1,0 +1,141 @@
+get:
+  tags:
+    - Management — Usage
+  summary: List usage records
+  description: |
+    Filterable, paginated, optionally-projected listing of request-level
+    usage records. Limited principals are force-scoped to their own
+    `apiKey`, regardless of query parameters.
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: limit
+      schema:
+        type: integer
+        default: 50
+    - in: query
+      name: offset
+      schema:
+        type: integer
+        default: 0
+    - in: query
+      name: sortBy
+      schema:
+        type: string
+        enum:
+          - date
+          - apiKey
+          - provider
+          - incomingModelAlias
+          - costTotal
+          - durationMs
+        default: date
+    - in: query
+      name: sortDir
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
+    - in: query
+      name: startDate
+      schema:
+        type: string
+        format: date-time
+    - in: query
+      name: endDate
+      schema:
+        type: string
+        format: date-time
+    - in: query
+      name: apiKey
+      schema:
+        type: string
+    - in: query
+      name: attribution
+      schema:
+        type: string
+    - in: query
+      name: incomingApiType
+      schema:
+        type: string
+    - in: query
+      name: provider
+      schema:
+        type: string
+    - in: query
+      name: incomingModelAlias
+      schema:
+        type: string
+    - in: query
+      name: selectedModelName
+      schema:
+        type: string
+    - in: query
+      name: outgoingApiType
+      schema:
+        type: string
+    - in: query
+      name: responseStatus
+      schema:
+        type: string
+        enum:
+          - success
+          - error
+    - in: query
+      name: minDurationMs
+      schema:
+        type: integer
+    - in: query
+      name: maxDurationMs
+      schema:
+        type: integer
+    - in: query
+      name: fields
+      schema:
+        type: string
+      description: >
+        Comma-separated projection (e.g. `requestId,date,costTotal`). Unknown
+        field
+
+        names are silently dropped. When unset, all fields are returned.
+  responses:
+    '200':
+      description: Paginated usage records.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: ../components/schemas/UsageRecord.yaml
+              total:
+                type: integer
+            required:
+              - data
+              - total
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementUsage
+delete:
+  tags:
+    - Management — Usage
+  summary: Delete usage records (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: olderThanDays
+      schema:
+        type: integer
+      description: Only delete records older than N days. Omit to delete everything.
+  responses:
+    '200':
+      $ref: ../components/responses/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementUsage

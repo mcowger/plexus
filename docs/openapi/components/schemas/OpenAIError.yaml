@@ -1,0 +1,30 @@
+type: object
+properties:
+  error:
+    type: object
+    properties:
+      message:
+        type: string
+      type:
+        type: string
+        example: invalid_request_error
+      code:
+        type:
+          - string
+          - integer
+          - 'null'
+      param:
+        type:
+          - string
+          - 'null'
+      routing_context:
+        type: object
+        description: >-
+          Plexus-specific routing metadata attached when a dispatcher retry
+          chain fails.
+        additionalProperties: true
+    required:
+      - message
+      - type
+required:
+  - error

@@ -1,0 +1,20 @@
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: List all provider quota checkers (admin only)
+  description: |
+    Note the path: `/v0/management/quotas` (not `/v0/quotas`).
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Per-checker snapshots.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: ../components/schemas/QuotaCheckerSnapshot.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotas

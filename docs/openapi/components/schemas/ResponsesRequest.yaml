@@ -1,0 +1,37 @@
+description: OpenAI Responses API request.
+type: object
+additionalProperties: true
+required:
+  - model
+properties:
+  model:
+    type: string
+  input: {}
+  instructions:
+    type: string
+  previous_response_id:
+    type: string
+  conversation:
+    oneOf:
+      - type: string
+      - type: object
+        properties:
+          id:
+            type: string
+        required:
+          - id
+  store:
+    type: boolean
+    default: true
+  stream:
+    type: boolean
+  tools:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+  tool_choice: {}
+  parallel_tool_calls:
+    type: boolean
+  prompt_cache_key:
+    type: string

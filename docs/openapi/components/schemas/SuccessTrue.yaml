@@ -1,0 +1,7 @@
+type: object
+properties:
+  success:
+    type: boolean
+    const: true
+required:
+  - success

@@ -1,0 +1,24 @@
+get:
+  tags:
+    - Management — Quotas (User)
+  summary: List all user quota definitions (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Definitions keyed by name.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              $ref: ../components/schemas/UserQuotaDefinition.yaml
+          example:
+            premium_hourly:
+              type: rolling
+              duration: 1h
+              limit: 100000
+              limitType: tokens
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementUserquotas

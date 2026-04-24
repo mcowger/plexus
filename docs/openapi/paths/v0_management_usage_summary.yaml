@@ -1,0 +1,43 @@
+get:
+  tags:
+    - Management — Usage
+  summary: Aggregated usage time-series and totals
+  description: |
+    Returns bucketed series plus 7-day and since-midnight rollups.
+    Limited principals see only their own key's data.
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: range
+      schema:
+        type: string
+        enum:
+          - hour
+          - day
+          - week
+          - month
+          - custom
+        default: day
+    - in: query
+      name: startDate
+      schema:
+        type: string
+        format: date-time
+      description: Required with `range=custom`.
+    - in: query
+      name: endDate
+      schema:
+        type: string
+        format: date-time
+      description: Required with `range=custom`.
+  responses:
+    '200':
+      description: Aggregates.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/UsageSummary.yaml
+    '400':
+      description: Invalid `range` or custom-range parameters.
+  operationId: getV0ManagementUsageSummary

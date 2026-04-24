@@ -1,0 +1,83 @@
+get:
+  tags:
+    - Management — Usage
+  summary: Live or historical concurrency buckets
+  description: |
+    Dual-mode endpoint used by the dashboard:
+
+    - `mode=live` (default) — currently in-flight requests
+      (`durationMs IS NULL`), grouped by provider and canonical model,
+      over the last hour.
+    - `mode=timeline` — bucketed counts over `timeRange` (or a
+      `startDate`/`endDate` custom window), grouped by either
+      `provider` or `model`. Adaptive bucketing caps at 100 buckets.
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: mode
+      schema:
+        type: string
+        enum:
+          - live
+          - timeline
+        default: live
+    - in: query
+      name: timeRange
+      schema:
+        type: string
+        enum:
+          - hour
+          - day
+          - week
+          - month
+          - custom
+        default: hour
+    - in: query
+      name: groupBy
+      schema:
+        type: string
+        enum:
+          - provider
+          - model
+        default: provider
+    - in: query
+      name: startDate
+      schema:
+        type: string
+        format: date-time
+    - in: query
+      name: endDate
+      schema:
+        type: string
+        format: date-time
+  responses:
+    '200':
+      description: Bucketed counts (shape depends on mode).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    provider:
+                      type:
+                        - string
+                        - 'null'
+                    model:
+                      type:
+                        - string
+                        - 'null'
+                    count:
+                      type: integer
+                    timestamp:
+                      type: integer
+                      description: Epoch ms bucket start (timeline) or "now" (live).
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConcurrency

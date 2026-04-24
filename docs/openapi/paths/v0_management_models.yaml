@@ -1,0 +1,22 @@
+delete:
+  tags:
+    - Management — Config
+  summary: Delete all model aliases (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Count deleted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              deletedCount:
+                type: integer
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementModels

@@ -1,0 +1,57 @@
+type: object
+additionalProperties: true
+properties:
+  request_id:
+    type: string
+    format: uuid
+  created_at:
+    type: string
+    format: date-time
+  start_time:
+    type: integer
+  duration_ms:
+    type: integer
+  server_name:
+    type: string
+  upstream_url:
+    type: string
+  method:
+    type: string
+    enum:
+      - GET
+      - POST
+      - DELETE
+  jsonrpc_method:
+    type:
+      - string
+      - 'null'
+  tool_name:
+    type:
+      - string
+      - 'null'
+  api_key:
+    type:
+      - string
+      - 'null'
+  attribution:
+    type:
+      - string
+      - 'null'
+  source_ip:
+    type:
+      - string
+      - 'null'
+  response_status:
+    type: integer
+  is_streamed:
+    type: boolean
+  has_debug:
+    type: boolean
+  error_code:
+    type:
+      - string
+      - 'null'
+  error_message:
+    type:
+      - string
+      - 'null'

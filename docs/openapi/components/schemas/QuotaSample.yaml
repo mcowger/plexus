@@ -1,0 +1,59 @@
+type: object
+properties:
+  id:
+    type: integer
+  provider:
+    type: string
+  checkerId:
+    type: string
+  groupId:
+    type:
+      - string
+      - 'null'
+  windowType:
+    type: string
+    enum:
+      - subscription
+      - hourly
+      - five_hour
+      - daily
+      - weekly
+      - monthly
+      - custom
+  checkedAt:
+    type: string
+    format: date-time
+  limit:
+    type: number
+  used:
+    type: number
+  remaining:
+    type: number
+  utilizationPercent:
+    type: number
+  unit:
+    type: string
+    description: e.g. dollars, tokens, requests, percentage.
+  resetsAt:
+    type:
+      - string
+      - 'null'
+    format: date-time
+  status:
+    type: string
+    enum:
+      - ok
+      - warning
+      - critical
+      - exhausted
+  success:
+    type: boolean
+  errorMessage:
+    type:
+      - string
+      - 'null'
+  createdAt:
+    type:
+      - string
+      - 'null'
+    format: date-time

@@ -1,0 +1,61 @@
+get:
+  tags:
+    - Management — Logging
+  summary: Get current log level (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Current level.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LoggingLevelState.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementLoggingLevel
+put:
+  tags:
+    - Management — Logging
+  summary: Set current log level (admin only)
+  description: Runtime-only; resets on process restart.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            level:
+              type: string
+              example: debug
+          required:
+            - level
+  responses:
+    '200':
+      description: Updated state.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LoggingLevelState.yaml
+    '400':
+      description: Unsupported level.
+  operationId: putV0ManagementLoggingLevel
+delete:
+  tags:
+    - Management — Logging
+  summary: Reset log level to startup default (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Reset state.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LoggingLevelState.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementLoggingLevel

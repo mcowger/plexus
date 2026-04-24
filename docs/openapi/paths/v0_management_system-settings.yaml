@@ -1,0 +1,45 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get all system settings (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Key/value settings map.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementSystemsettings
+patch:
+  tags:
+    - Management — Config
+  summary: Bulk upsert system settings (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+          description: Partial object. Keys not listed are preserved.
+  responses:
+    '200':
+      description: Success.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementSystemsettings

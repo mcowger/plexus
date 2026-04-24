@@ -1,0 +1,34 @@
+get:
+  tags:
+    - Management — Metrics
+  summary: Prometheus-format scrape endpoint (admin only)
+  description: |
+    Prometheus text exposition 0.0.4. Results are cached for
+    `PLEXUS_METRICS_CACHE_TTL_MS` milliseconds (default 15 s); the
+    `X-Metrics-Cache: HIT|MISS` header indicates whether the cache
+    served the response. See `GRAFANA.md` at the repo root for PromQL
+    examples.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: >-
+        Prometheus text body. Metric families include `plexus_requests_total`,
+        `plexus_tokens_total`, `plexus_provider_*`, `plexus_perf_*`,
+        `plexus_cooldown_*`, etc.
+      headers:
+        X-Metrics-Cache:
+          schema:
+            type: string
+            enum:
+              - HIT
+              - MISS
+      content:
+        text/plain:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Scrape failed; an error comment is returned.
+  operationId: getV0ManagementMetrics

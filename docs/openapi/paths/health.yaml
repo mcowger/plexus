@@ -1,0 +1,19 @@
+get:
+  tags:
+    - Health
+  summary: Liveness probe
+  description: >-
+    Returns 200/OK while the process is accepting traffic. Used by container
+    orchestrators.
+  security: []
+  responses:
+    '200':
+      description: Server is healthy.
+      content:
+        text/plain:
+          schema:
+            type: string
+            const: OK
+    '400':
+      description: Bad request.
+  operationId: getHealth

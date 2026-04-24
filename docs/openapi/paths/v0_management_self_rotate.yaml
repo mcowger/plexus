@@ -1,0 +1,37 @@
+post:
+  tags:
+    - Management — Auth
+  summary: Rotate the current principal's key secret
+  description: |
+    Generates a new `sk-…` secret and overwrites the key's `secret`
+    field. The plaintext value is returned exactly once. Admins must
+    supply `?keyName=` to rotate another user's key.
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: keyName
+      schema:
+        type: string
+      description: Required for admin callers; ignored for limited callers.
+  responses:
+    '200':
+      description: Rotation complete.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              keyName:
+                type: string
+              secret:
+                type: string
+                example: sk-0123456789abcdef...
+              message:
+                type: string
+            required:
+              - keyName
+              - secret
+    '404':
+      description: Key not found.
+  operationId: postV0ManagementSelfRotate

@@ -1,0 +1,20 @@
+type: object
+properties:
+  level:
+    type: string
+  startupLevel:
+    type: string
+  supportedLevels:
+    type: array
+    items:
+      type: string
+    example:
+      - error
+      - warn
+      - info
+      - debug
+      - verbose
+      - silly
+  ephemeral:
+    type: boolean
+    const: true

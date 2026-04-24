@@ -1,0 +1,119 @@
+parameters:
+  - in: path
+    name: name
+    required: true
+    schema:
+      type: string
+      pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
+get:
+  tags:
+    - Management — Quotas (User)
+  summary: Get one quota definition (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Definition.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/UserQuotaDefinition.yaml
+              - type: object
+                properties:
+                  name:
+                    type: string
+    '404':
+      description: Not found.
+  operationId: getV0ManagementUserquotasByname
+put:
+  tags:
+    - Management — Quotas (User)
+  summary: Create or replace a quota definition (admin only)
+  description: Validated against the full definition schema.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/UserQuotaDefinition.yaml
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+              quota:
+                $ref: ../components/schemas/UserQuotaDefinition.yaml
+    '400':
+      $ref: ../components/responses/ValidationError.yaml
+  operationId: putV0ManagementUserquotasByname
+patch:
+  tags:
+    - Management — Quotas (User)
+  summary: Partial update (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+              quota:
+                $ref: ../components/schemas/UserQuotaDefinition.yaml
+    '400':
+      $ref: ../components/responses/ValidationError.yaml
+    '404':
+      description: Not found.
+  operationId: patchV0ManagementUserquotasByname
+delete:
+  tags:
+    - Management — Quotas (User)
+  summary: Delete a quota definition (admin only)
+  description: Returns 409 if any configured key still references this quota.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+              message:
+                type: string
+    '404':
+      description: Not found.
+    '409':
+      description: Quota still in use.
+  operationId: deleteV0ManagementUserquotasByname

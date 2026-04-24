@@ -1,0 +1,26 @@
+type: object
+additionalProperties: true
+description: See `CONFIGURATION.md` for the full provider schema.
+properties:
+  type:
+    type: string
+    description: e.g. openai, anthropic, gemini, openrouter, oauth/…
+  base_url:
+    type: string
+    format: uri
+  api_key:
+    type: string
+  disable_cooldown:
+    type: boolean
+  quota:
+    type: object
+    description: Optional provider-level quota checker config.
+    additionalProperties: true
+  gpu_ram_gb:
+    type: number
+  gpu_bandwidth_tb_s:
+    type: number
+  gpu_flops_tflop:
+    type: number
+  gpu_power_draw_watts:
+    type: number

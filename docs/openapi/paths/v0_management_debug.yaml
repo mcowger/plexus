@@ -1,0 +1,69 @@
+get:
+  tags:
+    - Management — Debug
+  summary: Get debug-mode state
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Current state. Shape differs slightly for limited principals.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+            properties:
+              enabled:
+                type: boolean
+              enabledGlobal:
+                type: boolean
+              enabledForKey:
+                type: boolean
+                description: Only present for limited principals.
+              enabledKeys:
+                type: array
+                items:
+                  type: string
+                description: Only present for admins. Per-key opt-in list.
+              providers:
+                type:
+                  - array
+                  - 'null'
+                items:
+                  type: string
+                description: Filter; `null` means capture for all providers.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementDebug
+patch:
+  tags:
+    - Management — Debug
+  summary: Update debug-mode state (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            providers:
+              type:
+                - array
+                - 'null'
+              items:
+                type: string
+  responses:
+    '200':
+      description: New state.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementDebug

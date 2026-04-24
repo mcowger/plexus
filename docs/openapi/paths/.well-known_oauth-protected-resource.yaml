@@ -1,0 +1,16 @@
+get:
+  tags:
+    - MCP Proxy
+  summary: OAuth 2.0 protected resource metadata (public)
+  security: []
+  responses:
+    '200':
+      description: Metadata.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '400':
+      description: Bad request.
+  operationId: getWellknownOauthprotectedresource

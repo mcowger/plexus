@@ -1,0 +1,49 @@
+type: object
+required:
+  - id
+  - object
+  - created
+  - owned_by
+properties:
+  id:
+    type: string
+  object:
+    type: string
+    const: model
+  created:
+    type: integer
+    description: Epoch seconds.
+  owned_by:
+    type: string
+    const: plexus
+  name:
+    type: string
+  description:
+    type: string
+  context_length:
+    type: integer
+  architecture:
+    type: object
+    additionalProperties: true
+  pricing:
+    type: object
+    additionalProperties: true
+    properties:
+      prompt:
+        type: string
+      completion:
+        type: string
+      input_cache_read:
+        type: string
+  supported_parameters:
+    type: array
+    items:
+      type: string
+  top_provider:
+    type: object
+    additionalProperties: true
+    properties:
+      context_length:
+        type: integer
+      max_completion_tokens:
+        type: integer

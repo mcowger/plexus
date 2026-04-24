@@ -1,0 +1,62 @@
+get:
+  tags:
+    - Management — Auth
+  summary: Verify a candidate admin/API key
+  description: |
+    Runs the management `authenticate` hook only. Used by the admin UI login
+    screen to confirm a credential before persisting it to local storage.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Credential is valid. `role` indicates the principal class.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  role:
+                    type: string
+                    const: admin
+                required:
+                  - ok
+                  - role
+              - type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  role:
+                    type: string
+                    const: limited
+                  keyName:
+                    type: string
+                  allowedProviders:
+                    type: array
+                    items:
+                      type: string
+                  allowedModels:
+                    type: array
+                    items:
+                      type: string
+                  quotaName:
+                    type:
+                      - string
+                      - 'null'
+                  comment:
+                    type:
+                      - string
+                      - 'null'
+                required:
+                  - ok
+                  - role
+                  - keyName
+                  - allowedProviders
+                  - allowedModels
+    '401':
+      $ref: ../components/responses/AdminAuthError.yaml
+  operationId: getV0ManagementAuthVerify

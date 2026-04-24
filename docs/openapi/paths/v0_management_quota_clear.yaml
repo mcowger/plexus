@@ -1,0 +1,35 @@
+post:
+  tags:
+    - Management — Quotas (User)
+  summary: Reset a key's quota counters (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            key:
+              type: string
+          required:
+            - key
+  responses:
+    '200':
+      description: Reset.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              key:
+                type: string
+              message:
+                type: string
+    '400':
+      description: Missing `key`.
+  operationId: postV0ManagementQuotaClear

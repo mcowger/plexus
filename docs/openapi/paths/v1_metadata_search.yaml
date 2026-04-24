@@ -1,0 +1,65 @@
+get:
+  tags:
+    - Inference — Models
+  summary: Search a loaded metadata catalog (public)
+  description: Used by the admin UI to autocomplete metadata references on a model alias.
+  security: []
+  parameters:
+    - in: query
+      name: source
+      required: true
+      schema:
+        type: string
+        enum:
+          - openrouter
+          - models.dev
+          - catwalk
+    - in: query
+      name: q
+      schema:
+        type: string
+      description: Substring filter. Omit to return the first `limit` entries.
+    - in: query
+      name: limit
+      schema:
+        type: integer
+        default: 50
+        maximum: 200
+        minimum: 1
+  responses:
+    '200':
+      description: Matches.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                  required:
+                    - id
+                    - name
+              count:
+                type: integer
+            required:
+              - data
+              - count
+          example:
+            data:
+              - id: openai/gpt-4.1-nano
+                name: 'OpenAI: GPT-4.1 Nano'
+              - id: openai/gpt-4o
+                name: 'OpenAI: GPT-4o'
+            count: 2
+    '400':
+      description: Missing or invalid `source`.
+    '503':
+      description: Requested source has not been loaded.
+  operationId: getV1MetadataSearch

@@ -1,0 +1,23 @@
+type: object
+required:
+  - secret
+additionalProperties: true
+properties:
+  secret:
+    type: string
+    example: sk-0123...
+  comment:
+    type: string
+  allowedProviders:
+    type: array
+    items:
+      type: string
+  allowedModels:
+    type: array
+    items:
+      type: string
+  quota:
+    type:
+      - string
+      - 'null'
+    description: User-quota definition name.

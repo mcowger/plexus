@@ -1,0 +1,23 @@
+get:
+  tags:
+    - Management — Config
+  summary: List configured MCP servers (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Server map.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              $ref: ../components/schemas/McpServerConfig.yaml
+          example:
+            my-server:
+              upstream_url: http://localhost:3001
+              enabled: true
+              headers: {}
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementMcpservers

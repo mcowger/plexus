@@ -1,0 +1,50 @@
+parameters:
+  - in: path
+    name: name
+    required: true
+    schema:
+      type: string
+put:
+  tags:
+    - Management — Config
+  summary: Create or replace an API key (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/KeyConfig.yaml
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: putV0ManagementKeysByname
+delete:
+  tags:
+    - Management — Config
+  summary: Delete an API key (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementKeysByname

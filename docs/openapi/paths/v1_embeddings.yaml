@@ -1,0 +1,29 @@
+post:
+  tags:
+    - Inference — Embeddings
+  summary: OpenAI-compatible embeddings (always pass-through)
+  description: |
+    Requires a model configured with `type: embeddings`. The request and
+    response are forwarded verbatim.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/EmbeddingsRequest.yaml
+        examples:
+          basic:
+            value:
+              model: text-embedding-3-small
+              input:
+                - Hello world
+  responses:
+    '200':
+      description: Embeddings response.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/EmbeddingsResponse.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV1Embeddings

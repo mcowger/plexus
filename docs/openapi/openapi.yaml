@@ -1,0 +1,353 @@
+openapi: 3.1.0
+info:
+  title: Plexus API
+  version: '0'
+  summary: >-
+    Unified gateway for LLM provider APIs with usage tracking, quotas,
+    cooldowns, and an admin management plane.
+  description: >
+    Plexus exposes three logical surfaces:
+
+
+    1. **Inference APIs** (`/v1/*`, `/v1beta/*`) — OpenAI-, Anthropic-, and
+    Gemini-
+       compatible endpoints that transparently fan out to configured upstream
+       providers. Authenticated with a Plexus API key (see the
+       [`PlexusApiKey`](#/components/securitySchemes/PlexusApiKey) security scheme).
+
+    2. **Management APIs** (`/v0/management/*`) — Administrative operations
+       (configuration CRUD, usage analytics, debug tracing, quotas, OAuth
+       onboarding, Prometheus metrics, etc.). Authenticated with the
+       `x-admin-key` header. The admin header may be either the server's
+       `ADMIN_KEY` (full access) or the plaintext secret of a configured
+       API key (limited access, scoped to that key's own data). Endpoints
+       marked with the `AdminOnly` note reject limited principals with 403.
+
+    3. **MCP Proxy** (`/mcp/:name`) — Proxies JSON-RPC and SSE traffic to
+       database-registered MCP servers. Plus unauthenticated MCP OAuth
+       discovery under `/.well-known/*` and `POST /register`.
+
+    ## Authentication
+
+
+    ### Inference (`PlexusApiKey`)
+
+
+    A Plexus API key is accepted from any of the following, checked in order:
+
+
+    | Location | Example |
+
+    |---|---|
+
+    | `Authorization` header (Bearer) | `Authorization: Bearer sk-my-key` |
+
+    | `Authorization` header (no prefix) | `Authorization: sk-my-key` (server
+    prepends `Bearer`) |
+
+    | `x-api-key` header | `x-api-key: sk-my-key` |
+
+    | `x-goog-api-key` header | `x-goog-api-key: sk-my-key` |
+
+    | `?key=` query parameter | `GET /v1/models?key=sk-my-key` |
+
+
+    Keys are matched against the `secret` field of entries in the `keys`
+
+    configuration table. Append `:label` to a key to tag every resulting
+
+    usage record with an `attribution` label (e.g. `sk-abc:copilot`).
+
+
+    ### Management (`AdminKey`)
+
+
+    Pass the header `x-admin-key: <value>`. A successful match with
+
+    `process.env.ADMIN_KEY` produces an `admin` principal. Any other value
+
+    is checked against `keys[*].secret` — a match yields a `limited`
+
+    principal scoped to its own key's usage/debug/error records. Limited
+
+    principals are rejected (403) from endpoints documented as admin-only.
+
+
+    Use `GET /v0/management/auth/verify` to test a candidate admin/key
+
+    credential before storing it in the dashboard.
+
+
+    ## Public endpoints (no auth)
+
+
+    - `GET /health`
+
+    - `GET /v1/models`
+
+    - `GET /v1/openrouter/models`
+
+    - `GET /v1/metadata/search`
+
+    - `GET /v1/metadata/lookup`
+
+    - All `/.well-known/*` MCP discovery endpoints
+
+    - `POST /register` (MCP dynamic client registration)
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:4000
+    description: Local dev server (default port)
+  - url: '{protocol}://{host}'
+    description: Custom deployment
+    variables:
+      protocol:
+        default: https
+        enum:
+          - http
+          - https
+      host:
+        default: plexus.example.com
+tags:
+  - name: Health
+    description: Liveness probe.
+  - name: Inference — Chat
+    description: OpenAI Chat Completions compatible.
+  - name: Inference — Messages
+    description: Anthropic Messages compatible.
+  - name: Inference — Responses
+    description: OpenAI Responses API compatible (stateful, tool-using).
+  - name: Inference — Gemini
+    description: Google Gemini `generateContent` / `streamGenerateContent` compatible.
+  - name: Inference — Embeddings
+    description: OpenAI Embeddings compatible.
+  - name: Inference — Audio
+    description: OpenAI Audio speech and transcription compatible.
+  - name: Inference — Images
+    description: OpenAI Images generation and edit compatible.
+  - name: Inference — Models
+    description: Model and catalog discovery.
+  - name: Management — Auth
+    description: Admin-key verification and self-service identity.
+  - name: Management — Config
+    description: Providers, aliases, keys, system settings, MCP servers.
+  - name: Management — Usage
+    description: Request-level usage records and time-series aggregates.
+  - name: Management — Debug
+    description: Per-request debug capture toggles and logs.
+  - name: Management — Errors
+    description: Inference error log storage.
+  - name: Management — MCP Logs
+    description: Usage records for the MCP proxy.
+  - name: Management — Cooldowns
+    description: Provider/model cooldown state.
+  - name: Management — Performance
+    description: TTFT / throughput aggregates per (provider, model).
+  - name: Management — Metrics
+    description: Prometheus scrape endpoint.
+  - name: Management — Logging
+    description: Runtime log-level control.
+  - name: Management — OAuth
+    description: Per-provider OAuth onboarding sessions (pi-ai).
+  - name: Management — Quotas (Provider)
+    description: Upstream provider quota checkers (`checkerId`-based).
+  - name: Management — Quotas (User)
+    description: Per-API-key quota definitions and enforcement.
+  - name: Management — Test
+    description: Synthetic inference request used by the admin UI.
+  - name: Management — Restart
+    description: Graceful process restart.
+  - name: Management — Models
+    description: External model metadata helpers (HuggingFace).
+  - name: Events
+    description: Server-Sent Event streams.
+  - name: MCP Proxy
+    description: JSON-RPC/SSE proxy for configured MCP servers plus OAuth discovery.
+security:
+  - PlexusApiKey: []
+paths:
+  /health:
+    $ref: paths/health.yaml
+  /v1/chat/completions:
+    $ref: paths/v1_chat_completions.yaml
+  /v1/messages:
+    $ref: paths/v1_messages.yaml
+  /v1/responses:
+    $ref: paths/v1_responses.yaml
+  /v1/codex/responses:
+    $ref: paths/v1_codex_responses.yaml
+  /v1/responses/{response_id}:
+    $ref: paths/v1_responses_{response_id}.yaml
+  /v1/conversations/{conversation_id}:
+    $ref: paths/v1_conversations_{conversation_id}.yaml
+  /v1beta/models/{modelWithAction}:
+    $ref: paths/v1beta_models_{modelWithAction}.yaml
+  /v1/embeddings:
+    $ref: paths/v1_embeddings.yaml
+  /v1/audio/transcriptions:
+    $ref: paths/v1_audio_transcriptions.yaml
+  /v1/audio/speech:
+    $ref: paths/v1_audio_speech.yaml
+  /v1/images/generations:
+    $ref: paths/v1_images_generations.yaml
+  /v1/images/edits:
+    $ref: paths/v1_images_edits.yaml
+  /v1/models:
+    $ref: paths/v1_models.yaml
+  /v1/openrouter/models:
+    $ref: paths/v1_openrouter_models.yaml
+  /v1/metadata/search:
+    $ref: paths/v1_metadata_search.yaml
+  /v1/metadata/lookup:
+    $ref: paths/v1_metadata_lookup.yaml
+  /v0/management/auth/verify:
+    $ref: paths/v0_management_auth_verify.yaml
+  /v0/management/self/me:
+    $ref: paths/v0_management_self_me.yaml
+  /v0/management/self/rotate:
+    $ref: paths/v0_management_self_rotate.yaml
+  /v0/management/self/comment:
+    $ref: paths/v0_management_self_comment.yaml
+  /v0/management/self/debug/toggle:
+    $ref: paths/v0_management_self_debug_toggle.yaml
+  /v0/management/self/quota:
+    $ref: paths/v0_management_self_quota.yaml
+  /v0/management/config:
+    $ref: paths/v0_management_config.yaml
+  /v0/management/config/status:
+    $ref: paths/v0_management_config_status.yaml
+  /v0/management/config/export:
+    $ref: paths/v0_management_config_export.yaml
+  /v0/management/config/vision-fallthrough:
+    $ref: paths/v0_management_config_vision-fallthrough.yaml
+  /v0/management/system-settings:
+    $ref: paths/v0_management_system-settings.yaml
+  /v0/management/providers:
+    $ref: paths/v0_management_providers.yaml
+  /v0/management/providers/{slug}:
+    $ref: paths/v0_management_providers_{slug}.yaml
+  /v0/management/providers/fetch-models:
+    $ref: paths/v0_management_providers_fetch-models.yaml
+  /v0/management/aliases:
+    $ref: paths/v0_management_aliases.yaml
+  /v0/management/aliases/{slug}:
+    $ref: paths/v0_management_aliases_{slug}.yaml
+  /v0/management/models:
+    $ref: paths/v0_management_models.yaml
+  /v0/management/models/{aliasId}:
+    $ref: paths/v0_management_models_{aliasId}.yaml
+  /v0/management/models/huggingface/{modelId}:
+    $ref: paths/v0_management_models_huggingface_{modelId}.yaml
+  /v0/management/keys:
+    $ref: paths/v0_management_keys.yaml
+  /v0/management/keys/{name}:
+    $ref: paths/v0_management_keys_{name}.yaml
+  /v0/management/mcp-servers:
+    $ref: paths/v0_management_mcp-servers.yaml
+  /v0/management/mcp-servers/{serverName}:
+    $ref: paths/v0_management_mcp-servers_{serverName}.yaml
+  /v0/management/quota-checker-types:
+    $ref: paths/v0_management_quota-checker-types.yaml
+  /v0/management/usage:
+    $ref: paths/v0_management_usage.yaml
+  /v0/management/usage/summary:
+    $ref: paths/v0_management_usage_summary.yaml
+  /v0/management/usage/{requestId}:
+    $ref: paths/v0_management_usage_{requestId}.yaml
+  /v0/management/concurrency:
+    $ref: paths/v0_management_concurrency.yaml
+  /v0/management/debug:
+    $ref: paths/v0_management_debug.yaml
+  /v0/management/debug/logs:
+    $ref: paths/v0_management_debug_logs.yaml
+  /v0/management/debug/logs/{requestId}:
+    $ref: paths/v0_management_debug_logs_{requestId}.yaml
+  /v0/management/errors:
+    $ref: paths/v0_management_errors.yaml
+  /v0/management/errors/{requestId}:
+    $ref: paths/v0_management_errors_{requestId}.yaml
+  /v0/management/mcp-logs:
+    $ref: paths/v0_management_mcp-logs.yaml
+  /v0/management/mcp-logs/{requestId}:
+    $ref: paths/v0_management_mcp-logs_{requestId}.yaml
+  /v0/management/cooldowns:
+    $ref: paths/v0_management_cooldowns.yaml
+  /v0/management/cooldowns/{provider}:
+    $ref: paths/v0_management_cooldowns_{provider}.yaml
+  /v0/management/performance:
+    $ref: paths/v0_management_performance.yaml
+  /v0/management/metrics:
+    $ref: paths/v0_management_metrics.yaml
+  /v0/management/logging/level:
+    $ref: paths/v0_management_logging_level.yaml
+  /v0/management/oauth/providers:
+    $ref: paths/v0_management_oauth_providers.yaml
+  /v0/management/oauth/sessions:
+    $ref: paths/v0_management_oauth_sessions.yaml
+  /v0/management/oauth/sessions/{id}:
+    $ref: paths/v0_management_oauth_sessions_{id}.yaml
+  /v0/management/oauth/sessions/{id}/prompt:
+    $ref: paths/v0_management_oauth_sessions_{id}_prompt.yaml
+  /v0/management/oauth/sessions/{id}/manual-code:
+    $ref: paths/v0_management_oauth_sessions_{id}_manual-code.yaml
+  /v0/management/oauth/sessions/{id}/cancel:
+    $ref: paths/v0_management_oauth_sessions_{id}_cancel.yaml
+  /v0/management/oauth/credentials:
+    $ref: paths/v0_management_oauth_credentials.yaml
+  /v0/management/oauth/credentials/status:
+    $ref: paths/v0_management_oauth_credentials_status.yaml
+  /v0/management/oauth/models:
+    $ref: paths/v0_management_oauth_models.yaml
+  /v0/management/quotas:
+    $ref: paths/v0_management_quotas.yaml
+  /v0/management/quotas/{checkerId}:
+    $ref: paths/v0_management_quotas_{checkerId}.yaml
+  /v0/management/quotas/{checkerId}/history:
+    $ref: paths/v0_management_quotas_{checkerId}_history.yaml
+  /v0/management/quotas/{checkerId}/check:
+    $ref: paths/v0_management_quotas_{checkerId}_check.yaml
+  /v0/management/user-quotas:
+    $ref: paths/v0_management_user-quotas.yaml
+  /v0/management/user-quotas/{name}:
+    $ref: paths/v0_management_user-quotas_{name}.yaml
+  /v0/management/quota/clear:
+    $ref: paths/v0_management_quota_clear.yaml
+  /v0/management/quota/status/{key}:
+    $ref: paths/v0_management_quota_status_{key}.yaml
+  /v0/management/test:
+    $ref: paths/v0_management_test.yaml
+  /v0/management/restart:
+    $ref: paths/v0_management_restart.yaml
+  /v0/management/events:
+    $ref: paths/v0_management_events.yaml
+  /v0/system/logs/stream:
+    $ref: paths/v0_system_logs_stream.yaml
+  /mcp/{name}:
+    $ref: paths/mcp_{name}.yaml
+  /.well-known/oauth-authorization-server:
+    $ref: paths/.well-known_oauth-authorization-server.yaml
+  /.well-known/oauth-protected-resource:
+    $ref: paths/.well-known_oauth-protected-resource.yaml
+  /.well-known/openid-configuration:
+    $ref: paths/.well-known_openid-configuration.yaml
+  /register:
+    $ref: paths/register.yaml
+components:
+  securitySchemes:
+    PlexusApiKey:
+      type: http
+      scheme: bearer
+      description: |
+        Plexus API key. The server also accepts the same value in
+        `x-api-key`, `x-goog-api-key`, or the `?key=` query string.
+        Suffix the key with `:label` (e.g. `sk-abc:copilot`) to attach a
+        dynamic attribution label.
+    AdminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+      description: |
+        Either the server's `ADMIN_KEY` (full admin access) or the plaintext
+        secret of a configured API key (limited access, scoped to that key).

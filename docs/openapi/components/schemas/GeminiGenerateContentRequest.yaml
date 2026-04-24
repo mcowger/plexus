@@ -1,0 +1,29 @@
+description: Google `generateContent` request body.
+type: object
+additionalProperties: true
+required:
+  - contents
+properties:
+  contents:
+    type: array
+    items:
+      type: object
+      properties:
+        role:
+          type: string
+        parts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+  system_instruction:
+    type: object
+    additionalProperties: true
+  generationConfig:
+    type: object
+    additionalProperties: true
+  tools:
+    type: array
+    items:
+      type: object
+      additionalProperties: true

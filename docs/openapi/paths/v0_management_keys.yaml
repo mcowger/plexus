@@ -1,0 +1,18 @@
+get:
+  tags:
+    - Management — Config
+  summary: List all API keys (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Key map.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              $ref: ../components/schemas/KeyConfig.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementKeys

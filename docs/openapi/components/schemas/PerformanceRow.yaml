@@ -1,0 +1,28 @@
+type: object
+additionalProperties: true
+properties:
+  provider:
+    type: string
+  model:
+    type: string
+  avg_ttft_ms:
+    type: number
+  min_ttft_ms:
+    type: number
+  max_ttft_ms:
+    type: number
+  avg_tokens_per_sec:
+    type: number
+  min_tokens_per_sec:
+    type: number
+  max_tokens_per_sec:
+    type: number
+  sample_count:
+    type: integer
+  success_count:
+    type: integer
+  failure_count:
+    type: integer
+  last_updated:
+    type: integer
+    description: Epoch ms.

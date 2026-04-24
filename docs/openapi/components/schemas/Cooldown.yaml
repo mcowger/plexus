@@ -1,0 +1,13 @@
+type: object
+properties:
+  provider:
+    type: string
+  model:
+    type: string
+  expiry:
+    type: integer
+    description: Epoch ms.
+  timeRemainingMs:
+    type: integer
+  consecutiveFailures:
+    type: integer

@@ -1,0 +1,56 @@
+parameters:
+  - in: path
+    name: checkerId
+    required: true
+    schema:
+      type: string
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Historical quota samples (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: windowType
+      schema:
+        type: string
+        enum:
+          - subscription
+          - hourly
+          - five_hour
+          - daily
+          - weekly
+          - monthly
+          - custom
+    - in: query
+      name: since
+      schema:
+        type: string
+      description: ISO timestamp **or** relative format like `7d`, `30d`.
+  responses:
+    '200':
+      description: History.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              checkerId:
+                type: string
+              windowType:
+                type:
+                  - string
+                  - 'null'
+              since:
+                type:
+                  - string
+                  - 'null'
+                format: date-time
+              history:
+                type: array
+                items:
+                  $ref: ../components/schemas/QuotaSample.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotasBycheckerIdHistory

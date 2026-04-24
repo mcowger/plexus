@@ -1,0 +1,28 @@
+type: object
+additionalProperties: true
+required:
+  - model
+  - input
+properties:
+  model:
+    type: string
+  input:
+    oneOf:
+      - type: string
+      - type: array
+        items:
+          type: string
+      - type: array
+        items:
+          type: array
+          items:
+            type: integer
+  dimensions:
+    type: integer
+  encoding_format:
+    type: string
+    enum:
+      - float
+      - base64
+  user:
+    type: string

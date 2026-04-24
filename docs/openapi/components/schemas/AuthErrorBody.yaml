@@ -1,0 +1,20 @@
+type: object
+properties:
+  error:
+    type: object
+    properties:
+      message:
+        type: string
+      type:
+        type: string
+        enum:
+          - auth_error
+          - forbidden
+      code:
+        type: integer
+    required:
+      - message
+      - type
+      - code
+required:
+  - error

@@ -1,0 +1,5 @@
+description: Upstream provider returned an error or the dispatcher exhausted retries.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/OpenAIError.yaml

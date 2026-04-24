@@ -1,0 +1,50 @@
+post:
+  tags:
+    - Inference — Responses
+  summary: Create a Responses API response
+  description: |
+    OpenAI Responses API compatible. Plexus supports multi-turn continuation
+    via `previous_response_id` or `conversation` — it loads the prior output
+    items server-side so the client only needs to send the new input.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ResponsesRequest.yaml
+        examples:
+          first_turn:
+            summary: Fresh response with simple string input
+            value:
+              model: smart-model
+              input: Explain quantum tunneling in one sentence.
+          continued:
+            summary: Continue a prior response
+            value:
+              model: smart-model
+              previous_response_id: resp_01H...
+              input: Now translate that to Spanish.
+  responses:
+    '200':
+      description: A Responses API response.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ResponsesResponse.yaml
+        text/event-stream:
+          schema:
+            type: string
+            description: Responses API SSE stream.
+    '401':
+      $ref: ../components/responses/AuthError.yaml
+    '404':
+      description: Referenced `previous_response_id` or `conversation` not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/OpenAIError.yaml
+    '429':
+      $ref: ../components/responses/QuotaExceeded.yaml
+    5XX:
+      $ref: ../components/responses/ProviderError.yaml
+  operationId: postV1Responses

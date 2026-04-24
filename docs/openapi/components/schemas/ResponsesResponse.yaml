@@ -1,0 +1,23 @@
+type: object
+additionalProperties: true
+properties:
+  id:
+    type: string
+    example: resp_01HXYZ
+  object:
+    type: string
+    const: response
+  created_at:
+    type: integer
+  model:
+    type: string
+  status:
+    type: string
+  output:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+  usage:
+    type: object
+    additionalProperties: true

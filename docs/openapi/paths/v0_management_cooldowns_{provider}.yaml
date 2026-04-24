@@ -1,0 +1,24 @@
+parameters:
+  - in: path
+    name: provider
+    required: true
+    schema:
+      type: string
+delete:
+  tags:
+    - Management — Cooldowns
+  summary: Clear cooldowns for a provider (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - in: query
+      name: model
+      schema:
+        type: string
+      description: Optional. When set, only the (provider, model) pair is cleared.
+  responses:
+    '200':
+      $ref: ../components/responses/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementCooldownsByprovider

@@ -1,0 +1,35 @@
+post:
+  tags:
+    - Management — OAuth
+  summary: Start an OAuth onboarding session (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            providerId:
+              type: string
+              example: openai-codex
+            accountId:
+              type: string
+              example: work
+          required:
+            - providerId
+            - accountId
+  responses:
+    '200':
+      description: Created session. Poll /v0/management/oauth/sessions/{id} for updates.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: ../components/schemas/OAuthSession.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementOauthSessions

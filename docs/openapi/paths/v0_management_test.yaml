@@ -1,0 +1,59 @@
+post:
+  tags:
+    - Management — Test
+  summary: Synthetic test inference (admin only)
+  description: |
+    Runs a short inference request directly against a (provider, model)
+    pair, bypassing alias resolution. Used by the admin UI's "test"
+    button next to each alias target.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            provider:
+              type: string
+            model:
+              type: string
+            apiType:
+              type: string
+              enum:
+                - chat
+                - messages
+                - gemini
+                - responses
+                - embeddings
+                - images
+                - speech
+                - oauth
+              default: chat
+          required:
+            - provider
+            - model
+  responses:
+    '200':
+      description: >-
+        Test outcome. `success=false` still returns 200 with an error message so
+        the UI can render it.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              durationMs:
+                type: integer
+              apiType:
+                type: string
+              response:
+                type: string
+              error:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementTest

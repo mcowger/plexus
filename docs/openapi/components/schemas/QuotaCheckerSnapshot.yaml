@@ -1,0 +1,20 @@
+type: object
+properties:
+  checkerId:
+    type: string
+  checkerType:
+    type: string
+    description: e.g. naga, moonshot.
+  checkerCategory:
+    type: string
+    enum:
+      - balance
+      - rate-limit
+  oauthAccountId:
+    type: string
+  oauthProvider:
+    type: string
+  latest:
+    type: array
+    items:
+      $ref: ./QuotaSample.yaml

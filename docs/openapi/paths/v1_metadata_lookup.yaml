@@ -1,0 +1,42 @@
+get:
+  tags:
+    - Inference — Models
+  summary: Lookup full normalized metadata for a single model (public)
+  description: |
+    Used by the admin UI to seed the override form when the user enables
+    "Override catalog fields".
+  security: []
+  parameters:
+    - in: query
+      name: source
+      required: true
+      schema:
+        type: string
+        enum:
+          - openrouter
+          - models.dev
+          - catwalk
+    - in: query
+      name: source_path
+      required: true
+      schema:
+        type: string
+  responses:
+    '200':
+      description: Full normalized metadata record.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: ../components/schemas/NormalizedModelMetadata.yaml
+            required:
+              - data
+    '400':
+      description: Missing/invalid parameters.
+    '404':
+      description: No metadata found for the given `source_path`.
+    '503':
+      description: Source not loaded.
+  operationId: getV1MetadataLookup

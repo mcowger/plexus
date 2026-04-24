@@ -1,0 +1,12 @@
+type: object
+required:
+  - object
+  - data
+properties:
+  object:
+    type: string
+    const: list
+  data:
+    type: array
+    items:
+      $ref: ./ModelListEntry.yaml

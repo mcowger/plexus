@@ -1,0 +1,52 @@
+type: object
+required:
+  - model
+  - input
+  - voice
+properties:
+  model:
+    type: string
+  input:
+    type: string
+    maxLength: 4096
+  voice:
+    type: string
+    enum:
+      - alloy
+      - ash
+      - ballad
+      - coral
+      - echo
+      - fable
+      - onyx
+      - nova
+      - sage
+      - shimmer
+      - verse
+      - marin
+      - cedar
+  instructions:
+    type: string
+    description: Voice style; not supported on tts-1 / tts-1-hd.
+  response_format:
+    type: string
+    enum:
+      - mp3
+      - opus
+      - aac
+      - flac
+      - wav
+      - pcm
+    default: mp3
+  speed:
+    type: number
+    minimum: 0.25
+    maximum: 4
+    default: 1
+  stream_format:
+    type: string
+    enum:
+      - sse
+      - audio
+    default: audio
+    description: Not supported on tts-1 / tts-1-hd.

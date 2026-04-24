@@ -1,0 +1,70 @@
+parameters:
+  - in: path
+    name: name
+    required: true
+    schema:
+      type: string
+      pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
+    description: The `mcp_servers` key from config.
+post:
+  tags:
+    - MCP Proxy
+  summary: JSON-RPC message exchange
+  description: |
+    Forwards the JSON-RPC body to the configured upstream MCP server.
+    Client `Authorization` / `x-api-key` headers are **not** forwarded;
+    only the static `headers` in the server's config are used upstream.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+          description: JSON-RPC 2.0 request object.
+  responses:
+    '200':
+      description: JSON-RPC response (possibly streamed).
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+        text/event-stream:
+          schema:
+            type: string
+    '400':
+      description: Invalid server name.
+    '404':
+      description: Server not found or disabled.
+    '502':
+      description: Upstream error.
+    '504':
+      description: Upstream timeout.
+  operationId: postMcpByname
+get:
+  tags:
+    - MCP Proxy
+  summary: SSE stream to the upstream MCP server
+  responses:
+    '200':
+      description: Event stream.
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getMcpByname
+delete:
+  tags:
+    - MCP Proxy
+  summary: Upstream session termination
+  responses:
+    '200':
+      description: Success.
+    '204':
+      description: No content.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteMcpByname

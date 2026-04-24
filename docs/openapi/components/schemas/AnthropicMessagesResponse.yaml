@@ -1,0 +1,3 @@
+description: Anthropic Messages response (pass-through).
+type: object
+additionalProperties: true

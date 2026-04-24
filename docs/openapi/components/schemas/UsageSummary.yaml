@@ -1,0 +1,60 @@
+type: object
+properties:
+  range:
+    type: string
+  series:
+    type: array
+    items:
+      type: object
+      properties:
+        bucketStartMs:
+          type: integer
+        requests:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        cachedTokens:
+          type: integer
+        cacheWriteTokens:
+          type: integer
+        kwhUsed:
+          type: number
+        tokens:
+          type: integer
+          description: Sum of the four token types above.
+  stats:
+    type: object
+    description: 7-day rollup.
+    properties:
+      totalRequests:
+        type: integer
+      totalTokens:
+        type: integer
+      totalKwhUsed:
+        type: number
+      avgDurationMs:
+        type: number
+      totalDurationMs:
+        type: integer
+  today:
+    type: object
+    description: Since local midnight.
+    properties:
+      requests:
+        type: integer
+      inputTokens:
+        type: integer
+      outputTokens:
+        type: integer
+      reasoningTokens:
+        type: integer
+      cachedTokens:
+        type: integer
+      cacheWriteTokens:
+        type: integer
+      kwhUsed:
+        type: number
+      totalCost:
+        type: number

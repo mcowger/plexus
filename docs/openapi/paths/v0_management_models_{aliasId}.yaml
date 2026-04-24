@@ -1,0 +1,22 @@
+parameters:
+  - in: path
+    name: aliasId
+    required: true
+    schema:
+      type: string
+delete:
+  tags:
+    - Management — Config
+  summary: Delete a single model alias (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: deleteV0ManagementModelsByaliasId

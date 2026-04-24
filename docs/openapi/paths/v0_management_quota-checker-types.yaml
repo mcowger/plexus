@@ -1,0 +1,40 @@
+get:
+  tags:
+    - Management — Config
+  summary: Valid built-in quota-checker type strings (admin only)
+  description: The enum used in `providers[*].quota.type`.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Type list.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              types:
+                type: array
+                items:
+                  type: string
+              count:
+                type: integer
+          example:
+            types:
+              - naga
+              - synthetic
+              - nanogpt
+              - zai
+              - moonshot
+              - minimax
+              - openrouter
+              - kilo
+              - openai-codex
+              - claude-code
+              - copilot
+              - wisdomgate
+              - apertis
+            count: 13
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotacheckertypes

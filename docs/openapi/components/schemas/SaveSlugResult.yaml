@@ -1,0 +1,10 @@
+type: object
+properties:
+  success:
+    type: boolean
+    const: true
+  slug:
+    type: string
+required:
+  - success
+  - slug

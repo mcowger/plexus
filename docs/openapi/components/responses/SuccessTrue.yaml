@@ -1,0 +1,5 @@
+description: Success.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/SuccessTrue.yaml

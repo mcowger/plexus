@@ -1,0 +1,53 @@
+parameters:
+  - in: path
+    name: slug
+    required: true
+    schema:
+      type: string
+put:
+  tags:
+    - Management — Config
+  summary: Create or replace a model alias (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/AliasConfig.yaml
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SaveSlugResult.yaml
+    '400':
+      $ref: ../components/responses/ValidationError.yaml
+  operationId: putV0ManagementAliasesByslug
+patch:
+  tags:
+    - Management — Config
+  summary: Merge updates into a model alias (admin only)
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/SaveSlugResult.yaml
+    '400':
+      $ref: ../components/responses/ValidationError.yaml
+    '404':
+      description: Alias not found.
+  operationId: patchV0ManagementAliasesByslug

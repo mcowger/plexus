@@ -1,0 +1,23 @@
+post:
+  tags:
+    - Inference — Responses
+  summary: Alias of `/v1/responses` for the OpenAI Codex CLI
+  description: >-
+    Identical behaviour to `POST /v1/responses`. Exists because the Codex CLI
+    hard-codes this path.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ResponsesRequest.yaml
+  responses:
+    '200':
+      description: See `/v1/responses`.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ResponsesResponse.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV1CodexResponses

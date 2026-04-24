@@ -1,0 +1,41 @@
+parameters:
+  - in: path
+    name: key
+    required: true
+    schema:
+      type: string
+get:
+  tags:
+    - Management — Quotas (User)
+  summary: Current enforcement status for a key (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Status. `quota_name` is `null` when no quota is assigned.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/QuotaStatus.yaml
+          examples:
+            assigned:
+              value:
+                key: acme_corp
+                quota_name: premium_hourly
+                allowed: true
+                current_usage: 45000
+                limit: 100000
+                remaining: 55000
+                resets_at: '2026-02-19T01:00:00.000Z'
+            unassigned:
+              value:
+                key: free_user
+                quota_name: null
+                allowed: true
+                current_usage: 0
+                limit: null
+                remaining: null
+                resets_at: null
+    '404':
+      description: Key not found.
+  operationId: getV0ManagementQuotaStatusBykey

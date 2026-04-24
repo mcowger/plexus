@@ -1,0 +1,51 @@
+get:
+  tags:
+    - Inference — Models
+  summary: List configured aliases (public)
+  description: |
+    Returns all configured model aliases. If an alias has a `metadata`
+    block, the response includes enriched OpenRouter-style fields.
+  security: []
+  responses:
+    '200':
+      description: Alias list.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ModelList.yaml
+          example:
+            object: list
+            data:
+              - id: fast-model
+                object: model
+                created: 1748000000
+                owned_by: plexus
+                name: 'OpenAI: GPT-4.1 Nano'
+                description: GPT-4.1 Nano is a lightweight model for fast tasks.
+                context_length: 1000000
+                architecture:
+                  input_modalities:
+                    - text
+                    - image
+                  output_modalities:
+                    - text
+                  tokenizer: GPT
+                pricing:
+                  prompt: '0.0000001'
+                  completion: '0.0000004'
+                  input_cache_read: '0.000000025'
+                supported_parameters:
+                  - temperature
+                  - tools
+                  - tool_choice
+                  - max_tokens
+                top_provider:
+                  context_length: 1000000
+                  max_completion_tokens: 32768
+              - id: plain-model
+                object: model
+                created: 1748000000
+                owned_by: plexus
+    '400':
+      description: Bad request.
+  operationId: getV1Models

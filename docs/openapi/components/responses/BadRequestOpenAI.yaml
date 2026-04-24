@@ -1,0 +1,5 @@
+description: Invalid request.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/OpenAIError.yaml

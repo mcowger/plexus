@@ -1,0 +1,24 @@
+type: object
+required:
+  - type
+  - limit
+  - limitType
+properties:
+  type:
+    type: string
+    enum:
+      - rolling
+      - daily
+      - weekly
+  limitType:
+    type: string
+    enum:
+      - requests
+      - tokens
+  limit:
+    type: number
+    minimum: 0
+  duration:
+    type: string
+    description: 'Required for `type: rolling`; e.g. `1h`, `30m`, `1d`.'
+    example: 1h

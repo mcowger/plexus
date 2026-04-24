@@ -1,0 +1,29 @@
+post:
+  tags:
+    - MCP Proxy
+  summary: Dynamic MCP client registration (public, static response)
+  security: []
+  responses:
+    '201':
+      description: Static registration record pointing callers to Bearer auth.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              client_id:
+                type: string
+                const: plexus-mcp-static
+              client_id_issued_at:
+                type: integer
+              client_secret:
+                type: string
+              grant_types:
+                type: array
+                items:
+                  type: string
+              token_endpoint_auth_method:
+                type: string
+    '400':
+      description: Bad request.
+  operationId: postRegister

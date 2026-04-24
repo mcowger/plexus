@@ -1,0 +1,22 @@
+get:
+  tags:
+    - Management — Config
+  summary: Configuration deployment status (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Status flags.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              adminKeyFromYaml:
+                type: boolean
+                description: >-
+                  True when the server is still bootstrapping `ADMIN_KEY` from
+                  `plexus.yaml` (deprecated).
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigStatus

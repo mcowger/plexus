@@ -1,0 +1,20 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get the full in-memory configuration (admin only)
+  description: |
+    Returns the Plexus configuration object as JSON — the same structure
+    that backs `plexus.yaml`. For the raw YAML export form see
+    `GET /v0/management/config/export`.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Full configuration.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Config.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfig

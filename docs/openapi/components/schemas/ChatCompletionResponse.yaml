@@ -1,0 +1,43 @@
+description: OpenAI Chat Completions response (pass-through).
+type: object
+additionalProperties: true
+properties:
+  id:
+    type: string
+  object:
+    type: string
+    const: chat.completion
+  created:
+    type: integer
+  model:
+    type: string
+  choices:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      properties:
+        index:
+          type: integer
+        message:
+          type: object
+          additionalProperties: true
+          properties:
+            role:
+              type: string
+            content:
+              type:
+                - string
+                - 'null'
+        finish_reason:
+          type: string
+  usage:
+    type: object
+    additionalProperties: true
+    properties:
+      prompt_tokens:
+        type: integer
+      completion_tokens:
+        type: integer
+      total_tokens:
+        type: integer
