@@ -5,6 +5,23 @@ get:
   description: |
     Runs the management `authenticate` hook only. Used by the admin UI login
     screen to confirm a credential before persisting it to local storage.
+
+    ## Two response shapes
+
+    **Admin credential**: Returns `{ ok: true, role: "admin" }` — admins have
+    full access to all management endpoints.
+
+    **Limited credential**: Returns `{ ok: true, role: "limited", keyName, 
+    allowedProviders, allowedModels, quotaName, comment }` — restricted
+    to the configured provider/model/quotas.
+
+    The UI shows different options based on this `role` value.
+
+    ## 401 conditions
+
+    - Missing `Authorization` header
+    - Invalid key (not found in config)
+    - Expired key
   security:
     - AdminKey: []
   responses:

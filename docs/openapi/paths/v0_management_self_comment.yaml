@@ -2,6 +2,21 @@ patch:
   tags:
     - Management — Auth
   summary: Update the current principal's key comment
+  description: |
+    Updates the freeform comment/description on a key.
+
+    ## Usage
+
+    - Limited callers update their own key's comment
+    - Admins can update any key by passing `?keyName=<name>`
+
+    ## Null vs empty string
+
+    - Setting `comment: null` removes the comment entirely
+    - Setting `comment: ""` (empty string) is also valid and stored as-is
+
+    There's no length limit enforced by the API (though the UI may truncate
+    display for very long values).
   security:
     - AdminKey: []
   parameters:
@@ -9,7 +24,9 @@ patch:
       name: keyName
       schema:
         type: string
-      description: Required for admin callers.
+      description: >
+        Admin-only: specify which key to update. Limited callers always
+        update their own key.
   requestBody:
     required: true
     content:
@@ -21,6 +38,7 @@ patch:
               type:
                 - string
                 - 'null'
+              description: New comment value (null to remove).
   responses:
     '200':
       description: Updated.

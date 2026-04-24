@@ -4,8 +4,34 @@ post:
   summary: Rotate the current principal's key secret
   description: |
     Generates a new `sk-…` secret and overwrites the key's `secret`
-    field. The plaintext value is returned exactly once. Admins must
-    supply `?keyName=` to rotate another user's key.
+    field. The plaintext value is returned exactly once.
+
+    ## How it works
+
+    1. A new random secret is generated
+    2. The existing secret is replaced in the config
+    3. The new plaintext secret is returned **once** in the response
+    4. All requests using the old secret fail with 401
+
+    ## Data retention
+
+    Historical usage data stays attached to the **key name**, not the secret
+    value. This means attribution history is preserved across rotations.
+
+    ## Auditing
+
+    The old secret is immediately invalidated. If you need to audit who
+    had access, check the config commit history or logs.
+
+    ## Admin usage
+
+    Admins must supply `?keyName=<name>` to rotate another user's key.
+    Limited callers always rotate their own key (the query param is ignored).
+
+    ## Return value formatting
+
+    The new secret is returned as a string starting with `sk-`. Store it
+    securely — this is the only time it will be returned in plaintext.
   security:
     - AdminKey: []
   parameters:
@@ -13,7 +39,9 @@ post:
       name: keyName
       schema:
         type: string
-      description: Required for admin callers; ignored for limited callers.
+      description: >
+        Admin-only: specify which key to rotate. Limited callers always
+        rotate their own key.
   responses:
     '200':
       description: Rotation complete.

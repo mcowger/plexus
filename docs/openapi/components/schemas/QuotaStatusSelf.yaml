@@ -1,29 +1,40 @@
 type: object
-description: Self-service form of QuotaStatus (camelCase, always 200).
+description: >
+  Self-service form of QuotaStatus. Always returns 200 even when no quota
+  is assigned — allows the UI to render a "no quota" state vs error.
 properties:
   key:
     type: string
+    description: The key name.
   quotaName:
     type:
       - string
       - 'null'
+    description: Name of the assigned user quota. Null if no quota assigned.
   allowed:
     type: boolean
+    description: >
+      Whether requests are currently allowed. False when the quota limit
+      has been exceeded.
   currentUsage:
     type: number
+    description: Usage in the current period (count of requests or tokens).
   limit:
     type:
       - number
       - 'null'
+    description: Period limit. Null if no quota assigned.
   remaining:
     type:
       - number
       - 'null'
+    description: Remaining allowance in the period. Null if no quota.
   resetsAt:
     type:
       - string
       - 'null'
     format: date-time
+    description: ISO timestamp when the current period resets. Null if no quota.
   limitType:
     type:
       - string
@@ -32,3 +43,6 @@ properties:
       - requests
       - tokens
       - null
+    description: >
+      What the quota limits. `requests` — total API calls; `tokens` — 
+      sum of input + output + cached tokens.

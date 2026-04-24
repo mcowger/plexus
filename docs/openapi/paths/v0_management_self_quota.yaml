@@ -2,7 +2,28 @@ get:
   tags:
     - Management — Auth
   summary: Current principal's quota status
-  description: Same shape as `GET /v0/management/quota/status/:key`.
+  description: |
+    Returns the quota status for the current key (or a specified key for admins).
+
+    ## Why 200 with nulls?
+
+    Always returns 200 even when no quota is assigned. This is intentional —
+    the UI depends on a consistent 200 response to render the quota card
+    correctly (showing a "no quota" state vs an error state).
+
+    The response shape is:
+    - `key` — The key name
+    - `quotaName` — Name of assigned quota (null if none)
+    - `allowed` — Whether requests are currently allowed
+    - `currentUsage` — Current period usage (requests or tokens)
+    - `limit` — Period limit (null if no quota)
+    - `remaining` — Remaining in period (null if no quota)
+    - `resetsAt` — ISO timestamp when the period resets (null if no quota)
+    - `limitType` — `requests` or `tokens` (null if no quota)
+
+    ## Admin with keyName query
+
+    Admins can view another key's quota by passing `?keyName=...`.
   security:
     - AdminKey: []
   parameters:
@@ -10,7 +31,8 @@ get:
       name: keyName
       schema:
         type: string
-      description: Required for admin callers.
+      description: >
+        Admin-only: specify a key to inspect instead of the calling principal.
   responses:
     '200':
       description: Quota status.

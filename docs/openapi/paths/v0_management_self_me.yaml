@@ -2,11 +2,45 @@ get:
   tags:
     - Management — Auth
   summary: Current principal's identity and scoping
-  description: >-
-    Limited users receive their key metadata and trace toggle state; admins just
-    get `{ role: admin }`.
+  description: |
+    Returns the authenticated principal's identity and permissions.
+
+    ## Two response shapes
+
+    **Admin** — Simple response with just `{ role: "admin" }`. Admins have
+    full access to all management endpoints.
+
+    **Limited** — Full key metadata including:
+    - `keyName` — The key's identifier
+    - `allowedProviders` — Array of provider slugs this key can use (empty = all)
+    - `allowedModels` — Array of model aliases this key can use (empty = all)
+    - `quotaName` — Name of assigned user quota (null = none)
+    - `comment` — Freeform description
+    - `traceEnabled` — Per-key debug capture state
+    - `traceEnabledGlobal` — Global debug state (affects all keys)
+
+    ## traceEnabled vs traceEnabledGlobal
+
+    - `traceEnabledGlobal` — If false, no debug logs are captured for any key
+    - `traceEnabled` — Only matters if global is true; enables per-key capture
+
+    To capture debug for a limited key, **both** must be true. This two-tier
+    system allows admins to quickly disable all debugging without changing
+    per-key settings.
+
+    ## Admin with keyName query
+
+    Admins can also view another key's identity by passing `?keyName=...`.
+    This returns the limited-shape response for that key.
   security:
     - AdminKey: []
+  parameters:
+    - in: query
+      name: keyName
+      schema:
+        type: string
+      description: >
+        Admin-only: specify a key to inspect instead of the calling principal.
   responses:
     '200':
       description: Principal details.

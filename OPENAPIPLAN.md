@@ -646,10 +646,7 @@ green; rendered `preview-docs` reads as the primary reference.
 |  4 | Usage & observability schemas           | ✅ done        | All schemas fully documented (40+ fields) |
 |  5 | Usage / debug / errors / MCP-logs       | ✅ done        | Endpoint descriptions, scoping, retention, params |
 |  6 | Configuration CRUD                      | ✅ done        | Config schemas + all CRUD operations documented |
-|  4 | Usage & observability schemas           | ⬜ not started |       |
-|  5 | Usage / debug / errors / MCP-logs       | ⬜ not started |       |
-|  6 | Configuration CRUD                      | ⬜ not started |       |
-|  7 | Self-service / principal                | ⬜ not started |       |
+|  7 | Self-service / principal                | ✅ done        | /self/* endpoints, dual admin/limited behavior |
 |  8 | OAuth provider onboarding               | ⬜ not started |       |
 |  9 | Provider quotas                         | ⬜ not started |       |
 | 10 | User quotas / enforcement               | ⬜ not started |       |
