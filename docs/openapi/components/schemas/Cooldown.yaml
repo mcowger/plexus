@@ -1,13 +1,26 @@
 type: object
+description: >
+  Provider cooldown entry indicating a provider/model pair is temporarily
+  unavailable due to consecutive failures.
 properties:
   provider:
     type: string
+    description: Provider identifier (e.g. "openai", "anthropic").
   model:
     type: string
+    description: Model name or alias that is in cooldown.
   expiry:
     type: integer
-    description: Epoch ms.
+    description: >
+      Absolute cooldown expiration timestamp in epoch milliseconds. After
+      this time, the provider/model can be retried.
   timeRemainingMs:
     type: integer
+    description: >
+      Derived time remaining until expiry (expiry - currentTime). Useful for
+      UI display. 0 if already expired.
   consecutiveFailures:
     type: integer
+    description: >
+      Number of consecutive failures that triggered this cooldown. Resets
+      to 0 on any successful request.

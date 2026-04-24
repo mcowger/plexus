@@ -1,28 +1,45 @@
 type: object
+description: >
+  Aggregated performance metrics for a provider/model pair. Sample window
+  is typically 24 hours. Error responses and failed streaming requests are
+  excluded from sample_count but counted in failure_count.
 additionalProperties: true
 properties:
   provider:
     type: string
+    description: Provider identifier.
   model:
     type: string
+    description: Model name or alias.
   avg_ttft_ms:
     type: number
+    description: Average time to first token in milliseconds.
   min_ttft_ms:
     type: number
+    description: Minimum time to first token observed.
   max_ttft_ms:
     type: number
+    description: Maximum time to first token observed.
   avg_tokens_per_sec:
     type: number
+    description: Average output tokens per second (throughput).
   min_tokens_per_sec:
     type: number
+    description: Minimum throughput observed.
   max_tokens_per_sec:
     type: number
+    description: Maximum throughput observed.
   sample_count:
     type: integer
+    description: >
+      Number of successful requests in the sample window. Excludes errors
+      and failed streaming requests.
   success_count:
     type: integer
+    description: Number of requests that returned successfully.
   failure_count:
     type: integer
+    description: Number of requests that failed (any error status).
   last_updated:
     type: integer
-    description: Epoch ms.
+    description: Timestamp of last metric update (epoch ms).

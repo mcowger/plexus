@@ -1,60 +1,87 @@
 type: object
+description: >
+  Aggregated usage statistics over time windows.
 properties:
   range:
     type: string
+    description: >
+      Time range for series data. Format depends on query param (e.g. "24h",
+      "7d", custom start/end). Affects only the series field.
   series:
     type: array
     items:
       type: object
+      description: Time-bucketed aggregation.
       properties:
         bucketStartMs:
           type: integer
+          description: Start of the time bucket (epoch ms).
         requests:
           type: integer
+          description: Number of requests in this bucket.
         inputTokens:
           type: integer
+          description: Sum of input tokens across all requests.
         outputTokens:
           type: integer
+          description: Sum of output tokens across all requests.
         cachedTokens:
           type: integer
+          description: Sum of cached tokens across all requests.
         cacheWriteTokens:
           type: integer
+          description: Sum of cache-write tokens across all requests.
         kwhUsed:
           type: number
+          description: Sum of energy usage (kWh) across all requests.
         tokens:
           type: integer
-          description: Sum of the four token types above.
+          description: >
+            Total token count = inputTokens + outputTokens + cachedTokens + cacheWriteTokens.
   stats:
     type: object
-    description: 7-day rollup.
+    description: Rolling 7-day aggregation window.
     properties:
       totalRequests:
         type: integer
+        description: Total requests in the 7-day window.
       totalTokens:
         type: integer
+        description: Total tokens (input + output + cached + cacheWrite) in the window.
       totalKwhUsed:
         type: number
+        description: Total energy usage in the window.
       avgDurationMs:
         type: number
+        description: Average request duration in milliseconds.
       totalDurationMs:
         type: integer
+        description: Sum of all request durations in milliseconds.
   today:
     type: object
-    description: Since local midnight.
+    description: Aggregation since local midnight (time-of-day based, not UTC).
     properties:
       requests:
         type: integer
+        description: Number of requests since midnight.
       inputTokens:
         type: integer
+        description: Input tokens since midnight.
       outputTokens:
         type: integer
+        description: Output tokens since midnight.
       reasoningTokens:
         type: integer
+        description: Reasoning tokens since midnight.
       cachedTokens:
         type: integer
+        description: Cached tokens since midnight.
       cacheWriteTokens:
         type: integer
+        description: Cache-write tokens since midnight.
       kwhUsed:
         type: number
+        description: Energy usage since midnight.
       totalCost:
         type: number
+        description: Total cost in dollars since midnight.
