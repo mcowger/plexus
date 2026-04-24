@@ -41,7 +41,6 @@ describe('WisdomGateQuotaChecker', () => {
           object: 'usage_details',
           total_usage: 148.49091,
           total_available: 0.067706,
-          regular_amount: 0.067706,
         }),
         {
           status: 200,
@@ -92,7 +91,6 @@ describe('WisdomGateQuotaChecker', () => {
           object: 'usage_details',
           total_usage: 10,
           total_available: 10,
-          regular_amount: 10,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -114,6 +112,11 @@ describe('WisdomGateQuotaChecker', () => {
     expect(capturedUrl).toBe(
       'https://custom.endpoint.example.com/api/dashboard/billing/usage/details'
     );
+  });
+
+  it('has category balance', () => {
+    const checker = new WisdomGateQuotaChecker(makeConfig());
+    expect(checker.category).toBe('balance');
   });
 
   it('throws error when session option is missing', async () => {

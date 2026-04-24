@@ -6,11 +6,10 @@ interface WisdomGateUsageResponse {
   object: string;
   total_usage: number;
   total_available: number;
-  regular_amount: number;
 }
 
 export class WisdomGateQuotaChecker extends QuotaChecker {
-  readonly category = 'rate-limit' as const;
+  readonly category = 'balance' as const;
 
   async checkQuota(): Promise<QuotaCheckResult> {
     const session = this.requireOption<string>('session');
