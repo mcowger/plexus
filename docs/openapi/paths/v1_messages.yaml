@@ -2,7 +2,20 @@ post:
   tags:
     - Inference — Messages
   summary: Anthropic-compatible messages endpoint
-  description: Drop-in replacement for `POST https://api.anthropic.com/v1/messages`.
+  description: |
+    Drop-in replacement for `POST https://api.anthropic.com/v1/messages`.
+
+    ## Anthropic-specific quirks
+
+    - **`system` top-level**: Unlike OpenAI where system messages live in the
+      `messages` array, Anthropic accepts `system` as a top-level field.
+    - **`max_tokens` required**: Must be provided; determines maximum response length.
+    - **Tool use blocks**: When using tools, the response includes `tool_use` blocks
+      with `input` (the tool call) and `type: tool_use`. Continue the conversation
+      by submitting a `tool` role message with the tool result.
+
+    Streaming uses SSE with Anthropic event types (`message_start`, `content_block_start`,
+    `content_block_delta`, `message_delta`, etc.).
   requestBody:
     required: true
     content:

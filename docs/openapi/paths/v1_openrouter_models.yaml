@@ -2,7 +2,12 @@ get:
   tags:
     - Inference — Models
   summary: OpenRouter model slugs known to Plexus (public)
-  description: Requires that the OpenRouter pricing catalog has been loaded at startup.
+  description: |
+    Returns all model slugs from the OpenRouter pricing catalog.
+
+    **Requires startup-loaded catalog:** The OpenRouter catalog must have been
+    loaded when Plexus started. This happens automatically if `openrouter` is
+    configured as a provider. Returns 503 if the catalog hasn't been loaded.
   security: []
   parameters:
     - in: query

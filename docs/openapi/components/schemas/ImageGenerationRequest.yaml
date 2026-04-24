@@ -5,13 +5,16 @@ required:
 properties:
   model:
     type: string
+    description: Model identifier (e.g. `dall-e-3`, `dall-e-2`).
   prompt:
     type: string
+    description: Text description of the desired image.
   'n':
     type: integer
     minimum: 1
     maximum: 10
     default: 1
+    description: Number of images to generate (1-10).
   size:
     type: string
     enum:
@@ -20,12 +23,22 @@ properties:
       - 1024x1024
       - 1792x1024
       - 1024x1792
+    description: >
+      Output dimensions. Not all sizes are available on all models.
+
+      - `256x256`, `512x512`, `1024x1024` — available on DALL-E 2 and 3.
+      - `1792x1024`, `1024x1792` — widescreen/portrait, DALL-E 3 only.
   response_format:
     type: string
     enum:
       - url
       - b64_json
     default: url
+    description: >
+      How the image is returned.
+
+      - **url** — Temporary URL (expires after 1 hour).
+      - **b64_json** — Base64-encoded image data.
   quality:
     type: string
     enum:
@@ -34,10 +47,22 @@ properties:
       - high
       - medium
       - low
+    description: >
+      Detail level. Values vary by provider.
+
+      - **standard** — Default quality.
+      - **hd** — Higher detail (DALL-E 3).
+      - **high**, **medium**, **low** — Provider-specific detail levels.
   style:
     type: string
     enum:
       - vivid
       - natural
+    description: >
+      Visual style.
+
+      - **vivid** — Generates more dramatic, stylized images.
+      - **natural** — More realistic, natural-looking images.
   user:
     type: string
+    description: User identifier for content policy tracking.

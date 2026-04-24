@@ -2,6 +2,9 @@ post:
   tags:
     - Inference — Images
   summary: OpenAI-compatible image generation
+  description: |
+    Generates images from text prompts using DALL-E. Pass-through to the
+    configured provider; full OpenAI Images schema accepted.
   requestBody:
     required: true
     content:

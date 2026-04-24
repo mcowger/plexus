@@ -1,4 +1,5 @@
 type: object
+description: Request body for image editing (multipart/form-data).
 required:
   - image
   - prompt
@@ -6,20 +7,25 @@ properties:
   image:
     type: string
     format: binary
-    description: PNG file < 4 MB.
+    description: Source image file. Must be PNG format, less than 4 MB.
   prompt:
     type: string
+    description: Text description of the desired edits.
   mask:
     type: string
     format: binary
-    description: PNG where transparent pixels mark editable regions.
+    description: >-
+      Optional mask image. Must be PNG format. Transparent pixels mark areas
+      that should be edited. Opaque pixels preserve the original image.
   model:
     type: string
+    description: Model to use (e.g. `dall-e-2`, `dall-e-3`).
   'n':
     type: integer
     minimum: 1
     maximum: 10
     default: 1
+    description: Number of variations to generate.
   size:
     type: string
     enum:
@@ -27,12 +33,18 @@ properties:
       - 512x512
       - 1024x1024
     default: 1024x1024
+    description: Output dimensions.
   response_format:
     type: string
     enum:
       - url
       - b64_json
     default: url
+    description: >-
+      How the image is returned.
+
+      - **url** — Temporary URL (expires after 1 hour).
+      - **b64_json** — Base64-encoded image data.
   quality:
     type: string
     enum:
@@ -40,5 +52,7 @@ properties:
       - high
       - medium
       - low
+    description: Detail level (provider-specific).
   user:
     type: string
+    description: User identifier for content policy tracking.

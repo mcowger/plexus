@@ -4,10 +4,37 @@ post:
   summary: OpenAI-compatible chat completion
   description: |
     Drop-in replacement for `POST https://api.openai.com/v1/chat/completions`.
-    The full OpenAI request schema is accepted as-is; routing to the
-    configured upstream provider is driven by the `model` field.
-    Forwarded client headers of note: `x-app` (optional, echoed into usage
-    `plexus_metadata.clientHeaders`).
+    The full OpenAI request schema is accepted as-is.
+
+    ## Transformer pipeline
+
+    Requests flow through:
+    1. `model` field resolved against configured aliases → target provider
+    2. Request transformed to target provider format
+    3. Upstream call executed
+    4. Response transformed back to OpenAI shape
+
+    ## Routing
+
+    The `model` value is matched against configured aliases. If no alias matches,
+    Plexus treats it as a direct `provider/model` syntax and attempts passthrough.
+
+    ## Caching
+
+    Plexus respects standard cache headers:
+    - `Cache-Control: no-cache` — bypasses any response caching
+    - `x-plexus-force-fresh` — forces a fresh upstream request
+
+    Add `:label` to your API key (e.g. `sk-abc:copilot`) to tag usage with attribution.
+
+    ## Streaming
+
+    When `stream: true`, responses use Server-Sent Events (`text/event-stream`)
+    with `data: {...}` frames containing chat completions deltas, terminated by
+    `data: [DONE]`.
+
+    Forwarded client headers: `x-app` (echoed into usage `plexus_metadata.clientHeaders`),
+    `session_id`, `x-client-request-id` (for prompt cache routing on `/v1/responses`).
   requestBody:
     required: true
     content:

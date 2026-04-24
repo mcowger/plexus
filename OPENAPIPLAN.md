@@ -641,8 +641,8 @@ green; rendered `preview-docs` reads as the primary reference.
 | #  | Phase                                  | Status       | Notes |
 |---:|----------------------------------------|--------------|-------|
 |  1 | Shared vocabulary (enums + info.desc)  | ✅ done        | 14 enums annotated, info.description rewritten |
-|  2 | Core inference endpoints                | ⬜ not started |       |
-|  3 | Model discovery & metadata              | ⬜ not started |       |
+|  2 | Core inference endpoints                | ✅ done        | All endpoints documented, schemas annotated |
+|  3 | Model discovery & metadata              | ✅ done        | + openrouter startup req, schema property docs |
 |  4 | Usage & observability schemas           | ⬜ not started |       |
 |  5 | Usage / debug / errors / MCP-logs       | ⬜ not started |       |
 |  6 | Configuration CRUD                      | ⬜ not started |       |

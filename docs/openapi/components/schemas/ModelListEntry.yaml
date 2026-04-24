@@ -1,4 +1,7 @@
 type: object
+description: >
+  Model alias entry. If the alias has a `metadata` block, includes enriched
+  OpenRouter-style fields.
 required:
   - id
   - object
@@ -7,43 +10,64 @@ required:
 properties:
   id:
     type: string
+    description: Alias identifier (slug).
   object:
     type: string
     const: model
+    description: Fixed value indicating a model.
   created:
     type: integer
-    description: Epoch seconds.
+    description: Creation timestamp in epoch seconds.
   owned_by:
     type: string
     const: plexus
+    description: Fixed value indicating Plexus-managed.
   name:
     type: string
+    description: >
+      Display name (e.g. "OpenAI: GPT-4.1 Nano").
   description:
     type: string
+    description: Model description from metadata.
   context_length:
     type: integer
+    description: Maximum context window size in tokens.
   architecture:
     type: object
     additionalProperties: true
+    description: >
+      Model architecture details including:
+      - input_modalities: array of supported input types (text, image, audio)
+      - output_modalities: array of supported output types
+      - tokenizer: tokenizer family name
   pricing:
     type: object
     additionalProperties: true
+    description: >
+      Pricing in dollars per million tokens.
     properties:
       prompt:
         type: string
+        description: Input price per million tokens.
       completion:
         type: string
+        description: Output price per million tokens.
       input_cache_read:
         type: string
+        description: Cache hit price per million tokens.
   supported_parameters:
     type: array
     items:
       type: string
+    description: List of supported request parameters (e.g. temperature, tools, max_tokens).
   top_provider:
     type: object
     additionalProperties: true
+    description: Primary provider details.
     properties:
       context_length:
         type: integer
+        description: Provider's context length limit.
       max_completion_tokens:
         type: integer
+        description: Maximum output tokens supported.
