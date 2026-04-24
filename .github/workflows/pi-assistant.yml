@@ -34,6 +34,11 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Configure git identity
+        run: |
+          git config --global user.email "pi-agent@plexus.dev"
+          git config --global user.name "Pi Agent"
+
       - uses: mcowger/pi-coding-agent-action@refs/heads/v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -64,6 +69,11 @@ jobs:
             `create_pull_request` tool. Changes that are not committed and
             submitted as a PR will be lost when this CI run ends. Never leave
             modified files uncommitted.
+
+            Git identity: The git user is already configured as "Pi Agent"
+            <pi-agent@plexus.dev>. Do NOT run `git config` commands to set
+            user.email or user.name — they are already set up. Just use
+            `git add`, `git commit`, and `git push` directly.
 
             BEFORE pushing your branch or creating a PR, you MUST run these
             validation commands and ensure they pass:
