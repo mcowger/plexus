@@ -25,9 +25,9 @@ properties:
 
       - **subscription** — Monthly/billing-cycle quota or prepaid balance.
       - **hourly** — Hourly rolling window.
-      - **five_hour** — 5-hour rolling window (Anthropic).
+      - **five_hour** — 5-hour rolling window (common across multiple providers).
       - **daily** — Daily reset quota.
-      - **weekly** — 7-day rolling window (Anthropic).
+      - **weekly** — 7-day rolling window (common across multiple providers).
       - **monthly** — Calendar month quota.
       - **custom** — Provider-specific window.
   checkedAt:

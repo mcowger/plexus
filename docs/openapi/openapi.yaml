@@ -102,13 +102,17 @@ info:
 
 
     The following client headers, when present, are forwarded to upstream
-    providers and echoed into `plexus_metadata.clientHeaders` on the usage
-    record:
+    providers:
 
 
-    - `x-app` — application identifier.
-    - `session_id` — client session identifier.
+    - `x-app` — application identifier. Echoed into
+      `plexus_metadata.clientHeaders` on the usage record (all inference
+      routes).
+    - `session_id` — client session identifier. Forwarded as an HTTP
+      header for prompt cache routing (`/v1/responses` only).
     - `x-client-request-id` — client-supplied request correlation ID.
+      Forwarded as an HTTP header for prompt cache routing
+      (`/v1/responses` only).
 
 
     ## Environment variables
@@ -255,9 +259,9 @@ tags:
       |---|---|
       | `subscription` | Monthly/billing-cycle quota or prepaid balance. |
       | `hourly` | Hourly rolling window. |
-      | `five_hour` | 5-hour rolling window (Anthropic). |
+      | `five_hour` | 5-hour rolling window (common across multiple providers). |
       | `daily` | Daily reset quota. |
-      | `weekly` | 7-day rolling window (Anthropic). |
+      | `weekly` | 7-day rolling window (common across multiple providers). |
       | `monthly` | Calendar month quota. |
       | `custom` | Provider-specific window. |
 
