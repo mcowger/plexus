@@ -48,7 +48,7 @@ jobs:
           base_url: ${{ secrets.PLEXUS_URL }}
           thinking_level: medium
           append_prompt: >
-            Communication protocol: Post a SINGLE comment using
+            Communication protocol: Post a SINGLE initial comment using
             `create_issue_comment` that acknowledges the request and includes a
             GitHub markdown checklist outlining your plan, for example:
 
@@ -58,10 +58,26 @@ jobs:
               - [ ] Create a pull request
 
             Do NOT post a separate acknowledgment comment followed by a plan
-            comment — combine them into one. As you complete each step, use
-            `update_issue_comment` to check off items by changing `- [ ]` to
-            `- [x]`. Do NOT use strikethrough or other formatting — use only
-            `- [ ]` / `- [x]` checkbox syntax.
+            comment — combine them into one.
+
+            CRITICAL: You MUST use `update_issue_comment` FREQUENTLY — update
+            the progress comment IMMEDIATELY after completing ANY meaningful
+            work or sub-step. Do not wait until the end to update it. Check
+            off items as you go by changing `- [ ]` to `- [x]`. Add new
+            sub-items under existing steps as they become relevant. Do NOT use
+            strikethrough or other formatting — use only `- [ ]` / `- [x]`
+            checkbox syntax.
+
+            Update the comment:
+              - Immediately after analyzing/understanding the request
+              - After each file you modify
+              - After each validation command finishes (typecheck, format, test)
+              - When you encounter blockers or need clarification
+              - When creating a PR
+              - When completing the task
+
+            The user should be able to refresh the page and see your current
+            progress without waiting for completion.
 
             Code changes: If the request involves any code changes — or if you
             make any modifications to files during your work — you MUST create a
