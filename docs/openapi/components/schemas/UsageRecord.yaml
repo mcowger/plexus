@@ -1,29 +1,36 @@
 type: object
-description: >-
-  Per-request usage record stored in `request_usage`. Fields with `[null]` may
-  be missing on error paths.
+description: >
+  Per-request usage record stored in `request_usage`. Populated after each
+  inference request completes (or errors). Fields may be null on error paths.
 properties:
   requestId:
     type: string
     format: uuid
+    description: Unique request identifier (UUID).
   date:
     type: string
     format: date-time
+    description: Date string in ISO format (YYYY-MM-DD).
   startTime:
     type: integer
-    description: Epoch ms.
+    description: Request start timestamp in epoch milliseconds.
   sourceIp:
     type:
       - string
       - 'null'
+    description: Client source IP address.
   apiKey:
     type:
       - string
       - 'null'
+    description: API key used for authentication (may be hashed depending on config).
   attribution:
     type:
       - string
       - 'null'
+    description: >
+      Attribution label from API key suffix (e.g. `sk-xxx:copilot` → "copilot").
+      Null if no suffix was provided.
   incomingApiType:
     type: string
     enum:
@@ -36,7 +43,7 @@ properties:
       - speech
       - images
       - oauth
-    description: >-
+    description: >
       API format received from the client.
 
       - **chat** — OpenAI Chat Completions (`/v1/chat/completions`).
@@ -52,87 +59,125 @@ properties:
     type:
       - string
       - 'null'
+    description: Final provider used for the request (e.g. "openai", "anthropic").
   attemptCount:
     type: integer
+    description: Number of request attempts (including retries). 1 = no retries.
   retryHistory:
     type:
       - string
       - 'null'
-    description: JSON-encoded retry chain.
+    description: >
+      JSON-encoded retry chain array. Each entry contains provider, model,
+      error info, and whether it was the final attempt. Null if no retries occurred.
   incomingModelAlias:
     type:
       - string
       - 'null'
+    description: Model alias as specified in the request (before resolution).
   canonicalModelName:
     type:
       - string
       - 'null'
+    description: >
+      Resolved canonical model name. For aliases with `model_architecture`,
+      this is the target; otherwise same as `incomingModelAlias`.
   selectedModelName:
     type:
       - string
       - 'null'
+    description: >
+      Final model name sent to the upstream provider. May differ from
+      `canonicalModelName` due to provider-specific transformations.
   finalAttemptProvider:
     type:
       - string
       - 'null'
+    description: Provider used for the final (successful or last) attempt.
   finalAttemptModel:
     type:
       - string
       - 'null'
+    description: Model used for the final attempt.
   allAttemptedProviders:
     type:
       - string
       - 'null'
-    description: JSON array string.
+    description: >
+      JSON array of all providers attempted during this request (each appears
+      once, in order of attempt). Null if only one provider was used.
   outgoingApiType:
     type:
       - string
       - 'null'
+    description: >
+      API format sent to upstream provider. May differ from `incomingApiType`
+      due to protocol transformation.
   tokensInput:
     type:
       - integer
       - 'null'
+    description: >
+      Number of input tokens consumed. Reported by provider when available;
+      otherwise estimated based on character count. Null on error.
   tokensOutput:
     type:
       - integer
       - 'null'
+    description: Number of output tokens generated. Null on error.
   tokensReasoning:
     type:
       - integer
       - 'null'
+    description: >
+      Number of reasoning/thinking tokens (for models that report them separately,
+      e.g. o1, o3, Claude Opus). Null if not applicable or on error.
   tokensCached:
     type:
       - integer
       - 'null'
+    description: >
+      Number of tokens served from prompt cache. Only populated when cache
+      was hit. Null otherwise.
   tokensCacheWrite:
     type:
       - integer
       - 'null'
+    description: >
+      Number of new tokens written to cache. Null if caching was not enabled
+      or not applicable to the request.
   tokensEstimated:
     type:
       - integer
       - 'null'
-    description: 1 when token counts were estimated.
+    description: >
+      Flag indicating token count source. 0 = actual usage from provider;
+      1 = estimated from character counts when provider did not report.
   costInput:
     type:
       - number
       - 'null'
+    description: Cost in dollars for input tokens.
   costOutput:
     type:
       - number
       - 'null'
+    description: Cost in dollars for output tokens.
   costCached:
     type:
       - number
       - 'null'
+    description: Cost in dollars for cached tokens (typically discounted).
   costCacheWrite:
     type:
       - number
       - 'null'
+    description: Cost in dollars for tokens written to cache.
   costTotal:
     type:
       - number
       - 'null'
+    description: Total cost in dollars (sum of all cost fields).
   costSource:
     type:
       - string
@@ -144,7 +189,7 @@ properties:
       - defined
       - per_request
       - null
-    description: >-
+    description: >
       Pricing method used to calculate cost fields.
 
       - **default** — No pricing configured; all cost fields are zero.
@@ -161,34 +206,52 @@ properties:
     type:
       - string
       - 'null'
-    description: JSON-encoded pricing detail.
+    description: >
+      JSON-encoded pricing details including rate, currency, and any
+      provider-specific pricing overrides used.
   durationMs:
     type:
       - integer
       - 'null'
+    description: >
+      Total request duration in milliseconds (from start to final response
+      received). Null if request was abandoned early.
   ttftMs:
     type:
       - integer
       - 'null'
+    description: >
+      Time to first token in milliseconds. Only populated for streaming
+      requests. Null for non-streaming or if first token timing unavailable.
   tokensPerSec:
     type:
       - number
       - 'null'
+    description: >
+      Output tokens per second (throughput). Calculated as
+      `tokensOutput / (durationMs - ttftMs)` for streaming requests.
+      Null for non-streaming or if calculation invalid.
   kwhUsed:
     type:
       - number
       - 'null'
+    description: >
+      Estimated energy consumption in kilowatt-hours. Calculated from
+      `model_architecture` token estimates and provider-specific energy
+      coefficients. Requires `model_architecture` to be set on the alias.
   isStreamed:
     type: boolean
+    description: Whether the response was streamed (SSE).
   isPassthrough:
     type: boolean
+    description: Whether the request was a direct passthrough (no transformation).
   responseStatus:
     type: string
     enum:
       - success
       - error
       - pending
-    description: >-
+    description: >
       Outcome of the request.
 
       - **success** — Upstream returned a successful response.
@@ -198,23 +261,36 @@ properties:
     type:
       - integer
       - 'null'
+    description: Number of tools/function definitions in the request.
   messageCount:
     type:
       - integer
       - 'null'
+    description: Number of messages in the conversation (including system).
   parallelToolCallsEnabled:
     type:
       - boolean
       - 'null'
+    description: Whether parallel tool calls were enabled in the request.
   toolCallsCount:
     type:
       - integer
       - 'null'
+    description: Number of tool calls made in the response.
   finishReason:
     type:
       - string
       - 'null'
+    description: >
+      Model's finish reason (e.g. "stop", "length", "tool_calls"). Null if
+      not applicable or on error.
   hasDebug:
     type: boolean
+    description: >
+      Whether debug logs exist for this request (mirrors presence in
+      `debug_logs` table).
   hasError:
     type: boolean
+    description: >
+      Whether error records exist for this request (mirrors presence in
+      `inference_errors` table).

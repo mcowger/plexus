@@ -1,27 +1,35 @@
 type: object
+description: >
+  MCP proxy usage record. Tracks each request through the MCP server proxy.
 additionalProperties: true
 properties:
   request_id:
     type: string
     format: uuid
+    description: Unique request identifier.
   created_at:
     type: string
     format: date-time
+    description: Record creation timestamp (ISO 8601).
   start_time:
     type: integer
+    description: Request start timestamp (epoch ms).
   duration_ms:
     type: integer
+    description: Request duration in milliseconds.
   server_name:
     type: string
+    description: Name of the MCP server this request was proxied to.
   upstream_url:
     type: string
+    description: Full URL of the upstream MCP server endpoint.
   method:
     type: string
     enum:
       - GET
       - POST
       - DELETE
-    description: >-
+    description: >
       HTTP method used for the MCP proxy request.
 
       - **GET** — Opens an SSE stream for server-to-client notifications.
@@ -32,33 +40,47 @@ properties:
     type:
       - string
       - 'null'
+    description: >
+      The JSON-RPC method name for POST requests (e.g. "tools/list",
+      "tools/call", "resources/read"). Null for GET requests.
   tool_name:
     type:
       - string
       - 'null'
+    description: >
+      Name of the tool being called (for tool/* methods). Null if the
+      request was not a tool call (e.g. resources/read, prompts/list).
   api_key:
     type:
       - string
       - 'null'
+    description: API key used for proxy authentication.
   attribution:
     type:
       - string
       - 'null'
+    description: Attribution label from API key suffix.
   source_ip:
     type:
       - string
       - 'null'
+    description: Client source IP address.
   response_status:
     type: integer
+    description: HTTP response status code (e.g. 200, 500).
   is_streamed:
     type: boolean
+    description: Whether the response was streamed (SSE).
   has_debug:
     type: boolean
+    description: Whether debug logs exist for this request.
   error_code:
     type:
       - string
       - 'null'
+    description: Error code if the request failed (e.g. -32600, -32601).
   error_message:
     type:
       - string
       - 'null'
+    description: Error message if the request failed.

@@ -1,26 +1,50 @@
 type: object
+description: >
+  Debug capture for an inference request. Can contain request/response
+  snapshots at various transformation stages. Only populated if debug is
+  enabled for the request (via header or key configuration).
 additionalProperties: true
 properties:
   requestId:
     type: string
     format: uuid
+    description: The request this debug log belongs to.
   rawRequest:
     type: object
     additionalProperties: true
+    description: >
+      Original client request body as received by Plexus, before any
+      transformation. This is what the client sent.
   transformedRequest:
     type: object
     additionalProperties: true
+    description: >
+      Request body after Plexus transformation, as sent to the upstream
+      provider. Includes any protocol conversion (OpenAI → Anthropic, etc.).
   rawResponse:
     type: object
     additionalProperties: true
+    description: >
+      Raw response from the upstream provider, before Plexus transformation.
+      May include provider-specific fields not in the standard schema.
   transformedResponse:
     type: object
     additionalProperties: true
+    description: >
+      Response after Plexus transformation, as returned to the client.
+      This is what the client received.
   rawResponseSnapshot:
     type: object
     additionalProperties: true
+    description: >
+      Snapshot of the raw response taken at completion. Stored for reference
+      even if the original stream was consumed.
   transformedResponseSnapshot:
     type: object
     additionalProperties: true
+    description: >
+      Snapshot of the transformed response at completion. Mirrors what was
+      sent to the client for non-streaming requests.
   createdAt:
     type: integer
+    description: Timestamp when the debug log was created (epoch ms).
