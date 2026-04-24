@@ -73,15 +73,9 @@ jobs:
       actions: write
     steps:
       - name: Dispatch dev-release workflow
-        uses: actions/github-script@v9
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'dev-release.yml',
-              ref: 'main',
-              inputs: {
-                sha: '${{ needs.generate.outputs.new_sha }}'
-              }
-            });
+        run: |
+          gh workflow run dev-release.yml \
+            --ref main \
+            --field sha=${{ needs.generate.outputs.new_sha }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
