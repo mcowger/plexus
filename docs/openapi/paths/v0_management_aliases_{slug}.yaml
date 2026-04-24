@@ -32,6 +32,29 @@ put:
       application/json:
         schema:
           $ref: ../components/schemas/AliasConfig.yaml
+        examples:
+          chat_alias:
+            summary: Chat model alias
+            value:
+              type: chat
+              targets:
+                - provider: openai
+                  model: gpt-4o
+              metadata:
+                pricing:
+                  input: 2.5
+                  output: 10
+                context_window: 128000
+          embeddings_alias:
+            summary: Embeddings model alias
+            value:
+              type: embeddings
+              targets:
+                - provider: openai
+                  model: text-embedding-3-small
+              metadata:
+                pricing:
+                  input: 0.02
   responses:
     '200':
       description: Saved.

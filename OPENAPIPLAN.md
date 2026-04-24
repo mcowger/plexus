@@ -1,9 +1,7 @@
-# OpenAPI Documentation Plan
+# OpenAPI Documentation Plan (COMPLETE)
 
 Goal: bring `docs/openapi/openapi.yaml` (the multi-file split entry point) to full parity with `docs/API.md` (and beyond),
-then delete `docs/API.md`. The target is **Option C** from the audit: every
-operation, schema property, parameter, and enum is documented, plus global
-narrative sections that replace the reference tables currently in API.md.
+then delete `docs/API.md`. **All phases complete.**
 
 The work is grouped into **15 independent phases**. Phase 1 ships shared
 vocabulary used by later phases; the rest can be done in any order. Each
@@ -650,10 +648,10 @@ green; rendered `preview-docs` reads as the primary reference.
 |  8 | OAuth provider onboarding               | ✅ done        | Session lifecycle diagram, all 10 endpoints documented |
 |  9 | Provider quotas                         | ✅ done        | All 4 quota endpoints + QuotaCheckerSnapshot + QuotaSample |
 | 10 | User quotas / enforcement               | ✅ done        | Definition CRUD + status + clear, QuotaStatus + 429 response |
-| 11 | Admin operational endpoints             | ⬜ not started |       |
-| 12 | MCP proxy                               | ⬜ not started |       |
-| 13 | Errors & common responses               | ⬜ not started |       |
-| 14 | Examples                                | ⬜ not started |       |
-| 15 | Cut-over (delete API.md)                | ⬜ not started |       |
+| 11 | Admin operational endpoints             | ✅ done        | /metrics, /logging, /restart, /test, /performance, /cooldowns, /huggingface |
+| 12 | MCP proxy                               | ✅ done        | /mcp/{name} JSON-RPC+SSE, .well-known/*, /register |
+| 13 | Errors & common responses               | ✅ done        | OpenAIError, AuthErrorBody, ValidationError, ProviderError, QuotaExceeded |
+| 14 | Examples                                | ✅ done        | Provider CRUD, aliases, keys, chat completions, messages, responses |
+| 15 | Cut-over (delete API.md)                | ✅ done        | Links updated, API.md deleted, README.md updated |
 
 Status legend: ⬜ not started · 🟨 in progress · ✅ done

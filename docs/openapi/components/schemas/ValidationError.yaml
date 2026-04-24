@@ -3,9 +3,45 @@ properties:
   error:
     type: string
     const: Validation failed
+    description: Fixed error type indicating validation failure.
+    example: Validation failed
   details:
     type: array
+    description: >
+      Array of validation issues. Each item is a Zod validation error
+      object describing a specific field failure.
+
+      Common fields in each detail object:
+      - `path` — Array of keys leading to the invalid field (e.g. `['body', 'model']`)
+      - `message` — Human-readable description of the failure
+      - `code` — Zod error code (e.g. 'invalid_type', 'invalid_enum_value')
+      - `expected` — Expected type or value
+      - `received` — Actual type or value received
     items:
       type: object
       additionalProperties: true
-description: Body failed schema validation.
+      description: Zod validation error object.
+description: >
+  Request body failed schema validation.
+
+  This response is returned when the request body does not conform to the
+  endpoint's expected schema. The `details` array contains one object per
+  validation failure, making it suitable for rendering error messages in
+  UI forms.
+
+  ## Example response
+
+  ```json
+  {
+    "error": "Validation failed",
+    "details": [
+      {
+        "path": ["body", "model"],
+        "message": "Expected string, received number",
+        "code": "invalid_type",
+        "expected": "string",
+        "received": "number"
+      }
+    ]
+  }
+  ```

@@ -460,9 +460,10 @@ For issues or questions:
 - **GitHub Issues**: https://github.com/mcowger/plexus/issues
 - **Documentation**: https://github.com/mcowger/plexus/tree/main/docs
 - **Configuration Reference**: [CONFIGURATION.md](CONFIGURATION.md)
+- **API Reference**: [/docs/openapi/openapi.yaml](/docs/openapi/openapi.yaml)
 
 ## See Also
 
 - [Configuration Guide](CONFIGURATION.md)
-- [API Reference](API.md)
+- [API Reference](/docs/openapi/openapi.yaml)
 - [Installation Guide](INSTALLATION.md)

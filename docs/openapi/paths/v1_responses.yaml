@@ -18,12 +18,21 @@ post:
             value:
               model: smart-model
               input: Explain quantum tunneling in one sentence.
-          continued:
+          continued_by_id:
             summary: Continue a prior response
             value:
               model: smart-model
               previous_response_id: resp_01H...
               input: Now translate that to Spanish.
+          multi_turn:
+            summary: Multi-turn conversation (via conversation ID)
+            value:
+              model: smart-model
+              conversation:
+                id: conv_01H...
+              input: How does that work at the cellular level?
+              store: true
+              temperature: 0.7
   responses:
     '200':
       description: A Responses API response.

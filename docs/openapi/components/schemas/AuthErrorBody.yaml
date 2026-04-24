@@ -5,16 +5,36 @@ properties:
     properties:
       message:
         type: string
+        description: Human-readable error message.
+        example: Invalid or missing API key
       type:
         type: string
         enum:
           - auth_error
           - forbidden
+        description: >
+          Error type category:
+          - `auth_error` — Authentication failed (missing, invalid, or expired
+            API key). Typically request has no `Authorization` header or
+            the key is not recognized.
+          - `forbidden` — Authentication succeeded but principal lacks permission
+            for the requested operation. Returned for limited principals trying
+            to access admin-only endpoints.
+        example: auth_error
       code:
         type: integer
+        description: HTTP status code.
+        example: 401
     required:
       - message
       - type
       - code
 required:
   - error
+description: >
+  Authentication error response.
+
+  Returned when:
+  - Request has no `Authorization` header (401)
+  - API key is invalid or revoked (401)
+  - API key belongs to a limited principal accessing admin-only endpoint (403)

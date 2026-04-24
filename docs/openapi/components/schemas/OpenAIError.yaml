@@ -5,26 +5,65 @@ properties:
     properties:
       message:
         type: string
+        description: Human-readable error message describing what went wrong.
+        example: The model 'gpt-4o' does not exist
       type:
         type: string
+        description: >
+          Error type category. Common values include:
+          - `invalid_request_error` — Malformed request or invalid parameter
+          - `authentication_error` — Invalid or missing API key
+          - `rate_limit_error` — Too many requests
+          - `invalid_api_key` — Key doesn't exist or is revoked
+          - `insufficient_quota` — No quota remaining
+          - `server_error` — Upstream provider internal error
+          - `api_error` — General API error
         example: invalid_request_error
       code:
         type:
           - string
           - integer
           - 'null'
+        description: >
+          Provider-specific error code, if any. May be a string (e.g.
+          'billing_oversubscribed') or integer (e.g. 429).
       param:
         type:
           - string
           - 'null'
+        description: >
+          The parameter that caused the error. Null if the error is not
+          parameter-specific.
+        example: model
       routing_context:
         type: object
-        description: >-
+        description: |
           Plexus-specific routing metadata attached when a dispatcher retry
           chain fails.
+
+          This field is populated when:
+          - Multiple providers were tried in sequence
+          - Each failed with an error
+          - The final error response includes context about what was tried
+
+          Example structure:
+          ```json
+          {
+            "routing_context": {
+              "providers_attempted": ["openai", "anthropic"],
+              "last_provider": "anthropic",
+              "attempt_count": 2
+            }
+          }
         additionalProperties: true
     required:
       - message
       - type
 required:
   - error
+description: >
+  OpenAI-compatible error response format.
+
+  Used by all inference endpoints when a request fails. The `error.type`
+  field follows OpenAI's error classification, with additional Plexus
+  extensions in `routing_context`.

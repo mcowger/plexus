@@ -1,4 +1,12 @@
-description: Missing or invalid `x-admin-key`.
+description: |
+  Missing or invalid admin key.
+
+  Returned when:
+  - Request to an admin-only endpoint has no `x-admin-key` header
+  - The provided admin key is invalid or doesn't match the configured key
+
+  Limited principals (non-admin) trying to access admin endpoints receive
+  a 403 `forbidden` error via the standard `AuthError` response, not this one.
 content:
   application/json:
     schema:

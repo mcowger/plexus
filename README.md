@@ -4,7 +4,7 @@
 
 <img src="docs/images/plexus_logo_transparent.png" alt="Plexus Logo" width="120"/>
 
-### [🚀 API Reference](docs/API.md) | [⚙️ Configuration](docs/CONFIGURATION.md) | [📦 Installation](docs/INSTALLATION.md) | [🔬 Testing](docs/TESTING.md)
+### [🚀 API Reference](/docs/openapi/openapi.yaml) | [⚙️ Configuration](docs/CONFIGURATION.md) | [📦 Installation](docs/INSTALLATION.md) | [🔬 Testing](docs/TESTING.md)
 
 Plexus is a high-performance API gateway that unifies access to multiple AI providers (OpenAI, Anthropic, Google, GitHub Copilot, and more) under a single endpoint. Switch models and providers without rewriting client code.
 
@@ -190,7 +190,7 @@ Plexus supports protocol translation between:
 
 A request sent in Anthropic format can be routed to an OpenAI provider — Plexus handles the transformation in both directions, including streaming and tool use.
 
-→ See [API Reference](docs/API.md)
+→ See [API Reference](/docs/openapi/openapi.yaml)
 
 ### OAuth Providers
 

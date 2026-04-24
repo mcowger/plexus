@@ -58,7 +58,38 @@ post:
                 - role: system
                   content: You are terse.
                 - role: user
-                  content: List 3 primes.
+                  content: Tell me about quantum computing.
+          with_tools:
+            summary: Call with tools
+            value:
+              model: smart-model
+              messages:
+                - role: user
+                  content: What is the weather in Tokyo?
+              tools:
+                - type: function
+                  function:
+                    name: get_weather
+                    description: Get weather for a location
+                    parameters:
+                      type: object
+                      properties:
+                        location:
+                          type: string
+                          description: City name
+                      required:
+                        - location
+          attribution:
+            summary: With attribution label
+            value:
+              model: fast-model
+              messages:
+                - role: user
+                  content: Hello
+              extra_body:
+                # In practice, add :label to your x-api-key header
+                # e.g., x-api-key: sk-abc:copilot
+                stream: false
   responses:
     '200':
       description: |

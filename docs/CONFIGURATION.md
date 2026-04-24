@@ -425,7 +425,7 @@ providers:
         hertzSession: "paste-session-cookie-here"
 ```
 
-Quota data is available via the Management API — see [API Reference: Quota Management](./API.md#quota-management).
+Quota data is available via the Management API — see [API Reference: Quota Management](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1quotas).
 
 ---
 
@@ -740,7 +740,7 @@ If you change a quota's `limitType`, Plexus automatically detects this and reset
 - `GET /v0/management/quota/status/:key` — quota status for a key
 - `POST /v0/management/quota/clear` — reset usage to zero
 
-See [API Reference: User Quota Enforcement](./API.md#user-quota-enforcement-api).
+See [API Reference: User Quota Enforcement](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1quota~1status~1{key}).
 
 ---
 
@@ -786,7 +786,7 @@ cooldown:
 - `DELETE /v0/management/cooldowns` — clear all cooldowns
 - `DELETE /v0/management/cooldowns/:provider?model=:model` — clear specific cooldown
 
-See [API Reference: Cooldown Management](./API.md#cooldown-management).
+See [API Reference: Cooldown Management](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1cooldowns).
 
 #### Disabling Cooldowns Per Provider
 

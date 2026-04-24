@@ -1,4 +1,56 @@
-description: Upstream provider returned an error or the dispatcher exhausted retries.
+description: |
+  Upstream provider returned an error or the dispatcher exhausted retries.
+
+  ## When this is returned
+
+  This response is returned by inference endpoints (`/v1/*`) when:
+  1. The upstream provider returns a 5xx error (server error)
+  2. Network failure occurs while calling the provider
+  3. The dispatcher exhausts all retry attempts
+
+  ## Response semantics
+
+  The response uses the `OpenAIError` schema but with specific type values:
+  - `type: server_error` — Provider returned 5xx
+  - `type: api_error` — Network or connection error
+
+  ## Fields that survive
+
+  When a request fails after multiple provider retries, the `routing_context`
+  field in the error contains metadata about the retry chain:
+  - `providers_attempted` — Array of provider slugs that were tried
+  - `last_provider` — The final provider that failed
+  - `attempt_count` — Number of providers attempted
+  - `errors` — Array of error messages from each attempt (if available)
+
+  ## Example
+
+  ```json
+  {
+    "error": {
+      "message": "All providers failed: last error: 503 Service Unavailable",
+      "type": "server_error",
+      "code": 503,
+      "routing_context": {
+        "providers_attempted": ["openai", "anthropic", "cerebras"],
+        "last_provider": "cerebras",
+        "attempt_count": 3
+      }
+    }
+  }
+  ```
+
+  ## Affected endpoints
+
+  - `POST /v1/chat/completions`
+  - `POST /v1/messages`
+  - `POST /v1/responses`
+  - `POST /v1/codex/responses`
+  - `POST /v1/embeddings`
+  - `POST /v1/audio/transcriptions`
+  - `POST /v1/audio/speech`
+  - `POST /v1/images/generations`
+  - `POST /v1/images/edits`
 content:
   application/json:
     schema:

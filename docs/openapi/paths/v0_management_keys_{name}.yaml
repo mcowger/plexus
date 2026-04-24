@@ -38,6 +38,24 @@ put:
       application/json:
         schema:
           $ref: ../components/schemas/KeyConfig.yaml
+        examples:
+          production_key:
+            summary: Production API key
+            value:
+              secret: sk-prod-xxxxx
+              comment: Production API key for web app
+              allowedProviders:
+                - openai
+                - anthropic
+              quota: premium_daily
+          development_key:
+            summary: Development API key
+            value:
+              secret: sk-dev-xxxxx
+              comment: Development/testing key
+              allowedModels:
+                - fast-model
+                - cheap-model
   responses:
     '200':
       description: Saved.
