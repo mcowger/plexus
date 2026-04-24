@@ -4,12 +4,43 @@ parameters:
     required: true
     schema:
       type: string
-    description: HuggingFace repo id, URL-encoded (e.g. `mistralai%2FMixtral-8x7B`).
+    description: >
+      HuggingFace repo ID, URL-encoded (e.g. `mistralai%2FMixtral-8x7B`).
+      The `/` character must be encoded as `%2F`.
 get:
   tags:
     - Management — Models
   summary: Fetch model architecture from HuggingFace (admin only)
-  description: Used by the energy-usage estimator to populate layer/head counts.
+  description: |
+    Fetches model architecture parameters from HuggingFace for use by the
+    energy-usage estimator.
+
+    ## Use case
+
+    The energy-usage estimator needs layer count, head count, and parameter
+    totals to calculate kWh consumed. This endpoint fetches that data from
+    HuggingFace's model card.
+
+    ## Rate limiting
+
+    - HuggingFace API has rate limits; repeated calls may be throttled
+    - Responses are cached in Plexus to reduce unnecessary calls
+
+    ## Response fields
+
+    - `success` — Whether the fetch succeeded
+    - `model_id` — The model ID queried
+    - `architecture` — Model architecture parameters:
+      - `total_params` — Total parameters in billions (estimated)
+      - `active_params` — Active (non-quantized) parameters
+      - `layers` — Number of transformer layers
+      - `heads` — Number of attention heads
+      - `kv_lora_rank` — KV quantization rank (if applicable)
+      - `qk_rope_head_dim` — QK RoPE head dimension (if applicable)
+      - `context_length` — Maximum context window
+      - `dtype` — Model data type (e.g. `float16`, `bfloat16`)
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

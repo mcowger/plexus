@@ -2,6 +2,17 @@ get:
   tags:
     - MCP Proxy
   summary: OpenID Connect discovery (public)
+  description: |
+    Returns OpenID Connect discovery document for MCP client compatibility.
+
+    ## Use case
+
+    MCP clients use this endpoint to discover OIDC configuration, including
+    supported token types, issuer URL, and other OAuth/OIDC parameters.
+
+    **Not functional OIDC** — This exists for MCP client compatibility.
+
+    **No auth** — This endpoint is public.
   security: []
   responses:
     '200':

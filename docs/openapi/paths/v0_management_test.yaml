@@ -4,8 +4,36 @@ post:
   summary: Synthetic test inference (admin only)
   description: |
     Runs a short inference request directly against a (provider, model)
-    pair, bypassing alias resolution. Used by the admin UI's "test"
-    button next to each alias target.
+    pair, bypassing alias resolution.
+
+    ## Use case
+
+    Used by the admin UI's "test" button next to each alias target. Allows
+    testing a specific provider/model combination without going through
+    the normal routing pipeline.
+
+    ## Direct bypass
+
+    Unlike normal inference, this endpoint:
+    - Bypasses alias resolution — uses provider/model directly
+    - Uses only the provider's base URL and API key from config
+    - No retries, cooldowns, or quota checks applied
+    - Short timeout (typically 30s)
+
+    ## Response
+
+    Returns 200 even on failure (`success: false`). This is intentional —
+    the UI needs to render error messages from failed tests, not treat them
+    as HTTP errors.
+
+    ## Request fields
+
+    - `provider` — Provider slug (e.g. `openai`, `anthropic`)
+    - `model` — Model name (e.g. `gpt-4o`, `claude-3-opus`)
+    - `apiType` — API type (default: `chat`). Options: `chat`, `messages`,
+      `gemini`, `responses`, `embeddings`, `images`, `speech`, `oauth`
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -17,8 +45,12 @@ post:
           properties:
             provider:
               type: string
+              description: Provider slug from config (e.g. `openai`, `anthropic`).
+              example: openai
             model:
               type: string
+              description: Model name to test.
+              example: gpt-4o
             apiType:
               type: string
               enum:
@@ -31,14 +63,13 @@ post:
                 - speech
                 - oauth
               default: chat
+              description: API type to use.
           required:
             - provider
             - model
   responses:
     '200':
-      description: >-
-        Test outcome. `success=false` still returns 200 with an error message so
-        the UI can render it.
+      description: Test outcome (success or failure).
       content:
         application/json:
           schema:
@@ -46,14 +77,32 @@ post:
             properties:
               success:
                 type: boolean
+                description: Whether the test request succeeded.
               durationMs:
                 type: integer
+                description: Time taken for the request.
               apiType:
                 type: string
+                description: The API type used.
               response:
                 type: string
+                description: Response body (truncated if large).
               error:
                 type: string
+                description: Error message if success is false.
+          examples:
+            success:
+              value:
+                success: true
+                durationMs: 1234
+                apiType: chat
+                response: "Hello! How can I help you?"
+            failure:
+              value:
+                success: false
+                durationMs: 567
+                apiType: chat
+                error: "401 Unauthorized - invalid API key"
     '401':
       description: Authentication required or invalid credentials.
   operationId: postV0ManagementTest

@@ -305,7 +305,33 @@ tags:
   - name: Events
     description: Server-Sent Event streams.
   - name: MCP Proxy
-    description: JSON-RPC/SSE proxy for configured MCP servers plus OAuth discovery.
+    description: >-
+      JSON-RPC/SSE proxy for configured MCP servers plus OAuth discovery.
+
+      ### Header forwarding rules
+
+      - Client `Authorization` header is **stripped** — not forwarded to
+        upstream servers.
+      - Client `x-api-key` header is **stripped** — not forwarded.
+      - Static `headers` from the server's config are forwarded to the
+        upstream.
+
+      ### Redaction
+
+      Sensitive headers are removed from requests flowing through the
+      proxy. Only configured static headers from `mcp_servers` are used.
+
+      ### Session semantics
+
+      Each proxy connection maintains a session with the upstream MCP
+      server. Sessions are per-connection and terminate when the client
+      disconnects or `DELETE` is called.
+
+      ### OAuth discovery endpoints
+
+      The `.well-known/*` and `/register` endpoints exist solely for MCP
+      client compatibility — they return static metadata and don't
+      perform functional OAuth.
 security:
   - PlexusApiKey: []
 paths:

@@ -2,7 +2,28 @@ get:
   tags:
     - Management — Cooldowns
   summary: List active cooldowns
-  description: Providers configured with disable_cooldown=true never appear here.
+  description: |
+    Returns all providers/models currently in cooldown due to consecutive
+    failures.
+
+    ## Trigger conditions
+
+    A provider/model enters cooldown when:
+    - Configured with `disable_cooldown: false` (default)
+    - Has had multiple consecutive failed requests
+    - The failure threshold is provider-specific
+
+    ## Excluded providers
+
+    Providers configured with `disable_cooldown: true` in `plexus.yaml`
+    never appear in this list, regardless of failures.
+
+    ## Admin-only
+
+    This endpoint is available to both admin and limited principals,
+    but limited principals only see cooldowns for their own key's usage.
+
+    **Admin access:** full list. **Limited access:** scoped to own key.
   security:
     - AdminKey: []
   responses:
@@ -21,6 +42,21 @@ delete:
   tags:
     - Management — Cooldowns
   summary: Clear all cooldowns (admin only)
+  description: |
+    Removes cooldown state from all providers/models.
+
+    ## Use cases
+
+    - Manually clear cooldowns after resolving an upstream issue
+    - Force all providers back into service after an outage
+    - Testing: reset cooldown state for reproducible tests
+
+    ## Note
+
+    This is admin-only because clearing cooldowns can lead to immediate
+    request failures if the upstream is still unhealthy.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

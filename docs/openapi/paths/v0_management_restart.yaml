@@ -3,9 +3,27 @@ post:
     - Management — Restart
   summary: Gracefully restart the process (admin only)
   description: |
-    Closes Fastify and exits with status 0. The process manager (systemd,
-    Docker, PM2, etc.) is responsible for restarting the binary. The
-    response is sent before the shutdown begins.
+    Initiates a graceful shutdown and exits with status 0.
+
+    ## Process manager assumption
+
+    This endpoint assumes a process manager is running (systemd, Docker,
+    PM2, etc.) that will automatically restart the Plexus binary after
+    exit.
+
+    ## Behaviour
+
+    - `SIGTERM` is sent to initiate graceful shutdown
+    - Fastify stops accepting new connections
+    - In-flight requests are allowed to complete
+    - Server exits with code 0
+
+    ## Alternative
+
+    For non-graceful restart, the process manager may be configured to
+    send `SIGKILL` after a timeout.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

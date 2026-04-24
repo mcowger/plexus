@@ -2,6 +2,29 @@ get:
   tags:
     - Management — Performance
   summary: Per (provider, model) TTFT / throughput aggregates (admin only)
+  description: |
+    Returns aggregated performance statistics for each (provider, model)
+    combination.
+
+    ## Data source
+
+    Performance data is stored in the `performance` table. Statistics are
+    aggregated from individual request samples with automatic windowing.
+
+    ## Query parameters
+
+    - `provider` — Filter by provider slug (optional)
+    - `model` — Filter by model name (optional)
+
+    When both are omitted, returns all performance data.
+
+    ## Sample aggregation
+
+    - Samples are grouped by (provider, model)
+    - Error responses and failed streams are excluded from `sample_count`
+    - The aggregation window is adaptive based on data volume
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   parameters:
@@ -9,10 +32,12 @@ get:
       name: provider
       schema:
         type: string
+      description: Filter by provider slug.
     - in: query
       name: model
       schema:
         type: string
+      description: Filter by model name.
   responses:
     '200':
       description: Rows.
@@ -29,6 +54,25 @@ delete:
   tags:
     - Management — Performance
   summary: Delete aggregated performance data for a model (admin only)
+  description: |
+    Deletes all performance statistics for a specific model.
+
+    ## Query parameters
+
+    - `model` — **Required.** Model name to delete data for.
+
+    ## Use case
+
+    - Clear stale performance data after a model change
+    - Reset counters for a model that's being reconfigured
+    - Free up database space for unused models
+
+    ## Note
+
+    This deletes data across all providers for the specified model. There
+    is no way to delete data for a specific (provider, model) pair only.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   parameters:
@@ -37,6 +81,7 @@ delete:
       required: true
       schema:
         type: string
+      description: Model name to delete data for.
   responses:
     '200':
       description: Success.
@@ -51,5 +96,7 @@ delete:
               model:
                 type: string
     '400':
-      description: Missing `model`.
+      description: Missing `model` query parameter.
+    '401':
+      description: Authentication required or invalid credentials.
   operationId: deleteV0ManagementPerformance

@@ -3,19 +3,68 @@ get:
     - Management — Metrics
   summary: Prometheus-format scrape endpoint (admin only)
   description: |
-    Prometheus text exposition 0.0.4. Results are cached for
-    `PLEXUS_METRICS_CACHE_TTL_MS` milliseconds (default 15 s); the
-    `X-Metrics-Cache: HIT|MISS` header indicates whether the cache
-    served the response. See `GRAFANA.md` at the repo root for PromQL
-    examples.
+    Returns Prometheus metrics in text exposition format 0.0.4.
+
+    ## Caching
+
+    Results are cached for `PLEXUS_METRICS_CACHE_TTL_MS` milliseconds
+    (default 15 seconds). The `X-Metrics-Cache` response header indicates:
+    - `HIT` — Response served from cache
+    - `MISS` — Fresh scrape performed
+
+    ## Metric families (~40 total)
+
+    ### Cumulative counters
+    - `plexus_requests_total` — Total inference requests by API type
+    - `plexus_tokens_total` — Total tokens processed (input/output/cached)
+    - `plexus_cost_total` — Total spend in dollars
+
+    ### Today's metrics
+    - `plexus_requests_today` — Requests in current local day
+    - `plexus_tokens_today` — Tokens in current local day
+    - `plexus_cost_today` — Cost in current local day
+
+    ### Per-provider metrics
+    - `plexus_provider_requests` — Requests per provider
+    - `plexus_provider_tokens` — Tokens per provider
+    - `plexus_provider_cost` — Cost per provider
+
+    ### Per-model metrics
+    - `plexus_model_requests` — Requests per model alias
+    - `plexus_model_tokens` — Tokens per model alias
+
+    ### Performance metrics
+    - `plexus_ttft_seconds` — Time to first token (histogram)
+    - `plexus_tp_seconds` — Tokens per second (histogram)
+
+    ### Cooldown metrics
+    - `plexus_cooldown_active` — Currently in cooldown (gauge)
+    - `plexus_cooldown_seconds_remaining` — Seconds until cooldown expires
+
+    ### In-flight metrics
+    - `plexus_in_flight` — Current requests being processed (gauge)
+
+    ## Example scrape
+
+    ```
+    # HELP plexus_requests_total Total requests
+    # TYPE plexus_requests_total counter
+    plexus_requests_total{api_type="chat"} 1234
+    plexus_requests_total{api_type="messages"} 567
+
+    # HELP plexus_cost_total Total cost in USD
+    # TYPE plexus_cost_total counter
+    plexus_cost_total 42.50
+    ```
+
+    See `GRAFANA.md` at the repo root for PromQL examples.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
     '200':
-      description: >-
-        Prometheus text body. Metric families include `plexus_requests_total`,
-        `plexus_tokens_total`, `plexus_provider_*`, `plexus_perf_*`,
-        `plexus_cooldown_*`, etc.
+      description: Prometheus text body.
       headers:
         X-Metrics-Cache:
           schema:
@@ -23,12 +72,24 @@ get:
             enum:
               - HIT
               - MISS
+          description: >
+            - HIT: response served from cache
+            - MISS: fresh scrape performed
+          examples:
+            hit:
+              value: HIT
+            miss:
+              value: MISS
       content:
         text/plain:
           schema:
             type: string
+          example: |
+            # HELP plexus_requests_total Total requests
+            # TYPE plexus_requests_total counter
+            plexus_requests_total{api_type="chat"} 1234
     '401':
       description: Authentication required or invalid credentials.
     '500':
-      description: Scrape failed; an error comment is returned.
+      description: Scrape failed; an error comment is returned in the body.
   operationId: getV0ManagementMetrics

@@ -2,6 +2,27 @@ get:
   tags:
     - MCP Proxy
   summary: OAuth 2.0 authorization server metadata (public)
+  description: |
+    Returns OAuth 2.0 authorization server metadata for MCP client
+    compatibility.
+
+    ## Use case
+
+    MCP clients use this endpoint to discover OAuth configuration. The
+    response indicates that bearer token authentication is supported.
+
+    ## Response
+
+    Static metadata describing the authorization server. The exact content
+    varies by configuration but typically includes:
+    - `issuer` — Authorization server identifier
+    - `token_endpoint` — Where to request tokens
+    - `grant_types` — Supported grant types
+
+    **Not functional OAuth** — This exists for MCP client compatibility;
+    the actual OAuth flow is handled differently in Plexus.
+
+    **No auth** — This endpoint is public.
   security: []
   responses:
     '200':

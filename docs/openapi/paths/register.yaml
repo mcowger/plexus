@@ -2,6 +2,30 @@ post:
   tags:
     - MCP Proxy
   summary: Dynamic MCP client registration (public, static response)
+  description: |
+    Returns a static client registration record for MCP client compatibility.
+
+    ## Use case
+
+    MCP clients that support dynamic registration require this endpoint.
+    Plexus returns a static response indicating a pre-registered client.
+
+    ## Response
+
+    A static registration record:
+    - `client_id` — Fixed value: `plexus-mcp-static`
+    - `client_id_issued_at` — Unix timestamp
+    - `client_secret` — Empty (not used)
+    - `grant_types` — Supported grant types
+    - `token_endpoint_auth_method` — Authentication method for token endpoint
+
+    ## Note
+
+    This is a **static response** — it doesn't actually register new clients.
+    The endpoint exists solely for MCP client compatibility with clients
+    that expect this metadata before connecting.
+
+    **No auth** — This endpoint is public.
   security: []
   responses:
     '201':

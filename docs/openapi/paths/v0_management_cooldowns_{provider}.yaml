@@ -4,10 +4,28 @@ parameters:
     required: true
     schema:
       type: string
+    description: Provider slug.
 delete:
   tags:
     - Management — Cooldowns
   summary: Clear cooldowns for a provider (admin only)
+  description: |
+    Removes cooldown state from a specific provider, optionally scoped to
+    a single model.
+
+    ## Query parameters
+
+    - `model` (optional) — When provided, only clears cooldowns for the
+      specific (provider, model) pair. When omitted, clears all cooldowns
+      for the provider.
+
+    ## Use cases
+
+    - Clear cooldowns for a specific provider after it recovers
+    - Target a single model within a provider (e.g., `gpt-4o` within `openai`)
+    - Selective recovery without affecting other providers
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   parameters:

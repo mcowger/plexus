@@ -5,15 +5,38 @@ parameters:
     schema:
       type: string
       pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
-    description: The `mcp_servers` key from config.
+    description: >
+      MCP server name matching a key in `mcp_servers` config. Must match
+      regex `^[a-z0-9][a-z0-9-_]{1,62}$`.
 post:
   tags:
     - MCP Proxy
   summary: JSON-RPC message exchange
   description: |
-    Forwards the JSON-RPC body to the configured upstream MCP server.
-    Client `Authorization` / `x-api-key` headers are **not** forwarded;
-    only the static `headers` in the server's config are used upstream.
+    Forwards JSON-RPC requests to a configured upstream MCP server.
+
+    ## Header handling
+
+    - Client `Authorization` header is **stripped** — not forwarded
+    - Client `x-api-key` header is **stripped** — not forwarded
+    - Only the static `headers` from the server's config are forwarded
+      to the upstream
+
+    ## Response modes
+
+    - **JSON response** — Standard JSON-RPC response
+    - **Streamed (`text/event-stream`)** — Server-sent events for
+      long-running operations
+
+    ## Error codes
+
+    - `400` — Invalid server name (doesn't match regex)
+    - `404` — Server not found or disabled in config
+    - `502` — Upstream MCP server returned an error
+    - `504` — Upstream request timed out
+
+    **No auth** — MCP proxy endpoints are unauthenticated.
+  operationId: postMcpByname
   requestBody:
     required: true
     content:
@@ -22,6 +45,11 @@ post:
           type: object
           additionalProperties: true
           description: JSON-RPC 2.0 request object.
+        example:
+          jsonrpc: "2.0"
+          id: 1
+          method: tools/list
+          params: {}
   responses:
     '200':
       description: JSON-RPC response (possibly streamed).
@@ -41,11 +69,30 @@ post:
       description: Upstream error.
     '504':
       description: Upstream timeout.
-  operationId: postMcpByname
 get:
   tags:
     - MCP Proxy
   summary: SSE stream to the upstream MCP server
+  description: |
+    Establishes a Server-Sent Events stream to the upstream MCP server.
+
+    ## Use case
+
+    Some MCP servers use SSE for real-time event delivery. This endpoint
+    proxies that stream to the client.
+
+    ## Query string passthrough
+
+    Any query parameters on the request are forwarded to the upstream
+    MCP server unchanged.
+
+    ## Headers
+
+    - Upstream connection headers from the server's config are forwarded
+    - Client authentication headers are stripped
+
+    **No auth** — MCP proxy endpoints are unauthenticated.
+  operationId: getMcpByname
   responses:
     '200':
       description: Event stream.
@@ -55,11 +102,20 @@ get:
             type: string
     '401':
       description: Authentication required or invalid credentials.
-  operationId: getMcpByname
 delete:
   tags:
     - MCP Proxy
   summary: Upstream session termination
+  description: |
+    Signals the upstream MCP server to terminate the session.
+
+    ## Use case
+
+    Cleanly closes the connection to the upstream MCP server. May trigger
+    cleanup handlers on the upstream.
+
+    **No auth** — MCP proxy endpoints are unauthenticated.
+  operationId: deleteMcpByname
   responses:
     '200':
       description: Success.
@@ -67,4 +123,3 @@ delete:
       description: No content.
     '401':
       description: Authentication required or invalid credentials.
-  operationId: deleteMcpByname

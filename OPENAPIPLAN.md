@@ -648,9 +648,8 @@ green; rendered `preview-docs` reads as the primary reference.
 |  6 | Configuration CRUD                      | ✅ done        | Config schemas + all CRUD operations documented |
 |  7 | Self-service / principal                | ✅ done        | /self/* endpoints, dual admin/limited behavior |
 |  8 | OAuth provider onboarding               | ✅ done        | Session lifecycle diagram, all 10 endpoints documented |
-|  8 | OAuth provider onboarding               | ⬜ not started |       |
-|  9 | Provider quotas                         | ⬜ not started |       |
-| 10 | User quotas / enforcement               | ⬜ not started |       |
+|  9 | Provider quotas                         | ✅ done        | All 4 quota endpoints + QuotaCheckerSnapshot + QuotaSample |
+| 10 | User quotas / enforcement               | ✅ done        | Definition CRUD + status + clear, QuotaStatus + 429 response |
 | 11 | Admin operational endpoints             | ⬜ not started |       |
 | 12 | MCP proxy                               | ⬜ not started |       |
 | 13 | Errors & common responses               | ⬜ not started |       |

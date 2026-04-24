@@ -2,6 +2,25 @@ get:
   tags:
     - Management — Logging
   summary: Get current log level (admin only)
+  description: |
+    Returns the current runtime log level and the startup-derived level.
+
+    ## Response fields
+
+    - `current` — The actively applied log level
+    - `startup` — The level derived from `LOG_LEVEL` env var at startup
+
+    ## Log levels
+
+    In order of verbosity (least to most):
+    - `error` — Only errors
+    - `warn` — Warnings and errors
+    - `info` — Informational messages, warnings, errors
+    - `debug` — Debug and above
+    - `verbose` — Verbose debugging
+    - `silly` — Maximum verbosity
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -18,7 +37,26 @@ put:
   tags:
     - Management — Logging
   summary: Set current log level (admin only)
-  description: Runtime-only; resets on process restart.
+  description: |
+    Changes the runtime log level immediately.
+
+    ## Runtime-only
+
+    This change persists only for the current process lifetime. When the
+    server restarts, the level reverts to the startup-derived level
+    (`startup` field).
+
+    ## Use cases
+
+    - Increase verbosity to debug an issue without restarting
+    - Reduce noise in production by temporarily setting to `error`
+
+    ## Validation
+
+    Invalid levels return 400. Valid levels: `error`, `warn`, `info`,
+    `debug`, `verbose`, `silly`.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -30,7 +68,15 @@ put:
           properties:
             level:
               type: string
+              enum:
+                - error
+                - warn
+                - info
+                - debug
+                - verbose
+                - silly
               example: debug
+              description: Target log level.
           required:
             - level
   responses:
@@ -42,11 +88,31 @@ put:
             $ref: ../components/schemas/LoggingLevelState.yaml
     '400':
       description: Unsupported level.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
   operationId: putV0ManagementLoggingLevel
 delete:
   tags:
     - Management — Logging
   summary: Reset log level to startup default (admin only)
+  description: |
+    Reverts the current log level to the startup-derived level.
+
+    ## Use case
+
+    After debugging with a temporary log level, `DELETE` to restore the
+    original configuration without restarting the server.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
