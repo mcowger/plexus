@@ -21,6 +21,13 @@ properties:
       - GET
       - POST
       - DELETE
+    description: >-
+      HTTP method used for the MCP proxy request.
+
+      - **GET** — Opens an SSE stream for server-to-client notifications.
+      - **POST** — Sends a JSON-RPC message exchange (initialize, tool calls,
+        etc.).
+      - **DELETE** — Terminates an upstream MCP session.
   jsonrpc_method:
     type:
       - string

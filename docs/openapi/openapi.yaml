@@ -5,15 +5,24 @@ info:
   summary: >-
     Unified gateway for LLM provider APIs with usage tracking, quotas,
     cooldowns, and an admin management plane.
-  description: >
+  description: >-
+    Plexus is a unified API gateway for LLM providers. It exposes
+    OpenAI-, Anthropic-, and Gemini-compatible endpoints and routes
+    requests to any backend provider, handling request/response
+    transformation automatically.
+
+
+    ## Surfaces
+
+
     Plexus exposes three logical surfaces:
 
 
     1. **Inference APIs** (`/v1/*`, `/v1beta/*`) — OpenAI-, Anthropic-, and
-    Gemini-
-       compatible endpoints that transparently fan out to configured upstream
-       providers. Authenticated with a Plexus API key (see the
-       [`PlexusApiKey`](#/components/securitySchemes/PlexusApiKey) security scheme).
+       Gemini-compatible endpoints that transparently fan out to configured
+       upstream providers. Authenticated with a Plexus API key (see the
+       [`PlexusApiKey`](#/components/securitySchemes/PlexusApiKey) security
+       scheme).
 
     2. **Management APIs** (`/v0/management/*`) — Administrative operations
        (configuration CRUD, usage analytics, debug tracing, quotas, OAuth
@@ -27,6 +36,7 @@ info:
        database-registered MCP servers. Plus unauthenticated MCP OAuth
        discovery under `/.well-known/*` and `POST /register`.
 
+
     ## Authentication
 
 
@@ -37,62 +47,100 @@ info:
 
 
     | Location | Example |
-
     |---|---|
-
     | `Authorization` header (Bearer) | `Authorization: Bearer sk-my-key` |
-
-    | `Authorization` header (no prefix) | `Authorization: sk-my-key` (server
-    prepends `Bearer`) |
-
+    | `Authorization` header (no prefix) | `Authorization: sk-my-key` (server prepends `Bearer`) |
     | `x-api-key` header | `x-api-key: sk-my-key` |
-
     | `x-goog-api-key` header | `x-goog-api-key: sk-my-key` |
-
     | `?key=` query parameter | `GET /v1/models?key=sk-my-key` |
 
 
     Keys are matched against the `secret` field of entries in the `keys`
-
-    configuration table. Append `:label` to a key to tag every resulting
-
-    usage record with an `attribution` label (e.g. `sk-abc:copilot`).
+    configuration table.
 
 
     ### Management (`AdminKey`)
 
 
     Pass the header `x-admin-key: <value>`. A successful match with
-
     `process.env.ADMIN_KEY` produces an `admin` principal. Any other value
-
     is checked against `keys[*].secret` — a match yields a `limited`
-
     principal scoped to its own key's usage/debug/error records. Limited
-
     principals are rejected (403) from endpoints documented as admin-only.
 
 
     Use `GET /v0/management/auth/verify` to test a candidate admin/key
-
     credential before storing it in the dashboard.
+
+
+    ## Dynamic key attribution
+
+
+    Append `:label` to a Plexus API key (e.g. `sk-abc:copilot`) to tag
+    every resulting usage record with an `attribution` label. The label
+    surfaces in the `UsageRecord.attribution` field and in
+    `api_key_attribution_*` Prometheus metrics.
+
+
+    ## Principal model
+
+
+    The `x-admin-key` header resolves to one of two principal types:
+
+
+    - **`admin`** — full access to every management endpoint. Matched when
+      the header equals `process.env.ADMIN_KEY`.
+    - **`limited`** — scoped to the key's own usage, debug, and error
+      records. Matched when the header equals a configured key's `secret`.
+      Limited principals are rejected (403) from admin-only endpoints.
+
+    On `/v0/management/self/*` routes an `admin` principal can impersonate
+    any key by passing `?keyName=<name>`.
+
+
+    ## Header forwarding
+
+
+    The following client headers, when present, are forwarded to upstream
+    providers and echoed into `plexus_metadata.clientHeaders` on the usage
+    record:
+
+
+    - `x-app` — application identifier.
+    - `session_id` — client session identifier.
+    - `x-client-request-id` — client-supplied request correlation ID.
+
+
+    ## Environment variables
+
+
+    Key environment variables that affect runtime behaviour:
+
+
+    | Variable | Purpose |
+    |---|---|
+    | `ADMIN_KEY` | Master admin key for management endpoints. |
+    | `CONFIG_FILE` | Path to the YAML configuration file. |
+    | `LOG_LEVEL` | Runtime log level (`error`, `warn`, `info`, `debug`, `verbose`, `silly`). |
+    | `DEBUG` | Set to `true` to enable debug log capture at startup. |
+    | `PLEXUS_METRICS_CACHE_TTL_MS` | TTL for the Prometheus metrics cache in milliseconds. |
+    | `DATABASE_URL` | Connection string for PostgreSQL (omit for SQLite). |
+    | `ENCRYPTION_KEY` | Key used to encrypt secrets at rest. |
+
+
+    See `docs/CONFIGURATION.md` for the full list and configuration file
+    format.
 
 
     ## Public endpoints (no auth)
 
 
     - `GET /health`
-
     - `GET /v1/models`
-
     - `GET /v1/openrouter/models`
-
     - `GET /v1/metadata/search`
-
     - `GET /v1/metadata/lookup`
-
     - All `/.well-known/*` MCP discovery endpoints
-
     - `POST /register` (MCP dynamic client registration)
   license:
     name: MIT
@@ -114,7 +162,18 @@ tags:
   - name: Health
     description: Liveness probe.
   - name: Inference — Chat
-    description: OpenAI Chat Completions compatible.
+    description: >-
+      OpenAI Chat Completions compatible.
+
+      Requests are dispatched through the transformer pipeline: the `model`
+      field is resolved against configured aliases, the request is
+      transformed to the target provider format, the upstream call is made,
+      and the response is transformed back.
+
+      When an upstream provider fails, Plexus retries across alternate
+      targets per the failover policy. Providers that return consecutive
+      errors are placed on exponential-backoff cooldown (see the
+      `Management — Cooldowns` tag).
   - name: Inference — Messages
     description: Anthropic Messages compatible.
   - name: Inference — Responses
@@ -134,7 +193,18 @@ tags:
   - name: Management — Config
     description: Providers, aliases, keys, system settings, MCP servers.
   - name: Management — Usage
-    description: Request-level usage records and time-series aggregates.
+    description: >-
+      Request-level usage records and time-series aggregates.
+
+      ### Cost source semantics
+
+      | `costSource` | Meaning |
+      |---|---|
+      | `default` | No pricing configured; all cost fields are zero. |
+      | `simple` | Per-token pricing from `input_price_per_million` / `output_price_per_million` on the model. |
+      | `openrouter` | Pricing fetched from OpenRouter at request time. |
+      | `defined` | Explicit pricing ranges from `pricing.range` in model config. |
+      | `per_request` | Flat fee per call; full amount in `costInput`, others zero. |
   - name: Management — Debug
     description: Per-request debug capture toggles and logs.
   - name: Management — Errors
@@ -150,9 +220,55 @@ tags:
   - name: Management — Logging
     description: Runtime log-level control.
   - name: Management — OAuth
-    description: Per-provider OAuth onboarding sessions (pi-ai).
+    description: >-
+      Per-provider OAuth onboarding sessions (pi-ai).
+
+      Sessions follow a state machine:
+
+      ```
+      waiting → prompt ↔ manual-code → complete
+                 \            |
+                  → cancelled ←
+                  → failed
+      ```
+
+      - **waiting** — session created, waiting for user to open the auth URL.
+      - **prompt** — provider requires a user confirmation (e.g. "yes").
+      - **manual-code** — provider requires a manually pasted auth code
+        (e.g. Codex CLI, Claude Code).
+      - **complete** — credentials stored, provider ready.
+      - **failed** — authentication error.
+      - **cancelled** — user cancelled the session.
+
+      Providers that use the callback server (`usesCallbackServer: true`)
+      transition automatically; others require manual code paste.
   - name: Management — Quotas (Provider)
-    description: Upstream provider quota checkers (`checkerId`-based).
+    description: >-
+      Upstream provider quota checkers (`checkerId`-based).
+
+      Each checker periodically polls an upstream provider for its current
+      quota utilisation and stores a `QuotaSample` snapshot.
+
+      ### Window types
+
+      | Window Type | Description |
+      |---|---|
+      | `subscription` | Monthly/billing-cycle quota or prepaid balance. |
+      | `hourly` | Hourly rolling window. |
+      | `five_hour` | 5-hour rolling window (Anthropic). |
+      | `daily` | Daily reset quota. |
+      | `weekly` | 7-day rolling window (Anthropic). |
+      | `monthly` | Calendar month quota. |
+      | `custom` | Provider-specific window. |
+
+      ### Status thresholds
+
+      | Status | Utilisation | Description |
+      |---|---|---|
+      | `ok` | 0–75% | Healthy, plenty of quota remaining. |
+      | `warning` | 75–90% | Approaching exhaustion. |
+      | `critical` | 90–100% | Near exhaustion, take action soon. |
+      | `exhausted` | 100% | Quota fully consumed, requests will fail. |
   - name: Management — Quotas (User)
     description: Per-API-key quota definitions and enforcement.
   - name: Management — Test

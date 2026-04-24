@@ -18,6 +18,17 @@ properties:
       - transcriptions
       - speech
       - image
+    description: >-
+      Inference API type this alias targets.
+
+      - **chat** — OpenAI Chat Completions.
+      - **messages** — Anthropic Messages.
+      - **responses** — OpenAI Responses API.
+      - **gemini** — Google Gemini.
+      - **embeddings** — OpenAI Embeddings.
+      - **transcriptions** — OpenAI Audio Transcriptions.
+      - **speech** — OpenAI Audio Speech.
+      - **image** — OpenAI Images generation/edit.
   metadata:
     type: object
     additionalProperties: true
