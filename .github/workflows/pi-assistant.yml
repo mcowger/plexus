@@ -27,6 +27,13 @@ jobs:
         with:
           node-version: 24
 
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
       - uses: mcowger/pi-coding-agent-action@refs/heads/v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
