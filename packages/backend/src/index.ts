@@ -1,5 +1,6 @@
 // Check for subcommands (e.g. `./plexus rekey`) before starting the server.
 // This allows Docker users to run CLI tools without needing the source code.
+// Yup
 const subcommand = process.argv[2];
 if (subcommand === 'rekey') {
   const { rekeyMain } = await import('./cli/rekey');
