@@ -5,15 +5,25 @@ parameters:
     schema:
       type: string
       format: uuid
+    description: The request ID of the usage record to delete.
 delete:
   tags:
     - Management — Usage
   summary: Delete a single usage record (admin only)
+  description: |
+    Delete a specific usage record by its request ID.
+
+    **Admin only** — limited principals receive 403.
+
+    - Returns 404 if the record doesn't exist or belongs to a different key
+      (for limited principals).
   security:
     - AdminKey: []
   responses:
     '200':
       $ref: ../components/responses/SuccessTrue.yaml
+    '401':
+      description: Authentication required or invalid credentials.
     '404':
-      description: Not found.
+      description: Record not found.
   operationId: deleteV0ManagementUsageByrequestId

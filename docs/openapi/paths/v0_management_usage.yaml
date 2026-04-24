@@ -4,8 +4,25 @@ get:
   summary: List usage records
   description: |
     Filterable, paginated, optionally-projected listing of request-level
-    usage records. Limited principals are force-scoped to their own
-    `apiKey`, regardless of query parameters.
+    usage records.
+
+    ## Scoping
+
+    Limited principals are force-scoped to their own `apiKey`, regardless
+    of query parameters. Admins see all records.
+
+    ## Query parameters
+
+    - **sortBy** — Field to sort by: `date`, `apiKey`, `provider`,
+      `incomingModelAlias`, `costTotal`, `durationMs`. Default: `date`.
+    - **startDate / endDate** — ISO 8601 timestamps. Filter records to
+      requests that started within the range.
+    - **fields** — Comma-separated projection (e.g. `requestId,date,costTotal`).
+      Unknown field names are silently omitted. When unset, returns all fields.
+    - **responseStatus** — Filter by outcome: `success` or `error`.
+    - **minDurationMs / maxDurationMs** — Filter by request duration range.
+
+    Note: `limit` caps at 500, `offset` enables pagination.
   security:
     - AdminKey: []
   parameters:
@@ -98,9 +115,7 @@ get:
         type: string
       description: >
         Comma-separated projection (e.g. `requestId,date,costTotal`). Unknown
-        field
-
-        names are silently dropped. When unset, all fields are returned.
+        field names are silently dropped. When unset, all fields are returned.
   responses:
     '200':
       description: Paginated usage records.
@@ -125,6 +140,15 @@ delete:
   tags:
     - Management — Usage
   summary: Delete usage records (admin only)
+  description: |
+    Bulk delete usage records from the `request_usage` table.
+
+    **Admin only** — limited principals receive 403.
+
+    - **olderThanDays** — Only delete records older than N days.
+      Omit to delete all records (use with caution).
+
+    Returns the count of deleted records.
   security:
     - AdminKey: []
   parameters:

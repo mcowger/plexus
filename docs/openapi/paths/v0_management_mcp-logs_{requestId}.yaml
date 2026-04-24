@@ -5,10 +5,17 @@ parameters:
     schema:
       type: string
       format: uuid
+    description: The request ID of the MCP log to delete.
 delete:
   tags:
     - Management — MCP Logs
   summary: Delete one MCP log (admin only)
+  description: |
+    Delete a specific MCP log by request ID.
+
+    **Admin only** — limited principals receive 403.
+
+    Returns 404 if not found.
   security:
     - AdminKey: []
   responses:

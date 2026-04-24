@@ -2,6 +2,37 @@ get:
   tags:
     - Management — Debug
   summary: Get debug-mode state
+  description: |
+    Returns the current debug capture configuration.
+
+    ## Response shapes
+
+    ### Admin principal
+
+    ```json
+    {
+      "enabled": true,
+      "enabledGlobal": false,
+      "enabledKeys": ["sk-alpha", "sk-beta"],
+      "providers": ["openai", "anthropic"]
+    }
+    ```
+
+    ### Limited principal
+
+    ```json
+    {
+      "enabled": true,
+      "enabledGlobal": false,
+      "enabledForKey": true
+    }
+    ```
+
+    - **enabled** — Global debug enable (overrides per-key settings).
+    - **enabledGlobal** — True if global debug is on.
+    - **enabledKeys** — (admin only) List of keys with per-key debug enabled.
+    - **enabledForKey** — (limited only) Whether debug is on for this key.
+    - **providers** — Provider filter; `null` means capture for all providers.
   security:
     - AdminKey: []
   responses:
@@ -39,6 +70,15 @@ patch:
   tags:
     - Management — Debug
   summary: Update debug-mode state (admin only)
+  description: |
+    Update global debug capture settings.
+
+    **Admin only** — limited principals receive 403. Limited users must
+    use `POST /v0/management/self/debug/toggle` to enable debug for their key.
+
+    - **enabled** — Toggle global debug on/off.
+    - **providers** — Optional filter to only capture for specific providers.
+      `null` = capture for all providers.
   security:
     - AdminKey: []
   requestBody:

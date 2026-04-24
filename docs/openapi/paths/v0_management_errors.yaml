@@ -2,6 +2,29 @@ get:
   tags:
     - Management — Errors
   summary: List inference error logs
+  description: |
+    Returns stored inference error records from the `inference_errors` table.
+
+    ## Capture triggers
+
+    Errors are captured when:
+    - Upstream provider returns a non-2xx response
+    - Network/connection failure during dispatch
+    - Timeout or upstream abort
+    - Transformer failure
+
+    Each error record includes the request context, error code, message,
+    and provider response (if available).
+
+    ## Scoping
+
+    Limited principals see only errors for their own API key.
+    Admins see all errors.
+
+    ## Retention
+
+    Error logs are auto-cleaned by a background job (typically 30 days).
+    Use DELETE to manually manage retention.
   security:
     - AdminKey: []
   parameters:
@@ -10,11 +33,13 @@ get:
       schema:
         type: integer
         default: 50
+      description: Maximum records to return.
     - in: query
       name: offset
       schema:
         type: integer
         default: 0
+      description: Pagination offset.
   responses:
     '200':
       description: Array of error records.
@@ -32,6 +57,12 @@ delete:
   tags:
     - Management — Errors
   summary: Delete all error logs (admin only)
+  description: |
+    Bulk delete all error logs from the `inference_errors` table.
+
+    **Admin only** — limited principals receive 403.
+
+    Use with caution — this cannot be undone.
   security:
     - AdminKey: []
   responses:

@@ -3,15 +3,36 @@ get:
     - Events
   summary: Live usage event stream
   description: |
-    Emits `started`, `updated`, `completed` (and legacy `created`) events
-    as requests progress through the dispatcher. Sends `ping` every 10s.
-    Limited principals see only events for their own key.
+    Server-Sent Events stream of request lifecycle events, used by the
+    admin dashboard for real-time monitoring.
+
+    ## Event types
+
+    - **started** — Request received, dispatched to provider.
+    - **updated** — Request metadata updated (e.g. token counts known).
+    - **completed** — Request finished (success or error). Contains the
+      full `UsageRecord`.
+    - **created** — Legacy/alias for `started`.
+
+    Each event includes the `UsageRecord` payload (for `completed`) or
+    partial data (for `started`/`updated`).
+
+    ## Ping
+
+    A `ping` event is sent every 10 seconds to keep the connection alive.
+
+    ## Format
 
     ```
     event: completed
-    data: { ...UsageRecord... }
+    data: {"requestId":"...","date":"...","provider":"openai",...}
     id: 1735689599000
     ```
+
+    ## Scoping
+
+    Limited principals see only events for their own API key.
+    Admins see all events.
   security:
     - AdminKey: []
   responses:

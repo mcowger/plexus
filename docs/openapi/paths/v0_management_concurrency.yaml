@@ -3,14 +3,40 @@ get:
     - Management — Usage
   summary: Live or historical concurrency buckets
   description: |
-    Dual-mode endpoint used by the dashboard:
+    Dual-mode endpoint used by the dashboard to visualize request concurrency.
 
-    - `mode=live` (default) — currently in-flight requests
-      (`durationMs IS NULL`), grouped by provider and canonical model,
-      over the last hour.
-    - `mode=timeline` — bucketed counts over `timeRange` (or a
-      `startDate`/`endDate` custom window), grouped by either
-      `provider` or `model`. Adaptive bucketing caps at 100 buckets.
+    ## Modes
+
+    ### live (default)
+
+    Returns currently in-flight requests (where `durationMs IS NULL`),
+    grouped by provider and canonical model. Shows requests started within
+    the last hour. Useful for real-time dashboard monitoring.
+
+    ### timeline
+
+    Returns bucketed historical counts over a time range, useful for
+    historical analysis. Groups by either `provider` or `model`.
+
+    ## Parameters
+
+    - **mode** — `live` or `timeline`. Default: `live`.
+    - **timeRange** — For timeline mode: `hour`, `day`, `week`, `month`,
+      or `custom`. Default: `hour`.
+    - **groupBy** — How to group: `provider` or `model`. Default: `provider`.
+      Note: finer granularity (model) may produce more buckets; the adaptive
+      algorithm caps at 100 buckets total.
+    - **startDate / endDate** — For custom time range (ISO timestamps).
+
+    ## Adaptive bucketing
+
+    The endpoint auto-sizes buckets based on the time range to keep bucket
+    count between ~20-100 for readable charts. Smaller ranges = finer buckets.
+
+    ## Scoping
+
+    Limited principals see only their own key's concurrency data.
+    Admins see all providers/models.
   security:
     - AdminKey: []
   parameters:
@@ -22,6 +48,8 @@ get:
           - live
           - timeline
         default: live
+      description: >
+        `live` = in-flight requests; `timeline` = historical buckets.
     - in: query
       name: timeRange
       schema:
@@ -33,6 +61,7 @@ get:
           - month
           - custom
         default: hour
+      description: Time window for timeline mode.
     - in: query
       name: groupBy
       schema:
@@ -41,19 +70,22 @@ get:
           - provider
           - model
         default: provider
+      description: Grouping dimension.
     - in: query
       name: startDate
       schema:
         type: string
         format: date-time
+      description: Required when timeRange=custom.
     - in: query
       name: endDate
       schema:
         type: string
         format: date-time
+      description: Required when timeRange=custom.
   responses:
     '200':
-      description: Bucketed counts (shape depends on mode).
+      description: Bucketed concurrency data.
       content:
         application/json:
           schema:

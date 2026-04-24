@@ -5,10 +5,17 @@ parameters:
     schema:
       type: string
       format: uuid
+    description: The request ID of the error log to delete.
 delete:
   tags:
     - Management — Errors
   summary: Delete a single error log
+  description: |
+    Delete a specific error log by request ID.
+
+    **Admin only** — limited principals receive 403.
+
+    Returns 404 if not found.
   security:
     - AdminKey: []
   responses:

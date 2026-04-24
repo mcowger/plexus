@@ -3,13 +3,35 @@ get:
     - Events
   summary: Live backend log stream (admin only)
   description: |
-    All backend log lines are serialized into `syslog` events, plus a
-    `ping` every 10s.
+    Server-Sent Events stream of all backend log lines atDEBUG and above.
+
+    ## Event format
 
     ```
     event: syslog
-    data: { "level": "info", "message": "...", "timestamp": "..." }
+    data: {"level": "info", "message": "Request started", "timestamp": "2024-01-01T12:00:00.000Z", ...}
     ```
+
+    ## Event payload
+
+    Each `syslog` event contains:
+    - **level** — Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal`
+    - **message** — Log message text
+    - **timestamp** — ISO 8601 timestamp
+    - **context** — Additional fields (provider, model, requestId, etc.)
+
+    ## Ping
+
+    A `ping` event is sent every 10 seconds to keep the connection alive.
+
+    ## Level filtering
+
+    The stream honors the current runtime log level setting. Logs below
+    the current level are NOT emitted. Check `GET /v0/management/logging/level`
+    to see the current level. To receive all logs, ensure level is set to
+    `trace` or `debug`.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
