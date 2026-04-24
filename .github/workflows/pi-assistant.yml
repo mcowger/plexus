@@ -7,15 +7,16 @@ on:
   pull_request_review_comment:
     types: [created]
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  workflows: write
+
 jobs:
   pi-agent:
     if: contains(github.event.comment.body, '/pi')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      workflows: write
 
     steps:
       - uses: actions/checkout@v6
