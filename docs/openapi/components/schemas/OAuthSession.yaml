@@ -1,12 +1,21 @@
 type: object
 additionalProperties: true
+description: OAuth onboarding session state.
 properties:
   id:
     type: string
+    description: Unique session identifier (UUID).
   providerId:
     type: string
+    description: >
+      Provider identifier (e.g. `openai-codex`, `anthropic-claude-code`).
+      Matches a provider from `/v0/management/oauth/providers`.
   accountId:
     type: string
+    description: >
+      User-chosen identifier for this account. Enables multi-account
+      support — you can have multiple credential sets for the same
+      provider with different account IDs.
   status:
     type: string
     enum:
@@ -16,7 +25,7 @@ properties:
       - complete
       - failed
       - cancelled
-    description: >-
+    description: >
       Session lifecycle state.
 
       - **waiting** — Session created; the user should open the auth URL from
@@ -31,23 +40,37 @@ properties:
   authInfo:
     type: object
     additionalProperties: true
+    description: >
+      Authorization URL and instructions. Populated when status is
+      `waiting`. Contains `url` (the OAuth consent page) and optionally
+      `instructions` (human-readable guidance).
     properties:
       url:
         type: string
         format: uri
+        description: The OAuth consent URL the user must visit.
       instructions:
         type: string
+        description: Human-readable instructions for completing auth.
   prompt:
     type:
       - object
       - 'null'
     additionalProperties: true
+    description: >
+      Prompt response from the provider. Populated when status is
+      `prompt` — contains the question or confirmation the user must answer.
   progress:
     type: array
     items:
       type: object
       additionalProperties: true
+    description: >
+      Array of status updates/messages from the auth flow. Useful for
+      debugging and showing progress to the user.
   createdAt:
     type: integer
+    description: Unix timestamp (ms) when the session was created.
   updatedAt:
     type: integer
+    description: Unix timestamp (ms) when the session was last updated.

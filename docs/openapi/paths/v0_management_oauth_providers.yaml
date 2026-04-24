@@ -2,6 +2,27 @@ get:
   tags:
     - Management — OAuth
   summary: List OAuth providers (admin only)
+  description: |
+    Returns all OAuth-capable providers that Plexus supports.
+
+    ## Provider properties
+
+    - `id` — Unique identifier (e.g. `openai-codex`, `anthropic-claude-code`)
+    - `name` — Human-readable display name
+    - `usesCallbackServer` — Whether this provider uses the callback server
+      for OAuth flow vs requiring manual code paste
+
+    ## Callback vs manual code
+
+    - **usesCallbackServer: true** — Plexus runs a callback server that
+      receives the OAuth redirect. The user visits the auth URL and is
+      automatically redirected back. No manual copy-paste needed.
+
+    - **usesCallbackServer: false** — The provider returns an authorization
+      code that must be manually pasted into Plexus. Use the
+      `/sessions/{id}/manual-code` endpoint.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

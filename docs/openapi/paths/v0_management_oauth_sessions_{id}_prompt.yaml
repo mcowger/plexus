@@ -4,10 +4,29 @@ parameters:
     required: true
     schema:
       type: string
+    description: Session ID (UUID).
 post:
   tags:
     - Management — OAuth
   summary: Submit a prompt response (admin only)
+  description: |
+    Submit a response to a provider's confirmation prompt.
+
+    ## When to use
+
+    Use this when `GET /sessions/{id}` returns `status: prompt`. The session's
+    `prompt` field will contain the question or confirmation text.
+
+    ## Request body
+
+    - `value` — The user's response (typically "yes" or "allow")
+
+    ## Response
+
+    Returns the updated session. Poll again to check if authentication
+    succeeded (`status: complete`) or failed (`status: failed`).
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -19,6 +38,7 @@ post:
           properties:
             value:
               type: string
+              description: User's response to the prompt (typically "yes").
           required:
             - value
   responses:

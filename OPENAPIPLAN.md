@@ -647,6 +647,7 @@ green; rendered `preview-docs` reads as the primary reference.
 |  5 | Usage / debug / errors / MCP-logs       | ✅ done        | Endpoint descriptions, scoping, retention, params |
 |  6 | Configuration CRUD                      | ✅ done        | Config schemas + all CRUD operations documented |
 |  7 | Self-service / principal                | ✅ done        | /self/* endpoints, dual admin/limited behavior |
+|  8 | OAuth provider onboarding               | ✅ done        | Session lifecycle diagram, all 10 endpoints documented |
 |  8 | OAuth provider onboarding               | ⬜ not started |       |
 |  9 | Provider quotas                         | ⬜ not started |       |
 | 10 | User quotas / enforcement               | ⬜ not started |       |

@@ -2,6 +2,28 @@ get:
   tags:
     - Management — OAuth
   summary: List models known to an OAuth provider (admin only)
+  description: |
+    Returns the list of models available from a specific OAuth provider.
+
+    ## Data source
+
+    This endpoint returns models from the pi-ai static catalog. It's used
+    to populate dropdowns in the UI when configuring provider targets.
+
+    ## Response fields
+
+    - `id` — Model identifier (e.g. `gpt-5.4`)
+    - `name` — Human-readable model name
+    - `context_length` — Maximum context window in tokens
+    - `pricing` — Token pricing (if available)
+
+    ## Note
+
+    This is a static catalog — it doesn't query the provider's live API.
+    Use `/v1/openrouter/models` or `/v1/models` to get the currently
+    configured model list.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   parameters:
@@ -10,6 +32,7 @@ get:
       required: true
       schema:
         type: string
+      description: Provider ID to list models for.
   responses:
     '200':
       description: Model list (pi-ai static catalog).

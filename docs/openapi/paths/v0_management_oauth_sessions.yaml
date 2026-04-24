@@ -2,6 +2,38 @@ post:
   tags:
     - Management — OAuth
   summary: Start an OAuth onboarding session (admin only)
+  description: |
+    Creates a new OAuth session to authenticate with a provider.
+
+    ## providerId
+
+    The provider to authenticate with. Get the list from
+    `GET /v0/management/oauth/providers`.
+
+    ## accountId
+
+    A user-chosen identifier for this account. This enables **multi-account
+    support** — you can have multiple credential sets for the same provider
+    with different account IDs. For example, you might have `personal` and
+    `work` accounts for the same provider.
+
+    The accountId becomes part of the credential storage key, so each
+    unique accountId gets its own credentials file.
+
+    ## Response
+
+    Returns the new session with `status: waiting` and `authInfo.url`
+    populated. Poll `GET /v0/management/oauth/sessions/{id}` to track progress.
+
+    ## Session lifecycle
+
+    ```
+    waiting → prompt ↔ manual-code → complete
+                    ↘︎ failed
+                    ↘︎ cancelled
+    ```
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -14,9 +46,13 @@ post:
             providerId:
               type: string
               example: openai-codex
+              description: Provider ID from /v0/management/oauth/providers.
             accountId:
               type: string
               example: work
+              description: >
+                User-chosen identifier for this account. Enables multi-account
+                support per provider.
           required:
             - providerId
             - accountId
