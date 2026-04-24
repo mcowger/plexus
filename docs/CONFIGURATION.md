@@ -1,757 +1,316 @@
 # Configuration
 
-Plexus is configured via environment variables and a `config/plexus.yaml` file. Environment variables control server-level settings, while the YAML file (or database) defines your providers, model routing logic, and global settings.
+Plexus stores all configuration in the database and manages it via the **Admin UI** (recommended) or **Management API**. On first launch with an existing `plexus.yaml` file, Plexus imports it; afterward, use the UI or API to make changes.
 
-## Required Environment Variables
+**Environment variables** control server-level settings. Everything else (providers, models, keys, quotas) is stored in the database.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ADMIN_KEY` | **Required.** Password for admin dashboard and management API access. The server will refuse to start if not set. | _(none)_ |
-| `DATABASE_URL` | Database connection string. Supports `sqlite://` and `postgres://` URIs. | `sqlite://<DATA_DIR>/plexus.db` |
-| `ENCRYPTION_KEY` | Encryption key for sensitive data at rest. See [Encryption at Rest](#encryption-at-rest-optional). | _(none — plaintext mode)_ |
-| `DATA_DIR` | Directory for data files (used as default location for SQLite database). | `./data` |
-| `CONFIG_FILE` | Path to `plexus.yaml` for initial import on first launch. | Auto-detected |
-| `LOG_LEVEL` | Logging level (`error`, `warn`, `info`, `debug`, `silly`). | `info` |
-| `PORT` | Port to listen on. | `4000` |
-| `HOST` | Host to bind to. | `0.0.0.0` |
+---
+
+## Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `ADMIN_KEY` | Password for admin dashboard and management API. Server refuses to start if unset. | Yes |
+| `DATABASE_URL` | Connection string. Supports `sqlite://` and `postgres://` URIs. | No |
+| `ENCRYPTION_KEY` | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32` | No |
+| `DATA_DIR` | Directory for SQLite database. | No |
+| `LOG_LEVEL` | Verbosity: `error`, `warn`, `info`, `debug`, `silly` | No |
+| `PORT` | HTTP server port. | No |
+| `HOST` | Address to bind to. | No |
 
 ### Quick Start
 
 ```bash
-# Minimal setup with SQLite (database auto-created in ./data/)
-ADMIN_KEY="my-secret-password" bun run dev
+# SQLite (database auto-created in ./data/)
+ADMIN_KEY="my-secret" bun run dev
 
-# With PostgreSQL
-ADMIN_KEY="my-secret-password" DATABASE_URL="postgres://user:pass@localhost:5432/plexus" bun run dev
-```
+# PostgreSQL
+ADMIN_KEY="my-secret" DATABASE_URL="postgres://user:pass@localhost:5432/plexus" bun run dev
 
-### Docker
-
-```bash
-docker run -e ADMIN_KEY="my-secret-password" -v ./data:/app/data -p 4000:4000 plexus:latest
-```
-
-Or with docker-compose, create a `.env` file:
-
-```env
-ADMIN_KEY=my-secret-password
-# DATABASE_URL=postgres://user:pass@localhost:5432/plexus  # optional, defaults to SQLite
-```
-
-Then run `docker compose up`.
-
-## Configuration File (`plexus.yaml`)
-
-The configuration file is YAML-based and sits at the heart of how Plexus routes and transforms requests. On first launch, Plexus imports it into the database. After that, configuration is managed via the Admin UI or Management API.
-
-### Example Configuration
-
-```yaml
-providers:
-  openai_direct:
-    api_base_url: https://api.openai.com/v1
-    api_key: your_openai_key
-    models:
-      - gpt-4o
-      - gpt-4o-mini
-      - text-embedding-3-small
-
-  my_anthropic:
-    api_base_url: https://api.anthropic.com/v1
-    api_key: your_anthropic_key
-    models:
-      - claude-3-5-sonnet-latest
-
-  voyage:
-    api_base_url: https://api.voyageai.com/v1
-    api_key: your_voyage_key
-    models:
-      voyage-3:
-        type: embeddings
-        pricing:
-          source: simple
-          input: 0.00006
-          output: 0
-
-models:
-  fast-model:
-    targets:
-      - provider: openai_direct
-        model: gpt-4o-mini
-
-  smart-model:
-    targets:
-      - provider: my_anthropic
-        model: claude-3-5-sonnet-latest
-
-  balanced-model:
-    selector: random
-    targets:
-      - provider: openai_direct
-        model: gpt-4o
-      - provider: my_anthropic
-        model: claude-3-5-sonnet-latest
-
-  embeddings-model:
-    type: embeddings
-    selector: cost
-    targets:
-      - provider: openai_direct
-        model: text-embedding-3-small
-      - provider: voyage
-        model: voyage-3
-
-  transcription-model:
-    type: transcriptions
-    targets:
-      - provider: openai_direct
-        model: whisper-1
-
-  speech-model:
-    type: speech
-    targets:
-      - provider: openai_direct
-        model: tts-1-hd
-
-  image-model:
-    type: image
-    targets:
-      - provider: openai_direct
-        model: dall-e-3
-
-keys:
-  my-app:
-    secret: "sk-plexus-my-key"
-    comment: "Main application"
+# Docker
+docker run -e ADMIN_KEY="my-secret" -v ./data:/app/data -p 4000:4000 plexus:latest
 ```
 
 ---
 
-## Configuration Sections
+## Configuration via Admin UI
 
-### `ADMIN_KEY` (Environment Variable — Required)
+The **Admin UI** (accessible at `http://localhost:4000` after starting) is the easiest way to configure Plexus. It provides forms for all configuration options with real-time validation.
 
-The `ADMIN_KEY` environment variable secures the Admin Dashboard and Management APIs (`/v0/*`). The server will refuse to start if it is not set.
+- **Providers**: Add/edit upstream AI providers (API keys, base URLs, model lists)
+- **Models**: Create model aliases with routing logic and pricing
+- **Keys**: Manage client API keys with optional quota assignment
+- **Quotas**: Define usage limits (tokens, requests, or spending) per time window
+- **MCP Servers**: Configure MCP proxy endpoints
+- **OAuth**: Login to OAuth-backed providers (Anthropic, GitHub Copilot, Codex, etc.)
+- **Settings**: Vision fallthrough, global defaults, cooldown configuration
 
-It is used in two ways:
+### Management API
 
-1. **Dashboard Access**: Users are prompted for this key when opening the web interface.
-2. **API Access**: Requests to Management APIs (`/v0/*`) must include the header `x-admin-key: <your-key>`.
+For programmatic configuration, use the Management API (`/v0/management/*`). All endpoints require the `x-admin-key` header.
 
----
+| Endpoint | Description |
+|----------|-------------|
+| `GET /v0/management/providers` | List all providers |
+| `PUT /v0/management/providers/{slug}` | Create/update provider |
+| `DELETE /v0/management/providers/{slug}` | Remove provider |
+| `GET /v0/management/aliases` | List all model aliases |
+| `PUT /v0/management/aliases/{slug}` | Create/update alias |
+| `DELETE /v0/management/aliases/{slug}` | Remove alias |
+| `GET /v0/management/keys` | List all API keys |
+| `PUT /v0/management/keys/{name}` | Create/update key |
+| `DELETE /v0/management/keys/{name}` | Remove key |
+| `GET /v0/management/user-quotas` | List quota definitions |
+| `PUT /v0/management/user-quotas/{name}` | Create/update quota |
+| `DELETE /v0/management/user-quotas/{name}` | Remove quota |
+| `GET /v0/management/config/export` | Export full config as JSON |
+| `PUT /v0/management/config` | Import config (replace all) |
 
-### `providers`
-
-This section defines the upstream AI providers that Plexus will route requests to.
-
-**Basic Configuration Fields:**
-
-- **`api_base_url`**: The base URL for the provider's API. The API type is automatically inferred:
-  - URLs starting with `oauth://` → OAuth format (pi-ai)
-  - URLs containing `anthropic.com` → `messages` format
-  - URLs containing `generativelanguage.googleapis.com` → `gemini` format
-  - All other URLs → `chat` format (OpenAI-compatible)
-
-  For providers that support multiple API formats, use a map:
-  ```yaml
-  api_base_url:
-    chat: https://api.example.com/v1
-    messages: https://api.example.com/anthropic/v1
-  ```
-  The keys (`chat`, `messages`) define the supported API types.
-
-- **`display_name`**: (Optional) A friendly name shown in logs and the dashboard.
-
-- **`api_key`**: (Required) The authentication key for this provider.
-
-- **`enabled`**: (Optional, default: `true`) Set to `false` to temporarily disable a provider.
-
-- **`models`**: The models available from this provider. Can be a simple list or a map with per-model configuration:
-  ```yaml
-  models:
-    gpt-4o:
-      pricing:
-        source: simple
-        input: 5.0
-        output: 15.0
-    text-embedding-3-small:
-      type: embeddings
-    dall-e-3:
-      type: image
-      pricing:
-        source: per_request
-        amount: 0.04
-  ```
-
-- **`headers`**: (Optional) Custom HTTP headers to include in every request to this provider.
-
-- **`extraBody`**: (Optional) Additional fields to merge into every request body.
-
-- **`discount`**: (Optional) A percentage discount (0.0–1.0) applied to `simple` and `openrouter` pricing for this provider.
-
-- **`estimateTokens`**: (Optional, default: `false`) Enable automatic token estimation for providers that don't return usage data. See [Token Estimation](TOKEN_ESTIMATION.md).
-
-- **`disable_cooldown`**: (Optional, default: `false`) When `true`, this provider is never placed on cooldown regardless of errors. See [Disabling Cooldowns Per Provider](#disabling-cooldowns-per-provider).
+See the [API Reference](/docs/openapi/openapi.yaml) for complete endpoint documentation.
 
 ---
 
-### Vision Fallthrough
+## Providers
 
-Vision Fallthrough (Image-to-Text preprocessing) is most easily configured via the **Admin UI**. 
+A **provider** represents an upstream AI service that Plexus routes requests to. Each provider has authentication credentials, a base URL, and a list of available models.
 
-1. Set the global **Descriptor Model** in the Dashboard Settings.
-2. Enable **Use Image Fallthrough** on individual Model Aliases.
+### Provider Settings
 
-While these can be set in `plexus.yaml` (`vision_fallthrough.descriptor_model` and `models.<alias>.use_image_fallthrough`), using the UI is the recommended approach for rapid testing and configuration.
+| Setting | Description | Required |
+|---------|-------------|----------|
+| **Slug** | Unique identifier (e.g., `openai_direct`, `anthropic-prod`) | Yes |
+| **Display Name** | Friendly name for logs and UI | No |
+| **API Base URL** | Provider's endpoint. Common values: | Yes |
+| | `https://api.openai.com/v1` | |
+| | `https://api.anthropic.com/v1` | |
+| | `https://generativelanguage.googleapis.com/v1beta` | |
+| | `https://openrouter.ai/api/v1` | |
+| | `oauth://` (for OAuth-backed providers) | |
+| **API Key** | Authentication token | Yes |
+| **Enabled** | Whether this provider is active for routing | No (default: true) |
+| **Headers** | Custom HTTP headers sent with every request | No |
+| **Extra Body** | Additional fields merged into every request | No |
+| **Disable Cooldown** | Exclude from automatic cooldown on errors | No |
 
-#### Model Pricing Sources
+### Multi-Protocol Providers
 
-Each model entry can include a `pricing` block. Four sources are supported:
+Some providers support multiple API formats (OpenAI chat, Anthropic messages, embeddings). Configure them with a map of protocol → URL:
 
-| Source | Description |
-|--------|-------------|
-| `simple` | Fixed per-million token rates for input, output, cached reads, and cache writes. |
-| `openrouter` | Live per-token rates fetched from OpenRouter by model slug. |
-| `defined` | Tiered token-based pricing where the rate depends on input token volume. |
-| `per_request` | Flat fee per API call, regardless of token count. |
+| Protocol | Use Case |
+|----------|----------|
+| `chat` | OpenAI-compatible chat completions |
+| `messages` | Anthropic Claude Messages API |
+| `embeddings` | OpenAI-compatible embeddings |
+| `image` | Image generation (DALL-E, etc.) |
+| `transcriptions` | Speech-to-text (Whisper) |
+| `speech` | Text-to-speech |
 
-**`simple`** — fixed rates per million tokens:
-```yaml
-pricing:
-  source: simple
-  input: 3.00        # $ per million input tokens
-  output: 15.00      # $ per million output tokens
-  cached: 0.30       # $ per million cache-read tokens (optional)
-  cache_write: 3.75  # $ per million cache-write tokens (optional)
-```
+When combined with `priority: api_match` on a model alias, Plexus prefers providers that natively support the incoming API format.
 
-**`openrouter`** — live rates from the OpenRouter pricing API:
-```yaml
-pricing:
-  source: openrouter
-  slug: anthropic/claude-3.5-sonnet
-  discount: 0.1      # Optional: 10% discount applied to all rates
-```
+### OAuth Providers
 
-**`defined`** — tiered rates by input token volume:
-```yaml
-pricing:
-  source: defined
-  range:
-    - lower_bound: 0
-      upper_bound: 200000
-      input_per_m: 3.00
-      output_per_m: 15.00
-      cached_per_m: 0.30        # optional: cache read cost
-      cache_write_per_m: 3.75   # optional: cache write cost
-    - lower_bound: 200001
-      upper_bound: .inf
-      input_per_m: 1.50
-      output_per_m: 7.50
-      cached_per_m: 0.15        # optional
-      cache_write_per_m: 6.25   # optional: higher rate for large context caching
-```
+Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai) library. These require authentication through the Admin UI.
 
-This is particularly useful for providers like Anthropic that charge different cache write rates based on context window size (e.g., different rates for >200k token contexts).
+**Supported OAuth providers:**
+- Anthropic Claude
+- GitHub Copilot
+- OpenAI Codex
+- Gemini CLI
+- Antigravity
+- OpenAI o1-pro
 
-**`per_request`** — flat fee per call, independent of token usage:
-```yaml
-pricing:
-  source: per_request
-  amount: 0.04   # $ charged for every request
-```
+**Configuration:**
+- Set API Base URL to `oauth://`
+- Set API Key to `oauth`
+- Set OAuth Account (e.g., `work`, `personal`)
+- Set OAuth Provider if the provider key differs from pi-ai's expected ID
 
-The full cost is stored under `costInput`; `costOutput`, `costCached`, and `costCacheWrite` are zero. `costSource` will be `per_request` and `costMetadata` will contain `{"amount": 0.04}`.
+Once configured, log in via the Admin UI to authorize Plexus. Tokens are stored encrypted (when `ENCRYPTION_KEY` is set) and auto-refreshed.
 
-#### Multi-Protocol Providers
+### Provider Quota Checkers
 
-For providers that support multiple API formats, map each type to its specific base URL:
+Quota checkers monitor upstream provider rate limits and prevent routing to exhausted providers.
 
-```yaml
-providers:
-  synthetic:
-    display_name: Synthetic Provider
-    api_base_url:
-      chat: https://api.synthetic.new/openai/v1
-      messages: https://api.synthetic.new/anthropic/v1
-      embeddings: https://api.synthetic.new/openai/v1
-    api_key: "your-synthetic-key"
-    models:
-      "hf:MiniMaxAI/MiniMax-M2.1":
-        access_via: ["chat", "messages"]
-      "hf:nomic-ai/nomic-embed-text-v1.5":
-        type: embeddings
-```
+| Checker Type | Description | Options |
+|--------------|-------------|---------|
+| `synthetic` | Usage from Synthetic API | `apiKey` (defaults to provider's key) |
+| `naga` | Naga AI balance |
+| `nanogpt` | NanoGPT usage |
+| `openai-codex` | Codex quota (OAuth) | Reads token from database |
+| `claude-code` | Claude Code quota (OAuth) | Reads token from database |
+| `zai` | ZAI balance |
+| `moonshot` | Moonshot balance |
+| `novita` | Novita balance |
+| `minimax` | Minimax balance | Requires `groupid`, `hertzSession` |
 
-When combined with `priority: api_match` on a model alias, Plexus will automatically prefer providers that natively speak the incoming API format.
-
-#### OAuth Providers (pi-ai)
-
-Plexus supports OAuth-backed providers (Anthropic, GitHub Copilot, Gemini CLI, Antigravity, OpenAI Codex) through the [pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai) library. Credentials are managed through the Admin UI — no manual file setup is required.
-
-**Requirements:**
-- Provider `api_base_url` set to `oauth://`
-- Provider `api_key` set to `oauth`
-- `oauth_account` set to a specific account ID (e.g. `work`, `personal`)
-- `oauth_provider` set when the provider key doesn't match the pi-ai provider ID
-
-**Example:**
-
-```yaml
-providers:
-  codex-work:
-    display_name: OpenAI Codex (Work)
-    api_base_url: oauth://
-    api_key: oauth
-    oauth_provider: openai-codex
-    oauth_account: work
-    models:
-      - gpt-5-mini
-      - gpt-5
-
-  codex-personal:
-    display_name: OpenAI Codex (Personal)
-    api_base_url: oauth://
-    api_key: oauth
-    oauth_provider: openai-codex
-    oauth_account: personal
-    models:
-      - gpt-5-mini
-      - gpt-5
-
-  github-copilot-main:
-    display_name: GitHub Copilot (Main)
-    api_base_url: oauth://
-    api_key: oauth
-    oauth_provider: github-copilot
-    oauth_account: main
-    models:
-      - gpt-4o
-      - claude-3-5-sonnet-20241022
-```
-
-#### OAuth Credentials
-
-OAuth credentials are stored in the database. They are created and managed through the Admin UI when you log in to OAuth-backed providers.
-
-Once authenticated via the Admin UI, Plexus stores OAuth tokens encrypted at rest (when `ENCRYPTION_KEY` is configured) and handles automatic refresh when tokens expire.
-
-#### `providers.<provider>.quota_checker` (Optional)
-
-Quota checkers are configured per provider. Plexus periodically polls each enabled checker and stores results for monitoring and alerting.
-
-```yaml
-providers:
-  my-provider:
-    api_key: "..."
-    api_base_url: https://api.example.com/v1
-    quota_checker:
-      type: synthetic | naga | nanogpt | openai-codex | claude-code | zai | moonshot | minimax
-      enabled: true
-      intervalMinutes: 30
-      # id: custom-checker-id   # optional; defaults to provider key
-      # options: {}
-```
-
-**Fields:**
-- `type` (**required**): checker implementation to use.
-- `enabled` (optional, default `true`): enable/disable checker.
-- `intervalMinutes` (optional, default `30`): polling interval, minimum `1`.
-- `id` (optional): explicit checker ID. Defaults to provider key.
-- `options` (optional): checker-specific options map.
-
-**OAuth restrictions:**
-- Providers with `oauth_provider: openai-codex` must use `quota_checker.type: openai-codex`.
-- Providers with `oauth_provider: anthropic` must use `quota_checker.type: claude-code`.
-
-**Checker notes:**
-- `maxUtilizationPercent` (available on all checker types, default 99): When any quota window reaches this utilization percentage, the provider is placed on cooldown until the window resets. Set lower to reserve quota for other consumers (e.g. `30` = provider treated as exhausted at 30% usage, preserving 70%). Must be between 1 and 100. Use `enabled: false` to fully disable a provider instead of setting this to 0.
-- `synthetic`: Derives `options.apiKey` from provider `api_key` by default.
-- `naga`: Balance-based checker.
-- `nanogpt`: NanoGPT usage checker.
-- `openai-codex`: OAuth-backed; reads token from the database.
-- `claude-code`: OAuth-backed; reads token from the database.
-- `zai`: ZAI balance-based checker.
-- `moonshot`: Moonshot balance-based checker.
-- `novita`: Novita balance-based checker.
-- `minimax`: Requires `options.groupid` and `options.hertzSession` (treat like a password).
-
-**Examples:**
-
-```yaml
-providers:
-  synthetic:
-    api_base_url:
-      chat: https://api.synthetic.new/openai/v1
-      messages: https://api.synthetic.new/anthropic/v1
-    api_key: syn_your_api_key
-    quota_checker:
-      type: synthetic
-      enabled: true
-      intervalMinutes: 30
-
-  # Shared Synthetic key with quota reservation — provider is cooled down
-  # when any window hits 30% utilization, preserving 70% for the key owner
-  friend-synthetic:
-    api_base_url:
-      chat: https://api.synthetic.new/openai/v1
-    api_key: syn_friends_api_key
-    quota_checker:
-      type: synthetic
-      enabled: true
-      intervalMinutes: 5
-      options:
-        maxUtilizationPercent: 30
-
-  codex:
-    api_base_url: oauth://
-    api_key: oauth
-    oauth_provider: openai-codex
-    oauth_account: work
-    quota_checker:
-      type: openai-codex
-      enabled: true
-      intervalMinutes: 10
-
-  minimax:
-    api_base_url: https://api.minimax.chat/v1
-    api_key: dummy
-    quota_checker:
-      type: minimax
-      enabled: true
-      intervalMinutes: 30
-      options:
-        groupid: "1234567890"
-        hertzSession: "paste-session-cookie-here"
-```
+**Settings:**
+- `enabled`: Enable/disable polling
+- `intervalMinutes`: Polling frequency (minimum 1)
+- `maxUtilizationPercent`: Treat provider as exhausted when any window reaches this % (default 99)
 
 Quota data is available via the Management API — see [API Reference: Quota Management](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1quotas).
 
 ---
 
-### `models`
+## Model Aliases
 
-This section defines virtual model aliases that clients use in the `model` field of their requests.
+A **model alias** is a virtual model name that clients use in requests. Each alias maps to one or more provider targets with routing logic.
 
-- **Model Alias**: The key (e.g., `fast-model`) is the name clients send.
+### Alias Settings
 
-- **`type`**: (Optional) `chat` (default), `embeddings`, `transcriptions`, `speech`, or `image`. Determines which endpoints can access this model:
-  - `chat`: `/v1/chat/completions` and `/v1/messages`
-  - `embeddings`: `/v1/embeddings` only
-  - `transcriptions`: `/v1/audio/transcriptions` only
-  - `speech`: `/v1/audio/speech` only
-  - `image`: `/v1/images/generations` and `/v1/images/edits`
+| Setting | Description | Required |
+|---------|-------------|----------|
+| **Slug** | Name clients send (e.g., `fast-model`) | Yes |
+| **Type** | `chat` (default), `embeddings`, `transcriptions`, `speech`, `image` | No |
+| **Additional Aliases** | Alternative names that also route here | No |
+| **Selector** | How to pick between targets | No |
+| **Priority** | Routing order: `selector` (default) or `api_match` | No |
+| **Targets** | List of provider/model pairs | Yes |
+| **Metadata** | External catalog for model info | No |
 
-- **`additional_aliases`**: (Optional) Alternative names that also route to this alias. Useful for clients with fixed model name lists.
+### Selector Strategies
 
-- **`selector`**: (Optional) How to choose between multiple targets. See [Selector Strategies](#selector-strategies) below.
+| Strategy | Behavior |
+|----------|----------|
+| `random` (default) | Distributes requests randomly across healthy targets |
+| `in_order` | Tries targets in order, skips unhealthy ones |
+| `cost` | Routes to cheapest provider (requires pricing) |
+| `performance` | Routes to highest tokens/sec (based on recent requests) |
+| `latency` | Routes to lowest time-to-first-token |
 
-- **`priority`**: (Optional) Controls the routing lifecycle order:
-  - `selector` (default): Choose a provider using the selector, then find the best API format for that provider.
-  - `api_match`: Filter for providers that natively support the incoming API format first, then apply the selector. Falls back to all providers if none match. Best for tools that rely on specific API features (e.g., Claude Code with Anthropic messages).
+Use `performanceExplorationRate` (default 0.05) to occasionally explore other targets and prevent locking onto one provider.
 
-- **`targets`**: A list of provider/model pairs that back this alias.
-  - `provider`: Must match a key in the `providers` section.
-  - `model`: The upstream model name.
-  - `enabled`: (Optional, default `true`) Set to `false` to temporarily skip this target.
+### Priority Modes
 
-- **`metadata`**: (Optional) Link this alias to a model in an external catalog. When configured, Plexus fetches the model's metadata at startup and includes enriched fields (`name`, `description`, `context_length`, `architecture`, `pricing`, `supported_parameters`, `top_provider`) in the `GET /v1/models` response, following the OpenRouter model format. This is useful for clients that rely on model metadata to make routing decisions (e.g., context window selection).
+- **`selector` (default)**: Selector picks a provider first, then matches API format.
+- **`api_match`**: Filter for providers that natively support the incoming API format first, then apply selector. Best for tools requiring specific API features (e.g., Claude Code with Anthropic messages).
 
-  **Fields:**
-  - `source` (required): The external catalog to use. One of: `openrouter`, `models.dev`, `catwalk`
-  - `source_path` (required): The model's identifier within that catalog.
+### Targets
 
-  **`source_path` format by source:**
+Each target specifies:
+- **Provider**: Must match an existing provider slug
+- **Model**: Upstream model name
+- **Enabled**: Whether this target is active
 
-  | Source | Format | Example |
-  |--------|-----|---------|
-  | `openrouter` | `provider/model` | `openai/gpt-4.1-nano` |
-  | `models.dev` | `providerid.modelid` | `anthropic.claude-3-5-haiku-20241022` |
-  | `catwalk` | `providerid.modelid` | `anthropic.claude-3-5-haiku-20241022` |
+### External Metadata
 
-  **Example:**
-  ```yaml
-  models:
-    fast-model:
-      targets:
-        - provider: openai_direct
-          model: gpt-4.1-nano
-      metadata:
-        source: openrouter
-        source_path: openai/gpt-4.1-nano
+Link an alias to an external model catalog to return enriched metadata in `GET /v1/models`:
 
-    smart-model:
-      targets:
-     - provider: my_anthropic
-          model: claude-3-5-haiku-20241022
-      metadata:
-        source: models.dev
-        source_path: anthropic.claude-3-5-haiku-20241022
-  ```
+| Source | URL | Format |
+|--------|-----|--------|
+| `openrouter` | openrouter.ai | `provider/model` |
+| `models.dev` | models.dev | `providerid.modelid` |
+| `catwalk` | catwalk.charm.sh | `providerid.modelid` |
 
-  The metadata catalog is loaded at startup from:
-  - OpenRouter: `https://openrouter.ai/api/v1/models`
-  - models.dev: `https://models.dev/api.json`
-  - Catwalk: `https://catwalk.charm.sh/v2/providers`
+Metadata loads at startup. Failures are non-fatal — Plexus operates without enriched data if a source is unavailable.
 
-  Metadata loading is non-fatal — if a source is unavailable, Plexus continues operating and returns base model information for aliases that reference that source.
+### Direct Model Routing
 
-**Example with multiple targets and API priority:**
-
-```yaml
-models:
-  balanced-model:
-    selector: random
-    priority: api_match
-    targets:
-      - provider: openai
-        model: gpt-4o
-      - provider: anthropic
-        model: claude-3-5-sonnet-latest
-```
-
-With this configuration, Anthropic-format requests prefer the Anthropic provider; OpenAI-format requests prefer OpenAI. Both fall back to transformation if the preferred provider is unavailable.
-
-#### Selector Strategies
-
-The `selector` field determines which target is chosen from the available healthy targets:
-
-- **`random` (Default)**: Distributes requests randomly. Good for general load balancing.
-
-- **`in_order`**: Selects targets in the order defined, falling back to the next if the current is unhealthy. Useful for primary/fallback patterns:
-
-  ```yaml
-  models:
-    minimax-m2.1:
-      selector: in_order
-      targets:
-        - provider: naga
-          model: minimax-m2.1
-        - provider: synthetic
-          model: "hf:MiniMaxAI/MiniMax-M2.1"
-  ```
-
-- **`cost`**: Routes to the lowest-cost healthy provider. Uses a standardized comparison (1000 input + 500 output tokens). Requires pricing configuration. For `per_request` pricing, the flat fee is used directly.
-
-- **`performance`**: Routes to the highest average tokens/sec provider based on the last 10 requests. Falls back to the first target if no data exists.
-
-  To prevent the selector from permanently locking on to one provider, configure an exploration rate:
-  ```yaml
-  performanceExplorationRate: 0.05  # 5% chance to pick a random provider (default)
-  ```
-
-- **`latency`**: Routes to the lowest average time-to-first-token provider based on the last 10 requests.
-
-  ```yaml
-  latencyExplorationRate: 0.05  # 5% chance to explore (defaults to performanceExplorationRate)
-  ```
-
-#### Direct Model Routing
-
-Requests can bypass the alias system entirely using the `direct/` prefix format:
-
-**Format:** `direct/<provider-key>/<model-name>`
+Bypass aliases entirely using the format `direct/<provider>/<model>`:
 
 ```bash
-# Route directly to gpt-4o-mini on the openai_direct provider
 curl ... -d '{"model": "direct/openai_direct/gpt-4o-mini", ...}'
 ```
 
-- The provider must exist in `providers` and be enabled.
-- The model must be listed in the provider's `models`.
-- Bypasses selector logic, `additional_aliases`, and alias configuration.
-- Used by the Admin UI's provider test feature.
-
-#### Routing & Dispatching Lifecycle
-
-When a request enters Plexus, it follows a two-stage process:
-
-**Default (`priority: selector`):**
-
-1. **Routing** — The selector picks exactly one healthy target.
-2. **Dispatching** — Plexus matches the incoming API format to the chosen provider's supported formats. If they match, it uses pass-through (no transformation). Otherwise it transforms.
-
-**Inverted (`priority: api_match`):**
-
-1. **API Matching** — Plexus filters all healthy targets to those that natively support the incoming API format. If none match, it falls back to all healthy targets.
-2. **Routing** — The selector is applied to the filtered list.
+- Provider and model must exist in configuration
+- Bypasses selector logic and alias settings
 
 ---
 
-### `keys`
+## API Keys
 
-This section defines the API keys that clients must use to access Plexus inference endpoints.
+API keys authenticate clients to inference endpoints (`/v1/*`).
 
-- **Key Name**: A unique identifier (e.g., `client-app-1`).
-- **`secret`**: The bearer token clients include in the `Authorization` header.
-- **`comment`**: (Optional) Description or owner.
-- **`quota`**: (Optional) Name of a quota definition from `user_quotas` to enforce for this key.
+### Key Settings
 
-```yaml
-keys:
-  production-app:
-    secret: "sk-plexus-abc-123"
-    comment: "Main production application"
+| Setting | Description | Required |
+|---------|-------------|----------|
+| **Name** | Unique identifier | Yes |
+| **Secret** | Bearer token (clients send in `Authorization` header) | Yes |
+| **Comment** | Description or owner | No |
+| **Quota** | Name of a quota definition to enforce | No |
 
-  testing-key:
-    secret: "sk-plexus-test-456"
-    comment: "CI/CD Test Key"
-```
+### Authentication Methods
 
-At least one key is required. Clients must include `Authorization: Bearer <secret>` on all requests. The `/v1/models` endpoint is exempt from authentication.
+Clients can provide credentials via:
+- `Authorization: Bearer <secret>`
+- `Authorization: <secret>` (prefix added automatically)
+- `x-api-key: <secret>`
+- `?key=<secret>` query parameter
 
-#### Dynamic Key Attribution
+The `/v1/models` endpoint is public (no auth required).
 
-Append a `:label` to any secret to track usage by feature or team without creating separate keys:
+### Dynamic Attribution
 
-**Format:** `<secret>:<attribution>`
+Append `:label` to track usage without creating separate keys:
 
 ```bash
-# Track requests from the Copilot feature
-curl -H "Authorization: Bearer sk-plexus-app-abc-123:copilot" ...
-
-# Track requests from mobile v2.5
-curl -H "Authorization: Bearer sk-plexus-app-abc-123:mobile:v2.5" ...
+Authorization: Bearer sk-plexus-key:copilot
+Authorization: Bearer sk-plexus-key:mobile:v2.5
 ```
 
-- The part before the first colon authenticates the request.
-- The remainder is stored as `attribution` in usage logs.
-- Attribution values are normalized to lowercase.
-- All variations of the same secret authenticate as the same key.
-
-Query attribution data:
+The part before the first colon authenticates; the rest is stored as `attribution` in usage logs. Query via:
 
 ```sql
-SELECT api_key, attribution, COUNT(*) as request_count, SUM(tokens_input) as total_input_tokens
+SELECT attribution, COUNT(*), SUM(tokens_input + tokens_output)
 FROM request_usage
-WHERE api_key = 'app-key'
-GROUP BY attribution
-ORDER BY request_count DESC;
+WHERE api_key = 'key-name'
+GROUP BY attribution;
 ```
 
 ---
 
-## Optional Configuration
+## User Quotas
 
-### `user_quotas`
+User quotas enforce per-key usage limits. Unlike provider quota checkers (which monitor upstream limits), these control client consumption.
 
-Per-API-key usage enforcement. Unlike provider quota checkers (which monitor provider rate limits), user quotas limit how much an individual key can consume.
+### Quota Types
 
-| Type | Description |
-|------|-------------|
-| `rolling` | Time-window quota with behavior based on `limitType` |
-| `daily` | Calendar day quota (resets at UTC midnight) |
-| `weekly` | Calendar week quota (resets at UTC midnight Sunday) |
-| `monthly` | Calendar month quota (resets at 00:00 UTC on the 1st of each month) |
+| Type | Reset Behavior |
+|------|----------------|
+| `rolling` | Continuous window (e.g., "last hour") |
+| `daily` | Resets at UTC midnight |
+| `weekly` | Resets at UTC midnight Sunday |
+| `monthly` | Resets at 00:00 UTC on the 1st |
 
-**Limit types:**
+### Limit Types
 
-| Type | Description | Rolling Behavior |
-|------|-------------|------------------|
-| `requests` | Count per call | Leaky bucket - continuously decays |
-| `tokens` | Sum of input + output + reasoning + cached | Leaky bucket - continuously decays |
-| `cost` | Dollar spending limit | Cumulative - resets when window expires |
+| Type | What It Counts |
+|------|----------------|
+| `requests` | Number of API calls |
+| `tokens` | Input + output + reasoning + cached tokens |
+| `cost` | Dollar spending (requires pricing on models) |
 
-```yaml
-user_quotas:
-  premium_hourly:
-    type: rolling
-    limitType: tokens
-    limit: 100000
-    duration: 1h      # Required for rolling. Supports: 30s, 5m, 1h, 2h30m, 1d
+### Rolling Window Durations
 
-  burst_limited:
-    type: rolling
-    limitType: requests
-    limit: 10
-    duration: 5m
+Supported durations: `30s`, `5m`, `10m`, `30m`, `1h`, `2h`, `2h30m`, `6h`, `12h`, `1d`
 
-  basic_daily:
-    type: daily
-    limitType: requests
-    limit: 1000
+### How Quotas Work
 
-  enterprise_weekly:
-    type: weekly
-    limitType: tokens
-    limit: 5000000
+**Tokens/Requests (leaky bucket):**
+1. After each request, usage is recorded.
+2. Before each request, usage "leaks" based on elapsed time: `leaked = elapsed × (limit / duration)`
+3. Remaining capacity determines if the request is allowed.
 
-  # Cost-based quotas (spending limits)
-  budget_hourly:
-    type: rolling
-    limitType: cost
-    limit: 10.0      # $10 per hour spending limit
-    duration: 1h
+**Cost (cumulative):**
+1. Spending accumulates as requests complete.
+2. Resets when the window expires.
+3. No leak/refill within the window.
 
-  budget_weekly:
-    type: weekly
-    limitType: cost
-    limit: 100.0     # $100 per week spending limit
+### Assigning Quotas
 
-  budget_monthly:
-    type: monthly
-    limitType: cost
-    limit: 500.0     # $500 per month spending limit
-```
-
-**Assign to keys:**
-
-```yaml
-keys:
-  acme_corp:
-    secret: "sk-acme-secret"
-    quota: premium_hourly
-
-  free_user:
-    secret: "sk-free-secret"
-    quota: basic_daily
-
-  budget_user:
-    secret: "sk-budget-secret"
-    quota: budget_hourly
-
-  unlimited:
-    secret: "sk-unlimited"
-    # No quota field = unlimited access
-```
-
-**How rolling quotas work:**
-
-For `tokens` and `requests` quotas, a leaky bucket algorithm is used:
-1. Usage is recorded after each request completes.
-2. On the next request, usage "leaks" based on elapsed time: `leaked = elapsed_time × (limit / duration)`.
-3. New usage is added to the remaining amount.
-
-Example: 10 requests/hour quota. You make 10 requests at 12:00 PM. At 12:30 PM, 50% has leaked → remaining usage is 5. A new request brings it to 6.
-
-For `cost` quotas, spending is cumulative within the window:
-1. Usage accumulates as requests complete.
-2. No leak/refill - spending only resets when the window expires.
-3. Window alignment is math-based (floor division from Unix epoch), not calendar-aligned.
-4. For calendar-aligned cost quotas, use `daily`, `weekly`, or `monthly` types instead.
-
-> **Note:** For budget-based limits aligned to calendar boundaries (e.g., "$500 per calendar month"), use the `monthly` type rather than `rolling` with a month duration.
-
-> **Note:** The stored usage value may be fractional for `requests` quotas due to the leak calculation. This is expected.
-
-If you change a quota's `limitType`, Plexus automatically detects this and resets usage to zero.
-
-**Management API:**
-- `GET /v0/management/quota/status/:key` — quota status for a key
-- `POST /v0/management/quota/clear` — reset usage to zero
-
-See [API Reference: User Quota Enforcement](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1quota~1status~1{key}).
+Reference a quota by name in the key's `quota` field. Keys without a quota have unlimited access.
 
 ---
 
-### `cooldown`
+## Cooldowns
 
-Configures the escalating cooldown system that temporarily removes unhealthy providers from the routing pool using exponential backoff.
+When a provider returns errors, Plexus uses an escalating cooldown system to temporarily remove it from the routing pool.
 
-**Formula:** `C(n) = min(C_max, C_0 × 2^n)` where `n` = consecutive failures (0-indexed).
+### Cooldown Schedule
 
-| Failure # | Duration (defaults) |
-|-----------|---------------------|
+| Consecutive Failures | Duration |
+|---------------------|----------|
 | 1st | 2 minutes |
 | 2nd | 4 minutes |
 | 3rd | 8 minutes |
@@ -762,201 +321,223 @@ Configures the escalating cooldown system that temporarily removes unhealthy pro
 | 8th | 256 minutes |
 | 9th+ | 300 minutes (cap) |
 
-**Key behaviors:**
-- Any successful request resets the failure count to 0.
-- `413 Payload Too Large` errors do NOT trigger cooldowns — they are client-side errors.
+### Behavior
+
+- Successful requests reset failure count to 0.
+- `413 Payload Too Large` errors do NOT trigger cooldowns (client error).
 - Each provider+model combination tracks failures independently.
-- Cooldowns persist to the database and survive restarts.
+- Cooldowns persist in the database across restarts.
 
-```yaml
-cooldown:
-  initialMinutes: 2    # Default: 2
-  maxMinutes: 300      # Default: 300 (5 hours)
-```
+### Configuration
 
-More aggressive example (1 min initial, 1 hour max):
-```yaml
-cooldown:
-  initialMinutes: 1
-  maxMinutes: 60
-```
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `initialMinutes` | First failure duration | 2 |
+| `maxMinutes` | Cap for exponential backoff | 300 |
 
-**Management API:**
+### Disabling Per Provider
+
+Set `disable_cooldown: true` on a provider to exclude it from the cooldown system. Recommended for:
+- Local model servers (Ollama, LM Studio)
+- Providers with their own rate-limit handling
+- Testing scenarios
+
+**Do not** disable for cloud providers with unreliable endpoints.
+
+### Management API
+
 - `GET /v0/management/cooldowns` — list active cooldowns
-- `DELETE /v0/management/cooldowns` — clear all cooldowns
-- `DELETE /v0/management/cooldowns/:provider?model=:model` — clear specific cooldown
+- `DELETE /v0/management/cooldowns` — clear all
+- `DELETE /v0/management/cooldowns/:provider?model=:model` — clear specific
 
 See [API Reference: Cooldown Management](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1cooldowns).
 
-#### Disabling Cooldowns Per Provider
-
-Set `disable_cooldown: true` on a provider to opt it out of the cooldown system entirely. Useful for local model servers, providers with their own rate-limit handling, or testing:
-
-```yaml
-providers:
-  local-ollama:
-    display_name: Local Ollama
-    api_base_url: http://localhost:11434/v1
-    api_key: ollama
-    disable_cooldown: true
-    models:
-      - llama3.2
-      - mistral
-```
-
-**Behavior:** Targets backed by this provider are always considered healthy for routing. Error recording still occurs normally. Other providers in the same alias are unaffected.
-
-| Scenario | Recommended |
-|----------|-------------|
-| Local model server (Ollama, LM Studio) | ✅ Yes |
-| Provider with its own external rate-limit handling | ✅ Yes |
-| Primary fallback that must always be available | ✅ Yes |
-| Testing provider where cooldowns interfere | ✅ Yes |
-| Production cloud provider with unreliable endpoints | ❌ No |
-| Provider that frequently returns 429s | ❌ No |
-
-The toggle is also available in the Admin UI under **Advanced → Disable Cooldowns** on any provider.
-
 ---
 
-### `mcp_servers` (Optional)
+## MCP Servers
 
-Proxy [Model Context Protocol](https://modelcontextprotocol.io) servers through Plexus. Only **streamable HTTP** transport is supported — `stdio` is not.
+Plexus proxies [Model Context Protocol](https://modelcontextprotocol.io) servers. Only HTTP streaming transport is supported.
 
-```yaml
-mcp_servers:
-  tavily:
-    upstream_url: "https://mcp.tavily.com/mcp/?tavilyApiKey=your-api-key"
-    enabled: true
+### Settings
 
-  filesystem:
-    upstream_url: "http://localhost:3001/mcp"
-    enabled: true
-    headers:
-      Authorization: "Bearer some-token"
-```
+| Setting | Description | Required |
+|---------|-------------|----------|
+| **Server Name** | Identifier used in URLs | Yes |
+| **Upstream URL** | Full MCP server endpoint | Yes |
+| **Enabled** | Active for routing | No |
+| **Headers** | Static headers forwarded to upstream | No |
 
-**Fields:**
-- `upstream_url` (**required**): Full URL of the MCP server endpoint.
-- `enabled` (optional, default `true`): Whether this server is active.
-- `headers` (optional): Static headers forwarded to the upstream on every request.
+### Endpoints
 
-**Endpoints:** Each server is exposed at `/mcp/:name`:
-- `POST /mcp/:name` — JSON-RPC messages
-- `GET /mcp/:name` — Server-Sent Events (SSE) for streaming
-- `DELETE /mcp/:name` — Session termination
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/mcp/:name` | JSON-RPC messages |
+| `GET` | `/mcp/:name` | SSE streaming |
+| `DELETE` | `/mcp/:name` | End session |
 
-**Authentication:** All MCP endpoints require a Plexus API key (`Authorization: Bearer <key>`). Client auth headers are **not** forwarded upstream — only the static `headers` configured above.
+### Authentication
 
-**OAuth Discovery:** Plexus exposes standard OAuth 2.0 discovery endpoints for MCP clients that expect OAuth flows:
+All MCP endpoints require a Plexus API key. Client auth headers are NOT forwarded — only configured static headers are added.
+
+### OAuth Discovery
+
+Plexus exposes standard OAuth 2.0 endpoints for MCP clients:
 - `GET /.well-known/oauth-authorization-server`
 - `GET /.well-known/oauth-protected-resource`
 - `GET /.well-known/openid-configuration`
 - `POST /register`
 
-These return metadata indicating that Plexus uses Bearer token (API key) authentication.
+---
+
+## Vision Fallthrough
+
+Vision fallthrough allows image inputs to be preprocessed by a vision-capable model before routing to the actual target.
+
+**Configuration:**
+1. Set a global **Descriptor Model** in Settings (Admin UI)
+2. Enable **Use Image Fallthrough** on individual model aliases
+
+Images are sent to the descriptor model first; the text analysis is prepended to the original prompt.
 
 ---
 
-### `failover` (Optional)
+## Pricing
 
-Controls the global failover/retry behavior for multi-target model aliases.
+Configure pricing to enable `cost` selector strategy, cost-based quotas, and usage reporting.
+
+### Pricing Sources
+
+| Source | Description |
+|--------|-------------|
+| `simple` | Fixed per-million token rates |
+| `openrouter` | Live rates from OpenRouter API |
+| `defined` | Tiered rates based on input token volume |
+| `per_request` | Flat fee per API call |
+
+### Simple Pricing
 
 ```yaml
-failover:
-  enabled: true
-  # retryableStatusCodes:
-  #   - 408
-  #   - 429
-  #   - 500
-  #   - 502
-  #   - 503
-  #   - 504
-  # retryableErrors:
-  #   - ECONNREFUSED
-  #   - ETIMEDOUT
-  #   - ENOTFOUND
+input: 3.00    # dollars per million input tokens
+output: 15.00  # dollars per million output tokens
+cached: 0.30   # cache read (optional)
+cache_write: 3.75  # cache write (optional)
 ```
 
-By default, all non-2xx status codes except `400` and `422` trigger failover to the next healthy target. `retryableStatusCodes` and `retryableErrors` can be used to restrict this behaviour.
+### OpenRouter Pricing
 
----
+Fetches live rates from OpenRouter. Set the model `slug` and optional `discount`:
 
-### Encryption at Rest (Optional)
-
-Plexus can encrypt sensitive data stored in the database using AES-256-GCM. When enabled, the following fields are encrypted:
-
-| Table | Fields |
-|-------|--------|
-| API Keys | `secret` |
-| OAuth Credentials | `accessToken`, `refreshToken` |
-| Providers | `apiKey`, `headers`, `quotaCheckerOptions` |
-| MCP Servers | `headers` |
-
-**Setup:**
-
-```bash
-# Generate a 32-byte hex key
-openssl rand -hex 32
-
-# Set as environment variable
-export ENCRYPTION_KEY="your-64-character-hex-key"
+```yaml
+source: openrouter
+slug: anthropic/claude-3.5-sonnet
+discount: 0.1  # 10% off all rates
 ```
 
-**How it works:**
+### Tiered Pricing
 
-1. On first startup with `ENCRYPTION_KEY` set, Plexus automatically encrypts all existing plaintext values in the database.
-2. All new data is encrypted on write and decrypted on read at the repository layer.
-3. The in-memory configuration cache holds decrypted values, so no other components are affected.
-4. API key authentication uses SHA-256 hash-based lookups (a `secret_hash` column) for performance.
+Useful for providers with volume discounts:
 
-**Key format:** `ENCRYPTION_KEY` accepts either:
-- A 64-character hex string (32 bytes, used directly)
-- An arbitrary passphrase (derived to 32 bytes via scrypt KDF)
-
-**Key rotation:** To rotate the encryption key, use the built-in rekey utility:
-
-```bash
-# Docker (no source code required):
-docker exec -e ENCRYPTION_KEY="old-key" -e NEW_ENCRYPTION_KEY="new-key" plexus ./plexus rekey
-
-# Docker Compose:
-docker compose exec -e ENCRYPTION_KEY="old-key" -e NEW_ENCRYPTION_KEY="new-key" plexus ./plexus rekey
-
-# Binary install:
-ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" ./plexus rekey
-
-# From source:
-ENCRYPTION_KEY="old-key" NEW_ENCRYPTION_KEY="new-key" bun run rekey
+```yaml
+source: defined
+range:
+  - lower_bound: 0
+    upper_bound: 200000
+    input_per_m: 3.00
+    output_per_m: 15.00
+  - lower_bound: 200001
+    upper_bound: .inf
+    input_per_m: 1.50
+    output_per_m: 7.50
 ```
 
-This decrypts all data with the old key and re-encrypts with the new key. After re-keying, update `ENCRYPTION_KEY` to the new key before restarting.
+### Per-Request Pricing
 
-**Backward compatibility:** Without `ENCRYPTION_KEY`, the system operates exactly as before — all data stored in plaintext. A warning is logged at startup when the key is not set.
+Flat fee regardless of token count:
 
-**Important:**
-- If the encryption key is lost, encrypted data **cannot be recovered**. Back up your key securely.
-- Encrypted values are prefixed with `enc:v1:` in the database, making them easy to identify.
-- The migration is idempotent — restarting with the same key does not re-encrypt already encrypted data.
+```yaml
+source: per_request
+amount: 0.04
+```
+
+Full cost stored in `costInput`; output/cached fields are zero.
 
 ---
 
 ## Token Estimation
 
-Some providers (particularly free-tier models on OpenRouter) don't return usage data in their responses. Enable `estimateTokens: true` on a provider to have Plexus automatically estimate token counts using a character-based heuristic.
+Some providers (especially free-tier models) don't return usage data. Enable token estimation to automatically calculate token counts using a character-based heuristic.
 
-```yaml
-providers:
-  openrouter-free:
-    api_base_url: https://openrouter.ai/api/v1
-    api_key: your_key
-    estimateTokens: true
-    models:
-      - meta-llama/llama-3.2-3b-instruct:free
+**Enable via:**
+- Provider setting: `estimateTokens: true`
+- Admin UI: **Advanced → Estimate Tokens**
+
+Estimated counts are flagged with `tokensEstimated = 1` in usage records. Typical accuracy is within ±15% of actual values.
+
+---
+
+## Encryption at Rest
+
+Plexus can encrypt sensitive data using AES-256-GCM.
+
+### What Gets Encrypted
+
+| Data | Fields |
+|------|--------|
+| API Keys | secret |
+| OAuth Credentials | accessToken, refreshToken |
+| Providers | apiKey, headers, quotaCheckerOptions |
+| MCP Servers | headers |
+
+### Setup
+
+```bash
+# Generate a key
+openssl rand -hex 32
+
+# Set environment variable
+export ENCRYPTION_KEY="your-64-character-hex-key"
 ```
 
-Estimated counts are typically within ±15% of actual values and are flagged with `tokensEstimated = 1` in the usage database. Estimation can also be enabled per-provider in the Admin UI under **Advanced → Estimate Tokens**.
+Key format accepts:
+- 64-character hex string (32 bytes, used directly)
+- Arbitrary passphrase (derived via scrypt)
 
-→ See [Token Estimation Guide](TOKEN_ESTIMATION.md) for algorithm details, accuracy characteristics, performance impact, and database schema.
+### Behavior
 
-→ See [Token Accounting Guide](TOKEN_ACCOUNTING.md) for provider-specific usage field semantics and Plexus normalization rules.
+- Existing plaintext data encrypts on first startup with key set.
+- New data encrypts on write, decrypts on read.
+- API key authentication uses SHA-256 hash lookups.
+
+### Key Rotation
+
+```bash
+# Docker
+docker exec -e ENCRYPTION_KEY="old" -e NEW_ENCRYPTION_KEY="new" plexus ./plexus rekey
+
+# Binary
+ENCRYPTION_KEY="old" NEW_ENCRYPTION_KEY="new" ./plexus rekey
+```
+
+After re-keying, update `ENCRYPTION_KEY` before restarting.
+
+### Important
+
+- Lost keys = unreachable data. Back up keys securely.
+- Encrypted values prefixed with `enc:v1:` in database.
+- Without `ENCRYPTION_KEY`, all data stored plaintext.
+
+---
+
+## Failover
+
+Plexus automatically retries failed requests across alternative targets in multi-target model aliases.
+
+### Default Behavior
+
+All non-2xx status codes except `400` and `422` trigger failover. Custom retryable codes and errors can be configured.
+
+### Configuration Options
+
+- `enabled`: Toggle failover on/off
+- `retryableStatusCodes`: List of status codes that trigger retry
+- `retryableErrors`: List of network errors that trigger retry
