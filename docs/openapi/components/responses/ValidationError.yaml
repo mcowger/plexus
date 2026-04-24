@@ -2,13 +2,4 @@ description: Body failed schema validation.
 content:
   application/json:
     schema:
-      type: object
-      properties:
-        error:
-          type: string
-          const: Validation failed
-        details:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
+      $ref: ../schemas/ValidationError.yaml

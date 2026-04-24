@@ -3,7 +3,33 @@ get:
     - Management — Quotas (Provider)
   summary: List all provider quota checkers (admin only)
   description: |
-    Note the path: `/v0/management/quotas` (not `/v0/quotas`).
+    Returns the latest quota snapshot for every configured provider.
+
+    ## Path note
+
+    The path is `/v0/management/quotas` (not `/v0/quotas` as older documentation
+    may show).
+
+    ## What this returns
+
+    A snapshot per provider, containing:
+    - Checker metadata (ID, type, category)
+    - OAuth account info (if using OAuth)
+    - Array of `QuotaSample` for each window the provider reports
+
+    ## Which providers contribute data
+
+    Every provider with a `quota` configuration block in `plexus.yaml` has a
+    checker. The checker's `checkerType` matches the provider slug.
+
+    ## Polling cadence
+
+    Quota checkers run on a scheduler (typically every 1–5 minutes). The
+    `latest` array shows the most recent sample for each window type. To
+    see historical data, use `/quotas/{checkerId}/history`.
+
+    **Admin only** — limited principals receive 403.
+  operationId: getV0ManagementQuotas
   security:
     - AdminKey: []
   responses:
@@ -17,4 +43,3 @@ get:
               $ref: ../components/schemas/QuotaCheckerSnapshot.yaml
     '401':
       description: Authentication required or invalid credentials.
-  operationId: getV0ManagementQuotas

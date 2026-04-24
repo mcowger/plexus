@@ -2,6 +2,32 @@ post:
   tags:
     - Management — Quotas (User)
   summary: Reset a key's quota counters (admin only)
+  description: |
+    Resets usage counters for a key's quota to zero.
+
+    ## What this does
+
+    - Sets the key's current usage to 0
+    - Resets any internal window tracking
+    - Does NOT delete or modify the quota definition itself
+
+    ## What this doesn't do
+
+    - Does NOT remove the quota assignment from the key
+    - Does NOT affect other keys' usage
+
+    ## Use cases
+
+    - Grant a "fresh start" to a key that hit its limit
+    - Reset after a billing cycle
+    - Clear accumulated usage before a new trial period
+
+    ## Audit note
+
+    This operation is logged for audit purposes. The logs record which
+    admin performed the reset and when.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -13,6 +39,7 @@ post:
           properties:
             key:
               type: string
+              description: The API key name to reset.
           required:
             - key
   responses:
@@ -32,4 +59,6 @@ post:
                 type: string
     '400':
       description: Missing `key`.
+    '401':
+      description: Authentication required or invalid credentials.
   operationId: postV0ManagementQuotaClear

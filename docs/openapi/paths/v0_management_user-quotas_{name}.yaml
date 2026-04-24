@@ -5,10 +5,17 @@ parameters:
     schema:
       type: string
       pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
+    description: >
+      Quota definition name. Must match regex `^[a-z0-9][a-z0-9-_]{1,62}$`
+      (lowercase letters, digits, hyphens, underscores; 2–63 chars).
 get:
   tags:
     - Management — Quotas (User)
   summary: Get one quota definition (admin only)
+  description: |
+    Returns a single quota definition by name.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -23,6 +30,8 @@ get:
                 properties:
                   name:
                     type: string
+    '401':
+      description: Authentication required or invalid credentials.
     '404':
       description: Not found.
   operationId: getV0ManagementUserquotasByname
@@ -30,7 +39,22 @@ put:
   tags:
     - Management — Quotas (User)
   summary: Create or replace a quota definition (admin only)
-  description: Validated against the full definition schema.
+  description: |
+    Creates a new quota definition or replaces an existing one.
+
+    ## PUT vs PATCH
+
+    - **PUT** — Complete replacement. All required fields must be provided.
+      Use for creating new definitions or full updates.
+    - **PATCH** — Partial update. Only provided fields are updated. Use
+      for making small changes without sending the full definition.
+
+    ## Validation
+
+    The request body is validated against the `UserQuotaDefinition` schema.
+    Invalid definitions return 400 with validation error details.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -56,11 +80,29 @@ put:
                 $ref: ../components/schemas/UserQuotaDefinition.yaml
     '400':
       $ref: ../components/responses/ValidationError.yaml
+    '401':
+      description: Authentication required or invalid credentials.
   operationId: putV0ManagementUserquotasByname
 patch:
   tags:
     - Management — Quotas (User)
   summary: Partial update (admin only)
+  description: |
+    Partially updates a quota definition.
+
+    ## PUT vs PATCH
+
+    - **PUT** — Complete replacement. All required fields must be provided.
+    - **PATCH** — Partial update. Only provided fields are updated. Only
+      fields present in the request body are changed; missing fields retain
+      their current values.
+
+    ## Use cases
+
+    - Change just the limit: `{"limit": 50000}`
+    - Change just the duration: `{"duration": "2h"}`
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   requestBody:
@@ -87,6 +129,8 @@ patch:
                 $ref: ../components/schemas/UserQuotaDefinition.yaml
     '400':
       $ref: ../components/responses/ValidationError.yaml
+    '401':
+      description: Authentication required or invalid credentials.
     '404':
       description: Not found.
   operationId: patchV0ManagementUserquotasByname
@@ -94,7 +138,20 @@ delete:
   tags:
     - Management — Quotas (User)
   summary: Delete a quota definition (admin only)
-  description: Returns 409 if any configured key still references this quota.
+  description: |
+    Deletes a quota definition.
+
+    ## 409 Conflict
+
+    Returns 409 if any configured key still references this quota via its
+    `quota` field. You must either:
+    1. Remove the quota assignment from the key first
+    2. Delete the key itself
+
+    This prevents accidental deletion of quotas that are actively limiting
+    API keys.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -112,8 +169,24 @@ delete:
                 type: string
               message:
                 type: string
+    '401':
+      description: Authentication required or invalid credentials.
     '404':
       description: Not found.
     '409':
       description: Quota still in use.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: false
+              error:
+                type: string
+                enum:
+                  - quota_in_use
+              message:
+                type: string
   operationId: deleteV0ManagementUserquotasByname

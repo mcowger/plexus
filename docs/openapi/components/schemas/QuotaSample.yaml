@@ -1,15 +1,24 @@
 type: object
+description: Individual quota measurement at a point in time.
 properties:
   id:
     type: integer
+    description: Database record ID for this sample.
   provider:
     type: string
+    description: Provider identifier (e.g. `naga`, `moonshot`).
   checkerId:
     type: string
+    description: >
+      Foreign key to the checker this sample belongs to. Matches
+      `QuotaCheckerSnapshot.checkerId`.
   groupId:
     type:
       - string
       - 'null'
+    description: >
+      Optional grouping identifier. For multi-tenant or sub-account setups.
+      Null when not applicable.
   windowType:
     type: string
     enum:
@@ -20,7 +29,7 @@ properties:
       - weekly
       - monthly
       - custom
-    description: >-
+    description: >
       Time window that the quota measurement covers.
 
       - **subscription** — Monthly/billing-cycle quota or prepaid balance.
@@ -33,22 +42,42 @@ properties:
   checkedAt:
     type: string
     format: date-time
+    description: Timestamp when this sample was captured.
   limit:
     type: number
+    description: >
+      Maximum allowed value for this window. For `balance` category checkers,
+      this is the prepaid balance in dollars. For `rate-limit` category, this
+      is the request/token limit for the window.
   used:
     type: number
+    description: >
+      Amount consumed so far in this window. For `balance` category, this is
+      dollars spent. For `rate-limit` category, this is requests or tokens used.
   remaining:
     type: number
+    description: >
+      Calculated as `limit - used`. The remaining quota available in this
+      window. May be negative if over-consumption occurred.
   utilizationPercent:
     type: number
+    description: >
+      Percentage of quota consumed, calculated as `(used / limit) * 100`.
+      Use this to drive UI progress bars and status warnings.
   unit:
     type: string
-    description: e.g. dollars, tokens, requests, percentage.
+    description: >
+      Unit of measurement. Common values: `dollars` (prepaid balances),
+      `requests` (request count limits), `tokens` (token count limits),
+      `percentage` (percentage-based limits).
   resetsAt:
     type:
       - string
       - 'null'
     format: date-time
+    description: >
+      Timestamp when this quota window resets. Null for rolling windows or
+      subscription balances without a defined reset time.
   status:
     type: string
     enum:
@@ -56,7 +85,7 @@ properties:
       - warning
       - critical
       - exhausted
-    description: >-
+    description: >
       Utilisation severity level.
 
       - **ok** — 0–75% utilisation. Healthy, plenty of quota remaining.
@@ -65,12 +94,21 @@ properties:
       - **exhausted** — 100% utilisation. Quota fully consumed, requests will fail.
   success:
     type: boolean
+    description: >
+      Whether the quota query to the provider succeeded. False if the provider
+      API is unreachable or returned an error.
   errorMessage:
     type:
       - string
       - 'null'
+    description: >
+      Error message when `success` is false. Contains the provider's error
+      response or a network error description.
   createdAt:
     type:
       - string
       - 'null'
     format: date-time
+    description: >
+      Timestamp when this record was created. Usually matches `checkedAt`
+      but may differ due to batch processing.

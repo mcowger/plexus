@@ -274,7 +274,28 @@ tags:
       | `critical` | 90–100% | Near exhaustion, take action soon. |
       | `exhausted` | 100% | Quota fully consumed, requests will fail. |
   - name: Management — Quotas (User)
-    description: Per-API-key quota definitions and enforcement.
+    description: >-
+      Per-API-key quota definitions and enforcement.
+
+      ### Definition lifecycle
+
+      1. Create a quota definition with `PUT /v0/management/user-quotas/{name}`
+      2. Assign it to keys via `keys[*].quota` in config or `PATCH /keys/{name}`
+      3. The enforcement middleware checks requests against the assigned quota
+
+      ### Assignment vs enforcement separation
+
+      - **Assignment**: A quota definition is linked to a key via the key's
+        `quota` field in `plexus.yaml` or via the keys API.
+      - **Enforcement**: The middleware evaluates the key's usage against its
+        assigned quota definition at request time. If `quota_name` is null,
+        the key has no quota and is unlimited.
+
+      ### Why 200 for "no quota"
+
+      `GET /v0/management/quota/status/{key}` returns 200 (not 404) even when
+      no quota is assigned. This is intentional — the UI needs to render a
+      "no quota" state (unlimited) rather than an error state.
   - name: Management — Test
     description: Synthetic inference request used by the admin UI.
   - name: Management — Restart
