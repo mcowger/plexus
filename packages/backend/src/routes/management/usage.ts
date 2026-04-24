@@ -335,7 +335,7 @@ export async function registerUsageRoutes(
 
       return reply.send({
         range,
-        series: seriesRows.map((row) => ({
+        series: seriesRows.map((row: any) => ({
           bucketStartMs: toNumber(row.bucketStartMs),
           requests: toNumber(row.requests),
           inputTokens: toNumber(row.inputTokens),
@@ -583,7 +583,7 @@ export async function registerUsageRoutes(
           .orderBy(bucketSql);
 
         // Map 'key' back to 'provider' or 'model' for frontend compatibility
-        const mappedResults = results.map((row) => ({
+        const mappedResults = results.map((row: any) => ({
           timestamp: row.timestamp,
           [groupBy]: row.key,
           count: row.count,

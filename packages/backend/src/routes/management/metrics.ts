@@ -334,7 +334,7 @@ export async function registerMetricsRoutes(
         .orderBy(schema.requestUsage.startTime);
 
       const totalActiveMs = computeActiveTimeMs(
-        requestTimestamps.map((r) => ({
+        requestTimestamps.map((r: any) => ({
           startTime: toNum(r.startTime),
           durationMs: toNum(r.durationMs),
         }))
@@ -600,7 +600,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_requests_total',
           'counter',
           'Total requests routed to each provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.requests),
           }))
@@ -612,7 +612,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_errors_total',
           'counter',
           'Total non-success responses from each provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.errors),
           }))
@@ -624,7 +624,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_tokens_total',
           'counter',
           'Total tokens (input + output + cached + cache_write) sent to each provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value:
               toNum(r.tokensInput) +
@@ -640,7 +640,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_cost_usd_total',
           'counter',
           'Cumulative cost in USD for each provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.costTotal),
           }))
@@ -652,7 +652,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_avg_latency_ms',
           'gauge',
           'All-time average end-to-end latency in milliseconds per provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.avgLatencyMs),
           }))
@@ -664,7 +664,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_avg_ttft_ms',
           'gauge',
           'All-time average time-to-first-token in milliseconds per provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.avgTtftMs),
           }))
@@ -676,7 +676,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_avg_tokens_per_sec',
           'gauge',
           'All-time average token throughput in tokens/second per provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.avgTps),
           }))
@@ -688,7 +688,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_energy_kwh_total',
           'counter',
           'Total estimated energy consumption in kilowatt-hours per provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.kwhUsed),
           }))
@@ -700,7 +700,7 @@ export async function registerMetricsRoutes(
           'plexus_provider_duration_ms_total',
           'counter',
           'Total inference duration in milliseconds per provider.',
-          byProviderRows.map((r) => ({
+          byProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.totalDurationMs),
           }))
@@ -714,7 +714,7 @@ export async function registerMetricsRoutes(
           'plexus_model_alias_requests_total',
           'counter',
           'Total requests received per incoming model alias (the model name the client sent).',
-          byModelAliasRows.map((r) => ({
+          byModelAliasRows.map((r: any) => ({
             labels: { model_alias: r.modelAlias ?? 'unknown' },
             value: toNum(r.requests),
           }))
@@ -726,7 +726,7 @@ export async function registerMetricsRoutes(
           'plexus_model_alias_tokens_total',
           'counter',
           'Total tokens (input + output + cached + cache_write) per incoming model alias.',
-          byModelAliasRows.map((r) => ({
+          byModelAliasRows.map((r: any) => ({
             labels: { model_alias: r.modelAlias ?? 'unknown' },
             value:
               toNum(r.tokensInput) +
@@ -742,7 +742,7 @@ export async function registerMetricsRoutes(
           'plexus_model_alias_energy_kwh_total',
           'counter',
           'Total estimated energy consumption in kilowatt-hours per incoming model alias.',
-          byModelAliasRows.map((r) => ({
+          byModelAliasRows.map((r: any) => ({
             labels: { model_alias: r.modelAlias ?? 'unknown' },
             value: toNum(r.kwhUsed),
           }))
@@ -754,7 +754,7 @@ export async function registerMetricsRoutes(
           'plexus_model_alias_duration_ms_total',
           'counter',
           'Total inference duration in milliseconds per incoming model alias.',
-          byModelAliasRows.map((r) => ({
+          byModelAliasRows.map((r: any) => ({
             labels: { model_alias: r.modelAlias ?? 'unknown' },
             value: toNum(r.totalDurationMs),
           }))
@@ -768,7 +768,7 @@ export async function registerMetricsRoutes(
           'plexus_api_key_requests_total',
           'counter',
           'Total requests per API key (hashed or named key identifier).',
-          byApiKeyRows.map((r) => ({
+          byApiKeyRows.map((r: any) => ({
             labels: { api_key: r.apiKey ?? 'unknown' },
             value: toNum(r.requests),
           }))
@@ -780,7 +780,7 @@ export async function registerMetricsRoutes(
           'plexus_api_key_tokens_total',
           'counter',
           'Total tokens per API key.',
-          byApiKeyRows.map((r) => ({
+          byApiKeyRows.map((r: any) => ({
             labels: { api_key: r.apiKey ?? 'unknown' },
             value:
               toNum(r.tokensInput) +
@@ -798,7 +798,7 @@ export async function registerMetricsRoutes(
           'plexus_api_key_attribution_requests_total',
           'counter',
           'Total requests per API key and attribution suffix (the part after the colon in the key, e.g. "mysecret:copilot" → attribution="copilot").',
-          byApiKeyAttributionRows.map((r) => ({
+          byApiKeyAttributionRows.map((r: any) => ({
             labels: {
               api_key: r.apiKey ?? 'unknown',
               attribution: r.attribution ?? '',
@@ -813,7 +813,7 @@ export async function registerMetricsRoutes(
           'plexus_api_key_attribution_tokens_total',
           'counter',
           'Total tokens per API key and attribution suffix.',
-          byApiKeyAttributionRows.map((r) => ({
+          byApiKeyAttributionRows.map((r: any) => ({
             labels: {
               api_key: r.apiKey ?? 'unknown',
               attribution: r.attribution ?? '',
@@ -832,7 +832,7 @@ export async function registerMetricsRoutes(
           'plexus_api_key_attribution_cost_usd_total',
           'counter',
           'Cumulative cost in USD per API key and attribution suffix.',
-          byApiKeyAttributionRows.map((r) => ({
+          byApiKeyAttributionRows.map((r: any) => ({
             labels: {
               api_key: r.apiKey ?? 'unknown',
               attribution: r.attribution ?? '',
@@ -847,7 +847,7 @@ export async function registerMetricsRoutes(
           'plexus_api_key_attribution_errors_total',
           'counter',
           'Total non-success responses per API key and attribution suffix.',
-          byApiKeyAttributionRows.map((r) => ({
+          byApiKeyAttributionRows.map((r: any) => ({
             labels: {
               api_key: r.apiKey ?? 'unknown',
               attribution: r.attribution ?? '',
@@ -864,7 +864,7 @@ export async function registerMetricsRoutes(
           'plexus_in_flight_requests',
           'gauge',
           'Number of requests currently in-flight (started but not yet completed), per provider.',
-          inFlightByProviderRows.map((r) => ({
+          inFlightByProviderRows.map((r: any) => ({
             labels: { provider: r.provider ?? 'unknown' },
             value: toNum(r.count),
           }))
@@ -876,7 +876,7 @@ export async function registerMetricsRoutes(
           'plexus_in_flight_requests_by_model',
           'gauge',
           'Number of requests currently in-flight, per canonical model name.',
-          inFlightByModelRows.map((r) => ({
+          inFlightByModelRows.map((r: any) => ({
             labels: { model: r.model ?? 'unknown' },
             value: toNum(r.count),
           }))
@@ -939,7 +939,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_avg_ttft_ms',
           'gauge',
           'Average time-to-first-token in milliseconds per provider and target model, aggregated over all recorded samples.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.avg_ttft_ms,
           }))
@@ -951,7 +951,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_min_ttft_ms',
           'gauge',
           'Minimum time-to-first-token in milliseconds per provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.min_ttft_ms,
           }))
@@ -963,7 +963,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_max_ttft_ms',
           'gauge',
           'Maximum time-to-first-token in milliseconds per provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.max_ttft_ms,
           }))
@@ -975,7 +975,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_avg_tokens_per_sec',
           'gauge',
           'Average token throughput in tokens/second per provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.avg_tokens_per_sec,
           }))
@@ -987,7 +987,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_min_tokens_per_sec',
           'gauge',
           'Minimum token throughput in tokens/second per provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.min_tokens_per_sec,
           }))
@@ -999,7 +999,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_max_tokens_per_sec',
           'gauge',
           'Maximum token throughput in tokens/second per provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.max_tokens_per_sec,
           }))
@@ -1011,7 +1011,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_sample_count',
           'gauge',
           'Number of requests sampled in the performance aggregate for this provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.sample_count,
           }))
@@ -1023,7 +1023,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_success_count',
           'gauge',
           'Number of successful requests in the performance aggregate for this provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.success_count,
           }))
@@ -1035,7 +1035,7 @@ export async function registerMetricsRoutes(
           'plexus_perf_failure_count',
           'gauge',
           'Number of failed requests in the performance aggregate for this provider and model.',
-          perfRows.map((r) => ({
+          perfRows.map((r: any) => ({
             labels: { provider: r.provider, model: r.model },
             value: r.failure_count,
           }))

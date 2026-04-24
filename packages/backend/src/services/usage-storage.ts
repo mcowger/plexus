@@ -405,7 +405,7 @@ export class UsageStorageService extends EventEmitter {
         .offset(offset);
       const results = where ? await query.where(where) : await query;
 
-      return results.map((row) => ({
+      return results.map((row: any) => ({
         requestId: row.requestId,
         createdAt: row.createdAt,
       }));
@@ -588,7 +588,7 @@ export class UsageStorageService extends EventEmitter {
         .limit(pagination.limit)
         .offset(pagination.offset);
 
-      const mappedData: UsageRecord[] = data.map((row) => ({
+      const mappedData: UsageRecord[] = data.map((row: any) => ({
         requestId: row.requestId,
         date: row.date,
         sourceIp: row.sourceIp,
@@ -884,7 +884,7 @@ export class UsageStorageService extends EventEmitter {
         )
         .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
 
-      const mappedRows = perfRows.map((row) => ({
+      const mappedRows = perfRows.map((row: any) => ({
         provider: row.provider,
         model: row.model,
         target_model: row.targetModel,
@@ -915,7 +915,7 @@ export class UsageStorageService extends EventEmitter {
           .where(and(...usageConditions))
           .groupBy(this.schema.requestUsage.provider);
 
-        const existingProviders = new Set(mappedRows.map((row) => row.provider));
+        const existingProviders = new Set(mappedRows.map((row: any) => row.provider));
         for (const usageProvider of usageProviders) {
           if (!existingProviders.has(usageProvider.provider)) {
             mappedRows.push({
@@ -984,7 +984,7 @@ export class UsageStorageService extends EventEmitter {
 
         // Process this batch
         await Promise.all(
-          batch.map(async (request) => {
+          batch.map(async (request: any) => {
             const tokensInput = request.tokensInput || 0;
             const tokensOutput = request.tokensOutput || 0;
 

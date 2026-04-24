@@ -1,5 +1,8 @@
 import { vi, afterEach, describe, test, expect, beforeEach } from 'vitest';
-import type { MockInstance, SpyInstance } from 'vitest';
+
+// Using any for spy types since vitest v4+ doesn't export SpyInstance consistently
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type SpyInstance = any;
 
 /**
  * Global Spy Registry
@@ -21,7 +24,7 @@ import type { MockInstance, SpyInstance } from 'vitest';
  */
 
 interface TrackedSpy {
-  spy: SpyInstance<any, any>;
+  spy: SpyInstance;
   target: any;
   methodName: string;
 }
@@ -33,22 +36,17 @@ const trackedSpies: TrackedSpy[] = [];
  * Register a spy that will be automatically restored after each test.
  * Use this instead of spyOn() for any spy that should not leak.
  */
-export function registerSpy<T extends object, K extends keyof T>(
-  target: T,
-  methodName: K
-): SpyInstance<any, any>;
-export function registerSpy(target: any, methodName: string): SpyInstance<any, any>;
-export function registerSpy(target: any, methodName: string): SpyInstance<any, any> {
+export function registerSpy(target: any, methodName: string): SpyInstance {
   const spy = vi.spyOn(target, methodName as never);
   trackedSpies.push({ spy, target, methodName });
-  return spy as SpyInstance<any, any>;
+  return spy;
 }
 
 /**
  * Unregister a specific spy (stop tracking it for auto-restore).
  * Call this if you want to manage the spy's lifecycle manually.
  */
-export function unregisterSpy(spy: SpyInstance<any, any>): void {
+export function unregisterSpy(spy: SpyInstance): void {
   const index = trackedSpies.findIndex((t) => t.spy === spy);
   if (index !== -1) {
     trackedSpies.splice(index, 1);
@@ -88,8 +86,8 @@ afterEach(() => {
  */
 export function createTrackedMock<T extends (...args: any[]) => any>(
   implementation: T
-): MockInstance<T> {
-  const m = vi.fn(implementation) as unknown as MockInstance<T>;
+): SpyInstance {
+  const m = vi.fn(implementation);
   return m;
 }
 

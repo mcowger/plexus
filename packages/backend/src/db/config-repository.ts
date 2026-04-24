@@ -1039,7 +1039,7 @@ export class ConfigRepository {
     const schema = this.schema();
     const timestamp = now();
 
-    await this.db().transaction(async (tx) => {
+    await this.db().transaction(async (tx: any) => {
       for (const [key, value] of Object.entries(entries)) {
         const wrapped = toJson({ value });
         const existing = await tx

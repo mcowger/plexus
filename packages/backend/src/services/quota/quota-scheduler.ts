@@ -125,7 +125,9 @@ export class QuotaScheduler {
 
     const DEFAULT_EXHAUSTION_THRESHOLD = 99;
     const checker = this.checkers.get(result.checkerId);
-    const exhaustionThreshold = checker?.exhaustionThreshold ?? DEFAULT_EXHAUSTION_THRESHOLD;
+    // Access exhaustionThreshold via type assertion - the actual class has this getter
+    const exhaustionThreshold =
+      (checker as any)?.exhaustionThreshold ?? DEFAULT_EXHAUSTION_THRESHOLD;
     const cooldownManager = CooldownManager.getInstance();
     const provider = result.provider;
 
@@ -172,7 +174,7 @@ export class QuotaScheduler {
       // However, if THIS checker has the strictest threshold (i.e. it's the one that
       // likely set the cooldown), allow it to clear its own cooldown.
       const strictestThreshold = this.getStrictestThresholdForProvider(provider);
-      if (checker && checker.exhaustionThreshold <= strictestThreshold) {
+      if (checker && (checker as any).exhaustionThreshold <= strictestThreshold) {
         // This checker is at least as strict as any other — safe to clear
         await cooldownManager.markProviderSuccess(provider, '');
       } else {
@@ -192,8 +194,9 @@ export class QuotaScheduler {
     let strictest = 99;
     for (const [, checker] of this.checkers) {
       if (checker.config.provider !== provider) continue;
-      if (checker.exhaustionThreshold < strictest) {
-        strictest = checker.exhaustionThreshold;
+      const threshold = (checker as any).exhaustionThreshold;
+      if (threshold !== undefined && threshold < strictest) {
+        strictest = threshold;
       }
     }
     return strictest;

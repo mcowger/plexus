@@ -291,7 +291,7 @@ export class ResponsesStorageService {
         .from(this.schema.responses)
         .where(lt(this.schema.responses.createdAt, cutoffTime));
 
-      const responseIds = oldResponses.map((r) => r.id);
+      const responseIds = oldResponses.map((r: any) => r.id);
 
       if (responseIds.length === 0) {
         return { deletedResponses: 0, deletedItems: 0, deletedConversations: 0 };
@@ -315,7 +315,7 @@ export class ResponsesStorageService {
         )
         .where(sql`${this.schema.responses.id} IS NULL`);
 
-      const orphanedIds = conversationIdsToDelete.map((c) => c.id);
+      const orphanedIds = conversationIdsToDelete.map((c: any) => c.id);
       let deletedConversations = 0;
       if (orphanedIds.length > 0) {
         await db

@@ -87,4 +87,6 @@ export interface QuotaSnapshot {
 export interface QuotaChecker {
   config: QuotaCheckerConfig;
   checkQuota(): Promise<QuotaCheckResult>;
+  // Optional getter - actual implementations have this property
+  exhaustionThreshold?: number;
 }

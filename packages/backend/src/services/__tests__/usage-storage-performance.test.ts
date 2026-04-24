@@ -103,8 +103,8 @@ describe('UsageStorageService performance metrics', () => {
       .from(schema.providerPerformance)
       .groupBy(schema.providerPerformance.provider, schema.providerPerformance.model);
 
-    const a = rows.find((r) => r.provider === 'provider-a' && r.model === 'model-1');
-    const b = rows.find((r) => r.provider === 'provider-b' && r.model === 'model-2');
+    const a = rows.find((r: any) => r.provider === 'provider-a' && r.model === 'model-1');
+    const b = rows.find((r: any) => r.provider === 'provider-b' && r.model === 'model-2');
 
     expect(a?.count).toBe(100);
     expect(b?.count).toBe(3);
@@ -123,8 +123,8 @@ describe('UsageStorageService performance metrics', () => {
     const allForModel = await storage.getProviderPerformance(undefined, 'model-x');
     expect(allForModel.length).toBe(2);
 
-    const rowA = allForModel.find((r) => r.provider === 'provider-a');
-    const rowB = allForModel.find((r) => r.provider === 'provider-b');
+    const rowA = allForModel.find((r: any) => r.provider === 'provider-a');
+    const rowB = allForModel.find((r: any) => r.provider === 'provider-b');
 
     expect(rowA?.sample_count).toBe(3);
     expect(rowB?.sample_count).toBe(2);
@@ -190,7 +190,7 @@ describe('UsageStorageService performance metrics', () => {
     }
 
     const rows = await storage.getProviderPerformance(undefined, 'glm-4.7');
-    const providers = new Set(rows.map((row) => row.provider));
+    const providers = new Set(rows.map((row: any) => row.provider));
 
     expect(providers.size).toBe(5);
     expect(providers.has('zai')).toBe(true);
@@ -217,7 +217,7 @@ describe('UsageStorageService performance metrics', () => {
     });
 
     const rows = await storage.getProviderPerformance(undefined, 'glm-4.7');
-    const providers = new Set(rows.map((row) => row.provider));
+    const providers = new Set(rows.map((row: any) => row.provider));
 
     expect(providers.has('zai')).toBe(true);
     expect(providers.has('apertis')).toBe(true);
@@ -434,7 +434,7 @@ describe('UsageStorageService performance metrics', () => {
       {},
       { limit: 10, offset: 0, sortBy: 'apiKey', sortDir: 'asc' }
     );
-    expect(byKeyAsc.data.map((row) => row.requestId)).toEqual([
+    expect(byKeyAsc.data.map((row: any) => row.requestId)).toEqual([
       'sort-a-new',
       'sort-a-old',
       'sort-z',
@@ -444,7 +444,7 @@ describe('UsageStorageService performance metrics', () => {
       {},
       { limit: 10, offset: 0, sortBy: 'costTotal', sortDir: 'desc' }
     );
-    expect(byCostDesc.data.map((row) => row.requestId)).toEqual([
+    expect(byCostDesc.data.map((row: any) => row.requestId)).toEqual([
       'sort-z',
       'sort-a-new',
       'sort-a-old',
@@ -454,7 +454,7 @@ describe('UsageStorageService performance metrics', () => {
       {},
       { limit: 10, offset: 0, sortBy: 'durationMs', sortDir: 'asc' }
     );
-    expect(byDurationAsc.data.map((row) => row.requestId)).toEqual([
+    expect(byDurationAsc.data.map((row: any) => row.requestId)).toEqual([
       'sort-z',
       'sort-a-old',
       'sort-a-new',
@@ -474,6 +474,6 @@ describe('UsageStorageService performance metrics', () => {
     });
 
     const filtered = await storage.getUsage({ apiKey: 'alpha' }, { limit: 10, offset: 0 });
-    expect(filtered.data.map((row) => row.requestId)).toEqual(['filter-alpha']);
+    expect(filtered.data.map((row: any) => row.requestId)).toEqual(['filter-alpha']);
   });
 });
