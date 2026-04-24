@@ -187,7 +187,7 @@ export const getTrackedWindowsForChecker = (category: string, windows: any[]): s
         .filter((t) => t !== 'subscription')
         .sort((a, b) => (WINDOW_PRIORITY[a] || 99) - (WINDOW_PRIORITY[b] || 99));
     case 'wisdomgate':
-      return ['monthly'].filter((t) => availableTypes.has(t));
+      return ['subscription'].filter((t) => availableTypes.has(t));
     case 'minimax-coding':
       return ['custom'].filter((t) => availableTypes.has(t));
     case 'apertis-coding-plan':

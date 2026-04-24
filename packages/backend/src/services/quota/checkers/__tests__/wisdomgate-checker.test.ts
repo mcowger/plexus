@@ -27,7 +27,7 @@ describe('WisdomGateQuotaChecker', () => {
     expect(QuotaCheckerFactory.isRegistered('wisdomgate')).toBe(true);
   });
 
-  it('queries balance with session cookie and returns monthly subscription quota with dollars', async () => {
+  it('queries balance with session cookie and returns subscription quota with dollars', async () => {
     let capturedUrl: string | undefined;
     let capturedCookie: string | undefined;
 
@@ -38,22 +38,9 @@ describe('WisdomGateQuotaChecker', () => {
 
       return new Response(
         JSON.stringify({
-          object: 'billing_details',
-          total_usage: 76.147972,
-          total_available: 23.852028,
-          regular_amount: 100,
-          package_details: [
-            {
-              package_id: 'pkg_123',
-              title: 'Test Package',
-              amount: 23.852028,
-              total_amount: 100,
-              expiry_time: 1735689600,
-              expiry_date: '2025-01-01',
-              begin_time: 1704067200,
-              begin_date: '2024-01-01',
-            },
-          ],
+          object: 'usage_details',
+          total_usage: 148.49091,
+          total_available: 0.067706,
         }),
         {
           status: 200,
@@ -73,13 +60,13 @@ describe('WisdomGateQuotaChecker', () => {
     expect(result.windows).toHaveLength(1);
 
     const window = result.windows?.[0];
-    expect(window?.windowType).toBe('monthly');
+    expect(window?.windowType).toBe('subscription');
     expect(window?.unit).toBe('dollars');
-    expect(window?.limit).toBe(100);
-    expect(window?.used).toBeCloseTo(76.147972, 6);
-    expect(window?.remaining).toBeCloseTo(23.852028, 6);
-    expect(window?.description).toBe('Wisdom Gate monthly subscription');
-    expect(window?.resetsAt).toBeInstanceOf(Date);
+    expect(window?.used).toBeCloseTo(148.49091, 6);
+    expect(window?.remaining).toBeCloseTo(0.067706, 6);
+    expect(window?.limit).toBeCloseTo(148.558616, 6);
+    expect(window?.description).toBe('Wisdom Gate subscription');
+    expect(window?.resetsAt).toBeUndefined();
   });
 
   it('returns error for non-200 response', async () => {
@@ -101,22 +88,9 @@ describe('WisdomGateQuotaChecker', () => {
       capturedUrl = String(input);
       return new Response(
         JSON.stringify({
-          object: 'billing_details',
-          total_usage: 0,
+          object: 'usage_details',
+          total_usage: 10,
           total_available: 10,
-          regular_amount: 10,
-          package_details: [
-            {
-              package_id: 'pkg_123',
-              title: 'Test Package',
-              amount: 10,
-              total_amount: 10,
-              expiry_time: 1735689600,
-              expiry_date: '2025-01-01',
-              begin_time: 1704067200,
-              begin_date: '2024-01-01',
-            },
-          ],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -138,6 +112,11 @@ describe('WisdomGateQuotaChecker', () => {
     expect(capturedUrl).toBe(
       'https://custom.endpoint.example.com/api/dashboard/billing/usage/details'
     );
+  });
+
+  it('has category balance', () => {
+    const checker = new WisdomGateQuotaChecker(makeConfig());
+    expect(checker.category).toBe('balance');
   });
 
   it('throws error when session option is missing', async () => {

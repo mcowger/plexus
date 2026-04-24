@@ -24,6 +24,7 @@ const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   poe: 'POE',
   apertis: 'Apertis',
   neuralwatt: 'Neuralwatt',
+  wisdomgate: 'Wisdom Gate',
 };
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
