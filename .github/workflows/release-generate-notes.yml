@@ -144,7 +144,7 @@ jobs:
 
       - name: Generate release notes via Pi
         id: pi
-        uses: mcowger/pi-coding-agent-action@mcowger/baseurl
+        uses: shaftoe/pi-coding-agent-action@v2.13.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
