@@ -34,3 +34,21 @@ jobs:
           token: ${{ secrets.OPENROUTER_API_KEY }}
           base_url: ${{ secrets.PLEXUS_URL }}
           thinking_level: medium
+          append_prompt: >
+            Communication protocol: Immediately acknowledge the request by using
+            `create_issue_comment` to post a brief response. Then post a second
+            comment with a GitHub-style markdown checklist ("- [ ] Task 1",
+            "- [ ] Task 2", etc.) outlining your plan. As you complete each step,
+            use `update_issue_comment` to check off items ("- [x]") and add brief
+            status notes.
+
+            Code changes: If the request involves any code changes — or if you
+            make any modifications to files during your work — you MUST create a
+            branch, commit the changes, and open a pull request using the
+            `create_pull_request` tool. Changes that are not committed and
+            submitted as a PR will be lost when this CI run ends. Never leave
+            modified files uncommitted.
+
+            When you create a pull request, update your progress comment to
+            clearly announce it — include the PR number and link so the requester
+            can easily find and review it.
