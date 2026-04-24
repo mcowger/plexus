@@ -250,4 +250,4 @@ Full support for OpenAI's `/v1/responses` endpoint including stateful multi-turn
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) file.
+MIT License — see [LICENSE](LICENSE) file
