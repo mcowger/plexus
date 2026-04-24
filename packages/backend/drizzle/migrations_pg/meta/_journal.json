@@ -260,6 +260,13 @@
       "when": 1776372435462,
       "tag": "0036_serious_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1777001004457,
+      "tag": "0037_massive_quentin_quire",
+      "breakpoints": true
     }
   ]
 }
