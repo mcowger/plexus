@@ -4,10 +4,53 @@ parameters:
     required: true
     schema:
       type: string
+    description: >
+      API key name to check quota status for. Must match a configured key.
 get:
   tags:
     - Management — Quotas (User)
   summary: Current enforcement status for a key (admin only)
+  description: |
+    Returns the current quota enforcement status for a specific API key.
+
+    ## Response shapes
+
+    Two possible shapes depending on whether a quota is assigned:
+
+    **Assigned (quota_name is set):**
+    ```json
+    {
+      "key": "acme_corp",
+      "quota_name": "premium_hourly",
+      "allowed": true,
+      "current_usage": 45000,
+      "limit": 100000,
+      "remaining": 55000,
+      "resets_at": "2026-02-19T01:00:00.000Z"
+    }
+    ```
+
+    **Unassigned (quota_name is null):**
+    ```json
+    {
+      "key": "free_user",
+      "quota_name": null,
+      "allowed": true,
+      "current_usage": 0,
+      "limit": null,
+      "remaining": null,
+      "resets_at": null
+    }
+    ```
+
+    ## Why 200 for "no quota"
+
+    Returns 200 (not 404) even when no quota is assigned. This is intentional
+    — the UI needs to render a "no quota" state (unlimited) rather than an
+    error state. When `quota_name` is null, `allowed` is always `true` and
+    limit/remaining are null.
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
@@ -36,6 +79,8 @@ get:
                 limit: null
                 remaining: null
                 resets_at: null
+    '401':
+      description: Authentication required or invalid credentials.
     '404':
       description: Key not found.
   operationId: getV0ManagementQuotaStatusBykey

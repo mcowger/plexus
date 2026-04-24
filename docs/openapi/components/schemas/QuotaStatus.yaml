@@ -1,25 +1,49 @@
 type: object
+description: >
+  Quota enforcement status for an API key. Returned by the status check
+  endpoint; used by the quota middleware to decide whether to allow or
+  block requests.
 properties:
   key:
     type: string
+    description: The API key name this status applies to.
   quota_name:
     type:
       - string
       - 'null'
+    description: >
+      Name of the quota definition assigned to this key. Null when no quota
+      is assigned — requests are allowed without rate limiting.
   allowed:
     type: boolean
+    description: >
+      Whether requests are currently allowed. False when the user has exceeded
+      their quota limit. The quota middleware blocks requests when this is
+      false and returns 429.
   current_usage:
     type: number
+    description: >
+      Current usage count/tokens within the quota window. What this represents
+      depends on `limitType` in the quota definition (tokens or requests).
   limit:
     type:
       - number
       - 'null'
+    description: >
+      Maximum allowed usage for the quota window. Null when no quota is
+      assigned (unlimited).
   remaining:
     type:
       - number
       - 'null'
+    description: >
+      Calculated as `limit - current_usage`. Null when no quota is assigned.
+      Can be negative if over-consumption occurred.
   resets_at:
     type:
       - string
       - 'null'
     format: date-time
+    description: >
+      Timestamp when the quota window resets and usage counters clear. Null
+      for rolling windows or when no quota is assigned.

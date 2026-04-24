@@ -4,10 +4,36 @@ parameters:
     required: true
     schema:
       type: string
+    description: >
+      Checker ID in format `{provider}:{account}`, e.g. `naga:default`,
+      `moonshot:work`.
 post:
   tags:
     - Management — Quotas (Provider)
   summary: Force an immediate quota check (admin only)
+  description: |
+    Triggers an immediate quota check outside the normal scheduler cadence.
+
+    ## Use case
+
+    Use this to get current quota data without waiting for the next scheduler
+    run. Useful after adding credits or changing provider configuration.
+
+    ## What it does
+
+    - Immediately calls the provider's API to fetch fresh quota data
+    - Updates the local sample database
+    - Returns the checker's result (same shape as `GET /quotas/{checkerId}`)
+
+    ## What it doesn't do
+
+    - **Does not bypass provider-side rate limits**. The check counts against
+      any rate limits the provider imposes on quota API calls.
+    - **Does not modify the scheduler cadence**. The next scheduled check
+      runs at its normal time.
+
+    **Admin only** — limited principals receive 403.
+  operationId: postV0ManagementQuotasBycheckerIdCheck
   security:
     - AdminKey: []
   responses:
@@ -18,6 +44,7 @@ post:
           schema:
             type: object
             additionalProperties: true
+    '401':
+      description: Authentication required or invalid credentials.
     '404':
       description: Checker not found.
-  operationId: postV0ManagementQuotasBycheckerIdCheck

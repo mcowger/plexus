@@ -1,4 +1,30 @@
-description: User quota exceeded.
+description: |
+  Returned when a user's quota limit is exceeded. The request is rejected
+  with HTTP 429.
+
+  ## When this is returned
+
+  This response is returned by inference endpoints (`/v1/*`) when:
+  1. The API key has an assigned quota (via `keys[*].quota` in config)
+  2. The key's usage has reached or exceeded the quota limit
+  3. The quota enforcement middleware blocks the request
+
+  ## Response fields
+
+  - `error.type` — Always `quota_exceeded`
+  - `error.message` — Human-readable error message
+  - `error.quota_name` — Name of the quota definition being enforced
+  - `error.current_usage` — Usage at the time of rejection
+  - `error.limit` — The limit that was exceeded
+  - `error.resets_at` — When the quota window resets (if applicable)
+
+  ## Rate limiting behaviour
+
+  After this response is returned, subsequent requests continue to be
+  blocked until:
+  - The quota window resets (e.g., midnight for daily, window expiry for rolling)
+  - An admin clears the quota counters via `POST /v0/management/quota/clear`
+  - The quota assignment is removed from the key
 content:
   application/json:
     schema:

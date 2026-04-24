@@ -2,6 +2,22 @@ get:
   tags:
     - Management — Quotas (User)
   summary: List all user quota definitions (admin only)
+  description: |
+    Returns all user quota definitions keyed by name.
+
+    ## Use case
+
+    Use this to see all available quota definitions and their current
+    configuration.
+
+    ## Name regex
+
+    Quota definition names must match: `^[a-z0-9][a-z0-9-_]{1,62}$`
+    - Starts with lowercase letter or digit
+    - Allowed: lowercase letters, digits, hyphens, underscores
+    - 2–63 characters
+
+    **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:

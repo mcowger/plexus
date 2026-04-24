@@ -4,10 +4,40 @@ parameters:
     required: true
     schema:
       type: string
+    description: >
+      Checker ID in format `{provider}:{account}`, e.g. `naga:default`,
+      `moonshot:work`.
 get:
   tags:
     - Management — Quotas (Provider)
   summary: Historical quota samples (admin only)
+  description: |
+    Returns historical quota measurements for a specific checker.
+
+    ## Query parameters
+
+    - **windowType** — Filter by time window. Options: `subscription`,
+      `hourly`, `five_hour`, `daily`, `weekly`, `monthly`, `custom`.
+      When omitted, returns all window types.
+
+    - **since** — Start of the time range. Supports two formats:
+      - **Absolute**: ISO 8601 timestamp, e.g. `2026-01-01T00:00:00Z`
+      - **Relative**: `Nd` format, e.g. `7d` (last 7 days), `30d` (last 30 days)
+
+    ## Response structure
+
+    - `checkerId` — The checker this history is for
+    - `windowType` — The window type filter used (null if no filter)
+    - `since` — The timestamp of the earliest sample
+    - `history` — Array of `QuotaSample` objects sorted by `checkedAt` ascending
+
+    ## Retention
+
+    Historical samples are retained for 30 days. Trying to query beyond
+    the retention window returns an empty array.
+
+    **Admin only** — limited principals receive 403.
+  operationId: getV0ManagementQuotasBycheckerIdHistory
   security:
     - AdminKey: []
   parameters:
@@ -23,11 +53,15 @@ get:
           - weekly
           - monthly
           - custom
+      description: >
+        Filter by time window type. Returns all window types when omitted.
     - in: query
       name: since
       schema:
         type: string
-      description: ISO timestamp **or** relative format like `7d`, `30d`.
+      description: >
+        Start of the time range. Supports ISO timestamp (e.g.
+        `2026-01-01T00:00:00Z`) or relative format like `7d`, `30d`.
   responses:
     '200':
       description: History.
@@ -53,4 +87,3 @@ get:
                   $ref: ../components/schemas/QuotaSample.yaml
     '401':
       description: Authentication required or invalid credentials.
-  operationId: getV0ManagementQuotasBycheckerIdHistory

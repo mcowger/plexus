@@ -1,0 +1,11 @@
+type: object
+properties:
+  error:
+    type: string
+    const: Validation failed
+  details:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+description: Body failed schema validation.

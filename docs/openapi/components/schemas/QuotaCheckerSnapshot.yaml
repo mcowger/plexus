@@ -2,15 +2,20 @@ type: object
 properties:
   checkerId:
     type: string
+    description: >
+      Unique identifier for this quota checker. Format: `{provider}:{account}`,
+      e.g. `naga:default`, `moonshot:work`.
   checkerType:
     type: string
-    description: e.g. naga, moonshot.
+    description: >
+      Provider identifier (e.g. `naga`, `moonshot`, `openai-codex`). Maps to
+      provider config slug.
   checkerCategory:
     type: string
     enum:
       - balance
       - rate-limit
-    description: >-
+    description: >
       Whether the checker tracks a prepaid account balance or a time-windowed
       rate limit.
 
@@ -20,9 +25,20 @@ properties:
         `tokens`, or `percentage`). Renders as a progress bar in the UI.
   oauthAccountId:
     type: string
+    description: >
+      OAuth account identifier. Present when the provider uses OAuth
+      authentication. Used to distinguish multiple accounts for the same
+      provider.
   oauthProvider:
     type: string
+    description: >
+      OAuth provider identifier (e.g. `openai-codex`, `anthropic-claude-code`).
+      Present when credentials are stored via OAuth flow.
   latest:
     type: array
     items:
       $ref: ./QuotaSample.yaml
+    description: >
+      Most recent quota samples for each window type. The array contains
+      samples for the primary windows (subscription, daily, etc.) that the
+      provider reports.

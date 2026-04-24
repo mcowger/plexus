@@ -4,10 +4,30 @@ parameters:
     required: true
     schema:
       type: string
+    description: >
+      Checker ID in format `{provider}:{account}`, e.g. `naga:default`,
+      `moonshot:work`. Use the checker IDs returned by `GET /quotas`.
 get:
   tags:
     - Management — Quotas (Provider)
   summary: Latest quota for one checker (admin only)
+  description: |
+    Returns the most recent quota sample for a specific provider/account
+    combination.
+
+    ## Use case
+
+    Use this to get the current quota status for one provider without
+    fetching all checkers. Equivalent to filtering `GET /quotas` by
+    `checkerId`.
+
+    ## Same shape as list endpoint
+
+    The response structure is identical to items in `GET /quotas` — a
+    `QuotaCheckerSnapshot` with the latest samples.
+
+    **Admin only** — limited principals receive 403.
+  operationId: getV0ManagementQuotasBycheckerId
   security:
     - AdminKey: []
   responses:
@@ -19,4 +39,5 @@ get:
             $ref: ../components/schemas/QuotaCheckerSnapshot.yaml
     '401':
       description: Authentication required or invalid credentials.
-  operationId: getV0ManagementQuotasBycheckerId
+    '404':
+      description: Checker not found.
