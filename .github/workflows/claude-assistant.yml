@@ -42,7 +42,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-            --allowedTools Read,Write,Edit,Replace,Bash,Grep,Glob,TaskOutput,KillTask
+            --allowedTools Read,Write,Edit,Replace,Bash,Grep,Glob,TaskOutput,KillTask,mcp__github__create_pull_request
           path_to_bun_executable: /home/runner/.bun/bin/bun
           assignee_trigger: claude
           show_full_output: true
@@ -52,19 +52,13 @@ jobs:
           track_progress: false
           prompt: |
             Code changes: If the request involves any code changes — or if you
-            make any modifications to files during your work — you MUST:
-
-              1. Create a branch and commit the changes.
-              2. Push the branch to origin.
-              3. Actually open the pull request by running `gh pr create`
-                 (e.g. `gh pr create --base main --head <branch> --title "..." --body "..."`).
-                 Do NOT just provide a "Create PR" link or compare URL — actually
-                 create the PR via the `gh` CLI.
-              4. Capture the resulting PR URL/number from `gh pr create` and
-                 include it verbatim in your final reply.
-
-            Changes that are not committed and submitted as a PR will be lost when
-            this CI run ends. Never leave modified files uncommitted.
+            make any modifications to files during your work — you MUST commit
+            the changes, push the branch, and open a real pull request by
+            calling the `mcp__github__create_pull_request` tool. Do not just
+            emit a compare/quick_pull link in your reply — actually create the
+            PR via the MCP tool and reference the resulting PR URL. Changes
+            that are not committed and submitted as a PR will be lost when this
+            CI run ends. Never leave modified files uncommitted.
 
             BEFORE pushing your branch or creating a PR, you MUST run these
             validation commands and ensure they pass:
@@ -77,10 +71,5 @@ jobs:
             If `bun run format` makes changes, stage them with `git add` before
             committing. Do NOT create a PR if these checks fail — fix the issues first.
 
-            Final reply format: keep it short and human-readable. Include:
-              - A brief one-paragraph summary of what changed and why.
-              - The PR number and URL returned by `gh pr create`.
-
-            Do NOT include a step-by-step checklist, progress tracker, todo list,
-            or list of internal tasks in your final reply. The reply should read
-            as a summary, not a build log.
+            When you create a pull request, clearly announce it — include the PR
+            number and link so the requester can easily find and review it.
