@@ -34,20 +34,20 @@ export async function registerQuotaRoutes(
         try {
           const latest = await quotaScheduler.getLatestQuota(checkerId);
           results.push({
-            checkerId,
-            checkerType: getCheckerType(checkerId),
             ...getOAuthMetadata(checkerId),
             ...(latest ?? { success: false, meters: [] }),
+            checkerId,
+            checkerType: getCheckerType(checkerId),
           });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
           results.push({
-            checkerId,
-            checkerType: getCheckerType(checkerId),
             ...getOAuthMetadata(checkerId),
             success: false,
             meters: [],
             error: error instanceof Error ? error.message : 'Unknown error',
+            checkerId,
+            checkerType: getCheckerType(checkerId),
           });
         }
       }
@@ -64,10 +64,10 @@ export async function registerQuotaRoutes(
       const { checkerId } = request.params as { checkerId: string };
       const latest = await quotaScheduler.getLatestQuota(checkerId);
       return {
-        checkerId,
-        checkerType: getCheckerType(checkerId),
         ...getOAuthMetadata(checkerId),
         ...(latest ?? { success: false, meters: [] }),
+        checkerId,
+        checkerType: getCheckerType(checkerId),
       };
     } catch (error) {
       logger.error(`Failed to get quota for '${(request.params as any).checkerId}': ${error}`);
@@ -90,11 +90,7 @@ export async function registerQuotaRoutes(
         }
       }
 
-      const history = await quotaScheduler.getQuotaHistory(
-        checkerId,
-        querystring.meterKey,
-        since
-      );
+      const history = await quotaScheduler.getQuotaHistory(checkerId, querystring.meterKey, since);
       return {
         checkerId,
         meterKey: querystring.meterKey,

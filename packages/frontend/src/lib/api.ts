@@ -546,7 +546,6 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'kilo',
   'wisdomgate',
   'apertis',
-  'apertis-coding-plan',
   'copilot',
   'poe',
   'gemini-cli',
@@ -2244,7 +2243,12 @@ export const api = {
         `${API_BASE}/v0/management/quotas/${checkerId}/history?${params}`
       );
       if (!res.ok) throw new Error('Failed to fetch quota history');
-      return (await res.json()) as { checkerId: string; meterKey?: string; since?: string; history: any[] };
+      return (await res.json()) as {
+        checkerId: string;
+        meterKey?: string;
+        since?: string;
+        history: any[];
+      };
     } catch (e) {
       console.error('API Error getQuotaHistory', e);
       return null;

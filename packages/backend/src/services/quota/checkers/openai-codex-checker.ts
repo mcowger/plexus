@@ -1,9 +1,11 @@
 import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
+import { CodexVersionService } from '../../codex-version-service';
 import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
 import { logger } from '../../../utils/logger';
 import type { Meter } from '../../../types/meter';
+import type { MeterContext } from '../checker-registry';
 
 interface CodexUsageWindow {
   used_percent?: number;
@@ -61,7 +63,8 @@ function windowPeriod(limitWindowSeconds?: number): {
   periodUnit: 'hour' | 'day';
   periodCycle: 'rolling';
 } {
-  if (limitWindowSeconds === 5 * 60 * 60) return { periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling' };
+  if (limitWindowSeconds === 5 * 60 * 60)
+    return { periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling' };
   return { periodValue: 7, periodUnit: 'day', periodCycle: 'rolling' };
 }
 
@@ -69,7 +72,7 @@ function buildMeterFromWindow(
   window: CodexUsageWindow,
   key: string,
   label: string,
-  ctx: { allowance: (...args: any[]) => Meter }
+  ctx: Pick<MeterContext, 'allowance'>
 ): Meter | null {
   const usedPercent = window.used_percent;
   const used =
@@ -96,8 +99,14 @@ export default defineChecker({
     timeoutMs: z.number().int().positive().optional(),
   }),
   async check(ctx) {
-    const endpoint = ctx.getOption<string>('endpoint', 'https://chatgpt.com/backend-api/wham/usage');
-    const userAgent = ctx.getOption<string>('userAgent', 'codex_cli_rs/0.125.0 (Debian 13.0.0; x86_64) WindowsTerminal');
+    const endpoint = ctx.getOption<string>(
+      'endpoint',
+      'https://chatgpt.com/backend-api/wham/usage'
+    );
+    const userAgent = ctx.getOption<string>(
+      'userAgent',
+      CodexVersionService.getInstance().getUserAgent()
+    );
     const timeoutMs = ctx.getOption<number>('timeoutMs', 15000);
 
     let accessToken: string;
@@ -107,7 +116,8 @@ export default defineChecker({
     if (configuredApiKey) {
       accessToken = parseAccessToken(configuredApiKey);
     } else {
-      const provider = ctx.getOption<string>('oauthProvider', 'openai-codex').trim() || 'openai-codex';
+      const provider =
+        ctx.getOption<string>('oauthProvider', 'openai-codex').trim() || 'openai-codex';
       const oauthAccountId = ctx.getOption<string>('oauthAccountId', '').trim();
       const authManager = OAuthAuthManager.getInstance();
 
@@ -151,7 +161,7 @@ export default defineChecker({
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'User-Agent': userAgent,
-      Version: '0.125.0',
+      Version: CodexVersionService.getInstance().getVersion(),
     };
     if (accountId) headers['Chatgpt-Account-Id'] = accountId;
 
@@ -166,7 +176,8 @@ export default defineChecker({
     }).finally(() => clearTimeout(timeout));
 
     const bodyText = await response.text();
-    if (!response.ok) throw new Error(`quota request failed with status ${response.status}: ${bodyText}`);
+    if (!response.ok)
+      throw new Error(`quota request failed with status ${response.status}: ${bodyText}`);
 
     let data: CodexUsageResponse;
     try {
@@ -197,12 +208,22 @@ export default defineChecker({
     }
 
     if (rateLimit.primary_window) {
-      const m = buildMeterFromWindow(rateLimit.primary_window, 'primary', 'Primary rate limit', ctx);
+      const m = buildMeterFromWindow(
+        rateLimit.primary_window,
+        'primary',
+        'Primary rate limit',
+        ctx
+      );
       if (m) meters.push(m);
     }
 
     if (rateLimit.secondary_window) {
-      const m = buildMeterFromWindow(rateLimit.secondary_window, 'secondary', 'Secondary rate limit', ctx);
+      const m = buildMeterFromWindow(
+        rateLimit.secondary_window,
+        'secondary',
+        'Secondary rate limit',
+        ctx
+      );
       if (m) meters.push(m);
     }
 

@@ -71,9 +71,7 @@ export class QuotaScheduler {
       const intervalMs = config.intervalMinutes * 60 * 1000;
       const intervalId = setInterval(() => this.runCheckNow(id), intervalMs);
       this.intervals.set(id, intervalId);
-      logger.info(
-        `Scheduled quota checker '${id}' to run every ${config.intervalMinutes} minutes`
-      );
+      logger.info(`Scheduled quota checker '${id}' to run every ${config.intervalMinutes} minutes`);
       this.runCheckNow(id).catch((error) => {
         logger.error(`Initial quota check failed for '${id}': ${error}`);
       });
@@ -237,9 +235,7 @@ export class QuotaScheduler {
               ? 'not_applicable'
               : 'reported';
         const utilizationPercent = typeof util === 'number' ? util : null;
-        const resetsAt = meter.resetsAt
-          ? toDbTimestampMs(new Date(meter.resetsAt), dialect)
-          : null;
+        const resetsAt = meter.resetsAt ? toDbTimestampMs(new Date(meter.resetsAt), dialect) : null;
 
         await db.insert(schema.meterSnapshots).values({
           checkerId: result.checkerId,
@@ -267,20 +263,13 @@ export class QuotaScheduler {
           createdAt,
         });
       } catch (error) {
-        logger.error(
-          `Failed to persist meter '${meter.key}' for '${result.checkerId}': ${error}`
-        );
+        logger.error(`Failed to persist meter '${meter.key}' for '${result.checkerId}': ${error}`);
       }
     }
   }
 
   getCheckerIds(): string[] {
     return Array.from(this.configs.keys());
-  }
-
-  // Category is now per-meter (meter.kind); kept for minimal API compat, always undefined
-  getCheckerCategory(_checkerId: string): 'balance' | 'rate-limit' | undefined {
-    return undefined;
   }
 
   async getLatestQuota(checkerId: string): Promise<MeterCheckResult | null> {

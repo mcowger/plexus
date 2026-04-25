@@ -1,10 +1,4 @@
 {
   "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["../../llms/src/*"]
-    }
-  }
+  "compilerOptions": {}
 }
