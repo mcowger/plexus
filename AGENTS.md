@@ -8,7 +8,7 @@
 
 ## Critical Requirements
 
-- **NEVER** commit or push without explicit request. Every individual commit and push requires explicit user permission — even if permission was granted earlier in the same session. Do not assume continued consent.
+- **NEVER** commit or push without explicit request, unless running in CI (`CI=true`). In local/interactive sessions, every individual commit and push requires explicit user permission — even if permission was granted earlier in the same session. Do not assume continued consent. In GitHub Actions (CI), commits and pushes are expected as part of the workflow and do not require per-instance approval.
 - **NEVER** use --no-verify without user permission.
 - **AVOID** search library type definitions for documentation. Use search and context skills where available first.
 - **NEVER** produce implementation or summary documents unless specifically requested.
