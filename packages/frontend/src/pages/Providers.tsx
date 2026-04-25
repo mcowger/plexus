@@ -9,7 +9,6 @@ import {
 } from '../lib/api';
 import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
 import type { QuotaCheckerInfo } from '../types/quota';
-import { formatPoints } from '../lib/format';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -1000,7 +999,9 @@ export const Providers = () => {
     };
 
     // Balance meters: show remaining
-    const balanceMeter = quota.meters.find((m) => m.kind === 'balance' && m.remaining !== undefined);
+    const balanceMeter = quota.meters.find(
+      (m) => m.kind === 'balance' && m.remaining !== undefined
+    );
     if (balanceMeter && balanceMeter.remaining !== undefined) {
       const formatted = formatMeterValue(balanceMeter.remaining, balanceMeter.unit);
       return (

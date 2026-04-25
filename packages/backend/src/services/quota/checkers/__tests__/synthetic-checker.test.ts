@@ -1,22 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QuotaCheckerConfig } from '../../../../types/quota';
-import { SyntheticQuotaChecker } from '../synthetic-checker';
-import { QuotaCheckerFactory } from '../../quota-checker-factory';
+import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
+import checkerDef from '../synthetic-checker';
 
-const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig => ({
-  id: 'synthetic-test',
-  provider: 'synthetic',
-  type: 'synthetic',
-  enabled: true,
-  intervalMinutes: 30,
-  options: {
-    apiKey: 'synthetic-api-key',
-    ...options,
-  },
-});
+const makeCtx = (options: Record<string, unknown> = {}) =>
+  createMeterContext('synthetic-test', 'synthetic', { apiKey: 'synthetic-api-key', ...options });
 
-describe('SyntheticQuotaChecker', () => {
-  const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
+describe('synthetic checker', () => {
+  const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
     global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
@@ -25,10 +15,10 @@ describe('SyntheticQuotaChecker', () => {
   });
 
   it('is registered under synthetic', () => {
-    expect(QuotaCheckerFactory.isRegistered('synthetic')).toBe(true);
+    expect(isCheckerRegistered('synthetic')).toBe(true);
   });
 
-  it('maps rollingFiveHourLimit to rolling_five_hour window', async () => {
+  it('maps rollingFiveHourLimit to a 5h rolling allowance meter', async () => {
     setFetchMock(
       async () =>
         new Response(
@@ -39,19 +29,22 @@ describe('SyntheticQuotaChecker', () => {
         )
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    const w = result.windows?.find((w) => w.windowType === 'rolling_five_hour');
-    expect(w).toBeDefined();
-    expect(w?.remaining).toBe(30);
-    expect(w?.limit).toBe(100);
-    expect(w?.used).toBe(70);
-    expect(w?.unit).toBe('requests');
-    expect(w?.description).toBe('Rolling 5-hour limit');
+    expect(meters).toHaveLength(1);
+    const m = meters[0]!;
+    expect(m.key).toBe('rolling_5h');
+    expect(m.kind).toBe('allowance');
+    expect(m.unit).toBe('requests');
+    expect(m.remaining).toBe(30);
+    expect(m.limit).toBe(100);
+    expect(m.used).toBe(70);
+    expect(m.periodValue).toBe(5);
+    expect(m.periodUnit).toBe('hour');
+    expect(m.periodCycle).toBe('rolling');
   });
 
-  it('maps weeklyTokenLimit dollar strings to rolling_weekly window', async () => {
+  it('maps weeklyTokenLimit dollar strings to 7d rolling allowance meter with usd unit', async () => {
     setFetchMock(
       async () =>
         new Response(
@@ -66,16 +59,18 @@ describe('SyntheticQuotaChecker', () => {
         )
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    const w = result.windows?.find((w) => w.windowType === 'rolling_weekly');
-    expect(w).toBeDefined();
-    expect(w?.limit).toBeCloseTo(50);
-    expect(w?.remaining).toBeCloseTo(20);
-    expect(w?.used).toBeCloseTo(30);
-    expect(w?.unit).toBe('dollars');
-    expect(w?.description).toBe('Weekly token credits');
+    expect(meters).toHaveLength(1);
+    const m = meters[0]!;
+    expect(m.key).toBe('weekly_credits');
+    expect(m.unit).toBe('usd');
+    expect(m.limit).toBeCloseTo(50);
+    expect(m.remaining).toBeCloseTo(20);
+    expect(m.used).toBeCloseTo(30);
+    expect(m.periodValue).toBe(7);
+    expect(m.periodUnit).toBe('day');
+    expect(m.periodCycle).toBe('rolling');
   });
 
   it('handles weeklyTokenLimit with dollar-sign-less credit strings', async () => {
@@ -89,29 +84,28 @@ describe('SyntheticQuotaChecker', () => {
         )
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
-    const w = result.windows?.find((w) => w.windowType === 'rolling_weekly');
-    expect(w?.limit).toBeCloseTo(100);
-    expect(w?.remaining).toBeCloseTo(40);
-    expect(w?.used).toBeCloseTo(60);
+    const meters = await checkerDef.check(makeCtx());
+
+    const m = meters.find((x) => x.key === 'weekly_credits')!;
+    expect(m.limit).toBeCloseTo(100);
+    expect(m.remaining).toBeCloseTo(40);
+    expect(m.used).toBeCloseTo(60);
   });
 
-  it('omits rolling_weekly window when credit strings are unparseable', async () => {
+  it('omits weekly_credits meter when credit strings are unparseable', async () => {
     setFetchMock(
       async () =>
         new Response(
-          JSON.stringify({
-            weeklyTokenLimit: { maxCredits: 'N/A', remainingCredits: 'N/A' },
-          }),
+          JSON.stringify({ weeklyTokenLimit: { maxCredits: 'N/A', remainingCredits: 'N/A' } }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
-    // Window is created but limit/used are undefined — treated as no useful data
-    const w = result.windows?.find((w) => w.windowType === 'rolling_weekly');
-    expect(w?.limit).toBeUndefined();
-    expect(w?.used).toBeUndefined();
+    const meters = await checkerDef.check(makeCtx());
+
+    const m = meters.find((x) => x.key === 'weekly_credits');
+    expect(m?.limit).toBeUndefined();
+    expect(m?.used).toBeUndefined();
   });
 
   it('maps search hourly window when present', async () => {
@@ -127,15 +121,17 @@ describe('SyntheticQuotaChecker', () => {
         )
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
-    const w = result.windows?.find((w) => w.windowType === 'search');
-    expect(w).toBeDefined();
-    expect(w?.limit).toBe(50);
-    expect(w?.remaining).toBe(40);
-    expect(w?.unit).toBe('requests');
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters).toHaveLength(1);
+    const m = meters[0]!;
+    expect(m.key).toBe('search_hourly');
+    expect(m.unit).toBe('requests');
+    expect(m.limit).toBe(50);
+    expect(m.remaining).toBe(40);
   });
 
-  it('returns success with empty windows when response has no known fields', async () => {
+  it('returns empty meters when response has no known fields', async () => {
     setFetchMock(
       async () =>
         new Response(JSON.stringify({}), {
@@ -144,33 +140,31 @@ describe('SyntheticQuotaChecker', () => {
         })
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
-    expect(result.success).toBe(true);
-    expect(result.windows).toHaveLength(0);
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(0);
   });
 
-  it('returns error for non-200 response', async () => {
+  it('throws for non-200 response', async () => {
     setFetchMock(
       async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
     );
 
-    const result = await new SyntheticQuotaChecker(makeConfig()).checkQuota();
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('HTTP 401: Unauthorized');
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow('HTTP 401: Unauthorized');
   });
 
   it('sends Authorization header with api key', async () => {
     let capturedAuth: string | undefined;
 
-    setFetchMock(async (_input, init) => {
-      capturedAuth = new Headers(init?.headers).get('Authorization') ?? undefined;
+    setFetchMock(async (_input: unknown, init: unknown) => {
+      capturedAuth =
+        new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    await new SyntheticQuotaChecker(makeConfig()).checkQuota();
+    await checkerDef.check(makeCtx());
     expect(capturedAuth).toBe('Bearer synthetic-api-key');
   });
 });

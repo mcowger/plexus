@@ -1,33 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QuotaCheckerConfig } from '../../../../types/quota';
-import { KimiCodeQuotaChecker } from '../kimi-code-checker';
-import { QuotaCheckerFactory } from '../../quota-checker-factory';
+import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
+import checkerDef from '../kimi-code-checker';
 
-const makeConfig = (options: Record<string, unknown> = {}): QuotaCheckerConfig => ({
-  id: 'kimi-code-test',
-  provider: 'kimi',
-  type: 'kimi-code',
-  enabled: true,
-  intervalMinutes: 30,
-  options: {
-    apiKey: 'test-api-key',
-    ...options,
-  },
-});
+const makeCtx = (options: Record<string, unknown> = {}) =>
+  createMeterContext('kimi-code-test', 'kimi', { apiKey: 'test-api-key', ...options });
 
 const makeSuccessResponse = (
-  overrides: Partial<{
-    usage: {
-      limit: string;
-      used: string;
-      remaining: string;
-      resetTime: string;
-    };
-    limits: Array<{
+  overrides: {
+    usage?: { limit: string; used: string; remaining: string; resetTime: string };
+    limits?: Array<{
       window: { duration: number; timeUnit: string };
       detail: { limit: string; remaining: string; resetTime: string };
     }>;
-  }> = {}
+  } = {}
 ) => ({
   usage: overrides.usage ?? {
     limit: '1000',
@@ -38,17 +23,13 @@ const makeSuccessResponse = (
   limits: overrides.limits ?? [
     {
       window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' },
-      detail: {
-        limit: '100',
-        remaining: '80',
-        resetTime: '2024-12-31T00:00:00Z',
-      },
+      detail: { limit: '100', remaining: '80', resetTime: '2024-12-31T00:00:00Z' },
     },
   ],
 });
 
-describe('KimiCodeQuotaChecker', () => {
-  const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
+describe('kimi-code checker', () => {
+  const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
     global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
@@ -57,26 +38,24 @@ describe('KimiCodeQuotaChecker', () => {
   });
 
   it('is registered under kimi-code', () => {
-    expect(QuotaCheckerFactory.isRegistered('kimi-code')).toBe(true);
+    expect(isCheckerRegistered('kimi-code')).toBe(true);
   });
 
   it('queries the default endpoint with Bearer token auth', async () => {
     let capturedUrl: string | undefined;
     let capturedAuth: string | undefined;
 
-    setFetchMock(async (input: RequestInfo | URL, init?: RequestInit) => {
-      capturedUrl = String(input);
-      const headers = new Headers(init?.headers);
-      capturedAuth = headers.get('Authorization') ?? undefined;
-
+    setFetchMock(async (input: unknown, init: unknown) => {
+      capturedUrl = String(input as string);
+      capturedAuth =
+        new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
       return new Response(JSON.stringify(makeSuccessResponse()), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    const checker = new KimiCodeQuotaChecker(makeConfig({ apiKey: 'my-api-key' }));
-    await checker.checkQuota();
+    await checkerDef.check(makeCtx({ apiKey: 'my-api-key' }));
 
     expect(capturedUrl).toBe('https://api.kimi.com/coding/v1/usages');
     expect(capturedAuth).toBe('Bearer my-api-key');
@@ -85,23 +64,20 @@ describe('KimiCodeQuotaChecker', () => {
   it('uses a custom endpoint when provided', async () => {
     let capturedUrl: string | undefined;
 
-    setFetchMock(async (input: RequestInfo | URL) => {
-      capturedUrl = String(input);
+    setFetchMock(async (input: unknown) => {
+      capturedUrl = String(input as string);
       return new Response(JSON.stringify(makeSuccessResponse()), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    const checker = new KimiCodeQuotaChecker(
-      makeConfig({ endpoint: 'https://custom.example.com/quota' })
-    );
-    await checker.checkQuota();
+    await checkerDef.check(makeCtx({ endpoint: 'https://custom.example.com/quota' }));
 
     expect(capturedUrl).toBe('https://custom.example.com/quota');
   });
 
-  it('parses usage window correctly (string-encoded numbers)', async () => {
+  it('parses usage window correctly', async () => {
     setFetchMock(
       async () =>
         new Response(
@@ -120,23 +96,19 @@ describe('KimiCodeQuotaChecker', () => {
         )
     );
 
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    expect(result.windows).toHaveLength(1);
-
-    const window = result.windows?.[0];
-    expect(window?.windowType).toBe('custom');
-    expect(window?.unit).toBe('requests');
-    expect(window?.limit).toBe(1000);
-    expect(window?.used).toBe(250);
-    expect(window?.remaining).toBe(750);
-    expect(window?.description).toBe('Usage limit');
-    expect(window?.resetsAt).toEqual(new Date('2024-12-31T00:00:00Z'));
+    expect(meters).toHaveLength(1);
+    const m = meters[0]!;
+    expect(m.kind).toBe('allowance');
+    expect(m.unit).toBe('requests');
+    expect(m.limit).toBe(1000);
+    expect(m.used).toBe(250);
+    expect(m.remaining).toBe(750);
+    expect(m.label).toBe('Usage limit');
   });
 
-  it('parses limits array and creates windows for each entry', async () => {
+  it('parses limits array and creates meters for each entry', async () => {
     const resetTime = '2024-12-31T05:00:00Z';
 
     setFetchMock(
@@ -158,25 +130,22 @@ describe('KimiCodeQuotaChecker', () => {
         )
     );
 
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    expect(result.windows).toHaveLength(2);
-
-    const [w0, w1] = result.windows!;
-    expect(w0?.windowType).toBe('five_hour');
-    expect(w0?.limit).toBe(100);
-    expect(w0?.remaining).toBe(80);
-    expect(w0?.used).toBe(20); // 100 - 80
-
-    expect(w1?.windowType).toBe('daily');
-    expect(w1?.limit).toBe(500);
-    expect(w1?.remaining).toBe(400);
-    expect(w1?.used).toBe(100); // 500 - 400
+    expect(meters).toHaveLength(2);
+    expect(meters[0]?.limit).toBe(100);
+    expect(meters[0]?.remaining).toBe(80);
+    expect(meters[0]?.used).toBe(20);
+    expect(meters[0]?.periodValue).toBe(5);
+    expect(meters[0]?.periodUnit).toBe('hour');
+    expect(meters[1]?.limit).toBe(500);
+    expect(meters[1]?.remaining).toBe(400);
+    expect(meters[1]?.used).toBe(100);
+    expect(meters[1]?.periodValue).toBe(1);
+    expect(meters[1]?.periodUnit).toBe('day');
   });
 
-  it('returns both usage and limits windows when both are present', async () => {
+  it('returns both usage and limits meters when both are present', async () => {
     setFetchMock(
       async () =>
         new Response(JSON.stringify(makeSuccessResponse()), {
@@ -185,17 +154,14 @@ describe('KimiCodeQuotaChecker', () => {
         })
     );
 
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    // One from usage + one from limits
-    expect(result.windows).toHaveLength(2);
-    expect(result.windows?.[0]?.windowType).toBe('custom');
-    expect(result.windows?.[1]?.windowType).toBe('five_hour');
+    expect(meters).toHaveLength(2);
+    expect(meters[0]?.label).toBe('Usage limit');
+    expect(meters[1]?.label).toBe('Rate limit');
   });
 
-  it('returns empty windows when response has no usage and no limits', async () => {
+  it('returns empty meters when response has no usage and no limits', async () => {
     setFetchMock(
       async () =>
         new Response(JSON.stringify({}), {
@@ -204,11 +170,9 @@ describe('KimiCodeQuotaChecker', () => {
         })
     );
 
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    expect(result.windows).toHaveLength(0);
+    expect(meters).toHaveLength(0);
   });
 
   it('skips limit entries that have no detail field', async () => {
@@ -217,7 +181,7 @@ describe('KimiCodeQuotaChecker', () => {
         new Response(
           JSON.stringify({
             limits: [
-              { window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' } }, // no detail
+              { window: { duration: 5, timeUnit: 'TIME_UNIT_HOUR' } },
               {
                 window: { duration: 1, timeUnit: 'TIME_UNIT_DAY' },
                 detail: { limit: '500', remaining: '400', resetTime: '2024-12-31T00:00:00Z' },
@@ -227,56 +191,39 @@ describe('KimiCodeQuotaChecker', () => {
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
     );
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
 
-    expect(result.success).toBe(true);
-    expect(result.windows).toHaveLength(1);
-    expect(result.windows?.[0]?.windowType).toBe('daily');
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters).toHaveLength(1);
+    expect(meters[0]?.periodUnit).toBe('day');
   });
 
-  it('returns error for non-200 HTTP response', async () => {
+  it('throws for non-200 HTTP response', async () => {
     setFetchMock(
       async () => new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
     );
 
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('HTTP 401: Unauthorized');
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow('HTTP 401: Unauthorized');
   });
 
-  it('returns error when fetch throws a network error', async () => {
+  it('throws when fetch throws a network error', async () => {
     setFetchMock(async () => {
       throw new Error('network timeout');
     });
 
-    const checker = new KimiCodeQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('network timeout');
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow('network timeout');
   });
 
   it('throws when apiKey option is missing', async () => {
-    const checker = new KimiCodeQuotaChecker({
-      id: 'no-key',
-      provider: 'kimi',
-      type: 'kimi-code',
-      enabled: true,
-      intervalMinutes: 30,
-      options: {},
-    });
-
-    await expect(checker.checkQuota()).rejects.toThrow("Required option 'apiKey' not provided");
+    const ctx = createMeterContext('no-key', 'kimi', {});
+    await expect(checkerDef.check(ctx)).rejects.toThrow("Required option 'apiKey' not provided");
   });
 
-  describe('windowTypeFromDuration', () => {
-    const windowTypeFor = async (
+  describe('period resolution from window duration', () => {
+    const periodFor = async (
       duration: number,
       timeUnit: string
-    ): Promise<string | undefined> => {
+    ): Promise<{ periodValue?: number; periodUnit?: string; periodCycle?: string }> => {
       setFetchMock(
         async () =>
           new Response(
@@ -292,54 +239,44 @@ describe('KimiCodeQuotaChecker', () => {
           )
       );
 
-      const checker = new KimiCodeQuotaChecker(makeConfig());
-      const result = await checker.checkQuota();
-      return result.windows?.[0]?.windowType;
+      const meters = await checkerDef.check(makeCtx());
+      const m = meters[0];
+      return {
+        periodValue: m?.periodValue,
+        periodUnit: m?.periodUnit,
+        periodCycle: m?.periodCycle,
+      };
     };
 
-    it('maps 5 TIME_UNIT_HOUR to five_hour', async () => {
-      expect(await windowTypeFor(5, 'TIME_UNIT_HOUR')).toBe('five_hour');
+    it('maps 5 TIME_UNIT_HOUR to 5h rolling', async () => {
+      const p = await periodFor(5, 'TIME_UNIT_HOUR');
+      expect(p.periodValue).toBe(5);
+      expect(p.periodUnit).toBe('hour');
+      expect(p.periodCycle).toBe('rolling');
     });
 
-    it('maps 60 TIME_UNIT_MINUTE to hourly', async () => {
-      expect(await windowTypeFor(60, 'TIME_UNIT_MINUTE')).toBe('hourly');
+    it('maps 1 TIME_UNIT_HOUR to 1h fixed', async () => {
+      const p = await periodFor(1, 'TIME_UNIT_HOUR');
+      expect(p.periodValue).toBe(1);
+      expect(p.periodUnit).toBe('hour');
     });
 
-    it('maps 30 TIME_UNIT_MINUTE to hourly', async () => {
-      expect(await windowTypeFor(30, 'TIME_UNIT_MINUTE')).toBe('hourly');
+    it('maps 1 TIME_UNIT_DAY to 1 day fixed', async () => {
+      const p = await periodFor(1, 'TIME_UNIT_DAY');
+      expect(p.periodValue).toBe(1);
+      expect(p.periodUnit).toBe('day');
     });
 
-    it('maps 1 TIME_UNIT_HOUR to hourly', async () => {
-      expect(await windowTypeFor(1, 'TIME_UNIT_HOUR')).toBe('hourly');
+    it('maps 7 TIME_UNIT_DAY to 7d rolling', async () => {
+      const p = await periodFor(7, 'TIME_UNIT_DAY');
+      expect(p.periodValue).toBe(7);
+      expect(p.periodUnit).toBe('day');
+      expect(p.periodCycle).toBe('rolling');
     });
 
-    it('maps 2 TIME_UNIT_HOUR to daily', async () => {
-      expect(await windowTypeFor(2, 'TIME_UNIT_HOUR')).toBe('daily');
-    });
-
-    it('maps 1 TIME_UNIT_DAY to daily', async () => {
-      expect(await windowTypeFor(1, 'TIME_UNIT_DAY')).toBe('daily');
-    });
-
-    it('maps 3 TIME_UNIT_DAY to weekly', async () => {
-      expect(await windowTypeFor(3, 'TIME_UNIT_DAY')).toBe('weekly');
-    });
-
-    it('maps 7 TIME_UNIT_DAY to weekly', async () => {
-      expect(await windowTypeFor(7, 'TIME_UNIT_DAY')).toBe('weekly');
-    });
-
-    it('maps 8 TIME_UNIT_DAY to monthly', async () => {
-      expect(await windowTypeFor(8, 'TIME_UNIT_DAY')).toBe('monthly');
-    });
-
-    it('maps 30 TIME_UNIT_DAY to monthly', async () => {
-      expect(await windowTypeFor(30, 'TIME_UNIT_DAY')).toBe('monthly');
-    });
-
-    it('defaults unknown timeUnit as TIME_UNIT_MINUTE', async () => {
-      // Unknown timeUnit: duration stays as-is (minutes). 300 min = five_hour.
-      expect(await windowTypeFor(300, 'UNKNOWN_UNIT')).toBe('five_hour');
+    it('maps large duration to monthly', async () => {
+      const p = await periodFor(30, 'TIME_UNIT_DAY');
+      expect(p.periodUnit).toBe('month');
     });
   });
 });

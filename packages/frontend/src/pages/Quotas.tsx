@@ -62,7 +62,7 @@ export const Quotas = () => {
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [allowanceQuotas]);
 
-  const renderCheckerCard = (quota: QuotaCheckerInfo, groupDisplayName: string) => {
+  const renderCheckerCard = (quota: QuotaCheckerInfo, _groupDisplayName: string) => {
     const allowances = quota.meters.filter((m) => m.kind === 'allowance');
 
     return (
@@ -88,7 +88,9 @@ export const Quotas = () => {
             <div className="flex items-center gap-2 text-danger">
               <AlertTriangle size={14} />
               <span className="text-xs">Check failed</span>
-              {quota.error && <span className="text-xs text-text-muted truncate">{quota.error}</span>}
+              {quota.error && (
+                <span className="text-xs text-text-muted truncate">{quota.error}</span>
+              )}
             </div>
           ) : allowances.length === 0 ? (
             <span className="text-xs text-text-muted">No data yet</span>
@@ -154,7 +156,10 @@ export const Quotas = () => {
               </div>
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {allowanceGroups.map(([checkerType, quotasList]) => {
-                  const displayName = getCheckerDisplayName(checkerType, quotasList[0]?.checkerId ?? checkerType);
+                  const displayName = getCheckerDisplayName(
+                    checkerType,
+                    quotasList[0]?.checkerId ?? checkerType
+                  );
                   return (
                     <div key={checkerType} className="flex flex-col gap-3">
                       <h3 className="font-heading text-xs font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border-glass pb-2">
