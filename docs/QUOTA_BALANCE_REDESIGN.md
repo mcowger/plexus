@@ -174,8 +174,19 @@ interface Meter {
   key: string;
   /** Human-readable, e.g. "5-hour quota", "Account balance", "Search". */
   label: string;
-  /** Optional refinement, e.g. "Pro models", "Flash models". */
-  subject?: string;
+
+  /** Optional UI grouping. Meters that share a `group` are rendered
+   *  together under one heading (e.g. all "Pro models" rows from
+   *  Antigravity, or both "5-hour" and "weekly" rows of a single
+   *  Claude plan). Pure cosmetic — nothing keys off it. */
+  group?: string;
+
+  /** Optional resource scope — the specific thing this meter is
+   *  measuring within its checker (e.g. "gemini-2.5-pro", "cash",
+   *  "voucher", "search", "input_tokens"). Used to disambiguate
+   *  meters that share a label and to label a row in the UI when the
+   *  group rolls multiple scopes together. */
+  scope?: string;
 
   // ── Classification ────────────────────────────────────────────────────
   kind: 'balance' | 'allowance';
@@ -215,8 +226,8 @@ Notes:
 
 - `key` is a checker-local identifier. The frontend never branches on
   its value; it identifies the meter for history graphing.
-- `label`/`subject` is what the UI shows; the checker translates
-  provider-speak.
+- `label` is what the UI shows; the checker translates
+  provider-speak. `group` and `scope` add structure when needed.
 - `kind` is what divides the UI: balances on one card, allowances on
   another. Hybrid checkers emit meters of both kinds.
 - Period fields are flat. A balance meter omits all of them.
@@ -247,7 +258,8 @@ Notes:
 
 - `meters` is the only payload. There are no `windows`, no `groups`,
   no checker-level `category`. If a provider exposes per-model rows,
-  each row is a meter with the model name in `subject`.
+  each row is a separate meter (with the model name in `scope` and an
+  optional `group` to roll related models together).
 - There is **no `rawResponse` field.** It exists today as a debugging
   aid and gets used as a feature crutch (frontend code reaching into
   raw provider JSON because the modelled fields are insufficient).
@@ -310,7 +322,7 @@ meters: [
     limit: 200, used: 37, remaining: 163,
     periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling',
     utilizationPercent: 18.5, status: 'ok' },
-  { key: 'search_hourly', label: 'Search requests', subject: 'hourly',
+  { key: 'search_hourly', label: 'Search', scope: 'search',
     kind: 'allowance', unit: 'requests',
     periodValue: 1, periodUnit: 'hour', periodCycle: 'fixed',
     resetsAt: '2026-04-25T18:00:00Z', ... },
@@ -375,6 +387,37 @@ meters: [{
 }]
 ```
 
+**Antigravity** (per-model rows, grouped by family):
+```js
+meters: [
+  { key: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro',
+    group: 'Pro', scope: 'gemini-2.5-pro',
+    kind: 'allowance', unit: 'percentage',
+    used: 12, remaining: 88,
+    periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling',
+    utilizationPercent: 12, status: 'ok' },
+  { key: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash',
+    group: 'Flash', scope: 'gemini-2.5-flash',
+    kind: 'allowance', unit: 'percentage',
+    used: 3, remaining: 97,
+    periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling',
+    utilizationPercent: 3, status: 'ok' },
+  // ... one meter per model, sorted by group in the UI
+]
+```
+
+**Moonshot** (cash and voucher balances surfaced separately):
+```js
+meters: [
+  { key: 'cash', label: 'Cash balance', scope: 'cash',
+    kind: 'balance', unit: 'usd',
+    remaining: 4.20, utilizationPercent: 'not_applicable', status: 'ok' },
+  { key: 'voucher', label: 'Voucher balance', scope: 'voucher',
+    kind: 'balance', unit: 'usd',
+    remaining: 25.00, utilizationPercent: 'not_applicable', status: 'ok' },
+]
+```
+
 ## 4. Database Schema
 
 A new table — `meter_snapshots` — is created from scratch. The existing
@@ -396,7 +439,8 @@ One row per (checker invocation, meter). Columns:
 | `kind`                  | text           | `'balance'` or `'allowance'`                             |
 | `unit`                  | text           | open string; canonical names recommended (§ 3.3)         |
 | `label`                 | text           | human-readable, set by the checker                       |
-| `subject`               | text NULL      | optional sub-scope (e.g. model name)                     |
+| `group`                 | text NULL      | optional UI grouping (e.g. "Pro models")                 |
+| `scope`                 | text NULL      | optional resource scope (e.g. model name, "cash")        |
 | `limit`                 | real NULL      |                                                          |
 | `used`                  | real NULL      |                                                          |
 | `remaining`             | real NULL      |                                                          |
@@ -476,10 +520,10 @@ Each checker's `check(ctx)` returns a `Meter[]`. Helpers on the context
 build meters with derived fields filled in:
 
 ```ts
-ctx.balance({ key, label, unit, remaining, limit?, subject? })
+ctx.balance({ key, label, unit, remaining, limit?, group?, scope? })
 ctx.allowance({ key, label, unit, used, limit?, remaining?,
                 periodValue, periodUnit, periodCycle, resetsAt?,
-                subject? })
+                group?, scope? })
 ```
 
 `utilizationPercent` and `status` are derived inside the helper — the
@@ -505,13 +549,21 @@ sentinels (`'unknown'`, `'not_applicable'`) skip cooldown evaluation
 for that meter.
 
 **Balance meters.** `exhaustionThreshold` is a **floor on `remaining`**
-in the meter's `unit` (e.g. `0.50` for USD, `100` for points). When
-`remaining <= threshold`, the provider is cooled down. The cooldown
-lasts until the next checker poll — a balance can be topped up
-out-of-band at any moment, so the only way to learn the new value is
-to keep checking. Default floor is `0` (cool down only when the
-balance is fully drained); operators can raise it per-checker to
-"reserve" a tail.
+in the meter's `unit`. When `remaining <= threshold`, the provider is
+cooled down. The cooldown lasts until the **next normally-scheduled
+checker poll** — a balance can be topped up out-of-band at any moment,
+so we just keep checking at the configured cadence; we do not
+accelerate polling when exhausted, and we do not extend the cooldown
+beyond it.
+
+Defaults:
+
+- For `unit === 'usd'`, the default floor is **`0.50`** (i.e. cool
+  down once the balance falls to fifty cents or below). USD balances
+  are the common case and "near zero" is meaningful here.
+- For all other units, the default floor is `0`. There is no
+  one-size-fits-all "near zero" for points, tokens, or kWh — the
+  operator sets the floor per-checker if they want a buffer.
 
 Every meter contributes to the cooldown decision; the most-constrained
 one wins. The "strictest threshold" calculation iterates all meters
@@ -551,14 +603,16 @@ components:
 
 - `BalanceMeterRow` — wallet icon, label, formatted `remaining` value,
   optional progress bar when `limit` is known.
-- `AllowanceMeterRow` — progress bar with `utilizationPercent`, a label,
-  `used / limit` formatted by unit, and a countdown to `period.resetsAt`
-  if present.
+- `AllowanceMeterRow` — progress bar with `utilizationPercent`, a
+  label, `used / limit` formatted by unit, and a countdown to
+  `resetsAt` if present.
 
-`MeterValue.tsx` formats a number based on `unit`:
+`MeterValue.tsx` formats a number based on `unit`. For canonical units
+it uses a known formatter; for **anything else, the unit string is
+shown verbatim** as the suffix:
 
 ```ts
-function formatMeterValue(v: number, unit: MeterUnit) {
+function formatMeterValue(v: number, unit: string): string {
   switch (unit) {
     case 'usd':        return formatCost(v);
     case 'tokens':     return formatTokens(v);
@@ -566,9 +620,21 @@ function formatMeterValue(v: number, unit: MeterUnit) {
     case 'kwh':        return `${v.toFixed(3)} kWh`;
     case 'points':     return `${formatPointsFull(v)} pts`;
     case 'percentage': return `${Math.round(v)}%`;
+    default:           return `${formatNumber(v)} ${unit}`;
   }
 }
 ```
+
+A meter with `unit: 'flows'` therefore renders as `82 flows`, matching
+what the provider's docs call them. The provider-config UI shows the
+unit string the same way — verbatim, not coerced to a friendly label.
+
+Display also respects the `utilizationPercent` sentinels: `'unknown'`
+and `'not_applicable'` suppress the progress bar and colour scale,
+showing only the raw `remaining` value.
+
+Meters that share a `group` are rendered under a sub-heading inside
+the same checker card; otherwise each meter gets its own row.
 
 ### 6.2 Sidebar / dashboard sections
 
@@ -660,7 +726,7 @@ Tying it back to the issues from § 1:
 | Problem                                       | Resolution                                              |
 |-----------------------------------------------|---------------------------------------------------------|
 | `category` on the wrong object                | Moved to `kind` on each meter.                          |
-| `windowType` conflates four axes              | Split into `kind`, `period.duration`, `period.cycle`, `subject`. |
+| `windowType` conflates four axes              | Split into `kind`, flat `period*` fields, and `group`/`scope`. |
 | `unit: 'points'` overloaded for kWh           | New `kwh` unit. `points` reserved for opaque provider currencies. |
 | Hybrid checkers need manual override sets     | Mixed checkers naturally emit meters of both kinds.     |
 | 21 near-duplicate display components          | Two generic row components + a presentation registry.   |
@@ -669,46 +735,18 @@ Tying it back to the issues from § 1:
 | `getTrackedWindowsForChecker` 23-arm switch   | Deleted — every meter is rendered the same way.         |
 | OAuth fields duplicated on every snapshot     | Removed from the wire shape; resolved from checker config only when needed. |
 
-## 9. Open questions
+## 9. Resolved decisions
 
-These need answers before implementation; they affect the data model:
+For posterity, the points that were called out during review and
+folded into the design above:
 
-1. **Balance-cooldown threshold semantics.** I've defined
-   `exhaustionThreshold` as a percentage for allowance meters and a
-   floor on `remaining` (in `unit`) for balance meters. Two follow-on
-   questions:
-   - Default for balance meters is `0` (cool down only when fully
-     drained). Is that right, or should the default be a small
-     non-zero value (e.g. 1% of `limit` when known) to leave a buffer?
-   - Should we allow operators to express the floor as a percentage
-     of `limit` for balances that have a known total (Wisdom Gate,
-     Neuralwatt PAYG cap)?
-2. **Cooldown duration when balance is exhausted.** A balance with no
-   `resetsAt` cools down "until the next checker poll." That means
-   exactly the polling cadence of the checker — typically 30 minutes.
-   Is that the right cadence, or should an exhausted balance accelerate
-   polling (e.g. every minute) so that an out-of-band top-up resumes
-   routing quickly?
-3. **Open `unit` strings in the management UI.** The provider config
-   modal shows the unit somewhere; if a checker emits `'flows'` rather
-   than the canonical `'requests'`, do we surface "flows" verbatim in
-   the UI or coerce to a friendly label? Suggest verbatim — it matches
-   what the provider's docs say. Confirm.
-4. **Per-model meters in the schema.** Antigravity and Gemini-CLI emit
-   one row per model (using `subject` for the model name). Some have
-   dozens of models; the history table grows by `models * checks`.
-   Should we cap or aggregate (e.g. keep only the worst-utilized model
-   per check), or store every row and let retention sweep handle it?
-5. **`subject` semantics.** Used for "cash vs. voucher" balances,
-   "Pro vs. Flash" model-grouped quotas, "search" within a multi-meter
-   provider, and per-model rows. Are those all the same field, or
-   should we split (e.g. `groupKey` for model-rollup, `qualifier` for
-   "input tokens" vs "output tokens")? Right now the design uses one
-   field. Confirm that's enough.
-6. **Rolling-window `resetsAt`.** Rolling windows recover
-   continuously; the API sometimes returns a "next-tick" timestamp.
-   The design keeps `resetsAt` as "earliest moment capacity will
-   visibly improve" for rolling cycles. Acceptable? Or should rolling
-   meters omit `resetsAt` entirely and the UI render "rolling" with no
-   countdown?
+| Decision                               | Choice                                                      | Where it lives          |
+|----------------------------------------|-------------------------------------------------------------|-------------------------|
+| Default balance-cooldown floor (USD)   | `$0.50`                                                     | § 5.3                   |
+| Default balance-cooldown floor (other) | `0`                                                         | § 5.3                   |
+| Polling cadence when exhausted         | Keep the configured cadence; don't accelerate or extend     | § 5.3                   |
+| Per-model meter retention              | Store every row; let retention sweeps handle it             | § 4.1                   |
+| `subject` overloading                  | Split into `group` (UI rollup) and `scope` (resource id)    | § 3.5, § 3.7, § 4.1     |
+| Rolling-window `resetsAt`              | Keep populated; means "earliest visible improvement"        | § 3.4                   |
+| Open `unit` strings in the UI          | Render verbatim, don't coerce to friendly labels            | § 3.3, § 6.1            |
 
