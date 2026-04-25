@@ -1,9 +1,4 @@
 {
   "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["../../llms/src/*"]
-    }
-  }
+  "compilerOptions": {}
 }
