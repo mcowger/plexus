@@ -142,31 +142,23 @@ jobs:
         run: |
           printf '%s' "$PR_SUMMARY" > changes.md
 
-      - name: Generate release notes via Pi
-        id: pi
-        uses: mcowger/pi-coding-agent-action@refs/heads/v2
+      - name: Generate release notes via Claude
+        uses: anthropics/claude-code-action@v1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          provider: openrouter
-          model: ${{ vars.PLEXUS_MODEL }}
-          token: ${{ secrets.OPENROUTER_API_KEY }}
-          base_url: ${{ secrets.PLEXUS_URL }}
-          thinking_level: medium
-          load_builtin_extensions: false
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: >
             Generate release notes for version ${{ inputs.tag }}.
-            The file `changes.md` in the current directory lists all PRs and commits
+            Read the file `changes.md` in the current directory which lists all PRs and commits
             included in this release. Use ONLY that content — do not look up additional
             history. Omit CI/workflow/internal tooling changes unless they affect end users.
-            Keep the tone concise and factual. Output only the release notes markdown,
-            nothing else.
+            Keep the tone concise and factual.
+            Write ONLY the release notes markdown to a file called `release-notes.md`
+            in the current directory. Do not output anything else.
 
       - name: Write release notes artifact
-        env:
-          NOTES: ${{ steps.pi.outputs.response }}
         run: |
           mkdir -p ${{ runner.temp }}/release-notes
-          printf '%s' "$NOTES" > ${{ runner.temp }}/release-notes/notes.md
+          cp release-notes.md ${{ runner.temp }}/release-notes/notes.md
 
       - uses: actions/upload-artifact@v7
         with:

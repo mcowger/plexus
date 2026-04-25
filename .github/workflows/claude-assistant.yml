@@ -1,0 +1,60 @@
+name: Claude Assistant
+run-name: ${{ github.event.issue.title || github.event.pull_request.title || 'Claude Assistant' }}
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  claude-agent:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || '' }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            Code changes: If the request involves any code changes — or if you
+            make any modifications to files during your work — you MUST create a
+            branch, commit the changes, and open a pull request. Changes that are
+            not committed and submitted as a PR will be lost when this CI run ends.
+            Never leave modified files uncommitted.
+
+            BEFORE pushing your branch or creating a PR, you MUST run these
+            validation commands and ensure they pass:
+
+              1. `bun run build:frontend` — Build the frontend first (required for typecheck)
+              2. `bun run typecheck` — TypeScript type checking across all packages
+              3. `bun run format` — Biome formatting (this will auto-fix issues)
+              4. `bun run test` — Run the test suite
+
+            If `bun run format` makes changes, stage them with `git add` before
+            committing. Do NOT create a PR if these checks fail — fix the issues first.
+
+            When you create a pull request, clearly announce it — include the PR
+            number and link so the requester can easily find and review it.
