@@ -129,6 +129,7 @@ Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `D
 ### Other rules
 - `packages/backend/bunfig.toml` blocks raw `bun test` — use `bun run test` / `bun run test:watch`
 - Root `bunfig.toml` blocks raw `bun test` at repo root — use `cd packages/backend && bun run test`
+- **Prefer `bun run test` (affected only) over `bun run test:force-all`.** The default test command uses `--changed HEAD` and runs only tests affected by uncommitted changes — use it unless you have a specific reason to run the full suite (e.g., verifying a cross-cutting refactor or diagnosing flakiness unrelated to your changes). Never reach for `test:force-all` out of habit.
 - If you must mock a module, implement its **full public interface**
 - Do not use `__mocks__` directories for node_modules mocks — they are not reliably loaded with `isolate: false` when the real module may already be cached
 
