@@ -19,12 +19,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@v1.0.107
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
+          path_to_bun_executable: /home/runner/.bun/bin/bun
           use_sticky_comment: true
           prompt: >
             Review this pull request. Check for bugs, logic errors, security issues,
