@@ -418,12 +418,12 @@ export class OAuthTransformer implements Transformer {
     const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
     let userAgent = '';
     if (provider === 'openai-codex') {
-      userAgent = 'codex_cli_rs/0.101.0 (Debian 13.0.0; x86_64) WindowsTerminal';
+      userAgent = 'codex_cli_rs/0.125.0 (Debian 13.0.0; x86_64) WindowsTerminal';
     }
 
     const baseHeaders: Record<string, string> = {
       ...((filteredOptions as any).headers as Record<string, string>),
-      Version: '0.101.0',
+      Version: '0.125.0',
       ...(provider === 'anthropic' && auth.authMode === 'apiKey' ? { 'x-api-key': rawApiKey } : {}),
       ...(userAgent ? { 'User-Agent': userAgent } : {}),
     };

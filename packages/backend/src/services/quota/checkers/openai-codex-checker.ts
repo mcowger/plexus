@@ -47,7 +47,7 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
     );
     this.userAgent = this.getOption<string>(
       'userAgent',
-      'codex_cli_rs/0.101.0 (Debian 13.0.0; x86_64) WindowsTerminal'
+      'codex_cli_rs/0.125.0 (Debian 13.0.0; x86_64) WindowsTerminal'
     );
     this.timeoutMs = this.getOption<number>('timeoutMs', 15000);
   }
@@ -67,7 +67,7 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'User-Agent': this.userAgent,
-        Version: '0.101.0',
+        Version: '0.125.0',
       };
 
       if (accountId) {
