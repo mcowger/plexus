@@ -12,6 +12,7 @@ permissions:
   issues: write
   pull-requests: write
   id-token: write
+  actions: read
 
 jobs:
   claude-agent:
@@ -42,9 +43,11 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-            --allowedTools Read,Write,Edit,Replace,Bash,Grep,Glob,TaskOutput,KillTask
+            --allowedTools Read,Write,Edit,Replace,Bash,Grep,Glob,TaskOutput,KillTask,mcp__github__*,mcp__github_comment__*,mcp__github_file_ops__*,mcp__github_inline_comment__*,mcp__github_ci__*
           path_to_bun_executable: /home/runner/.bun/bin/bun
           assignee_trigger: claude
+          additional_permissions: |
+            actions: read
           show_full_output: true
           display_report: true
           use_sticky_comment: true
@@ -52,10 +55,13 @@ jobs:
           track_progress: true
           prompt: |
             Code changes: If the request involves any code changes — or if you
-            make any modifications to files during your work — you MUST create a
-            branch, commit the changes, and open a pull request. Changes that are
-            not committed and submitted as a PR will be lost when this CI run ends.
-            Never leave modified files uncommitted.
+            make any modifications to files during your work — you MUST commit
+            the changes, push the branch, and open a real pull request by
+            calling the `mcp__github__create_pull_request` tool. Do not just
+            emit a compare/quick_pull link in your reply — actually create the
+            PR via the MCP tool and reference the resulting PR URL. Changes
+            that are not committed and submitted as a PR will be lost when this
+            CI run ends. Never leave modified files uncommitted.
 
             BEFORE pushing your branch or creating a PR, you MUST run these
             validation commands and ensure they pass:
