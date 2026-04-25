@@ -35,8 +35,11 @@ jobs:
         run: bun install
 
       - uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
           track_progress: true
           prompt: |
             Code changes: If the request involves any code changes — or if you

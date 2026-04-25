@@ -144,8 +144,11 @@ jobs:
 
       - name: Generate release notes via Claude
         uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
           prompt: >
             Generate release notes for version ${{ inputs.tag }}.
             Read the file `changes.md` in the current directory which lists all PRs and commits
