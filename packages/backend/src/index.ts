@@ -32,6 +32,7 @@ import { CooldownManager } from './services/cooldown-manager';
 import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
 import { ModelMetadataManager } from './services/model-metadata-manager';
+import { CodexVersionService } from './services/codex-version-service';
 import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
 import { ResponsesStorageService } from './services/responses-storage';
@@ -278,6 +279,11 @@ try {
     .loadAll()
     .catch((e) => {
       logger.error('Failed to load model metadata', e);
+    });
+  CodexVersionService.getInstance()
+    .fetchVersion()
+    .catch((e) => {
+      logger.error('Failed to fetch codex version', e);
     });
 } catch (e) {
   logger.error('Failed to load config or pricing', e);

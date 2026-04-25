@@ -26,6 +26,7 @@ import {
   isClaudeOAuthToken,
   type ClaudeOAuthContext,
 } from './oauth-claude';
+import { CodexVersionService } from '../../services/codex-version-service';
 
 /**
  * Returns the pi-ai request options needed to enable thinking/reasoning for a given
@@ -417,13 +418,16 @@ export class OAuthTransformer implements Transformer {
     const isClaudeCodeToken = apiKey.includes('sk-ant-oat');
     const requestOptions: Record<string, any> = { apiKey, ...filteredOptions };
     let userAgent = '';
+    let codexVersion = '';
     if (provider === 'openai-codex') {
-      userAgent = 'codex_cli_rs/0.125.0 (Debian 13.0.0; x86_64) WindowsTerminal';
+      const codexVersionService = CodexVersionService.getInstance();
+      codexVersion = codexVersionService.getVersion();
+      userAgent = codexVersionService.getUserAgent();
     }
 
     const baseHeaders: Record<string, string> = {
       ...((filteredOptions as any).headers as Record<string, string>),
-      Version: '0.125.0',
+      ...(codexVersion ? { Version: codexVersion } : {}),
       ...(provider === 'anthropic' && auth.authMode === 'apiKey' ? { 'x-api-key': rawApiKey } : {}),
       ...(userAgent ? { 'User-Agent': userAgent } : {}),
     };

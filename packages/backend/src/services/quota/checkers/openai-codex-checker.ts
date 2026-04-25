@@ -8,6 +8,7 @@ import { QuotaChecker } from '../quota-checker';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
 import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
 import { logger } from '../../../utils/logger';
+import { CodexVersionService } from '../../codex-version-service';
 
 interface OAuthCredentialsBlob {
   access_token?: string;
@@ -47,7 +48,7 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
     );
     this.userAgent = this.getOption<string>(
       'userAgent',
-      'codex_cli_rs/0.125.0 (Debian 13.0.0; x86_64) WindowsTerminal'
+      CodexVersionService.getInstance().getUserAgent()
     );
     this.timeoutMs = this.getOption<number>('timeoutMs', 15000);
   }
@@ -67,7 +68,7 @@ export class OpenAICodexQuotaChecker extends QuotaChecker {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'User-Agent': this.userAgent,
-        Version: '0.125.0',
+        Version: CodexVersionService.getInstance().getVersion(),
       };
 
       if (accountId) {
