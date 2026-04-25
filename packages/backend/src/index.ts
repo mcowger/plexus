@@ -36,6 +36,7 @@ import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
 import { ResponsesStorageService } from './services/responses-storage';
 import { OAuthAuthManager } from './services/oauth-auth-manager';
+import { CodexVersionService } from './services/codex-version-service';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
@@ -278,6 +279,12 @@ try {
     .loadAll()
     .catch((e) => {
       logger.error('Failed to load model metadata', e);
+    });
+  // Fetch latest codex CLI version from GitHub releases (non-fatal on failure; falls back to default)
+  CodexVersionService.getInstance()
+    .getVersion()
+    .catch((e) => {
+      logger.error('Failed to fetch codex version', e);
     });
 } catch (e) {
   logger.error('Failed to load config or pricing', e);
