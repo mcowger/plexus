@@ -77,26 +77,18 @@ grouped by structural shape, not by current `category` label.
 Today these all emit `windowType: 'subscription'`, `category: 'balance'`,
 `limit: undefined`, `used: undefined`, `remaining: <value>`, no `resetsAt`.
 
-### 2.2 Bounded balances with a known total (still no time reset)
-
-| Checker      | Unit    | Exposes                                                            |
-|--------------|---------|--------------------------------------------------------------------|
-| `wisdomgate` | dollars | `total_usage`, `total_available` → code derives `limit = used + remaining` |
-
-Currently emitted as `windowType: 'subscription'` with a `limit`.
-Semantically it's still a balance — it just has a known historical total.
-
-### 2.3 Subscription quotas with a single periodic window
+### 2.2 Subscription quotas with a single periodic window
 
 | Checker               | Window      | Unit                       | Notes                                                  |
 |-----------------------|-------------|----------------------------|--------------------------------------------------------|
 | `copilot`             | monthly     | requests **or** percentage | Falls back to % when entitlement missing               |
 | `apertis-coding-plan` | monthly     | requests                   | `cycle_*` fields                                       |
+| `wisdomgate`          | monthly     | dollars                    | Returns `total_usage`/`total_available`; cycle-bound   |
 | `minimax-coding`      | "custom"    | requests                   | API field is misnamed; remaining lives in `usage_count`|
 | `gemini-cli`          | "five_hour" | percentage                 | Aggregated per-model bucket                            |
 | `antigravity`         | "five_hour" | percentage                 | Per-model rows                                         |
 
-### 2.4 Subscription quotas with multiple independent windows
+### 2.3 Subscription quotas with multiple independent windows
 
 | Checker        | Windows                                                       | Units                                |
 |----------------|---------------------------------------------------------------|--------------------------------------|
@@ -109,7 +101,7 @@ Semantically it's still a balance — it just has a known historical total.
 | `nanogpt`      | weekly input tokens + daily input tokens + daily images       | tokens, tokens, requests             |
 | `synthetic`    | rolling-5h requests + hourly search + rolling-weekly credits  | requests, requests, dollars          |
 
-### 2.5 Hybrid: balance **and** subscription quota together
+### 2.4 Hybrid: balance **and** subscription quota together
 
 | Checker      | Balance side                       | Subscription side                                       |
 |--------------|------------------------------------|---------------------------------------------------------|
@@ -169,11 +161,12 @@ cases mapping checker name → window-type strings to render.
   branches that work around it.
 - `points` is used for both **Poe points** (a real currency-like balance)
   and **Zenmux flows** (a per-cycle quota count) and **kWh** (an energy
-  quantity). Three completely different things.
-- `percentage` is a degenerate unit — it means "we don't know the underlying
-  count, only the fraction." Everywhere `unit='percentage'` is used,
-  `limit=100`, `used=<percent>`, `remaining=<percent>`, which is a clumsy
-  encoding of "no count, just utilization."
+  quantity). Three completely different things, all stored under the
+  same name.
+- `percentage` is encoded as `limit=100, used=<percent>, remaining=<percent>`
+  rather than just storing the percentage in `used` and letting the
+  consumer treat the unit as the unit. Mostly cosmetic, but it leaks
+  into every history graph.
 
 ### 3.4 Window output is not uniform within a checker
 
@@ -226,19 +219,23 @@ Most of that is rote.
 2. **Orthogonal axes.** Period duration, period kind (rolling vs. fixed),
    unit of measure, and what the meter counts are independent fields. No
    compound enums.
-3. **No degenerate units.** `percentage` stops being a unit; it's a
-   *display preference* derived from `used/limit`. Units name what is being
-   counted (USD, tokens, requests, kWh, opaque-points).
+3. **One unit per number, never overloaded.** kWh is `kwh`, points are
+   `points`, percentages are `percentage`. We never pretend a kWh
+   reading is a "point" so that the schema enum is shorter.
 4. **No magic strings to wire up the UI.** The model carries enough
    self-describing metadata that a generic balance row and a generic quota
    row can render any checker. Per-checker custom UI is only needed when a
    provider has genuinely unusual semantics — and even then it is opt-in,
    not the default.
-5. **One source of truth for checker registration.** Type list, postgres
-   enum, frontend dropdown, factory map should derive from a single
-   declaration.
-6. **The migration must be backwards-compatible** for stored snapshots —
-   we don't want to lose history.
+5. **One source of truth for checker registration.** Type list,
+   frontend dropdown, factory map should derive from a single
+   declaration. Don't repeat the same list in three places.
+6. **No SQL enums on values that change with every new checker.**
+   Plain text columns; validation lives in code, not in a migration
+   that has to ship every time we add a provider.
+
+This is a rethink, not a refactor. There is no requirement to preserve
+the current data model, the current wire format, or any stored history.
 
 ## 5. Proposed Data Model
 
@@ -273,26 +270,30 @@ and there is no checker-level kind.
 ```ts
 type MeterUnit =
   | 'usd'         // dollars / credits expressed in dollars
-  | 'tokens'      // LLM tokens (input + output unless qualified by `subject`)
+  | 'tokens'      // LLM tokens
   | 'requests'    // API calls / interactions / "flows" / coding-plan calls
-  | 'energy_kwh'  // kilowatt-hours
-  | 'points'      // opaque provider-specific units (Poe points, etc.) —
-                  // used only when the provider's docs literally call them
-                  // "points" and there is no better mapping
+  | 'kwh'         // kilowatt-hours
+  | 'points'      // opaque provider-specific units — used only when the
+                  // provider's docs literally call them "points" and there
+                  // is no better mapping (Poe is the canonical case)
+  | 'percentage'  // when the provider only tells us a fraction and there
+                  // is no underlying count we can recover
 ```
 
-`percentage` is removed as a unit. When a provider only exposes a
-percentage (Claude Code, Codex, Antigravity, Gemini-CLI), the meter is
-emitted with `unit: 'requests'`, `limit: 100`, `used: <percent>`,
-`remaining: 100 - <percent>`, and a flag `valuesArePercent: true` that
-tells the UI not to print "37 requests" but "37%". This keeps the wire
-format honest about what we know (only a fraction) without inventing a
-fake count.
+Notes:
 
-Alternative considered: keep `percentage` as a unit. Rejected because it
-forces every consumer to branch on it ("if percentage, render differently;
-if anything else, render normally"), which is exactly the situation we
-have today.
+- The unit names what is being counted, not the measurement. `kwh` is a
+  unit; "energy" is the measurement, and we don't need to encode the
+  measurement separately — the label and subject already say "Energy
+  quota."
+- `percentage` is a real unit, not a degenerate one. Several providers
+  (Claude Code, Codex, Antigravity, Gemini-CLI) only expose a fraction,
+  and inventing a fake "limit=100, used=N" requests count would lie
+  about what we know. When `unit: 'percentage'`, `used`/`remaining` are
+  on the 0..100 scale and the formatter prints `N%`.
+- `points` is reserved for opaque provider currencies. Energy quotas
+  use `kwh`. Per-cycle "flows" and "interactions" are `requests`. There
+  is no `'points'`-as-anything-else.
 
 ### 5.4 Periods
 
@@ -331,9 +332,6 @@ interface Meter {
   // ── Classification ────────────────────────────────────────────────────
   kind: MeterKind;
   unit: MeterUnit;
-  /** When true, `used`/`remaining`/`limit` are 0..100 percentages, not
-   *  counts of `unit`. Set when the upstream API only reports a fraction. */
-  valuesArePercent?: boolean;
 
   // ── Values ────────────────────────────────────────────────────────────
   /** Total cycle entitlement (allowance) or initial deposit (balance, if
@@ -382,27 +380,29 @@ Notes:
 
 ```ts
 interface QuotaCheckResult {
-  checkerId: string;
-  checkerType: string;            // 'claude-code', 'neuralwatt', etc.
-  provider: string;
-  checkedAt: string;              // ISO-8601
+  checkerId: string;     // unique instance id chosen by the operator
+  checkerType: string;   // 'claude-code', 'neuralwatt', etc.
+  provider: string;      // routing provider this checker is attached to
+  checkedAt: string;     // ISO-8601
   success: boolean;
   error?: string;
 
-  meters: Meter[];                // 0..N. Replaces `windows` and `groups`.
-
-  oauthAccountId?: string;
-  oauthProvider?: string;
-  rawResponse?: unknown;
+  meters: Meter[];       // 0..N independent meters
+  rawResponse?: unknown; // for debugging only
 }
 ```
 
 Notes:
 
-- `meters` replaces both `windows` and `groups`. If a checker wants to
-  group meters (e.g. per-model rows), each group member is its own meter
-  with `subject` set to the model name.
-- No checker-level `category` field.
+- `meters` is the only payload. There are no `windows`, no `groups`,
+  no checker-level `category`. If a provider exposes per-model rows
+  (Antigravity, Gemini-CLI), each row becomes a meter with the model
+  name in `subject`.
+- `oauthProvider`/`oauthAccountId` are **not** on the result. They're
+  duplicative: a checker is configured against a single OAuth account,
+  so `(checkerType, checkerId)` already identifies the account.
+  Anything that needs to display the OAuth account name resolves it
+  from the checker's config, not from each snapshot.
 
 ### 5.7 Worked examples (existing providers in the new model)
 
@@ -415,12 +415,14 @@ meters: [{
 }]
 ```
 
-**Wisdom Gate** (bounded balance — note: still a balance, has no period):
+**Wisdom Gate** (monthly subscription credit allowance):
 ```js
 meters: [{
-  key: 'balance', label: 'Wisdom Gate balance',
-  kind: 'balance', unit: 'usd',
+  key: 'monthly_credits', label: 'Wisdom Gate subscription',
+  kind: 'allowance', unit: 'usd',
   limit: 50, used: 18.20, remaining: 31.80,
+  period: { duration: {value: 1, unit: 'month'}, cycle: 'fixed',
+            resetsAt: '2026-05-01T00:00:00Z' },
   utilizationPercent: 36.4, status: 'ok',
 }]
 ```
@@ -429,14 +431,14 @@ meters: [{
 ```js
 meters: [
   { key: 'five_hour', label: '5-hour quota',
-    kind: 'allowance', unit: 'requests', valuesArePercent: true,
-    limit: 100, used: 27, remaining: 73,
+    kind: 'allowance', unit: 'percentage',
+    used: 27, remaining: 73,
     period: { duration: {value: 5, unit: 'hour'}, cycle: 'rolling',
               resetsAt: '2026-04-25T18:00:00Z' },
     utilizationPercent: 27, status: 'ok' },
   { key: 'weekly', label: 'Weekly quota',
-    kind: 'allowance', unit: 'requests', valuesArePercent: true,
-    limit: 100, used: 41, remaining: 59,
+    kind: 'allowance', unit: 'percentage',
+    used: 41, remaining: 59,
     period: { duration: {value: 7, unit: 'day'}, cycle: 'rolling',
               resetsAt: '2026-04-30T00:00:00Z' },
     utilizationPercent: 41, status: 'ok' },
@@ -459,26 +461,26 @@ meters: [
 ]
 ```
 
-**Neuralwatt** (the hybrid case — no special-casing needed):
+**Neuralwatt** (hybrid: balance + monthly energy allowance):
 ```js
 meters: [
   { key: 'credits', label: 'Credit balance',
     kind: 'balance', unit: 'usd',
     limit: 100, used: 23.50, remaining: 76.50, ...},
   { key: 'energy', label: 'Energy quota',
-    kind: 'allowance', unit: 'energy_kwh',
+    kind: 'allowance', unit: 'kwh',
     limit: 50, used: 12.4, remaining: 37.6,
     period: { duration: {value: 1, unit: 'month'}, cycle: 'fixed',
               resetsAt: '2026-05-01T00:00:00Z' }, ...},
 ]
 ```
 
-**Apertis** (combined into a single checker — no more two-checker split):
+**Apertis** (one checker, both PAYG balance and the cycle quota when
+the account is also a subscriber — both come from the same response):
 ```js
 meters: [
   { key: 'payg', label: 'PAYG balance',
     kind: 'balance', unit: 'usd', remaining: 8.42, ...},
-  // emitted only if the account is a subscriber:
   { key: 'cycle_quota', label: 'Apertis pro plan',
     kind: 'allowance', unit: 'requests',
     limit: 5000, used: 1200, remaining: 3800,
@@ -497,148 +499,123 @@ meters: [{
 
 ## 6. Database Schema
 
-The current `quota_snapshots` table stores one row per (checker, window,
-checkedAt). That granularity is right and should be preserved; only the
-column set changes.
+A new table — `meter_snapshots` — is created from scratch. The existing
+`quota_snapshots` table is left alone and ignored by the new code. There
+is no data migration. Anything historical that someone wants from the old
+table can be addressed separately, later.
 
-### 6.1 New columns (proposed)
+### 6.1 `meter_snapshots`
 
-| Column                | Type      | Replaces / new                                          |
-|-----------------------|-----------|---------------------------------------------------------|
-| `id`                  | int PK    | unchanged                                               |
-| `provider`            | text      | unchanged                                               |
-| `checker_id`          | text      | unchanged                                               |
-| `meter_key`           | text      | replaces `window_type`                                  |
-| `kind`                | text      | new: `'balance' \| 'allowance'`                         |
-| `label`               | text      | replaces `description` for the human-readable name      |
-| `subject`             | text NULL | new: optional sub-scope                                 |
-| `unit`                | text      | new enum: `'usd'\|'tokens'\|'requests'\|'energy_kwh'\|'points'` |
-| `values_are_percent`  | bool      | new                                                     |
-| `limit`               | real      | unchanged                                               |
-| `used`                | real      | unchanged                                               |
-| `remaining`           | real      | unchanged                                               |
-| `utilization_percent` | real      | unchanged                                               |
-| `period_duration_value`| int NULL | new                                                     |
-| `period_duration_unit`| text NULL | new: `'minute'\|'hour'\|'day'\|'week'\|'month'`         |
-| `period_cycle`        | text NULL | new: `'fixed'\|'rolling'`                               |
-| `resets_at`           | timestamp | unchanged (now nullable for balances, was always so)    |
-| `status`              | text      | unchanged                                               |
-| `success`             | bool      | unchanged                                               |
-| `error_message`       | text      | unchanged                                               |
-| `checked_at`          | timestamp | unchanged                                               |
-| `created_at`          | timestamp | unchanged                                               |
+One row per (checker invocation, meter). Columns:
 
-The compound primary index becomes `(checker_id, meter_key, checked_at)`,
-which lines up with how the history modal queries data.
+| Column                  | Type        | Notes                                            |
+|-------------------------|-------------|--------------------------------------------------|
+| `id`                    | int PK      |                                                  |
+| `checker_id`            | text        | operator-chosen instance id                      |
+| `checker_type`          | text        | e.g. `'claude-code'`                             |
+| `provider`              | text        | routing provider this checker is attached to     |
+| `meter_key`             | text        | checker-local id, e.g. `'five_hour'`, `'balance'`|
+| `kind`                  | text        | `'balance'` or `'allowance'`                     |
+| `unit`                  | text        | `'usd'`, `'tokens'`, `'requests'`, `'kwh'`, `'points'`, `'percentage'` |
+| `label`                 | text        | human-readable, set by the checker               |
+| `subject`               | text NULL   | optional sub-scope (e.g. model name)             |
+| `limit`                 | real NULL   |                                                  |
+| `used`                  | real NULL   |                                                  |
+| `remaining`             | real NULL   |                                                  |
+| `utilization_percent`   | real        | 0..100                                           |
+| `status`                | text        | `'ok'` / `'warning'` / `'critical'` / `'exhausted'` |
+| `period_duration_value` | int NULL    | only for allowances                              |
+| `period_duration_unit`  | text NULL   | `'minute'` / `'hour'` / `'day'` / `'week'` / `'month'` |
+| `period_cycle`          | text NULL   | `'fixed'` / `'rolling'`                          |
+| `resets_at`             | timestamp NULL | when the meter next regains capacity          |
+| `success`               | bool        | did the checker call succeed                     |
+| `error_message`         | text NULL   |                                                  |
+| `checked_at`            | timestamp   |                                                  |
+| `created_at`            | timestamp   |                                                  |
 
-`group_id` is dropped — `subject` covers the per-model case in a way the
-UI can render generically.
+Indexes:
 
-### 6.2 Postgres enums
+- `(checker_id, meter_key, checked_at)` — primary access path for the
+  history modal and the "latest meter" lookup.
+- `(provider, checked_at)` — for any cross-provider scans.
+- `(checked_at)` — for retention sweeps.
 
-- `quota_meter_kind_enum` = `('balance', 'allowance')`
-- `quota_meter_unit_enum` = `('usd', 'tokens', 'requests', 'energy_kwh', 'points')`
-- `quota_period_duration_unit_enum` = `('minute','hour','day','week','month')`
-- `quota_period_cycle_enum` = `('fixed', 'rolling')`
-- `quota_checker_type_enum` — kept, but its source-of-truth list is moved
-  (see § 7.1).
+### 6.2 No SQL enums
 
-### 6.3 Migration plan for stored history
+All categorical columns (`kind`, `unit`, `period_cycle`,
+`period_duration_unit`, `status`, `checker_type`) are plain `text`.
+Validation lives in code: the checker base class only emits valid
+values, and the API layer rejects anything malformed. Adding a new
+checker type or a new unit therefore costs zero database migrations.
 
-A backfill migration maps old rows to new ones with a deterministic
-translation table. Critical mappings:
+The trade-off is well understood: a typo on the write path becomes a
+runtime bug instead of a database error. We accept that — typos are
+caught by the checker's tests and the type system.
 
-| Old `windowType`      | New `kind`  | New `period`                                            |
-|-----------------------|-------------|---------------------------------------------------------|
-| `subscription`        | `balance`   | (none)                                                  |
-| `hourly`              | `allowance` | `{1, 'hour', 'fixed'}`                                  |
-| `five_hour`           | `allowance` | `{5, 'hour', 'rolling'}` (Claude/Codex use rolling)     |
-| `rolling_five_hour`   | `allowance` | `{5, 'hour', 'rolling'}`                                |
-| `daily`               | `allowance` | `{1, 'day', 'fixed'}`                                   |
-| `weekly`              | `allowance` | `{1, 'week', 'fixed'}`                                  |
-| `rolling_weekly`      | `allowance` | `{1, 'week', 'rolling'}`                                |
-| `monthly`             | `allowance` | `{1, 'month', 'fixed'}`                                 |
-| `toolcalls`           | `allowance` | (per-checker; `subject='tool calls'`)                   |
-| `search`              | `allowance` | (per-checker; `subject='search'`)                       |
-| `custom`              | `allowance` | (per-checker; encoded from API metadata where possible) |
+## 7. Backend
 
-Old `unit='percentage'` rows become `unit='requests'` with
-`values_are_percent=true`. Old `unit='points'` rows for Neuralwatt become
-`unit='energy_kwh'` (special-case in the migration based on `checker_id`).
-Old `unit='kwh'` is renamed to `energy_kwh` for consistency. Other
-`unit='points'` rows (Poe, Zenmux) stay as `points`.
+### 7.1 Checker registration
 
-For safety, keep the old columns for one release and write to both. The
-quota scheduler reads from new columns only; the history modal
-double-reads during the transition window.
-
-## 7. Backend changes
-
-### 7.1 Single source of truth for checker registration
-
-Replace the four parallel lists with one declaration per checker:
+A checker is a class plus an options-schema. They live together in the
+checker's own module and self-register:
 
 ```ts
-// packages/backend/src/services/quota/checkers/registry.ts
-export const CHECKER_DEFS = [
-  { type: 'naga',         class: NagaQuotaChecker,         optionsSchema: NagaQuotaCheckerOptionsSchema },
-  { type: 'claude-code',  class: ClaudeCodeQuotaChecker,   optionsSchema: ClaudeCodeQuotaCheckerOptionsSchema },
-  ...
-] as const;
+// packages/backend/src/services/quota/checkers/claude-code.ts
+import { defineChecker } from '../checker-registry';
+
+export default defineChecker({
+  type: 'claude-code',
+  optionsSchema: z.object({
+    endpoint: z.string().url().optional(),
+    oauthAccountId: z.string().optional(),
+    maxUtilizationPercent: z.number().min(1).max(100).optional(),
+  }),
+  async check(ctx): Promise<Meter[]> {
+    // hits the API, returns meters
+  },
+});
 ```
 
-Derived from this single array:
+`defineChecker` adds the entry to a module-private registry. Importing
+the checker file is enough; there is no separate factory map, no enum
+list, no parallel array of types in `config.ts`. The registry exposes:
 
-- `VALID_QUOTA_CHECKER_TYPES` (config.ts)
-- `ProviderQuotaCheckerSchema` (the discriminated union, generated by
-  mapping over `CHECKER_DEFS`)
-- `CHECKER_REGISTRY` (factory)
-- `quotaCheckerTypeEnum` values (postgres)
-- The response of `/v0/management/quota-checker-types`
+- `getCheckerTypes(): string[]` — for the management API.
+- `validateProviderConfig(cfg)` — uses the per-type `optionsSchema`.
+- `instantiate(type, options)` — replaces the old `createChecker`.
 
-The frontend fetches `/v0/management/quota-checker-types` and the
-fallback constants in `api.ts` and `Providers.tsx` are removed (a stale
-fallback is worse than a brief loading state).
+The frontend calls `/v0/management/quota-checker-types` and uses what it
+gets back. There is no fallback list duplicated in the frontend — if the
+API is unreachable, the dropdown shows a loading state.
 
-### 7.2 Base class shape
+### 7.2 Base behaviour
+
+Each checker's `check(ctx)` returns a `Meter[]`. Helpers on the context
+build meters with derived fields filled in:
 
 ```ts
-abstract class QuotaChecker {
-  abstract readonly type: string;          // e.g. 'claude-code'
-  abstract checkQuota(): Promise<QuotaCheckResult>;
-
-  /** Default exhaustion threshold for the whole checker; overridable
-   *  per-meter inside checkQuota(). */
-  get exhaustionThreshold(): number {
-    return this.config.options.maxUtilizationPercent ?? 99;
-  }
-
-  // Helpers — emit a meter, derive utilization, compute status, etc.
-  protected balanceMeter(...): Meter;
-  protected allowanceMeter(...): Meter;
-}
+ctx.balance({ key, label, unit, remaining, limit?, subject? })
+ctx.allowance({ key, label, unit, used, limit?, remaining?,
+                period: { duration, cycle, resetsAt? },
+                subject? })
 ```
 
-Note: no more `category` getter on the checker. The
-`getCheckerCategory(checkerId)` function in
-`packages/backend/src/routes/management/quotas.ts` is deleted; the API
-returns meters with their own `kind` already.
+`utilizationPercent` and `status` are derived inside the helper — the
+checker does not compute them. There is no checker-level `category`,
+`window`, or `category` getter.
+
+Configuration like `maxUtilizationPercent` lives in the checker's own
+options schema. If a checker wants to expose per-meter overrides, it
+does so via its own option shape; the base class doesn't pretend to
+solve it generically.
 
 ### 7.3 Cooldown / scheduler
 
-`QuotaScheduler.applyCooldownsFromResult` already iterates windows and
-picks the most-constrained one. The same logic applies to meters. Two
-small adjustments:
-
-1. **Skip balance meters** for cooldown injection. A balance going to
-   zero is a billing problem, not a rate-limit problem; the request will
-   fail upstream with a clear error. The scheduler should *not* keep
-   slamming the cooldown awake/asleep on every poll just because a
-   balance was 0 — and it cannot reset itself, so there's nothing to
-   wait for. (Today this is implicit because balances have no
-   `resetsAt`; making it explicit makes the intent obvious.)
-2. The "strictest threshold" calculation iterates `meters`, not
-   `windows`.
+Cooldown injection iterates over the latest meters for each checker.
+Only allowance meters with a known `resetsAt` participate — a balance
+meter at zero is a billing failure, not a rate-limit, and there is
+nothing to wait for. The "strictest threshold" calculation looks at all
+allowance meters across all checkers attached to a provider.
 
 ### 7.4 API response shape
 
@@ -647,22 +624,22 @@ small adjustments:
 ```ts
 {
   checkerId: string;
-  checkerType: string;          // moves up — was always there but now
-                                // is the only "what kind of checker is this"
-  oauthAccountId?: string;
-  oauthProvider?: string;
+  checkerType: string;
+  provider: string;
   latest: {
     checkedAt: string;
     success: boolean;
     error?: string;
-    meters: Meter[];            // the most recent snapshot reconstructed
-                                // by grouping rows on `meter_key`
+    meters: Meter[];
   };
 }[]
 ```
 
-`checkerCategory` is removed from the API. Consumers determine kind
-per-meter.
+The "latest" meters are reconstructed from `meter_snapshots` by taking
+the most recent row for each `(checker_id, meter_key)`. There is no
+`checkerCategory`, no `oauthAccountId`, no `oauthProvider` on the
+response — the frontend asks the provider-config endpoint when it wants
+to label an OAuth account.
 
 ## 8. Frontend changes
 
@@ -674,21 +651,20 @@ components:
 - `BalanceMeterRow` — wallet icon, label, formatted `remaining` value,
   optional progress bar when `limit` is known.
 - `AllowanceMeterRow` — progress bar with `utilizationPercent`, a label,
-  `used / limit` formatted via `unit` and `valuesArePercent`, and a
-  countdown to `period.resetsAt` if present.
+  `used / limit` formatted by unit, and a countdown to `period.resetsAt`
+  if present.
 
-`MeterValue.tsx` formats a number based on `unit` (and
-`valuesArePercent`):
+`MeterValue.tsx` formats a number based on `unit`:
 
 ```ts
-function formatMeterValue(v: number, unit: MeterUnit, asPercent?: boolean) {
-  if (asPercent) return `${Math.round(v)}%`;
+function formatMeterValue(v: number, unit: MeterUnit) {
   switch (unit) {
-    case 'usd':         return formatCost(v);
-    case 'tokens':      return formatTokens(v);
-    case 'requests':    return `${formatNumber(v)} reqs`;
-    case 'energy_kwh':  return `${v.toFixed(3)} kWh`;
-    case 'points':      return `${formatPointsFull(v)} pts`;
+    case 'usd':        return formatCost(v);
+    case 'tokens':     return formatTokens(v);
+    case 'requests':   return `${formatNumber(v)} reqs`;
+    case 'kwh':        return `${v.toFixed(3)} kWh`;
+    case 'points':     return `${formatPointsFull(v)} pts`;
+    case 'percentage': return `${Math.round(v)}%`;
   }
 }
 ```
@@ -746,34 +722,35 @@ Config components stay, because each checker has different config inputs
 backend shape — `Meter`, `MeterKind`, `MeterUnit`, `Period`, etc. The
 old `QuotaWindow`/`QuotaWindowType` types are removed.
 
-## 9. Migration / Rollout Plan
+## 9. Implementation Order
 
-The change is large but cleanly stageable:
+This is a greenfield build alongside the existing one, then a cutover.
+There is no historical-data migration to worry about. Suggested order:
 
-1. **Land the new types** alongside the old ones (`Meter` next to
-   `QuotaWindow`). Add a `meters: Meter[]` field to the wire shape; keep
-   `windows: QuotaWindow[]` populated from `meters` for one release so
-   nothing breaks during deploy.
-2. **Migrate one checker** end-to-end (suggest `naga` — simplest balance
-   case) to prove the new base class. Snapshot it with both old and new
-   columns.
-3. **Generate the schema migration** (new columns nullable, old columns
-   nullable). Backfill with a one-shot script using the mapping table
-   from § 6.3.
-4. **Migrate the remaining checkers**. The hybrid case (Neuralwatt) and
-   the multi-meter cases (Synthetic, NanoGPT, Codex, Claude) prove the
-   model. Apertis collapses from two checkers into one — provider
-   configs that reference `apertis-coding-plan` are mapped to
-   `apertis` on read for one release.
-5. **Frontend cutover**: ship the generic `BalanceMeterRow` /
-   `AllowanceMeterRow`. Delete the 21 per-checker display components in
-   the same PR. The two `BALANCE_CHECKERS_WITH_RATE_LIMIT` literals,
-   the three `CHECKER_DISPLAY_NAMES` copies, and
-   `getTrackedWindowsForChecker` all delete.
-6. **Drop the old columns and types** one release later, after the
-   double-write window has expired.
+1. **New types and base class.** Land `Meter`, `MeterKind`, `MeterUnit`,
+   `Period`, the `defineChecker` helper, and the `meter_snapshots`
+   schema. No checkers yet.
+2. **Build new checkers from scratch.** One per existing provider, in
+   the new base class. The hybrid (Neuralwatt) and multi-meter cases
+   (Synthetic, NanoGPT, Codex, Claude) are the most informative to do
+   early — they prove the model. Apertis is a single checker emitting
+   both meters from one response; `apertis-coding-plan` does not exist
+   in the new world.
+3. **New API endpoints.** `/v0/management/quotas` returns the new
+   shape. The old endpoint is left in place but unused, and is removed
+   at the end.
+4. **New frontend components.** `BalanceMeterRow`, `AllowanceMeterRow`,
+   the presentation registry, the config-component lookup. The Quotas
+   page and the sidebar render from `meters` directly.
+5. **Cutover.** The new scheduler reads from `meter_snapshots`; the new
+   provider-config UI writes the new options; the old code is deleted
+   in the same PR. There is no double-write, no compatibility shim.
+   The old `quota_snapshots` table is left untouched in the database
+   and ignored by the application.
 
-Each step is independently shippable; the system stays green throughout.
+Each step except the cutover is independently shippable behind code
+that nothing else calls, so a half-finished step doesn't break anything
+in production.
 
 ## 10. What this fixes, concretely
 
@@ -783,35 +760,32 @@ Tying it back to the issues from § 3:
 |-----------------------------------------------|---------------------------------------------------------|
 | `category` on the wrong object                | Moved to `kind` on each meter.                          |
 | `windowType` conflates four axes              | Split into `kind`, `period.duration`, `period.cycle`, `subject`. |
-| `unit: 'percentage'` is degenerate            | Replaced by `valuesArePercent` flag on the underlying real unit. |
-| `unit: 'points'` overloaded for kWh           | New `energy_kwh` unit; `points` reserved for opaque provider currencies. |
+| `unit: 'points'` overloaded for kWh           | New `kwh` unit. `points` reserved for opaque provider currencies. |
 | Hybrid checkers need manual override sets     | Mixed checkers naturally emit meters of both kinds.     |
 | 21 near-duplicate display components          | Two generic row components + a presentation registry.   |
-| 4 parallel checker-type registrations         | One `CHECKER_DEFS` array generates all of them.         |
+| 4 parallel checker-type registrations         | `defineChecker` self-registers; a single in-process registry serves API, factory, and validation. |
 | Apertis pays for two API calls                | Single checker emits both meters from one response.     |
-| History rows mix `requests` and `percentage`  | Stored unit is stable; `valuesArePercent` decides display only. |
 | `getTrackedWindowsForChecker` 23-arm switch   | Deleted — every meter is rendered the same way.         |
+| OAuth fields duplicated on every snapshot     | Removed from the wire shape; resolved from checker config only when needed. |
 
 ## 11. Open questions
 
-- **Per-meter exhaustion thresholds.** Today `maxUtilizationPercent` is a
-  checker-level config. For checkers with multiple meters the operator
-  may want to cool down on the 5-hour window at 95% but tolerate 99% on
-  the weekly. Suggest allowing the option as either a number (applies
-  to all meters) or a `Record<meterKey, number>`. Out of scope for the
-  initial migration; can land later without further schema changes.
+- **Per-meter exhaustion thresholds.** Today `maxUtilizationPercent` is
+  a checker-level option. For checkers with multiple meters the
+  operator may want to cool down on the 5-hour window at 95% but
+  tolerate 99% on the weekly. Suggest allowing the option as either a
+  number (applies to all meters) or a `Record<meterKey, number>`. Each
+  checker can opt in via its own options schema; the base class doesn't
+  need to know.
 - **Rolling-window reset semantics.** Truly rolling windows don't have
   a single "reset moment" — they recover continuously. Today the code
-  pretends they do (using `nextTickAt`/`resetTime` from the API).
-  Acceptable for now: keep `resetsAt` populated when the API gives us
-  one, document that for `cycle: 'rolling'` it means "earliest moment
-  capacity will visibly improve."
+  pretends they do (using `nextTickAt`/`resetTime` from the API). The
+  new model keeps `resetsAt` populated when the API supplies one and
+  documents that for `cycle: 'rolling'` it means "earliest moment
+  capacity will visibly improve," not "everything resets."
 - **Multiple balance currencies on one provider.** Moonshot exposes
   `cash_balance` and `voucher_balance` separately. Today only
-  `available_balance` is recorded. The new model can emit both as
-  separate meters if we want to surface them; deferring that decision.
-- **Energy units beyond kWh.** Neuralwatt is the only energy meter
-  today. If others appear with different units (joules, CO₂eq), promote
-  `energy_kwh` to a more general `{ unit: 'energy', subUnit: 'kwh' }`.
-  Premature now.
+  `available_balance` is recorded. The new model has no obstacle to
+  emitting both as separate meters with `subject: 'cash'` /
+  `subject: 'voucher'`; whether to do so is a UX call per provider.
 
