@@ -1,4 +1,4 @@
-name: Pi PR Review
+name: Claude PR Review
 
 on:
   pull_request_target:
@@ -18,18 +18,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
         with:
-          node-version: 24
-
-      - uses: mcowger/pi-coding-agent-action@refs/heads/v2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          provider: openrouter
-          model: ${{ vars.PLEXUS_MODEL }}
-          token: ${{ secrets.OPENROUTER_API_KEY }}
-          base_url: ${{ secrets.PLEXUS_URL }}
-          thinking_level: medium
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
+          use_sticky_comment: true
           prompt: >
             Review this pull request. Check for bugs, logic errors, security issues,
             and missing test coverage. Note any style or documentation concerns but
