@@ -13,6 +13,7 @@
 - **AVOID** search library type definitions for documentation. Use search and context skills where available first.
 - **NEVER** produce implementation or summary documents unless specifically requested.
 - **NEVER** edit existing migration files or manually create SQL migrations. See [Migrations](#migrations) below.
+- **Only errors matter.** When reading linter, type-checker, or build output, ignore warnings — only fix actual errors. Warnings should not block progress or require changes.
 
 ---
 
