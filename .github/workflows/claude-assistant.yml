@@ -52,7 +52,7 @@ jobs:
           display_report: true
           use_sticky_comment: true
           include_fix_links: true
-          track_progress: false
+          track_progress: true
           prompt: |
             Code changes: If the request involves any code changes — or if you
             make any modifications to files during your work — you MUST commit
