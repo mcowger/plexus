@@ -32,6 +32,10 @@ import {
   Download,
   Info,
   AlertTriangle,
+  Play,
+  Loader2,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 
 import { Switch } from '../components/ui/Switch';
@@ -374,6 +378,63 @@ export const Providers = () => {
   const [affectedAliases, setAffectedAliases] = useState<
     { aliasId: string; targetsCount: number }[]
   >([]);
+
+  // Test model state
+  const [testStates, setTestStates] = useState<
+    Record<
+      string,
+      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
+    >
+  >({});
+
+  const handleTestModel = async (providerId: string, modelId: string, modelType?: string) => {
+    const testKey = `${providerId}-${modelId}`;
+    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true } }));
+
+    let testApiTypes: string[] = ['chat'];
+    if (modelType === 'embeddings') testApiTypes = ['embeddings'];
+    else if (modelType === 'image') testApiTypes = ['images'];
+    else if (modelType === 'responses') testApiTypes = ['responses'];
+    else if (modelType === 'transcriptions') testApiTypes = ['transcriptions'];
+    else if (modelType === 'speech') testApiTypes = ['speech'];
+
+    try {
+      const results = await Promise.all(
+        testApiTypes.map((apiType) => api.testModel(providerId, modelId, apiType))
+      );
+
+      const allSuccess = results.every((r) => r.success);
+      const firstError = results.find((r) => !r.success);
+      const totalDuration = results.reduce((sum, r) => sum + r.durationMs, 0);
+      const avgDuration = Math.round(totalDuration / results.length);
+
+      setTestStates((prev) => ({
+        ...prev,
+        [testKey]: {
+          loading: false,
+          result: allSuccess ? 'success' : 'error',
+          message: allSuccess
+            ? `Success (${avgDuration}ms avg, ${testApiTypes.length} API${testApiTypes.length > 1 ? 's' : ''})`
+            : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
+          showResult: true,
+        },
+      }));
+
+      if (allSuccess) {
+        setTimeout(() => {
+          setTestStates((prev) => ({
+            ...prev,
+            [testKey]: { ...prev[testKey], showResult: false },
+          }));
+        }, 3000);
+      }
+    } catch (e) {
+      setTestStates((prev) => ({
+        ...prev,
+        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true },
+      }));
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -2603,6 +2664,41 @@ export const Providers = () => {
                             <ChevronRight size={12} />
                           )}
                           <span style={{ fontWeight: 600, fontSize: '12px', flex: 1 }}>{mId}</span>
+                          {(() => {
+                            const testKey = `${editingProvider.id}-${mId}`;
+                            const testState = testStates[testKey];
+                            return (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTestModel(editingProvider.id, mId, mCfg.type);
+                                }}
+                                className="flex items-center cursor-pointer"
+                                title="Test this model"
+                              >
+                                {testState?.loading ? (
+                                  <Loader2 size={14} className="animate-spin text-text-secondary" />
+                                ) : testState?.showResult && testState.result === 'success' ? (
+                                  <CheckCircle size={14} className="text-success" />
+                                ) : testState?.showResult && testState.result === 'error' ? (
+                                  <XCircle size={14} className="text-danger" />
+                                ) : (
+                                  <Play size={14} className="text-primary opacity-60" />
+                                )}
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const testKey = `${editingProvider.id}-${mId}`;
+                            const testState = testStates[testKey];
+                            return testState?.showResult && testState.message ? (
+                              <span
+                                className={`text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
+                              >
+                                {testState.message}
+                              </span>
+                            ) : null;
+                          })()}
                           <Button
                             size="sm"
                             variant="ghost"
