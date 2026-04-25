@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../../services/dispatcher';
+import { UsageStorageService } from '../../services/usage-storage';
+import { UsageRecord } from '../../types/usage';
+import { getClientIp } from '../../utils/ip';
+import { calculateCosts } from '../../utils/calculate-costs';
+import { DebugManager } from '../../services/debug-manager';
 import {
   OpenAITransformer,
   AnthropicTransformer,
@@ -97,7 +102,11 @@ const TEST_TEMPLATES = {
   }),
 };
 
-export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: Dispatcher) {
+export async function registerTestRoutes(
+  fastify: FastifyInstance,
+  dispatcher: Dispatcher,
+  usageStorage: UsageStorageService
+) {
   /**
    * POST /v0/management/test
    * Test a specific provider/model combination with a simple request
@@ -105,6 +114,20 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
   fastify.post('/v0/management/test', async (request, reply) => {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
+
+    let usageRecord: Partial<UsageRecord> = {
+      requestId,
+      date: new Date().toISOString(),
+      sourceIp: getClientIp(request),
+      incomingApiType: 'chat',
+      startTime,
+      isStreamed: false,
+      responseStatus: 'pending',
+      incomingModelAlias: 'test-request',
+    };
+
+    // Emit 'started' event immediately
+    usageStorage.emitStartedAsync(usageRecord);
 
     try {
       const body = request.body as { provider: string; model: string; apiType?: string };
@@ -120,6 +143,10 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
 
       // Default to 'chat' if no apiType specified
       const apiType = body.apiType || 'chat';
+
+      usageRecord.incomingApiType = apiType;
+      usageRecord.incomingModelAlias = `direct/${body.provider}/${body.model}`;
+      usageRecord.apiKey = (request as any).keyName;
 
       logger.info(`Testing model: ${body.provider}/${body.model} via ${apiType} API`);
 
@@ -281,6 +308,50 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
 
       const durationMs = Date.now() - startTime;
 
+      // Update usage record with routing details from response
+      usageRecord.provider = response.plexus?.provider;
+      usageRecord.selectedModelName = response.plexus?.model;
+      usageRecord.canonicalModelName = response.plexus?.canonicalModel;
+      usageRecord.outgoingApiType = response.plexus?.apiType;
+      usageRecord.durationMs = durationMs;
+      usageRecord.responseStatus = 'success';
+      usageRecord.isPassthrough =
+        apiType !== 'chat' &&
+        apiType !== 'messages' &&
+        apiType !== 'gemini' &&
+        apiType !== 'responses';
+      usageRecord.attemptCount = response.plexus?.attemptCount || 1;
+      usageRecord.retryHistory = response.plexus?.retryHistory || null;
+      usageRecord.finalAttemptProvider =
+        response.plexus?.finalAttemptProvider || usageRecord.provider || null;
+      usageRecord.finalAttemptModel =
+        response.plexus?.finalAttemptModel || usageRecord.selectedModelName || null;
+      usageRecord.allAttemptedProviders = response.plexus?.allAttemptedProviders || null;
+
+      // Capture token usage if available
+      if (response.usage) {
+        usageRecord.tokensInput = response.usage.input_tokens;
+        usageRecord.tokensOutput = response.usage.output_tokens;
+        usageRecord.tokensCached = response.usage.cached_tokens;
+        usageRecord.tokensCacheWrite = response.usage.cache_creation_tokens;
+        usageRecord.tokensReasoning = response.usage.reasoning_tokens;
+      }
+
+      const pricing = response.plexus?.pricing;
+      const providerDiscount = response.plexus?.providerDiscount;
+      calculateCosts(usageRecord, pricing, providerDiscount);
+
+      // Emit 'updated' event with routing details
+      usageStorage.emitUpdatedAsync({
+        requestId,
+        provider: usageRecord.provider,
+        selectedModelName: usageRecord.selectedModelName,
+        canonicalModelName: usageRecord.canonicalModelName,
+      });
+
+      // Save usage record
+      usageStorage.saveRequest(usageRecord as UsageRecord);
+
       logger.info(`Test completed in ${durationMs}ms`);
 
       // Extract response text based on API type
@@ -313,6 +384,20 @@ export async function registerTestRoutes(fastify: FastifyInstance, dispatcher: D
       const durationMs = Date.now() - startTime;
       logger.error('Error testing model:', e);
       logger.error('Error stack:', e.stack);
+
+      usageRecord.responseStatus = 'error';
+      usageRecord.durationMs = durationMs;
+      usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
+      usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;
+      usageStorage.saveRequest(usageRecord as UsageRecord);
+
+      const errorDetails = {
+        apiType: (request.body as any)?.apiType || 'chat',
+        ...(e.routingContext || {}),
+      };
+      usageStorage.saveError(requestId, e, errorDetails);
+
+      DebugManager.getInstance().flush(requestId);
 
       return reply.code(200).send({
         success: false,

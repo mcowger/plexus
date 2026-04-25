@@ -91,7 +91,7 @@ export async function registerManagementRoutes(
 
       await registerConfigRoutes(adminOnly, usageStorage);
       await registerSystemLogRoutes(adminOnly);
-      await registerTestRoutes(adminOnly, dispatcher);
+      await registerTestRoutes(adminOnly, dispatcher, usageStorage);
       await registerOAuthRoutes(adminOnly);
       await registerLoggingRoutes(adminOnly);
       await registerRestartRoutes(adminOnly);
