@@ -1,6 +1,6 @@
 import { formatNumber, formatPoints } from './format';
-import { toBoolean, toIsoString } from './normalize';
-import type { QuotaCheckerInfo, QuotaSnapshot, QuotaCheckResult } from '../types/quota';
+
+import type { QuotaCheckerInfo } from '../types/quota';
 
 const API_BASE = ''; // Proxied via server.ts
 
@@ -120,32 +120,10 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   return res;
 };
 
-function normalizeQuotaSnapshot(snapshot: QuotaSnapshot): QuotaSnapshot {
-  return {
-    ...snapshot,
-    checkedAt: toIsoString(snapshot.checkedAt) ?? new Date(0).toISOString(),
-    resetsAt: toIsoString(snapshot.resetsAt),
-    createdAt: toIsoString(snapshot.createdAt) ?? new Date(0).toISOString(),
-    success: toBoolean(snapshot.success),
-  };
-}
-
 function normalizeQuotaCheckerInfo(checker: QuotaCheckerInfo): QuotaCheckerInfo {
   return {
     ...checker,
-    latest: Array.isArray(checker.latest) ? checker.latest.map(normalizeQuotaSnapshot) : [],
-  };
-}
-
-function normalizeQuotaCheckResult(result: QuotaCheckResult): QuotaCheckResult {
-  return {
-    ...result,
-    checkedAt: toIsoString(result.checkedAt) ?? new Date(0).toISOString(),
-    success: toBoolean(result.success),
-    windows: result.windows?.map((window) => ({
-      ...window,
-      resetsAt: window.resetsAt ? (toIsoString(window.resetsAt) ?? undefined) : undefined,
-    })),
+    meters: Array.isArray(checker.meters) ? checker.meters : [],
   };
 }
 
@@ -2255,46 +2233,31 @@ export const api = {
 
   getQuotaHistory: async (
     checkerId: string,
-    windowType?: string,
+    meterKey?: string,
     since?: string
-  ): Promise<{
-    checkerId: string;
-    windowType?: string;
-    since?: string;
-    history: QuotaSnapshot[];
-  } | null> => {
+  ): Promise<{ checkerId: string; meterKey?: string; since?: string; history: any[] } | null> => {
     try {
       const params = new URLSearchParams();
-      if (windowType) params.set('windowType', windowType);
+      if (meterKey) params.set('meterKey', meterKey);
       if (since) params.set('since', since);
       const res = await fetchWithAuth(
         `${API_BASE}/v0/management/quotas/${checkerId}/history?${params}`
       );
       if (!res.ok) throw new Error('Failed to fetch quota history');
-      const json = (await res.json()) as {
-        checkerId: string;
-        windowType?: string;
-        since?: string;
-        history: QuotaSnapshot[];
-      };
-      return {
-        ...json,
-        history: Array.isArray(json.history) ? json.history.map(normalizeQuotaSnapshot) : [],
-      };
+      return (await res.json()) as { checkerId: string; meterKey?: string; since?: string; history: any[] };
     } catch (e) {
       console.error('API Error getQuotaHistory', e);
       return null;
     }
   },
 
-  triggerQuotaCheck: async (checkerId: string): Promise<QuotaCheckResult | null> => {
+  triggerQuotaCheck: async (checkerId: string): Promise<QuotaCheckerInfo | null> => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/${checkerId}/check`, {
         method: 'POST',
       });
       if (!res.ok) throw new Error('Failed to trigger quota check');
-      const json = (await res.json()) as QuotaCheckResult;
-      return normalizeQuotaCheckResult(json);
+      return normalizeQuotaCheckerInfo((await res.json()) as QuotaCheckerInfo);
     } catch (e) {
       console.error('API Error triggerQuotaCheck', e);
       return null;

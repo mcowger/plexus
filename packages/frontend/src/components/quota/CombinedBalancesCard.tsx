@@ -1,88 +1,39 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { clsx } from 'clsx';
 import { Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
-import { formatCost, formatPointsFull, toTitleCase } from '../../lib/format';
+import { toTitleCase } from '../../lib/format';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
-import { BalanceHistoryModal } from './BalanceHistoryModal';
+import { getCheckerDisplayName } from './checker-presentation';
+import { BalanceMeterRow } from './BalanceMeterRow';
 
 interface CombinedBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
   onRefresh: (checkerId: string) => void;
   refreshing: Set<string>;
-  getQuotaResult: (quota: QuotaCheckerInfo) => any;
 }
-
-// Checker display names
-const CHECKER_DISPLAY_NAMES: Record<string, string> = {
-  openrouter: 'OpenRouter',
-  minimax: 'MiniMax',
-  moonshot: 'Moonshot',
-  novita: 'Novita',
-  naga: 'Naga',
-  kilo: 'Kilo',
-  poe: 'POE',
-  apertis: 'Apertis',
-  neuralwatt: 'Neuralwatt',
-  wisdomgate: 'Wisdom Gate',
-};
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   balanceQuotas,
   onRefresh,
   refreshing,
-  getQuotaResult,
 }) => {
-  const [selectedQuota, setSelectedQuota] = useState<QuotaCheckerInfo | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  if (balanceQuotas.length === 0) return null;
 
-  const handleRowClick = (quota: QuotaCheckerInfo) => {
-    setSelectedQuota(quota);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedQuota(null);
-  };
-
-  const getDisplayName = (quota: QuotaCheckerInfo): string => {
-    const checkerType = quota.checkerType || quota.checkerId;
-    return CHECKER_DISPLAY_NAMES[checkerType] || quota.checkerId;
-  };
-
-  if (balanceQuotas.length === 0) {
-    return null;
-  }
-
-  // Split balances into columns (max 2 columns)
   const midPoint = Math.ceil(balanceQuotas.length / 2);
   const shouldSplit = balanceQuotas.length > 3;
   const leftColumn = shouldSplit ? balanceQuotas.slice(0, midPoint) : balanceQuotas;
   const rightColumn = shouldSplit ? balanceQuotas.slice(midPoint) : [];
 
-  const renderBalanceRow = (quota: QuotaCheckerInfo) => {
-    const result = getQuotaResult(quota);
-    const checkerType = quota.checkerType || quota.checkerId;
-    const displayName = CHECKER_DISPLAY_NAMES[checkerType] || quota.checkerId;
-    const windows = result.windows || [];
-    const subscriptionWindow = windows.find((w: any) => w.windowType === 'subscription');
-    const balance = subscriptionWindow?.remaining;
-    const unit = subscriptionWindow?.unit;
-
-    const formatBalance = (value: number) => {
-      if (unit === 'points') return `${formatPointsFull(value)} pts`;
-      if (unit === 'kwh') return `${value.toFixed(6)} kWh`;
-      return formatCost(value);
-    };
+  const renderRow = (quota: QuotaCheckerInfo) => {
+    const displayName = getCheckerDisplayName(quota.checkerType, quota.checkerId);
+    const balanceMeters = quota.meters.filter((m) => m.kind === 'balance');
 
     return (
       <div
         key={quota.checkerId}
-        onClick={() => handleRowClick(quota)}
-        className="px-4 py-3 flex items-center justify-between hover:bg-bg-hover transition-colors cursor-pointer"
+        className="px-4 py-3 flex items-center justify-between hover:bg-bg-hover transition-colors"
       >
-        {/* Left: Provider Name & Account */}
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Wallet size={14} className="text-info flex-shrink-0" />
@@ -90,38 +41,28 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
           </div>
           <div className="text-xs text-text-muted pl-5 truncate">
             {displayName}
-            {result.oauthAccountId && ` • Account: ${result.oauthAccountId}`}
+            {quota.oauthAccountId && ` • Account: ${quota.oauthAccountId}`}
           </div>
         </div>
 
-        {/* Center: Balance or Error */}
-        <div className="flex items-center gap-3 px-4">
-          {!result.success ? (
+        <div className="flex flex-col gap-0.5 px-4 min-w-0">
+          {!quota.success ? (
             <div className="flex items-center gap-2 text-danger">
               <AlertTriangle size={14} />
               <span className="text-xs">Error</span>
             </div>
-          ) : balance !== undefined ? (
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs text-text-secondary">Balance</span>
-              <span className="text-base font-semibold text-info tabular-nums">
-                {formatBalance(balance)}
-              </span>
-            </div>
+          ) : balanceMeters.length > 0 ? (
+            balanceMeters.map((meter) => <BalanceMeterRow key={meter.key} meter={meter} />)
           ) : (
             <span className="text-xs text-text-muted">No data</span>
           )}
         </div>
 
-        {/* Right: Refresh Button */}
         <div className="flex-shrink-0">
           <Button
             size="sm"
             variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRefresh(quota.checkerId);
-            }}
+            onClick={() => onRefresh(quota.checkerId)}
             disabled={refreshing.has(quota.checkerId)}
             className="h-7 w-7 p-0"
           >
@@ -136,38 +77,20 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   };
 
   return (
-    <>
-      <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
-        {/* Header */}
-        <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
-          <Wallet size={18} className="text-info" />
-          <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
-        </div>
-
-        {/* Balance Grid - max 2 columns */}
-        <div
-          className={clsx('grid gap-0', shouldSplit ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}
-        >
-          {/* Left Column */}
-          <div className="divide-y divide-border">
-            {leftColumn.map((quota) => renderBalanceRow(quota))}
-          </div>
-
-          {/* Right Column */}
-          {rightColumn.length > 0 && (
-            <div className="divide-y divide-border lg:border-l border-border">
-              {rightColumn.map((quota) => renderBalanceRow(quota))}
-            </div>
-          )}
-        </div>
+    <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
+      <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
+        <Wallet size={18} className="text-info" />
+        <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
       </div>
 
-      <BalanceHistoryModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        quota={selectedQuota}
-        displayName={selectedQuota ? getDisplayName(selectedQuota) : ''}
-      />
-    </>
+      <div className={clsx('grid gap-0', shouldSplit ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}>
+        <div className="divide-y divide-border">{leftColumn.map(renderRow)}</div>
+        {rightColumn.length > 0 && (
+          <div className="divide-y divide-border lg:border-l border-border">
+            {rightColumn.map(renderRow)}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };

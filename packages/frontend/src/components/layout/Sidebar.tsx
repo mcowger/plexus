@@ -26,7 +26,6 @@ import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
 import { CompactBalancesCard, CompactQuotasCard } from '../quota';
 import type { QuotaCheckerInfo } from '../../types/quota';
-import { toBoolean, toIsoString } from '../../lib/normalize';
 
 import logo from '../../assets/plexus_logo_transparent.png';
 
@@ -209,66 +208,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
     window.location.href = '/ui/login';
   };
 
-  const getQuotaResult = (quota: QuotaCheckerInfo) => {
-    if (!quota.latest || quota.latest.length === 0) {
-      return {
-        provider: 'unknown',
-        checkerId: quota.checkerId,
-        oauthAccountId: quota.oauthAccountId,
-        oauthProvider: quota.oauthProvider,
-        checkedAt: new Date().toISOString(),
-        success: false,
-        error: 'No quota data available yet',
-        windows: [],
-      };
-    }
-    const windowsByType = new Map<string, (typeof quota.latest)[0]>();
-    for (const snapshot of quota.latest) {
-      const key = snapshot.description
-        ? `${snapshot.windowType}:${snapshot.description}`
-        : snapshot.windowType;
-      const existing = windowsByType.get(key);
-      if (!existing || snapshot.checkedAt > existing.checkedAt) {
-        windowsByType.set(key, snapshot);
-      }
-    }
-    const windows = Array.from(windowsByType.values()).map((snapshot) => ({
-      windowType: snapshot.windowType as any,
-      windowLabel: snapshot.description || snapshot.windowType,
-      limit: snapshot.limit ?? undefined,
-      used: snapshot.used ?? undefined,
-      remaining: snapshot.remaining ?? undefined,
-      utilizationPercent: snapshot.utilizationPercent ?? 0,
-      unit: (snapshot.unit as any) || 'percentage',
-      resetsAt: toIsoString(snapshot.resetsAt) ?? undefined,
-      resetInSeconds:
-        snapshot.resetInSeconds !== null && snapshot.resetInSeconds !== undefined
-          ? snapshot.resetInSeconds
-          : undefined,
-      status: (snapshot.status as any) || 'ok',
-    }));
-    const firstSnapshot = quota.latest[0];
-    const errorFromSnapshots =
-      quota.latest.find((snapshot) => snapshot.errorMessage)?.errorMessage || undefined;
-    return {
-      provider: firstSnapshot.provider,
-      checkerId: firstSnapshot.checkerId,
-      oauthAccountId: quota.oauthAccountId,
-      oauthProvider: quota.oauthProvider,
-      checkedAt: toIsoString(firstSnapshot.checkedAt) ?? new Date(0).toISOString(),
-      success: toBoolean(firstSnapshot.success),
-      error: errorFromSnapshots,
-      windows,
-    };
-  };
-
-  const BALANCE_CHECKERS_WITH_RATE_LIMIT = new Set(['neuralwatt']);
-  const balanceQuotas = quotas.filter((quota) => quota.checkerCategory === 'balance');
-  const rateLimitQuotas = quotas.filter(
-    (quota) =>
-      quota.checkerCategory === 'rate-limit' ||
-      BALANCE_CHECKERS_WITH_RATE_LIMIT.has(quota.checkerType || quota.checkerId)
-  );
+  const balanceQuotas = quotas.filter((q) => q.meters.some((m) => m.kind === 'balance'));
+  const allowanceQuotas = quotas.filter((q) => q.meters.some((m) => m.kind === 'allowance'));
 
   const isDrawer = mode === 'drawer';
 
@@ -399,16 +340,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                   collapsed && 'opacity-0 h-0 overflow-hidden'
                 )}
               >
-                <CompactBalancesCard
-                  balanceQuotas={balanceQuotas}
-                  getQuotaResult={getQuotaResult}
-                />
+                <CompactBalancesCard balanceQuotas={balanceQuotas} />
               </div>
             )}
           </div>
         )}
 
-        {isAdmin && rateLimitQuotas.length > 0 && (
+        {isAdmin && allowanceQuotas.length > 0 && (
           <div className="mt-4 px-2">
             <button
               onClick={() => setQuotasExpanded(!quotasExpanded)}
@@ -439,10 +377,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                   collapsed && 'opacity-0 h-0 overflow-hidden'
                 )}
               >
-                <CompactQuotasCard
-                  rateLimitQuotas={rateLimitQuotas}
-                  getQuotaResult={getQuotaResult}
-                />
+                <CompactQuotasCard allowanceQuotas={allowanceQuotas} />
               </div>
             )}
           </div>

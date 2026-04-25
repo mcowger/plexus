@@ -1,67 +1,37 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface KiloBalanceResponse {
   balance?: number;
 }
 
-export class KiloQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
-  private endpoint: string;
-  private organizationId?: string;
+export default defineChecker({
+  type: 'kilo',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'Kilo API key is required'),
+    endpoint: z.string().url().optional(),
+    organizationId: z.string().trim().min(1).optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://api.kilo.ai/api/profile/balance');
+    const organizationId = ctx.getOption<string | undefined>('organizationId', undefined)?.trim() || undefined;
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.kilo.ai/api/profile/balance');
-    this.organizationId =
-      this.getOption<string | undefined>('organizationId', undefined)?.trim() || undefined;
-  }
+    logger.silly(`[kilo] Calling ${endpoint}`);
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    };
+    if (organizationId) headers['x-kilocode-organizationid'] = organizationId;
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
+    const response = await fetch(endpoint, { method: 'GET', headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-    try {
-      logger.silly(`[kilo] Calling ${this.endpoint}`);
+    const data: KiloBalanceResponse = await response.json();
+    const remaining = Number(data.balance);
+    if (!Number.isFinite(remaining)) throw new Error(`Invalid balance: ${String(data.balance)}`);
 
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      };
-
-      if (this.organizationId) {
-        headers['x-kilocode-organizationid'] = this.organizationId;
-      }
-
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: KiloBalanceResponse = await response.json();
-      const balance = Number(data.balance);
-
-      if (!Number.isFinite(balance)) {
-        return this.errorResult(new Error(`Invalid balance received: ${String(data.balance)}`));
-      }
-
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
-        undefined,
-        undefined,
-        balance,
-        'dollars',
-        undefined,
-        'Kilo account balance'
-      );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
-}
+    return [ctx.balance({ key: 'balance', label: 'Account balance', unit: 'usd', remaining })];
+  },
+});

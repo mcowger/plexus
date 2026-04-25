@@ -1,5 +1,5 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface NeuralwattQuotaResponse {
@@ -10,23 +10,10 @@ interface NeuralwattQuotaResponse {
     accounting_method: string;
   };
   usage?: {
-    lifetime?: {
-      cost_usd: number;
-      requests: number;
-      tokens: number;
-      energy_kwh: number;
-    };
-    current_month?: {
-      cost_usd: number;
-      requests: number;
-      tokens: number;
-      energy_kwh: number;
-    };
+    lifetime?: { cost_usd: number; requests: number; tokens: number; energy_kwh: number };
+    current_month?: { cost_usd: number; requests: number; tokens: number; energy_kwh: number };
   };
-  limits?: {
-    overage_limit_usd: number | null;
-    rate_limit_tier: string;
-  };
+  limits?: { overage_limit_usd: number | null; rate_limit_tier: string };
   subscription?: {
     plan: string;
     status: string;
@@ -39,114 +26,66 @@ interface NeuralwattQuotaResponse {
     kwh_remaining: number;
     in_overage: boolean;
   };
-  key?: {
-    name: string;
-    allowance: number | null;
-  };
+  key?: { name: string; allowance: number | null };
 }
 
-const NEURALWATT_DEFAULT_ENDPOINT = 'https://api.neuralwatt.com/v1/quota';
+export default defineChecker({
+  type: 'neuralwatt',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'Neuralwatt API key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://api.neuralwatt.com/v1/quota');
 
-export class NeuralwattQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
-  private endpoint: string;
+    logger.silly(`[neuralwatt] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    });
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', NEURALWATT_DEFAULT_ENDPOINT);
-  }
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
+    const data: NeuralwattQuotaResponse = await response.json();
+    const meters = [];
 
-    try {
-      logger.silly(`[neuralwatt] Calling ${this.endpoint}`);
-
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: NeuralwattQuotaResponse = await response.json();
-      const windows: QuotaWindow[] = [];
-
-      // Balance window (always present)
-      if (
-        data.balance &&
-        typeof data.balance.credits_remaining_usd === 'number' &&
-        Number.isFinite(data.balance.credits_remaining_usd)
-      ) {
-        logger.debug(
-          `[neuralwatt] balance: remaining=$${data.balance.credits_remaining_usd} ` +
-            `total=$${data.balance.total_credits_usd} used=$${data.balance.credits_used_usd} ` +
-            `method=${data.balance.accounting_method}`
-        );
-
-        windows.push(
-          this.createWindow(
-            'subscription',
-            data.balance.total_credits_usd,
-            data.balance.credits_used_usd,
-            data.balance.credits_remaining_usd,
-            'dollars',
-            undefined,
-            'Neuralwatt credit balance'
-          )
-        );
-      } else {
-        logger.debug(`[neuralwatt] No valid balance data in API response`);
-      }
-
-      // Subscription window (if present)
-      if (data.subscription) {
-        const sub = data.subscription;
-
-        logger.debug(
-          `[neuralwatt] subscription: plan=${sub.plan} status=${sub.status} ` +
-            `kwh_included=${sub.kwh_included} kwh_used=${sub.kwh_used} ` +
-            `kwh_remaining=${sub.kwh_remaining} in_overage=${sub.in_overage}`
-        );
-
-        if (
-          Number.isFinite(sub.kwh_included) &&
-          Number.isFinite(sub.kwh_used) &&
-          Number.isFinite(sub.kwh_remaining)
-        ) {
-          const resetsAt = new Date(sub.current_period_end);
-
-          windows.push(
-            this.createWindow(
-              'monthly',
-              sub.kwh_included,
-              sub.kwh_used,
-              sub.kwh_remaining,
-              'points',
-              resetsAt,
-              `Neuralwatt ${sub.plan} plan energy quota`
-            )
-          );
-        }
-      }
-
-      if (windows.length === 0) {
-        return this.errorResult(
-          new Error('No valid balance or subscription data received from Neuralwatt API')
-        );
-      }
-
-      return {
-        ...this.successResult(windows),
-        rawResponse: data,
-      };
-    } catch (error) {
-      return this.errorResult(error as Error);
+    if (data.balance && Number.isFinite(data.balance.credits_remaining_usd)) {
+      meters.push(
+        ctx.balance({
+          key: 'credit_balance',
+          label: 'Credit balance',
+          unit: 'usd',
+          limit: Number.isFinite(data.balance.total_credits_usd) ? data.balance.total_credits_usd : undefined,
+          used: Number.isFinite(data.balance.credits_used_usd) ? data.balance.credits_used_usd : undefined,
+          remaining: data.balance.credits_remaining_usd,
+        })
+      );
     }
-  }
-}
+
+    if (data.subscription) {
+      const sub = data.subscription;
+      if (Number.isFinite(sub.kwh_included) && Number.isFinite(sub.kwh_used) && Number.isFinite(sub.kwh_remaining)) {
+        meters.push(
+          ctx.allowance({
+            key: 'energy_quota',
+            label: `${sub.plan} plan energy quota`,
+            unit: 'kwh',
+            limit: sub.kwh_included,
+            used: sub.kwh_used,
+            remaining: sub.kwh_remaining,
+            periodValue: 1,
+            periodUnit: 'month',
+            periodCycle: 'fixed',
+            resetsAt: new Date(sub.current_period_end).toISOString(),
+          })
+        );
+      }
+    }
+
+    if (meters.length === 0) throw new Error('No valid balance or subscription data received from Neuralwatt API');
+
+    logger.debug(`[neuralwatt] Returning ${meters.length} meters`);
+    return meters;
+  },
+});

@@ -1,5 +1,5 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface MoonshotBalanceResponse {
@@ -13,59 +13,57 @@ interface MoonshotBalanceResponse {
   status: boolean;
 }
 
-export class MoonshotQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
-  private endpoint: string;
-
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>(
+export default defineChecker({
+  type: 'moonshot',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'Moonshot API key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>(
       'endpoint',
       'https://api.moonshot.ai/v1/users/me/balance'
     );
-  }
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
+    logger.silly(`[moonshot] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    });
 
-    try {
-      logger.silly(`[moonshot] Calling ${this.endpoint}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: MoonshotBalanceResponse = await response.json();
-
-      if (!data.status || data.code !== 0) {
-        return this.errorResult(
-          new Error(`Moonshot API error: code=${data.code}, scode=${data.scode}`)
-        );
-      }
-
-      const { available_balance, voucher_balance, cash_balance } = data.data;
-
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
-        undefined,
-        undefined,
-        available_balance,
-        'dollars',
-        undefined,
-        'Moonshot account balance'
-      );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
+    const data: MoonshotBalanceResponse = await response.json();
+    if (!data.status || data.code !== 0) {
+      throw new Error(`Moonshot API error: code=${data.code}, scode=${data.scode}`);
     }
-  }
-}
+
+    const { cash_balance, voucher_balance } = data.data;
+    const meters = [];
+
+    meters.push(
+      ctx.balance({
+        key: 'cash',
+        label: 'Cash balance',
+        scope: 'cash',
+        unit: 'usd',
+        remaining: cash_balance,
+      })
+    );
+
+    if (voucher_balance > 0) {
+      meters.push(
+        ctx.balance({
+          key: 'voucher',
+          label: 'Voucher balance',
+          scope: 'voucher',
+          unit: 'usd',
+          remaining: voucher_balance,
+        })
+      );
+    }
+
+    return meters;
+  },
+});

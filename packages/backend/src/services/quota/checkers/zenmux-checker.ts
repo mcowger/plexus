@@ -1,5 +1,5 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface ZenmuxQuotaResponse {
@@ -40,76 +40,62 @@ interface ZenmuxQuotaResponse {
   };
 }
 
-const ZENMUX_DEFAULT_ENDPOINT = 'https://zenmux.ai/api/v1/management/subscription/detail';
+export default defineChecker({
+  type: 'zenmux',
+  optionsSchema: z.object({
+    managementApiKey: z.string().min(1, 'Zenmux management API key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const managementApiKey = ctx.requireOption<string>('managementApiKey');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://zenmux.ai/api/v1/management/subscription/detail');
 
-export class ZenmuxQuotaChecker extends QuotaChecker {
-  readonly category = 'rate-limit' as const;
-  private endpoint: string;
+    logger.silly(`[zenmux] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${managementApiKey}`, Accept: 'application/json' },
+    });
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', ZENMUX_DEFAULT_ENDPOINT);
-  }
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const managementApiKey = this.requireOption<string>('managementApiKey');
+    const data: ZenmuxQuotaResponse = await response.json();
 
-    try {
-      logger.silly(`[zenmux] Calling ${this.endpoint}`);
+    if (!data.success || !data.data) throw new Error('Zenmux API returned unsuccessful response');
 
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${managementApiKey}`,
-          Accept: 'application/json',
-        },
-      });
+    const { quota_5_hour, quota_7_day } = data.data;
+    const meters = [];
 
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
+    meters.push(
+      ctx.allowance({
+        key: 'quota_5h',
+        label: '5-hour quota',
+        unit: 'flows',
+        limit: quota_5_hour.max_flows,
+        used: quota_5_hour.used_flows,
+        remaining: quota_5_hour.remaining_flows,
+        periodValue: 5,
+        periodUnit: 'hour',
+        periodCycle: 'rolling',
+        resetsAt: new Date(quota_5_hour.resets_at).toISOString(),
+      })
+    );
 
-      const data: ZenmuxQuotaResponse = await response.json();
+    meters.push(
+      ctx.allowance({
+        key: 'quota_7d',
+        label: '7-day quota',
+        unit: 'flows',
+        limit: quota_7_day.max_flows,
+        used: quota_7_day.used_flows,
+        remaining: quota_7_day.remaining_flows,
+        periodValue: 7,
+        periodUnit: 'day',
+        periodCycle: 'rolling',
+        resetsAt: new Date(quota_7_day.resets_at).toISOString(),
+      })
+    );
 
-      if (!data.success || !data.data) {
-        return this.errorResult(new Error('Zenmux API returned unsuccessful response'));
-      }
-
-      const { quota_5_hour, quota_7_day } = data.data;
-      const windows: QuotaWindow[] = [];
-
-      // 5-hour rolling window
-      windows.push(
-        this.createWindow(
-          'rolling_five_hour',
-          quota_5_hour.max_flows,
-          quota_5_hour.used_flows,
-          quota_5_hour.remaining_flows,
-          'points',
-          new Date(quota_5_hour.resets_at),
-          '5-hour quota'
-        )
-      );
-
-      // 7-day rolling window
-      windows.push(
-        this.createWindow(
-          'rolling_weekly',
-          quota_7_day.max_flows,
-          quota_7_day.used_flows,
-          quota_7_day.remaining_flows,
-          'points',
-          new Date(quota_7_day.resets_at),
-          '7-day quota'
-        )
-      );
-
-      return {
-        ...this.successResult(windows),
-        rawResponse: data,
-      };
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
-}
+    logger.silly(`[zenmux] Returning ${meters.length} meters`);
+    return meters;
+  },
+});

@@ -1,4 +1,5 @@
 // Re-export from sqlite by default for backward compatibility
+export * from './sqlite/meter-snapshots';
 export * from './sqlite/request-usage';
 export * from './sqlite/provider-cooldowns';
 export * from './sqlite/debug-logs';
@@ -21,6 +22,7 @@ export { debugLogs as pgDebugLogs } from './postgres/debug-logs';
 export { inferenceErrors as pgInferenceErrors } from './postgres/inference-errors';
 export { providerPerformance as pgProviderPerformance } from './postgres/provider-performance';
 export { quotaSnapshots as pgQuotaSnapshots } from './postgres/quota-snapshots';
+export { meterSnapshots as pgMeterSnapshots } from './postgres/meter-snapshots';
 export {
   responses as pgResponses,
   conversations as pgConversations,

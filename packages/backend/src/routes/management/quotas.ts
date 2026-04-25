@@ -2,50 +2,29 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
-import { toBoolean, toIsoString } from '../../utils/normalize';
 
-function normalizeQuotaSnapshot(snapshot: any) {
+function getOAuthMetadata(checkerId: string) {
+  const quotaConfig = getConfig().quotas?.find((q) => q.id === checkerId);
+  if (!quotaConfig) return {} as { oauthAccountId?: string; oauthProvider?: string };
+
+  const oauthAccountId = (quotaConfig.options?.oauthAccountId as string | undefined)?.trim();
+  const oauthProvider = (quotaConfig.options?.oauthProvider as string | undefined)?.trim();
+
   return {
-    ...snapshot,
-    checkedAt: toIsoString(snapshot.checkedAt),
-    resetsAt: toIsoString(snapshot.resetsAt),
-    createdAt: toIsoString(snapshot.createdAt),
-    success: toBoolean(snapshot.success),
+    oauthAccountId: oauthAccountId?.length ? oauthAccountId : undefined,
+    oauthProvider: oauthProvider?.length ? oauthProvider : undefined,
   };
+}
+
+function getCheckerType(checkerId: string): string | undefined {
+  return getConfig().quotas?.find((q) => q.id === checkerId)?.type;
 }
 
 export async function registerQuotaRoutes(
   fastify: FastifyInstance,
   quotaScheduler: QuotaScheduler
 ) {
-  // Look up quota config from the current config at call time so that config reloads
-  // (triggered when users save provider settings via the UI) are always reflected.
-  const getQuotaConfig = (checkerId: string) => getConfig().quotas?.find((q) => q.id === checkerId);
-
-  const getOAuthMetadata = (checkerId: string) => {
-    const quotaConfig = getQuotaConfig(checkerId);
-    if (!quotaConfig) {
-      return {} as { oauthAccountId?: string; oauthProvider?: string };
-    }
-
-    const oauthAccountId = (quotaConfig.options?.oauthAccountId as string | undefined)?.trim();
-    const oauthProvider = (quotaConfig.options?.oauthProvider as string | undefined)?.trim();
-
-    return {
-      oauthAccountId: oauthAccountId && oauthAccountId.length > 0 ? oauthAccountId : undefined,
-      oauthProvider: oauthProvider && oauthProvider.length > 0 ? oauthProvider : undefined,
-    };
-  };
-
-  const getCheckerType = (checkerId: string): string | undefined => {
-    return getQuotaConfig(checkerId)?.type;
-  };
-
-  const getCheckerCategory = (checkerId: string): 'balance' | 'rate-limit' | undefined => {
-    return quotaScheduler.getCheckerCategory(checkerId);
-  };
-
-  fastify.get('/v0/management/quotas', async (request, reply) => {
+  fastify.get('/v0/management/quotas', async (_request, reply) => {
     try {
       const checkerIds = quotaScheduler.getCheckerIds();
       logger.debug(`[Quotas API] getCheckerIds returned: ${JSON.stringify(checkerIds)}`);
@@ -57,27 +36,23 @@ export async function registerQuotaRoutes(
           results.push({
             checkerId,
             checkerType: getCheckerType(checkerId),
-            checkerCategory: getCheckerCategory(checkerId),
-            latest,
             ...getOAuthMetadata(checkerId),
+            ...(latest ?? { success: false, meters: [] }),
           });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
           results.push({
             checkerId,
             checkerType: getCheckerType(checkerId),
-            checkerCategory: getCheckerCategory(checkerId),
-            latest: [],
-            error: error instanceof Error ? error.message : 'Unknown error',
             ...getOAuthMetadata(checkerId),
+            success: false,
+            meters: [],
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
       }
 
-      return results.map((result) => ({
-        ...result,
-        latest: Array.isArray(result.latest) ? result.latest.map(normalizeQuotaSnapshot) : [],
-      }));
+      return results;
     } catch (error) {
       logger.error(`Failed to get quotas: ${error}`);
       return reply.status(500).send({ error: 'Failed to retrieve quotas' });
@@ -91,9 +66,8 @@ export async function registerQuotaRoutes(
       return {
         checkerId,
         checkerType: getCheckerType(checkerId),
-        checkerCategory: getCheckerCategory(checkerId),
-        latest: latest.map(normalizeQuotaSnapshot),
         ...getOAuthMetadata(checkerId),
+        ...(latest ?? { success: false, meters: [] }),
       };
     } catch (error) {
       logger.error(`Failed to get quota for '${(request.params as any).checkerId}': ${error}`);
@@ -104,7 +78,7 @@ export async function registerQuotaRoutes(
   fastify.get('/v0/management/quotas/:checkerId/history', async (request, reply) => {
     try {
       const { checkerId } = request.params as { checkerId: string };
-      const querystring = request.query as { windowType?: string; since?: string };
+      const querystring = request.query as { meterKey?: string; since?: string };
       let since: number | undefined;
 
       if (querystring.since) {
@@ -118,14 +92,14 @@ export async function registerQuotaRoutes(
 
       const history = await quotaScheduler.getQuotaHistory(
         checkerId,
-        querystring.windowType,
+        querystring.meterKey,
         since
       );
       return {
         checkerId,
-        windowType: querystring.windowType,
+        meterKey: querystring.meterKey,
         since: since ? new Date(since).toISOString() : undefined,
-        history: history.map(normalizeQuotaSnapshot),
+        history,
       };
     } catch (error) {
       logger.error(

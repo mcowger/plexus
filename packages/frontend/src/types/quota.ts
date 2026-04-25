@@ -1,87 +1,33 @@
-export type QuotaWindowType =
-  | 'subscription'
-  | 'hourly'
-  | 'five_hour'
-  | 'rolling_five_hour'
-  | 'toolcalls'
-  | 'search'
-  | 'daily'
-  | 'weekly'
-  | 'rolling_weekly'
-  | 'monthly'
-  | 'custom';
+export type MeterKind = 'balance' | 'allowance';
+export type MeterStatus = 'ok' | 'warning' | 'critical' | 'exhausted';
+export type Utilization = number | 'unknown' | 'not_applicable';
 
-export type QuotaUnit = 'dollars' | 'requests' | 'tokens' | 'percentage' | 'points' | 'kwh';
-
-export type QuotaStatus = 'ok' | 'warning' | 'critical' | 'exhausted';
-
-export interface QuotaWindow {
-  windowType: QuotaWindowType;
-  windowLabel?: string;
-  description?: string;
+export interface Meter {
+  key: string;
+  label: string;
+  kind: MeterKind;
+  unit: string;
   limit?: number;
   used?: number;
   remaining?: number;
-  utilizationPercent: number;
-  unit: QuotaUnit;
+  utilizationPercent: Utilization;
+  status: MeterStatus;
+  periodValue?: number;
+  periodUnit?: string;
+  periodCycle?: string;
   resetsAt?: string;
-  resetInSeconds?: number;
-  status?: QuotaStatus;
-  estimation?: {
-    projectedUsedAtReset: number;
-    projectedUtilizationPercent: number;
-    willExceed: boolean;
-    exceedanceTimestamp?: number; // When quota is projected to be exceeded
-    projectionBasedOnMinutes: number; // How many minutes of historical data was used
-  };
-}
-
-export interface QuotaGroup {
-  groupId: string;
-  groupLabel: string;
-  models: string[];
-  windows: QuotaWindow[];
-}
-
-export interface QuotaCheckResult {
-  provider: string;
-  checkerId: string;
-  checkedAt: string;
-  success: boolean;
-  error?: string;
-  oauthAccountId?: string;
-  oauthProvider?: string;
-  windows?: QuotaWindow[];
-  groups?: QuotaGroup[];
-  rawResponse?: unknown;
+  group?: string;
+  scope?: string;
 }
 
 export interface QuotaCheckerInfo {
   checkerId: string;
   checkerType?: string;
-  checkerCategory?: 'balance' | 'rate-limit';
+  provider?: string;
+  checkedAt?: string;
+  success: boolean;
+  error?: string;
+  meters: Meter[];
   oauthAccountId?: string;
   oauthProvider?: string;
-  latest: QuotaSnapshot[];
-}
-
-export interface QuotaSnapshot {
-  id: number;
-  provider: string;
-  checkerId: string;
-  groupId: string | null;
-  windowType: string;
-  description?: string;
-  checkedAt: string | number;
-  limit: number | null;
-  used: number | null;
-  remaining: number | null;
-  utilizationPercent: number | null;
-  unit: string | null;
-  resetsAt: string | number | null;
-  resetInSeconds?: number | null;
-  status: string | null;
-  success: boolean | number;
-  errorMessage: string | null;
-  createdAt: string | number;
 }
