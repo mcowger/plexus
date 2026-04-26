@@ -225,6 +225,13 @@
       "when": 1776319522506,
       "tag": "0031_parched_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1777231626499,
+      "tag": "0032_mysterious_triathlon",
+      "breakpoints": true
     }
   ]
 }
