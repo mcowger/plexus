@@ -249,3 +249,24 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
   );
   return { inserted, skipped, totalSource };
 }
+
+// ─── Truncate ─────────────────────────────────────────────────────────────────
+
+export async function truncateLegacySnapshots(): Promise<void> {
+  const db = getDatabase();
+  const dialect = getCurrentDialect();
+
+  if (!(await tableExists(db, 'quota_snapshots'))) {
+    logger.info('[legacy-migrator] quota_snapshots does not exist, nothing to truncate.');
+    return;
+  }
+
+  // SQLite has no TRUNCATE statement; DELETE FROM is equivalent.
+  if (dialect === 'sqlite') {
+    await db.execute(sql`DELETE FROM quota_snapshots`);
+  } else {
+    await db.execute(sql`TRUNCATE TABLE quota_snapshots`);
+  }
+
+  logger.info('[legacy-migrator] quota_snapshots truncated.');
+}

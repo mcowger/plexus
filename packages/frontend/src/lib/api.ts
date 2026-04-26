@@ -2296,6 +2296,20 @@ export const api = {
     }
   },
 
+  truncateLegacySnapshots: async (): Promise<boolean> => {
+    try {
+      const res = await fetchWithAuth(
+        `${API_BASE}/v0/management/quotas/truncate-legacy-snapshots`,
+        { method: 'POST' }
+      );
+      if (!res.ok) throw new Error('Failed to truncate legacy snapshots');
+      return true;
+    } catch (e) {
+      console.error('API Error truncateLegacySnapshots', e);
+      return false;
+    }
+  },
+
   deleteAlias: async (aliasId: string): Promise<void> => {
     const res = await fetchWithAuth(
       `${API_BASE}/v0/management/models/${encodeURIComponent(aliasId)}`,

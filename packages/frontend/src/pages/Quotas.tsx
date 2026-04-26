@@ -23,6 +23,8 @@ export const Quotas = () => {
     skipped: number;
     totalSource: number;
   } | null>(null);
+  const [truncating, setTruncating] = useState(false);
+  const [truncated, setTruncated] = useState(false);
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -54,6 +56,14 @@ export const Quotas = () => {
       setLegacyRowCount(null);
       fetchQuotas();
     }
+  };
+
+  const handleTruncate = async () => {
+    if (!confirm('Truncate quota_snapshots? This cannot be undone.')) return;
+    setTruncating(true);
+    const ok = await api.truncateLegacySnapshots();
+    setTruncating(false);
+    if (ok) setTruncated(true);
   };
 
   const handleRefresh = async (checkerId: string) => {
@@ -175,16 +185,31 @@ export const Quotas = () => {
       )}
 
       {migrationResult !== null && (
-        <div className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm">
-          <DatabaseZap size={16} className="shrink-0 text-green-400" />
-          <p className="text-green-300">
-            Migration complete — {migrationResult.inserted.toLocaleString()} row
-            {migrationResult.inserted !== 1 ? 's' : ''} inserted
-            {migrationResult.skipped > 0
-              ? `, ${migrationResult.skipped.toLocaleString()} already existed`
-              : ''}
-            .
-          </p>
+        <div className="flex items-start gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm">
+          <DatabaseZap size={16} className="mt-0.5 shrink-0 text-green-400" />
+          <div className="flex-1">
+            <p className="font-medium text-green-300">
+              Migration complete — {migrationResult.inserted.toLocaleString()} row
+              {migrationResult.inserted !== 1 ? 's' : ''} inserted
+              {migrationResult.skipped > 0
+                ? `, ${migrationResult.skipped.toLocaleString()} already existed`
+                : ''}
+              .
+            </p>
+            {!truncated && (
+              <p className="mt-0.5 text-text-secondary">
+                You can now truncate the old <code className="font-mono">quota_snapshots</code>{' '}
+                table to free up space.
+              </p>
+            )}
+          </div>
+          {truncated ? (
+            <span className="text-xs text-text-muted self-center">quota_snapshots truncated</span>
+          ) : (
+            <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
+              Truncate quota_snapshots
+            </Button>
+          )}
         </div>
       )}
 

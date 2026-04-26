@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 import {
   getLegacySnapshotStatus,
   migrateLegacySnapshots,
+  truncateLegacySnapshots,
 } from '../../services/quota/legacy-snapshot-migrator';
 
 function getOAuthMetadata(checkerId: string) {
@@ -125,6 +126,16 @@ export async function registerQuotaRoutes(
     } catch (error) {
       logger.error(`Failed to migrate legacy snapshots: ${error}`);
       return reply.status(500).send({ error: 'Failed to migrate legacy snapshots' });
+    }
+  });
+
+  fastify.post('/v0/management/quotas/truncate-legacy-snapshots', async (_request, reply) => {
+    try {
+      await truncateLegacySnapshots();
+      return { ok: true };
+    } catch (error) {
+      logger.error(`Failed to truncate legacy snapshots: ${error}`);
+      return reply.status(500).send({ error: 'Failed to truncate legacy snapshots' });
     }
   });
 
