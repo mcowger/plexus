@@ -17,8 +17,6 @@ jobs:
   claude-agent:
     if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
-    permissions:
-      workflows: write
 
     steps:
       - uses: actions/checkout@v6
