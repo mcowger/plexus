@@ -4,7 +4,7 @@
  * API route so the behaviour is identical in both contexts.
  */
 
-import { sql } from 'drizzle-orm';
+import { sql, SQL } from 'drizzle-orm';
 import { getDatabase, getCurrentDialect } from '../../db/client';
 import { logger } from '../../utils/logger';
 import { toDbTimestampMs } from '../../utils/normalize';
@@ -56,26 +56,32 @@ function deriveStatus(existingStatus: string | null | undefined): MeterStatus {
   return 'ok';
 }
 
+// ─── Dialect-aware raw SELECT helper ─────────────────────────────────────────
+//
+// drizzle-orm's bun-sqlite driver exposes `db.all()` for SELECT queries.
+// The postgres-js driver exposes `db.execute()` instead. Using the wrong one
+// returns metadata (run/changes) rather than rows, or throws entirely.
+
+async function selectAll(db: ReturnType<typeof getDatabase>, query: SQL): Promise<any[]> {
+  const dialect = getCurrentDialect();
+  if (dialect === 'sqlite') {
+    return (db as any).all(query) as any[];
+  }
+  return (await (db as any).execute(query)) as any[];
+}
+
 // ─── Table existence / row count ─────────────────────────────────────────────
 
 async function tableExists(
   db: ReturnType<typeof getDatabase>,
   tableName: string
 ): Promise<boolean> {
-  const dialect = getCurrentDialect();
   try {
-    if (dialect === 'sqlite') {
-      const rows = (await db.execute(
-        sql`SELECT name FROM sqlite_master WHERE type='table' AND name=${tableName}`
-      )) as any[];
-      return rows.length > 0;
-    } else {
-      const rows = (await db.execute(
-        sql`SELECT 1 FROM information_schema.tables WHERE table_name=${tableName} LIMIT 1`
-      )) as any[];
-      return rows.length > 0;
-    }
-  } catch {
+    // Attempt a zero-row scan. "No such table" throws on both SQLite and Postgres.
+    await selectAll(db, sql.raw(`SELECT 1 FROM ${tableName} LIMIT 0`));
+    return true;
+  } catch (err) {
+    logger.debug(`[legacy-migrator] tableExists(${tableName}) → false (${err})`);
     return false;
   }
 }
@@ -92,8 +98,8 @@ export async function getLegacySnapshotStatus(): Promise<LegacySnapshotStatus> {
     return { tableExists: false, rowCount: 0 };
   }
 
-  const countResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM quota_snapshots`);
-  const rowCount = Number((countResult as any)[0]?.cnt ?? 0);
+  const countResult = await selectAll(db, sql`SELECT COUNT(*) as cnt FROM quota_snapshots`);
+  const rowCount = Number(countResult[0]?.cnt ?? 0);
   return { tableExists: true, rowCount };
 }
 
@@ -114,8 +120,8 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
     return { inserted: 0, skipped: 0, totalSource: 0 };
   }
 
-  const countResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM quota_snapshots`);
-  const totalSource = Number((countResult as any)[0]?.cnt ?? 0);
+  const countResult = await selectAll(db, sql`SELECT COUNT(*) as cnt FROM quota_snapshots`);
+  const totalSource = Number(countResult[0]?.cnt ?? 0);
 
   if (totalSource === 0) {
     logger.info('[legacy-migrator] quota_snapshots is empty — nothing to migrate.');
@@ -124,28 +130,17 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
 
   logger.info(`[legacy-migrator] Migrating ${totalSource} row(s) from quota_snapshots…`);
 
-  const sourceRows = (await db.execute(sql`
-    SELECT
-      id,
-      provider,
-      checker_id,
-      group_id,
-      window_type,
-      description,
-      checked_at,
-      "limit",
-      used,
-      remaining,
-      utilization_percent,
-      unit,
-      resets_at,
-      status,
-      success,
-      error_message,
-      created_at
-    FROM quota_snapshots
-    ORDER BY id ASC
-  `)) as any[];
+  const sourceRows = await selectAll(
+    db,
+    sql`
+      SELECT
+        id, provider, checker_id, group_id, window_type, description,
+        checked_at, "limit", used, remaining, utilization_percent, unit,
+        resets_at, status, success, error_message, created_at
+      FROM quota_snapshots
+      ORDER BY id ASC
+    `
+  );
 
   let inserted = 0;
   let skipped = 0;
@@ -297,14 +292,17 @@ export async function exportLegacySnapshots(format: ExportFormat): Promise<strin
     return format === 'csv' ? COLUMNS.join(',') + '\n' : '-- quota_snapshots is empty\n';
   }
 
-  const rows = (await db.execute(sql`
-    SELECT
-      id, provider, checker_id, group_id, window_type, description,
-      checked_at, "limit", used, remaining, utilization_percent, unit,
-      resets_at, status, success, error_message, created_at
-    FROM quota_snapshots
-    ORDER BY id ASC
-  `)) as any[];
+  const rows = await selectAll(
+    db,
+    sql`
+      SELECT
+        id, provider, checker_id, group_id, window_type, description,
+        checked_at, "limit", used, remaining, utilization_percent, unit,
+        resets_at, status, success, error_message, created_at
+      FROM quota_snapshots
+      ORDER BY id ASC
+    `
+  );
 
   if (format === 'csv') {
     const lines: string[] = [COLUMNS.join(',')];
