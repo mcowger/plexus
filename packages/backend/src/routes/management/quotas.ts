@@ -6,6 +6,8 @@ import {
   getLegacySnapshotStatus,
   migrateLegacySnapshots,
   truncateLegacySnapshots,
+  exportLegacySnapshots,
+  type ExportFormat,
 } from '../../services/quota/legacy-snapshot-migrator';
 
 function getOAuthMetadata(checkerId: string) {
@@ -107,6 +109,26 @@ export async function registerQuotaRoutes(
         `Failed to get quota history for '${(request.params as any).checkerId}': ${error}`
       );
       return reply.status(500).send({ error: 'Failed to retrieve quota history' });
+    }
+  });
+
+  fastify.get('/v0/management/quotas/backup-legacy-snapshots', async (request, reply) => {
+    try {
+      const { format = 'csv' } = request.query as { format?: string };
+      const fmt: ExportFormat = format === 'sql' ? 'sql' : 'csv';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `quota_snapshots_backup_${timestamp}.${fmt}`;
+      const body = await exportLegacySnapshots(fmt);
+      reply
+        .header(
+          'Content-Type',
+          fmt === 'sql' ? 'text/plain; charset=utf-8' : 'text/csv; charset=utf-8'
+        )
+        .header('Content-Disposition', `attachment; filename="${filename}"`);
+      return reply.send(body);
+    } catch (error) {
+      logger.error(`Failed to export legacy snapshots: ${error}`);
+      return reply.status(500).send({ error: 'Failed to export legacy snapshots' });
     }
   });
 

@@ -2310,6 +2310,23 @@ export const api = {
     }
   },
 
+  downloadLegacySnapshotsBackup: async (format: 'csv' | 'sql'): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/quotas/backup-legacy-snapshots?format=${format}`
+    );
+    if (!res.ok) throw new Error('Failed to download backup');
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? `quota_snapshots_backup.${format}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   deleteAlias: async (aliasId: string): Promise<void> => {
     const res = await fetchWithAuth(
       `${API_BASE}/v0/management/models/${encodeURIComponent(aliasId)}`,

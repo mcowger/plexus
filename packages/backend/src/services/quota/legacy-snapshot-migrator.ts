@@ -250,6 +250,85 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
   return { inserted, skipped, totalSource };
 }
 
+// ─── Export ──────────────────────────────────────────────────────────────────
+
+const COLUMNS = [
+  'id',
+  'provider',
+  'checker_id',
+  'group_id',
+  'window_type',
+  'description',
+  'checked_at',
+  'limit',
+  'used',
+  'remaining',
+  'utilization_percent',
+  'unit',
+  'resets_at',
+  'status',
+  'success',
+  'error_message',
+  'created_at',
+] as const;
+
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = value instanceof Date ? value.toISOString() : String(value);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replaceAll('"', '""')}"`;
+  }
+  return s;
+}
+
+function sqlEscape(value: unknown): string {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? '1' : '0';
+  const s = value instanceof Date ? value.toISOString() : String(value);
+  return `'${s.replaceAll("'", "''")}'`;
+}
+
+export type ExportFormat = 'csv' | 'sql';
+
+export async function exportLegacySnapshots(format: ExportFormat): Promise<string> {
+  const db = getDatabase();
+
+  if (!(await tableExists(db, 'quota_snapshots'))) {
+    return format === 'csv' ? COLUMNS.join(',') + '\n' : '-- quota_snapshots is empty\n';
+  }
+
+  const rows = (await db.execute(sql`
+    SELECT
+      id, provider, checker_id, group_id, window_type, description,
+      checked_at, "limit", used, remaining, utilization_percent, unit,
+      resets_at, status, success, error_message, created_at
+    FROM quota_snapshots
+    ORDER BY id ASC
+  `)) as any[];
+
+  if (format === 'csv') {
+    const lines: string[] = [COLUMNS.join(',')];
+    for (const row of rows) {
+      lines.push(COLUMNS.map((col) => csvEscape(row[col])).join(','));
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  // SQL insert statements
+  const lines: string[] = [
+    '-- quota_snapshots backup',
+    `-- Exported ${new Date().toISOString()}`,
+    `-- ${rows.length} row(s)`,
+    '',
+  ];
+  for (const row of rows) {
+    const vals = COLUMNS.map((col) => sqlEscape(row[col])).join(', ');
+    lines.push(`INSERT INTO quota_snapshots (${COLUMNS.join(', ')}) VALUES (${vals});`);
+  }
+  return lines.join('\n') + '\n';
+}
+
 // ─── Truncate ─────────────────────────────────────────────────────────────────
 
 export async function truncateLegacySnapshots(): Promise<void> {

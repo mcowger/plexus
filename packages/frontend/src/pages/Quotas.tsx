@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { RefreshCw, Cpu, Gauge, AlertTriangle, DatabaseZap } from 'lucide-react';
+import { RefreshCw, Cpu, Gauge, AlertTriangle, DatabaseZap, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../lib/api';
 import { Card } from '../components/ui/Card';
@@ -25,6 +25,7 @@ export const Quotas = () => {
   } | null>(null);
   const [truncating, setTruncating] = useState(false);
   const [truncated, setTruncated] = useState(false);
+  const [downloading, setDownloading] = useState<'csv' | 'sql' | null>(null);
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -64,6 +65,17 @@ export const Quotas = () => {
     const ok = await api.truncateLegacySnapshots();
     setTruncating(false);
     if (ok) setTruncated(true);
+  };
+
+  const handleDownloadBackup = async (format: 'csv' | 'sql') => {
+    setDownloading(format);
+    try {
+      await api.downloadLegacySnapshotsBackup(format);
+    } catch (e) {
+      console.error('Backup download failed', e);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   const handleRefresh = async (checkerId: string) => {
@@ -172,15 +184,37 @@ export const Quotas = () => {
               Migrate this historical data into the new meter snapshots table to preserve it.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            isLoading={migrating}
-            onClick={handleMigrate}
-            leftIcon={<DatabaseZap size={13} />}
-          >
-            Migrate now
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="ghost"
+              isLoading={downloading === 'csv'}
+              disabled={downloading !== null}
+              onClick={() => handleDownloadBackup('csv')}
+              leftIcon={<Download size={13} />}
+            >
+              CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              isLoading={downloading === 'sql'}
+              disabled={downloading !== null}
+              onClick={() => handleDownloadBackup('sql')}
+              leftIcon={<Download size={13} />}
+            >
+              SQL
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              isLoading={migrating}
+              onClick={handleMigrate}
+              leftIcon={<DatabaseZap size={13} />}
+            >
+              Migrate now
+            </Button>
+          </div>
         </div>
       )}
 
@@ -206,9 +240,31 @@ export const Quotas = () => {
           {truncated ? (
             <span className="text-xs text-text-muted self-center">quota_snapshots truncated</span>
           ) : (
-            <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
-              Truncate quota_snapshots
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                isLoading={downloading === 'csv'}
+                disabled={downloading !== null}
+                onClick={() => handleDownloadBackup('csv')}
+                leftIcon={<Download size={13} />}
+              >
+                CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                isLoading={downloading === 'sql'}
+                disabled={downloading !== null}
+                onClick={() => handleDownloadBackup('sql')}
+                leftIcon={<Download size={13} />}
+              >
+                SQL
+              </Button>
+              <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
+                Truncate quota_snapshots
+              </Button>
+            </div>
           )}
         </div>
       )}
