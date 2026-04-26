@@ -162,12 +162,19 @@ jobs:
             Keep the tone concise and factual. Return the release notes as a markdown string
             in the `release_notes` field.
 
-      - name: Write release notes artifact
-        run: |
-          mkdir -p ${{ runner.temp }}/release-notes
-          echo '${{ steps.claude.outputs.structured_output }}' \
-            | jq -r '.release_notes // "Release notes generation did not produce output."' \
-            > ${{ runner.temp }}/release-notes/notes.md
+      - name: Save structured output to file
+        uses: actions/github-script@v9
+        env:
+          STRUCTURED_OUTPUT: ${{ steps.claude.outputs.structured_output }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = path.join(process.env.RUNNER_TEMP, 'release-notes');
+            fs.mkdirSync(dir, { recursive: true });
+            const output = JSON.parse(process.env.STRUCTURED_OUTPUT || '{}');
+            const notes = output.release_notes || 'Release notes generation did not produce output.';
+            fs.writeFileSync(path.join(dir, 'notes.md'), notes);
 
       - uses: actions/upload-artifact@v7
         with:
