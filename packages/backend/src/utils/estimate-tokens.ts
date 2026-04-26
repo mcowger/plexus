@@ -88,7 +88,9 @@ export function estimateTokensHeuristic(text: string): number {
 
   const codeIndicators =
     (text.match(/[=<>!&|]{2}/g) || []).length +
-    (text.match(/\w+\(/g) || []).length +
+    // Bounded quantifier avoids catastrophic backtracking on long runs of word
+    // chars (e.g. base64 data) — identifiers in real code fit in 64 chars.
+    (text.match(/\w{1,64}\(/g) || []).length +
     (text.match(/\n {2,}/g) || []).length;
   if (codeIndicators > charCount / 100) {
     tokenEstimate *= 1.08;
