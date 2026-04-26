@@ -17,6 +17,17 @@
 
 ---
 
+## Efficiency & Batching
+
+Think ahead and **perform multiple reads, edits, and commands in the same response** whenever they don't depend on each other's results. Minimize round-trips by:
+
+- **Reading multiple files at once.** If you need to understand several files to diagnose a problem, issue all reads in one call rather than sequentially.
+- **Making multiple edits at once.** When changing several locations in a file, or multiple independent files, issue all edits in parallel.
+- **Batching independent tool calls.** Any tool calls (reads, edits, bash commands) that don't depend on each other's results should be issued in the same turn.
+- **Planning before acting.** Before calling a tool, consider what else you'll need and whether you can combine it with the current call. A little upfront planning avoids many round-trips.
+
+---
+
 
 ## Database & Migrations
 
