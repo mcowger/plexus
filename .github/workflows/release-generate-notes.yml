@@ -14,10 +14,12 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v6
         with:
+          token: ${{ secrets.REPO_SUPER_TOKEN }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v6
