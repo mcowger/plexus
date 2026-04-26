@@ -145,38 +145,29 @@ jobs:
           printf '%s' "$PR_SUMMARY" > changes.md
 
       - name: Generate release notes via Claude
+        id: claude
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
+          claude_args: >-
+            --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
+            --json-schema '{"type":"object","properties":{"release_notes":{"type":"string"}},"required":["release_notes"]}'
           prompt: >
             Generate release notes for version ${{ inputs.tag }}.
             Read the file `changes.md` in the current directory which lists all PRs and commits
             included in this release. Use ONLY that content — do not look up additional
             history. Omit CI/workflow/internal tooling changes unless they affect end users.
-            Keep the tone concise and factual.
-            Write ONLY the release notes markdown to a file called `release-notes.md`
-            in the current directory. Do not output anything else.
+            Keep the tone concise and factual. Return the release notes as a markdown string
+            in the `release_notes` field.
 
       - name: Write release notes artifact
         run: |
           mkdir -p ${{ runner.temp }}/release-notes
-          if [ -f release-notes.md ]; then
-            cp release-notes.md ${{ runner.temp }}/release-notes/notes.md
-          else
-            echo "WARNING: release-notes.md not found in workspace root"
-            echo "Searching for it..."
-            found=$(find . -name release-notes.md -type f 2>/dev/null | head -1)
-            if [ -n "$found" ]; then
-              echo "Found at: $found"
-              cp "$found" ${{ runner.temp }}/release-notes/notes.md
-            else
-              echo "No release-notes.md found; writing placeholder"
-              echo "Release notes generation did not produce output." > ${{ runner.temp }}/release-notes/notes.md
-            fi
-          fi
+          echo '${{ steps.claude.outputs.structured_output }}' \
+            | jq -r '.release_notes // "Release notes generation did not produce output."' \
+            > ${{ runner.temp }}/release-notes/notes.md
 
       - uses: actions/upload-artifact@v7
         with:
