@@ -146,7 +146,7 @@ jobs:
 
       - name: Generate release notes via Claude
         id: claude
-        uses: anthropics/claude-code-base-action@v1
+        uses: anthropics/claude-code-base-action@main
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
         with:
