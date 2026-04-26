@@ -54,6 +54,8 @@ export type Principal =
       keyName: string;
       allowedProviders: string[];
       allowedModels: string[];
+      excludedProviders: string[];
+      excludedModels: string[];
       quotaName?: string | null;
       comment?: string | null;
     };
@@ -75,6 +77,8 @@ export async function verifyAdminKey(key: string): Promise<Principal | null> {
       keyName?: string;
       allowedProviders?: string[];
       allowedModels?: string[];
+      excludedProviders?: string[];
+      excludedModels?: string[];
       quotaName?: string | null;
       comment?: string | null;
     };
@@ -85,6 +89,8 @@ export async function verifyAdminKey(key: string): Promise<Principal | null> {
       keyName: body.keyName!,
       allowedProviders: body.allowedProviders ?? [],
       allowedModels: body.allowedModels ?? [],
+      excludedProviders: body.excludedProviders ?? [],
+      excludedModels: body.excludedModels ?? [],
       quotaName: body.quotaName ?? null,
       comment: body.comment ?? null,
     };
@@ -919,6 +925,8 @@ export interface KeyConfig {
   quota?: string; // Optional quota assignment
   allowedModels?: string[];
   allowedProviders?: string[];
+  excludedModels?: string[];
+  excludedProviders?: string[];
 }
 
 export type UsageSortField =

@@ -878,7 +878,9 @@ export class Dispatcher {
     // This method trusts that the policy is already clean.
     if (
       (!policy.allowedModels || policy.allowedModels.length === 0) &&
-      (!policy.allowedProviders || policy.allowedProviders.length === 0)
+      (!policy.allowedProviders || policy.allowedProviders.length === 0) &&
+      (!policy.excludedModels || policy.excludedModels.length === 0) &&
+      (!policy.excludedProviders || policy.excludedProviders.length === 0)
     ) {
       return null;
     }
@@ -901,23 +903,43 @@ export class Dispatcher {
     const policy = this.getKeyAccessPolicy(request);
     if (!policy) return candidates;
 
+    // Excluded models: block if the requested model is in the denylist
+    if (policy.excludedModels && policy.excludedModels.includes(request.model)) {
+      throw this.buildAccessDeniedError(
+        `Key is not allowed to access model '${request.model}' for ${apiType}`
+      );
+    }
+
+    // Allowed models: block if the requested model is NOT in the allowlist
     if (policy.allowedModels && !policy.allowedModels.includes(request.model)) {
       throw this.buildAccessDeniedError(
         `Key is not allowed to access model '${request.model}' for ${apiType}`
       );
     }
 
-    if (!policy.allowedProviders) {
-      return candidates;
+    // Excluded providers: filter out candidates on the denylist
+    let filtered = candidates;
+    if (policy.excludedProviders && policy.excludedProviders.length > 0) {
+      filtered = filtered.filter(
+        (candidate) => !policy.excludedProviders!.includes(candidate.provider)
+      );
+      if (filtered.length === 0) {
+        throw this.buildAccessDeniedError(
+          `Key is not allowed to access any provider configured for model '${request.model}'`
+        );
+      }
     }
 
-    const filtered = candidates.filter((candidate) =>
-      policy.allowedProviders!.includes(candidate.provider)
-    );
-    if (filtered.length === 0) {
-      throw this.buildAccessDeniedError(
-        `Key is not allowed to access any provider configured for model '${request.model}'`
+    // Allowed providers: filter candidates to only those on the allowlist
+    if (policy.allowedProviders && policy.allowedProviders.length > 0) {
+      filtered = filtered.filter((candidate) =>
+        policy.allowedProviders!.includes(candidate.provider)
       );
+      if (filtered.length === 0) {
+        throw this.buildAccessDeniedError(
+          `Key is not allowed to access any provider configured for model '${request.model}'`
+        );
+      }
     }
 
     return filtered;

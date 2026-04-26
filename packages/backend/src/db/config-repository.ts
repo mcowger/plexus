@@ -753,6 +753,8 @@ export class ConfigRepository {
     for (const row of rows) {
       const allowedModels = parseStringArray(row.allowedModels);
       const allowedProviders = parseStringArray(row.allowedProviders);
+      const excludedModels = parseStringArray(row.excludedModels);
+      const excludedProviders = parseStringArray(row.excludedProviders);
 
       result[row.name] = {
         secret: decrypt(row.secret),
@@ -760,6 +762,8 @@ export class ConfigRepository {
         ...(row.quotaName ? { quota: row.quotaName } : {}),
         ...(allowedModels ? { allowedModels } : {}),
         ...(allowedProviders ? { allowedProviders } : {}),
+        ...(excludedModels ? { excludedModels } : {}),
+        ...(excludedProviders ? { excludedProviders } : {}),
       };
     }
 
@@ -798,6 +802,8 @@ export class ConfigRepository {
     const row = rows[0]!;
     const allowedModels = parseStringArray(row.allowedModels);
     const allowedProviders = parseStringArray(row.allowedProviders);
+    const excludedModels = parseStringArray(row.excludedModels);
+    const excludedProviders = parseStringArray(row.excludedProviders);
 
     return {
       name: row.name,
@@ -807,6 +813,8 @@ export class ConfigRepository {
         ...(row.quotaName ? { quota: row.quotaName } : {}),
         ...(allowedModels ? { allowedModels } : {}),
         ...(allowedProviders ? { allowedProviders } : {}),
+        ...(excludedModels ? { excludedModels } : {}),
+        ...(excludedProviders ? { excludedProviders } : {}),
       },
     };
   }
@@ -833,6 +841,8 @@ export class ConfigRepository {
           quotaName: config.quota ?? null,
           allowedModels: stringifyStringArray(config.allowedModels),
           allowedProviders: stringifyStringArray(config.allowedProviders),
+          excludedModels: stringifyStringArray(config.excludedModels),
+          excludedProviders: stringifyStringArray(config.excludedProviders),
           updatedAt: timestamp,
         })
         .where(eq(schema.apiKeys.name, name));
@@ -847,6 +857,8 @@ export class ConfigRepository {
           quotaName: config.quota ?? null,
           allowedModels: stringifyStringArray(config.allowedModels),
           allowedProviders: stringifyStringArray(config.allowedProviders),
+          excludedModels: stringifyStringArray(config.excludedModels),
+          excludedProviders: stringifyStringArray(config.excludedProviders),
           createdAt: timestamp,
           updatedAt: timestamp,
         });

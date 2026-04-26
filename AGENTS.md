@@ -82,15 +82,14 @@ Backend tests run on **Vitest** with two parallel projects (sqlite + postgres) d
 | Setting | Value | Effect |
 |---------|-------|--------|
 | `pool` | `forks` | Each test file runs in a child process fork |
-| `isolate` | `false` | All files in one worker share the **same module registry** — no reset between files |
-| `maxWorkers` | `1` | One fork at a time (sequential files within each project) |
+| `isolate` | `true` | Each test file gets its own module registry — modules are re-imported fresh per file |
 | `mockReset` | `true` | `vi.resetAllMocks()` before every test — clears `vi.fn()` call history and resets implementations to original |
 | `clearMocks` | `true` | Clears call history (redundant with mockReset but explicit) |
 | `restoreMocks` | `true` | Restores `vi.spyOn` mocks to originals after every test |
 
 **Global setup:** `packages/backend/test/vitest.global-setup.ts` — creates a temporary DB, runs migrations once, cleans up after the run. Runs once total.
 
-**Per-file setup:** `packages/backend/test/vitest.setup.ts` — **runs once per test file** (even with `isolate: false`). Installs the logger mock and the `@mariozechner/pi-ai` mock.
+**Per-file setup:** `packages/backend/test/vitest.setup.ts` — **runs once per test file**. Installs the logger mock and the `@mariozechner/pi-ai` mock.
 
 **Rule 4 — Test shared mutable state through the system under test, not through direct mutation.**
 The `utils/logger` mock in `vitest.setup.ts` closes over a `currentLogLevel` variable that both the mock functions and route handlers share. Adding a competing `vi.mock` for the same path in a test file can bind different closures to different variables, causing silent mismatches. Tests for stateful behaviour (e.g., logging routes) must interact exclusively through the API/HTTP layer — never by calling `setCurrentLogLevel` or `getCurrentLogLevel` directly from test code.
@@ -135,14 +134,14 @@ This means the global mock's `complete: vi.fn(async () => ({...}))` is safe — 
 
 ### Singletons and test isolation
 
-Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `DebugManager`). Always reset them in `beforeEach`/`afterEach` using their provided `resetForTesting()` or equivalent methods. With `isolate: false`, a singleton left in a non-default state in one test leaks into every subsequent test in the same worker.
+Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `DebugManager`). Always reset them in `beforeEach`/`afterEach` using their provided `resetForTesting()` or equivalent methods. With `pool: forks` and `isolate: true`, singletons are re-initialized per file, but can still leak state between tests within the same file.
 
 ### Other rules
 - `packages/backend/bunfig.toml` blocks raw `bun test` — use `bun run test` / `bun run test:watch`
 - Root `bunfig.toml` blocks raw `bun test` at repo root — use `cd packages/backend && bun run test`
 - **Prefer `bun run test` (affected only) over `bun run test:force-all`.** The default test command uses `--changed HEAD` and runs only tests affected by uncommitted changes — use it unless you have a specific reason to run the full suite (e.g., verifying a cross-cutting refactor or diagnosing flakiness unrelated to your changes). Never reach for `test:force-all` out of habit.
 - If you must mock a module, implement its **full public interface**
-- Do not use `__mocks__` directories for node_modules mocks — they are not reliably loaded with `isolate: false` when the real module may already be cached
+- Do not use `__mocks__` directories for node_modules mocks — they are not reliably loaded by Vitest with `pool: forks`
 
 ---
 

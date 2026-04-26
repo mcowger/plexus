@@ -79,6 +79,8 @@ export type ThinkLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh
 export interface KeyAccessPolicy {
   allowedModels?: string[];
   allowedProviders?: string[];
+  excludedModels?: string[];
+  excludedProviders?: string[];
 }
 
 // Unified Request

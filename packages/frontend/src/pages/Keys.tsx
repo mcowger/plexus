@@ -271,7 +271,11 @@ export const Keys = () => {
       (k.comment && k.comment.toLowerCase().includes(search.toLowerCase())) ||
       (k.quota && k.quota.toLowerCase().includes(search.toLowerCase())) ||
       k.allowedModels?.some((model) => model.toLowerCase().includes(search.toLowerCase())) ||
-      k.allowedProviders?.some((provider) => provider.toLowerCase().includes(search.toLowerCase()))
+      k.allowedProviders?.some((provider) =>
+        provider.toLowerCase().includes(search.toLowerCase())
+      ) ||
+      k.excludedModels?.some((model) => model.toLowerCase().includes(search.toLowerCase())) ||
+      k.excludedProviders?.some((provider) => provider.toLowerCase().includes(search.toLowerCase()))
   );
 
   const filteredQuotas = Object.entries(quotas).filter(([name]) =>
@@ -698,6 +702,22 @@ export const Keys = () => {
           />
 
           <TagSelect
+            label="Excluded Model Aliases"
+            placeholder="Optional: select model aliases to exclude..."
+            options={aliasIds}
+            selected={editingKey.excludedModels || []}
+            onChange={(excludedModels) =>
+              setEditingKey({
+                ...editingKey,
+                excludedModels: excludedModels.length > 0 ? excludedModels : undefined,
+              })
+            }
+          />
+          <p className="text-xs text-text-muted -mt-1">
+            Optional denylist. If set, this key cannot use these model aliases.
+          </p>
+
+          <TagSelect
             label="Allowed Model Aliases"
             placeholder="Optional: select model aliases..."
             options={aliasIds}
@@ -711,6 +731,22 @@ export const Keys = () => {
           />
           <p className="text-xs text-text-muted -mt-1">
             Optional allowlist. If set, this key can only use these configured model aliases.
+          </p>
+
+          <TagSelect
+            label="Excluded Providers"
+            placeholder="Optional: select providers to exclude..."
+            options={providerIds}
+            selected={editingKey.excludedProviders || []}
+            onChange={(excludedProviders) =>
+              setEditingKey({
+                ...editingKey,
+                excludedProviders: excludedProviders.length > 0 ? excludedProviders : undefined,
+              })
+            }
+          />
+          <p className="text-xs text-text-muted -mt-1">
+            Optional denylist. If set, routing will not use these provider IDs.
           </p>
 
           <TagSelect
@@ -750,7 +786,8 @@ export const Keys = () => {
               ))}
             </select>
             <p className="text-xs text-text-muted">
-              Optional: assign a quota to this key. Allowlist checks run before and during routing.
+              Optional: assign a quota to this key. Allowlist/denylist checks run before and during
+              routing.
             </p>
           </div>
         </div>

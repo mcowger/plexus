@@ -460,4 +460,104 @@ describe('Dispatcher Failover', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
+
+  test('provider denylist filters out excluded providers', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock.mockImplementation(async () => successChatResponse('model-1'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch({
+      ...makeChatRequest(),
+      metadata: {
+        plexus_metadata: {
+          plexus_key_policy: {
+            excludedProviders: ['p1'],
+          },
+        },
+      },
+    });
+    const meta = (response as any).plexus;
+
+    expect(meta?.attemptCount).toBe(1);
+    expect(meta?.finalAttemptProvider).toBe('p2');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String((fetchMock as any).mock.calls[0]?.[0])).toContain('p2.example.com');
+  });
+
+  test('model denylist blocks excluded aliases with 403 before fetch', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+
+    const dispatcher = new Dispatcher();
+
+    await expect(
+      dispatcher.dispatch({
+        ...makeChatRequest(),
+        metadata: {
+          plexus_metadata: {
+            plexus_key_policy: {
+              excludedModels: ['test-alias'],
+            },
+          },
+        },
+      })
+    ).rejects.toMatchObject({
+      message: "Key is not allowed to access model 'test-alias' for chat",
+      routingContext: {
+        statusCode: 403,
+        errorType: 'access_denied',
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  test('excluded models take precedence over allowed models for the same entry', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+
+    const dispatcher = new Dispatcher();
+
+    // If a model is in both allowed AND excluded lists, excluded wins
+    await expect(
+      dispatcher.dispatch({
+        ...makeChatRequest(),
+        metadata: {
+          plexus_metadata: {
+            plexus_key_policy: {
+              allowedModels: ['test-alias'],
+              excludedModels: ['test-alias'],
+            },
+          },
+        },
+      })
+    ).rejects.toMatchObject({
+      routingContext: {
+        statusCode: 403,
+        errorType: 'access_denied',
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
+  test('excluded providers filter out candidates, then allowed providers further restrict', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock.mockImplementation(async () => successChatResponse('model-2'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch({
+      ...makeChatRequest(),
+      metadata: {
+        plexus_metadata: {
+          plexus_key_policy: {
+            excludedProviders: ['p1'],
+            allowedProviders: ['p2'],
+          },
+        },
+      },
+    });
+    const meta = (response as any).plexus;
+
+    expect(meta?.attemptCount).toBe(1);
+    expect(meta?.finalAttemptProvider).toBe('p2');
+  });
 });
