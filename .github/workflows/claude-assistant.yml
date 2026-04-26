@@ -21,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          token: ${{ secrets.REPO_SUPER_TOKEN }}
           ref: ${{ github.event.pull_request.head.ref || '' }}
           fetch-depth: 0
 
