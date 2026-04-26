@@ -65,16 +65,15 @@ async function tableExists(
   const dialect = getCurrentDialect();
   try {
     if (dialect === 'sqlite') {
-      const rows = await db.run(
+      const rows = (await db.execute(
         sql`SELECT name FROM sqlite_master WHERE type='table' AND name=${tableName}`
-      );
-      const result = rows as any;
-      return (result?.rows?.length ?? result?.length ?? 0) > 0;
+      )) as any[];
+      return rows.length > 0;
     } else {
-      const rows = await db.execute(
+      const rows = (await db.execute(
         sql`SELECT 1 FROM information_schema.tables WHERE table_name=${tableName} LIMIT 1`
-      );
-      return (rows as any[]).length > 0;
+      )) as any[];
+      return rows.length > 0;
     }
   } catch {
     return false;
