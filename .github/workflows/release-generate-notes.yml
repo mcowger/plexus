@@ -163,7 +163,20 @@ jobs:
       - name: Write release notes artifact
         run: |
           mkdir -p ${{ runner.temp }}/release-notes
-          cp release-notes.md ${{ runner.temp }}/release-notes/notes.md
+          if [ -f release-notes.md ]; then
+            cp release-notes.md ${{ runner.temp }}/release-notes/notes.md
+          else
+            echo "WARNING: release-notes.md not found in workspace root"
+            echo "Searching for it..."
+            found=$(find . -name release-notes.md -type f 2>/dev/null | head -1)
+            if [ -n "$found" ]; then
+              echo "Found at: $found"
+              cp "$found" ${{ runner.temp }}/release-notes/notes.md
+            else
+              echo "No release-notes.md found; writing placeholder"
+              echo "Release notes generation did not produce output." > ${{ runner.temp }}/release-notes/notes.md
+            fi
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
