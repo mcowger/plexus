@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { RefreshCw, Cpu, Gauge, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Cpu, Gauge, AlertTriangle, DatabaseZap } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../lib/api';
 import { Card } from '../components/ui/Card';
@@ -16,6 +16,13 @@ export const Quotas = () => {
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
+  const [legacyRowCount, setLegacyRowCount] = useState<number | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{
+    inserted: number;
+    skipped: number;
+    totalSource: number;
+  } | null>(null);
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -29,6 +36,25 @@ export const Quotas = () => {
     const interval = setInterval(fetchQuotas, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    api.getLegacySnapshotStatus().then((status) => {
+      if (status?.tableExists && status.rowCount > 0) {
+        setLegacyRowCount(status.rowCount);
+      }
+    });
+  }, []);
+
+  const handleMigrate = async () => {
+    setMigrating(true);
+    const result = await api.migrateLegacySnapshots();
+    setMigrating(false);
+    if (result) {
+      setMigrationResult(result);
+      setLegacyRowCount(null);
+      fetchQuotas();
+    }
+  };
 
   const handleRefresh = async (checkerId: string) => {
     setRefreshing((prev) => new Set(prev).add(checkerId));
@@ -122,6 +148,45 @@ export const Quotas = () => {
           </Button>
         }
       />
+
+      {legacyRowCount !== null && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <DatabaseZap size={16} className="mt-0.5 shrink-0 text-amber-400" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-300">
+              Legacy quota data detected ({legacyRowCount.toLocaleString()} row
+              {legacyRowCount !== 1 ? 's' : ''} in{' '}
+              <code className="font-mono">quota_snapshots</code>)
+            </p>
+            <p className="mt-0.5 text-text-secondary">
+              Migrate this historical data into the new meter snapshots table to preserve it.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            isLoading={migrating}
+            onClick={handleMigrate}
+            leftIcon={<DatabaseZap size={13} />}
+          >
+            Migrate now
+          </Button>
+        </div>
+      )}
+
+      {migrationResult !== null && (
+        <div className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm">
+          <DatabaseZap size={16} className="shrink-0 text-green-400" />
+          <p className="text-green-300">
+            Migration complete — {migrationResult.inserted.toLocaleString()} row
+            {migrationResult.inserted !== 1 ? 's' : ''} inserted
+            {migrationResult.skipped > 0
+              ? `, ${migrationResult.skipped.toLocaleString()} already existed`
+              : ''}
+            .
+          </p>
+        </div>
+      )}
 
       {loading && quotas.length === 0 ? (
         <div className="flex items-center justify-center h-64 gap-3">

@@ -2,6 +2,10 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
+import {
+  getLegacySnapshotStatus,
+  migrateLegacySnapshots,
+} from '../../services/quota/legacy-snapshot-migrator';
 
 function getOAuthMetadata(checkerId: string) {
   const quotaConfig = getConfig().quotas?.find((q) => q.id === checkerId);
@@ -102,6 +106,25 @@ export async function registerQuotaRoutes(
         `Failed to get quota history for '${(request.params as any).checkerId}': ${error}`
       );
       return reply.status(500).send({ error: 'Failed to retrieve quota history' });
+    }
+  });
+
+  fastify.get('/v0/management/quotas/legacy-snapshot-status', async (_request, reply) => {
+    try {
+      return await getLegacySnapshotStatus();
+    } catch (error) {
+      logger.error(`Failed to get legacy snapshot status: ${error}`);
+      return reply.status(500).send({ error: 'Failed to get legacy snapshot status' });
+    }
+  });
+
+  fastify.post('/v0/management/quotas/migrate-legacy-snapshots', async (_request, reply) => {
+    try {
+      const result = await migrateLegacySnapshots();
+      return result;
+    } catch (error) {
+      logger.error(`Failed to migrate legacy snapshots: ${error}`);
+      return reply.status(500).send({ error: 'Failed to migrate legacy snapshots' });
     }
   });
 
