@@ -100,6 +100,48 @@ function makeWebpVP8X(width: number, height: number): Buffer {
   return buf;
 }
 
+function makeWebpVP8(width: number, height: number): Buffer {
+  // RIFF .... WEBP VP8 <size> <frame-tag-3B> <start-code-3B> <14-bit w/h packed LE>
+  const buf = Buffer.alloc(30);
+  buf.write('RIFF', 0, 'ascii');
+  buf.writeUInt32LE(22, 4);
+  buf.write('WEBP', 8, 'ascii');
+  buf.write('VP8 ', 12, 'ascii');
+  buf.writeUInt32LE(10, 16); // chunk size
+  // bytes 20..23: frame tag (3) + start code byte
+  buf[20] = 0;
+  buf[21] = 0;
+  buf[22] = 0;
+  buf[23] = 0x9d; // start code
+  buf[24] = 0x01;
+  buf[25] = 0x2a;
+  // width and height each occupy 14 bits at offsets 26 and 28 (LE).
+  buf.writeUInt16LE(width & 0x3fff, 26);
+  buf.writeUInt16LE(height & 0x3fff, 28);
+  return buf;
+}
+
+function makeWebpVP8L(width: number, height: number): Buffer {
+  // RIFF .... WEBP VP8L <size> 0x2f <14+14 bit packed dims (each minus 1)>.
+  // Padded to 30 bytes (the parser's minimum WebP buffer length).
+  const buf = Buffer.alloc(30);
+  buf.write('RIFF', 0, 'ascii');
+  buf.writeUInt32LE(22, 4);
+  buf.write('WEBP', 8, 'ascii');
+  buf.write('VP8L', 12, 'ascii');
+  buf.writeUInt32LE(10, 16); // chunk size
+  buf[20] = 0x2f; // VP8L signature
+  const w = width - 1;
+  const h = height - 1;
+  // 14 bits of width: low 8 in b0, high 6 in low 6 of b1
+  buf[21] = w & 0xff;
+  buf[22] = ((w >> 8) & 0x3f) | ((h & 0x03) << 6);
+  // 14 bits of height: low 2 already in top of b1, next 8 in b2, top 4 in low 4 of b3
+  buf[23] = (h >> 2) & 0xff;
+  buf[24] = (h >> 10) & 0x0f;
+  return buf;
+}
+
 function dataUri(mime: string, bytes: Buffer): string {
   return `data:${mime};base64,${bytes.toString('base64')}`;
 }
@@ -158,6 +200,26 @@ describe('getImageDimensionsFromBuffer', () => {
       width: 2000,
       height: 1500,
     });
+  });
+
+  test('WebP (VP8 lossy)', () => {
+    expect(getImageDimensionsFromBuffer(makeWebpVP8(640, 480))).toEqual({
+      width: 640,
+      height: 480,
+    });
+  });
+
+  test('WebP (VP8L lossless)', () => {
+    expect(getImageDimensionsFromBuffer(makeWebpVP8L(800, 600))).toEqual({
+      width: 800,
+      height: 600,
+    });
+  });
+
+  test('WebP (VP8L) rejects buffer with wrong signature byte', () => {
+    const buf = makeWebpVP8L(800, 600);
+    buf[20] = 0x00; // corrupt the VP8L signature (should be 0x2f)
+    expect(getImageDimensionsFromBuffer(buf)).toBeNull();
   });
 
   test('returns null on too-small buffer', () => {
@@ -345,5 +407,31 @@ describe('estimateInputTokens — image accounting', () => {
     const total = estimateInputTokens(body, 'chat');
     // Should be in the low thousands at most, NOT hundreds of thousands.
     expect(total).toBeLessThan(5_000);
+  });
+
+  test('Anthropic messages: non-string non-array system field is JSON-counted, not String()-coerced', () => {
+    // A misshapen `system` (object instead of string/array) used to be coerced
+    // to "[object Object]" via String(). The walker should now JSON-stringify
+    // and tokenize the actual content.
+    const systemObj = { instructions: 'You are a helpful assistant with a long system prompt.' };
+    const body = {
+      messages: [{ role: 'user', content: 'hi' }],
+      system: systemObj,
+    };
+    const total = estimateInputTokens(body, 'messages');
+    // The instruction string alone is ~10 tokens. "[object Object]" would be ~5.
+    expect(total).toBeGreaterThan(8);
+  });
+
+  test('walker fallback on unexpected shape uses stringify path, never silently 0', () => {
+    // Pass an object that the walker cannot interpret; the catch-block fallback
+    // should still produce a non-zero conservative estimate so enforcement
+    // doesn't silently let an oversized request through.
+    const garbage: any = {};
+    const big = 'x'.repeat(2000);
+    // Inject a circular-ish nested shape that still serializes:
+    garbage.messages = [{ role: 'user', content: { weird: { nested: big } } }];
+    const total = estimateInputTokens(garbage, 'chat');
+    expect(total).toBeGreaterThan(0);
   });
 });

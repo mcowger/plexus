@@ -201,7 +201,7 @@ export function getImageDimensionsFromBuffer(bytes: Buffer): ImageDimensions | n
       const h = bytes.readUInt16LE(28) & 0x3fff;
       return { width: w, height: h };
     }
-    if (chunk === 'VP8L' && bytes.length >= 25) {
+    if (chunk === 'VP8L' && bytes.length >= 25 && bytes.readUInt8(20) === 0x2f) {
       // Lossless: signature 0x2f at offset 20, then 14+14 bits packed.
       const b0 = bytes.readUInt8(21);
       const b1 = bytes.readUInt8(22);
@@ -482,7 +482,7 @@ export function estimateInputTokens(originalBody: any, apiType: string): number 
         if (originalBody.system != null) {
           total += Array.isArray(originalBody.system)
             ? walkAnthropicContent(originalBody.system)
-            : estimateTokens(String(originalBody.system));
+            : tokensForStringOrJson(originalBody.system);
         }
         if (originalBody.tools) total += tokensForStringOrJson(originalBody.tools);
         break;
@@ -542,8 +542,15 @@ export function estimateInputTokens(originalBody: any, apiType: string): number 
 
     return total;
   } catch (err) {
-    logger.error('Failed to estimate input tokens:', err);
-    return 0;
+    // Walker hit unexpected shape — fall back to the legacy stringify path
+    // so enforcement still gets a conservative estimate. Returning 0 here
+    // would let an oversized request slip past enforce-limits.
+    logger.error('Failed to estimate input tokens, falling back to stringify:', err);
+    try {
+      return estimateTokens(JSON.stringify(originalBody));
+    } catch {
+      return 0;
+    }
   }
 }
 
