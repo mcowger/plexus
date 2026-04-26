@@ -12,6 +12,7 @@ permissions:
   issues: write
   pull-requests: write
   actions: read
+  workflows: write
 
 jobs:
   claude-agent:
