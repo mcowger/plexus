@@ -25,7 +25,14 @@ export interface FixtureRecord {
 /**
  * Headers that vary between runs and should not affect fixture matching.
  */
-const SKIP_HEADERS = new Set(['x-request-id', 'cf-ray', 'date', 'set-cookie']);
+const SKIP_HEADERS = new Set([
+  'x-request-id',
+  'cf-ray',
+  'date',
+  'set-cookie',
+  'authorization',
+  'x-api-key',
+]);
 
 /**
  * Remove headers that vary between recording and replay sessions

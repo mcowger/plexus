@@ -31,15 +31,10 @@ export async function runRecorder(
 
   await server.start();
 
-  const rule = await server.anyRequest().thenPassThrough({
-    // Strip the Authorization header from fixtures to avoid committing API keys.
-    beforeRequest: (req) => ({
-      headers: {
-        ...req.headers,
-        authorization: 'Bearer REDACTED',
-      },
-    }),
-  });
+  // Auth headers (authorization, x-api-key) are stripped by normalizeHeaders
+  // when recording fixtures, so the proxy can pass real keys through to
+  // upstream APIs without them ever appearing in fixture files.
+  const rule = await server.anyRequest().thenPassThrough();
 
   try {
     await driveTraffic(server.url);
