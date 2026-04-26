@@ -10,7 +10,7 @@ on:
       tag:
         required: true
         type: string
-        description: "The release tag to publish (must already exist)"
+        description: "The release tag to publish (will be created on HEAD of main if it doesn't exist)"
 
 jobs:
   setup:
