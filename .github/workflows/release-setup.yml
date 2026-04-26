@@ -15,6 +15,8 @@ jobs:
   setup:
     name: Setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       tag: ${{ steps.release_tag.outputs.tag }}
     steps:
@@ -23,8 +25,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get tag from ref
+      - name: Get tag from ref and create if missing
         id: release_tag
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
+
+          # If the tag doesn't exist, create it on HEAD of main
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG does not exist, creating it on main"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
