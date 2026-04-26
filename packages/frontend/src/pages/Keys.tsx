@@ -702,38 +702,6 @@ export const Keys = () => {
           />
 
           <TagSelect
-            label="Allowed Model Aliases"
-            placeholder="Optional: select model aliases..."
-            options={aliasIds}
-            selected={editingKey.allowedModels || []}
-            onChange={(allowedModels) =>
-              setEditingKey({
-                ...editingKey,
-                allowedModels: allowedModels.length > 0 ? allowedModels : undefined,
-              })
-            }
-          />
-          <p className="text-xs text-text-muted -mt-1">
-            Optional allowlist. If set, this key can only use these configured model aliases.
-          </p>
-
-          <TagSelect
-            label="Allowed Providers"
-            placeholder="Optional: select providers..."
-            options={providerIds}
-            selected={editingKey.allowedProviders || []}
-            onChange={(allowedProviders) =>
-              setEditingKey({
-                ...editingKey,
-                allowedProviders: allowedProviders.length > 0 ? allowedProviders : undefined,
-              })
-            }
-          />
-          <p className="text-xs text-text-muted -mt-1">
-            Optional allowlist. If set, routing is limited to these provider IDs.
-          </p>
-
-          <TagSelect
             label="Excluded Model Aliases"
             placeholder="Optional: select model aliases to exclude..."
             options={aliasIds}
@@ -750,6 +718,22 @@ export const Keys = () => {
           </p>
 
           <TagSelect
+            label="Allowed Model Aliases"
+            placeholder="Optional: select model aliases..."
+            options={aliasIds}
+            selected={editingKey.allowedModels || []}
+            onChange={(allowedModels) =>
+              setEditingKey({
+                ...editingKey,
+                allowedModels: allowedModels.length > 0 ? allowedModels : undefined,
+              })
+            }
+          />
+          <p className="text-xs text-text-muted -mt-1">
+            Optional allowlist. If set, this key can only use these configured model aliases.
+          </p>
+
+          <TagSelect
             label="Excluded Providers"
             placeholder="Optional: select providers to exclude..."
             options={providerIds}
@@ -763,6 +747,22 @@ export const Keys = () => {
           />
           <p className="text-xs text-text-muted -mt-1">
             Optional denylist. If set, routing will not use these provider IDs.
+          </p>
+
+          <TagSelect
+            label="Allowed Providers"
+            placeholder="Optional: select providers..."
+            options={providerIds}
+            selected={editingKey.allowedProviders || []}
+            onChange={(allowedProviders) =>
+              setEditingKey({
+                ...editingKey,
+                allowedProviders: allowedProviders.length > 0 ? allowedProviders : undefined,
+              })
+            }
+          />
+          <p className="text-xs text-text-muted -mt-1">
+            Optional allowlist. If set, routing is limited to these provider IDs.
           </p>
 
           <div className="flex flex-col gap-2">
