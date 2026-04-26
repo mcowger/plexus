@@ -70,6 +70,16 @@ async function selectAll(db: ReturnType<typeof getDatabase>, query: SQL): Promis
   return (await (db as any).execute(query)) as any[];
 }
 
+// bun-sqlite uses db.run() for DML; postgres-js uses db.execute().
+async function runStatement(db: ReturnType<typeof getDatabase>, query: SQL): Promise<void> {
+  const dialect = getCurrentDialect();
+  if (dialect === 'sqlite') {
+    (db as any).run(query);
+  } else {
+    await (db as any).execute(query);
+  }
+}
+
 // ─── Table existence / row count ─────────────────────────────────────────────
 
 async function tableExists(
@@ -192,38 +202,38 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
       };
 
       try {
-        if (dialect === 'sqlite') {
-          await db.execute(sql`
-            INSERT OR IGNORE INTO meter_snapshots
-              (checker_id, checker_type, provider, meter_key, kind, unit, label,
-               "group", scope, "limit", used, remaining, utilization_state,
-               utilization_percent, status, period_value, period_unit, period_cycle,
-               resets_at, success, error_message, checked_at, created_at)
-            VALUES
-              (${v.checkerId}, ${v.checkerType}, ${v.provider}, ${v.meterKey},
-               ${v.kind}, ${v.unit}, ${v.label}, ${v.group}, ${v.scope},
-               ${v.limit}, ${v.used}, ${v.remaining}, ${v.utilizationState},
-               ${v.utilizationPercent}, ${v.status}, ${v.periodValue}, ${v.periodUnit},
-               ${v.periodCycle}, ${v.resetsAt}, ${v.success}, ${v.errorMessage},
-               ${v.checkedAt}, ${v.createdAt})
-          `);
-        } else {
-          await db.execute(sql`
-            INSERT INTO meter_snapshots
-              (checker_id, checker_type, provider, meter_key, kind, unit, label,
-               "group", scope, "limit", used, remaining, utilization_state,
-               utilization_percent, status, period_value, period_unit, period_cycle,
-               resets_at, success, error_message, checked_at, created_at)
-            VALUES
-              (${v.checkerId}, ${v.checkerType}, ${v.provider}, ${v.meterKey},
-               ${v.kind}, ${v.unit}, ${v.label}, ${v.group}, ${v.scope},
-               ${v.limit}, ${v.used}, ${v.remaining}, ${v.utilizationState},
-               ${v.utilizationPercent}, ${v.status}, ${v.periodValue}, ${v.periodUnit},
-               ${v.periodCycle}, ${v.resetsAt}, ${v.success}, ${v.errorMessage},
-               ${v.checkedAt}, ${v.createdAt})
-            ON CONFLICT DO NOTHING
-          `);
-        }
+        const insertSql =
+          dialect === 'sqlite'
+            ? sql`
+                INSERT OR IGNORE INTO meter_snapshots
+                  (checker_id, checker_type, provider, meter_key, kind, unit, label,
+                   "group", scope, "limit", used, remaining, utilization_state,
+                   utilization_percent, status, period_value, period_unit, period_cycle,
+                   resets_at, success, error_message, checked_at, created_at)
+                VALUES
+                  (${v.checkerId}, ${v.checkerType}, ${v.provider}, ${v.meterKey},
+                   ${v.kind}, ${v.unit}, ${v.label}, ${v.group}, ${v.scope},
+                   ${v.limit}, ${v.used}, ${v.remaining}, ${v.utilizationState},
+                   ${v.utilizationPercent}, ${v.status}, ${v.periodValue}, ${v.periodUnit},
+                   ${v.periodCycle}, ${v.resetsAt}, ${v.success}, ${v.errorMessage},
+                   ${v.checkedAt}, ${v.createdAt})
+              `
+            : sql`
+                INSERT INTO meter_snapshots
+                  (checker_id, checker_type, provider, meter_key, kind, unit, label,
+                   "group", scope, "limit", used, remaining, utilization_state,
+                   utilization_percent, status, period_value, period_unit, period_cycle,
+                   resets_at, success, error_message, checked_at, created_at)
+                VALUES
+                  (${v.checkerId}, ${v.checkerType}, ${v.provider}, ${v.meterKey},
+                   ${v.kind}, ${v.unit}, ${v.label}, ${v.group}, ${v.scope},
+                   ${v.limit}, ${v.used}, ${v.remaining}, ${v.utilizationState},
+                   ${v.utilizationPercent}, ${v.status}, ${v.periodValue}, ${v.periodUnit},
+                   ${v.periodCycle}, ${v.resetsAt}, ${v.success}, ${v.errorMessage},
+                   ${v.checkedAt}, ${v.createdAt})
+                ON CONFLICT DO NOTHING
+              `;
+        await runStatement(db, insertSql);
         inserted++;
       } catch (err) {
         logger.warn(
@@ -339,9 +349,9 @@ export async function truncateLegacySnapshots(): Promise<void> {
 
   // SQLite has no TRUNCATE statement; DELETE FROM is equivalent.
   if (dialect === 'sqlite') {
-    await db.execute(sql`DELETE FROM quota_snapshots`);
+    await runStatement(db, sql`DELETE FROM quota_snapshots`);
   } else {
-    await db.execute(sql`TRUNCATE TABLE quota_snapshots`);
+    await runStatement(db, sql`TRUNCATE TABLE quota_snapshots`);
   }
 
   logger.info('[legacy-migrator] quota_snapshots truncated.');
