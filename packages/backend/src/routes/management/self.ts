@@ -67,6 +67,8 @@ export async function registerSelfRoutes(fastify: FastifyInstance, quotaEnforcer
       keyName: principal.keyName,
       allowedProviders: principal.allowedProviders,
       allowedModels: principal.allowedModels,
+      excludedProviders: principal.excludedProviders,
+      excludedModels: principal.excludedModels,
       quotaName: principal.quotaName ?? null,
       comment: keyRow?.comment ?? principal.comment ?? null,
       traceEnabled: DebugManager.getInstance().isEnabledForKey(principal.keyName),

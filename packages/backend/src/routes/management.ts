@@ -60,6 +60,8 @@ export async function registerManagementRoutes(
         keyName: p.keyName,
         allowedProviders: p.allowedProviders,
         allowedModels: p.allowedModels,
+        excludedProviders: p.excludedProviders,
+        excludedModels: p.excludedModels,
         quotaName: p.quotaName ?? null,
         comment: p.comment ?? null,
       });

@@ -31,6 +31,8 @@ export type Principal =
       keyName: string;
       allowedProviders: string[];
       allowedModels: string[];
+      excludedProviders: string[];
+      excludedModels: string[];
       quotaName?: string | null;
       comment?: string | null;
     };
@@ -94,6 +96,8 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
     const cfg = matched.cfg as {
       allowedProviders?: string[];
       allowedModels?: string[];
+      excludedProviders?: string[];
+      excludedModels?: string[];
       quota?: string | null;
       comment?: string | null;
     };
@@ -102,6 +106,8 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
       keyName: matched.name,
       allowedProviders: cfg.allowedProviders ?? [],
       allowedModels: cfg.allowedModels ?? [],
+      excludedProviders: cfg.excludedProviders ?? [],
+      excludedModels: cfg.excludedModels ?? [],
       quotaName: cfg.quota ?? null,
       comment: cfg.comment ?? null,
     };

@@ -555,6 +555,8 @@ export const KeyConfigSchema = z.object({
   quota: z.string().optional(), // References a quota definition name
   allowedModels: z.array(z.string().min(1)).optional(),
   allowedProviders: z.array(z.string().min(1)).optional(),
+  excludedModels: z.array(z.string().min(1)).optional(),
+  excludedProviders: z.array(z.string().min(1)).optional(),
 });
 
 const QuotaConfigSchema = z.object({

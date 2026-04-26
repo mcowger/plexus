@@ -11,6 +11,8 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
     | {
         allowedModels?: string[];
         allowedProviders?: string[];
+        excludedModels?: string[];
+        excludedProviders?: string[];
       }
     | undefined;
 
@@ -20,10 +22,16 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
   const allowedProviders = keyConfig?.allowedProviders
     ?.map((entry) => entry.trim())
     .filter(Boolean);
+  const excludedModels = keyConfig?.excludedModels?.map((entry) => entry.trim()).filter(Boolean);
+  const excludedProviders = keyConfig?.excludedProviders
+    ?.map((entry) => entry.trim())
+    .filter(Boolean);
 
   if (
     (!allowedModels || allowedModels.length === 0) &&
-    (!allowedProviders || allowedProviders.length === 0)
+    (!allowedProviders || allowedProviders.length === 0) &&
+    (!excludedModels || excludedModels.length === 0) &&
+    (!excludedProviders || excludedProviders.length === 0)
   ) {
     return unifiedRequest;
   }
@@ -37,6 +45,8 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
         plexus_key_policy: {
           ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
           ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
+          ...(excludedModels && excludedModels.length > 0 ? { excludedModels } : {}),
+          ...(excludedProviders && excludedProviders.length > 0 ? { excludedProviders } : {}),
         },
       },
     },
