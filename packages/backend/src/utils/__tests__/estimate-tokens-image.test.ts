@@ -299,6 +299,35 @@ describe('estimateImageTokens', () => {
   test('OpenAI (chat) external URL uses conservative default', () => {
     expect(estimateImageTokens({ url: 'https://x.com/y.png' }, 'chat')).toBe(1100);
   });
+
+  test('OpenAI (chat) detail=auto picks low for small images (<= 512x512)', () => {
+    expect(
+      estimateImageTokens(
+        { dataUri: dataUri('image/png', makePng(400, 400)), detail: 'auto' },
+        'chat'
+      )
+    ).toBe(85);
+  });
+
+  test('OpenAI (chat) detail=auto picks high for large images (> 512x512)', () => {
+    expect(
+      estimateImageTokens(
+        { dataUri: dataUri('image/png', makePng(1024, 1024)), detail: 'auto' },
+        'chat'
+      )
+    ).toBe(765);
+  });
+
+  test('OpenAI (chat) unknown detail value falls through to high (over-count, safe for enforcement)', () => {
+    // Anything we don't recognize ('medium', '', etc.) takes the tile-based
+    // path so we err on the side of rejecting borderline-oversized requests.
+    expect(
+      estimateImageTokens(
+        { dataUri: dataUri('image/png', makePng(1024, 1024)), detail: 'medium' as any },
+        'chat'
+      )
+    ).toBe(765);
+  });
 });
 
 // ---------- structural walker: image + text in each format ----------

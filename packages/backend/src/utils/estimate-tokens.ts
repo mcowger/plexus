@@ -288,7 +288,8 @@ export function getImageDimensionsFromBuffer(bytes: Buffer): ImageDimensions | n
         (marker >= 0xc5 && marker <= 0xc7) ||
         (marker >= 0xc9 && marker <= 0xcb) ||
         (marker >= 0xcd && marker <= 0xcf);
-      if (isSOF && i + 7 < bytes.length) {
+      // height occupies i+3..i+4, width occupies i+5..i+6 — last index read is i+6.
+      if (isSOF && i + 6 < bytes.length) {
         return {
           height: bytes.readUInt16BE(i + 3),
           width: bytes.readUInt16BE(i + 5),
@@ -339,9 +340,16 @@ function claudeImageTokens(image: NormalizedImage): number {
 }
 
 function openaiImageTokens(image: NormalizedImage): number {
+  // OpenAI's vision API accepts detail: 'low' | 'high' | 'auto' (default).
+  // 'auto' picks low for small images and high otherwise; anything else we
+  // don't recognize gets treated as 'high' so we over-count rather than
+  // under-count for enforcement purposes.
   if (image.detail === 'low') return OPENAI_LOW_DETAIL_TOKENS;
   const dims = dimensionsFor(image);
   if (!dims || dims.width <= 0 || dims.height <= 0) return OPENAI_DEFAULT_IMAGE_TOKENS;
+  if (image.detail === 'auto' && dims.width <= 512 && dims.height <= 512) {
+    return OPENAI_LOW_DETAIL_TOKENS;
+  }
 
   // Fit within 2048×2048 preserving aspect.
   let { width, height } = dims;
