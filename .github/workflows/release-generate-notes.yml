@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.REPO_SUPER_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Get previous release tag
@@ -49,114 +49,60 @@ jobs:
             echo "prev_sha=$(git rev-parse "${PREV_TAG}^{}")" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Gather PR and commit info between tags
-        id: pr_info
+      - name: Gather commits and PR info
+        id: commits
         uses: actions/github-script@v9
         with:
           script: |
-            const prevTag = '${{ steps.prev_tag.outputs.tag }}';
-            const currentTag = '${{ steps.prev_tag.outputs.current_tag }}';
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+            const { data: comparison } = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: '${{ steps.prev_tag.outputs.tag }}',
+              head: '${{ steps.prev_tag.outputs.current_tag }}'
+            });
 
-            const { execSync } = require('child_process');
-            let commits;
-            try {
-              const prevDate = execSync(`git log -1 --format=%ci '${prevTag}'`, { encoding: 'utf8' }).trim();
-              const currentDate = execSync(`git log -1 --format=%ci '${currentTag}'`, { encoding: 'utf8' }).trim();
-              commits = execSync(`git log --since='${prevDate}' --until='${currentDate}' --pretty=format:'%H'`, { encoding: 'utf8' }).trim().split('\n');
-            } catch (e) {
-              commits = [];
+            const results = [];
+            for (const commit of comparison.commits) {
+              const sha = commit.sha;
+              const fullMessage = commit.commit.message;
+              const shortMessage = fullMessage.split('\n')[0];
+              const author = commit.commit.author.name;
+              const date = commit.commit.author.date;
+              const url = commit.html_url;
+
+              const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: sha
+              });
+
+              const pr = prs[0] ? {
+                number: prs[0].number,
+                title: prs[0].title,
+                body: prs[0].body,
+                url: prs[0].html_url,
+                author: prs[0].user?.login,
+                labels: prs[0].labels?.map(l => l.name) || [],
+                merged_at: prs[0].merged_at
+              } : null;
+
+              results.push({ sha, fullMessage, shortMessage, author, date, url, pr });
             }
 
-            if (commits.length === 0 || (commits.length === 1 && commits[0] === '')) {
-              core.setOutput('pr_summary', 'No commits found between tags.');
-              return;
-            }
-
-            const prMap = new Map();
-            const standaloneCommits = [];
-
-            for (const sha of commits) {
-              try {
-                const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                  owner, repo, commit_sha: sha
-                });
-                if (prs.length > 0) {
-                  const pr = prs[0];
-                  if (!prMap.has(pr.number)) {
-                    prMap.set(pr.number, {
-                      number: pr.number,
-                      title: pr.title,
-                      url: pr.html_url,
-                      author: pr.user?.login || '',
-                      commits: []
-                    });
-                  }
-                  prMap.get(pr.number).commits.push(sha.substring(0, 7));
-                } else {
-                  const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
-                  const author = execSync(`git log -1 --pretty=format:'%an' ${sha}`, { encoding: 'utf8' }).trim();
-                  standaloneCommits.push({
-                    sha: sha.substring(0, 7),
-                    message: msg,
-                    author: author,
-                    url: `https://github.com/${owner}/${repo}/commit/${sha}`
-                  });
-                }
-              } catch (e) {
-                const msg = execSync(`git log -1 --pretty=format:'%s' ${sha}`, { encoding: 'utf8' }).trim();
-                standaloneCommits.push({
-                  sha: sha.substring(0, 7),
-                  message: msg,
-                  author: '',
-                  url: `https://github.com/${owner}/${repo}/commit/${sha}`
-                });
-              }
-            }
-
-            let summary = '';
-            if (prMap.size > 0) {
-              summary += '## Pull Requests\n\n';
-              for (const [number, pr] of prMap) {
-                summary += `- PR #${number}: ${pr.title} (${pr.url}) by @${pr.author} [${pr.commits.length} commit(s): ${pr.commits.join(', ')}]\n`;
-              }
-              summary += '\n';
-            }
-            if (standaloneCommits.length > 0) {
-              summary += '## Direct Commits (no associated PR)\n\n';
-              for (const c of standaloneCommits) {
-                summary += `- ${c.sha}: ${c.message} (${c.url})`;
-                if (c.author) summary += ` by ${c.author}`;
-                summary += '\n';
-              }
-            }
-
-            core.setOutput('pr_summary', summary);
-
-      - name: Write changes to file for Pi
-        env:
-          PR_SUMMARY: ${{ steps.pr_info.outputs.pr_summary }}
-        run: |
-          printf '%s' "$PR_SUMMARY" > changes.md
+            const fs = require('fs');
+            fs.writeFileSync('${{ github.workspace }}/github_changes.tmp.json', JSON.stringify(results, null, 2));
 
       - name: Generate release notes via Claude
         id: claude
         uses: anthropics/claude-code-base-action@main
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          INPUT_PROMPT_FILE: ${{ github.workspace }}/.github/workflows/prompts/release-generate-notes.md
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: >-
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
             --json-schema '{"type":"object","properties":{"release_notes":{"type":"string"}},"required":["release_notes"]}'
-          prompt: >
-            Generate release notes for version ${{ inputs.tag }}.
-            Read the file `changes.md` in the current directory which lists all PRs and commits
-            included in this release. Use ONLY that content — do not look up additional
-            history. Omit CI/workflow/internal tooling changes unless they affect end users.
-            Keep the tone concise and factual. Return the release notes as a markdown string
-            in the `release_notes` field.
 
       - name: Save structured output to file
         uses: actions/github-script@v9
