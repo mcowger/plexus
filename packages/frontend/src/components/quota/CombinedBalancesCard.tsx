@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toTitleCase } from '../../lib/format';
-import type { QuotaCheckerInfo } from '../../types/quota';
+import type { QuotaCheckerInfo, Meter } from '../../types/quota';
 import { Button } from '../ui/Button';
 import { getCheckerDisplayName } from './checker-presentation';
 import { BalanceMeterRow } from './BalanceMeterRow';
+import { MeterHistoryModal } from './MeterHistoryModal';
 
 interface CombinedBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
@@ -18,6 +19,12 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   onRefresh,
   refreshing,
 }) => {
+  const [historyTarget, setHistoryTarget] = useState<{
+    quota: QuotaCheckerInfo;
+    meter: Meter;
+    displayName: string;
+  } | null>(null);
+
   if (balanceQuotas.length === 0) return null;
 
   const midPoint = Math.ceil(balanceQuotas.length / 2);
@@ -52,7 +59,19 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
               <span className="text-xs">Error</span>
             </div>
           ) : balanceMeters.length > 0 ? (
-            balanceMeters.map((meter) => <BalanceMeterRow key={meter.key} meter={meter} />)
+            balanceMeters.map((meter) => (
+              <BalanceMeterRow
+                key={meter.key}
+                meter={meter}
+                onClick={() =>
+                  setHistoryTarget({
+                    quota,
+                    meter,
+                    displayName: getCheckerDisplayName(quota.checkerType, quota.checkerId),
+                  })
+                }
+              />
+            ))
           ) : (
             <span className="text-xs text-text-muted">No data</span>
           )}
@@ -77,20 +96,34 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   };
 
   return (
-    <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
-      <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
-        <Wallet size={18} className="text-info" />
-        <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
+    <>
+      <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
+          <Wallet size={18} className="text-info" />
+          <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
+        </div>
+
+        <div
+          className={clsx('grid gap-0', shouldSplit ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}
+        >
+          <div className="divide-y divide-border">{leftColumn.map(renderRow)}</div>
+          {rightColumn.length > 0 && (
+            <div className="divide-y divide-border lg:border-l border-border">
+              {rightColumn.map(renderRow)}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className={clsx('grid gap-0', shouldSplit ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}>
-        <div className="divide-y divide-border">{leftColumn.map(renderRow)}</div>
-        {rightColumn.length > 0 && (
-          <div className="divide-y divide-border lg:border-l border-border">
-            {rightColumn.map(renderRow)}
-          </div>
-        )}
-      </div>
-    </div>
+      {historyTarget && (
+        <MeterHistoryModal
+          isOpen
+          onClose={() => setHistoryTarget(null)}
+          quota={historyTarget.quota}
+          meter={historyTarget.meter}
+          displayName={historyTarget.displayName}
+        />
+      )}
+    </>
   );
 };

@@ -6,6 +6,7 @@ import { formatMeterValue } from './MeterValue';
 interface AllowanceMeterRowProps {
   meter: Meter;
   compact?: boolean;
+  onClick?: () => void;
 }
 
 function periodLabel(meter: Meter): string {
@@ -36,16 +37,17 @@ function statusColor(status: MeterStatus): string {
   }
 }
 
-export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({ meter, compact }) => {
-  const utilNum =
-    typeof meter.utilizationPercent === 'number' ? meter.utilizationPercent : null;
+export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
+  meter,
+  compact,
+  onClick,
+}) => {
+  const utilNum = typeof meter.utilizationPercent === 'number' ? meter.utilizationPercent : null;
   const pct = utilNum !== null ? Math.max(0, Math.min(100, utilNum)) : null;
   const period = periodLabel(meter);
 
   const remaining =
-    meter.remaining !== undefined
-      ? formatMeterValue(meter.remaining, meter.unit, true)
-      : undefined;
+    meter.remaining !== undefined ? formatMeterValue(meter.remaining, meter.unit, true) : undefined;
 
   if (compact) {
     return (
@@ -61,7 +63,10 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({ meter, com
         {pct !== null && (
           <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden border border-border/30">
             <div
-              className={clsx('h-full rounded-full transition-all duration-500', statusColor(meter.status))}
+              className={clsx(
+                'h-full rounded-full transition-all duration-500',
+                statusColor(meter.status)
+              )}
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -71,16 +76,21 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({ meter, com
   }
 
   return (
-    <div className="flex flex-col gap-1 py-0.5">
+    <div
+      className={clsx(
+        'flex flex-col gap-1 py-0.5',
+        onClick && 'cursor-pointer hover:bg-bg-hover rounded px-1 -mx-1 transition-colors'
+      )}
+      onClick={onClick}
+      title={onClick ? 'Click to view history' : undefined}
+    >
       <div className="flex items-center justify-between gap-2 min-w-0">
         <span className="text-xs text-text-secondary truncate flex-1">{meter.label}</span>
         <div className="flex items-center gap-2 flex-shrink-0">
           {remaining !== undefined && (
             <span className="text-xs tabular-nums text-text">{remaining} left</span>
           )}
-          {period && (
-            <span className="text-[10px] text-text-muted">{period}</span>
-          )}
+          {period && <span className="text-[10px] text-text-muted">{period}</span>}
           {pct !== null && (
             <span
               className={clsx(
@@ -100,7 +110,10 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({ meter, com
       {pct !== null && (
         <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden border border-border/30">
           <div
-            className={clsx('h-full rounded-full transition-all duration-500', statusColor(meter.status))}
+            className={clsx(
+              'h-full rounded-full transition-all duration-500',
+              statusColor(meter.status)
+            )}
             style={{ width: `${pct}%` }}
           />
         </div>

@@ -7,9 +7,10 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
-import type { QuotaCheckerInfo } from '../types/quota';
+import type { QuotaCheckerInfo, Meter } from '../types/quota';
 import { CombinedBalancesCard } from '../components/quota/CombinedBalancesCard';
 import { AllowanceMeterRow } from '../components/quota/AllowanceMeterRow';
+import { MeterHistoryModal } from '../components/quota/MeterHistoryModal';
 import { getCheckerDisplayName } from '../components/quota/checker-presentation';
 
 export const Quotas = () => {
@@ -26,6 +27,11 @@ export const Quotas = () => {
   const [truncating, setTruncating] = useState(false);
   const [truncated, setTruncated] = useState(false);
   const [downloading, setDownloading] = useState<'csv' | 'sql' | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<{
+    quota: QuotaCheckerInfo;
+    meter: Meter;
+    displayName: string;
+  } | null>(null);
 
   const fetchQuotas = async () => {
     setLoading(true);
@@ -145,7 +151,17 @@ export const Quotas = () => {
           ) : (
             <div className="space-y-2">
               {allowances.map((meter) => (
-                <AllowanceMeterRow key={meter.key} meter={meter} />
+                <AllowanceMeterRow
+                  key={meter.key}
+                  meter={meter}
+                  onClick={() =>
+                    setHistoryTarget({
+                      quota,
+                      meter,
+                      displayName: _groupDisplayName,
+                    })
+                  }
+                />
               ))}
             </div>
           )}
@@ -321,6 +337,15 @@ export const Quotas = () => {
             </section>
           )}
         </div>
+      )}
+      {historyTarget && (
+        <MeterHistoryModal
+          isOpen
+          onClose={() => setHistoryTarget(null)}
+          quota={historyTarget.quota}
+          meter={historyTarget.meter}
+          displayName={historyTarget.displayName}
+        />
       )}
     </PageContainer>
   );
