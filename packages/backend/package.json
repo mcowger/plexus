@@ -26,6 +26,7 @@
     "eventsource-encoder": "^1.0.1",
     "eventsource-parser": "^3.0.8",
     "fastify": "^5.8.5",
+    "js-tiktoken": "^1.0.21",
     "parse-duration": "^2.1.6",
     "pkce-challenge": "^6.0.0",
     "postgres": "^3.4.9",
