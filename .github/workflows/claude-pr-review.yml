@@ -25,27 +25,18 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
-          ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ vars.CLAUDE_SMALL_MODEL || 'minimax-m2.7' }}
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ vars.CLAUDE_SMALL_MODEL  }}
+          INPUT_PROMPT_FILE: ${{ github.workspace }}/.github/workflows/prompts/claude-pr-review.md
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           allowed_non_write_users: '*'
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-            --allowedTools Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__list_pull_request_files,mcp__github__get_file_contents,mcp__github__search_code,mcp__github__get_pull_request_diff,mcp__github_comment__update_claude_comment
+            --allowedTools Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__list_pull_request_files,mcp__github__get_file_contents,mcp__github__search_code,mcp__github__get_pull_request_diff,mcp__github_comment__update_claude_comment,mcp__github__create_pending_pull_request_review,mcp__github__add_pull_request_review_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__create_and_submit_pull_request_review
           path_to_bun_executable: /home/runner/.bun/bin/bun
-          assignee_trigger: claude
           show_full_output: true
           display_report: true
           use_sticky_comment: true
           include_fix_links: false
           track_progress: true
-          prompt: >
-            Review this pull request. Your job is to find problems, not to praise good work.
-            Focus exclusively on: bugs, logic errors, security issues, missing or inadequate
-            test coverage, incorrect assumptions, and edge cases that aren't handled.
-            Do not comment on things that are correct or well-done — omit all positive
-            observations, compliments, and "non-blocking" style notes unless they mask a
-            real risk. If something is fine, say nothing about it. Every sentence in your
-            review should describe a concrete concern the author needs to address or
-            consciously accept. Post your findings as a PR review comment.
