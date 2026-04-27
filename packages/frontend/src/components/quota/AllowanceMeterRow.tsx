@@ -84,29 +84,7 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
       onClick={onClick}
       title={onClick ? 'Click to view history' : undefined}
     >
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <span className="text-xs text-text-secondary truncate flex-1">{meter.label}</span>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {remaining !== undefined && (
-            <span className="text-xs tabular-nums text-text">{remaining} left</span>
-          )}
-          {period && <span className="text-[10px] text-text-muted">{period}</span>}
-          {pct !== null && (
-            <span
-              className={clsx(
-                'text-xs font-semibold tabular-nums',
-                meter.status === 'exhausted' || meter.status === 'critical'
-                  ? 'text-danger'
-                  : meter.status === 'warning'
-                    ? 'text-warning'
-                    : 'text-text-secondary'
-              )}
-            >
-              {Math.round(pct)}%
-            </span>
-          )}
-        </div>
-      </div>
+      <span className="text-xs text-text-secondary truncate">{meter.label}</span>
       {pct !== null && (
         <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden border border-border/30">
           <div
@@ -118,6 +96,26 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
           />
         </div>
       )}
+      <div className="flex items-center gap-2">
+        {remaining !== undefined && (
+          <span className="text-xs tabular-nums text-text">{remaining} left</span>
+        )}
+        {period && <span className="text-[10px] text-text-muted">{period}</span>}
+        {pct !== null && (
+          <span
+            className={clsx(
+              'text-xs font-semibold tabular-nums',
+              meter.status === 'exhausted' || meter.status === 'critical'
+                ? 'text-danger'
+                : meter.status === 'warning'
+                  ? 'text-warning'
+                  : 'text-text-secondary'
+            )}
+          >
+            {Math.round(pct)}%
+          </span>
+        )}
+      </div>
     </div>
   );
 };
