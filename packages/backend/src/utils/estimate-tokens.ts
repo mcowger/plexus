@@ -397,8 +397,14 @@ function tokensForStringOrJson(value: unknown): number {
   if (typeof value === 'string') return estimateTokens(value);
   try {
     return estimateTokens(JSON.stringify(value));
-  } catch {
-    return 0;
+  } catch (err) {
+    // JSON.stringify failed (circular ref, BigInt without toJSON, throwing
+    // Proxy, etc.). HTTP-borne bodies can't reach this state — only internal
+    // bugs would. Fail closed so enforcement rejects the request rather than
+    // silently letting an un-counted payload through. Matches the same
+    // sentinel used at the top-level catch in estimateInputTokens.
+    logger.error('[estimate-tokens] tokensForStringOrJson failed; failing closed', err);
+    return Number.MAX_SAFE_INTEGER;
   }
 }
 

@@ -479,6 +479,21 @@ describe('estimateInputTokens — image accounting', () => {
     expect(estimateInputTokens(circular, 'chat')).toBeGreaterThan(0);
   });
 
+  test('per-part stringify failure (e.g. circular tools array) fails closed, not silent 0', () => {
+    // tokensForStringOrJson is called for tools, tool_calls, fallback content,
+    // etc. If JSON.stringify throws on a circular ref nested inside tools,
+    // that part should contribute MAX_SAFE_INTEGER so the whole request gets
+    // rejected — returning 0 here would let the rest of the walker's count
+    // through as the only signal, silently bypassing enforcement.
+    const tools: any = [{ type: 'function', function: { name: 'foo' } }];
+    tools[0].function.parameters = tools; // circular
+    const total = estimateInputTokens(
+      { messages: [{ role: 'user', content: 'hi' }], tools },
+      'chat'
+    );
+    expect(total).toBeGreaterThanOrEqual(Number.MAX_SAFE_INTEGER);
+  });
+
   test('walker catch + stringify-fallback failure returns MAX_SAFE_INTEGER (fail closed)', () => {
     // Force both the walker and the JSON.stringify fallback to throw, by
     // wrapping the body in a Proxy whose property access throws. Enforcement
