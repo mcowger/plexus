@@ -9,9 +9,10 @@ let _encoder: Tiktoken | null = null;
 let _encoderFailed = false;
 
 // js-tiktoken (pure JS, WASM-free for portability) has an O(n²) worst case
-// on highly repetitive input. Bound text length and detect low-entropy input
-// to keep enforcement latency in the millisecond range.
-const MAX_TOKENIZE_CHARS = 4_000;
+// on highly repetitive input. The entropy check below catches that — the
+// length cap is a soft guard for atypical real input (e.g. pasted base64
+// certificates) where the heuristic is materially faster.
+const MAX_TOKENIZE_CHARS = 256_000;
 const ENTROPY_SAMPLE_CHARS = 512;
 const MIN_UNIQUE_CHARS = 8;
 
