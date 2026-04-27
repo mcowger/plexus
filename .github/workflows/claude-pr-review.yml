@@ -27,7 +27,8 @@ jobs:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.REPO_SUPER_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_non_write_users: '*'
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
             --allowedTools Read,Write,Edit,Replace,Bash,Grep,Glob,TaskOutput,KillTask
