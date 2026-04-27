@@ -33,7 +33,7 @@ jobs:
           allowed_non_write_users: '*'
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-            --allowedTools Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__list_pull_request_files,mcp__github__get_file_contents,mcp__github__search_code,mcp__github__get_pull_request_diff,mcp__github_comment__update_claude_comment
+            --allowedTools Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__list_pull_request_files,mcp__github__get_file_contents,mcp__github__search_code,mcp__github__get_pull_request_diff,mcp__github_comment__update_claude_comment,mcp__github__create_pending_pull_request_review,mcp__github__add_pull_request_review_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__create_and_submit_pull_request_review
           path_to_bun_executable: /home/runner/.bun/bin/bun
           show_full_output: true
           display_report: true
