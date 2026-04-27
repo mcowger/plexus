@@ -17,9 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      new_sha: ${{ steps.push.outputs.new_sha }}
-      has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -62,20 +59,5 @@ jobs:
           git add packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/
           git commit --no-verify -m "chore: auto-generate migrations for schema changes"
           git push
-          echo "new_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  trigger-dev-release:
-    name: Trigger Dev Release
-    needs: generate
-    if: needs.generate.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Dispatch dev-release workflow
-        run: |
-          gh workflow run dev-release.yml \
-            --ref main \
-            --field sha=${{ needs.generate.outputs.new_sha }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
