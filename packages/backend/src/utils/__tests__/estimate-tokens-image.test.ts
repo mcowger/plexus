@@ -418,20 +418,42 @@ describe('estimateInputTokens — image accounting', () => {
       messages: [{ role: 'user', content: 'hi' }],
       system: systemObj,
     };
-    const total = estimateInputTokens(body, 'messages');
-    // The instruction string alone is ~10 tokens. "[object Object]" would be ~5.
-    expect(total).toBeGreaterThan(8);
+    const totalWithObj = estimateInputTokens(body, 'messages');
+    // What the buggy String() path would have produced: "[object Object]" (~6 tokens).
+    const stringifiedNaive = estimateInputTokens(
+      { messages: [{ role: 'user', content: 'hi' }], system: '[object Object]' },
+      'messages'
+    );
+    // The fixed path JSON-encodes the object, so it counts the actual instruction
+    // string. That should be materially more than the "[object Object]" baseline.
+    expect(totalWithObj).toBeGreaterThan(stringifiedNaive + 5);
   });
 
-  test('walker fallback on unexpected shape uses stringify path, never silently 0', () => {
-    // Pass an object that the walker cannot interpret; the catch-block fallback
-    // should still produce a non-zero conservative estimate so enforcement
-    // doesn't silently let an oversized request through.
-    const garbage: any = {};
-    const big = 'x'.repeat(2000);
-    // Inject a circular-ish nested shape that still serializes:
-    garbage.messages = [{ role: 'user', content: { weird: { nested: big } } }];
-    const total = estimateInputTokens(garbage, 'chat');
+  test('walker fallback path produces non-zero on a still-serializable nested shape', () => {
+    // Non-array content gets JSON-stringified through tokensForStringOrJson —
+    // not the catch-block fallback (the walker handles this case explicitly).
+    // We just verify the result is non-zero and reflects the nested content.
+    const body = {
+      messages: [{ role: 'user', content: { weird: { nested: 'x'.repeat(2000) } } }],
+    };
+    const total = estimateInputTokens(body, 'chat');
     expect(total).toBeGreaterThan(0);
+  });
+
+  test('does not crash on a circular reference (degrades to 0 without throwing)', () => {
+    // Valid HTTP request bodies can't be circular (they came from JSON.parse),
+    // but if internal code ever passes one in we should degrade gracefully
+    // instead of crashing — JSON.stringify on a circular ref throws, and the
+    // inner catch in the walker returns 0.
+    const circular: any = { messages: [{ role: 'user', content: 'hi' }] };
+    circular.self = circular;
+    expect(() => estimateInputTokens(circular, 'chat')).not.toThrow();
+    expect(typeof estimateInputTokens(circular, 'chat')).toBe('number');
+  });
+
+  test('does not crash on null/undefined apiType', () => {
+    const body = { messages: [{ role: 'user', content: 'hi' }] };
+    expect(() => estimateInputTokens(body, null as any)).not.toThrow();
+    expect(() => estimateInputTokens(body, undefined as any)).not.toThrow();
   });
 });

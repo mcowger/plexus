@@ -40,10 +40,19 @@ export function __setEncoderFailedForTests(failed: boolean): void {
  * Cheap entropy check: a long string with very few distinct characters
  * is the worst case for BPE merges. Sampling the prefix is enough — real
  * prose has dozens of distinct characters in any 500-char window.
+ *
+ * Iterates by Unicode code point (not UTF-16 code unit) so a string of
+ * surrogate-pair characters (e.g. emoji) isn't misclassified — `new Set(text)`
+ * would split each emoji into two halves and drastically undercount uniqueness.
  */
 function looksRepetitive(text: string): boolean {
   const sample = text.length > ENTROPY_SAMPLE_CHARS ? text.slice(0, ENTROPY_SAMPLE_CHARS) : text;
-  return new Set(sample).size < MIN_UNIQUE_CHARS;
+  const unique = new Set<string>();
+  for (const ch of sample) {
+    unique.add(ch);
+    if (unique.size >= MIN_UNIQUE_CHARS) return false;
+  }
+  return true;
 }
 
 /**
@@ -51,7 +60,8 @@ function looksRepetitive(text: string): boolean {
  * available (within ~5–15% of Claude / Gemini tokenizers, exact for OpenAI).
  *
  * Routes to the heuristic when the input would be slow to tokenize:
- *   - longer than 4k chars (BPE cost grows non-linearly), or
+ *   - longer than MAX_TOKENIZE_CHARS (BPE cost grows non-linearly on
+ *     atypical real input like pasted base64), or
  *   - low-entropy (highly repetitive — pathological for BPE merges).
  *
  * Also falls back to the heuristic if the encoder fails to load.
@@ -72,6 +82,20 @@ export function estimateTokens(text: string): number {
   return estimateTokensHeuristic(text);
 }
 
+// Pre-compiled regexes for the heuristic — building these on every call adds
+// up under high request volume.
+const HEURISTIC_RE_WHITESPACE = /\s/g;
+const HEURISTIC_RE_BRACKETS = /[{}\[\]]/g;
+const HEURISTIC_RE_PUNCT = /[.,;:!?]/g;
+const HEURISTIC_RE_NUMBERS = /\d+/g;
+const HEURISTIC_RE_URLS = /https?:\/\/\S+/g;
+const HEURISTIC_RE_COMPARES = /[=<>!&|]{2}/g;
+// Bounded quantifier avoids catastrophic backtracking on long runs of word
+// chars (e.g. base64 data) — identifiers in real code fit in 64 chars.
+const HEURISTIC_RE_FNCALLS = /\w{1,64}\(/g;
+const HEURISTIC_RE_INDENT = /\n {2,}/g;
+const HEURISTIC_RE_SPECIAL = /[^\w\s.,;:!?'"()\[\]{}<>\/\\-]/g;
+
 /**
  * Character-density heuristic. Kept as a fallback when the tokenizer is
  * unavailable. ±20–30% variance vs. real tokenizers — worse than o200k_base
@@ -83,7 +107,7 @@ export function estimateTokensHeuristic(text: string): number {
   const charCount = text.length;
   let tokenEstimate = charCount / 4;
 
-  const whitespaceCount = (text.match(/\s/g) || []).length;
+  const whitespaceCount = (text.match(HEURISTIC_RE_WHITESPACE) || []).length;
   const whitespaceRatio = whitespaceCount / charCount;
   if (whitespaceRatio > 0.15) {
     tokenEstimate *= 0.95;
@@ -91,10 +115,10 @@ export function estimateTokensHeuristic(text: string): number {
     tokenEstimate *= 1.1;
   }
 
-  const jsonBrackets = (text.match(/[{}\[\]]/g) || []).length;
-  const punctuation = (text.match(/[.,;:!?]/g) || []).length;
-  const numbers = (text.match(/\d+/g) || []).length;
-  const urls = (text.match(/https?:\/\/[^\s]+/g) || []).length;
+  const jsonBrackets = (text.match(HEURISTIC_RE_BRACKETS) || []).length;
+  const punctuation = (text.match(HEURISTIC_RE_PUNCT) || []).length;
+  const numbers = (text.match(HEURISTIC_RE_NUMBERS) || []).length;
+  const urls = (text.match(HEURISTIC_RE_URLS) || []).length;
 
   tokenEstimate += jsonBrackets * 0.5;
   tokenEstimate += punctuation * 0.3;
@@ -102,16 +126,14 @@ export function estimateTokensHeuristic(text: string): number {
   tokenEstimate += urls * 2;
 
   const codeIndicators =
-    (text.match(/[=<>!&|]{2}/g) || []).length +
-    // Bounded quantifier avoids catastrophic backtracking on long runs of word
-    // chars (e.g. base64 data) — identifiers in real code fit in 64 chars.
-    (text.match(/\w{1,64}\(/g) || []).length +
-    (text.match(/\n {2,}/g) || []).length;
+    (text.match(HEURISTIC_RE_COMPARES) || []).length +
+    (text.match(HEURISTIC_RE_FNCALLS) || []).length +
+    (text.match(HEURISTIC_RE_INDENT) || []).length;
   if (codeIndicators > charCount / 100) {
     tokenEstimate *= 1.08;
   }
 
-  const specialChars = (text.match(/[^\w\s.,;:!?'"()\[\]{}<>\/\\-]/g) || []).length;
+  const specialChars = (text.match(HEURISTIC_RE_SPECIAL) || []).length;
   tokenEstimate += specialChars * 0.4;
 
   const uniqueChars = new Set(text).size;
@@ -483,7 +505,7 @@ export function estimateInputTokens(originalBody: any, apiType: string): number 
   if (!originalBody || typeof originalBody !== 'object') return 0;
 
   try {
-    const t = apiType.toLowerCase();
+    const t = (apiType || '').toLowerCase();
     let total = 0;
 
     switch (t) {
@@ -676,7 +698,7 @@ export function estimateTokensFromReconstructed(
   let reasoningText = '';
 
   try {
-    switch (apiType.toLowerCase()) {
+    switch ((apiType || '').toLowerCase()) {
       case 'chat': {
         const c = extractChatContent(reconstructed);
         outputText = c.output;
