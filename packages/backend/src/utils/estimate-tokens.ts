@@ -1,4 +1,4 @@
-import { get_encoding, type Tiktoken } from 'tiktoken';
+import { getEncoding, type Tiktoken } from 'js-tiktoken';
 import { logger } from './logger';
 
 // ---------------------------------------------------------------------------
@@ -8,15 +8,17 @@ import { logger } from './logger';
 let _encoder: Tiktoken | null = null;
 let _encoderFailed = false;
 
-// Above this length, BPE encoding cost is no longer negligible (especially
-// on adversarial / repetitive input). Use the heuristic for the tail of any
-// text longer than this — accurate enough at scale and bounds worst-case CPU.
-const MAX_TOKENIZE_CHARS = 32_000;
+// js-tiktoken (pure JS, WASM-free for portability) has an O(n²) worst case
+// on highly repetitive input. Bound text length and detect low-entropy input
+// to keep enforcement latency in the millisecond range.
+const MAX_TOKENIZE_CHARS = 4_000;
+const ENTROPY_SAMPLE_CHARS = 512;
+const MIN_UNIQUE_CHARS = 8;
 
 function getEncoder(): Tiktoken | null {
   if (_encoder || _encoderFailed) return _encoder;
   try {
-    _encoder = get_encoding('o200k_base');
+    _encoder = getEncoding('o200k_base');
   } catch (err) {
     _encoderFailed = true;
     logger.warn(
@@ -34,18 +36,30 @@ export function __setEncoderFailedForTests(failed: boolean): void {
 }
 
 /**
- * Counts tokens for a text string. Uses o200k_base via tiktoken when
+ * Cheap entropy check: a long string with very few distinct characters
+ * is the worst case for BPE merges. Sampling the prefix is enough — real
+ * prose has dozens of distinct characters in any 500-char window.
+ */
+function looksRepetitive(text: string): boolean {
+  const sample = text.length > ENTROPY_SAMPLE_CHARS ? text.slice(0, ENTROPY_SAMPLE_CHARS) : text;
+  return new Set(sample).size < MIN_UNIQUE_CHARS;
+}
+
+/**
+ * Counts tokens for a text string. Uses o200k_base via js-tiktoken when
  * available (within ~5–15% of Claude / Gemini tokenizers, exact for OpenAI).
  *
- * For very long strings (> 32k chars), a heuristic is used to keep enforcement
- * latency bounded — the BPE cost on adversarial repetitive input is O(n²) in
- * the JS port and the heuristic is accurate enough at scale.
+ * Routes to the heuristic when the input would be slow to tokenize:
+ *   - longer than 4k chars (BPE cost grows non-linearly), or
+ *   - low-entropy (highly repetitive — pathological for BPE merges).
  *
- * Falls back to the heuristic if the encoder fails to load.
+ * Also falls back to the heuristic if the encoder fails to load.
  */
 export function estimateTokens(text: string): number {
   if (!text || text.length === 0) return 0;
-  if (text.length > MAX_TOKENIZE_CHARS) return estimateTokensHeuristic(text);
+  if (text.length > MAX_TOKENIZE_CHARS || looksRepetitive(text)) {
+    return estimateTokensHeuristic(text);
+  }
   const enc = getEncoder();
   if (enc) {
     try {
