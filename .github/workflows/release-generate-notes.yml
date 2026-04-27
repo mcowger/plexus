@@ -97,9 +97,9 @@ jobs:
         uses: anthropics/claude-code-base-action@main
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
-          INPUT_PROMPT_FILE: ${{ github.workspace }}/.github/workflows/prompts/release-generate-notes.md
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt_file: .github/workflows/prompts/release-generate-notes.md
           claude_args: >-
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
             --json-schema '{"type":"object","properties":{"release_notes":{"type":"string"}},"required":["release_notes"]}'
