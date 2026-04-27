@@ -26,10 +26,10 @@ jobs:
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
           ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ vars.CLAUDE_SMALL_MODEL  }}
-          INPUT_PROMPT_FILE: ${{ github.workspace }}/.github/workflows/prompts/claude-pr-review.md
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt_file: .github/workflows/prompts/claude-pr-review.md
           allowed_non_write_users: '*'
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
