@@ -469,15 +469,34 @@ describe('estimateInputTokens — image accounting', () => {
     expect(total).toBeGreaterThan(0);
   });
 
-  test('does not crash on a circular reference (degrades to 0 without throwing)', () => {
-    // Valid HTTP request bodies can't be circular (they came from JSON.parse),
-    // but if internal code ever passes one in we should degrade gracefully
-    // instead of crashing — JSON.stringify on a circular ref throws, and the
-    // inner catch in the walker returns 0.
+  test('does not crash on a circular reference; counts the walkable parts', () => {
+    // A circular self-reference at the top level doesn't force the walker
+    // into its catch — the walker only descends through known fields per
+    // apiType, so `self` is ignored and `messages` is counted normally.
     const circular: any = { messages: [{ role: 'user', content: 'hi' }] };
     circular.self = circular;
     expect(() => estimateInputTokens(circular, 'chat')).not.toThrow();
-    expect(typeof estimateInputTokens(circular, 'chat')).toBe('number');
+    expect(estimateInputTokens(circular, 'chat')).toBeGreaterThan(0);
+  });
+
+  test('walker catch + stringify-fallback failure returns MAX_SAFE_INTEGER (fail closed)', () => {
+    // Force both the walker and the JSON.stringify fallback to throw, by
+    // wrapping the body in a Proxy whose property access throws. Enforcement
+    // should reject the request — returning 0 here would silently let an
+    // un-counted payload through.
+    const throwingBody = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('property access blocked');
+        },
+        ownKeys() {
+          throw new Error('keys blocked');
+        },
+      }
+    );
+    const total = estimateInputTokens(throwingBody, 'chat');
+    expect(total).toBe(Number.MAX_SAFE_INTEGER);
   });
 
   test('does not crash on null/undefined apiType', () => {

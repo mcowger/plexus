@@ -94,7 +94,7 @@ const HEURISTIC_RE_COMPARES = /[=<>!&|]{2}/g;
 // chars (e.g. base64 data) — identifiers in real code fit in 64 chars.
 const HEURISTIC_RE_FNCALLS = /\w{1,64}\(/g;
 const HEURISTIC_RE_INDENT = /\n {2,}/g;
-const HEURISTIC_RE_SPECIAL = /[^\w\s.,;:!?'"()\[\]{}<>\/\\-]/g;
+const HEURISTIC_RE_SPECIAL = /[^\w\s.,;:!?'"()\[\]{}<>\/\\\-]/g;
 
 /**
  * Character-density heuristic. Kept as a fallback when the tokenizer is
@@ -259,6 +259,10 @@ export function getImageDimensionsFromBuffer(bytes: Buffer): ImageDimensions | n
   }
 
   // JPEG: starts with FF D8 FF; scan for SOF marker, then height@+5, width@+7.
+  // Outer loop: `i < bytes.length - 9` is a pessimistic bound that leaves
+  // room for any per-iteration read (segLen at i, marker scan, etc.). The
+  // SOF read below has its own tighter `i + 6 < bytes.length` check —
+  // they're guarding different reads at different points in the loop.
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
     let i = 2;
     while (i < bytes.length - 9) {
@@ -594,7 +598,14 @@ export function estimateInputTokens(originalBody: any, apiType: string): number 
     try {
       return estimateTokens(JSON.stringify(originalBody));
     } catch {
-      return 0;
+      // Both the walker and the stringify fallback failed — input is something
+      // we genuinely cannot count (BigInt, circular ref, throwing Proxy, etc.).
+      // Fail closed: return a value that exceeds any plausible context window
+      // so enforcement rejects the request rather than silently letting an
+      // un-counted payload through. HTTP bodies (parsed via JSON.parse) can't
+      // produce this state — only internal-code bugs should ever reach here.
+      logger.error('Stringify fallback also failed; returning MAX_SAFE_INTEGER to fail closed.');
+      return Number.MAX_SAFE_INTEGER;
     }
   }
 }
