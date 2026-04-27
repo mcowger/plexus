@@ -3,10 +3,12 @@ name: Claude PR Review
 on:
   pull_request_target:
     types: [opened, synchronize, ready_for_review]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
   review:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false || github.event_name == 'pull_request_review_comment'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,11 +56,24 @@ jobs:
             Edge cases that are unhandled but unlikely in practice, or issues that degrade
             reliability or maintainability meaningfully. Worth addressing.
 
-            Post your findings as a PR review comment.
+            Important constraints:
+            - Do NOT attempt to run any code, tests, or commands.
+            - Do NOT make any edits or suggest file changes via tools.
+            - Base your entire review solely on the contents of the diff and any
+              relevant source files you read for context. Nothing more.
+
+            Wherever possible, post findings as inline comments directly on the relevant
+            lines of the diff using the inline comment tool, including a code suggestion
+            (using GitHub's ```suggestion``` syntax) when a fix is straightforward and
+            obvious. Use a top-level PR review comment only for findings that cannot be
+            anchored to a specific line.
+
+            If this review was triggered by a @claude comment on a specific diff line,
+            focus your response on that line and its immediate context, and reply inline.
           allowed_non_write_users: '*'
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-            --allowedTools Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__list_pull_request_files,mcp__github__get_file_contents,mcp__github__search_code,mcp__github__get_pull_request_diff,mcp__github_comment__update_claude_comment,mcp__github__create_pending_pull_request_review,mcp__github__add_pull_request_review_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__create_and_submit_pull_request_review
+            --allowedTools Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__list_pull_request_files,mcp__github__get_file_contents,mcp__github__search_code,mcp__github__get_pull_request_diff,mcp__github_comment__update_claude_comment,mcp__github_comment__update,mcp__github__add_pull_request_review_comment,mcp__github__create_pending_pull_request_review,mcp__github__add_pull_request_review_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__create_and_submit_pull_request_review,mcp__github_inline_comment__create_inline_comment
           path_to_bun_executable: /home/runner/.bun/bin/bun
           show_full_output: true
           display_report: true
