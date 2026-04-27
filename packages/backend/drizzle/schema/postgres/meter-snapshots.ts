@@ -1,4 +1,13 @@
-import { pgTable, serial, text, real, integer, bigint, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  serial,
+  text,
+  real,
+  integer,
+  bigint,
+  boolean,
+  index,
+} from 'drizzle-orm/pg-core';
 
 export const meterSnapshots = pgTable(
   'meter_snapshots',
@@ -23,7 +32,7 @@ export const meterSnapshots = pgTable(
     periodUnit: text('period_unit'),
     periodCycle: text('period_cycle'),
     resetsAt: bigint('resets_at', { mode: 'number' }),
-    success: integer('success').notNull().default(1),
+    success: boolean('success').notNull().default(true),
     errorMessage: text('error_message'),
     checkedAt: bigint('checked_at', { mode: 'number' }).notNull(),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
