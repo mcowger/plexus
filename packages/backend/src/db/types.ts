@@ -6,7 +6,8 @@ export type ProviderCooldown = InferSelectModel<typeof schema.providerCooldowns>
 export type DebugLog = InferSelectModel<typeof schema.debugLogs>;
 export type InferenceError = InferSelectModel<typeof schema.inferenceErrors>;
 export type ProviderPerformance = InferSelectModel<typeof schema.providerPerformance>;
-export type QuotaSnapshot = InferSelectModel<typeof schema.quotaSnapshots>;
+// QuotaSnapshot / NewQuotaSnapshot removed — the old quota_snapshots table is
+// superseded by meter_snapshots. See src/types/meter.ts for the new types.
 export type McpRequestUsage = InferSelectModel<typeof schema.mcpRequestUsage>;
 export type McpDebugLog = InferSelectModel<typeof schema.mcpDebugLogs>;
 
@@ -15,7 +16,6 @@ export type NewProviderCooldown = InferInsertModel<typeof schema.providerCooldow
 export type NewDebugLog = InferInsertModel<typeof schema.debugLogs>;
 export type NewInferenceError = InferInsertModel<typeof schema.inferenceErrors>;
 export type NewProviderPerformance = InferInsertModel<typeof schema.providerPerformance>;
-export type NewQuotaSnapshot = InferInsertModel<typeof schema.quotaSnapshots>;
 export type NewMcpRequestUsage = InferInsertModel<typeof schema.mcpRequestUsage>;
 export type NewMcpDebugLog = InferInsertModel<typeof schema.mcpDebugLogs>;
 

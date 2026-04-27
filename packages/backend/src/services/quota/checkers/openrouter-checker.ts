@@ -1,5 +1,5 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface OpenRouterCreditsResponse {
@@ -9,53 +9,41 @@ interface OpenRouterCreditsResponse {
   };
 }
 
-export class OpenRouterQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
-  private endpoint: string;
+export default defineChecker({
+  type: 'openrouter',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'OpenRouter management key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://openrouter.ai/api/v1/credits');
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://openrouter.ai/api/v1/credits');
-  }
+    logger.silly(`[openrouter] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-    try {
-      logger.silly(`[openrouter] Calling ${this.endpoint}`);
+    const data: OpenRouterCreditsResponse = await response.json();
+    const { total_credits, total_usage } = data.data;
+    const remaining = total_credits - total_usage;
 
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: OpenRouterCreditsResponse = await response.json();
-      const { total_credits, total_usage } = data.data;
-
-      // Calculate remaining credits
-      const remainingCredits = total_credits - total_usage;
-
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
-        undefined,
-        undefined,
-        remainingCredits,
-        'dollars',
-        undefined,
-        'OpenRouter account credits'
-      );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
-}
+    return [
+      ctx.balance({
+        key: 'balance',
+        label: 'Account credits',
+        unit: 'usd',
+        limit: total_credits,
+        used: total_usage,
+        remaining,
+      }),
+    ];
+  },
+});

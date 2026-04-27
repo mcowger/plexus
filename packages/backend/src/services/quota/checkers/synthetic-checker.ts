@@ -1,13 +1,7 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 
 interface SyntheticQuotaResponse {
-  subscription?: {
-    limit?: number;
-    requests?: number;
-    remaining?: number;
-    renewsAt?: string;
-  };
   search?: {
     hourly?: {
       limit?: number;
@@ -16,112 +10,117 @@ interface SyntheticQuotaResponse {
       renewsAt?: string;
     };
   };
-  freeToolCalls?: {
-    limit?: number;
-    requests?: number;
-    remaining?: number;
-    renewsAt?: string;
-  };
   weeklyTokenLimit?: {
     nextRegenAt?: string;
-    percentRemaining?: number;
     maxCredits?: string;
     remainingCredits?: string;
-    nextRegenCredits?: string;
   };
   rollingFiveHourLimit?: {
     nextTickAt?: string;
-    tickPercent?: number;
     remaining?: number;
     max?: number;
-    limited?: boolean;
   };
 }
 
-export class SyntheticQuotaChecker extends QuotaChecker {
-  readonly category = 'rate-limit' as const;
-  private endpoint: string;
-
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.synthetic.new/v2/quotas');
-  }
-
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
-
-    try {
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: SyntheticQuotaResponse = await response.json();
-      const windows: QuotaWindow[] = [];
-
-      if (data.rollingFiveHourLimit) {
-        const { remaining, max, nextTickAt } = data.rollingFiveHourLimit;
-        windows.push(
-          this.createWindow(
-            'rolling_five_hour',
-            max,
-            max !== undefined && remaining !== undefined ? max - remaining : undefined,
-            remaining,
-            'requests',
-            nextTickAt ? new Date(nextTickAt) : undefined,
-            'Rolling 5-hour limit'
-          )
-        );
-      }
-
-      if (data.search?.hourly) {
-        windows.push(
-          this.createWindow(
-            'search',
-            data.search.hourly.limit,
-            data.search.hourly.requests,
-            data.search.hourly.remaining,
-            'requests',
-            data.search.hourly.renewsAt ? new Date(data.search.hourly.renewsAt) : undefined,
-            'Search requests (hourly)'
-          )
-        );
-      }
-
-      if (data.weeklyTokenLimit) {
-        const { maxCredits, remainingCredits, nextRegenAt } = data.weeklyTokenLimit;
-        const parseCredits = (val?: string) => {
-          if (!val) return undefined;
-          const num = parseFloat(val.replace('$', ''));
-          return isNaN(num) ? undefined : num;
-        };
-        const parsedMax = parseCredits(maxCredits);
-        const parsedRemaining = parseCredits(remainingCredits);
-        windows.push(
-          this.createWindow(
-            'rolling_weekly',
-            parsedMax,
-            parsedMax !== undefined && parsedRemaining !== undefined
-              ? parsedMax - parsedRemaining
-              : undefined,
-            parsedRemaining,
-            'dollars',
-            nextRegenAt ? new Date(nextRegenAt) : undefined,
-            'Weekly token credits'
-          )
-        );
-      }
-
-      return this.successResult(windows);
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
+function parseCredits(val?: string): number | undefined {
+  if (!val) return undefined;
+  const num = parseFloat(val.replace('$', ''));
+  return isNaN(num) ? undefined : num;
 }
+
+export default defineChecker({
+  type: 'synthetic',
+  optionsSchema: z.object({
+    apiKey: z.string().optional(),
+    endpoint: z.string().url().optional(),
+    maxUtilizationPercent: z
+      .number()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe(
+        'Maximum utilization percentage before the provider is placed on cooldown (default: 99).'
+      ),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.getOption<string>('apiKey', '');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://api.synthetic.new/v2/quotas');
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+    const data: SyntheticQuotaResponse = await response.json();
+    const meters = [];
+
+    if (data.rollingFiveHourLimit) {
+      const { remaining, max, nextTickAt } = data.rollingFiveHourLimit;
+      const used = max !== undefined && remaining !== undefined ? max - remaining : undefined;
+      meters.push(
+        ctx.allowance({
+          key: 'rolling_5h',
+          label: 'Rolling 5-hour limit',
+          unit: 'requests',
+          limit: max,
+          used,
+          remaining,
+          periodValue: 5,
+          periodUnit: 'hour',
+          periodCycle: 'rolling',
+          resetsAt: nextTickAt ? new Date(nextTickAt).toISOString() : undefined,
+        })
+      );
+    }
+
+    if (data.search?.hourly) {
+      const { limit, requests: used, remaining, renewsAt } = data.search.hourly;
+      meters.push(
+        ctx.allowance({
+          key: 'search_hourly',
+          label: 'Search',
+          scope: 'search',
+          unit: 'requests',
+          limit,
+          used,
+          remaining,
+          periodValue: 1,
+          periodUnit: 'hour',
+          periodCycle: 'fixed',
+          resetsAt: renewsAt ? new Date(renewsAt).toISOString() : undefined,
+        })
+      );
+    }
+
+    if (data.weeklyTokenLimit) {
+      const { maxCredits, remainingCredits, nextRegenAt } = data.weeklyTokenLimit;
+      const parsedMax = parseCredits(maxCredits);
+      const parsedRemaining = parseCredits(remainingCredits);
+      const parsedUsed =
+        parsedMax !== undefined && parsedRemaining !== undefined
+          ? parsedMax - parsedRemaining
+          : undefined;
+      meters.push(
+        ctx.allowance({
+          key: 'weekly_credits',
+          label: 'Weekly token credits',
+          unit: 'usd',
+          limit: parsedMax,
+          used: parsedUsed,
+          remaining: parsedRemaining,
+          periodValue: 7,
+          periodUnit: 'day',
+          periodCycle: 'rolling',
+          resetsAt: nextRegenAt ? new Date(nextRegenAt).toISOString() : undefined,
+        })
+      );
+    }
+
+    return meters;
+  },
+});

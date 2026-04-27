@@ -1,19 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QuotaCheckerConfig } from '../../../../types/quota';
-import { NanoGPTQuotaChecker } from '../nanogpt-checker';
-import { QuotaCheckerFactory } from '../../quota-checker-factory';
+import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
+import checkerDef from '../nanogpt-checker';
 
-const makeConfig = (apiKey = 'nanogpt_test_key'): QuotaCheckerConfig => ({
-  id: 'nanogpt-test',
-  provider: 'nanogpt',
-  type: 'nanogpt',
-  enabled: true,
-  intervalMinutes: 30,
-  options: { apiKey },
-});
+const makeCtx = (apiKey = 'nanogpt_test_key') =>
+  createMeterContext('nanogpt-test', 'nanogpt', { apiKey });
 
-describe('NanoGPTQuotaChecker', () => {
-  const setFetchMock = (impl: (...args: any[]) => Promise<Response>): void => {
+describe('nanogpt checker', () => {
+  const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
     global.fetch = vi.fn(impl) as unknown as typeof fetch;
   };
 
@@ -22,100 +15,72 @@ describe('NanoGPTQuotaChecker', () => {
   });
 
   it('is registered under nanogpt', () => {
-    expect(QuotaCheckerFactory.isRegistered('nanogpt')).toBe(true);
+    expect(isCheckerRegistered('nanogpt')).toBe(true);
   });
 
-  it('returns daily and monthly usage windows', async () => {
-    setFetchMock(async () => {
-      return new Response(
-        JSON.stringify({
-          active: true,
-          state: 'active',
-          graceUntil: null,
-          limits: {
-            weeklyInputTokens: null,
-            dailyInputTokens: 5000,
-            dailyImages: null,
-          },
-          dailyInputTokens: {
-            used: 5,
-            remaining: 4995,
-            percentUsed: 0.001,
-            resetAt: 1738540800000,
-          },
-          weeklyInputTokens: {
-            used: 45,
-            remaining: 59955,
-            percentUsed: 0.00075,
-            resetAt: 1739404800000,
-          },
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    });
+  it('returns daily and weekly allowance meters', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            active: true,
+            state: 'active',
+            limits: { weeklyInputTokens: null, dailyInputTokens: 5000, dailyImages: null },
+            dailyInputTokens: { used: 5, remaining: 4995, resetAt: 1738540800000 },
+            weeklyInputTokens: { used: 45, remaining: 59955, resetAt: 1739404800000 },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
 
-    const checker = new NanoGPTQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
-    expect(result.success).toBe(true);
-    expect(result.error).toBeUndefined();
-    expect(result.windows).toHaveLength(2);
+    expect(meters).toHaveLength(2);
 
-    const weeklyWindow = result.windows?.find((w) => w.windowType === 'weekly');
-    const dailyWindow = result.windows?.find((w) => w.windowType === 'daily');
+    const weekly = meters.find((m) => m.key === 'weekly_tokens')!;
+    const daily = meters.find((m) => m.key === 'daily_tokens')!;
 
-    expect(weeklyWindow).toBeDefined();
-    expect(weeklyWindow?.used).toBe(45);
-    expect(weeklyWindow?.remaining).toBe(59955);
-    expect(weeklyWindow?.resetsAt?.toISOString()).toBe('2025-02-13T00:00:00.000Z');
+    expect(weekly).toBeDefined();
+    expect(weekly.kind).toBe('allowance');
+    expect(weekly.unit).toBe('tokens');
+    expect(weekly.used).toBe(45);
+    expect(weekly.remaining).toBe(59955);
+    expect(weekly.resetsAt).toBe('2025-02-13T00:00:00.000Z');
 
-    expect(dailyWindow).toBeDefined();
-    expect(dailyWindow?.limit).toBe(5000);
-    expect(dailyWindow?.used).toBe(5);
-    expect(dailyWindow?.remaining).toBe(4995);
-    expect(dailyWindow?.status).toBe('ok');
-    expect(dailyWindow?.resetsAt?.toISOString()).toBe('2025-02-03T00:00:00.000Z');
+    expect(daily).toBeDefined();
+    expect(daily.limit).toBe(5000);
+    expect(daily.used).toBe(5);
+    expect(daily.remaining).toBe(4995);
+    expect(daily.status).toBe('ok');
+    expect(daily.resetsAt).toBe('2025-02-03T00:00:00.000Z');
   });
 
-  it('returns error when response has no daily/monthly windows', async () => {
-    setFetchMock(async () => {
-      return new Response(
-        JSON.stringify({ active: true, state: 'unknown', limits: { dailyInputTokens: 5000 } }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    });
+  it('throws when response has no daily/weekly windows', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({ active: true, state: 'unknown', limits: { dailyInputTokens: 5000 } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
 
-    const checker = new NanoGPTQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('did not include any usage windows');
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow('usage windows');
   });
 
-  it('returns error for non-200 response', async () => {
+  it('throws for non-200 response', async () => {
     setFetchMock(
       async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
     );
 
-    const checker = new NanoGPTQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('HTTP 401: Unauthorized');
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow('HTTP 401: Unauthorized');
   });
 
   it('trims and normalizes bearer-style API keys', async () => {
     let capturedAuthHeader: string | undefined;
     let capturedXApiKeyHeader: string | undefined;
 
-    setFetchMock(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const headers = new Headers(init?.headers);
+    setFetchMock(async (_input: unknown, init: unknown) => {
+      const headers = new Headers((init as RequestInit | undefined)?.headers);
       capturedAuthHeader = headers.get('Authorization') ?? undefined;
       capturedXApiKeyHeader = headers.get('x-api-key') ?? undefined;
 
@@ -131,10 +96,8 @@ describe('NanoGPTQuotaChecker', () => {
       );
     });
 
-    const checker = new NanoGPTQuotaChecker(makeConfig('  Bearer test_token_123  '));
-    const result = await checker.checkQuota();
+    await checkerDef.check(makeCtx('  Bearer test_token_123  '));
 
-    expect(result.success).toBe(true);
     expect(capturedAuthHeader).toBe('Bearer test_token_123');
     expect(capturedXApiKeyHeader).toBeUndefined();
   });
@@ -142,9 +105,9 @@ describe('NanoGPTQuotaChecker', () => {
   it('retries auth strategies when first attempt is unauthorized', async () => {
     let callCount = 0;
 
-    setFetchMock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    setFetchMock(async (_input: unknown, init: unknown) => {
       callCount += 1;
-      const headers = new Headers(init?.headers);
+      const headers = new Headers((init as RequestInit | undefined)?.headers);
 
       if (callCount === 1) {
         expect(headers.get('Authorization')).toBe('Bearer nanogpt_test_key');
@@ -166,11 +129,9 @@ describe('NanoGPTQuotaChecker', () => {
       );
     });
 
-    const checker = new NanoGPTQuotaChecker(makeConfig());
-    const result = await checker.checkQuota();
+    const meters = await checkerDef.check(makeCtx());
 
     expect(callCount).toBe(2);
-    expect(result.success).toBe(true);
-    expect(result.windows).toHaveLength(2);
+    expect(meters).toHaveLength(2);
   });
 });

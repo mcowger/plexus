@@ -1,5 +1,5 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface ApertisBillingCreditsResponse {
@@ -12,63 +12,70 @@ interface ApertisBillingCreditsResponse {
     token_remaining: string | number;
     token_is_unlimited: boolean;
   };
+  subscription?: {
+    plan_type: 'lite' | 'pro' | 'max';
+    status: 'active' | 'suspended' | 'cancelled';
+    cycle_quota_limit: number;
+    cycle_quota_used: number;
+    cycle_quota_remaining: number;
+    cycle_end: string;
+  };
 }
 
-const APERTIS_DEFAULT_ENDPOINT = 'https://api.apertis.ai/v1/dashboard/billing/credits';
+export default defineChecker({
+  type: 'apertis',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'Apertis API key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://api.apertis.ai/v1/dashboard/billing/credits');
 
-export class ApertisQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
-    const endpoint = this.getOption<string>('endpoint', APERTIS_DEFAULT_ENDPOINT);
+    logger.silly(`[apertis] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    });
 
-    try {
-      logger.silly(`[apertis] Calling ${endpoint}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: 'application/json',
-        },
-      });
+    const data: ApertisBillingCreditsResponse = await response.json();
 
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
+    if (data.object !== 'billing_credits') throw new Error('Invalid response: expected billing_credits object');
 
-      const data: ApertisBillingCreditsResponse = await response.json();
+    const meters = [];
 
-      logger.debug(`[apertis] Response: ${JSON.stringify(data)}`);
-
-      if (data.object !== 'billing_credits') {
-        return this.errorResult(new Error('Invalid response: expected billing_credits object'));
-      }
-
-      const payg = data.payg;
-
-      logger.debug(`[apertis] PAYG: account_credits=${payg.account_credits}`);
-
-      // Use account_credits as the PAYG balance
-      if (!Number.isFinite(payg.account_credits)) {
-        return this.errorResult(
-          new Error('Invalid PAYG balance: account_credits is not a valid number')
-        );
-      }
-
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
-        undefined,
-        undefined,
-        payg.account_credits,
-        'dollars',
-        undefined,
-        'Apertis PAYG balance'
+    if (Number.isFinite(data.payg.account_credits)) {
+      meters.push(
+        ctx.balance({
+          key: 'payg',
+          label: 'PAYG balance',
+          unit: 'usd',
+          remaining: data.payg.account_credits,
+        })
       );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
     }
-  }
-}
+
+    if (data.is_subscriber && data.subscription) {
+      const sub = data.subscription;
+      meters.push(
+        ctx.allowance({
+          key: 'cycle_quota',
+          label: `${sub.plan_type.charAt(0).toUpperCase() + sub.plan_type.slice(1)} plan quota`,
+          unit: 'requests',
+          limit: sub.cycle_quota_limit,
+          used: sub.cycle_quota_used,
+          remaining: sub.cycle_quota_remaining,
+          periodValue: 1,
+          periodUnit: 'month',
+          periodCycle: 'fixed',
+          resetsAt: new Date(sub.cycle_end).toISOString(),
+        })
+      );
+    }
+
+    logger.debug(`[apertis] Returning ${meters.length} meters`);
+    return meters;
+  },
+});
