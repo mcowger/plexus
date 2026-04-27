@@ -9,15 +9,8 @@ interface CompactQuotasCardProps {
   allowanceQuotas: QuotaCheckerInfo[];
 }
 
-function primaryAllowanceMeter(meters: Meter[]): Meter | undefined {
-  const allowances = meters.filter((m) => m.kind === 'allowance');
-  if (allowances.length === 0) return undefined;
-  // Pick the most constrained (highest utilization)
-  return allowances.reduce((worst, m) => {
-    const wu = typeof worst.utilizationPercent === 'number' ? worst.utilizationPercent : 0;
-    const mu = typeof m.utilizationPercent === 'number' ? m.utilizationPercent : 0;
-    return mu > wu ? m : worst;
-  });
+function getAllowanceMeters(meters: Meter[]): Meter[] {
+  return meters.filter((m) => m.kind === 'allowance');
 }
 
 export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQuotas }) => {
@@ -40,6 +33,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
     >
       {allowanceQuotas.map((quota) => {
         const displayName = getCheckerDisplayName(quota.checkerType, quota.checkerId);
+        const allowanceMeters = getAllowanceMeters(quota.meters);
 
         if (!quota.success) {
           return (
@@ -50,8 +44,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
           );
         }
 
-        const primary = primaryAllowanceMeter(quota.meters);
-        if (!primary) {
+        if (allowanceMeters.length === 0) {
           return (
             <div key={quota.checkerId} className="flex items-center gap-2 min-w-0 py-0.5">
               <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
@@ -60,12 +53,17 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
           );
         }
 
+        // Show the service name once, then stack all allowance meters below it
         return (
           <div key={quota.checkerId} className="py-0.5">
             <span className="text-[11px] text-text-muted pl-0 block truncate mb-0.5">
               {displayName}
             </span>
-            <AllowanceMeterRow meter={primary} compact />
+            <div className="space-y-px">
+              {allowanceMeters.map((meter) => (
+                <AllowanceMeterRow key={meter.key} meter={meter} compact />
+              ))}
+            </div>
           </div>
         );
       })}
