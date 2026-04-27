@@ -232,6 +232,13 @@
       "when": 1777231626499,
       "tag": "0032_mysterious_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1777250517649,
+      "tag": "0033_kind_shriek",
+      "breakpoints": true
     }
   ]
 }
