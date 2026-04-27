@@ -6,8 +6,9 @@
 
 import { sql, SQL } from 'drizzle-orm';
 import { getDatabase, getCurrentDialect } from '../../db/client';
+import { meterSnapshots as sqliteMeterSnapshots } from '../../../drizzle/schema/sqlite/meter-snapshots';
+import { meterSnapshots as pgMeterSnapshots } from '../../../drizzle/schema/postgres/meter-snapshots';
 import { logger } from '../../utils/logger';
-import { toDbTimestampMs } from '../../utils/normalize';
 
 // ─── Window-type helpers ──────────────────────────────────────────────────────
 
@@ -124,6 +125,9 @@ export interface MigrationResult {
 export async function migrateLegacySnapshots(): Promise<MigrationResult> {
   const db = getDatabase();
   const dialect = getCurrentDialect();
+  const meterSnapshots = dialect === 'sqlite' ? sqliteMeterSnapshots : pgMeterSnapshots;
+
+  logger.info(`[legacy-migrator] Starting migration. dialect=${dialect}`);
 
   if (!(await tableExists(db, 'quota_snapshots'))) {
     logger.info('[legacy-migrator] quota_snapshots table does not exist — nothing to migrate.');
@@ -131,6 +135,7 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
   }
 
   const countResult = await selectAll(db, sql`SELECT COUNT(*) as cnt FROM quota_snapshots`);
+  logger.info(`[legacy-migrator] COUNT(*) raw result: ${JSON.stringify(countResult[0])}`);
   const totalSource = Number(countResult[0]?.cnt ?? 0);
 
   if (totalSource === 0) {
@@ -152,99 +157,100 @@ export async function migrateLegacySnapshots(): Promise<MigrationResult> {
     `
   );
 
+  logger.info(
+    `[legacy-migrator] Fetched ${sourceRows.length} source row(s). First row sample: ${JSON.stringify(sourceRows[0])}`
+  );
+
   let inserted = 0;
   let skipped = 0;
   const BATCH_SIZE = 200;
 
   for (let i = 0; i < sourceRows.length; i += BATCH_SIZE) {
     const batch = sourceRows.slice(i, i + BATCH_SIZE);
+    const valueBatch: any[] = [];
 
     for (const row of batch) {
       const windowType: string = row.window_type ?? 'unknown';
       const period = mapWindowType(windowType);
 
-      const checkedAt = toDbTimestampMs(row.checked_at, dialect);
-      const createdAt = toDbTimestampMs(row.created_at ?? row.checked_at, dialect);
-      const resetsAt = row.resets_at != null ? toDbTimestampMs(row.resets_at, dialect) : null;
+      // Raw ms integers from SQLite — do NOT convert to Date here; drizzle's
+      // timestamp_ms columns expect a Date object and handle the ms<->Date
+      // conversion themselves. Passing a plain integer would be stored as-is
+      // (also correct for SQLite) but for safety we always give drizzle a Date.
+      const toDate = (v: unknown): Date => {
+        if (v instanceof Date) return v;
+        if (typeof v === 'number') return new Date(v);
+        if (typeof v === 'string') return new Date(Number(v));
+        return new Date(0);
+      };
+
+      const checkedAtDate = toDate(row.checked_at);
+      const createdAtDate = toDate(row.created_at ?? row.checked_at);
+      const resetsAtDate = row.resets_at != null ? toDate(row.resets_at) : null;
+
+      if (isNaN(checkedAtDate.getTime())) {
+        logger.warn(
+          `[legacy-migrator] Row id=${row.id} has invalid checked_at=${row.checked_at}, skipping`
+        );
+        skipped++;
+        continue;
+      }
 
       const utilizPct: number | null =
         row.utilization_percent != null ? Number(row.utilization_percent) : null;
-      const utilState = utilizationState(utilizPct);
-      const status = deriveStatus(row.status);
-      const label: string = (row.description as string | null) ?? windowType;
-      const unit: string = (row.unit as string | null) ?? '';
-      const successVal = dialect === 'sqlite' ? (row.success ? 1 : 0) : Boolean(row.success);
 
-      const v = {
-        checkerId: row.checker_id as string,
+      valueBatch.push({
+        checkerId: String(row.checker_id),
         checkerType: 'unknown',
-        provider: row.provider as string,
+        provider: String(row.provider),
         meterKey: windowType,
         kind: period.kind,
-        unit,
-        label,
+        unit: (row.unit as string | null) ?? '',
+        label: (row.description as string | null) ?? windowType,
         group: (row.group_id as string | null) ?? null,
-        scope: null as string | null,
+        scope: null,
         limit: row.limit != null ? Number(row.limit) : null,
         used: row.used != null ? Number(row.used) : null,
         remaining: row.remaining != null ? Number(row.remaining) : null,
-        utilizationState: utilState,
+        utilizationState: utilizationState(utilizPct),
         utilizationPercent: utilizPct,
-        status,
+        status: deriveStatus(row.status),
         periodValue: period.periodValue ?? null,
         periodUnit: period.periodUnit ?? null,
         periodCycle: period.periodCycle ?? null,
-        resetsAt,
-        success: successVal,
+        resetsAt: resetsAtDate,
+        success: Boolean(row.success),
         errorMessage: (row.error_message as string | null) ?? null,
-        checkedAt,
-        createdAt,
-      };
+        checkedAt: checkedAtDate,
+        createdAt: createdAtDate,
+      });
+    }
 
-      try {
-        const insertSql =
-          dialect === 'sqlite'
-            ? sql`
-                INSERT OR IGNORE INTO meter_snapshots
-                  (checker_id, checker_type, provider, meter_key, kind, unit, label,
-                   "group", scope, "limit", used, remaining, utilization_state,
-                   utilization_percent, status, period_value, period_unit, period_cycle,
-                   resets_at, success, error_message, checked_at, created_at)
-                VALUES
-                  (${v.checkerId}, ${v.checkerType}, ${v.provider}, ${v.meterKey},
-                   ${v.kind}, ${v.unit}, ${v.label}, ${v.group}, ${v.scope},
-                   ${v.limit}, ${v.used}, ${v.remaining}, ${v.utilizationState},
-                   ${v.utilizationPercent}, ${v.status}, ${v.periodValue}, ${v.periodUnit},
-                   ${v.periodCycle}, ${v.resetsAt}, ${v.success}, ${v.errorMessage},
-                   ${v.checkedAt}, ${v.createdAt})
-              `
-            : sql`
-                INSERT INTO meter_snapshots
-                  (checker_id, checker_type, provider, meter_key, kind, unit, label,
-                   "group", scope, "limit", used, remaining, utilization_state,
-                   utilization_percent, status, period_value, period_unit, period_cycle,
-                   resets_at, success, error_message, checked_at, created_at)
-                VALUES
-                  (${v.checkerId}, ${v.checkerType}, ${v.provider}, ${v.meterKey},
-                   ${v.kind}, ${v.unit}, ${v.label}, ${v.group}, ${v.scope},
-                   ${v.limit}, ${v.used}, ${v.remaining}, ${v.utilizationState},
-                   ${v.utilizationPercent}, ${v.status}, ${v.periodValue}, ${v.periodUnit},
-                   ${v.periodCycle}, ${v.resetsAt}, ${v.success}, ${v.errorMessage},
-                   ${v.checkedAt}, ${v.createdAt})
-                ON CONFLICT DO NOTHING
-              `;
-        await runStatement(db, insertSql);
-        inserted++;
-      } catch (err) {
-        logger.warn(
-          `[legacy-migrator] Skipping row (checker=${v.checkerId}, meterKey=${v.meterKey}): ${err}`
-        );
-        skipped++;
+    if (valueBatch.length === 0) continue;
+
+    try {
+      // Use drizzle's ORM insert — it handles timestamp_ms ↔ Date conversion
+      // correctly for both SQLite and Postgres, avoiding raw-SQL binding issues.
+      await db.insert(meterSnapshots).values(valueBatch);
+      inserted += valueBatch.length;
+    } catch (err) {
+      // Batch failed — fall back to row-by-row so one bad row doesn't drop the whole batch.
+      logger.warn(`[legacy-migrator] Batch insert failed, falling back to row-by-row: ${err}`);
+      for (const v of valueBatch) {
+        try {
+          await db.insert(meterSnapshots).values(v);
+          inserted++;
+        } catch (rowErr) {
+          logger.warn(
+            `[legacy-migrator] Skipping row checker=${v.checkerId} meterKey=${v.meterKey} checkedAt=${v.checkedAt?.toISOString()}: ${rowErr}`
+          );
+          skipped++;
+        }
       }
     }
 
     logger.info(
-      `[legacy-migrator] Progress: ${Math.min(i + BATCH_SIZE, sourceRows.length)} / ${sourceRows.length}`
+      `[legacy-migrator] Progress: ${Math.min(i + BATCH_SIZE, sourceRows.length)} / ${sourceRows.length} — inserted so far: ${inserted}, skipped: ${skipped}`
     );
   }
 
