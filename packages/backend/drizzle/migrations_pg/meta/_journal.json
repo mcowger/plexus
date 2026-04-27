@@ -281,6 +281,13 @@
       "when": 1777250518322,
       "tag": "0039_gigantic_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1777315426333,
+      "tag": "0040_fuzzy_metal_master",
+      "breakpoints": true
     }
   ]
 }
