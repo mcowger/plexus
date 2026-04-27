@@ -42,8 +42,8 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
             <div
               key={quota.checkerId}
               className={clsx(
-                'flex items-center gap-2 min-w-0 py-0.5',
-                !isLast && 'border-b border-border/40'
+                'flex items-center gap-2 min-w-0 py-1',
+                !isLast && 'border-b border-border/60 pb-1.5'
               )}
             >
               <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
@@ -57,8 +57,8 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
             <div
               key={quota.checkerId}
               className={clsx(
-                'flex items-center gap-2 min-w-0 py-0.5',
-                !isLast && 'border-b border-border/40'
+                'flex items-center gap-2 min-w-0 py-1',
+                !isLast && 'border-b border-border/60 pb-1.5'
               )}
             >
               <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
@@ -71,7 +71,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
         return (
           <div
             key={quota.checkerId}
-            className={clsx('py-0.5', !isLast && 'border-b border-border/40')}
+            className={clsx('py-1', !isLast && 'border-b border-border/60 pb-1.5')}
           >
             <span className="text-[11px] text-text-muted pl-0 block truncate mb-0.5">
               {displayName}
