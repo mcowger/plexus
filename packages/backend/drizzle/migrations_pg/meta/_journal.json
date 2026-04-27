@@ -267,6 +267,20 @@
       "when": 1777001004457,
       "tag": "0037_massive_quentin_quire",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1777231627132,
+      "tag": "0038_cultured_songbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1777250518322,
+      "tag": "0039_gigantic_spiral",
+      "breakpoints": true
     }
   ]
 }

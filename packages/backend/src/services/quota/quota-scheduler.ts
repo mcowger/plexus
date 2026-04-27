@@ -1,16 +1,30 @@
 import { logger } from '../../utils/logger';
 import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
-import { QuotaCheckerFactory } from './quota-checker-factory';
-import { QuotaEstimator } from './quota-estimator';
-import { toDbBoolean, toEpochMs, toDbTimestampMs } from '../../utils/normalize';
-import type { QuotaCheckerConfig, QuotaCheckResult, QuotaChecker } from '../../types/quota';
-import { and, eq, gte, desc } from 'drizzle-orm';
+import type { QuotaConfig } from '../../config';
+import { loadAllCheckers, getCheckerDefinition, createMeterContext } from './checker-registry';
+import type { MeterCheckResult, Meter } from '../../types/meter';
+import { toDbTimestampMs } from '../../utils/normalize';
+import { eq, desc, gte, and } from 'drizzle-orm';
 import { CooldownManager } from '../cooldown-manager';
+
+const DEFAULT_EXHAUSTION_THRESHOLD = 99;
+
+function toMs(val: unknown): number {
+  if (val instanceof Date) return val.getTime();
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') return new Date(val).getTime();
+  return 0;
+}
+
+function toIso(val: unknown): string {
+  return new Date(toMs(val)).toISOString();
+}
 
 export class QuotaScheduler {
   private static instance: QuotaScheduler;
-  private checkers: Map<string, QuotaChecker> = new Map();
+  private configs: Map<string, QuotaConfig> = new Map();
   private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private checkersLoaded = false;
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: ReturnType<typeof getSchema> | null = null;
 
@@ -28,68 +42,81 @@ export class QuotaScheduler {
       this.db = getDatabase();
       this.schema = getSchema();
     }
-    return { db: this.db, schema: this.schema };
+    return { db: this.db, schema: this.schema! };
   }
 
-  async initialize(quotaConfigs: QuotaCheckerConfig[]): Promise<void> {
+  async initialize(quotaConfigs: QuotaConfig[]): Promise<void> {
+    if (!this.checkersLoaded) {
+      await loadAllCheckers();
+      this.checkersLoaded = true;
+    }
+
     for (const config of quotaConfigs) {
       if (!config.enabled) {
         logger.info(`Quota checker '${config.id}' is disabled, skipping`);
         continue;
       }
-
-      try {
-        const checker = QuotaCheckerFactory.createChecker(config.type, config);
-        this.checkers.set(config.id, checker);
-        logger.info(
-          `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
-        );
-      } catch (error) {
-        logger.error(`Failed to register quota checker '${config.id}': ${error}`);
+      if (!getCheckerDefinition(config.type)) {
+        logger.error(`Unknown quota checker type '${config.type}' for checker '${config.id}'`);
+        continue;
       }
+      this.configs.set(config.id, config);
+      logger.info(
+        `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
+      );
     }
 
-    for (const [id, checker] of this.checkers) {
-      try {
-        const intervalMs = checker.config.intervalMinutes * 60 * 1000;
-        const intervalId = setInterval(() => this.runCheckNow(id), intervalMs);
-        this.intervals.set(id, intervalId);
-        logger.info(
-          `Scheduled quota checker '${id}' to run every ${checker.config.intervalMinutes} minutes`
-        );
-
-        // Run initial check asynchronously without blocking startup
-        this.runCheckNow(id).catch((error) => {
-          logger.error(`Initial quota check failed for '${id}': ${error}`);
-        });
-      } catch (error) {
-        logger.error(`Failed to schedule quota checker '${id}': ${error}`);
-      }
+    for (const [id, config] of this.configs) {
+      if (this.intervals.has(id)) continue;
+      const intervalMs = config.intervalMinutes * 60 * 1000;
+      const intervalId = setInterval(() => this.runCheckNow(id), intervalMs);
+      this.intervals.set(id, intervalId);
+      logger.info(`Scheduled quota checker '${id}' to run every ${config.intervalMinutes} minutes`);
+      this.runCheckNow(id).catch((error) => {
+        logger.error(`Initial quota check failed for '${id}': ${error}`);
+      });
     }
   }
 
-  async runCheckNow(checkerId: string): Promise<QuotaCheckResult | null> {
-    const checker = this.checkers.get(checkerId);
-    if (!checker) {
+  async runCheckNow(checkerId: string): Promise<MeterCheckResult | null> {
+    const config = this.configs.get(checkerId);
+    if (!config) {
       logger.warn(`Quota checker '${checkerId}' not found`);
       return null;
     }
 
+    const def = getCheckerDefinition(config.type);
+    if (!def) {
+      logger.warn(`No checker definition for type '${config.type}'`);
+      return null;
+    }
+
     logger.debug(`Running quota check for '${checkerId}'`);
-    let result: QuotaCheckResult;
+    const checkedAt = new Date().toISOString();
+    let result: MeterCheckResult;
 
     try {
-      result = await checker.checkQuota();
+      const ctx = createMeterContext(checkerId, config.provider, config.options);
+      const meters = await def.check(ctx);
+      result = {
+        checkerId,
+        checkerType: config.type,
+        provider: config.provider,
+        checkedAt,
+        success: true,
+        meters,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Quota checker '${checkerId}' threw an exception: ${message}`);
-
       result = {
-        provider: checker.config.provider,
         checkerId,
-        checkedAt: new Date(),
+        checkerType: config.type,
+        provider: config.provider,
+        checkedAt,
         success: false,
         error: message,
+        meters: [],
       };
     }
 
@@ -98,84 +125,54 @@ export class QuotaScheduler {
     }
 
     await this.persistResult(result);
-    await this.applyCooldownsFromResult(result);
+    await this.applyCooldownsFromResult(result, config);
 
     return result;
   }
 
-  /**
-   * After each quota check, inspect all windows for near-exhaustion.
-   * If any window is at or above the configured threshold AND has a known reset time,
-   * inject a provider-wide cooldown (model='') lasting until that reset — overriding
-   * the normal exponential backoff so routing stops immediately instead of hammering
-   * the provider.
-   *
-   * The exhaustion threshold defaults to 99%, but can be lowered per-checker via the
-   * `maxUtilizationPercent` option to reserve quota for other consumers.
-   * e.g. maxUtilizationPercent=30 means the provider is cooled down at 30% usage,
-   * preserving 70% of remaining quota.
-   *
-   * If all windows are healthy, clear any existing provider-wide quota cooldown so
-   * routing resumes as soon as the quota refreshes.
-   */
-  private async applyCooldownsFromResult(result: QuotaCheckResult): Promise<void> {
-    if (!result.success || !result.windows?.length) {
-      return;
-    }
+  private async applyCooldownsFromResult(
+    result: MeterCheckResult,
+    config: QuotaConfig
+  ): Promise<void> {
+    if (!result.success || result.meters.length === 0) return;
 
-    const DEFAULT_EXHAUSTION_THRESHOLD = 99;
-    const checker = this.checkers.get(result.checkerId);
-    // Access exhaustionThreshold via type assertion - the actual class has this getter
     const exhaustionThreshold =
-      (checker as any)?.exhaustionThreshold ?? DEFAULT_EXHAUSTION_THRESHOLD;
+      (config.options.maxUtilizationPercent as number | undefined) ?? DEFAULT_EXHAUSTION_THRESHOLD;
     const cooldownManager = CooldownManager.getInstance();
     const provider = result.provider;
 
-    // Find the most-constrained exhausted window that also has a reset time.
-    let earliestResetMs: number | null = null;
-    let exhaustedWindowDescription: string | null = null;
+    let latestResetMs: number | null = null;
+    let exhaustedMeterLabel: string | null = null;
 
-    for (const window of result.windows) {
-      if (
-        window.utilizationPercent !== undefined &&
-        window.utilizationPercent >= exhaustionThreshold
-      ) {
-        const resetMs = window.resetsAt ? window.resetsAt.getTime() : null;
+    for (const meter of result.meters) {
+      const util = meter.utilizationPercent;
+      if (typeof util === 'number' && util >= exhaustionThreshold) {
+        const resetMs = meter.resetsAt ? new Date(meter.resetsAt).getTime() : null;
         if (resetMs !== null && resetMs > Date.now()) {
-          // Use the latest reset time so we don't release the cooldown too early
-          // when multiple windows are exhausted with different reset schedules.
-          if (earliestResetMs === null || resetMs > earliestResetMs) {
-            earliestResetMs = resetMs;
-            exhaustedWindowDescription = window.description ?? window.windowType;
+          if (latestResetMs === null || resetMs > latestResetMs) {
+            latestResetMs = resetMs;
+            exhaustedMeterLabel = meter.label;
           }
         }
-        // If exhausted but no reset time, skip — let existing exponential backoff handle it.
       }
     }
 
-    if (earliestResetMs !== null) {
-      const durationMs = Math.max(0, earliestResetMs - Date.now());
+    if (latestResetMs !== null) {
+      const durationMs = Math.max(0, latestResetMs - Date.now());
       logger.info(
         `[quota-scheduler] Provider '${provider}' quota exhausted` +
-          ` (window: ${exhaustedWindowDescription}, threshold: ${exhaustionThreshold}%, checker: ${result.checkerId}).` +
+          ` (meter: ${exhaustedMeterLabel}, threshold: ${exhaustionThreshold}%, checker: ${result.checkerId}).` +
           ` Injecting provider-wide cooldown for ${Math.round(durationMs / 1000)}s.`
       );
       await cooldownManager.markProviderFailure(
         provider,
         '',
         durationMs,
-        `quota exhausted (threshold: ${exhaustionThreshold}%) — ${exhaustedWindowDescription}`
+        `quota exhausted (threshold: ${exhaustionThreshold}%) — ${exhaustedMeterLabel}`
       );
     } else {
-      // This checker's windows are all healthy — but before clearing the provider-wide
-      // cooldown, verify no OTHER checker for the same provider considers it exhausted.
-      // This prevents a lenient checker (e.g. threshold=99) from clearing a cooldown
-      // that a strict checker (e.g. threshold=30) just set.
-      // However, if THIS checker has the strictest threshold (i.e. it's the one that
-      // likely set the cooldown), allow it to clear its own cooldown.
       const strictestThreshold = this.getStrictestThresholdForProvider(provider);
-      if (checker && (checker as any).exhaustionThreshold <= strictestThreshold) {
-        // This checker is at least as strict as any other — safe to clear
+      if (exhaustionThreshold <= strictestThreshold) {
         await cooldownManager.markProviderSuccess(provider, '');
       } else {
         logger.debug(
@@ -186,15 +183,11 @@ export class QuotaScheduler {
     }
   }
 
-  /**
-   * Get the lowest (strictest) exhaustion threshold among all checkers
-   * for a given provider. Returns 99 (default) if no checkers have custom thresholds.
-   */
   private getStrictestThresholdForProvider(provider: string): number {
-    let strictest = 99;
-    for (const [, checker] of this.checkers) {
-      if (checker.config.provider !== provider) continue;
-      const threshold = (checker as any).exhaustionThreshold;
+    let strictest = DEFAULT_EXHAUSTION_THRESHOLD;
+    for (const [, config] of this.configs) {
+      if (config.provider !== provider) continue;
+      const threshold = config.options.maxUtilizationPercent as number | undefined;
       if (threshold !== undefined && threshold < strictest) {
         strictest = threshold;
       }
@@ -202,32 +195,28 @@ export class QuotaScheduler {
     return strictest;
   }
 
-  private async persistResult(result: QuotaCheckResult): Promise<void> {
+  private async persistResult(result: MeterCheckResult): Promise<void> {
     const { db, schema } = this.ensureDb();
     const dialect = getCurrentDialect();
-
-    const checkedAt = toDbTimestampMs(result.checkedAt, dialect);
-    const now = Date.now();
-    const createdAt = toDbTimestampMs(now, dialect);
+    const checkedAt = toDbTimestampMs(new Date(result.checkedAt), dialect);
+    const createdAt = toDbTimestampMs(Date.now(), dialect);
 
     if (!result.success) {
       try {
-        await db.insert(schema.quotaSnapshots).values({
-          provider: result.provider,
+        await db.insert(schema.meterSnapshots).values({
           checkerId: result.checkerId,
-          groupId: null,
-          windowType: 'custom',
-          checkedAt,
-          limit: null,
-          used: null,
-          remaining: null,
+          checkerType: result.checkerType,
+          provider: result.provider,
+          meterKey: '_error',
+          kind: 'allowance',
+          unit: '',
+          label: 'Quota check failed',
+          utilizationState: 'unknown',
           utilizationPercent: null,
-          unit: null,
-          resetsAt: null,
-          status: null,
-          description: 'Quota check failed',
-          success: toDbBoolean(false),
+          status: 'ok',
+          success: false,
           errorMessage: result.error ?? 'Unknown quota check error',
+          checkedAt,
           createdAt,
         });
       } catch (error) {
@@ -236,164 +225,156 @@ export class QuotaScheduler {
       return;
     }
 
-    if (result.windows) {
-      for (const window of result.windows) {
-        try {
-          await db.insert(schema.quotaSnapshots).values({
-            provider: result.provider,
-            checkerId: result.checkerId,
-            groupId: null,
-            windowType: window.windowType,
-            checkedAt,
-            limit: window.limit,
-            used: window.used,
-            remaining: window.remaining,
-            utilizationPercent: window.utilizationPercent,
-            unit: window.unit,
-            resetsAt: toDbTimestampMs(window.resetsAt, dialect),
-            status: window.status ?? null,
-            description: window.description ?? null,
-            success: toDbBoolean(true),
-            errorMessage: null,
-            createdAt,
-          });
-        } catch (error) {
-          logger.error(`Failed to persist quota window for '${result.checkerId}': ${error}`);
-        }
-      }
-    }
+    for (const meter of result.meters) {
+      try {
+        const util = meter.utilizationPercent;
+        const utilizationState =
+          util === 'unknown'
+            ? 'unknown'
+            : util === 'not_applicable'
+              ? 'not_applicable'
+              : 'reported';
+        const utilizationPercent = typeof util === 'number' ? util : null;
+        const resetsAt = meter.resetsAt ? toDbTimestampMs(new Date(meter.resetsAt), dialect) : null;
 
-    if (result.groups) {
-      for (const group of result.groups) {
-        for (const window of group.windows) {
-          try {
-            await db.insert(schema.quotaSnapshots).values({
-              provider: result.provider,
-              checkerId: result.checkerId,
-              groupId: group.groupId,
-              windowType: window.windowType,
-              checkedAt,
-              limit: window.limit,
-              used: window.used,
-              remaining: window.remaining,
-              utilizationPercent: window.utilizationPercent,
-              unit: window.unit,
-              resetsAt: toDbTimestampMs(window.resetsAt, dialect),
-              status: window.status ?? null,
-              description: window.description ?? null,
-              success: toDbBoolean(true),
-              errorMessage: null,
-              createdAt,
-            });
-          } catch (error) {
-            logger.error(
-              `Failed to persist quota group '${group.groupId}' for '${result.checkerId}': ${error}`
-            );
-          }
-        }
+        await db.insert(schema.meterSnapshots).values({
+          checkerId: result.checkerId,
+          checkerType: result.checkerType,
+          provider: result.provider,
+          meterKey: meter.key,
+          kind: meter.kind,
+          unit: meter.unit,
+          label: meter.label,
+          group: meter.group ?? null,
+          scope: meter.scope ?? null,
+          limit: meter.limit ?? null,
+          used: meter.used ?? null,
+          remaining: meter.remaining ?? null,
+          utilizationState,
+          utilizationPercent,
+          status: meter.status,
+          periodValue: meter.periodValue ?? null,
+          periodUnit: meter.periodUnit ?? null,
+          periodCycle: meter.periodCycle ?? null,
+          resetsAt,
+          success: true,
+          errorMessage: null,
+          checkedAt,
+          createdAt,
+        });
+      } catch (error) {
+        logger.error(`Failed to persist meter '${meter.key}' for '${result.checkerId}': ${error}`);
       }
     }
   }
 
   getCheckerIds(): string[] {
-    return Array.from(this.checkers.keys());
+    return Array.from(this.configs.keys());
   }
 
-  getCheckerCategory(checkerId: string): 'balance' | 'rate-limit' | undefined {
-    return (this.checkers.get(checkerId) as any)?.category;
-  }
-
-  async getLatestQuota(checkerId: string) {
+  async getLatestQuota(checkerId: string): Promise<MeterCheckResult | null> {
     try {
       const { db, schema } = this.ensureDb();
+      const config = this.configs.get(checkerId);
 
-      // Create a timeout promise to prevent indefinite hanging
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Database query timeout')), 15000);
       });
 
       const queryPromise = db
         .select()
-        .from(schema.quotaSnapshots)
-        .where(eq(schema.quotaSnapshots.checkerId, checkerId))
-        .orderBy(desc(schema.quotaSnapshots.checkedAt))
-        .limit(100);
+        .from(schema.meterSnapshots)
+        .where(eq(schema.meterSnapshots.checkerId, checkerId))
+        .orderBy(desc(schema.meterSnapshots.checkedAt))
+        .limit(200);
 
-      const results = (await Promise.race([queryPromise, timeoutPromise])) as any[];
+      const rows = (await Promise.race([queryPromise, timeoutPromise])) as any[];
+      if (rows.length === 0) return null;
 
-      // Get only the most recent snapshot per window type + description combination
-      // Using description as part of the key supports checkers (like antigravity) that emit
-      // multiple windows with the same windowType but different per-model descriptions.
-      const latestByWindowType = new Map<string, any>();
-      for (const snapshot of results) {
-        const key = snapshot.description
-          ? `${snapshot.windowType}:${snapshot.description}`
-          : snapshot.windowType;
-        const existing = latestByWindowType.get(key);
-        if (!existing || snapshot.checkedAt > existing.checkedAt) {
-          latestByWindowType.set(key, snapshot);
-        }
+      const latestMs = toMs(rows[0].checkedAt);
+      const latestRows = rows.filter((r: any) => toMs(r.checkedAt) === latestMs);
+
+      const errorRow = latestRows.find((r: any) => !r.success);
+      if (errorRow) {
+        return {
+          checkerId,
+          checkerType: config?.type ?? errorRow.checkerType,
+          provider: config?.provider ?? errorRow.provider,
+          checkedAt: toIso(errorRow.checkedAt),
+          success: false,
+          error: errorRow.errorMessage ?? 'Unknown error',
+          meters: [],
+        };
       }
 
-      // Add resetInSeconds calculation and quota estimation
-      const now = Date.now();
-      return Array.from(latestByWindowType.values()).map((snapshot) => {
-        const resetsAtMs = toEpochMs(snapshot.resetsAt);
-        const resetInSeconds =
-          resetsAtMs != null ? Math.max(0, Math.floor((resetsAtMs - now) / 1000)) : null;
-
-        // Calculate estimation for this window type
-        const estimation = QuotaEstimator.estimateUsageAtReset(
-          checkerId,
-          snapshot.windowType,
-          snapshot.used,
-          snapshot.limit,
-          resetsAtMs,
-          results // Pass all historical data
-        );
-
+      const meters: Meter[] = latestRows.map((row: any) => {
+        const util: Meter['utilizationPercent'] =
+          row.utilizationState === 'unknown'
+            ? 'unknown'
+            : row.utilizationState === 'not_applicable'
+              ? 'not_applicable'
+              : (row.utilizationPercent ?? 0);
         return {
-          ...snapshot,
-          resetInSeconds,
-          estimation,
+          key: row.meterKey,
+          label: row.label,
+          kind: row.kind,
+          unit: row.unit,
+          group: row.group ?? undefined,
+          scope: row.scope ?? undefined,
+          limit: row.limit ?? undefined,
+          used: row.used ?? undefined,
+          remaining: row.remaining ?? undefined,
+          utilizationPercent: util,
+          status: row.status,
+          periodValue: row.periodValue ?? undefined,
+          periodUnit: row.periodUnit ?? undefined,
+          periodCycle: row.periodCycle ?? undefined,
+          resetsAt: row.resetsAt ? toIso(row.resetsAt) : undefined,
         };
       });
+
+      const firstRow = latestRows[0];
+      return {
+        checkerId,
+        checkerType: config?.type ?? firstRow.checkerType,
+        provider: config?.provider ?? firstRow.provider,
+        checkedAt: toIso(firstRow.checkedAt),
+        success: true,
+        meters,
+      };
     } catch (error) {
       logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
       throw error;
     }
   }
 
-  async getQuotaHistory(checkerId: string, windowType?: string, since?: number) {
+  async getQuotaHistory(checkerId: string, meterKey?: string, since?: number): Promise<any[]> {
     try {
       const { db, schema } = this.ensureDb();
-      let conditions = [eq(schema.quotaSnapshots.checkerId, checkerId)];
+      const dialect = getCurrentDialect();
+      const conditions = [eq(schema.meterSnapshots.checkerId, checkerId)];
 
-      if (windowType) {
-        conditions.push(eq(schema.quotaSnapshots.windowType, windowType));
+      if (meterKey) {
+        conditions.push(eq(schema.meterSnapshots.meterKey, meterKey));
       }
-
       if (since) {
-        const dialect = getCurrentDialect();
         conditions.push(
-          gte(schema.quotaSnapshots.checkedAt, toDbTimestampMs(since, dialect) as any)
+          gte(schema.meterSnapshots.checkedAt, toDbTimestampMs(since, dialect) as any)
         );
       }
 
-      // Create a timeout promise to prevent indefinite hanging
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Database query timeout')), 15000);
       });
 
       const queryPromise = db
         .select()
-        .from(schema.quotaSnapshots)
+        .from(schema.meterSnapshots)
         .where(and(...conditions))
-        .orderBy(desc(schema.quotaSnapshots.checkedAt))
+        .orderBy(desc(schema.meterSnapshots.checkedAt))
         .limit(1000);
 
-      const results = await Promise.race([queryPromise, timeoutPromise]);
-      return results as any[];
+      return (await Promise.race([queryPromise, timeoutPromise])) as any[];
     } catch (error) {
       logger.error(`Failed to get quota history for '${checkerId}': ${error}`);
       throw error;
@@ -406,35 +387,37 @@ export class QuotaScheduler {
       logger.info(`Stopped quota checker '${id}'`);
     }
     this.intervals.clear();
-    this.checkers.clear();
+    this.configs.clear();
   }
 
-  async reload(quotaConfigs: QuotaCheckerConfig[]): Promise<void> {
-    const existingIds = new Set(this.checkers.keys());
+  async reload(quotaConfigs: QuotaConfig[]): Promise<void> {
+    if (!this.checkersLoaded) {
+      await loadAllCheckers();
+      this.checkersLoaded = true;
+    }
+
+    const existingIds = new Set(this.configs.keys());
     const newConfigs = quotaConfigs.filter((c) => !existingIds.has(c.id) && c.enabled);
 
     for (const config of newConfigs) {
-      try {
-        const checker = QuotaCheckerFactory.createChecker(config.type, config);
-        this.checkers.set(config.id, checker);
-        logger.info(
-          `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
-        );
-
-        const intervalMs = checker.config.intervalMinutes * 60 * 1000;
-        const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
-        this.intervals.set(config.id, intervalId);
-        logger.info(
-          `Scheduled quota checker '${config.id}' to run every ${checker.config.intervalMinutes} minutes`
-        );
-
-        // Run initial check asynchronously without blocking
-        this.runCheckNow(config.id).catch((error) => {
-          logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
-        });
-      } catch (error) {
-        logger.error(`Failed to register quota checker '${config.id}' on reload: ${error}`);
+      if (!getCheckerDefinition(config.type)) {
+        logger.error(`Unknown quota checker type '${config.type}' for checker '${config.id}'`);
+        continue;
       }
+      this.configs.set(config.id, config);
+      logger.info(
+        `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
+      );
+
+      const intervalMs = config.intervalMinutes * 60 * 1000;
+      const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
+      this.intervals.set(config.id, intervalId);
+      logger.info(
+        `Scheduled quota checker '${config.id}' to run every ${config.intervalMinutes} minutes`
+      );
+      this.runCheckNow(config.id).catch((error) => {
+        logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
+      });
     }
 
     const loadedIds = new Set(quotaConfigs.filter((c) => c.enabled).map((c) => c.id));
@@ -445,7 +428,7 @@ export class QuotaScheduler {
           clearInterval(intervalId);
           this.intervals.delete(id);
         }
-        this.checkers.delete(id);
+        this.configs.delete(id);
         logger.info(`Removed quota checker '${id}' on reload`);
       }
     }

@@ -13,6 +13,17 @@ if (subcommand === 'rekey') {
   await new Promise(() => {}); // Block forever; process.exit above will terminate
 }
 
+if (subcommand === 'migrate-quota-snapshots') {
+  const { migrateQuotaSnapshotsMain } = await import('./cli/migrate-quota-snapshots');
+  migrateQuotaSnapshotsMain()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Quota snapshot migration failed:', err);
+      process.exit(1);
+    });
+  await new Promise(() => {});
+}
+
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';

@@ -1,100 +1,83 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
-interface ZAIQuotaLimitResponse {
-  code: number;
-  msg: string;
-  success: boolean;
-  data?: {
-    limits?: Array<{
-      type: 'TOKENS_LIMIT' | 'TIME_LIMIT';
-      percentage: number;
-      currentValue?: number;
-      remaining?: number;
-      total?: number;
-      usageDetails?: Array<{ type: string; usage: number }>;
-      nextResetTime?: number;
-    }>;
-    level?: string;
-  };
+interface ZAILimit {
+  type: 'TOKENS_LIMIT' | 'TIME_LIMIT';
+  percentage: number;
+  currentValue?: number;
+  remaining?: number;
+  total?: number;
+  nextResetTime?: number;
 }
 
-export class ZAIQuotaChecker extends QuotaChecker {
-  readonly category = 'rate-limit' as const;
-  private endpoint: string;
+interface ZAIQuotaResponse {
+  success: boolean;
+  data?: { limits?: ZAILimit[] };
+}
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>(
+export default defineChecker({
+  type: 'zai',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'ZAI API key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>(
       'endpoint',
       'https://api.z.ai/api/monitor/usage/quota/limit'
     );
-  }
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
+    logger.silly(`[zai-checker] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Accept-Language': 'en-US,en',
+        'Content-Type': 'application/json',
+      },
+    });
 
-    try {
-      logger.silly(`[zai-checker] Calling ${this.endpoint}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Accept-Language': 'en-US,en',
-          'Content-Type': 'application/json',
-        },
-      });
+    const data: ZAIQuotaResponse = await response.json();
+    const limits = data.data?.limits ?? [];
+    const meters = [];
 
-      logger.silly(`[zai-checker] Response status: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.silly(`[zai-checker] Error response: ${errorText}`);
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
+    for (const limit of limits) {
+      if (limit.type === 'TOKENS_LIMIT') {
+        meters.push(
+          ctx.allowance({
+            key: 'five_hour',
+            label: 'Token usage (5 hour)',
+            unit: 'percentage',
+            used: limit.percentage,
+            remaining: 100 - limit.percentage,
+            periodValue: 5,
+            periodUnit: 'hour',
+            periodCycle: 'rolling',
+          })
+        );
+      } else if (limit.type === 'TIME_LIMIT') {
+        meters.push(
+          ctx.allowance({
+            key: 'monthly',
+            label: 'MCP usage (monthly)',
+            unit: 'requests',
+            limit: limit.total ?? undefined,
+            used: limit.currentValue,
+            remaining: limit.remaining,
+            periodValue: 1,
+            periodUnit: 'month',
+            periodCycle: 'fixed',
+            resetsAt: limit.nextResetTime ? new Date(limit.nextResetTime).toISOString() : undefined,
+          })
+        );
       }
-
-      const data: ZAIQuotaLimitResponse = await response.json();
-      logger.silly(`[zai-checker] Response data: ${JSON.stringify(data)}`);
-
-      const windows: QuotaWindow[] = [];
-      const limits = data.data?.limits ?? [];
-
-      if (limits) {
-        for (const limit of limits) {
-          if (limit.type === 'TOKENS_LIMIT') {
-            windows.push(
-              this.createWindow(
-                'five_hour',
-                100,
-                limit.percentage,
-                undefined,
-                'percentage',
-                undefined,
-                'Token usage (5 Hour)'
-              )
-            );
-          } else if (limit.type === 'TIME_LIMIT') {
-            windows.push(
-              this.createWindow(
-                'monthly',
-                limit.total ?? limit.remaining,
-                limit.currentValue,
-                limit.remaining,
-                'requests',
-                limit.nextResetTime ? new Date(limit.nextResetTime) : undefined,
-                'MCP usage (1 Month)'
-              )
-            );
-          }
-        }
-      }
-
-      logger.silly(`[zai-checker] Returning ${windows.length} windows`);
-      return this.successResult(windows);
-    } catch (error) {
-      return this.errorResult(error as Error);
     }
-  }
-}
+
+    logger.silly(`[zai-checker] Returning ${meters.length} meters`);
+    return meters;
+  },
+});

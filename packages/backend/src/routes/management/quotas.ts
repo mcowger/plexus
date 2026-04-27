@@ -2,50 +2,36 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
-import { toBoolean, toIsoString } from '../../utils/normalize';
+import {
+  getLegacySnapshotStatus,
+  migrateLegacySnapshots,
+  truncateLegacySnapshots,
+  exportLegacySnapshots,
+  type ExportFormat,
+} from '../../services/quota/legacy-snapshot-migrator';
 
-function normalizeQuotaSnapshot(snapshot: any) {
+function getOAuthMetadata(checkerId: string) {
+  const quotaConfig = getConfig().quotas?.find((q) => q.id === checkerId);
+  if (!quotaConfig) return {} as { oauthAccountId?: string; oauthProvider?: string };
+
+  const oauthAccountId = (quotaConfig.options?.oauthAccountId as string | undefined)?.trim();
+  const oauthProvider = (quotaConfig.options?.oauthProvider as string | undefined)?.trim();
+
   return {
-    ...snapshot,
-    checkedAt: toIsoString(snapshot.checkedAt),
-    resetsAt: toIsoString(snapshot.resetsAt),
-    createdAt: toIsoString(snapshot.createdAt),
-    success: toBoolean(snapshot.success),
+    oauthAccountId: oauthAccountId?.length ? oauthAccountId : undefined,
+    oauthProvider: oauthProvider?.length ? oauthProvider : undefined,
   };
+}
+
+function getCheckerType(checkerId: string): string | undefined {
+  return getConfig().quotas?.find((q) => q.id === checkerId)?.type;
 }
 
 export async function registerQuotaRoutes(
   fastify: FastifyInstance,
   quotaScheduler: QuotaScheduler
 ) {
-  // Look up quota config from the current config at call time so that config reloads
-  // (triggered when users save provider settings via the UI) are always reflected.
-  const getQuotaConfig = (checkerId: string) => getConfig().quotas?.find((q) => q.id === checkerId);
-
-  const getOAuthMetadata = (checkerId: string) => {
-    const quotaConfig = getQuotaConfig(checkerId);
-    if (!quotaConfig) {
-      return {} as { oauthAccountId?: string; oauthProvider?: string };
-    }
-
-    const oauthAccountId = (quotaConfig.options?.oauthAccountId as string | undefined)?.trim();
-    const oauthProvider = (quotaConfig.options?.oauthProvider as string | undefined)?.trim();
-
-    return {
-      oauthAccountId: oauthAccountId && oauthAccountId.length > 0 ? oauthAccountId : undefined,
-      oauthProvider: oauthProvider && oauthProvider.length > 0 ? oauthProvider : undefined,
-    };
-  };
-
-  const getCheckerType = (checkerId: string): string | undefined => {
-    return getQuotaConfig(checkerId)?.type;
-  };
-
-  const getCheckerCategory = (checkerId: string): 'balance' | 'rate-limit' | undefined => {
-    return quotaScheduler.getCheckerCategory(checkerId);
-  };
-
-  fastify.get('/v0/management/quotas', async (request, reply) => {
+  fastify.get('/v0/management/quotas', async (_request, reply) => {
     try {
       const checkerIds = quotaScheduler.getCheckerIds();
       logger.debug(`[Quotas API] getCheckerIds returned: ${JSON.stringify(checkerIds)}`);
@@ -55,29 +41,25 @@ export async function registerQuotaRoutes(
         try {
           const latest = await quotaScheduler.getLatestQuota(checkerId);
           results.push({
+            ...getOAuthMetadata(checkerId),
+            ...(latest ?? { success: false, meters: [] }),
             checkerId,
             checkerType: getCheckerType(checkerId),
-            checkerCategory: getCheckerCategory(checkerId),
-            latest,
-            ...getOAuthMetadata(checkerId),
           });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
           results.push({
+            ...getOAuthMetadata(checkerId),
+            success: false,
+            meters: [],
+            error: error instanceof Error ? error.message : 'Unknown error',
             checkerId,
             checkerType: getCheckerType(checkerId),
-            checkerCategory: getCheckerCategory(checkerId),
-            latest: [],
-            error: error instanceof Error ? error.message : 'Unknown error',
-            ...getOAuthMetadata(checkerId),
           });
         }
       }
 
-      return results.map((result) => ({
-        ...result,
-        latest: Array.isArray(result.latest) ? result.latest.map(normalizeQuotaSnapshot) : [],
-      }));
+      return results;
     } catch (error) {
       logger.error(`Failed to get quotas: ${error}`);
       return reply.status(500).send({ error: 'Failed to retrieve quotas' });
@@ -89,11 +71,10 @@ export async function registerQuotaRoutes(
       const { checkerId } = request.params as { checkerId: string };
       const latest = await quotaScheduler.getLatestQuota(checkerId);
       return {
+        ...getOAuthMetadata(checkerId),
+        ...(latest ?? { success: false, meters: [] }),
         checkerId,
         checkerType: getCheckerType(checkerId),
-        checkerCategory: getCheckerCategory(checkerId),
-        latest: latest.map(normalizeQuotaSnapshot),
-        ...getOAuthMetadata(checkerId),
       };
     } catch (error) {
       logger.error(`Failed to get quota for '${(request.params as any).checkerId}': ${error}`);
@@ -104,7 +85,7 @@ export async function registerQuotaRoutes(
   fastify.get('/v0/management/quotas/:checkerId/history', async (request, reply) => {
     try {
       const { checkerId } = request.params as { checkerId: string };
-      const querystring = request.query as { windowType?: string; since?: string };
+      const querystring = request.query as { meterKey?: string; since?: string };
       let since: number | undefined;
 
       if (querystring.since) {
@@ -116,22 +97,67 @@ export async function registerQuotaRoutes(
         }
       }
 
-      const history = await quotaScheduler.getQuotaHistory(
-        checkerId,
-        querystring.windowType,
-        since
-      );
+      const history = await quotaScheduler.getQuotaHistory(checkerId, querystring.meterKey, since);
       return {
         checkerId,
-        windowType: querystring.windowType,
+        meterKey: querystring.meterKey,
         since: since ? new Date(since).toISOString() : undefined,
-        history: history.map(normalizeQuotaSnapshot),
+        history,
       };
     } catch (error) {
       logger.error(
         `Failed to get quota history for '${(request.params as any).checkerId}': ${error}`
       );
       return reply.status(500).send({ error: 'Failed to retrieve quota history' });
+    }
+  });
+
+  fastify.get('/v0/management/quotas/backup-legacy-snapshots', async (request, reply) => {
+    try {
+      const { format = 'csv' } = request.query as { format?: string };
+      const fmt: ExportFormat = format === 'sql' ? 'sql' : 'csv';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `quota_snapshots_backup_${timestamp}.${fmt}`;
+      const body = await exportLegacySnapshots(fmt);
+      reply
+        .header(
+          'Content-Type',
+          fmt === 'sql' ? 'text/plain; charset=utf-8' : 'text/csv; charset=utf-8'
+        )
+        .header('Content-Disposition', `attachment; filename="${filename}"`);
+      return reply.send(body);
+    } catch (error) {
+      logger.error(`Failed to export legacy snapshots: ${error}`);
+      return reply.status(500).send({ error: 'Failed to export legacy snapshots' });
+    }
+  });
+
+  fastify.get('/v0/management/quotas/legacy-snapshot-status', async (_request, reply) => {
+    try {
+      return await getLegacySnapshotStatus();
+    } catch (error) {
+      logger.error(`Failed to get legacy snapshot status: ${error}`);
+      return reply.status(500).send({ error: 'Failed to get legacy snapshot status' });
+    }
+  });
+
+  fastify.post('/v0/management/quotas/migrate-legacy-snapshots', async (_request, reply) => {
+    try {
+      const result = await migrateLegacySnapshots();
+      return result;
+    } catch (error) {
+      logger.error(`Failed to migrate legacy snapshots: ${error}`);
+      return reply.status(500).send({ error: 'Failed to migrate legacy snapshots' });
+    }
+  });
+
+  fastify.post('/v0/management/quotas/truncate-legacy-snapshots', async (_request, reply) => {
+    try {
+      await truncateLegacySnapshots();
+      return { ok: true };
+    } catch (error) {
+      logger.error(`Failed to truncate legacy snapshots: ${error}`);
+      return reply.status(500).send({ error: 'Failed to truncate legacy snapshots' });
     }
   });
 

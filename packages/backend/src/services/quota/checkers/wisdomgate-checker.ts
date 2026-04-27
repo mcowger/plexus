@@ -1,5 +1,5 @@
-import type { QuotaCheckResult, QuotaWindow } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 interface WisdomGateUsageResponse {
@@ -8,53 +8,44 @@ interface WisdomGateUsageResponse {
   total_available: number;
 }
 
-export class WisdomGateQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
+export default defineChecker({
+  type: 'wisdomgate',
+  optionsSchema: z.object({
+    session: z.string().trim().min(1, 'Session cookie is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const session = ctx.requireOption<string>('session');
+    const endpoint = ctx.getOption<string>(
+      'endpoint',
+      'https://wisgate.ai/api/dashboard/billing/usage/details'
+    );
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const session = this.requireOption<string>('session');
-    const endpoint =
-      this.getOption<string>(
-        'endpoint',
-        'https://wisgate.ai/api/dashboard/billing/usage/details'
-      ) || 'https://wisgate.ai/api/dashboard/billing/usage/details';
+    logger.silly(`[wisdomgate] Calling ${endpoint}`);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Cookie: `session=${session}`, Accept: 'application/json' },
+    });
 
-    try {
-      logger.silly(`[wisdomgate] Calling ${endpoint}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          Cookie: `session=${session}`,
-          Accept: 'application/json',
-        },
-      });
+    const data: WisdomGateUsageResponse = await response.json();
+    const used = data.total_usage;
+    const remaining = data.total_available;
+    const limit = used + remaining;
 
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: WisdomGateUsageResponse = await response.json();
-
-      logger.silly(`[wisdomgate] Response: ${JSON.stringify(data)}`);
-
-      const used = data.total_usage;
-      const remaining = data.total_available;
-      const limit = used + remaining;
-
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
+    return [
+      ctx.allowance({
+        key: 'monthly_credits',
+        label: 'Wisdom Gate subscription',
+        unit: 'usd',
         limit,
         used,
         remaining,
-        'dollars',
-        undefined,
-        'Wisdom Gate subscription'
-      );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
-    }
-  }
-}
+        periodValue: 1,
+        periodUnit: 'month',
+        periodCycle: 'fixed',
+      }),
+    ];
+  },
+});

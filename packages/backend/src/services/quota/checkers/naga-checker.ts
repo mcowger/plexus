@@ -1,55 +1,41 @@
-import type { QuotaCheckResult, QuotaWindow, QuotaCheckerConfig } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 
 interface NagaBalanceResponse {
   balance: string;
 }
 
-export class NagaQuotaChecker extends QuotaChecker {
-  readonly category = 'balance' as const;
-  private endpoint: string;
+export default defineChecker({
+  type: 'naga',
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'Naga provisioning key is required'),
+    max: z.number().positive().optional(),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = ctx.requireOption<string>('apiKey');
+    const endpoint = ctx.getOption<string>('endpoint', 'https://api.naga.ac/v1/account/balance');
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>('endpoint', 'https://api.naga.ac/v1/account/balance');
-  }
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    });
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    const apiKey = this.requireOption<string>('apiKey');
-
-    try {
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
-
-      const data: NagaBalanceResponse = await response.json();
-      const currentBalance = parseFloat(data.balance);
-
-      if (isNaN(currentBalance)) {
-        return this.errorResult(new Error(`Invalid balance value received: ${data.balance}`));
-      }
-
-      const window: QuotaWindow = this.createWindow(
-        'subscription',
-        undefined,
-        undefined,
-        currentBalance,
-        'dollars',
-        undefined,
-        'Naga.ac account balance'
-      );
-
-      return this.successResult([window]);
-    } catch (error) {
-      return this.errorResult(error as Error);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-  }
-}
+
+    const data: NagaBalanceResponse = await response.json();
+    const remaining = parseFloat(data.balance);
+    if (isNaN(remaining)) throw new Error(`Invalid balance value: ${data.balance}`);
+
+    return [
+      ctx.balance({
+        key: 'balance',
+        label: 'Account balance',
+        unit: 'usd',
+        remaining,
+      }),
+    ];
+  },
+});

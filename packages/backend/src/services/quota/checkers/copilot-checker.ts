@@ -1,8 +1,8 @@
-import type { QuotaCheckResult, QuotaCheckerConfig, QuotaWindow } from '../../../types/quota';
-import { QuotaChecker } from '../quota-checker';
-import { logger } from '../../../utils/logger';
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
 import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
+import { logger } from '../../../utils/logger';
 
 interface CopilotUsageResponse {
   quota_reset_date_utc?: string;
@@ -15,163 +15,131 @@ interface CopilotUsageResponse {
   };
 }
 
-export class CopilotQuotaChecker extends QuotaChecker {
-  readonly category = 'rate-limit' as const;
-  private endpoint: string;
-  private userAgent: string;
-  private editorVersion: string;
-  private apiVersion: string;
-  private timeoutMs: number;
+async function resolveApiKey(
+  getOption: <T>(key: string, def: T) => T,
+  checkerId: string
+): Promise<string> {
+  const configured = getOption<string>('apiKey', '').trim();
+  if (configured) return configured;
 
-  constructor(config: QuotaCheckerConfig) {
-    super(config);
-    this.endpoint = this.getOption<string>(
-      'endpoint',
-      'https://api.github.com/copilot_internal/user'
-    );
-    this.userAgent = this.getOption<string>('userAgent', 'GitHubCopilotChat/0.26.7');
-    this.editorVersion = this.getOption<string>('editorVersion', 'vscode/1.96.2');
-    this.apiVersion = this.getOption<string>('apiVersion', '2025-04-01');
-    this.timeoutMs = this.getOption<number>('timeoutMs', 15000);
+  const provider = getOption<string>('oauthProvider', 'github-copilot').trim() || 'github-copilot';
+  const oauthAccountId = getOption<string>('oauthAccountId', '').trim();
+  const authManager = OAuthAuthManager.getInstance();
+
+  const credentials = oauthAccountId
+    ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
+    : authManager.getCredentials(provider as OAuthProvider);
+
+  if (!credentials) {
+    throw new Error(`No OAuth credentials found for provider '${provider}'`);
   }
 
-  async checkQuota(): Promise<QuotaCheckResult> {
-    try {
-      const apiKey = await this.resolveApiKey();
+  const refreshToken = (credentials as Record<string, unknown>)?.refresh as string | undefined;
+  logger.debug(
+    `[copilot-checker] resolveApiKey for '${checkerId}' — ` +
+      `refresh=${refreshToken ? `present(${refreshToken.length} chars)` : 'MISSING'}`
+  );
+  if (refreshToken) return refreshToken;
 
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), this.timeoutMs);
+  try {
+    return oauthAccountId
+      ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
+      : await authManager.getApiKey(provider as OAuthProvider);
+  } catch {
+    authManager.reload();
+    return oauthAccountId
+      ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
+      : await authManager.getApiKey(provider as OAuthProvider);
+  }
+}
 
-      logger.silly(`[copilot-checker] Requesting usage for '${this.id}' from ${this.endpoint}`);
-      logger.silly(
-        `[copilot-checker] Token length: ${apiKey.length}, starts with: ${apiKey.substring(0, 10)}...`
-      );
+export default defineChecker({
+  type: 'copilot',
+  optionsSchema: z.object({
+    apiKey: z.string().optional(),
+    oauthAccountId: z.string().optional(),
+    oauthProvider: z.string().optional(),
+    endpoint: z.string().url().optional(),
+    userAgent: z.string().trim().min(1).optional(),
+    editorVersion: z.string().trim().min(1).optional(),
+    apiVersion: z.string().trim().min(1).optional(),
+    timeoutMs: z.number().int().positive().optional(),
+  }),
+  async check(ctx) {
+    const apiKey = await resolveApiKey(ctx.getOption.bind(ctx), ctx.checkerId);
+    const endpoint = ctx.getOption<string>('endpoint', 'https://api.github.com/copilot_internal/user');
+    const userAgent = ctx.getOption<string>('userAgent', 'GitHubCopilotChat/0.26.7');
+    const editorVersion = ctx.getOption<string>('editorVersion', 'vscode/1.96.2');
+    const apiVersion = ctx.getOption<string>('apiVersion', '2025-04-01');
+    const timeoutMs = ctx.getOption<number>('timeoutMs', 15000);
 
-      const headers = {
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
+    logger.silly(`[copilot-checker] Requesting quota from ${endpoint}`);
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
         Authorization: `token ${apiKey}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'Editor-Version': this.editorVersion,
-        'User-Agent': this.userAgent,
-        'X-Github-Api-Version': this.apiVersion,
-      };
-      logger.silly(`[copilot-checker] Request headers: ${JSON.stringify(headers, null, 2)}`);
+        'Editor-Version': editorVersion,
+        'User-Agent': userAgent,
+        'X-Github-Api-Version': apiVersion,
+      },
+      signal: abortController.signal,
+    }).finally(() => clearTimeout(timeout));
 
-      const response = await fetch(this.endpoint, {
-        method: 'GET',
-        headers,
-        signal: abortController.signal,
-      }).finally(() => clearTimeout(timeout));
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-      logger.silly(`[copilot-checker] Response status: ${response.status} ${response.statusText}`);
+    const data: CopilotUsageResponse = await response.json();
+    logger.silly(`[copilot-checker] API response: ${JSON.stringify(data)}`);
 
-      if (!response.ok) {
-        return this.errorResult(new Error(`HTTP ${response.status}: ${response.statusText}`));
-      }
+    const resetDate = data.quota_reset_date_utc
+      ? new Date(data.quota_reset_date_utc).toISOString()
+      : undefined;
+    const pi = data.quota_snapshots?.premium_interactions;
+    if (!pi) return [];
 
-      const data: CopilotUsageResponse = await response.json();
-
-      logger.silly(`[copilot-checker] API response: ${JSON.stringify(data, null, 2)}`);
-
-      const windows: QuotaWindow[] = [];
-      const resetDate = data.quota_reset_date_utc ? new Date(data.quota_reset_date_utc) : undefined;
-
-      if (data.quota_snapshots?.premium_interactions) {
-        const pi = data.quota_snapshots.premium_interactions;
-
-        if (pi.entitlement !== undefined && pi.remaining !== undefined) {
-          const limit = pi.entitlement;
-          const remaining = pi.remaining;
-          const used = Math.max(0, limit - remaining);
-          windows.push(
-            this.createWindow(
-              'monthly',
-              limit,
-              used,
-              remaining,
-              'requests',
-              resetDate,
-              'GitHub Copilot premium interactions'
-            )
-          );
-        } else {
-          // Fallback to percentage when counts are unavailable
-          const percentRemaining = pi.percent_remaining ?? 0;
-          const usedPercent = Math.max(0, 100 - percentRemaining);
-          windows.push(
-            this.createWindow(
-              'monthly',
-              100,
-              usedPercent,
-              percentRemaining,
-              'percentage',
-              resetDate,
-              'GitHub Copilot premium interactions'
-            )
-          );
-        }
-      }
-
-      if (windows.length === 0) {
-        return this.errorResult(new Error('No quota data found in response'));
-      }
-
-      return this.successResult(windows);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return this.errorResult(new Error(`Request timed out after ${this.timeoutMs}ms`));
-      }
-      return this.errorResult(error as Error);
-    }
-  }
-
-  private async resolveApiKey(): Promise<string> {
-    const configuredApiKey = this.getOption<string>('apiKey', '').trim();
-    if (configuredApiKey) {
-      return configuredApiKey;
+    if (pi.entitlement !== undefined && pi.remaining !== undefined) {
+      const limit = pi.entitlement;
+      const remaining = pi.remaining;
+      const used = limit - remaining;
+      return [
+        ctx.allowance({
+          key: 'premium_interactions',
+          label: 'Premium interactions',
+          unit: 'requests',
+          limit,
+          used,
+          remaining,
+          periodValue: 1,
+          periodUnit: 'month',
+          periodCycle: 'fixed',
+          resetsAt: resetDate,
+        }),
+      ];
     }
 
-    const provider =
-      this.getOption<string>('oauthProvider', 'github-copilot').trim() || 'github-copilot';
-    const oauthAccountId = this.getOption<string>('oauthAccountId', '').trim();
-    const authManager = OAuthAuthManager.getInstance();
-
-    // Get credentials directly to access the 'refresh' token
-    const credentials = oauthAccountId
-      ? authManager.getCredentials(provider as OAuthProvider, oauthAccountId)
-      : authManager.getCredentials(provider as OAuthProvider);
-
-    if (!credentials) {
-      throw new Error(
-        `No OAuth credentials found for provider '${provider}'${oauthAccountId ? ` account '${oauthAccountId}'` : ''}`
-      );
+    if (pi.percent_remaining !== undefined) {
+      const remaining = pi.percent_remaining;
+      const used = 100 - remaining;
+      return [
+        ctx.allowance({
+          key: 'premium_interactions',
+          label: 'Premium interactions',
+          unit: 'percentage',
+          used,
+          remaining,
+          periodValue: 1,
+          periodUnit: 'month',
+          periodCycle: 'fixed',
+          resetsAt: resetDate,
+        }),
+      ];
     }
 
-    // For Copilot, we need the 'refresh' token (ghu_...) not the 'access' cookie
-    const refreshToken = (credentials as Record<string, unknown>)?.refresh as string | undefined;
-    logger.debug(
-      `[copilot-checker] resolveApiKey for '${this.id}' — ` +
-        `refresh=${refreshToken ? `present(${refreshToken.length} chars, starts: ${refreshToken.substring(0, 8)}...)` : 'MISSING'}, ` +
-        `access=${credentials.access ? `present(${credentials.access.length} chars)` : 'MISSING'}, ` +
-        `expires=${credentials.expires} (${credentials.expires > Date.now() ? 'valid' : 'EXPIRED'})`
-    );
-    if (refreshToken) {
-      return refreshToken;
-    }
-
-    // Fallback to the standard API key method if refresh is not available
-    try {
-      return oauthAccountId
-        ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
-        : await authManager.getApiKey(provider as OAuthProvider);
-    } catch {
-      authManager.reload();
-      logger.info(
-        `[copilot-checker] Reloaded OAuth auth file and retrying token retrieval for provider '${provider}'.`
-      );
-      return oauthAccountId
-        ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
-        : await authManager.getApiKey(provider as OAuthProvider);
-    }
-  }
-}
+    return [];
+  },
+});

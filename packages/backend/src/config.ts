@@ -302,13 +302,6 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     options: ApertisQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
-    type: z.literal('apertis-coding-plan'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
-    options: ApertisQuotaCheckerOptionsSchema.optional().default({}),
-  }),
-  z.object({
     type: z.literal('minimax-coding'),
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
@@ -555,6 +548,8 @@ export const KeyConfigSchema = z.object({
   quota: z.string().optional(), // References a quota definition name
   allowedModels: z.array(z.string().min(1)).optional(),
   allowedProviders: z.array(z.string().min(1)).optional(),
+  excludedModels: z.array(z.string().min(1)).optional(),
+  excludedProviders: z.array(z.string().min(1)).optional(),
 });
 
 const QuotaConfigSchema = z.object({
@@ -903,7 +898,6 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'copilot',
   'wisdomgate',
   'apertis',
-  'apertis-coding-plan',
   'poe',
   'gemini-cli',
   'antigravity',

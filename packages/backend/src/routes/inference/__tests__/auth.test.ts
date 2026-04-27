@@ -522,3 +522,85 @@ describe('Key Access Policy Propagation', () => {
     });
   });
 });
+
+describe('Key Access Policy Exclusion Propagation', () => {
+  let fastify: FastifyInstance;
+  let mockUsageStorage: UsageStorageService;
+  let capturedRequest: any;
+
+  beforeAll(async () => {
+    fastify = Fastify();
+    capturedRequest = null;
+
+    const mockDispatcher = {
+      dispatch: vi.fn(async (request: any) => {
+        capturedRequest = request;
+        return {
+          id: '123',
+          model: 'gpt-4',
+          created: 123,
+          content: 'test content',
+          usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 },
+        };
+      }),
+    } as unknown as Dispatcher;
+
+    mockUsageStorage = {
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
+    } as unknown as UsageStorageService;
+
+    DebugManager.getInstance().setStorage(mockUsageStorage);
+    SelectorFactory.setUsageStorage(mockUsageStorage);
+
+    setConfigForTesting({
+      providers: {},
+      models: {
+        'gpt-4': {
+          priority: 'selector',
+          targets: [{ provider: 'openai', model: 'gpt-4' }],
+        },
+      },
+      keys: {
+        excluded: {
+          secret: 'sk-excluded-key',
+          excludedModels: ['claude-3-opus', 'gpt-5'],
+          excludedProviders: ['azure-openai', 'google'],
+        },
+      },
+      failover: {
+        enabled: false,
+        retryableStatusCodes: [429, 500, 502, 503, 504],
+        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+      },
+      quotas: [],
+    });
+
+    await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
+    await fastify.ready();
+  });
+
+  it('attaches excluded models and providers policy metadata', async () => {
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: {
+        authorization: 'Bearer sk-excluded-key',
+        'content-type': 'application/json',
+      },
+      payload: {
+        model: 'gpt-4',
+        messages: [],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(capturedRequest?.metadata?.plexus_metadata?.plexus_key_policy).toEqual({
+      excludedModels: ['claude-3-opus', 'gpt-5'],
+      excludedProviders: ['azure-openai', 'google'],
+    });
+  });
+});

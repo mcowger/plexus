@@ -9,11 +9,7 @@ import {
 } from '../lib/api';
 import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
 import type { QuotaCheckerInfo } from '../types/quota';
-import { formatPoints } from '../lib/format';
-import {
-  getCheckerCategory,
-  getTrackedWindowsForChecker,
-} from '../components/quota/CompactQuotasCard';
+import { formatMeterValue } from '../components/quota/MeterValue';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -54,7 +50,6 @@ import { WisdomGateQuotaConfig } from '../components/quota/WisdomGateQuotaConfig
 import { GeminiCliQuotaConfig } from '../components/quota/GeminiCliQuotaConfig';
 import { AntigravityQuotaConfig } from '../components/quota/AntigravityQuotaConfig';
 import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
-import { ApertisCodingPlanQuotaConfig } from '../components/quota/ApertisCodingPlanQuotaConfig';
 import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
 import { OllamaQuotaConfig } from '../components/quota/OllamaQuotaConfig';
@@ -98,7 +93,6 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'kilo',
   'wisdomgate',
   'apertis',
-  'apertis-coding-plan',
   'poe',
   'copilot',
   'gemini-cli',
@@ -996,28 +990,19 @@ export const Providers = () => {
     if (!provider.quotaChecker?.enabled) return null;
     if (quotasLoading) return <span className="text-text-secondary text-xs">—</span>;
     const quota = quotas.find((q) => q.checkerId === provider.id);
-    if (!quota?.latest?.length) return null;
+    if (!quota?.meters?.length) return null;
 
     const handleQuotaClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       navigate('/quotas');
     };
 
-    // Balance-type checkers: show remaining dollars, points, or kwh
-    const subscriptionWindow = quota.latest.find(
-      (w) =>
-        w.windowType === 'subscription' &&
-        (w.unit === 'dollars' || w.unit === 'points' || w.unit === 'kwh')
+    // Balance meters: show remaining
+    const balanceMeter = quota.meters.find(
+      (m) => m.kind === 'balance' && m.remaining !== undefined
     );
-    if (subscriptionWindow?.remaining != null) {
-      let formatted: string;
-      if (subscriptionWindow.unit === 'points') {
-        formatted = `${formatPoints(subscriptionWindow.remaining)} pts`;
-      } else if (subscriptionWindow.unit === 'kwh') {
-        formatted = `${subscriptionWindow.remaining.toFixed(6)} kWh`;
-      } else {
-        formatted = `$${subscriptionWindow.remaining.toFixed(2)}`;
-      }
+    if (balanceMeter && balanceMeter.remaining !== undefined) {
+      const formatted = formatMeterValue(balanceMeter.remaining, balanceMeter.unit);
       return (
         <Badge
           status="neutral"
@@ -1029,15 +1014,17 @@ export const Providers = () => {
       );
     }
 
-    // Rate-limit-type checkers: pick the primary window using the same logic as CompactQuotasCard
-    const category = getCheckerCategory(quota);
-    const windowTypes = quota.latest.map((s) => ({ windowType: s.windowType }));
-    const trackedTypes = getTrackedWindowsForChecker(category, windowTypes);
-    if (!trackedTypes.length) return null;
-    const primarySnapshot = quota.latest.find((s) => s.windowType === trackedTypes[0]);
-    if (!primarySnapshot || primarySnapshot.utilizationPercent == null) return null;
+    // Allowance meters: pick most constrained (highest utilization)
+    const allowances = quota.meters.filter((m) => m.kind === 'allowance');
+    const primary = allowances.reduce<(typeof allowances)[0] | undefined>((worst, m) => {
+      if (!worst) return m;
+      const wu = typeof worst.utilizationPercent === 'number' ? worst.utilizationPercent : 0;
+      const mu = typeof m.utilizationPercent === 'number' ? m.utilizationPercent : 0;
+      return mu > wu ? m : worst;
+    }, undefined);
 
-    const pct = Math.round(primarySnapshot.utilizationPercent);
+    if (!primary || typeof primary.utilizationPercent !== 'number') return null;
+    const pct = Math.round(primary.utilizationPercent);
     const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
     return (
       <Badge
@@ -2036,23 +2023,6 @@ export const Providers = () => {
               {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
                 <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                   <ApertisQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis-coding-plan' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <ApertisCodingPlanQuotaConfig
                     options={editingProvider.quotaChecker?.options || {}}
                     onChange={(options) =>
                       setEditingProvider({

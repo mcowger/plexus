@@ -22,10 +22,6 @@ jobs:
           token: ${{ secrets.REPO_SUPER_TOKEN }}
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-
       - name: Get previous release tag
         id: prev_tag
         run: |
@@ -146,7 +142,7 @@ jobs:
 
       - name: Generate release notes via Claude
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-base-action@main
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
         with:

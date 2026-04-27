@@ -211,6 +211,69 @@ On first startup with `ENCRYPTION_KEY` set, existing plaintext values are automa
 
 ---
 
+## Admin CLI Utilities
+
+Plexus ships several one-shot CLI subcommands for database maintenance tasks. Pass the subcommand name as the first argument to the binary (or `bun run src/index.ts`).
+
+### Rotate Encryption Key (`rekey`)
+
+Decrypts all sensitive fields with the current key and re-encrypts them with a new one. Run this before rotating `ENCRYPTION_KEY` in your environment.
+
+```bash
+# Docker
+docker run --rm \
+  -e DATABASE_URL=sqlite:///app/data/plexus.db \
+  -e ENCRYPTION_KEY="<current-key>" \
+  -e NEW_ENCRYPTION_KEY="<new-key>" \
+  -v plexus-data:/app/data \
+  ghcr.io/mcowger/plexus:latest rekey
+
+# Binary
+ENCRYPTION_KEY="<current-key>" NEW_ENCRYPTION_KEY="<new-key>" \
+  DATABASE_URL=sqlite://./data/plexus.db ./plexus rekey
+```
+
+After a successful run, update `ENCRYPTION_KEY` to the new value before restarting the server.
+
+→ See [Configuration: Encryption](docs/CONFIGURATION.md#encryption-at-rest-optional)
+
+### Migrate Quota Snapshots (`migrate-quota-snapshots`)
+
+One-time ETL that copies historical data from the legacy `quota_snapshots` table into the new `meter_snapshots` table introduced in the quota-tracking overhaul. Run this once after upgrading to a version that includes the new quota system.
+
+```bash
+# Docker
+docker run --rm \
+  -e DATABASE_URL=sqlite:///app/data/plexus.db \
+  -v plexus-data:/app/data \
+  ghcr.io/mcowger/plexus:latest migrate-quota-snapshots
+
+# Binary
+DATABASE_URL=sqlite://./data/plexus.db ./plexus migrate-quota-snapshots
+
+# Development
+DATABASE_URL=sqlite://./data/plexus.db bun run src/index.ts migrate-quota-snapshots
+```
+
+`DATABASE_URL` must be set explicitly — there is no default. The command is **idempotent**: rows that already exist in `meter_snapshots` are skipped, so it is safe to run more than once. If `quota_snapshots` does not exist or is empty the command exits cleanly with no changes.
+
+**Field mapping summary:**
+
+| `quota_snapshots` | `meter_snapshots` | Notes |
+|---|---|---|
+| `provider` | `provider` | direct |
+| `checker_id` | `checker_id` | direct |
+| `group_id` | `group` | renamed |
+| `window_type` | `meter_key` | used as-is |
+| `window_type` | `kind` / `period_*` | `daily`→allowance/day, `monthly`→allowance/month, `balance`→balance, etc. |
+| `description` | `label` | falls back to `window_type` if null |
+| `unit` | `unit` | defaults to `''` if null |
+| `status` | `status` | defaults to `'ok'` if null |
+| `utilization_percent` | `utilization_percent` + `utilization_state` | null→`unknown`, number→`reported` |
+| *(not present)* | `checker_type` | set to `'unknown'` |
+
+---
+
 ## License
 
 MIT License — see [LICENSE](LICENSE) file
