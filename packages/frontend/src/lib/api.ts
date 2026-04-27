@@ -1588,6 +1588,8 @@ export const api = {
           quota?: string;
           allowedModels?: string[];
           allowedProviders?: string[];
+          excludedModels?: string[];
+          excludedProviders?: string[];
         }
       >;
 
@@ -1598,6 +1600,8 @@ export const api = {
         quota: val.quota,
         allowedModels: val.allowedModels,
         allowedProviders: val.allowedProviders,
+        excludedModels: val.excludedModels,
+        excludedProviders: val.excludedProviders,
       }));
     } catch (e) {
       console.error('API Error getKeys', e);
@@ -1617,6 +1621,8 @@ export const api = {
           ...(keyConfig.quota ? { quota: keyConfig.quota } : {}),
           allowedModels: keyConfig.allowedModels ?? [],
           allowedProviders: keyConfig.allowedProviders ?? [],
+          excludedModels: keyConfig.excludedModels ?? [],
+          excludedProviders: keyConfig.excludedProviders ?? [],
         }),
       }
     );
