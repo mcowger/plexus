@@ -37,7 +37,24 @@ jobs:
             observations, compliments, and "non-blocking" style notes unless they mask a
             real risk. If something is fine, say nothing about it. Every sentence in your
             review should describe a concrete concern the author needs to address or
-            consciously accept. Post your findings as a PR review comment.
+            consciously accept.
+
+            Group and prioritize your findings into the following sections, and omit any
+            section that has no findings. Do not include Low priority issues at all.
+
+            ## 🔴 Critical
+            Issues that are likely to cause data loss, security vulnerabilities, crashes,
+            or incorrectness in production. Must be fixed before merge.
+
+            ## 🟠 High
+            Significant logic errors, missing error handling, incorrect assumptions, or
+            test coverage gaps that could cause real problems. Should be fixed before merge.
+
+            ## 🟡 Medium
+            Edge cases that are unhandled but unlikely in practice, or issues that degrade
+            reliability or maintainability meaningfully. Worth addressing.
+
+            Post your findings as a PR review comment.
           allowed_non_write_users: '*'
           claude_args: |
             --model ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
