@@ -115,7 +115,12 @@ function attemptSQLiteAlreadyExistsRepair(
 
   // Reach the underlying Bun SQLite Database through the drizzle session
   const sqlite = db?.session?.client;
-  if (!sqlite?.run) return false;
+  if (!sqlite?.run) {
+    logger.warn(
+      'SQLite repair skipped: could not access underlying Database client via db.session.client'
+    );
+    return false;
+  }
 
   sqlite.run(`
     CREATE TABLE IF NOT EXISTS ${DRIZZLE_MIGRATIONS_TABLE} (
@@ -133,7 +138,12 @@ function attemptSQLiteAlreadyExistsRepair(
     const refersToObject = statements.some((s) =>
       s.toLowerCase().replace(/\s+/g, ' ').includes(`\`${objectName}\``)
     );
-    if (!refersToObject) continue;
+    if (!refersToObject) {
+      logger.silly(
+        `SQLite repair: migration ${entry.tag} does not reference ${objectName}, skipping`
+      );
+      continue;
+    }
 
     const alreadyApplied = sqlite
       .query(`SELECT id FROM ${DRIZZLE_MIGRATIONS_TABLE} WHERE hash = ?`)
@@ -249,14 +259,27 @@ export async function runMigrations() {
               await Bun.file(path.join(DEV_MIGRATIONS_DIR.sqlite, 'meta', '_journal.json')).text()
             ) as Journal);
       const migrations = await buildMigrations(journal, DEV_MIGRATIONS_DIR.sqlite);
+      // Make all CREATE TABLE/INDEX statements idempotent before running so that
+      // schema drift (tables created outside the migration system) never causes a
+      // fatal startup failure. The hash field is computed from the original file
+      // content and is not affected by this transformation, so migration tracking
+      // remains correct.
+      const idempotentMigrations = migrations.map((m) => ({
+        ...m,
+        sql: m.sql.map(toIdempotentSQLiteStatement),
+      }));
       try {
-        (db as any).dialect.migrate(migrations, (db as any).session, { migrationsFolder: '' });
+        (db as any).dialect.migrate(idempotentMigrations, (db as any).session, {
+          migrationsFolder: '',
+        });
       } catch (error: any) {
         if (isSQLiteAlreadyExistsError(error)) {
           const repaired = attemptSQLiteAlreadyExistsRepair(db, migrations, journal, error);
           if (repaired) {
             logger.warn('Retrying SQLite migrations after already-exists repair');
-            (db as any).dialect.migrate(migrations, (db as any).session, { migrationsFolder: '' });
+            (db as any).dialect.migrate(idempotentMigrations, (db as any).session, {
+              migrationsFolder: '',
+            });
           } else {
             throw error;
           }
