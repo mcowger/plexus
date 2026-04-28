@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
 
 export interface ApertisQuotaConfigProps {
   options: Record<string, unknown>;
@@ -24,6 +25,23 @@ export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({ options,
         />
         <span className="text-[10px] text-text-muted">
           Uses the provider's API key automatically. No additional configuration needed.
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="font-body text-[13px] font-medium text-text-secondary">
+          Quota Source
+        </label>
+        <Select
+          value={(options.mode as string) ?? 'subscription'}
+          onChange={(val) => onChange({ ...options, mode: val })}
+          options={[
+            { value: 'subscription', label: 'Subscription (quota only)' },
+            { value: 'payg', label: 'PAYG (balance only)' },
+          ]}
+        />
+        <span className="text-[10px] text-text-muted">
+          Subscription mode monitors the plan quota and triggers cooldowns when exhausted. PAYG mode
+          only tracks the prepaid balance, ignoring the subscription.
         </span>
       </div>
     </div>

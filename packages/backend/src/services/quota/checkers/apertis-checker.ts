@@ -27,10 +27,14 @@ export default defineChecker({
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Apertis API key is required'),
     endpoint: z.string().url().optional(),
+    mode: z.enum(['subscription', 'payg']).optional().default('subscription'),
   }),
   async check(ctx) {
     const apiKey = ctx.requireOption<string>('apiKey');
-    const endpoint = ctx.getOption<string>('endpoint', 'https://api.apertis.ai/v1/dashboard/billing/credits');
+    const endpoint = ctx.getOption<string>(
+      'endpoint',
+      'https://api.apertis.ai/v1/dashboard/billing/credits'
+    );
 
     logger.silly(`[apertis] Calling ${endpoint}`);
     const response = await fetch(endpoint, {
@@ -42,11 +46,15 @@ export default defineChecker({
 
     const data: ApertisBillingCreditsResponse = await response.json();
 
-    if (data.object !== 'billing_credits') throw new Error('Invalid response: expected billing_credits object');
+    if (data.object !== 'billing_credits')
+      throw new Error('Invalid response: expected billing_credits object');
 
     const meters = [];
 
-    if (Number.isFinite(data.payg.account_credits)) {
+    if (
+      ctx.getOption<string>('mode', 'subscription') === 'payg' &&
+      Number.isFinite(data.payg.account_credits)
+    ) {
       meters.push(
         ctx.balance({
           key: 'payg',
@@ -57,7 +65,11 @@ export default defineChecker({
       );
     }
 
-    if (data.is_subscriber && data.subscription) {
+    if (
+      ctx.getOption<string>('mode', 'subscription') !== 'payg' &&
+      data.is_subscriber &&
+      data.subscription
+    ) {
       const sub = data.subscription;
       meters.push(
         ctx.allowance({
