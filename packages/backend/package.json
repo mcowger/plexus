@@ -23,7 +23,7 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
-    "eventsource-encoder": "^1.0.1",
+    "eventsource-encoder": "^1.0.2",
     "eventsource-parser": "^3.0.8",
     "fastify": "^5.8.5",
     "js-tiktoken": "^1.0.21",
