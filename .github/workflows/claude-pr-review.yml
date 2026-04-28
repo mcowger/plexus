@@ -32,29 +32,45 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
-            Review this pull request. Your job is to find problems, not to praise good work.
-            Focus exclusively on: bugs, logic errors, security issues, missing or inadequate
-            test coverage, incorrect assumptions, and edge cases that aren't handled.
-            Do not comment on things that are correct or well-done — omit all positive
-            observations, compliments, and "non-blocking" style notes unless they mask a
-            real risk. If something is fine, say nothing about it. Every sentence in your
-            review should describe a concrete concern the author needs to address or
-            consciously accept.
+            Review this pull request in TWO STAGES.
 
-            Group and prioritize your findings into the following sections, and omit any
-            section that has no findings. Do not include Low priority issues at all.
+            ## Stage 1: Identify issues
+            Find bugs, logic errors, security vulnerabilities, missing or inadequate
+            test coverage, incorrect assumptions, and unhandled edge cases.
+            Do NOT include positive observations, compliments, style preferences,
+            defensive suggestions, or things that are merely suboptimal.
+            Classify every finding as Critical, High, Medium, or Low.
 
-            ## 🔴 Critical
-            Issues that are likely to cause data loss, security vulnerabilities, crashes,
-            or incorrectness in production. Must be fixed before merge.
+            ## Stage 2: Filter ruthlessly — only report what MUST be fixed
+            Re-examine every Medium and Low finding from Stage 1. Ask:
+            "If this were merged as-is, would real users be harmed under normal
+            operation?" If the answer is not a clear yes, discard it. Do not report it.
+            Also discard findings that require unusual manual actions, contrived
+            scenarios, or multiple unlikely things to happen simultaneously.
 
-            ## 🟠 High
-            Significant logic errors, missing error handling, incorrect assumptions, or
-            test coverage gaps that could cause real problems. Should be fixed before merge.
+            After filtering, ONLY report Critical and High findings. If there are
+            none, say: "No issues found that must be addressed before merge."
+            Do NOT pad the review with downgraded Medium items just to have
+            something to say. An empty review is a good review.
 
-            ## 🟡 Medium
-            Edge cases that are unhandled but unlikely in practice, or issues that degrade
-            reliability or maintainability meaningfully. Worth addressing.
+            === Severity definitions ===
+
+            🔴 Critical: Confirmed danger in production RIGHT NOW. You can
+            demonstrate the exact failure path — not speculate. Data loss,
+            exploitable security holes, crashes users WILL hit. Example of what is
+            NOT Critical: "a race condition might occur" or "this tag could point
+            to the wrong image under unusual conditions" — those are hypothetical,
+            not confirmed.
+
+            🟠 High: A confirmed logic error or incorrect behavior that real users
+            will experience under normal use. If the problem only manifests via
+            manual workflow dispatch, concurrent edge cases, or other unusual
+            interaction patterns, it is NOT High. "Could" and "might" mean it's
+            not High.
+
+            Do not use Medium, Low, or Suggestion categories in your output.
+            Those are Stage 1 working categories only — they must all be
+            discarded before you write the review.
 
             Important constraints:
             - Do NOT attempt to run any code, tests, or commands.
