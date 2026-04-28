@@ -69,7 +69,7 @@ describe('apertis checker', () => {
     expect(capturedUrl).toBe('https://custom.example.com/billing');
   });
 
-  it('returns PAYG balance meter from account_credits', async () => {
+  it('returns PAYG balance meter in payg mode', async () => {
     setFetchMock(
       async () =>
         new Response(JSON.stringify(makePaygResponse({ account_credits: 24.980973 })), {
@@ -78,7 +78,7 @@ describe('apertis checker', () => {
         })
     );
 
-    const meters = await checkerDef.check(makeCtx());
+    const meters = await checkerDef.check(makeCtx({ mode: 'payg' }));
 
     expect(meters).toHaveLength(1);
     const m = meters[0]!;
@@ -88,7 +88,7 @@ describe('apertis checker', () => {
     expect(m.label).toBe('PAYG balance');
   });
 
-  it('returns both balance and allowance meters for a subscriber', async () => {
+  it('returns allowance meter only for a subscriber in subscription mode', async () => {
     setFetchMock(
       async () =>
         new Response(
@@ -112,13 +112,12 @@ describe('apertis checker', () => {
 
     const meters = await checkerDef.check(makeCtx());
 
-    expect(meters).toHaveLength(2);
-    expect(meters[0]?.kind).toBe('balance');
-    expect(meters[1]?.kind).toBe('allowance');
-    expect(meters[1]?.unit).toBe('requests');
-    expect(meters[1]?.limit).toBe(1000);
-    expect(meters[1]?.used).toBe(200);
-    expect(meters[1]?.remaining).toBe(800);
+    expect(meters).toHaveLength(1);
+    expect(meters[0]?.kind).toBe('allowance');
+    expect(meters[0]?.unit).toBe('requests');
+    expect(meters[0]?.limit).toBe(1000);
+    expect(meters[0]?.used).toBe(200);
+    expect(meters[0]?.remaining).toBe(800);
   });
 
   it('omits PAYG balance meter when account_credits is NaN', async () => {
@@ -172,5 +171,62 @@ describe('apertis checker', () => {
     });
 
     await expect(checkerDef.check(makeCtx())).rejects.toThrow('network failure');
+  });
+
+  it('omits subscription meter when mode is payg', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify(
+            makePaygResponse({
+              account_credits: 5,
+              is_subscriber: true,
+              subscription: {
+                plan_type: 'lite',
+                status: 'active',
+                cycle_quota_limit: 1000,
+                cycle_quota_used: 900,
+                cycle_quota_remaining: 100,
+                cycle_end: '2026-05-01T00:00:00Z',
+              },
+            })
+          ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx({ mode: 'payg' }));
+
+    expect(meters).toHaveLength(1);
+    expect(meters[0]?.kind).toBe('balance');
+    expect(meters[0]?.label).toBe('PAYG balance');
+  });
+
+  it('includes subscription meter when mode is subscription (default)', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify(
+            makePaygResponse({
+              account_credits: 5,
+              is_subscriber: true,
+              subscription: {
+                plan_type: 'lite',
+                status: 'active',
+                cycle_quota_limit: 1000,
+                cycle_quota_used: 900,
+                cycle_quota_remaining: 100,
+                cycle_end: '2026-05-01T00:00:00Z',
+              },
+            })
+          ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx({ mode: 'subscription' }));
+
+    expect(meters).toHaveLength(1);
+    expect(meters[0]?.kind).toBe('allowance');
   });
 });

@@ -180,6 +180,7 @@ const OllamaQuotaCheckerOptionsSchema = z.object({
 
 const ApertisQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
+  mode: z.enum(['subscription', 'payg']).optional(),
 });
 
 const NeuralwattQuotaCheckerOptionsSchema = z.object({
