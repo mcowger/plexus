@@ -21,7 +21,7 @@ Plexus sits in front of your LLM providers and handles protocol translation, loa
 - **OAuth providers** — Authenticate via GitHub Copilot, Anthropic Claude, OpenAI Codex, Gemini CLI, and Antigravity through OAuth (no API key required)
 - **Model aliasing & load balancing** — Define virtual model names backed by multiple real providers with `random`, `cost`, `performance`, `latency`, or `in_order` selectors
 - **Vision fallthrough** — Automatically convert images to text descriptions for models that don't natively support vision, ensuring compatibility across all providers
-- **Intelligent failover** — Exponential backoff cooldowns automatically remove unhealthy providers from rotation
+- **Intelligent failover** — Exponential-backoff cooldowns automatically remove unhealthy providers from rotation
 - **Usage tracking** — Per-request cost, token counts, latency, and TPS metrics with a built-in dashboard
 - **MCP proxy** — Proxy Model Context Protocol servers through Plexus with per-request session isolation
 - **User quotas** — Per-API-key rate limiting by requests or tokens with rolling, daily, or weekly windows, along with cost restriction.
