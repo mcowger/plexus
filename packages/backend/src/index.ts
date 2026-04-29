@@ -507,7 +507,7 @@ const host = process.env.HOST || '0.0.0.0';
 const start = async () => {
   try {
     await fastify.listen({ port, host });
-    logger.info(`Server starting on port ${port}`);
+    logger.info(`Server listening on http://localhost:${port}`);
 
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
