@@ -45,6 +45,11 @@ export const Modal: React.FC<ModalProps> = ({
     if (e.target === e.currentTarget && mouseDownOnBackdropRef.current) {
       onClose();
     }
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && mouseDownOnBackdropRef.current) {
+      onClose();
+    }
+    mouseDownOnBackdropRef.current = false;
   };
 
   if (!isOpen) return null;
