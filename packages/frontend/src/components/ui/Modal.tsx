@@ -33,7 +33,11 @@ export const Modal: React.FC<ModalProps> = ({
     return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  useEffect(() => {
+    if (!isOpen) {
+      mouseDownOnBackdropRef.current = false;
+      return;
+    }
     mouseDownOnBackdropRef.current = e.target === e.currentTarget;
   };
 
