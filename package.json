@@ -5,7 +5,9 @@
     "@biomejs/biome": "latest",
     "@redocly/cli": "^2.30.1",
     "bun-types": "latest",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "pi-agent-browser-native": "latest",
+    "pi-extensions": "/Users/matt.cowger/workspace/plexus/.pi/npm"
   },
   "private": true,
   "scripts": {
@@ -35,6 +37,5 @@
   "type": "module",
   "workspaces": [
     "packages/*"
-  ],
-  "dependencies": {}
+  ]
 }
