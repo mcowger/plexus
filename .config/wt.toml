@@ -1,0 +1,9 @@
+   [[pre-start]]
+   trust = "mise trust"
+
+   [[pre-start]]
+   install = "bun install"
+
+   [[pre-start]]
+   build = "bun run build:frontend"
+
