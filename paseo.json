@@ -1,5 +1,0 @@
-{
-  "worktree": {
-    "setup": ["mise trust", "bun i", "bun run build:frontend"]
-  }
-}
