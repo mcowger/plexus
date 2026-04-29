@@ -47,7 +47,7 @@ The release notes must follow this structure, in this order, with no additional 
    - Reference the PR or issue number in parentheses at the end
    - Example: Fixed an issue where [description of bug]. (#5678)
 
-7. **Other Changes** — An H3 section (📦 icon) for deprecations, dependency updates, internal improvements, or anything that doesn't fit above. Same bullet format as the other sections.
+7. **Other Changes** — An H3 section (📦 icon) for deprecations, notable internal improvements, or anything that doesn't fit above, but only when it is meaningful to end users, operators, or integrators. Do NOT include items that are purely dependency updates or purely CI/workflow/build-pipeline maintenance. Same bullet format as the other sections.
 
 8. **Contributors** — An H3 section (🙏 icon) listing the people who contributed, prefixed with @. Format as a comma-separated line:
    Thanks to the following people who contributed to this release:
@@ -60,6 +60,9 @@ The release notes must follow this structure, in this order, with no additional 
 - Do NOT add sections not listed above (no Upgrade Instructions, no Links, no FAQ, etc.).
 - Breaking Changes comes immediately after Overview, before New Features.
 - If a section has no items, omit the section and its heading entirely — do not leave an empty section.
+- Exclude changes that are purely dependency/version bumps, lockfile refreshes, package manager maintenance, or similar dependency housekeeping unless the input clearly shows a user-visible impact that should be called out.
+- Exclude changes that are purely CI, GitHub Actions, workflow, release automation, test harness, or build-pipeline maintenance unless the input clearly shows a user-visible operational impact that belongs in release notes.
+- If a PR or commit mixes substantive product changes with dependency or CI/workflow churn, include only the substantive product-facing change and ignore the maintenance-only parts.
 - Every bullet must end with a PR or issue number in parentheses, e.g. (#1234), unless the input provides none.
 - Keep the narrative overview concise (3-5 sentences). It should read like a human wrote it, not an automated log.
 - Use consistent tense: present tense for features ("Adds"), past tense for fixes ("Fixed").
