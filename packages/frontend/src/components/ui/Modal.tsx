@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
@@ -22,6 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
 }) => {
   useBodyScrollLock(isOpen);
+  const mouseDownOnBackdropRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -32,12 +33,23 @@ export const Modal: React.FC<ModalProps> = ({
     return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    mouseDownOnBackdropRef.current = e.target === e.currentTarget;
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && mouseDownOnBackdropRef.current) {
+      onClose();
+    }
+  };
+
   if (!isOpen) return null;
 
   return createPortal(
     <div
       className="fixed inset-0 z-modal flex items-center justify-center p-4 sm:p-5 bg-black/70 backdrop-blur-md animate-[fadeIn_0.2s_ease]"
-      onClick={onClose}
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
       role="dialog"
       aria-modal="true"
       aria-label={title}
