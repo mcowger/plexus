@@ -1,6 +1,7 @@
 import { spawn } from 'bun';
 import { join, basename } from 'path';
 import { createServer } from 'net';
+import { writeFileSync, unlinkSync } from 'fs';
 
 // --- Dev defaults (only applied when not already set in environment) ---
 
@@ -47,6 +48,12 @@ await new Promise<void>((resolve, reject) => {
   process.exit(1);
 });
 
+// --- PID file ---
+// Written so that clear-dev.ts can send SIGHUP to trigger a backend restart.
+
+const PID_FILE = `/tmp/plexus-${dirName}.pid`;
+writeFileSync(PID_FILE, String(process.pid));
+
 // --- Startup ---
 
 const BACKEND_DIR = join(process.cwd(), 'packages/backend');
@@ -57,12 +64,16 @@ console.log(`  PORT:         ${process.env.PORT}`);
 console.log(`  DATABASE_URL: ${process.env.DATABASE_URL}`);
 console.log(`  ADMIN_KEY:    ${process.env.ADMIN_KEY}`);
 
-const backend = spawn(['bun', 'run', '--watch', '--no-clear-screen', 'src/index.ts'], {
-  cwd: BACKEND_DIR,
-  env: { ...process.env },
-  stdout: 'inherit',
-  stderr: 'inherit',
-});
+function spawnBackend() {
+  return spawn(['bun', 'run', '--watch', '--no-clear-screen', 'src/index.ts'], {
+    cwd: BACKEND_DIR,
+    env: { ...process.env },
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+}
+
+let backend = spawnBackend();
 
 console.log('[Frontend] Starting builder (watch mode)...');
 const frontend = spawn(['bun', 'run', 'dev'], {
@@ -74,11 +85,24 @@ const frontend = spawn(['bun', 'run', 'dev'], {
 console.log(`Backend: http://localhost:${process.env.PORT}`);
 console.log('Watching for changes...');
 
+// SIGHUP — kill and respawn the backend (used by clear-dev.ts after DB wipe)
+process.on('SIGHUP', () => {
+  console.log('\n[dev] SIGHUP received — restarting backend...');
+  backend.kill('SIGTERM');
+  backend.exited.then(() => {
+    backend = spawnBackend();
+    console.log('[dev] Backend restarted.');
+  });
+});
+
 // Cleanup on exit
 process.on('SIGINT', async () => {
   console.log('\nStopping...');
   backend.kill('SIGINT');
   frontend.kill('SIGINT');
+  try {
+    unlinkSync(PID_FILE);
+  } catch {}
   await Promise.all([backend.exited, frontend.exited]);
   process.exit(0);
 });

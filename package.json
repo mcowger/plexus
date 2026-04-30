@@ -24,6 +24,8 @@
     "test": "cd packages/backend && bun run test",
     "test:watch": "cd packages/backend && bun run test:watch",
     "release": "bun run scripts/release.ts",
+    "populate-dev": "bun run scripts/populate-dev.ts",
+    "clear-dev": "bun run scripts/clear-dev.ts",
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
     "format": "bunx biome format --write .",

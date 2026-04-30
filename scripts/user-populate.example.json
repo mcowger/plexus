@@ -1,0 +1,55 @@
+{
+  "_comment": "Copy this file to user-populate.json (git-ignored) and fill in your own secrets.",
+
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "sk-your-real-openai-key-here",
+      "disable_cooldown": false
+    },
+    "anthropic": {
+      "type": "anthropic",
+      "api_key": "sk-ant-your-real-anthropic-key-here",
+      "disable_cooldown": false
+    },
+    "gemini": {
+      "type": "gemini",
+      "api_key": "your-real-gemini-key-here",
+      "disable_cooldown": false
+    },
+    "openrouter": {
+      "type": "openai",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key": "sk-or-your-real-openrouter-key-here"
+    }
+  },
+
+  "quotas": {
+    "my-personal-quota": {
+      "type": "rolling",
+      "duration": "1h",
+      "limit": 100000,
+      "limitType": "tokens"
+    }
+  },
+
+  "aliases": {
+    "gpt-4o": {
+      "type": "chat",
+      "targets": [{ "provider": "openai", "model": "gpt-4o" }]
+    },
+    "claude-3-5-sonnet": {
+      "type": "messages",
+      "targets": [{ "provider": "anthropic", "model": "claude-3-5-sonnet-20241022" }]
+    }
+  },
+
+  "keys": {
+    "sk-personal": {
+      "secret": "sk-your-personal-plexus-key",
+      "comment": "My personal dev key",
+      "quota": "my-personal-quota"
+    }
+  }
+}

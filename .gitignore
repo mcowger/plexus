@@ -38,6 +38,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 config/plexus.yaml
 config/*.db
 config/*.sqlite
+
+# Local dev populate overrides (may contain real API keys)
+scripts/user-populate.json
 config/*.db*
 
 CLIProxyApi/

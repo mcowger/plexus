@@ -1,0 +1,431 @@
+{
+  "providers": {
+    "local-ollama": {
+      "type": "openai",
+      "api_base_url": "http://localhost:11434/v1",
+      "api_key": "ollama",
+      "disable_cooldown": true
+    },
+    "local-lmstudio": {
+      "type": "openai",
+      "api_base_url": "http://localhost:1234/v1",
+      "api_key": "lm-studio",
+      "disable_cooldown": true
+    },
+    "local-llamacpp": {
+      "type": "openai",
+      "api_base_url": "http://localhost:8080/v1",
+      "api_key": "no-key",
+      "disable_cooldown": false,
+      "gpu_ram_gb": 24,
+      "gpu_bandwidth_tb_s": 1.008,
+      "gpu_flops_tflop": 165.2,
+      "gpu_power_draw_watts": 350
+    },
+    "mock-openai": {
+      "type": "openai",
+      "api_base_url": "http://localhost:4010/v1",
+      "api_key": "sk-mock-openai-key",
+      "disable_cooldown": true
+    },
+    "mock-anthropic": {
+      "type": "anthropic",
+      "api_base_url": "http://localhost:4010",
+      "api_key": "sk-ant-mock-key",
+      "disable_cooldown": true
+    },
+    "mock-gemini": {
+      "type": "gemini",
+      "api_base_url": "http://localhost:4010",
+      "api_key": "mock-gemini-key",
+      "disable_cooldown": true
+    },
+    "mock-openrouter": {
+      "type": "openai",
+      "api_base_url": "http://localhost:4010/v1",
+      "api_key": "sk-or-mock-key",
+      "disable_cooldown": false
+    }
+  },
+
+  "quotas": {
+    "free-tier-hourly": {
+      "type": "rolling",
+      "duration": "1h",
+      "limit": 10000,
+      "limitType": "tokens"
+    },
+    "free-tier-daily": {
+      "type": "daily",
+      "limit": 50000,
+      "limitType": "tokens"
+    },
+    "standard-hourly-requests": {
+      "type": "rolling",
+      "duration": "1h",
+      "limit": 60,
+      "limitType": "requests"
+    },
+    "standard-daily-tokens": {
+      "type": "daily",
+      "limit": 500000,
+      "limitType": "tokens"
+    },
+    "premium-rolling-large": {
+      "type": "rolling",
+      "duration": "6h",
+      "limit": 2000000,
+      "limitType": "tokens"
+    },
+    "weekly-budget": {
+      "type": "weekly",
+      "limit": 5000000,
+      "limitType": "tokens"
+    },
+    "ci-pipeline-requests": {
+      "type": "rolling",
+      "duration": "30m",
+      "limit": 200,
+      "limitType": "requests"
+    }
+  },
+
+  "aliases": {
+    "gpt-4o": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-openai", "model": "gpt-4o" }],
+      "additional_aliases": ["gpt4o", "openai/gpt-4o"],
+      "input_price_per_million": 2.5,
+      "output_price_per_million": 10.0,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "GPT-4o",
+          "description": "OpenAI GPT-4o — fast flagship multimodal model",
+          "context_length": 128000,
+          "architecture": {
+            "input_modalities": ["text", "image"],
+            "output_modalities": ["text"]
+          }
+        }
+      }
+    },
+    "gpt-4o-mini": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-openai", "model": "gpt-4o-mini" }],
+      "additional_aliases": ["gpt4o-mini", "fast"],
+      "input_price_per_million": 0.15,
+      "output_price_per_million": 0.6,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "GPT-4o mini",
+          "description": "OpenAI GPT-4o mini — affordable small model",
+          "context_length": 128000,
+          "architecture": {
+            "input_modalities": ["text", "image"],
+            "output_modalities": ["text"]
+          }
+        }
+      }
+    },
+    "claude-3-5-sonnet": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-anthropic", "model": "claude-3-5-sonnet-20241022" }],
+      "additional_aliases": ["claude-sonnet", "anthropic/claude-3-5-sonnet"],
+      "input_price_per_million": 3.0,
+      "output_price_per_million": 15.0,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Claude 3.5 Sonnet",
+          "description": "Anthropic Claude 3.5 Sonnet — balanced intelligence and speed",
+          "context_length": 200000,
+          "architecture": {
+            "input_modalities": ["text", "image"],
+            "output_modalities": ["text"]
+          }
+        }
+      }
+    },
+    "claude-3-haiku": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-anthropic", "model": "claude-3-haiku-20240307" }],
+      "additional_aliases": ["claude-haiku", "cheap"],
+      "input_price_per_million": 0.25,
+      "output_price_per_million": 1.25,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Claude 3 Haiku",
+          "description": "Anthropic Claude 3 Haiku — fastest, most affordable Anthropic model",
+          "context_length": 200000,
+          "architecture": {
+            "input_modalities": ["text", "image"],
+            "output_modalities": ["text"]
+          }
+        }
+      }
+    },
+    "gemini-1-5-pro": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-gemini", "model": "gemini-1.5-pro-latest" }],
+      "additional_aliases": ["gemini-pro", "google/gemini-1.5-pro"],
+      "input_price_per_million": 3.5,
+      "output_price_per_million": 10.5,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Gemini 1.5 Pro",
+          "description": "Google Gemini 1.5 Pro — long-context multimodal model",
+          "context_length": 2000000,
+          "architecture": {
+            "input_modalities": ["text", "image", "audio", "video"],
+            "output_modalities": ["text"]
+          }
+        }
+      }
+    },
+    "gemini-flash": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-gemini", "model": "gemini-1.5-flash-latest" }],
+      "additional_aliases": ["gemini-1-5-flash", "google/gemini-flash"],
+      "input_price_per_million": 0.075,
+      "output_price_per_million": 0.3,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Gemini 1.5 Flash",
+          "description": "Google Gemini 1.5 Flash — fast and efficient",
+          "context_length": 1000000,
+          "architecture": {
+            "input_modalities": ["text", "image"],
+            "output_modalities": ["text"]
+          }
+        }
+      }
+    },
+    "smart": {
+      "type": "chat",
+      "targets": [
+        { "provider": "mock-openai", "model": "gpt-4o" },
+        { "provider": "mock-anthropic", "model": "claude-3-5-sonnet-20241022" },
+        { "provider": "mock-gemini", "model": "gemini-1.5-pro-latest" }
+      ],
+      "selector": "in_order",
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Smart (multi-provider)",
+          "description": "Routes to the best available smart model with automatic failover"
+        }
+      }
+    },
+    "balanced": {
+      "type": "chat",
+      "targets": [
+        { "provider": "mock-openai", "model": "gpt-4o-mini" },
+        { "provider": "mock-anthropic", "model": "claude-3-haiku-20240307" },
+        { "provider": "mock-gemini", "model": "gemini-1.5-flash-latest" }
+      ],
+      "selector": "in_order",
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Balanced (multi-provider)",
+          "description": "Routes to the best available balanced/cheap model with automatic failover"
+        }
+      }
+    },
+    "local-llama": {
+      "type": "chat",
+      "targets": [
+        { "provider": "local-ollama", "model": "llama3.2" },
+        { "provider": "local-lmstudio", "model": "llama-3.2-3b-instruct" }
+      ],
+      "selector": "in_order",
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Local Llama 3.2",
+          "description": "Local Llama 3.2 via Ollama or LM Studio"
+        }
+      }
+    },
+    "local-mistral": {
+      "type": "chat",
+      "targets": [
+        { "provider": "local-ollama", "model": "mistral" },
+        { "provider": "local-llamacpp", "model": "mistral-7b-instruct-v0.2" }
+      ],
+      "selector": "in_order",
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Local Mistral 7B",
+          "description": "Local Mistral 7B via Ollama or llama.cpp"
+        }
+      }
+    },
+    "text-embedding-3-small": {
+      "type": "embeddings",
+      "targets": [{ "provider": "mock-openai", "model": "text-embedding-3-small" }],
+      "additional_aliases": ["embedding-small", "embed-small"],
+      "input_price_per_million": 0.02,
+      "output_price_per_million": 0,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "text-embedding-3-small",
+          "description": "OpenAI text-embedding-3-small — efficient embedding model"
+        }
+      }
+    },
+    "text-embedding-3-large": {
+      "type": "embeddings",
+      "targets": [{ "provider": "mock-openai", "model": "text-embedding-3-large" }],
+      "additional_aliases": ["embedding-large", "embed-large"],
+      "input_price_per_million": 0.13,
+      "output_price_per_million": 0,
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "text-embedding-3-large",
+          "description": "OpenAI text-embedding-3-large — high-quality embedding model"
+        }
+      }
+    },
+    "tts-1": {
+      "type": "speech",
+      "targets": [{ "provider": "mock-openai", "model": "tts-1" }],
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "TTS-1",
+          "description": "OpenAI TTS-1 — text-to-speech"
+        }
+      }
+    },
+    "whisper-1": {
+      "type": "transcriptions",
+      "targets": [{ "provider": "mock-openai", "model": "whisper-1" }],
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "Whisper-1",
+          "description": "OpenAI Whisper — speech-to-text transcription"
+        }
+      }
+    },
+    "dall-e-3": {
+      "type": "image",
+      "targets": [{ "provider": "mock-openai", "model": "dall-e-3" }],
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "DALL-E 3",
+          "description": "OpenAI DALL-E 3 — image generation"
+        }
+      }
+    },
+    "openrouter-auto": {
+      "type": "chat",
+      "targets": [{ "provider": "mock-openrouter", "model": "openrouter/auto" }],
+      "additional_aliases": ["auto"],
+      "metadata": {
+        "source": "custom",
+        "overrides": {
+          "name": "OpenRouter Auto",
+          "description": "OpenRouter auto-routing to best available model"
+        }
+      }
+    }
+  },
+
+  "keys": {
+    "sk-dev": {
+      "secret": "sk-dev-plexus-local-testing-key",
+      "comment": "General development key — unrestricted, no quota"
+    },
+    "sk-free": {
+      "secret": "sk-free-tier-user-key",
+      "comment": "Free tier key — token quota enforced",
+      "quota": "free-tier-hourly"
+    },
+    "sk-free-daily": {
+      "secret": "sk-free-daily-user-key",
+      "comment": "Free tier key with daily token budget",
+      "quota": "free-tier-daily"
+    },
+    "sk-standard": {
+      "secret": "sk-standard-user-key",
+      "comment": "Standard tier — daily token quota",
+      "quota": "standard-daily-tokens"
+    },
+    "sk-standard-ratelimited": {
+      "secret": "sk-standard-ratelimited-key",
+      "comment": "Standard tier — hourly request quota (rate limiting demo)",
+      "quota": "standard-hourly-requests"
+    },
+    "sk-premium": {
+      "secret": "sk-premium-user-key",
+      "comment": "Premium tier — large rolling token budget",
+      "quota": "premium-rolling-large"
+    },
+    "sk-ci": {
+      "secret": "sk-ci-pipeline-key",
+      "comment": "CI pipeline key — restricted to fast/cheap models only",
+      "quota": "ci-pipeline-requests",
+      "allowedModels": [
+        "gpt-4o-mini",
+        "claude-3-haiku",
+        "gemini-flash",
+        "balanced",
+        "fast",
+        "cheap"
+      ]
+    },
+    "sk-openai-only": {
+      "secret": "sk-openai-only-key",
+      "comment": "Restricted to OpenAI provider only",
+      "allowedProviders": ["mock-openai"]
+    },
+    "sk-anthropic-only": {
+      "secret": "sk-anthropic-only-key",
+      "comment": "Restricted to Anthropic provider only",
+      "allowedProviders": ["mock-anthropic"]
+    },
+    "sk-local-only": {
+      "secret": "sk-local-models-only-key",
+      "comment": "Restricted to local inference providers only",
+      "allowedProviders": ["local-ollama", "local-lmstudio", "local-llamacpp"]
+    },
+    "sk-embedding-only": {
+      "secret": "sk-embedding-service-key",
+      "comment": "Embedding service key — restricted to embedding models only",
+      "allowedModels": [
+        "text-embedding-3-small",
+        "text-embedding-3-large",
+        "embedding-small",
+        "embedding-large",
+        "embed-small",
+        "embed-large"
+      ]
+    },
+    "sk-no-local": {
+      "secret": "sk-no-local-providers-key",
+      "comment": "Restricted to cloud providers — no local models",
+      "allowedProviders": ["mock-openai", "mock-anthropic", "mock-gemini", "mock-openrouter"]
+    },
+    "sk-weekly-budget": {
+      "secret": "sk-weekly-budget-key",
+      "comment": "Weekly token budget for batch workloads",
+      "quota": "weekly-budget"
+    },
+    "sk-smart-only": {
+      "secret": "sk-smart-model-only-key",
+      "comment": "Restricted to the smart routing alias only",
+      "allowedModels": ["smart", "gpt-4o", "claude-3-5-sonnet", "claude-sonnet", "gemini-1-5-pro"]
+    }
+  }
+}
