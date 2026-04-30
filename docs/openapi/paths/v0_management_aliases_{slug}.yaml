@@ -34,17 +34,30 @@ put:
           $ref: ../components/schemas/AliasConfig.yaml
         examples:
           chat_alias:
-            summary: Chat model alias
+            summary: Chat model alias (with custom metadata)
             value:
               type: chat
               targets:
                 - provider: openai
                   model: gpt-4o
+              input_price_per_million: 2.5
+              output_price_per_million: 10
               metadata:
-                pricing:
-                  input: 2.5
-                  output: 10
-                context_window: 128000
+                source: custom
+                overrides:
+                  name: GPT-4o
+                  description: OpenAI GPT-4o flagship model
+                  context_length: 128000
+          chat_alias_openrouter:
+            summary: Chat model alias (OpenRouter catalog metadata)
+            value:
+              type: chat
+              targets:
+                - provider: openrouter
+                  model: openai/gpt-4o
+              metadata:
+                source: openrouter
+                source_path: openai/gpt-4o
           embeddings_alias:
             summary: Embeddings model alias
             value:
@@ -52,9 +65,8 @@ put:
               targets:
                 - provider: openai
                   model: text-embedding-3-small
-              metadata:
-                pricing:
-                  input: 0.02
+              input_price_per_million: 0.02
+              output_price_per_million: 0
   responses:
     '200':
       description: Saved.

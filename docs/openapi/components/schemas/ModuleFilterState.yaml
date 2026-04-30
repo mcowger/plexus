@@ -7,6 +7,7 @@ properties:
       means all modules are shown.
     items:
       type: string
-      example:
-        - dispatcher
-        - model-metadata-manager
+      example: dispatcher
+    example:
+      - dispatcher
+      - model-metadata-manager

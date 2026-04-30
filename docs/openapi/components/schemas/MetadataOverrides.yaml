@@ -1,0 +1,75 @@
+type: object
+description: >
+  Override fields for model metadata. Used within alias `metadata` to
+  override individual fields sourced from an external catalog, or to
+  provide all fields when `source` is `custom`.
+properties:
+  name:
+    type: string
+    description: >
+      Human-readable model name. Required when `metadata.source` is
+      `custom` (no catalog fallback).
+  description:
+    type: string
+    description: Short description of the model.
+  context_length:
+    type: integer
+    minimum: 1
+    description: Maximum context window in tokens.
+  pricing:
+    type: object
+    description: >
+      Per-token pricing strings (as reported by the provider catalog).
+    properties:
+      prompt:
+        type: string
+        description: Cost per input token (as a decimal string, e.g. "0.000002").
+      completion:
+        type: string
+        description: Cost per output token.
+      input_cache_read:
+        type: string
+        description: Cost per cached input token read.
+      input_cache_write:
+        type: string
+        description: Cost per cached input token write.
+  architecture:
+    type: object
+    description: Input/output modality and tokenizer information.
+    properties:
+      input_modalities:
+        type: array
+        items:
+          type: string
+        description: >
+          Modalities this model accepts as input (e.g. `["text", "image"]`).
+      output_modalities:
+        type: array
+        items:
+          type: string
+        description: >
+          Modalities this model produces as output (e.g. `["text"]`).
+      tokenizer:
+        type: string
+        description: Tokenizer family (e.g. `cl100k_base`, `o200k_base`).
+  supported_parameters:
+    type: array
+    items:
+      type: string
+    description: >
+      List of inference parameters this model supports
+      (e.g. `["temperature", "top_p", "tools"]`).
+  top_provider:
+    type: object
+    description: Provider-level limits for this model.
+    properties:
+      context_length:
+        type: integer
+        minimum: 1
+        description: >
+          Provider-reported maximum context length. Takes precedence over
+          the top-level `context_length` override when both are set.
+      max_completion_tokens:
+        type: integer
+        minimum: 1
+        description: Maximum output tokens the provider allows per request.

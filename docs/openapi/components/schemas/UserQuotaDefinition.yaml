@@ -14,6 +14,7 @@ properties:
       - rolling
       - daily
       - weekly
+      - monthly
     description: >
       Quota window type.
 
@@ -21,11 +22,13 @@ properties:
         `1d`). Requires the `duration` field.
       - **daily** — Resets at midnight local time each day.
       - **weekly** — 7-day rolling window starting from first request.
+      - **monthly** — Calendar month window starting from first request.
   limitType:
     type: string
     enum:
       - requests
       - tokens
+      - cost
     description: >
       What the quota tracks and counts against the limit.
 
@@ -33,17 +36,21 @@ properties:
       - **tokens** — Sum of all token fields: `tokensInput` + `tokensOutput`
         + `tokensCached` + `tokensCacheWrite`. This is the total tokens
         processed, not just input or output.
+      - **cost** — Accumulated cost in USD based on the model's pricing
+        configuration.
   limit:
     type: number
-    minimum: 0
+    minimum: 1
     description: >
       Maximum allowed value within the window. Unit depends on `limitType`:
+
       - For `requests`: number of requests
       - For `tokens`: number of tokens
+      - For `cost`: cost in USD
   duration:
     type: string
     description: >
       Window length for `type: rolling`. Format: number + unit.
       Examples: `1h` (1 hour), `30m` (30 minutes), `1d` (1 day),
-      `5h` (5 hours). Required only when `type` is `rolling`.
+      `5h` (5 hours). Required when `type` is `rolling`, ignored otherwise.
     example: 1h

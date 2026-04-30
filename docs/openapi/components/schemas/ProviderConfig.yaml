@@ -1,38 +1,152 @@
 type: object
-additionalProperties: true
 description: >
   Provider configuration. Used to define upstream LLM providers that Plexus
   can route requests to. Corresponds to entries in `plexus.yaml`
   `providers` section.
+required:
+  - api_base_url
 properties:
-  type:
+  display_name:
     type: string
     description: >
-      Provider type identifier (e.g. openai, anthropic, gemini, openrouter,
-      oauth/anthropic). Determines the transformer and API format used.
-  base_url:
-    type: string
-    format: uri
+      Optional human-readable label for this provider shown in the admin UI.
+  api_base_url:
+    oneOf:
+      - type: string
+        format: uri
+        description: >
+          Base URL for all requests to this provider (e.g.
+          `https://api.openai.com/v1`). May also be an `oauth://` URI for
+          OAuth-authenticated providers.
+      - type: object
+        additionalProperties:
+          type: string
+        description: >
+          Map of inference-type → URL when a single provider exposes multiple
+          API surfaces at different endpoints. Keys are the inference type
+          strings (`chat`, `embeddings`, etc.).
     description: >
-      Optional override URL. When set, requests to this provider use this
-      URL instead of the default provider endpoint. Useful for proxies or
-      custom endpoints.
+      Provider base URL. Either a single URL string or a map of
+      inference-type → URL for providers with multiple surfaces. Accepts
+      `oauth://` URIs for OAuth-authenticated providers.
   api_key:
     type: string
     description: >
       API key for the provider. Can be a literal string or
-      `$env:VARIABLE_NAME` to reference an environment variable.
+      `$env:VARIABLE_NAME` to reference an environment variable. Required
+      unless `api_base_url` is an `oauth://` URI.
+  oauth_provider:
+    type: string
+    enum:
+      - anthropic
+      - openai-codex
+      - github-copilot
+      - google-gemini-cli
+      - google-antigravity
+    description: >
+      OAuth provider identifier. Required when `api_base_url` uses an
+      `oauth://` URI. Determines which OAuth flow is used to obtain
+      credentials.
+  oauth_account:
+    type: string
+    description: >
+      OAuth account identifier. Required when `api_base_url` uses an
+      `oauth://` URI.
+  enabled:
+    type: boolean
+    default: true
+    description: >
+      When false, this provider is excluded from all routing decisions.
   disable_cooldown:
     type: boolean
+    default: false
     description: >
       When true, disables automatic cooldown for this provider. Failed
       requests won't trigger exponential backoff. Use with caution.
-  quota:
+  discount:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: >
+      Cost discount factor applied to usage records for this provider.
+      `0` means no reduction, `1` means 100% discount (free). Used to
+      reflect negotiated discounts in cost calculations.
+  models:
+    oneOf:
+      - type: array
+        items:
+          type: string
+        description: >
+          Simple list of model IDs this provider exposes. Used for model
+          discovery only; does not restrict routing.
+      - type: object
+        additionalProperties:
+          type: object
+          properties:
+            pricing:
+              type: object
+              description: Pricing configuration for this specific model.
+            access_via:
+              type: array
+              items:
+                type: string
+              description: Alternative names this model can be accessed under.
+            type:
+              type: string
+              enum:
+                - chat
+                - responses
+                - embeddings
+                - transcriptions
+                - speech
+                - image
+            extraBody:
+              type: object
+              additionalProperties: true
+              description: Extra fields merged into the request body for this model.
+        description: >
+          Map of model ID → per-model configuration. Allows per-model pricing
+          overrides and access aliases.
+    description: >
+      Models available on this provider. Either a simple list of IDs or a map
+      of model ID → configuration for per-model pricing/type overrides.
+  headers:
+    type: object
+    additionalProperties:
+      type: string
+    description: >
+      Static headers forwarded on every request to this provider. Useful for
+      custom authentication schemes or provider-specific requirements.
+  extraBody:
+    type: object
+    additionalProperties: true
+    description: >
+      Extra fields merged into every request body sent to this provider.
+  estimateTokens:
+    type: boolean
+    default: false
+    description: >
+      When true, token counts are estimated locally rather than relying on
+      the provider's response. Useful for providers that omit usage fields.
+  useClaudeMasking:
+    type: boolean
+    default: false
+    description: >
+      When true, rewrites OpenAI-format requests to look like Claude requests
+      before forwarding. Used for providers that require Anthropic-compatible
+      request shapes.
+  quota_checker:
     type: object
     description: >
       Optional provider-level quota checker configuration. References a
       quota checker type from `GET /v0/management/quota-checker-types`.
     additionalProperties: true
+  gpu_profile:
+    type: string
+    description: >
+      Named GPU profile (e.g. `H100`, `A100`, `custom`). A display hint
+      used by the frontend; the backend uses the four numeric fields below
+      as the source of truth.
   gpu_ram_gb:
     type: number
     description: >

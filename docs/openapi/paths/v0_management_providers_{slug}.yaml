@@ -61,28 +61,39 @@ put:
           $ref: ../components/schemas/ProviderConfig.yaml
         examples:
           openai:
-            summary: OpenAI provider configuration
+            summary: OpenAI provider
             value:
-              slug: openai
-              api_type: chat
-              api_base: https://api.openai.com/v1
-              api_key: ${{ secrets.OPENAI_API_KEY }}
-              default.model: gpt-4o
-              default.parameters:
-                temperature: 0.7
-                max_tokens: 4096
+              api_base_url: https://api.openai.com/v1
+              api_key: sk-your-openai-key
               disable_cooldown: false
           anthropic:
-            summary: Anthropic provider configuration
+            summary: Anthropic provider
             value:
-              slug: anthropic
-              api_type: messages
-              api_base: https://api.anthropic.com
-              api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-              default.model: claude-3-5-sonnet-20241022
-              default.parameters:
-                temperature: 1.0
-                max_tokens: 4096
+              api_base_url: https://api.anthropic.com
+              api_key: sk-ant-your-anthropic-key
+              disable_cooldown: false
+          gemini:
+            summary: Google Gemini provider
+            value:
+              api_base_url: https://generativelanguage.googleapis.com
+              api_key: your-gemini-key
+              disable_cooldown: false
+          local_ollama:
+            summary: Local Ollama provider
+            value:
+              api_base_url: http://localhost:11434/v1
+              api_key: ollama
+              disable_cooldown: true
+          with_gpu_profile:
+            summary: Local provider with GPU energy profile
+            value:
+              api_base_url: http://localhost:8080/v1
+              api_key: no-key
+              disable_cooldown: false
+              gpu_ram_gb: 80
+              gpu_bandwidth_tb_s: 3.35
+              gpu_flops_tflop: 989.4
+              gpu_power_draw_watts: 700
   responses:
     '200':
       description: Saved.

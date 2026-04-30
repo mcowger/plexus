@@ -1,5 +1,6 @@
 type: object
-additionalProperties: true
+required:
+  - targets
 description: >
   Model alias configuration. Maps a client-facing model name to one or
   more provider targets. Corresponds to entries in `plexus.yaml` `models`
@@ -9,66 +10,307 @@ properties:
     type: array
     items:
       type: object
-      additionalProperties: true
+      required:
+        - provider
+        - model
+      properties:
+        provider:
+          type: string
+          description: Provider slug this target routes to.
+        model:
+          type: string
+          description: Model ID to request from the provider.
+        enabled:
+          type: boolean
+          default: true
+          description: When false, this target is skipped during dispatch.
     description: >
-      Array of provider/model targets. The dispatcher tries them in order
-      for failover. Each target is a {provider, model} pair.
+      Ordered list of provider/model targets. The dispatcher tries them in
+      order for failover. At least one target is required.
   type:
     type: string
     enum:
       - chat
-      - messages
       - responses
-      - gemini
       - embeddings
       - transcriptions
       - speech
       - image
     description: >
-      Inference API type this alias targets.
+      Inference API type this alias targets. Anthropic Messages and Google
+      Gemini models are both routed as `chat` — Plexus handles the
+      per-provider request/response transformation transparently.
 
-      - **chat** — OpenAI Chat Completions.
-      - **messages** — Anthropic Messages.
+      - **chat** — OpenAI Chat Completions (also used for Anthropic and Gemini backends).
       - **responses** — OpenAI Responses API.
-      - **gemini** — Google Gemini.
       - **embeddings** — OpenAI Embeddings.
       - **transcriptions** — OpenAI Audio Transcriptions.
       - **speech** — OpenAI Audio Speech.
       - **image** — OpenAI Images generation/edit.
-  metadata:
-    type: object
-    additionalProperties: true
+  selector:
+    type: string
+    enum:
+      - random
+      - in_order
+      - cost
+      - latency
+      - usage
+      - performance
     description: >
-      Optional enriched model data fetched from external catalogs
-      (OpenRouter, models.dev, catwalk). Used to pre-fill override forms
-      in the admin UI.
-  model_architecture:
-    type: object
-    additionalProperties: true
+      Target selection strategy when multiple targets are configured.
+
+      - **random** — Pick a target at random.
+      - **in_order** — Try targets sequentially; first healthy one wins (default behaviour).
+      - **cost** — Prefer the cheapest target based on pricing configuration.
+      - **latency** — Prefer the lowest-latency target based on recent TTFT data.
+      - **usage** — Distribute load proportionally across targets.
+      - **performance** — Prefer the target with the best throughput.
+  priority:
+    type: string
+    enum:
+      - selector
+      - api_match
+    default: selector
     description: >
-      Model architecture details used for energy estimation. Contains
-      input/output modalities, tokenizer info, and token throughput
-      estimates. When modified, triggers recalculation of kWh for
-      historical usage records.
-  input_price_per_million:
-    type: number
-    description: >
-      Simple pricing: input price per million tokens. Used when
-      pricing.source is 'simple'.
-  output_price_per_million:
-    type: number
-    description: >
-      Simple pricing: output price per million tokens.
-  pricing:
-    type: object
-    additionalProperties: true
-    description: >
-      Advanced pricing configuration. Can reference OpenRouter pricing,
-      define custom ranges, or set per-request flat fees.
+      Controls how the `selector` interacts with API-type matching.
+
+      - **selector** — Apply the selector across all targets regardless of API type.
+      - **api_match** — Filter targets to those whose provider supports the
+        requested API type first, then apply the selector.
   additional_aliases:
     type: array
     items:
       type: string
     description: >
-      Additional names this alias is known by. Useful for aliases that
-      map to multiple client-facing model names.
+      Additional names this alias is known by. Requests using any of these
+      names are routed identically to the primary slug.
+  use_image_fallthrough:
+    type: boolean
+    default: false
+    description: >
+      When true, vision requests that fail image processing fall through to
+      text-only handling rather than returning an error.
+  enforce_limits:
+    type: boolean
+    default: false
+    description: >
+      When true, enforces the model's `max_tokens` / `max_output_tokens`
+      constraint from metadata, rejecting requests that exceed it.
+  metadata:
+    description: >
+      Optional reference to an external model catalog entry. When configured,
+      Plexus fetches metadata at startup and includes enriched model
+      information in `GET /v1/models`. All sources support an `overrides`
+      object that wins over catalog values for the specified fields.
+    oneOf:
+      - type: object
+        required:
+          - source
+          - source_path
+        properties:
+          source:
+            type: string
+            enum: [openrouter]
+          source_path:
+            type: string
+            description: >
+              Path within the OpenRouter catalog (e.g. `openai/gpt-4.1-nano`).
+          overrides:
+            $ref: ./MetadataOverrides.yaml
+        additionalProperties: false
+      - type: object
+        required:
+          - source
+          - source_path
+        properties:
+          source:
+            type: string
+            enum: [models.dev]
+          source_path:
+            type: string
+            description: >
+              Path within the models.dev catalog (e.g.
+              `anthropic.claude-3-5-haiku-20241022`).
+          overrides:
+            $ref: ./MetadataOverrides.yaml
+        additionalProperties: false
+      - type: object
+        required:
+          - source
+          - source_path
+        properties:
+          source:
+            type: string
+            enum: [catwalk]
+          source_path:
+            type: string
+            description: >
+              Path within the catwalk catalog.
+          overrides:
+            $ref: ./MetadataOverrides.yaml
+        additionalProperties: false
+      - type: object
+        required:
+          - source
+          - overrides
+        properties:
+          source:
+            type: string
+            enum: [custom]
+          source_path:
+            type: string
+            description: >
+              Optional label. Not used for any catalog lookup.
+          overrides:
+            type: object
+            required:
+              - name
+            description: >
+              All metadata lives here for custom sources. `name` is required
+              because there is no catalog fallback.
+            allOf:
+              - $ref: ./MetadataOverrides.yaml
+        additionalProperties: false
+    discriminator:
+      propertyName: source
+  model_architecture:
+    type: object
+    description: >
+      Model architecture details used for inference energy estimation.
+      When modified, triggers async recalculation of kWh for all affected
+      historical usage records.
+    properties:
+      total_params:
+        type: number
+        description: Total parameter count (billions).
+      active_params:
+        type: number
+        description: Active (non-MoE-gated) parameter count (billions).
+      layers:
+        type: integer
+      heads:
+        type: integer
+      kv_lora_rank:
+        type: integer
+      qk_rope_head_dim:
+        type: integer
+      context_length:
+        type: integer
+      dtype:
+        type: string
+        enum:
+          - fp16
+          - bf16
+          - fp8
+          - fp8_e4m3
+          - fp8_e5m2
+          - nvfp4
+          - int4
+          - int8
+  input_price_per_million:
+    type: number
+    description: >
+      Shorthand simple pricing: input price per million tokens. Equivalent
+      to setting `pricing` to `{ source: "simple", input: <value>, output: <output_price_per_million> }`.
+      Only used when `pricing` is not set.
+  output_price_per_million:
+    type: number
+    description: >
+      Shorthand simple pricing: output price per million tokens. See
+      `input_price_per_million`.
+  pricing:
+    description: >
+      Advanced pricing configuration. Takes precedence over
+      `input_price_per_million` / `output_price_per_million` when set.
+    oneOf:
+      - type: object
+        required: [source, slug]
+        properties:
+          source:
+            type: string
+            enum: [openrouter]
+          slug:
+            type: string
+            description: OpenRouter model slug to pull live pricing from.
+          discount:
+            type: number
+            minimum: 0
+            maximum: 1
+      - type: object
+        required: [source, range]
+        properties:
+          source:
+            type: string
+            enum: [defined]
+          range:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [input_per_m, output_per_m]
+              properties:
+                lower_bound:
+                  type: number
+                  minimum: 0
+                  default: 0
+                upper_bound:
+                  type: number
+                  default: .inf
+                input_per_m:
+                  type: number
+                  minimum: 0
+                output_per_m:
+                  type: number
+                  minimum: 0
+                cached_per_m:
+                  type: number
+                  minimum: 0
+                cache_write_per_m:
+                  type: number
+                  minimum: 0
+      - type: object
+        required: [source, input, output]
+        properties:
+          source:
+            type: string
+            enum: [simple]
+          input:
+            type: number
+            minimum: 0
+          output:
+            type: number
+            minimum: 0
+          cached:
+            type: number
+            minimum: 0
+          cache_write:
+            type: number
+            minimum: 0
+      - type: object
+        required: [source, amount]
+        properties:
+          source:
+            type: string
+            enum: [per_request]
+          amount:
+            type: number
+            minimum: 0
+            description: Flat fee charged per request regardless of token count.
+  advanced:
+    type: array
+    description: >
+      List of model behaviour modifiers applied during request/response
+      transformation.
+    items:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - strip_adaptive_thinking
+          description: Behaviour modifier type.
+        enabled:
+          type: boolean
+          default: true
