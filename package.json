@@ -4,6 +4,7 @@
   "devDependencies": {
     "@biomejs/biome": "latest",
     "@redocly/cli": "^2.30.1",
+    "agent-browser": "^0.26.0",
     "bun-types": "latest",
     "octokit": "^5.0.5",
     "pi-agent-browser-native": "latest",

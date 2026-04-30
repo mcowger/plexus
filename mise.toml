@@ -1,4 +1,6 @@
 [tools]
 act = "latest"
-"aqua:vercel-labs/agent-browser" = "latest"
 bun = "latest"
+
+[env]
+_.path = ["./node_modules/.bin"]

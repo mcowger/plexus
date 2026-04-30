@@ -7,6 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "latest",
         "@redocly/cli": "^2.30.1",
+        "agent-browser": "^0.26.0",
         "bun-types": "latest",
         "octokit": "^5.0.5",
         "pi-agent-browser-native": "latest",
@@ -703,6 +704,8 @@
     "abstract-logging": ["abstract-logging@2.0.1", "", {}, "sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA=="],
 
     "agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
+
+    "agent-browser": ["agent-browser@0.26.0", "", { "bin": { "agent-browser": "bin/agent-browser.js" } }, "sha512-pdqSfjwbFSp+qnwlb2g23e9wXveIOfMi19xpPA9xZUbzEAUp6W4YBZj6Ybj8z4M7WkcbGDDYc+oDIHDt9R3EDQ=="],
 
     "ajv": ["@redocly/ajv@8.18.1", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Ifm/pP/tul1qmAecpbVxCBluVE32rKfjf8gYXH4xI2gCv9mRWFhJMHzkPDM4TXlxwPQYIFegymlsy8lXz7optA=="],
 
