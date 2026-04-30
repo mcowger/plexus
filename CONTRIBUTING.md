@@ -78,9 +78,85 @@ The pre-commit hook runs backend tests automatically.
 
 ## Development
 
+### Starting the dev server
+
 ```bash
-# Start both backend and frontend in watch mode
 bun run dev
 ```
 
-The backend runs on port 4000 by default.
+This starts the backend (with file watching) and the frontend builder in parallel.
+
+The port is derived automatically from the worktree directory name, so two
+worktrees can run simultaneously without collision. The port is printed at
+startup:
+
+```
+Starting Plexus Dev Stack...
+  PORT:         14641
+  DATABASE_URL: sqlite:///tmp/plexus-browsertesting.db
+  ADMIN_KEY:    password
+```
+
+Override any of these with environment variables:
+
+```bash
+PORT=4000 ADMIN_KEY=mysecret bun run dev
+```
+
+### Seeding baseline data
+
+After starting the dev server, seed it with a realistic baseline configuration
+(providers, model aliases, quota definitions, and API keys) that exercises the
+full feature set without requiring any real external credentials:
+
+```bash
+bun run populate-dev
+```
+
+This is idempotent — safe to re-run at any time. It uses `PUT` throughout, so
+existing resources are replaced rather than duplicated.
+
+#### What gets seeded
+
+| Category | Count | Notes |
+|---|---|---|
+| Providers | 7 | Local (Ollama, LM Studio, llama.cpp) + mock cloud (OpenAI, Anthropic, Gemini, OpenRouter) |
+| Quotas | 7 | Rolling, daily, weekly windows; requests and token limits |
+| Model aliases | 16 | chat, embeddings, speech, transcriptions, image types; multi-target failover aliases |
+| API keys | 14 | Unrestricted, quota-enforced, provider-restricted, model-restricted |
+
+All provider URLs point at `localhost` — no real API keys are needed by default.
+
+#### Adding your own data
+
+Create `scripts/user-populate.json` (git-ignored — see `scripts/user-populate.example.json`
+for the format). Anything in that file is merged over the defaults when you run
+`bun run populate-dev`, so you can add real provider keys or personal aliases
+without touching committed files and without risk of accidentally leaking secrets.
+
+#### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PLEXUS_URL` | `http://localhost` | Base URL of the target instance |
+| `PLEXUS_PORT` | derived from cwd | Port (matches `bun run dev` automatically) |
+| `PLEXUS_ADMIN_KEY` | `password` | Admin key |
+
+### Resetting to a clean state
+
+To wipe the database and restart the backend in one step:
+
+```bash
+bun run clear-dev
+```
+
+This deletes the SQLite file from `/tmp` and sends `SIGHUP` to the running dev
+server, which gracefully shuts down the backend and immediately relaunches it
+against the empty database. The frontend is unaffected. The whole cycle takes
+about two seconds.
+
+After clearing, re-run `bun run populate-dev` to restore the baseline config.
+
+> **Note:** `clear-dev` relies on a PID file written by `bun run dev` to
+> `/tmp/plexus-<worktree>.pid`. If the server is not running, it will delete
+> the database file and exit cleanly without error.
