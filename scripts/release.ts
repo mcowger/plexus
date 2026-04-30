@@ -56,9 +56,9 @@ async function main() {
   console.log('--------------------------\n');
 
   // Get GitHub token
-  const token = process.env.GITHUB_TOKEN;
+  const token = process.env.GH_TOKEN;
   if (!token) {
-    console.error('GITHUB_TOKEN environment variable is required');
+    console.error('GH_TOKEN environment variable is required');
     process.exit(1);
   }
 
