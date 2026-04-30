@@ -196,159 +196,108 @@ const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+// Common fields shared by every quota checker variant.
+const QuotaCheckerBaseSchema = z.object({
+  enabled: z.boolean().default(true),
+  intervalMinutes: z.number().min(1).default(30),
+  id: z.string().trim().min(1).optional(),
+  /**
+   * When true, the quota scheduler will not inject a provider-wide cooldown
+   * when utilization exceeds the exhaustion threshold. Quota data is still
+   * fetched and persisted. Circuit-breaker cooldowns (from failures/429s)
+   * are unaffected — use the provider-level disable_cooldown for those.
+   * Defaults to false (current behaviour).
+   */
+  disable_quota_cooldown: z.boolean().optional().default(false),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('naga'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: NagaQuotaCheckerOptionsSchema.optional(),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('synthetic'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: SyntheticQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('nanogpt'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: NanoGPTQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('zai'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: ZAIQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('moonshot'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: MoonshotQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('novita'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: NovitaQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('minimax'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: MiniMaxQuotaCheckerOptionsSchema,
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('openrouter'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: OpenRouterQuotaCheckerOptionsSchema,
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('kilo'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: KiloQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('openai-codex'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: OpenAICodexQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('kimi-code'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: KimiCodeQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('claude-code'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: ClaudeCodeQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('copilot'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: CopilotQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('wisdomgate'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: WisdomGateQuotaCheckerOptionsSchema.optional(),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('apertis'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: ApertisQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('minimax-coding'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: MiniMaxCodingQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('poe'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: PoeQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('gemini-cli'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: GeminiCliQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('antigravity'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: AntigravityQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('neuralwatt'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: NeuralwattQuotaCheckerOptionsSchema.optional().default({}),
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('ollama'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: OllamaQuotaCheckerOptionsSchema,
   }),
-  z.object({
+  QuotaCheckerBaseSchema.extend({
     type: z.literal('zenmux'),
-    enabled: z.boolean().default(true),
-    intervalMinutes: z.number().min(1).default(30),
-    id: z.string().trim().min(1).optional(),
     options: ZenmuxQuotaCheckerOptionsSchema.optional(),
   }),
 ]);
@@ -560,6 +509,14 @@ const QuotaConfigSchema = z.object({
   enabled: z.boolean().default(true),
   intervalMinutes: z.number().min(1).default(30),
   options: z.record(z.string(), z.any()).default({}),
+  /**
+   * When true, the quota scheduler will not inject a provider-wide cooldown
+   * when utilization exceeds the exhaustion threshold. Quota data is still
+   * fetched and persisted. Circuit-breaker cooldowns (from failures/429s)
+   * are unaffected — use the provider-level disable_cooldown for those.
+   * Defaults to false (current behaviour).
+   */
+  disableQuotaCooldown: z.boolean().default(false),
 });
 
 export const McpServerConfigSchema = z.object({
@@ -829,6 +786,7 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
       enabled: true,
       intervalMinutes: quotaChecker.intervalMinutes,
       options,
+      disableQuotaCooldown: quotaChecker.disable_quota_cooldown === true,
     });
   }
 

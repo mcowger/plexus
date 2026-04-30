@@ -136,6 +136,13 @@ export class QuotaScheduler {
   ): Promise<void> {
     if (!result.success || result.meters.length === 0) return;
 
+    if (config.disableQuotaCooldown) {
+      logger.debug(
+        `Quota checker '${result.checkerId}' has disableQuotaCooldown=true — skipping cooldown injection for provider '${result.provider}'.`
+      );
+      return;
+    }
+
     const exhaustionThreshold =
       (config.options.maxUtilizationPercent as number | undefined) ?? DEFAULT_EXHAUSTION_THRESHOLD;
     const cooldownManager = CooldownManager.getInstance();
