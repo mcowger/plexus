@@ -25,6 +25,7 @@ export const providers = sqliteTable(
     quotaCheckerEnabled: integer('quota_checker_enabled').notNull().default(1),
     quotaCheckerInterval: integer('quota_checker_interval').notNull().default(30),
     quotaCheckerOptions: text('quota_checker_options'), // JSON
+    quotaCheckerDisableCooldown: integer('quota_checker_disable_cooldown').notNull().default(0),
     // GPU Profile settings — display hint + resolved numeric params
     // gpu_profile is kept as a display hint; the 4 numeric fields are the source of truth.
     gpuProfile: text('gpu_profile'), // GPU profile name (e.g. 'H100', 'custom') — display hint only

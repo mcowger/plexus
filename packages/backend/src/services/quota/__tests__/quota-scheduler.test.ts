@@ -16,13 +16,17 @@ import type { QuotaConfig } from '../../../config';
 const CHECKER_ID = 'quota-persistence-checker';
 
 const makeConfig = (
-  overrides: Partial<{ maxUtilizationPercent: number }> & { id?: string; provider?: string } = {}
+  overrides: Partial<{ maxUtilizationPercent: number; disableQuotaCooldown: boolean }> & {
+    id?: string;
+    provider?: string;
+  } = {}
 ): QuotaConfig => ({
   id: overrides.id ?? CHECKER_ID,
   provider: overrides.provider ?? 'test-provider',
   type: 'synthetic',
   enabled: true,
   intervalMinutes: 60,
+  disableQuotaCooldown: overrides.disableQuotaCooldown ?? false,
   options: {
     ...(overrides.maxUtilizationPercent !== undefined
       ? { maxUtilizationPercent: overrides.maxUtilizationPercent }
@@ -277,5 +281,78 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
     );
     isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
     expect(isHealthy).toBe(false);
+  });
+});
+
+describe('QuotaScheduler disableQuotaCooldown', () => {
+  const PROVIDER = 'disable-quota-cooldown-test-provider';
+
+  beforeEach(async () => {
+    await closeDatabase();
+    process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
+    initializeDatabase(process.env.DATABASE_URL);
+    await runMigrations();
+
+    const db = getDatabase() as any;
+    const schema = getSchema() as any;
+    await db.delete(schema.meterSnapshots);
+  });
+
+  afterEach(async () => {
+    QuotaScheduler.getInstance().stop();
+    const cooldownManager = CooldownManager.getInstance();
+    await cooldownManager.markProviderSuccess(PROVIDER, '');
+    await closeDatabase();
+  });
+
+  it('does not inject a quota cooldown when disableQuotaCooldown is true, even at 100% utilization', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    const config = makeConfig({ provider: PROVIDER, disableQuotaCooldown: true });
+    scheduler.configs.set('no-quota-cooldown-checker', config);
+
+    await scheduler.applyCooldownsFromResult(
+      makeMeterResult(100, 'no-quota-cooldown-checker', PROVIDER),
+      config
+    );
+
+    const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+    expect(isHealthy).toBe(true);
+  });
+
+  it('still injects a cooldown when disableQuotaCooldown is false (default)', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    const config = makeConfig({ provider: PROVIDER, disableQuotaCooldown: false });
+    scheduler.configs.set('with-quota-cooldown-checker', config);
+
+    await scheduler.applyCooldownsFromResult(
+      makeMeterResult(99, 'with-quota-cooldown-checker', PROVIDER),
+      config
+    );
+
+    const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+    expect(isHealthy).toBe(false);
+  });
+
+  it('disableQuotaCooldown does not affect quota data persistence', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    const config = makeConfig({ provider: PROVIDER, disableQuotaCooldown: true });
+    scheduler.configs.set('no-quota-cooldown-persist-checker', config);
+
+    const result = makeMeterResult(100, 'no-quota-cooldown-persist-checker', PROVIDER);
+    await scheduler.persistResult(result);
+    await scheduler.applyCooldownsFromResult(result, config);
+
+    const db = getDatabase() as any;
+    const schema = getSchema() as any;
+    const rows = await db
+      .select()
+      .from(schema.meterSnapshots)
+      .where(eq(schema.meterSnapshots.checkerId, 'no-quota-cooldown-persist-checker'));
+
+    // Meter data was still persisted
+    expect(rows.length).toBeGreaterThan(0);
+    // But no cooldown was injected
+    const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+    expect(isHealthy).toBe(true);
   });
 });

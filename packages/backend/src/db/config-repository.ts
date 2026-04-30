@@ -299,6 +299,7 @@ export class ConfigRepository {
       quotaCheckerOptions: config.quota_checker?.options
         ? encryptJsonField(config.quota_checker.options)
         : null,
+      quotaCheckerDisableCooldown: fromBool(config.quota_checker?.disable_quota_cooldown === true),
       // GPU Profile settings for inference energy calculation
       gpuProfile: config.gpu_profile ?? null,
       gpuRamGb: config.gpu_ram_gb ?? null,
@@ -442,6 +443,7 @@ export class ConfigRepository {
         type: row.quotaCheckerType,
         enabled: toBool(row.quotaCheckerEnabled),
         intervalMinutes: row.quotaCheckerInterval,
+        disable_quota_cooldown: toBool(row.quotaCheckerDisableCooldown),
         ...(row.quotaCheckerId ? { id: row.quotaCheckerId } : {}),
         ...(row.quotaCheckerOptions ? { options: decryptJsonField(row.quotaCheckerOptions) } : {}),
       };

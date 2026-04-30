@@ -445,6 +445,7 @@ export class ConfigService {
         enabled: true,
         intervalMinutes: quotaChecker.intervalMinutes,
         options,
+        disableQuotaCooldown: quotaChecker.disable_quota_cooldown === true,
       });
     }
 
