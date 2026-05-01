@@ -1169,7 +1169,7 @@
 
     "perfect-scrollbar": ["perfect-scrollbar@1.5.6", "", {}, "sha512-rixgxw3SxyJbCaSpo1n35A/fwI1r2rdwMKOTCg/AcG+xOEyZcE8UHVjpZMFCVImzsFoCZeJTT+M/rdEIQYO2nw=="],
 
-    "pi-agent-browser-native": ["pi-agent-browser-native@0.2.12", "", { "peerDependencies": { "typebox": "*" } }, "sha512-Ior3PuhUmxhRcmKhBjk6IG6FGkCsF7Jh/dkgzu9j0ochXCbTXH2xVNnf//60/VmqbRosbPnXPkx1PX3SIbUNsw=="],
+    "pi-agent-browser-native": ["pi-agent-browser-native@0.2.13", "", { "peerDependencies": { "typebox": "*" }, "bin": { "pi-agent-browser-doctor": "scripts/doctor.mjs" } }, "sha512-XF1isEl61zHjDTmI0KAEN4tKbOmxKJWLj9qlvoYJpfAiULKj1oNSbgDwkRoMmXNchZ8BY3fW8mQFNVGtI/M26A=="],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
