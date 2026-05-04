@@ -14,6 +14,9 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/frontend/package.json ./packages/frontend/
 COPY packages/shared/package.json ./packages/shared/
 
+# Copy scripts needed by the prepare hook
+COPY scripts/ ./scripts/
+
 # Install dependencies
 RUN bun install --frozen-lockfile
 
