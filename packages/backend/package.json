@@ -10,7 +10,7 @@
     "test:force-all": "bunx --bun vitest run --config vitest.config.ts",
     "test:watch": "bunx --bun vitest --config vitest.config.ts",
     "rekey": "bun run src/cli/rekey.ts",
-    "backup": "bun run scripts/backup-db.ts"
+    "backup": "bun run src/cli/backup.ts"
   },
   "dependencies": {
     "@fastify/bearer-auth": "^10.1.2",
