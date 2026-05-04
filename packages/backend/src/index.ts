@@ -24,6 +24,17 @@ if (subcommand === 'migrate-quota-snapshots') {
   await new Promise(() => {});
 }
 
+if (subcommand === 'backup') {
+  const { backupMain } = await import('./cli/backup');
+  backupMain()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Backup failed:', err);
+      process.exit(1);
+    });
+  await new Promise(() => {});
+}
+
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
