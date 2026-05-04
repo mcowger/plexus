@@ -20,6 +20,7 @@ import { registerMetricsRoutes } from './management/metrics';
 import { registerSelfRoutes } from './management/self';
 import { authenticate, requireAdmin, ManagementAuthError } from './management/_principal';
 import { registerModelRoutes } from './management/models';
+import { registerBackupRoutes } from './management/backup';
 import { Dispatcher } from '../services/dispatcher';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
@@ -112,6 +113,8 @@ export async function registerManagementRoutes(
       await registerUserQuotaRoutes(adminOnly);
       // Model routes for AI energy calculations
       await registerModelRoutes(adminOnly);
+      // Backup and restore routes
+      await registerBackupRoutes(adminOnly);
     });
   });
 }
