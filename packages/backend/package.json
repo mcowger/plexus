@@ -33,7 +33,7 @@
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
     "yaml": "^2.8.3",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.4.5",
