@@ -17,7 +17,7 @@
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.1.3",
     "@google/genai": "^1.50.1",
-    "@mariozechner/pi-ai": "0.71.1",
+    "@mariozechner/pi-ai": "0.72.1",
     "@plexus/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
     "dotenv": "^17.4.2",
