@@ -27,8 +27,6 @@ import { DateTimePicker } from '../components/ui/DateTimePicker';
 import {
   ChevronLeft,
   ChevronRight,
-  PlayCircle,
-  Circle,
   Trash2,
   Bug,
   Zap,
@@ -59,6 +57,8 @@ import {
   Plane,
   Eye,
   ScanSearch,
+  PlayCircle,
+  Circle,
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -392,12 +392,9 @@ export const Logs = () => {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return { time: 'Invalid', date: 'Date' };
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
       return {
         time: d.toLocaleTimeString(),
-        date: `${year}-${month}-${day}`,
+        date: d.toISOString().split('T')[0],
       };
     } catch (e) {
       return { time: 'Error', date: 'Date' };
@@ -407,93 +404,92 @@ export const Logs = () => {
   const selectedRetryHistory = parseRetryHistory(selectedRetryLog?.retryHistory);
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="Logs"
         subtitle={
           principal?.role === 'limited' && principal.keyName
-            ? `Scoped to key "${principal.keyName}".`
-            : undefined
+            ? `Scoped to key "${principal.keyName}"`
+            : 'All API requests routed through the gateway'
         }
-      />
-
-      <Card flush>
-        <div className="p-3 sm:p-4 border-b border-border-glass">
-          <form
-            onSubmit={handleSearch}
-            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 justify-between"
-          >
-            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 min-w-0 flex-1">
-              {/* The apiKey filter is redundant for limited users — backend
-                  force-scopes results to their key. */}
-              {!isLimited && (
-                <div className="w-full sm:w-60">
-                  <SearchInput
-                    placeholder="Filter by Key..."
-                    value={filters.apiKey}
-                    onChange={(v) => setFilters({ ...filters, apiKey: v })}
-                  />
-                </div>
-              )}
-              <div className="w-full sm:w-60">
-                <SearchInput
-                  placeholder="Filter by Model..."
-                  value={filters.incomingModelAlias}
-                  onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
-                />
-              </div>
-              <div className="w-full sm:w-48">
-                <SearchInput
-                  placeholder="Filter by Provider..."
-                  value={filters.provider}
-                  onChange={(v) => setFilters({ ...filters, provider: v })}
-                />
-              </div>
-              <div className="w-full sm:w-auto flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <PlayCircle size={24} color="#94a3b8" />
-                  <DateTimePicker
-                    value={filters.startDate}
-                    onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
-                    placeholder="Start date"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Circle size={24} color="#94a3b8" />
-                  <DateTimePicker
-                    value={filters.endDate}
-                    onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
-                    placeholder="End date"
-                  />
-                </div>
-                {(filters.startDate || filters.endDate) && (
-                  <button
-                    type="button"
-                    onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
-                    className="rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
-                    title="Clear date filters"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              <Button type="submit" variant="primary">
-                Search
-              </Button>
+        actions={
+          isAdmin ? (
+            <Button
+              onClick={handleDeleteAll}
+              variant="danger"
+              size="sm"
+              leftIcon={<Trash2 size={14} />}
+              disabled={logs.length === 0}
+              type="button"
+            >
+              Delete All
+            </Button>
+          ) : undefined
+        }
+      >
+        <form
+          onSubmit={handleSearch}
+          className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch sm:items-end"
+        >
+          {!isLimited && (
+            <div className="w-full sm:w-56">
+              <SearchInput
+                placeholder="Filter by key…"
+                value={filters.apiKey}
+                onChange={(v) => setFilters({ ...filters, apiKey: v })}
+              />
             </div>
-            {isAdmin && (
-              <Button
-                onClick={handleDeleteAll}
-                variant="danger"
-                leftIcon={<Trash2 size={16} />}
-                disabled={logs.length === 0}
+          )}
+          <div className="w-full sm:w-56">
+            <SearchInput
+              placeholder="Filter by model…"
+              value={filters.incomingModelAlias}
+              onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
+            />
+          </div>
+          <div className="w-full sm:w-44">
+            <SearchInput
+              placeholder="Filter by provider…"
+              value={filters.provider}
+              onChange={(v) => setFilters({ ...filters, provider: v })}
+            />
+          </div>
+          <div className="w-full sm:w-auto flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <PlayCircle size={24} color="#94a3b8" />
+              <DateTimePicker
+                value={filters.startDate}
+                onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
+                placeholder="Start date"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Circle size={24} color="#94a3b8" />
+              <DateTimePicker
+                value={filters.endDate}
+                onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
+                placeholder="End date"
+              />
+            </div>
+            {(filters.startDate || filters.endDate) && (
+              <button
                 type="button"
+                onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
+                className="rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
+                title="Clear date filters"
               >
-                Delete All
-              </Button>
+                <X size={14} />
+              </button>
             )}
-          </form>
-        </div>
+          </div>
+          <Button type="submit" variant="primary" size="sm">
+            Search
+          </Button>
+        </form>
+      </PageHeader>
+
+      <PageContainer>
+        <Card flush>
 
         <div className="overflow-x-auto -mx-3 px-3">
           <table className="w-full border-collapse font-body text-[13px]">
@@ -1163,20 +1159,22 @@ export const Logs = () => {
           </table>
         </div>
 
-        <div className="flex justify-end items-center mt-5 gap-3">
-          <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+        <div className="flex justify-end items-center px-3 py-3 gap-3 border-t border-border">
+          <span className="text-xs text-text-secondary font-mono">
             Page {currentPage} of {Math.max(1, totalPages)}
           </span>
           <div className="flex gap-1">
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="icon"
               disabled={offset === 0}
               onClick={() => setOffset(Math.max(0, offset - limit))}
             >
               <ChevronLeft size={16} />
             </Button>
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="icon"
               disabled={offset + limit >= total}
               onClick={() => setOffset(offset + limit)}
             >
@@ -1185,6 +1183,7 @@ export const Logs = () => {
           </div>
         </div>
       </Card>
+      </PageContainer>
 
       <Modal
         isOpen={isRetryModalOpen}
@@ -1320,6 +1319,6 @@ export const Logs = () => {
           cannot be undone.
         </p>
       </Modal>
-    </PageContainer>
+    </div>
   );
 };

@@ -185,16 +185,17 @@ export const SystemLogs: React.FC = () => {
   };
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
-            <Terminal size={24} className="text-primary" />
+            <Terminal size={20} className="text-primary" />
             System Logs
           </span>
         }
-        subtitle="Live stream of backend system logs."
+        subtitle="Live tail · stderr+stdout"
       />
+      <PageContainer>
 
       <div className="flex flex-col gap-3 glass-bg rounded-lg overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-border-glass">
@@ -365,6 +366,7 @@ export const SystemLogs: React.FC = () => {
           <div ref={logsEndRef} />
         </div>
       </div>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

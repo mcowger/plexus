@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Zap, BarChart2, Gauge, LayoutDashboard } from 'lucide-react';
+import { Zap, BarChart3, Gauge, LayoutDashboard } from 'lucide-react';
 import { LiveTab } from '../components/dashboard/tabs/LiveTab';
 import { UsageTab } from '../components/dashboard/tabs/UsageTab';
 import { PerformanceTab } from '../components/dashboard/tabs/PerformanceTab';
@@ -26,7 +26,7 @@ const BASE_TABS = [
     value: 'usage' as const,
     label: (
       <span className="inline-flex items-center gap-2">
-        <BarChart2 size={14} /> Usage Analytics
+        <BarChart3 size={14} /> Usage Analytics
       </span>
     ),
   },
@@ -77,15 +77,27 @@ export const Dashboard = () => {
   }, [activeTab]);
 
   return (
-    <div className="flex flex-col min-h-full -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
-      <div className="sticky top-0 z-10 border-b border-border-glass bg-bg-surface/80 backdrop-blur-md px-2 sm:px-4">
-        <Tabs<TabId>
-          value={activeTab}
-          onChange={setTab}
-          items={tabs}
-          variant="underline"
-          aria-label="Dashboard sections"
-        />
+    <div className="flex flex-col min-h-full">
+      <div className="sticky top-0 z-20 glass-bg border-b border-white/5">
+        <div className="px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <div>
+              <h1 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight m-0">
+                Dashboard
+              </h1>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Real-time gateway traffic across all providers
+              </p>
+            </div>
+          </div>
+          <Tabs<TabId>
+            value={activeTab}
+            onChange={setTab}
+            items={tabs}
+            variant="underline"
+            aria-label="Dashboard sections"
+          />
+        </div>
       </div>
 
       <div className="flex-1 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-8">

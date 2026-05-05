@@ -294,24 +294,22 @@ export const Keys = () => {
   };
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="Access Control"
-        subtitle="Manage API keys and user quotas."
+        subtitle="API keys issued for downstream consumers"
         actions={
           activeTab === 'keys' ? (
-            <Button leftIcon={<Plus size={16} />} onClick={handleAddNewKey}>
-              Add Key
+            <Button leftIcon={<Plus size={14} />} onClick={handleAddNewKey} size="sm">
+              Create key
             </Button>
           ) : (
-            <Button leftIcon={<Plus size={16} />} onClick={handleAddNewQuota}>
-              Add Quota
+            <Button leftIcon={<Plus size={14} />} onClick={handleAddNewQuota} size="sm">
+              Add quota
             </Button>
           )
         }
-      />
-
-      <div className="mb-6">
+      >
         <Tabs
           value={activeTab}
           onChange={(v) => setActiveTab(v as 'keys' | 'quotas')}
@@ -320,7 +318,9 @@ export const Keys = () => {
             { value: 'quotas', label: `Quotas (${Object.keys(quotas).length})` },
           ]}
         />
-      </div>
+      </PageHeader>
+
+      <PageContainer>
 
       {/* Hidden old tabs (to avoid further JSX restructuring) */}
       <div className="hidden">
@@ -994,6 +994,7 @@ export const Keys = () => {
           </div>
         )}
       </Modal>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

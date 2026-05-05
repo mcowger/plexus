@@ -22,8 +22,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       <main
         className={clsx(
-          'min-h-screen p-4 sm:p-6 lg:p-8 transition-[margin] duration-300',
-          isCollapsed ? 'md:ml-[64px]' : 'md:ml-[200px]'
+          'min-h-screen transition-[margin] duration-300',
+          isCollapsed ? 'md:ml-[64px]' : 'md:ml-[220px]'
         )}
       >
         {children}

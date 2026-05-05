@@ -171,21 +171,24 @@ export const Quotas = () => {
   };
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Quota Trackers"
-        subtitle="Monitor provider quotas and rate limits."
+        title="Quotas"
+        subtitle="Provider balances and rate-quota allowances"
         actions={
           <Button
             variant="secondary"
+            size="sm"
             onClick={fetchQuotas}
             disabled={loading}
-            leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}
+            leftIcon={<RefreshCw size={14} className={clsx(loading && 'animate-spin')} />}
           >
-            Refresh All
+            Refresh all
           </Button>
         }
       />
+
+      <PageContainer>
 
       {legacyRowCount !== null && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
@@ -347,6 +350,7 @@ export const Quotas = () => {
           displayName={historyTarget.displayName}
         />
       )}
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

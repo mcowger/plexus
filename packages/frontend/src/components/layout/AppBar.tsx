@@ -1,13 +1,19 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
 import { useSidebar } from '../../contexts/SidebarContext';
-import logo from '../../assets/plexus_logo_transparent.png';
+import { useAuth } from '../../contexts/AuthContext';
+import { PlexusMark } from './PlexusMark';
 
 export const AppBar: React.FC = () => {
   const { openMobile } = useSidebar();
+  const { principal } = useAuth();
+
+  const initials = principal?.role === 'admin'
+    ? 'AD'
+    : (principal?.keyName || 'KU').slice(0, 2).toUpperCase();
 
   return (
-    <header className="md:hidden sticky top-0 z-sidebar h-14 flex items-center gap-3 px-4 bg-bg-surface/90 backdrop-blur-md border-b border-border">
+    <header className="md:hidden sticky top-0 z-sidebar h-14 flex items-center gap-3 px-4 glass-bg border-b border-white/5">
       <button
         type="button"
         onClick={openMobile}
@@ -17,10 +23,13 @@ export const AppBar: React.FC = () => {
         <Menu size={22} />
       </button>
       <div className="flex items-center gap-2">
-        <img src={logo} alt="" className="w-6 h-6" />
-        <span className="font-heading text-lg font-bold bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary">
-          Plexus
-        </span>
+        <PlexusMark size={22} />
+        <span className="font-heading text-base font-semibold amber-grad-text">Plexus</span>
+      </div>
+      <div className="ml-auto flex items-center gap-2">
+        <div className="w-7 h-7 rounded-full amber-grad-bg grid place-items-center text-[10px] font-semibold text-amber-950">
+          {initials}
+        </div>
       </div>
     </header>
   );

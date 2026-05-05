@@ -899,62 +899,64 @@ export const Models = () => {
   );
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="Models"
-        subtitle={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-bg-glass border border-border-glass">
-              <Eye size={14} className="text-text-secondary" />
-              <span className="text-xs font-medium text-text-secondary">Vision Fall Through:</span>
-              <select
-                className="bg-transparent border-none text-xs text-text outline-none focus:ring-0 cursor-pointer max-w-[140px]"
-                value={globalDescriptorModel}
-                onChange={(e) => setGlobalDescriptorModel(e.target.value)}
-              >
-                <option value="">(None)</option>
-                {sortedAliases.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.id}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleSaveDescriptor}
-                disabled={isSavingDescriptor}
-                className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
-                title="Save descriptor model"
-                type="button"
-              >
-                {isSavingDescriptor ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-              </button>
-            </span>
-          </span>
-        }
+        subtitle="Aliases that map gateway models to upstream provider models"
         actions={
           <>
-            <div className="w-full sm:w-64">
-              <SearchInput placeholder="Search models..." value={search} onChange={setSearch} />
-            </div>
             <Button
               variant="danger"
-              leftIcon={<Trash2 size={16} />}
+              size="sm"
+              leftIcon={<Trash2 size={14} />}
               onClick={() => setIsDeleteAllModalOpen(true)}
               disabled={aliases.length === 0}
             >
               Delete All
             </Button>
-            <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
-              Add Model
+            <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
+              Add model
             </Button>
           </>
         }
-      />
+      >
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch sm:items-center">
+          <div className="w-full sm:w-72">
+            <SearchInput placeholder="Search by alias, upstream id, tag…" value={search} onChange={setSearch} />
+          </div>
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-900/60 border border-border">
+            <Eye size={14} className="text-text-secondary" />
+            <span className="text-xs font-medium text-text-secondary">Vision Fall Through:</span>
+            <select
+              className="bg-transparent border-none text-xs text-text outline-none focus:ring-0 cursor-pointer max-w-[140px]"
+              value={globalDescriptorModel}
+              onChange={(e) => setGlobalDescriptorModel(e.target.value)}
+            >
+              <option value="">(None)</option>
+              {sortedAliases.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.id}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleSaveDescriptor}
+              disabled={isSavingDescriptor}
+              className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+              title="Save descriptor model"
+              type="button"
+            >
+              {isSavingDescriptor ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Save size={14} />
+              )}
+            </button>
+          </span>
+        </div>
+      </PageHeader>
 
+      <PageContainer>
       <Card className="mb-6">
         <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
           <table className="w-full border-collapse font-body text-[13px]">
@@ -2410,6 +2412,7 @@ export const Models = () => {
           </div>,
           document.body
         )}
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

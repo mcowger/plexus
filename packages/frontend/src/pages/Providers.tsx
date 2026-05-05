@@ -1039,16 +1039,17 @@ export const Providers = () => {
   };
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="Providers"
-        subtitle="Configure upstream inference providers, credentials, and quota checkers."
+        subtitle="Upstream LLM providers routed by the gateway"
         actions={
-          <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
-            Add Provider
+          <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
+            Add provider
           </Button>
         }
       />
+      <PageContainer>
       <Card flush>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse font-body text-[13px]">
@@ -3882,6 +3883,7 @@ export const Providers = () => {
           </div>
         </div>
       </Modal>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

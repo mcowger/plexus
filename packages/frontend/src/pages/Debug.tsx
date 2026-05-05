@@ -265,14 +265,14 @@ export const Debug: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-8rem)] -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
-      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-3 shrink-0">
+    <div className="flex flex-col min-h-[calc(100vh-3rem)]">
+      <div className="shrink-0">
         <PageHeader
-          title="Debug Traces"
+          title="Traces"
           subtitle={
             principal?.role === 'limited' && principal.keyName
               ? `Traces for key "${principal.keyName}" only. Toggle capture in My Key.`
-              : 'Inspect full request/response lifecycles.'
+              : 'Distributed spans · OTLP'
           }
           actions={
             <>

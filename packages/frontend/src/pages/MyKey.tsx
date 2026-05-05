@@ -62,25 +62,29 @@ export const MyKey: React.FC = () => {
 
   if (loading) {
     return (
-      <PageContainer width="standard">
+      <div className="flex flex-col min-h-full">
         <PageHeader title="My Key" subtitle="Loading your key details..." />
-        <div className="flex flex-col gap-4">
-          <Skeleton height={140} />
-          <Skeleton height={120} />
-          <Skeleton height={120} />
-        </div>
-      </PageContainer>
+        <PageContainer width="standard">
+          <div className="flex flex-col gap-4">
+            <Skeleton height={140} />
+            <Skeleton height={120} />
+            <Skeleton height={120} />
+          </div>
+        </PageContainer>
+      </div>
     );
   }
 
   if (!info || info.role !== 'limited') {
     return (
-      <PageContainer width="standard">
+      <div className="flex flex-col min-h-full">
         <PageHeader title="My Key" />
-        <Card>
-          <p className="text-danger">Unable to load key info.</p>
-        </Card>
-      </PageContainer>
+        <PageContainer width="standard">
+          <Card>
+            <p className="text-danger">Unable to load key info.</p>
+          </Card>
+        </PageContainer>
+      </div>
     );
   }
 
@@ -129,7 +133,7 @@ export const MyKey: React.FC = () => {
   const allowedModels = info.allowedModels ?? [];
 
   return (
-    <PageContainer width="standard">
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="My Key"
         subtitle={
@@ -139,6 +143,7 @@ export const MyKey: React.FC = () => {
           </>
         }
       />
+      <PageContainer width="standard">
 
       <div className="flex flex-col gap-4 sm:gap-6">
         <Card title="Identity">
@@ -272,6 +277,7 @@ export const MyKey: React.FC = () => {
           </p>
         )}
       </Modal>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

@@ -42,16 +42,16 @@ export const Drawer: React.FC<DrawerProps> = ({
       aria-label={ariaLabel}
     >
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
         onClick={onClose}
       />
       <div
         className={clsx(
-          'absolute top-0 bottom-0 z-drawer flex w-[280px] max-w-[85vw] flex-col bg-bg-surface border-border shadow-modal outline-none',
+          'absolute top-0 bottom-0 z-drawer flex glass-bg shadow-2xl outline-none',
           side === 'left' &&
-            'left-0 border-r animate-[drawerSlideLeft_250ms_cubic-bezier(0.22,1,0.36,1)]',
+            'left-0 w-[260px] max-w-[85vw] animate-[drawerSlideLeft_250ms_cubic-bezier(0.22,1,0.36,1)] flex-col',
           side === 'right' &&
-            'right-0 border-l animate-[drawerSlideRight_250ms_cubic-bezier(0.22,1,0.36,1)]',
+            'right-0 w-full max-w-[560px] animate-[drawerSlideRight_250ms_cubic-bezier(0.22,1,0.36,1)] flex-col',
           className
         )}
         onClick={(e) => e.stopPropagation()}

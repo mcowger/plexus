@@ -292,21 +292,20 @@ export const McpPage: React.FC = () => {
   }
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
-        title="MCP Servers"
-        subtitle="Configure Model Context Protocol upstream servers and review their call logs."
+        title="MCP servers"
+        subtitle="Model Context Protocol connections — exposes tools and resources to clients"
+        actions={
+          <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
+            Add server
+          </Button>
+        }
       />
-      <div className="flex flex-col gap-6">
-        {/* ── Servers Config Card ── */}
-        <Card
-          title="MCP Servers"
-          extra={
-            <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
-              Add MCP Server
-            </Button>
-          }
-        >
+      <PageContainer>
+      <div className="flex flex-col gap-5">
+        {/* Servers Config Card */}
+        <Card title="MCP Servers">
           {serverNames.length === 0 ? (
             <div className="p-4 text-text-secondary text-center">
               No MCP servers configured. Click "Add MCP Server" to create one.
@@ -864,7 +863,8 @@ export const McpPage: React.FC = () => {
           <p>Are you sure you want to delete this MCP log entry?</p>
         </Modal>
       </div>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };
 
