@@ -684,7 +684,10 @@ export class BackupService {
           relax_column_count: true, // tolerate rows with fewer columns
           trim: false, // don't trim — values may have significant whitespace
         });
-      } catch {
+      } catch (parseErr) {
+        logger.error(`[Backup] CSV parse failed for ${tableName}: ${parseErr}`);
+        throw new Error(`Failed to parse ${tableName}.csv: ${parseErr}`);
+      }
         counts[tableName] = 0;
         continue;
       }
