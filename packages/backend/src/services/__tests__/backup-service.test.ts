@@ -7,6 +7,7 @@
  * test database and are out of scope for this file.
  */
 import { describe, expect, it } from 'vitest';
+import { parse as parseCsvSync } from 'csv-parse/sync';
 import { gzipSync, gunzipSync } from 'node:zlib';
 
 // We test the internal helpers via the module's exported functions
@@ -29,36 +30,10 @@ describe('CSV escape and parse', () => {
     return str;
   }
 
-  function parseCsvLine(line: string): string[] {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]!;
-      if (inQuotes) {
-        if (ch === '"') {
-          if (i + 1 < line.length && line[i + 1] === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = false;
-          }
-        } else {
-          current += ch;
-        }
-      } else {
-        if (ch === '"') {
-          inQuotes = true;
-        } else if (ch === ',') {
-          result.push(current);
-          current = '';
-        } else {
-          current += ch;
-        }
-      }
-    }
-    result.push(current);
-    return result;
+  function parseCsvRow(line: string): string[] {
+    // Use the real csv-parse library for test round-trips
+    const records = parseCsvSync(line, { relax_column_count: true });
+    return records[0] ?? [];
   }
 
   it('escapes values with commas', () => {
@@ -89,19 +64,19 @@ describe('CSV escape and parse', () => {
   it('round-trips CSV line parsing', () => {
     const values = ['hello', 'world,with,commas', 'say "hi"', '', 'plain'];
     const line = values.map((v) => csvEscape(v)).join(',');
-    const parsed = parseCsvLine(line);
+    const parsed = parseCsvRow(line);
     expect(parsed).toEqual(values.map((v) => (v === '' ? '' : v)));
   });
 
   it('round-trips a CSV line with embedded quotes and commas', () => {
     const original = ['simple', 'has,comma', 'has "quotes"', 'has\nnewline'];
     const line = original.map((v) => csvEscape(v)).join(',');
-    const parsed = parseCsvLine(line);
+    const parsed = parseCsvRow(line);
     expect(parsed).toEqual(original);
   });
 
   it('parses empty fields correctly', () => {
-    const parsed = parseCsvLine('a,,c');
+    const parsed = parseCsvRow('a,,c');
     expect(parsed).toEqual(['a', '', 'c']);
   });
 });

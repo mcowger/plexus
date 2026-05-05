@@ -21,6 +21,7 @@ import { ConfigRepository, OAuthCredentialsData } from '../db/config-repository'
 import { logger } from '../utils/logger';
 import { decrypt, encrypt } from '../utils/encryption';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { parse as parseCsvSync } from 'csv-parse/sync';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -673,30 +674,37 @@ export class BackupService {
       const timestampMsCols = new Set(meta.timestampMsCols);
       const timestampTextCols = new Set(meta.timestampTextCols);
 
-      const lines = csvText.split('\n');
-      if (lines.length < 2) {
+      // Parse CSV with proper handling of quoted multi-line fields
+      // (JSON blobs in debug_logs, inference_errors, etc. contain newlines)
+      let records: Record<string, string>[];
+      try {
+        records = parseCsvSync(csvText, {
+          columns: true, // first row = header → objects keyed by column name
+          skip_empty_lines: true,
+          relax_column_count: true, // tolerate rows with fewer columns
+          trim: false, // don't trim — values may have significant whitespace
+        });
+      } catch {
         counts[tableName] = 0;
         continue;
       }
 
-      const columns = parseCsvLine(lines[0]!);
+      if (records.length === 0) {
+        counts[tableName] = 0;
+        continue;
+      }
+
       let inserted = 0;
 
       // Batch insert in chunks of 500
       const batchSize = 500;
       let batch: Record<string, unknown>[] = [];
 
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i]!.trim();
-        if (!line) continue;
-
-        const values = parseCsvLine(line);
+      for (const record of records) {
         const row: Record<string, unknown> = {};
-        for (let j = 0; j < columns.length; j++) {
-          const col = columns[j]!;
-          const val = j < values.length ? values[j]! : '';
+        for (const [col, val] of Object.entries(record)) {
           row[col] = csvValueToDb(
-            val,
+            val ?? '',
             col,
             booleanCols,
             timestampMsCols,
@@ -763,38 +771,5 @@ export class BackupService {
 
 // ─── CSV Parsing ─────────────────────────────────────────────────────
 
-/**
- * Parse a single CSV line respecting double-quoted fields.
- */
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"';
-          i++; // skip escaped quote
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        result.push(current);
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-  }
-  result.push(current);
-  return result;
-}
+// parseCsvLine removed — replaced by csv-parse/sync which handles
+// multi-line quoted fields correctly (e.g. JSON blobs in debug data)
