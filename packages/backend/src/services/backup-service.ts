@@ -688,9 +688,6 @@ export class BackupService {
         logger.error(`[Backup] CSV parse failed for ${tableName}: ${parseErr}`);
         throw new Error(`Failed to parse ${tableName}.csv: ${parseErr}`);
       }
-        counts[tableName] = 0;
-        continue;
-      }
 
       if (records.length === 0) {
         counts[tableName] = 0;
