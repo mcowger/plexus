@@ -559,7 +559,7 @@ export class BackupService {
     return {
       success: true,
       restored: counts,
-      message: 'Config restore complete. A restart is recommended to apply all changes.',
+      message: 'Config restore complete. Server is restarting to apply changes.',
     };
   }
 
@@ -742,7 +742,7 @@ export class BackupService {
     return {
       success: true,
       restored: counts,
-      message: 'Full restore complete. A restart is recommended to apply all changes.',
+      message: 'Full restore complete. Server is restarting to apply changes.',
     };
   }
 

@@ -75,12 +75,35 @@ export async function registerBackupRoutes(fastify: FastifyInstance) {
         result = await backupService.restoreFullBackup(body);
       }
 
+      // After restore, restart the server so all services pick up the new data.
+      // We send the response first, then close/exit after a short delay —
+      // the process manager (bun --watch, Docker, systemd) will respawn us.
       return reply.send(result);
     } catch (e: any) {
       logger.error('[Backup] Restore failed:', e);
       return reply.code(500).send({ error: e.message || 'Backup restore failed' });
     }
   });
+
+  // Trigger a graceful restart after a successful restore.
+  // Uses Fastify's onResponse hook so the reply is already sent.
+  // Skipped in test environments to avoid killing the test runner.
+  if (process.env.NODE_ENV !== 'test') {
+    fastify.addHook('onResponse', async (request, reply) => {
+      if (
+        request.method === 'POST' &&
+        request.url.startsWith('/v0/management/restore') &&
+        reply.statusCode >= 200 &&
+        reply.statusCode < 300
+      ) {
+        logger.info('[Backup] Restore successful — restarting server to apply changes');
+        setTimeout(async () => {
+          await fastify.close();
+          process.exit(0);
+        }, 100);
+      }
+    });
+  }
 
   // Allow binary body parsing for .tar.gz uploads
   fastify.addContentTypeParser(
