@@ -1,8 +1,8 @@
-import { spawn } from 'bun';
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
 import { createServer } from 'net';
 import { writeFileSync, unlinkSync } from 'fs';
+import { spawn as nodeSpawn, type ChildProcess } from 'child_process';
 
 // --- Dev defaults (only applied when not already set in environment) ---
 
@@ -91,7 +91,7 @@ await new Promise<void>((resolve, reject) => {
 });
 
 // --- PID file ---
-// Written so that clear-dev.ts can send SIGHUP to trigger a backend restart.
+// Written so that clear-dev.ts can send SIGUSR1 to trigger a backend restart.
 
 const PID_FILE = join(tmpdir(), `plexus-${dirName}.pid`);
 writeFileSync(PID_FILE, String(process.pid));
@@ -106,45 +106,113 @@ console.log(`  PORT:         ${process.env.PORT}`);
 console.log(`  DATABASE_URL: ${process.env.DATABASE_URL}`);
 console.log(`  ADMIN_KEY:    ${process.env.ADMIN_KEY}`);
 
-function spawnBackend() {
-  return spawn(['bun', 'run', '--watch', '--no-clear-screen', 'src/index.ts'], {
-    cwd: BACKEND_DIR,
+// --- Process management ---
+//
+// Bun's --watch processes trap SIGINT and *restart* instead of exiting.
+// So on shutdown we must SIGKILL them to force-terminate. Otherwise they
+// become orphaned and accumulate, eventually exhausting memory.
+//
+// Each child is spawned in its own process group (detached: true / setsid)
+// so that process.kill(-pgid) kills the entire subtree including
+// grandchildren spawned by --watch restarts.
+//
+// Note: terminal close (SIGHUP) is not reliably delivered to this process
+// because Bun may not propagate it. If you close your terminal without
+// Ctrl+C, run: pkill -f "bun run" to clean up.
+
+const WIN = process.platform === 'win32';
+
+const childPgids: number[] = [];
+let isShuttingDown = false;
+
+function spawnManaged(args: string[], cwd: string): ChildProcess {
+  const proc = nodeSpawn('bun', args, {
+    cwd,
     env: { ...process.env },
-    stdout: 'inherit',
-    stderr: 'inherit',
+    stdio: 'inherit',
+    detached: true, // own process group → can kill -pgid
+    ...(WIN ? { shell: true } : {}),
   });
+  // Don't unref() — we need the child handles to keep the event loop alive.
+  // Without them, Bun sees no pending work and exits immediately.
+  childPgids.push(proc.pid!);
+  return proc;
+}
+
+function killAll() {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  for (const pgid of childPgids) {
+    try {
+      if (WIN) {
+        process.kill(pgid);
+      } else {
+        process.kill(-pgid, 'SIGKILL');
+      }
+    } catch {
+      // already dead
+    }
+  }
+
+  try {
+    unlinkSync(PID_FILE);
+  } catch {}
+}
+
+function spawnBackend(): ChildProcess {
+  return spawnManaged(['run', '--watch', '--no-clear-screen', 'src/index.ts'], BACKEND_DIR);
 }
 
 let backend = spawnBackend();
 
 console.log('[Frontend] Starting builder (watch mode)...');
-const frontend = spawn(['bun', 'run', 'dev'], {
-  cwd: FRONTEND_DIR,
-  stdout: 'inherit',
-  stderr: 'inherit',
-});
+const frontend = spawnManaged(['run', 'dev'], FRONTEND_DIR);
 
 console.log(`Backend: http://localhost:${process.env.PORT}`);
 console.log('Watching for changes...');
 
-// SIGHUP — kill and respawn the backend (used by clear-dev.ts after DB wipe)
-process.on('SIGHUP', () => {
-  console.log('\n[dev] SIGHUP received — restarting backend...');
-  backend.kill('SIGTERM');
-  backend.exited.then(() => {
-    backend = spawnBackend();
-    console.log('[dev] Backend restarted.');
-  });
-});
+// Keep the event loop alive. The child handles already do this, but
+// the interval acts as a safety net in case Bun optimises them away.
+const keepalive = setInterval(() => {}, 60000);
+keepalive.unref();
 
-// Cleanup on exit
-process.on('SIGINT', async () => {
+// --- Signal handling ---
+
+process.on('SIGINT', () => {
   console.log('\nStopping...');
-  backend.kill('SIGINT');
-  frontend.kill('SIGINT');
-  try {
-    unlinkSync(PID_FILE);
-  } catch {}
-  await Promise.all([backend.exited, frontend.exited]);
+  killAll();
   process.exit(0);
 });
+
+process.on('SIGTERM', () => {
+  console.log('\nStopping (SIGTERM)...');
+  killAll();
+  process.exit(0);
+});
+
+process.on('SIGHUP', () => {
+  console.log('\nStopping (SIGHUP)...');
+  killAll();
+  process.exit(0);
+});
+
+// SIGUSR1 — kill and respawn the backend (used by clear-dev.ts after DB wipe).
+// We use SIGUSR1 instead of SIGHUP because SIGHUP is the standard signal
+// for "your controlling terminal went away" and should trigger shutdown.
+process.on('SIGUSR1', () => {
+  if (isShuttingDown) return;
+  console.log('\n[dev] SIGUSR1 received — restarting backend...');
+  try {
+    process.kill(-backend.pid!, 'SIGKILL');
+  } catch {
+    // already dead
+  }
+  const idx = childPgids.indexOf(backend.pid!);
+  if (idx >= 0) childPgids.splice(idx, 1);
+  backend = spawnBackend();
+  console.log('[dev] Backend restarted.');
+});
+
+// Synchronous fallback — runs even if the signal handler doesn't complete.
+process.on('exit', killAll);

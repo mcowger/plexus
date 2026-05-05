@@ -21,6 +21,7 @@
     "@mariozechner/pi-ai": "0.72.1",
     "@plexus/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
+    "csv-parse": "^6.2.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",

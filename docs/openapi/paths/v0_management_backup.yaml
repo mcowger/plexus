@@ -1,0 +1,50 @@
+get:
+  tags:
+    - Management — Backup
+  summary: Export a database backup (admin only)
+  description: |
+    Returns a database backup. Two modes are available:
+
+    - **Config-only** (default): Returns a JSON envelope containing all configuration
+      tables (providers, model aliases, API keys, user quotas, MCP servers, system
+      settings, OAuth credentials). This is small and fast — suitable for most
+      backup, migration, and cloning scenarios.
+
+    - **Full backup** (`?full=true`): Returns a gzipped tar archive (`.tar.gz`)
+      containing a `manifest.json`, a `config.json` (same as config-only), and
+      per-table `.csv.gz` files for operational/telemetry data (usage records,
+      debug logs, errors, cooldowns, performance stats, quota snapshots, etc.).
+
+    Sensitive fields (API key secrets, OAuth tokens) are decrypted in the export
+    so the backup is portable across instances with different `ENCRYPTION_KEY` values.
+    Store the resulting file securely.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  parameters:
+    - name: full
+      in: query
+      description: Set to `true` to include operational data as a .tar.gz archive.
+      schema:
+        type: boolean
+        default: false
+  responses:
+    '200':
+      description: |
+        Config-only backup (JSON) or full backup archive (.tar.gz),
+        depending on the `full` query parameter.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConfigBackupEnvelope'
+        application/gzip:
+          schema:
+            type: string
+            format: binary
+            description: Gzipped tar archive containing manifest.json, config.json, and per-table .csv.gz files.
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals cannot access this endpoint.
+  operationId: getV0ManagementBackup
