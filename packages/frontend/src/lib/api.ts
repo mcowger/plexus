@@ -2967,4 +2967,58 @@ export const api = {
     }
     return res.json();
   },
+
+  /** Export a config-only backup as JSON. */
+  createBackup: async (): Promise<Blob> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/backup`);
+    if (!res.ok) throw new Error('Failed to create backup');
+    return res.blob();
+  },
+
+  /** Export a full backup (config + operational data) as a .tar.gz archive. */
+  createFullBackup: async (): Promise<Blob> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/backup?full=true`);
+    if (!res.ok) throw new Error('Failed to create full backup');
+    return res.blob();
+  },
+
+  /** Restore from a config-only JSON backup. */
+  restoreBackup: async (
+    data: object
+  ): Promise<{
+    success: boolean;
+    restored: Record<string, number>;
+    message: string;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Restore failed' }));
+      throw new Error(err.error || 'Restore failed');
+    }
+    return res.json();
+  },
+
+  /** Restore from a full .tar.gz backup archive. */
+  restoreFullBackup: async (
+    file: File
+  ): Promise<{
+    success: boolean;
+    restored: Record<string, number>;
+    message: string;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: await file.arrayBuffer(),
+    } as RequestInit);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Restore failed' }));
+      throw new Error(err.error || 'Restore failed');
+    }
+    return res.json();
+  },
 };

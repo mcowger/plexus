@@ -5,7 +5,7 @@
     "": {
       "name": "plexus2",
       "devDependencies": {
-        "@biomejs/biome": "latest",
+        "@biomejs/biome": "2.4.14",
         "@redocly/cli": "^2.30.1",
         "agent-browser": "^0.26.0",
         "bun-types": "latest",
@@ -26,6 +26,7 @@
         "@mariozechner/pi-ai": "0.72.1",
         "@plexus/shared": "workspace:*",
         "@sinclair/typebox": "^0.34.49",
+        "csv-parse": "^6.2.1",
         "dotenv": "^17.4.2",
         "drizzle-orm": "^0.45.2",
         "drizzle-zod": "^0.8.3",
@@ -38,7 +39,7 @@
         "postgres": "^3.4.9",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",
-        "yaml": "^2.8.3",
+        "yaml": "^2.8.4",
         "zod": "^4.4.3",
       },
       "devDependencies": {
@@ -66,7 +67,7 @@
         "react-dom": "^19.2.5",
         "react-router-dom": "^7.14.2",
         "recharts": "^3.8.1",
-        "yaml": "^2.8.3",
+        "yaml": "^2.8.4",
       },
       "devDependencies": {
         "@tailwindcss/cli": "^4.2.4",
@@ -843,6 +844,8 @@
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
 
+    "csv-parse": ["csv-parse@6.2.1", "", {}, "sha512-LRLMV+UCyfMokp8Wb411duBf1gaBKJfOfBWU9eHMJ+b+cJYZsNu3AFmjJf3+yPGd59Exz1TsMjaSFyxnYB9+IQ=="],
+
     "d3-array": ["d3-array@3.2.4", "", { "dependencies": { "internmap": "1 - 2" } }, "sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg=="],
 
     "d3-color": ["d3-color@3.1.0", "", {}, "sha512-zg/chbXyeBtMQ1LbD/WSoW2DpC3I0mpmPdW+ynRTj/x2DAWYrIY7qeZIHidozwV24m4iavr15lNwIwLxRmOxhA=="],
@@ -1523,7 +1526,7 @@
 
     "y18n": ["y18n@5.0.8", "", {}, "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA=="],
 
-    "yaml": ["yaml@2.8.3", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg=="],
+    "yaml": ["yaml@2.8.4", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-ml/JPOj9fOQK8RNnWojA67GbZ0ApXAUlN2UQclwv2eVgTgn7O9gg9o7paZWKMp4g0H3nTLtS9LVzhkpOFIKzog=="],
 
     "yaml-ast-parser": ["yaml-ast-parser@0.0.43", "", {}, "sha512-2PTINUwsRqSd+s8XxKaJWQlUuEMHJQyEuh2edBbW8KNJz0SJPwUSD2zRWqezFEdN7IzAgeuYHFUCF7o8zRdZ0A=="],
 

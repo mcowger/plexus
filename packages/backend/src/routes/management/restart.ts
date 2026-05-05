@@ -22,7 +22,7 @@ export async function registerRestartRoutes(fastify: FastifyInstance) {
         logger.info('[RESTART] Closing server gracefully');
         await fastify.close();
         logger.info('[RESTART] Server closed, exiting process');
-        process.exit(0);
+        process.exit(1);
       }, 100);
     } catch (error: any) {
       logger.error('[RESTART] Error during restart:', error);

@@ -72,16 +72,18 @@ if (existsSync(DB_PATH)) {
   console.log(' not found (already clean)');
 }
 
-// Step 2 — send SIGHUP to dev.ts via its PID file, which kills and respawns
+// Step 2 — send SIGUSR1 to dev.ts via its PID file, which kills and respawns
 // the backend against the now-empty database.
-process.stdout.write('  Sending SIGHUP to dev server...');
+// (SIGUSR1 is used instead of SIGHUP because SIGHUP means "terminal closed"
+// and triggers a full shutdown in dev.ts.)
+process.stdout.write('  Sending SIGUSR1 to dev server...');
 try {
   if (!existsSync(PID_FILE)) {
     console.log(' skipped (no PID file — server not running)');
     console.log('\n  ✓  Database cleared. Start the server with: bun run dev\n');
   } else {
     const pid = parseInt(readFileSync(PID_FILE, 'utf8').trim(), 10);
-    process.kill(pid, 'SIGHUP');
+    process.kill(pid, 'SIGUSR1');
     console.log(` done (PID ${pid})`);
     console.log('\n  ✓  Backend is restarting against a fresh database.\n');
   }

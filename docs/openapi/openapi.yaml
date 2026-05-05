@@ -300,6 +300,21 @@ tags:
     description: Synthetic inference request used by the admin UI.
   - name: Management — Restart
     description: Graceful process restart.
+  - name: Management — Backup
+    description: >-
+      Full database export and import for disaster recovery and migration.
+      Two backup modes are available:
+
+      - **Config-only** (default): Exports providers, model aliases, API keys,
+        user quotas, MCP servers, system settings, and OAuth credentials as a
+        JSON envelope. Small and fast — covers most migration and cloning needs.
+      - **Full backup** (`?full=true`): Exports configuration plus all
+        operational/telemetry data (usage records, debug logs, errors, cooldowns,
+        performance stats, quota snapshots, responses) as a gzipped tar archive
+        with per-table compressed CSV files.
+
+      Both endpoints are admin-only. Backup files contain decrypted secrets
+      (API keys, OAuth tokens) and should be stored securely.
   - name: Management — Models
     description: External model metadata helpers (HuggingFace).
   - name: Events
@@ -489,6 +504,10 @@ paths:
     $ref: paths/v0_management_test.yaml
   /v0/management/restart:
     $ref: paths/v0_management_restart.yaml
+  /v0/management/backup:
+    $ref: paths/v0_management_backup.yaml
+  /v0/management/restore:
+    $ref: paths/v0_management_restore.yaml
   /v0/management/events:
     $ref: paths/v0_management_events.yaml
   /v0/system/logs/stream:
@@ -520,3 +539,84 @@ components:
       description: |
         Either the server's `ADMIN_KEY` (full admin access) or the plaintext
         secret of a configured API key (limited access, scoped to that key).
+    schemas:
+      ConfigBackupEnvelope:
+        type: object
+        required:
+          - plexus_backup
+          - version
+          - created_at
+          - data
+        properties:
+          plexus_backup:
+            type: boolean
+            const: true
+          version:
+            type: integer
+            description: Schema version for forward-compatible migration.
+            const: 1
+          created_at:
+            type: string
+            format: date-time
+            description: ISO 8601 timestamp of when the backup was created.
+          dialect:
+            type: string
+            enum: [sqlite, postgres]
+            description: Source database dialect (informational; not used on import).
+          data:
+            type: object
+            description: All configuration tables.
+            required:
+              - providers
+              - models
+              - keys
+              - user_quotas
+              - mcp_servers
+              - settings
+              - oauth_credentials
+            properties:
+              providers:
+                type: object
+                additionalProperties: true
+                description: Map of provider slug to provider configuration.
+              models:
+                type: object
+                additionalProperties: true
+                description: Map of model alias slug to model configuration.
+              keys:
+                type: object
+                additionalProperties: true
+                description: Map of key name to API key configuration.
+              user_quotas:
+                type: object
+                additionalProperties: true
+                description: Map of quota name to quota definition.
+              mcp_servers:
+                type: object
+                additionalProperties: true
+                description: Map of MCP server name to server configuration.
+              settings:
+                type: object
+                additionalProperties: true
+                description: Map of setting key to value.
+              oauth_credentials:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - provider_type
+                    - account_id
+                    - access_token
+                    - refresh_token
+                    - expires_at
+                  properties:
+                    provider_type:
+                      type: string
+                    account_id:
+                      type: string
+                    access_token:
+                      type: string
+                    refresh_token:
+                      type: string
+                    expires_at:
+                      type: number

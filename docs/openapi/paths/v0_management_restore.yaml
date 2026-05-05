@@ -1,0 +1,70 @@
+post:
+  tags:
+    - Management — Backup
+  summary: Restore database from a backup (admin only)
+  description: |
+    Accepts a backup file and replaces all existing data in the database.
+
+    Two input formats are accepted:
+
+    - **`application/json`**: A config-only backup envelope (as produced by
+      `GET /v0/management/backup` without `?full=true`). Restores configuration
+      tables only; operational data is not affected.
+
+    - **`application/octet-stream`** / **`application/gzip`**: A gzipped tar archive
+      (as produced by `GET /v0/management/backup?full=true`). Restores both
+      configuration and operational data.
+
+    **Destructive operation** — all current data is deleted before the backup is
+    applied. For full archive restores, the entire operation runs in a single
+    database transaction; if any step fails, the database is rolled back to its
+    pre-restore state.
+
+    After a successful restore, a server restart is recommended so that in-memory
+    caches and long-lived connections pick up the new configuration.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ConfigBackupEnvelope'
+        description: Config-only backup envelope.
+      application/octet-stream:
+        schema:
+          type: string
+          format: binary
+          description: Full backup .tar.gz archive.
+  responses:
+    '200':
+      description: Restore completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              restored:
+                type: object
+                additionalProperties:
+                  type: integer
+                description: Number of rows restored per table.
+                example:
+                  providers: 5
+                  model_aliases: 12
+                  api_keys: 3
+                  request_usage: 42381
+              message:
+                type: string
+    '400':
+      description: Invalid backup file or unsupported version.
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals cannot access this endpoint.
+  operationId: postV0ManagementRestore
