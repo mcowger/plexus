@@ -99,7 +99,7 @@ export async function registerBackupRoutes(fastify: FastifyInstance) {
         logger.info('[Backup] Restore successful — restarting server to apply changes');
         setTimeout(async () => {
           await fastify.close();
-          process.exit(0);
+          process.exit(1);
         }, 100);
       }
     });
