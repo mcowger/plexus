@@ -46,14 +46,15 @@ export class CodexVersionService {
       const tag = data.tag_name;
       if (!tag) return;
 
-      const version = tag.replace(/^v/, '');
-      if (!/^\d+\.\d+\.\d+/.test(version)) {
+      // Extract semver from anywhere in the tag (handles prefixed tags like "rust-v0.128.0").
+      const match = tag.match(/(\d+\.\d+\.\d+)/);
+      if (!match?.[1]) {
         logger.debug(`Unexpected tag format: ${tag}, ignoring`);
         return;
       }
 
-      this.version = version;
-      logger.debug(`Resolved codex version: ${version}`);
+      this.version = match[1];
+      logger.debug(`Resolved codex version: ${match[1]}`);
     } catch (error) {
       logger.warn(
         `Failed to fetch codex version from GitHub: ${String(error)}. Using fallback: ${DEFAULT_CODEX_VERSION}`
