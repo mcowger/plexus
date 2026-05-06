@@ -46,6 +46,11 @@ export class CodexVersionService {
       const tag = data.tag_name;
       if (!tag) return;
 
+      // Extract the semver portion from anywhere in the tag string.
+      // The OpenAI Codex repo uses various tag formats (e.g. "v0.200.0",
+      // "0.150.0", "rust-v0.128.0"), so a simple prefix strip is insufficient.
+      // Using match() finds the semver pattern regardless of what precedes it,
+      // while still rejecting tags that contain no valid semver (e.g. "codex-beta").
       const match = tag.match(/(\d+\.\d+\.\d+)/);
       if (!match?.[1]) {
         logger.debug(`Unexpected tag format: ${tag}, ignoring`);
