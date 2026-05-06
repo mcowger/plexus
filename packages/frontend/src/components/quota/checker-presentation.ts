@@ -21,6 +21,7 @@ export const CHECKER_DISPLAY_NAMES: Record<string, string> = {
   ollama: 'Ollama',
   neuralwatt: 'Neuralwatt',
   zenmux: 'Zenmux',
+  'opencode-go': 'OpenCode Go',
   devpass: 'DevPass',
 };
 

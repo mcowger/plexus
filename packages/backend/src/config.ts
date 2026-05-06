@@ -204,6 +204,12 @@ const DevPassQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const OpenCodeGoQuotaCheckerOptionsSchema = z.object({
+  workspaceId: z.string().min(1, 'OpenCode Go workspace ID is required'),
+  authCookie: z.string().min(1, 'OpenCode Go auth cookie is required'),
+  endpoint: z.string().url().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -372,6 +378,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: WaferQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('opencode-go'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: OpenCodeGoQuotaCheckerOptionsSchema.optional(),
   }),
 ]);
 
@@ -1000,6 +1013,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'zenmux',
   'devpass',
   'wafer',
+  'opencode-go',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

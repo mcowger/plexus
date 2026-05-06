@@ -20,6 +20,7 @@ import { DevPassQuotaConfig } from '../quota/DevPassQuotaConfig';
 import { NeuralwattQuotaConfig } from '../quota/NeuralwattQuotaConfig';
 import { ZenmuxQuotaConfig } from '../quota/ZenmuxQuotaConfig';
 import { WaferQuotaConfig } from '../quota/WaferQuotaConfig';
+import { OpenCodeGoQuotaConfig } from '../quota/OpenCodeGoQuotaConfig';
 
 interface Props {
   editingProvider: Provider;
@@ -59,6 +60,7 @@ const QUOTA_CONFIG_MAP: Record<
   neuralwatt: NeuralwattQuotaConfig,
   zenmux: ZenmuxQuotaConfig,
   wafer: WaferQuotaConfig,
+  'opencode-go': OpenCodeGoQuotaConfig,
 };
 
 export function ProviderQuotaEditor({

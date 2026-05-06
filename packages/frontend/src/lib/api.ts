@@ -568,6 +568,7 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'zenmux',
   'devpass',
   'wafer',
+  'opencode-go',
 ]);
 
 /**
