@@ -15,9 +15,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: linux
-            compile_cmd: bun run compile:linux
-            artifact_name: plexus-linux
+          - target: linux-amd64
+            compile_cmd: bun run compile:linux-amd64
+            artifact_name: plexus-linux-amd64
+          - target: linux-arm64
+            compile_cmd: bun run compile:linux-arm64
+            artifact_name: plexus-linux-arm64
           - target: macos
             compile_cmd: bun run compile:macos
             artifact_name: plexus-macos

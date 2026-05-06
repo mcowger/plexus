@@ -27,7 +27,8 @@ jobs:
       - name: Organize binaries
         run: |
           mkdir -p release
-          cp artifacts/binary-linux/plexus-linux release/
+          cp artifacts/binary-linux-amd64/plexus-linux-amd64 release/
+          cp artifacts/binary-linux-arm64/plexus-linux-arm64 release/
           cp artifacts/binary-macos/plexus-macos release/
           cp artifacts/binary-windows/plexus.exe release/
 
@@ -37,7 +38,8 @@ jobs:
           tag_name: ${{ inputs.tag }}
           body: ${{ inputs.release_notes }}
           files: |
-            release/plexus-linux
+            release/plexus-linux-amd64
+            release/plexus-linux-arm64
             release/plexus-macos
             release/plexus.exe
           draft: false
