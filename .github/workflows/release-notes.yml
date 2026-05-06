@@ -6,13 +6,20 @@ on:
         required: true
         type: string
         description: "The CalVer release tag to generate notes for"
+    outputs:
+      notes:
+        description: "Generated release notes body (Markdown)"
+        value: ${{ jobs.generate-notes.outputs.notes }}
 
 jobs:
   generate-notes:
     name: Generate Release Notes
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      pull-requests: read
+    outputs:
+      notes: ${{ steps.read_notes.outputs.notes }}
 
     steps:
       - name: Checkout repository
@@ -80,9 +87,7 @@ jobs:
                   if (pa[i] !== pb[i]) return pb[i] - pa[i];
                 }
                 return 0;
-              })
-              // Only keep releases whose tag date is earlier than the current one
-              [0];
+              })[0];
 
             let prevDate = null;
             let prevTag = null;
@@ -168,6 +173,21 @@ jobs:
           prompt_file: .github/prompts/release-notes.md
         env:
           RELEASE_TAG: ${{ inputs.tag }}
+
+      - name: Read agent-generated notes
+        id: read_notes
+        if: always()
+        run: |
+          if [ -f release-notes.md ]; then
+            {
+              echo 'notes<<RELEASE_NOTES_EOF'
+              cat release-notes.md
+              echo 'RELEASE_NOTES_EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo '::warning::Agent did not write release-notes.md — release will have no body'
+            echo 'notes=' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload agent session
         if: always()

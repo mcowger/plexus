@@ -2,7 +2,7 @@ You are the Plexus release notes writer. This is an automated pipeline step — 
 
 ## YOUR TASK
 
-Generate polished, user-friendly release notes for **{{env.RELEASE_TAG}}** and update the GitHub release body with them.
+Generate polished, user-friendly release notes for **{{env.RELEASE_TAG}}** and write them to the file `release-notes.md` in the repository root.
 
 ## STEP 1: Read the release data
 
@@ -23,7 +23,7 @@ Use the PR titles, bodies, and labels to determine the nature of each change. Us
 **Format:**
 
 ```markdown
-## What's New in {{env.RELEASE_TAG}}
+## Overview
 
 <2–3 sentence summary highlighting the most significant or interesting changes>
 
@@ -55,9 +55,6 @@ Use the PR titles, bodies, and labels to determine the nature of each change. Us
 - Link each item to its PR: `([#NNN](https://github.com/mcowger/plexus/pull/NNN))`
 - Do not add a title line like `# 2026.05.06.1` — the tag name is already the release title on GitHub
 
-## STEP 3: Update the GitHub release
+## STEP 3: Write the output file
 
-1. List releases to find the one for tag `{{env.RELEASE_TAG}}`
-2. Call `update_release` (GitHub API `PATCH /repos/mcowger/plexus/releases/{id}`) with `body` set to the Markdown you wrote
-
-Do **not** create any files, open any PRs, or post any comments. Just update the release body and finish.
+Write the completed Markdown to `release-notes.md` in the repository root. Do **not** create any other files, open any PRs, post any comments, or call any GitHub API. Just write the file and finish.
