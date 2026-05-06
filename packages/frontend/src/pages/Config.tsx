@@ -15,6 +15,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { formatMinutesToMinSec } from '@plexus/shared';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -105,12 +106,59 @@ export const Config = () => {
   const [cooldownPolicy, setCooldownPolicy] = useState<CooldownPolicy>(DEFAULT_COOLDOWN_POLICY);
   const [cooldownLoaded, setCooldownLoaded] = useState(false);
   const [cooldownSaving, setCooldownSaving] = useState(false);
+  // Raw input strings for cooldown fields (to allow natural typing)
+  const [cooldownInitialInput, setCooldownInitialInput] = useState('');
+  const [cooldownMaxInput, setCooldownMaxInput] = useState('');
 
-  // Exploration rate settings state
-  const [explorationRates, setExplorationRates] =
-    useState<ExplorationRates>(DEFAULT_EXPLORATION_RATES);
+  // Validate cooldown input strings
+  const validateCooldownInput = (
+    raw: string
+  ): { valid: boolean; value?: number; error?: string } => {
+    if (raw === '') {
+      return { valid: false, error: 'Required' };
+    }
+    const num = Number(raw);
+    if (isNaN(num) || !isFinite(num)) {
+      return { valid: false, error: 'Invalid number' };
+    }
+    if (num < 0.1) {
+      return { valid: false, error: 'Must be at least 0.1' };
+    }
+    return { valid: true, value: num };
+  };
+
+  const initialValidation = validateCooldownInput(cooldownInitialInput);
+  const maxValidation = validateCooldownInput(cooldownMaxInput);
+  const isCooldownValid = cooldownLoaded && initialValidation.valid && maxValidation.valid;
+
+  // Exploration rate settings state (setter only needed, value derived from inputs)
+  const [, setExplorationRates] = useState<ExplorationRates>(DEFAULT_EXPLORATION_RATES);
   const [explorationLoaded, setExplorationLoaded] = useState(false);
   const [explorationSaving, setExplorationSaving] = useState(false);
+  // Raw input strings for exploration rate fields
+  const [explorationPerformanceInput, setExplorationPerformanceInput] = useState('');
+  const [explorationLatencyInput, setExplorationLatencyInput] = useState('');
+
+  // Validate exploration rate input (0 to 1)
+  const validateExplorationInput = (
+    raw: string
+  ): { valid: boolean; value?: number; error?: string } => {
+    if (raw === '') {
+      return { valid: false, error: 'Required' };
+    }
+    const num = Number(raw);
+    if (isNaN(num) || !isFinite(num)) {
+      return { valid: false, error: 'Invalid number' };
+    }
+    if (num < 0 || num > 1) {
+      return { valid: false, error: 'Must be between 0 and 1' };
+    }
+    return { valid: true, value: num };
+  };
+
+  const perfValidation = validateExplorationInput(explorationPerformanceInput);
+  const latValidation = validateExplorationInput(explorationLatencyInput);
+  const isExplorationValid = explorationLoaded && perfValidation.valid && latValidation.valid;
 
   const loadFailoverPolicy = useCallback(async () => {
     try {
@@ -129,6 +177,8 @@ export const Config = () => {
     try {
       const policy = await api.getCooldownPolicy();
       setCooldownPolicy(policy);
+      setCooldownInitialInput(String(policy.initialMinutes));
+      setCooldownMaxInput(String(policy.maxMinutes));
       setCooldownLoaded(true);
     } catch (e) {
       console.error('Failed to load cooldown policy:', e);
@@ -140,6 +190,8 @@ export const Config = () => {
     try {
       const rates = await api.getExplorationRates();
       setExplorationRates(rates);
+      setExplorationPerformanceInput(String(rates.performanceExplorationRate));
+      setExplorationLatencyInput(String(rates.latencyExplorationRate));
       setExplorationLoaded(true);
     } catch (e) {
       console.error('Failed to load exploration rates:', e);
@@ -182,14 +234,17 @@ export const Config = () => {
   };
 
   const handleSaveCooldown = async () => {
+    if (!initialValidation.valid || !maxValidation.valid) return;
     setCooldownSaving(true);
     try {
       const updated = await api.patchCooldownPolicy({
-        initialMinutes: cooldownPolicy.initialMinutes,
-        maxMinutes: cooldownPolicy.maxMinutes,
+        initialMinutes: initialValidation.value!,
+        maxMinutes: maxValidation.value!,
       });
 
       setCooldownPolicy(updated);
+      setCooldownInitialInput(String(updated.initialMinutes));
+      setCooldownMaxInput(String(updated.maxMinutes));
       toast.success('Cooldown settings saved');
     } catch (e) {
       toast.error((e as Error).message, 'Failed to save cooldown settings');
@@ -199,14 +254,17 @@ export const Config = () => {
   };
 
   const handleSaveExplorationRates = async () => {
+    if (!perfValidation.valid || !latValidation.valid) return;
     setExplorationSaving(true);
     try {
       const updated = await api.patchExplorationRates({
-        performanceExplorationRate: explorationRates.performanceExplorationRate,
-        latencyExplorationRate: explorationRates.latencyExplorationRate,
+        performanceExplorationRate: perfValidation.value!,
+        latencyExplorationRate: latValidation.value!,
       });
 
       setExplorationRates(updated);
+      setExplorationPerformanceInput(String(updated.performanceExplorationRate));
+      setExplorationLatencyInput(String(updated.latencyExplorationRate));
       toast.success('Exploration rate settings saved');
     } catch (e) {
       toast.error((e as Error).message, 'Failed to save exploration rate settings');
@@ -561,7 +619,7 @@ export const Config = () => {
               size="sm"
               onClick={handleSaveCooldown}
               isLoading={cooldownSaving}
-              disabled={!cooldownLoaded}
+              disabled={!isCooldownValid}
               leftIcon={<Save size={14} />}
             >
               Save
@@ -592,21 +650,33 @@ export const Config = () => {
               </label>
               <p className="text-xs text-text-muted mb-2">
                 C₀ — the cooldown duration after the first failure. Subsequent failures double the
-                duration until the maximum is reached.
+                duration until the maximum is reached. Fractional values are supported (e.g. 0.1 = 6
+                seconds).
               </p>
-              <input
-                id="cooldownInitialMinutes"
-                type="number"
-                min={1}
-                value={cooldownPolicy.initialMinutes}
-                onChange={(e) =>
-                  setCooldownPolicy((prev) => ({
-                    ...prev,
-                    initialMinutes: Math.max(1, Number(e.target.value) || 1),
-                  }))
-                }
-                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <input
+                    id="cooldownInitialMinutes"
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={cooldownInitialInput}
+                    onChange={(e) => setCooldownInitialInput(e.target.value)}
+                    className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  {!initialValidation.valid && cooldownInitialInput !== '' && (
+                    <span className="text-xs text-warning">{initialValidation.error}</span>
+                  )}
+                </div>
+                <span className="text-xs text-text-muted tabular-nums min-w-[60px]">
+                  ={' '}
+                  {initialValidation.valid && initialValidation.value !== undefined
+                    ? formatMinutesToMinSec(initialValidation.value)
+                    : cooldownLoaded
+                      ? formatMinutesToMinSec(cooldownPolicy.initialMinutes)
+                      : '—'}
+                </span>
+              </div>
             </div>
 
             {/* Max Minutes */}
@@ -619,21 +689,33 @@ export const Config = () => {
               </label>
               <p className="text-xs text-text-muted mb-2">
                 C_max — the upper limit for any cooldown duration, regardless of how many
-                consecutive failures have occurred.
+                consecutive failures have occurred. Fractional values are supported (e.g. 0.1 = 6
+                seconds).
               </p>
-              <input
-                id="cooldownMaxMinutes"
-                type="number"
-                min={1}
-                value={cooldownPolicy.maxMinutes}
-                onChange={(e) =>
-                  setCooldownPolicy((prev) => ({
-                    ...prev,
-                    maxMinutes: Math.max(1, Number(e.target.value) || 1),
-                  }))
-                }
-                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <input
+                    id="cooldownMaxMinutes"
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={cooldownMaxInput}
+                    onChange={(e) => setCooldownMaxInput(e.target.value)}
+                    className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  {!maxValidation.valid && cooldownMaxInput !== '' && (
+                    <span className="text-xs text-warning">{maxValidation.error}</span>
+                  )}
+                </div>
+                <span className="text-xs text-text-muted tabular-nums min-w-[60px]">
+                  ={' '}
+                  {maxValidation.valid && maxValidation.value !== undefined
+                    ? formatMinutesToMinSec(maxValidation.value)
+                    : cooldownLoaded
+                      ? formatMinutesToMinSec(cooldownPolicy.maxMinutes)
+                      : '—'}
+                </span>
+              </div>
             </div>
           </div>
         </Disclosure>
@@ -648,7 +730,7 @@ export const Config = () => {
               size="sm"
               onClick={handleSaveExplorationRates}
               isLoading={explorationSaving}
-              disabled={!explorationLoaded}
+              disabled={!isExplorationValid}
               leftIcon={<Save size={14} />}
             >
               Save
@@ -681,24 +763,21 @@ export const Config = () => {
                 The probability of exploring a non-optimal provider when using the performance
                 selector. Default: 0.05 (5%).
               </p>
-              <input
-                id="performanceExplorationRate"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                value={explorationRates.performanceExplorationRate}
-                onChange={(e) =>
-                  setExplorationRates((prev) => ({
-                    ...prev,
-                    performanceExplorationRate: Math.min(
-                      1,
-                      Math.max(0, Number(e.target.value) || 0)
-                    ),
-                  }))
-                }
-                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <div className="flex flex-col gap-1">
+                <input
+                  id="performanceExplorationRate"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={explorationPerformanceInput}
+                  onChange={(e) => setExplorationPerformanceInput(e.target.value)}
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                {!perfValidation.valid && explorationPerformanceInput !== '' && (
+                  <span className="text-xs text-warning">{perfValidation.error}</span>
+                )}
+              </div>
             </div>
 
             {/* Latency Exploration Rate */}
@@ -713,21 +792,21 @@ export const Config = () => {
                 The probability of exploring a non-optimal provider when using the latency selector.
                 Defaults to the Performance Exploration Rate if not explicitly set.
               </p>
-              <input
-                id="latencyExplorationRate"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                value={explorationRates.latencyExplorationRate}
-                onChange={(e) =>
-                  setExplorationRates((prev) => ({
-                    ...prev,
-                    latencyExplorationRate: Math.min(1, Math.max(0, Number(e.target.value) || 0)),
-                  }))
-                }
-                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <div className="flex flex-col gap-1">
+                <input
+                  id="latencyExplorationRate"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={explorationLatencyInput}
+                  onChange={(e) => setExplorationLatencyInput(e.target.value)}
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                {!latValidation.valid && explorationLatencyInput !== '' && (
+                  <span className="text-xs text-warning">{latValidation.error}</span>
+                )}
+              </div>
             </div>
           </div>
         </Disclosure>

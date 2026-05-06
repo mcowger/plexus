@@ -104,6 +104,7 @@ import {
   formatTokens,
   formatTPS,
 } from '../../../lib/format';
+import { formatMsToMinSec } from '@plexus/shared';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../../contexts/ToastContext';
 
@@ -434,7 +435,7 @@ const EntityRow: React.FC<{ entity: EntityStats; isModel?: boolean }> = ({ entit
 interface CooldownRowProps {
   provider: string;
   modelDisplay: string;
-  minutes: number;
+  timeDisplay: string;
   consecutiveFailures?: number;
   lastError?: string;
   expiryStr: string;
@@ -444,7 +445,7 @@ interface CooldownRowProps {
 const CooldownRow: React.FC<CooldownRowProps> = ({
   provider,
   modelDisplay,
-  minutes,
+  timeDisplay,
   consecutiveFailures,
   lastError,
   expiryStr,
@@ -506,7 +507,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
       <AlertTriangle size={12} className="text-warning shrink-0" />
       <span className="text-xs font-medium text-text">{provider}</span>
       <span className="text-xs text-text-muted truncate">
-        {modelDisplay} — {minutes}m
+        {modelDisplay} — {timeDisplay}
       </span>
       <div className="relative ml-auto shrink-0 flex items-center gap-2" ref={ref}>
         <button
@@ -2234,13 +2235,13 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         const representative = modelCooldowns.reduce((a, b) =>
                           a.timeRemainingMs >= b.timeRemainingMs ? a : b
                         );
-                        const minutes = Math.ceil(maxTime / 60000);
+                        const timeDisplay = formatMsToMinSec(maxTime);
                         return (
                           <CooldownRow
                             key={key}
                             provider={normalizeTelemetryLabel(provider) || 'Unknown'}
                             modelDisplay={model || 'all models'}
-                            minutes={minutes}
+                            timeDisplay={timeDisplay}
                             consecutiveFailures={representative.consecutiveFailures}
                             lastError={representative.lastError}
                             expiryStr={new Date(representative.expiry).toLocaleString()}

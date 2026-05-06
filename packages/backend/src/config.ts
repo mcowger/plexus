@@ -570,8 +570,8 @@ export const McpServerConfigSchema = z.object({
 });
 
 const CooldownPolicySchema = z.object({
-  initialMinutes: z.number().min(1).default(2),
-  maxMinutes: z.number().min(1).default(300),
+  initialMinutes: z.number().min(0.1).default(2),
+  maxMinutes: z.number().min(0.1).default(300),
 });
 
 const VisionFallthroughConfigSchema = z.object({
