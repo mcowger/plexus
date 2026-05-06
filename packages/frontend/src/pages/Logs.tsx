@@ -23,9 +23,12 @@ import {
   formatTPS,
 } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
+import { DateTimePicker } from '../components/ui/DateTimePicker';
 import {
   ChevronLeft,
   ChevronRight,
+  PlayCircle,
+  Circle,
   Trash2,
   Bug,
   Zap,
@@ -56,6 +59,7 @@ import {
   Plane,
   Eye,
   ScanSearch,
+  X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
@@ -117,6 +121,8 @@ export const Logs = () => {
     apiKey: '',
     incomingModelAlias: '',
     provider: '',
+    startDate: '',
+    endDate: '',
   });
 
   const apiLogos: Record<string, string> = {
@@ -151,6 +157,8 @@ export const Logs = () => {
       if (filters.apiKey) cleanFilters.apiKey = filters.apiKey;
       if (filters.incomingModelAlias) cleanFilters.incomingModelAlias = filters.incomingModelAlias;
       if (filters.provider) cleanFilters.provider = filters.provider;
+      if (filters.startDate) cleanFilters.startDate = new Date(filters.startDate).toISOString();
+      if (filters.endDate) cleanFilters.endDate = new Date(filters.endDate).toISOString();
 
       const res = await api.getLogs(limit, offset, cleanFilters, sortBy, sortDir);
       setLogs(res.data);
@@ -289,6 +297,15 @@ export const Logs = () => {
                 ) {
                   matches = false;
                 }
+                // Client-side date filtering for SSE events
+                if (currentFilters.startDate && newLog.startTime) {
+                  const filterStart = new Date(currentFilters.startDate).getTime();
+                  if (newLog.startTime < filterStart) matches = false;
+                }
+                if (currentFilters.endDate && newLog.startTime) {
+                  const filterEnd = new Date(currentFilters.endDate).getTime();
+                  if (newLog.startTime > filterEnd) matches = false;
+                }
 
                 if (matches) {
                   setLogs((prev) => {
@@ -375,9 +392,12 @@ export const Logs = () => {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return { time: 'Invalid', date: 'Date' };
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
       return {
         time: d.toLocaleTimeString(),
-        date: d.toISOString().split('T')[0],
+        date: `${year}-${month}-${day}`,
       };
     } catch (e) {
       return { time: 'Error', date: 'Date' };
@@ -401,7 +421,7 @@ export const Logs = () => {
         <div className="p-3 sm:p-4 border-b border-border-glass">
           <form
             onSubmit={handleSearch}
-            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 justify-between"
+            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 justify-between"
           >
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 min-w-0 flex-1">
               {/* The apiKey filter is redundant for limited users — backend
@@ -428,6 +448,34 @@ export const Logs = () => {
                   value={filters.provider}
                   onChange={(v) => setFilters({ ...filters, provider: v })}
                 />
+              </div>
+              <div className="w-full sm:w-auto flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <PlayCircle size={24} color="#94a3b8" />
+                  <DateTimePicker
+                    value={filters.startDate}
+                    onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
+                    placeholder="Start date"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Circle size={24} color="#94a3b8" />
+                  <DateTimePicker
+                    value={filters.endDate}
+                    onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
+                    placeholder="End date"
+                  />
+                </div>
+                {(filters.startDate || filters.endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
+                    className="rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
+                    title="Clear date filters"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
               <Button type="submit" variant="primary">
                 Search
