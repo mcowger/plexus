@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, useCallback } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
 import {
@@ -9,11 +9,15 @@ import {
   RefreshCw,
   HardDrive,
   Archive,
+  Shield,
+  Save,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Switch } from '../components/ui/Switch';
+import { Disclosure } from '../components/ui/Disclosure';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import type { CardLayout } from '../types/card';
@@ -46,6 +50,18 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   }
 }
 
+interface FailoverPolicy {
+  enabled: boolean;
+  retryableStatusCodes: number[];
+  retryableErrors: string[];
+}
+
+const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
+  enabled: true,
+  retryableStatusCodes: [],
+  retryableErrors: [],
+};
+
 export const Config = () => {
   const toast = useToast();
   const [config, setConfig] = useState('');
@@ -55,6 +71,60 @@ export const Config = () => {
   const [isFullBackupLoading, setIsFullBackupLoading] = useState(false);
   const [isRestoreLoading, setIsRestoreLoading] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  // Failover settings state
+  const [failoverPolicy, setFailoverPolicy] = useState<FailoverPolicy>(DEFAULT_FAILOVER_POLICY);
+  const [failoverLoaded, setFailoverLoaded] = useState(false);
+  const [failoverSaving, setFailoverSaving] = useState(false);
+  const [statusCodesText, setStatusCodesText] = useState('');
+  const [errorsText, setErrorsText] = useState('');
+
+  const loadFailoverPolicy = useCallback(async () => {
+    try {
+      const policy = await api.getFailoverPolicy();
+      setFailoverPolicy(policy);
+      setStatusCodesText(policy.retryableStatusCodes.join(', '));
+      setErrorsText(policy.retryableErrors.join(', '));
+      setFailoverLoaded(true);
+    } catch (e) {
+      console.error('Failed to load failover policy:', e);
+      toast.error('Failed to load failover settings');
+    }
+  }, [toast]);
+
+  const handleSaveFailover = async () => {
+    setFailoverSaving(true);
+    try {
+      // Parse status codes
+      const statusCodes = statusCodesText
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n >= 100 && n <= 599);
+
+      // Parse error codes
+      const retryableErrors = errorsText
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const updated = await api.patchFailoverPolicy({
+        enabled: failoverPolicy.enabled,
+        retryableStatusCodes: statusCodes,
+        retryableErrors,
+      });
+
+      setFailoverPolicy(updated);
+      setStatusCodesText(updated.retryableStatusCodes.join(', '));
+      setErrorsText(updated.retryableErrors.join(', '));
+      toast.success('Failover settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save failover settings');
+    } finally {
+      setFailoverSaving(false);
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -70,6 +140,7 @@ export const Config = () => {
 
   useEffect(() => {
     loadConfig();
+    loadFailoverPolicy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -308,6 +379,86 @@ export const Config = () => {
             </EditorErrorBoundary>
           </div>
         </Card>
+
+        {/* ─── Failover Settings ──────────────────────────────────── */}
+        <Disclosure
+          title="Failover Settings"
+          defaultOpen={false}
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveFailover}
+              isLoading={failoverSaving}
+              disabled={!failoverLoaded}
+              leftIcon={<Save size={14} />}
+            >
+              Save
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5">
+            {/* Enabled toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield size={16} className="text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-text">Enable Failover</p>
+                  <p className="text-xs text-text-muted">
+                    When enabled, failed requests are automatically retried on the next available
+                    provider.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={failoverPolicy.enabled}
+                onChange={(checked) => setFailoverPolicy((prev) => ({ ...prev, enabled: checked }))}
+                aria-label="Toggle failover on/off"
+              />
+            </div>
+
+            {/* Retryable Status Codes */}
+            <div>
+              <label
+                htmlFor="retryableStatusCodes"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Retryable Status Codes
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                HTTP status codes that trigger a retry on the next provider. Enter comma-separated
+                values (100–599). Defaults to all non-2xx codes except 413 and 422 when empty.
+              </p>
+              <textarea
+                id="retryableStatusCodes"
+                value={statusCodesText}
+                onChange={(e) => setStatusCodesText(e.target.value)}
+                placeholder="e.g. 429, 500, 502, 503"
+                rows={3}
+                className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
+              />
+            </div>
+
+            {/* Retryable Errors */}
+            <div>
+              <label htmlFor="retryableErrors" className="block text-sm font-medium text-text mb-1">
+                Retryable Network Errors
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                Network error codes that trigger a retry on the next provider. Enter comma-separated
+                values. Defaults to ECONNREFUSED, ETIMEDOUT, ENOTFOUND when empty.
+              </p>
+              <textarea
+                id="retryableErrors"
+                value={errorsText}
+                onChange={(e) => setErrorsText(e.target.value)}
+                placeholder="e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND"
+                rows={2}
+                className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
+              />
+            </div>
+          </div>
+        </Disclosure>
 
         <Card
           title="Backup & Restore"

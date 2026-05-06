@@ -355,6 +355,51 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── Failover Policy ─────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/failover', async (_request, reply) => {
+    try {
+      const failover = await configService.getRepository().getFailoverPolicy();
+      return reply.send(failover);
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/failover', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      // Read current values, merge with updates, and write back
+      const current = await configService.getRepository().getFailoverPolicy();
+      const merged = { ...current, ...body };
+
+      if (body.enabled !== undefined) {
+        await configService.setSetting('failover.enabled', merged.enabled);
+      }
+      if (body.retryableStatusCodes !== undefined) {
+        await configService.setSetting(
+          'failover.retryableStatusCodes',
+          merged.retryableStatusCodes
+        );
+      }
+      if (body.retryableErrors !== undefined) {
+        await configService.setSetting('failover.retryableErrors', merged.retryableErrors);
+      }
+
+      // Return the final merged state
+      const updated = await configService.getRepository().getFailoverPolicy();
+      logger.debug('Failover policy updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch failover config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Vision Fallthrough ───────────────────────────────────────────
 
   fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {
