@@ -6,23 +6,6 @@ pre-commit:
     - CI: "true"
 
   commands:
-    # --- Block stale bun.lockb (Vitest transition cutoff 2025-04-18) ----------
-    lockfile-check:
-      skip:
-        - CI: "true"
-      run: |
-        CUTOFF="2025-04-18"
-        MTIME=$(stat -f "%Sm" -t "%Y-%m-%d" bun.lockb 2>/dev/null \
-             || stat -c "%y" bun.lockb 2>/dev/null | cut -d' ' -f1 \
-             || echo "1970-01-01")
-        if [ "$MTIME" \< "$CUTOFF" ]; then
-          echo ""
-          echo "[pre-commit] ERROR: bun.lockb is from $MTIME, before $CUTOFF."
-          echo "The project switched to Vitest. Run:  bun install"
-          echo ""
-          exit 1
-        fi
-
     # --- Block manually committed migration files ----------------------------
     no-migrations:
       skip:

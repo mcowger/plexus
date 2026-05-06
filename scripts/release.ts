@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { Octokit } from 'octokit';
 import { createInterface } from 'node:readline';
 
@@ -62,36 +63,24 @@ async function main() {
     process.exit(1);
   }
 
-  const octokit = new Octokit({ auth: token });
-  const owner = 'mcowger';
-  const repo = 'plexus';
+  // 1. Get local tags using git
+  const tagOutput = execSync('git tag', { encoding: 'utf-8' });
+  const allTags = tagOutput
+    .split('\n')
+    .map((t) => t.trim())
+    .filter(Boolean);
 
-  // 1. Get current version tags via GitHub API
-  let currentTag: CalVerTag | null = null;
-  try {
-    const { data: tags } = await octokit.request('GET /repos/{owner}/{repo}/tags', {
-      owner,
-      repo,
-      per_page: 100,
-    });
+  const calverTags = allTags.map((t) => parseCalVer(t)).filter((t): t is CalVerTag => t !== null);
 
-    const calverTags = tags
-      .map((t) => parseCalVer(t.name))
-      .filter((t): t is CalVerTag => t !== null);
+  // Sort: newest date first, then highest counter
+  calverTags.sort((a, b) => {
+    const dateA = a.year * 10000 + a.month * 100 + a.day;
+    const dateB = b.year * 10000 + b.month * 100 + b.day;
+    if (dateB !== dateA) return dateB - dateA;
+    return b.counter - a.counter;
+  });
 
-    if (calverTags.length > 0) {
-      // Sort: newest date first, then highest counter
-      calverTags.sort((a, b) => {
-        const dateA = a.year * 10000 + a.month * 100 + a.day;
-        const dateB = b.year * 10000 + b.month * 100 + b.day;
-        if (dateB !== dateA) return dateB - dateA;
-        return b.counter - a.counter;
-      });
-      currentTag = calverTags[0]!;
-    }
-  } catch (e) {
-    console.log('Could not fetch tags, starting fresh...\n');
-  }
+  const currentTag = calverTags.length > 0 ? calverTags[0]! : null;
 
   // Calculate next version
   const now = new Date();
@@ -99,15 +88,18 @@ async function main() {
 
   let nextVersion: string;
 
-  if (currentTag) {
-    const currentDateStr = `${currentTag.year}.${String(currentTag.month).padStart(2, '0')}.${String(currentTag.day).padStart(2, '0')}`;
-    if (currentDateStr === todayStr) {
-      // Same day, increment counter
-      nextVersion = `${todayStr}.${currentTag.counter + 1}`;
-    } else {
-      // New day, start at .1
-      nextVersion = `${todayStr}.1`;
-    }
+  // Find all tags for today and get the highest counter
+  const todayCalVerTags = calverTags.filter(
+    (t) => t.year === now.getFullYear() && t.month === now.getMonth() + 1 && t.day === now.getDate()
+  );
+
+  if (todayCalVerTags.length > 0) {
+    // Same day, increment from highest counter
+    const highestCounter = Math.max(...todayCalVerTags.map((t) => t.counter));
+    nextVersion = `${todayStr}.${highestCounter + 1}`;
+  } else if (currentTag) {
+    // New day, start at .1
+    nextVersion = `${todayStr}.1`;
   } else {
     // No tags yet
     nextVersion = `${todayStr}.1`;
@@ -123,6 +115,10 @@ async function main() {
   rl.close();
 
   // 3. GitHub API - create tag on main
+  const octokit = new Octokit({ auth: token });
+  const owner = 'mcowger';
+  const repo = 'plexus';
+
   console.log('\n📦 Creating tag on remote main...');
   try {
     // Get the latest commit SHA on main

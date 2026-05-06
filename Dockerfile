@@ -18,7 +18,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY scripts/ ./scripts/
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy the rest of the source code
 COPY . .
