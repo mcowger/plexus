@@ -1,0 +1,200 @@
+name: Generate Release Notes
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The CalVer release tag to generate notes for"
+    outputs:
+      notes:
+        description: "Generated release notes body (Markdown)"
+        value: ${{ jobs.generate-notes.outputs.notes }}
+
+jobs:
+  generate-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      notes: ${{ steps.read_notes.outputs.notes }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Gather release data
+        id: gather
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const currentTag = '${{ inputs.tag }}';
+            const calVerRegex = /^\d{4}\.\d{2}\.\d{2}\.\d+$/;
+            const fs = require('fs');
+
+            // Returns the timestamp that best represents when this tag was pushed.
+            // For annotated tags: the tagger.date embedded in the tag object.
+            // For lightweight tags (used by this project): the committer.date of the
+            // commit the tag points to, which is the closest proxy available via the
+            // GitHub API for when the tag was pushed.
+            async function getTagDate(tag) {
+              const ref = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`,
+              });
+
+              if (ref.data.object.type === 'tag') {
+                const tagObj = await github.rest.git.getTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_sha: ref.data.object.sha,
+                });
+                return new Date(tagObj.data.tagger.date);
+              }
+
+              const commit = await github.rest.git.getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: ref.data.object.sha,
+              });
+              return new Date(commit.data.committer.date);
+            }
+
+            const currentDate = await getTagDate(currentTag);
+            core.info(`Current tag ${currentTag} date: ${currentDate.toISOString()}`);
+
+            // Use listReleases (not listTags) so we only compare against actual published
+            // releases, not stray tags or pre-releases that were never shipped.
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            // Find the most-recent CalVer release that comes before the current one.
+            // Sort descending by CalVer parts so [0] is the newest prior release.
+            const prevRelease = releases
+              .filter(r => !r.prerelease && calVerRegex.test(r.tag_name) && r.tag_name !== currentTag)
+              .sort((a, b) => {
+                const pa = a.tag_name.split('.').map(Number);
+                const pb = b.tag_name.split('.').map(Number);
+                for (let i = 0; i < 4; i++) {
+                  if (pa[i] !== pb[i]) return pb[i] - pa[i];
+                }
+                return 0;
+              })[0];
+
+            let prevDate = null;
+            let prevTag = null;
+
+            if (prevRelease) {
+              prevTag = prevRelease.tag_name;
+              prevDate = await getTagDate(prevTag);
+              core.info(`Previous release ${prevTag} date: ${prevDate.toISOString()}`);
+            } else {
+              core.info('No previous CalVer release found — this appears to be the first release');
+            }
+
+            // Collect PRs whose merged_at falls strictly after prevDate and on/before currentDate.
+            const allPRs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              per_page: 100,
+            });
+
+            const relevantPRs = allPRs
+              .filter(pr => {
+                if (!pr.merged_at) return false;
+                const mergedAt = new Date(pr.merged_at);
+                if (prevDate && mergedAt <= prevDate) return false;
+                return mergedAt <= currentDate;
+              })
+              .map(pr => ({
+                number: pr.number,
+                title: pr.title,
+                author: pr.user?.login ?? 'unknown',
+                labels: pr.labels.map(l => l.name),
+                merged_at: pr.merged_at,
+                body: (pr.body ?? '').substring(0, 1000),
+              }));
+
+            core.info(`Found ${relevantPRs.length} PRs in this release window`);
+
+            // Collect commits pushed to main between the two tag dates.
+            const allCommits = await github.paginate(github.rest.repos.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: 'main',
+              since: prevDate ? prevDate.toISOString() : undefined,
+              until: currentDate.toISOString(),
+              per_page: 100,
+            });
+
+            const relevantCommits = allCommits.map(c => ({
+              sha: c.sha.substring(0, 7),
+              message: c.commit.message.split('\n')[0],
+              author: c.commit.author?.name ?? c.author?.login ?? 'unknown',
+              date: c.commit.committer?.date ?? null,
+            }));
+
+            core.info(`Found ${relevantCommits.length} commits in this release window`);
+
+            const releaseData = {
+              currentTag,
+              previousTag: prevTag,
+              currentDate: currentDate.toISOString(),
+              previousDate: prevDate ? prevDate.toISOString() : null,
+              pullRequests: relevantPRs,
+              commits: relevantCommits,
+            };
+
+            fs.writeFileSync('release-data.json', JSON.stringify(releaseData, null, 2));
+            core.info('Wrote release-data.json');
+
+      - name: Run release notes agent
+        id: release_notes_agent
+        uses: mcowger/pi-coding-agent-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          provider: openrouter
+          model: ${{ vars.LLM_MODEL_ID }}
+          token: ${{ secrets.LLM_API_KEY }}
+          base_url: ${{ secrets.LLM_API_HOST }}
+          trigger: generate-release-notes
+          load_builtin_extensions: true
+          suppress_final_comment: true
+          export_session_html: true
+          prompt_file: .github/prompts/release-notes.md
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+
+      - name: Read agent-generated notes
+        id: read_notes
+        if: always()
+        run: |
+          if [ -f release-notes.md ]; then
+            {
+              echo 'notes<<RELEASE_NOTES_EOF'
+              cat release-notes.md
+              echo 'RELEASE_NOTES_EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo '::warning::Agent did not write release-notes.md — release will have no body'
+            echo 'notes=' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload agent session
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-notes-session
+          path: ${{ steps.release_notes_agent.outputs.session_html_path }}
+          retention-days: 7
+          if-no-files-found: ignore
+          archive: false

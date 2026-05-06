@@ -6,6 +6,11 @@ on:
         required: true
         type: string
         description: "The release tag"
+      release_notes:
+        required: false
+        type: string
+        description: "Release notes body (Markdown)"
+        default: ""
 
 jobs:
   release:
@@ -30,6 +35,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
+          body: ${{ inputs.release_notes }}
           files: |
             release/plexus-linux
             release/plexus-macos
