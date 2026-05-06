@@ -50,3 +50,13 @@ jobs:
       tag: ${{ needs.setup.outputs.tag }}
     permissions:
       contents: write
+
+  generate-release-notes:
+    name: Generate Release Notes
+    needs: [setup, release]
+    uses: ./.github/workflows/release-notes.yml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: write
