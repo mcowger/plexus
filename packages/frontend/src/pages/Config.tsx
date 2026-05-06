@@ -11,6 +11,7 @@ import {
   Archive,
   Shield,
   Save,
+  Timer,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
@@ -56,10 +57,20 @@ interface FailoverPolicy {
   retryableErrors: string[];
 }
 
+interface CooldownPolicy {
+  initialMinutes: number;
+  maxMinutes: number;
+}
+
 const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
   enabled: true,
   retryableStatusCodes: [],
   retryableErrors: [],
+};
+
+const DEFAULT_COOLDOWN_POLICY: CooldownPolicy = {
+  initialMinutes: 2,
+  maxMinutes: 300,
 };
 
 export const Config = () => {
@@ -79,6 +90,11 @@ export const Config = () => {
   const [statusCodesText, setStatusCodesText] = useState('');
   const [errorsText, setErrorsText] = useState('');
 
+  // Cooldown settings state
+  const [cooldownPolicy, setCooldownPolicy] = useState<CooldownPolicy>(DEFAULT_COOLDOWN_POLICY);
+  const [cooldownLoaded, setCooldownLoaded] = useState(false);
+  const [cooldownSaving, setCooldownSaving] = useState(false);
+
   const loadFailoverPolicy = useCallback(async () => {
     try {
       const policy = await api.getFailoverPolicy();
@@ -89,6 +105,17 @@ export const Config = () => {
     } catch (e) {
       console.error('Failed to load failover policy:', e);
       toast.error('Failed to load failover settings');
+    }
+  }, [toast]);
+
+  const loadCooldownPolicy = useCallback(async () => {
+    try {
+      const policy = await api.getCooldownPolicy();
+      setCooldownPolicy(policy);
+      setCooldownLoaded(true);
+    } catch (e) {
+      console.error('Failed to load cooldown policy:', e);
+      toast.error('Failed to load cooldown settings');
     }
   }, [toast]);
 
@@ -126,6 +153,23 @@ export const Config = () => {
     }
   };
 
+  const handleSaveCooldown = async () => {
+    setCooldownSaving(true);
+    try {
+      const updated = await api.patchCooldownPolicy({
+        initialMinutes: cooldownPolicy.initialMinutes,
+        maxMinutes: cooldownPolicy.maxMinutes,
+      });
+
+      setCooldownPolicy(updated);
+      toast.success('Cooldown settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save cooldown settings');
+    } finally {
+      setCooldownSaving(false);
+    }
+  };
+
   const loadConfig = async () => {
     try {
       const data = await api.getConfigExport();
@@ -141,6 +185,7 @@ export const Config = () => {
   useEffect(() => {
     loadConfig();
     loadFailoverPolicy();
+    loadCooldownPolicy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -455,6 +500,93 @@ export const Config = () => {
                 placeholder="e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND"
                 rows={2}
                 className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
+              />
+            </div>
+          </div>
+        </Disclosure>
+
+        {/* ─── Cooldown Settings ──────────────────────────────────── */}
+        <Disclosure
+          title="Cooldown Settings"
+          defaultOpen={false}
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveCooldown}
+              isLoading={cooldownSaving}
+              disabled={!cooldownLoaded}
+              leftIcon={<Save size={14} />}
+            >
+              Save
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5">
+            {/* Exponential Backoff description */}
+            <div className="flex items-center gap-2">
+              <Timer size={16} className="text-primary" />
+              <div>
+                <p className="text-sm font-medium text-text">Exponential Backoff</p>
+                <p className="text-xs text-text-muted">
+                  When a provider fails, it is placed on cooldown using exponential backoff:{' '}
+                  <code className="text-text-secondary">C(n) = min(C_max, C₀ × 2ⁿ)</code> where n is
+                  the consecutive failure count.
+                </p>
+              </div>
+            </div>
+
+            {/* Initial Minutes */}
+            <div>
+              <label
+                htmlFor="cooldownInitialMinutes"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Initial Cooldown (minutes)
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                C₀ — the cooldown duration after the first failure. Subsequent failures double the
+                duration until the maximum is reached.
+              </p>
+              <input
+                id="cooldownInitialMinutes"
+                type="number"
+                min={1}
+                value={cooldownPolicy.initialMinutes}
+                onChange={(e) =>
+                  setCooldownPolicy((prev) => ({
+                    ...prev,
+                    initialMinutes: Math.max(1, Number(e.target.value) || 1),
+                  }))
+                }
+                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            {/* Max Minutes */}
+            <div>
+              <label
+                htmlFor="cooldownMaxMinutes"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Maximum Cooldown (minutes)
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                C_max — the upper limit for any cooldown duration, regardless of how many
+                consecutive failures have occurred.
+              </p>
+              <input
+                id="cooldownMaxMinutes"
+                type="number"
+                min={1}
+                value={cooldownPolicy.maxMinutes}
+                onChange={(e) =>
+                  setCooldownPolicy((prev) => ({
+                    ...prev,
+                    maxMinutes: Math.max(1, Number(e.target.value) || 1),
+                  }))
+                }
+                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
           </div>

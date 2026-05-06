@@ -3056,4 +3056,33 @@ export const api = {
     if (!res.ok) throw new Error('Failed to update failover policy');
     return res.json();
   },
+
+  // ─── Cooldown Settings ──────────────────────────────────────────────
+
+  /** Fetch current cooldown policy. */
+  getCooldownPolicy: async (): Promise<{
+    initialMinutes: number;
+    maxMinutes: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/cooldown`);
+    if (!res.ok) throw new Error('Failed to fetch cooldown policy');
+    return res.json();
+  },
+
+  /** Patch cooldown policy fields. */
+  patchCooldownPolicy: async (updates: {
+    initialMinutes?: number;
+    maxMinutes?: number;
+  }): Promise<{
+    initialMinutes: number;
+    maxMinutes: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/cooldown`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update cooldown policy');
+    return res.json();
+  },
 };
