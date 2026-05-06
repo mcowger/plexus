@@ -2,6 +2,7 @@
 act = "latest"
 actionlint = "latest"
 bun = "latest"
+lefthook = "latest"
 
 [env]
 _.path = ["./node_modules/.bin"]
