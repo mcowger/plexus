@@ -3024,4 +3024,36 @@ export const api = {
     }
     return res.json();
   },
+
+  // ─── Failover Settings ────────────────────────────────────────────
+
+  /** Fetch current failover policy. */
+  getFailoverPolicy: async (): Promise<{
+    enabled: boolean;
+    retryableStatusCodes: number[];
+    retryableErrors: string[];
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/failover`);
+    if (!res.ok) throw new Error('Failed to fetch failover policy');
+    return res.json();
+  },
+
+  /** Patch failover policy fields. */
+  patchFailoverPolicy: async (updates: {
+    enabled?: boolean;
+    retryableStatusCodes?: number[];
+    retryableErrors?: string[];
+  }): Promise<{
+    enabled: boolean;
+    retryableStatusCodes: number[];
+    retryableErrors: string[];
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/failover`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update failover policy');
+    return res.json();
+  },
 };
