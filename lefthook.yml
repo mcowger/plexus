@@ -1,0 +1,88 @@
+pre-commit:
+  # Skip the entire hook in CI — GitHub Actions runs each check independently
+  # in dedicated workflow steps, making the hook redundant and harmful
+  # (failed hook = create_pull_request retries with a new branch each time).
+  skip:
+    - CI: "true"
+
+  commands:
+    # --- Block stale bun.lockb (Vitest transition cutoff 2025-04-18) ----------
+    lockfile-check:
+      skip:
+        - CI: "true"
+      run: |
+        CUTOFF="2025-04-18"
+        MTIME=$(stat -f "%Sm" -t "%Y-%m-%d" bun.lockb 2>/dev/null \
+             || stat -c "%y" bun.lockb 2>/dev/null | cut -d' ' -f1 \
+             || echo "1970-01-01")
+        if [ "$MTIME" \< "$CUTOFF" ]; then
+          echo ""
+          echo "[pre-commit] ERROR: bun.lockb is from $MTIME, before $CUTOFF."
+          echo "The project switched to Vitest. Run:  bun install"
+          echo ""
+          exit 1
+        fi
+
+    # --- Block manually committed migration files ----------------------------
+    no-migrations:
+      skip:
+        - CI: "true"
+      run: |
+        if [ "${ALLOW_MIGRATIONS:-}" = "1" ]; then exit 0; fi
+        migration_files=$(git diff --cached --name-only -- \
+          'packages/backend/drizzle/migrations/' \
+          'packages/backend/drizzle/migrations_pg/' || true)
+        if [ -n "$migration_files" ]; then
+          echo ""
+          echo "[pre-commit] ERROR: Migration files should not be committed manually."
+          echo "Migrations are auto-generated on main by CI after schema changes merge."
+          echo ""
+          echo "Blocked files:"
+          echo "$migration_files" | sed 's/^/  /'
+          echo ""
+          echo "To remove them:  git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/"
+          echo "To bypass (maintainers only):  ALLOW_MIGRATIONS=1 git commit ..."
+          echo ""
+          exit 1
+        fi
+
+    # --- Validate changed GitHub Actions workflow YAML -----------------------
+    workflow-yaml:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: |
+        for f in {staged_files}; do
+          bun -e "
+            const fs = require('fs');
+            const yaml = require('./packages/backend/node_modules/yaml');
+            try {
+              yaml.parse(fs.readFileSync('$f', 'utf8'));
+              console.log('  ✓ $f');
+            } catch (e) {
+              console.error('  ✗ $f:', e.message);
+              process.exit(1);
+            }
+          " || exit 1
+        done
+
+    # --- Biome: format staged source files in-place and re-stage -------------
+    biome-format:
+      glob: "*.{ts,tsx,js,jsx,json}"
+      run: bunx biome format --write {staged_files} && git add {staged_files}
+
+    # --- Biome: lint all sources ---------------------------------------------
+    biome-lint:
+      run: bunx biome lint .
+
+    # --- TypeScript type-check across all packages ---------------------------
+    typecheck:
+      run: bun run typecheck
+
+    # --- Frontend build (catches broken imports/exports) ---------------------
+    frontend-build:
+      glob: "packages/frontend/src/**"
+      run: bun run build:frontend
+
+    # --- Backend tests (only when backend source changes) --------------------
+    backend-tests:
+      glob: "packages/backend/src/**"
+      run: cd packages/backend && bun run test

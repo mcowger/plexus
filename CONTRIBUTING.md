@@ -8,7 +8,7 @@ cd plexus
 bun install
 ```
 
-Running `bun install` automatically configures git hooks (via the `prepare` script). No extra setup is needed.
+Running `bun install` automatically installs git hooks via [Lefthook](https://github.com/evilmartians/lefthook) (the `prepare` script runs `lefthook install`). No extra setup is needed.
 
 ## Database Schema Changes
 
@@ -39,6 +39,14 @@ git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/
 ```
 
 Then commit again with only your schema `.ts` files.
+
+### Skipping hooks
+
+The hooks are skipped automatically when `CI=true` (GitHub Actions). To skip locally in exceptional circumstances:
+
+```bash
+LEFTHOOK=0 git commit -m "..."
+```
 
 ## Drizzle Config Files
 

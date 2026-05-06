@@ -6,6 +6,7 @@
     "@redocly/cli": "^2.30.1",
     "agent-browser": "^0.26.0",
     "bun-types": "latest",
+    "lefthook": "^2.1.6",
     "octokit": "^5.0.5",
     "pi-agent-browser-native": "latest",
     "vitest": "^4.1.5"
@@ -27,8 +28,7 @@
     "release": "bun run scripts/release.ts",
     "populate-dev": "bun run scripts/populate-dev.ts",
     "clear-dev": "bun run scripts/clear-dev.ts",
-    "prepare": "bun run scripts/setup-git-hooks.ts --no-fail --quiet",
-    "setup:hooks": "bun run scripts/setup-git-hooks.ts",
+    "prepare": "bunx lefthook install --reset-hooks-path",
     "format": "bunx biome format --write .",
     "format:check": "bunx biome format .",
     "lint": "bunx biome lint --write .",
