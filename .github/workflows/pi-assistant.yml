@@ -82,6 +82,7 @@ jobs:
           trigger: /pi
           load_builtin_extensions: true
           suppress_final_comment: true
+          suppress_bun_install: true
           export_session_html: true
           prompt_file: .github/prompts/pi-assistant.md
         env:
