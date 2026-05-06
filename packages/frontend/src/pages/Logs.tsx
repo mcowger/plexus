@@ -56,6 +56,8 @@ import {
   Plane,
   Eye,
   ScanSearch,
+  Calendar,
+  X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
@@ -117,6 +119,8 @@ export const Logs = () => {
     apiKey: '',
     incomingModelAlias: '',
     provider: '',
+    startDate: '',
+    endDate: '',
   });
 
   const apiLogos: Record<string, string> = {
@@ -151,6 +155,8 @@ export const Logs = () => {
       if (filters.apiKey) cleanFilters.apiKey = filters.apiKey;
       if (filters.incomingModelAlias) cleanFilters.incomingModelAlias = filters.incomingModelAlias;
       if (filters.provider) cleanFilters.provider = filters.provider;
+      if (filters.startDate) cleanFilters.startDate = new Date(filters.startDate).toISOString();
+      if (filters.endDate) cleanFilters.endDate = new Date(filters.endDate).toISOString();
 
       const res = await api.getLogs(limit, offset, cleanFilters, sortBy, sortDir);
       setLogs(res.data);
@@ -288,6 +294,15 @@ export const Logs = () => {
                   !newLog.provider?.toLowerCase().includes(currentFilters.provider.toLowerCase())
                 ) {
                   matches = false;
+                }
+                // Client-side date filtering for SSE events
+                if (currentFilters.startDate && newLog.startTime) {
+                  const filterStart = new Date(currentFilters.startDate).getTime();
+                  if (newLog.startTime < filterStart) matches = false;
+                }
+                if (currentFilters.endDate && newLog.startTime) {
+                  const filterEnd = new Date(currentFilters.endDate).getTime();
+                  if (newLog.startTime > filterEnd) matches = false;
                 }
 
                 if (matches) {
@@ -428,6 +443,42 @@ export const Logs = () => {
                   value={filters.provider}
                   onChange={(v) => setFilters({ ...filters, provider: v })}
                 />
+              </div>
+              <div className="w-full sm:w-auto flex items-end gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-body text-xs font-medium text-text-secondary">From</label>
+                  <div className="relative flex items-center">
+                    <Calendar size={14} className="absolute left-2 text-text-muted pointer-events-none" />
+                    <input
+                      type="datetime-local"
+                      value={filters.startDate}
+                      onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                      className="w-full sm:w-48 py-2 pl-8 pr-2 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-md outline-none transition-all duration-fast backdrop-blur-md focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-body text-xs font-medium text-text-secondary">To</label>
+                  <div className="relative flex items-center">
+                    <Calendar size={14} className="absolute left-2 text-text-muted pointer-events-none" />
+                    <input
+                      type="datetime-local"
+                      value={filters.endDate}
+                      onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                      className="w-full sm:w-48 py-2 pl-8 pr-2 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-md outline-none transition-all duration-fast backdrop-blur-md focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                    />
+                  </div>
+                </div>
+                {(filters.startDate || filters.endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
+                    className="p-2 rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
+                    title="Clear date filters"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
               <Button type="submit" variant="primary">
                 Search
