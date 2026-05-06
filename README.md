@@ -80,10 +80,17 @@ ADMIN_KEY="your-admin-password" ./plexus
 curl -L https://github.com/mcowger/plexus/releases/latest/download/plexus-linux -o plexus
 chmod +x plexus
 ADMIN_KEY="your-admin-password" ./plexus
-
-# Windows (x64) — download plexus.exe from the releases page, then:
-# set ADMIN_KEY=your-admin-password && plexus.exe
 ```
+
+```powershell
+# Windows (x64, PowerShell)
+Invoke-WebRequest -Uri "https://github.com/mcowger/plexus/releases/latest/download/plexus.exe" -OutFile "plexus.exe"
+$env:ADMIN_KEY = "your-admin-password"
+$env:DATABASE_URL = "sqlite://./data/plexus.db"
+.\plexus.exe
+```
+
+For Windows troubleshooting and Command Prompt usage, see [Running the Windows Standalone Binary](docs/INSTALLATION.md#running-the-windows-standalone-binary).
 
 The binary is self-contained — no runtime or external dependencies required. Database migration files and the web dashboard are embedded inside the binary.
 
