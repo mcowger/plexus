@@ -32,20 +32,7 @@ pre-commit:
     # --- Validate changed GitHub Actions workflow YAML -----------------------
     workflow-yaml:
       glob: ".github/workflows/*.{yml,yaml}"
-      run: |
-        for f in {staged_files}; do
-          bun -e "
-            const fs = require('fs');
-            const yaml = require('./packages/backend/node_modules/yaml');
-            try {
-              yaml.parse(fs.readFileSync('$f', 'utf8'));
-              console.log('  ✓ $f');
-            } catch (e) {
-              console.error('  ✗ $f:', e.message);
-              process.exit(1);
-            }
-          " || exit 1
-        done
+      run: mise exec -- actionlint {staged_files}
 
     # --- Biome: format staged source files in-place and re-stage -------------
     biome-format:
