@@ -400,6 +400,45 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── Cooldown Policy ──────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/cooldown', async (_request, reply) => {
+    try {
+      const cooldown = await configService.getRepository().getCooldownPolicy();
+      return reply.send(cooldown);
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/cooldown', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      // Read current values, merge with updates, and write back
+      const current = await configService.getRepository().getCooldownPolicy();
+      const merged = { ...current, ...body };
+
+      if (body.initialMinutes !== undefined) {
+        await configService.setSetting('cooldown.initialMinutes', merged.initialMinutes);
+      }
+      if (body.maxMinutes !== undefined) {
+        await configService.setSetting('cooldown.maxMinutes', merged.maxMinutes);
+      }
+
+      // Return the final merged state
+      const updated = await configService.getRepository().getCooldownPolicy();
+      logger.debug('Cooldown policy updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch cooldown config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Vision Fallthrough ───────────────────────────────────────────
 
   fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {
