@@ -46,10 +46,6 @@ jobs:
     uses: ./.github/workflows/release-build-docker.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
 
   release:
     name: Create Release
@@ -58,5 +54,3 @@ jobs:
     with:
       tag: ${{ needs.setup.outputs.tag }}
       release_notes: ${{ needs.generate-release-notes.outputs.notes }}
-    permissions:
-      contents: write
