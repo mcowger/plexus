@@ -23,9 +23,12 @@ import {
   formatTPS,
 } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
+import { DateTimePicker } from '../components/ui/DateTimePicker';
 import {
   ChevronLeft,
   ChevronRight,
+  PlayCircle,
+  Circle,
   Trash2,
   Bug,
   Zap,
@@ -56,7 +59,6 @@ import {
   Plane,
   Eye,
   ScanSearch,
-  Calendar,
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -416,7 +418,7 @@ export const Logs = () => {
         <div className="p-3 sm:p-4 border-b border-border-glass">
           <form
             onSubmit={handleSearch}
-            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 justify-between"
+            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 justify-between"
           >
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 min-w-0 flex-1">
               {/* The apiKey filter is redundant for limited users — backend
@@ -444,36 +446,28 @@ export const Logs = () => {
                   onChange={(v) => setFilters({ ...filters, provider: v })}
                 />
               </div>
-              <div className="w-full sm:w-auto flex items-end gap-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-body text-xs font-medium text-text-secondary">From</label>
-                  <div className="relative flex items-center">
-                    <Calendar size={14} className="absolute left-2 text-text-muted pointer-events-none" />
-                    <input
-                      type="datetime-local"
-                      value={filters.startDate}
-                      onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                      className="w-full sm:w-48 py-2 pl-8 pr-2 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-md outline-none transition-all duration-fast backdrop-blur-md focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
-                    />
-                  </div>
+              <div className="w-full sm:w-auto flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <PlayCircle size={24} color="#94a3b8" />
+                  <DateTimePicker
+                    value={filters.startDate}
+                    onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
+                    placeholder="Start date"
+                  />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-body text-xs font-medium text-text-secondary">To</label>
-                  <div className="relative flex items-center">
-                    <Calendar size={14} className="absolute left-2 text-text-muted pointer-events-none" />
-                    <input
-                      type="datetime-local"
-                      value={filters.endDate}
-                      onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                      className="w-full sm:w-48 py-2 pl-8 pr-2 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-md outline-none transition-all duration-fast backdrop-blur-md focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Circle size={24} color="#94a3b8" />
+                  <DateTimePicker
+                    value={filters.endDate}
+                    onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
+                    placeholder="End date"
+                  />
                 </div>
                 {(filters.startDate || filters.endDate) && (
                   <button
                     type="button"
                     onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
-                    className="p-2 rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
+                    className="rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
                     title="Clear date filters"
                   >
                     <X size={14} />
