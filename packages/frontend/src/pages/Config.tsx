@@ -469,12 +469,11 @@ export const Config = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-full">
+    <PageContainer>
       <PageHeader
-        title="Settings"
-        subtitle="Gateway configuration"
+        title="Configuration"
+        subtitle="View current system configuration (read-only). Use the Providers, Models, and Keys pages to make changes."
       />
-      <PageContainer>
 
       <div className="flex flex-col gap-6">
         <Card
@@ -952,7 +951,6 @@ export const Config = () => {
           </div>
         </Card>
       </div>
-      </PageContainer>
-    </div>
+    </PageContainer>
   );
 };

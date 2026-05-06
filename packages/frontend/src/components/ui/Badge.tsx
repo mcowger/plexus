@@ -57,17 +57,13 @@ export const Badge: React.FC<BadgeProps> = ({
       style={style}
       className={clsx(
         'inline-flex items-center gap-1.5 rounded-full border whitespace-nowrap tnum',
-        secondaryText
-          ? 'px-2 py-1 text-[11px]'
-          : 'px-2 py-0.5 text-[11px] font-medium',
+        secondaryText ? 'px-2 py-1 text-[11px]' : 'px-2 py-0.5 text-[11px] font-medium',
         onClick && 'cursor-pointer hover:opacity-80 transition-opacity duration-fast',
         statusClasses[status],
         className
       )}
     >
-      {!noDot && (
-        <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-      )}
+      {!noDot && <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />}
       {secondaryText ? (
         <div className="flex flex-col items-start leading-tight">
           <span className="font-semibold">{children}</span>

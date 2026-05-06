@@ -536,7 +536,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
               <div
                 ref={popoverRef}
                 onClick={(e) => e.stopPropagation()}
-                className="fixed z-100 w-72 rounded-md border border-border shadow-lg p-3 text-xs space-y-2"
+                className="fixed z-[500] w-72 rounded-md border border-border shadow-lg p-3 text-xs space-y-2"
                 style={{
                   backgroundColor: 'rgb(15, 23, 42)',
                   top: popoverStyle.top,
@@ -2114,16 +2114,18 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Metrics',
               extra: (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <Signal size={15} className="text-info" />
-                  <span className="text-[11px] text-text-muted">Overview & Live Stats</span>
+                  <span className="hidden text-[11px] text-text-muted sm:inline">
+                    Overview & Live Stats
+                  </span>
                 </div>
               ),
               onClick: () => openModal('stats'),
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content: (
-                <div className="h-56 grid grid-cols-2 divide-x divide-border overflow-hidden">
+                <div className="h-48 sm:h-56 grid grid-cols-2 divide-x divide-border overflow-hidden">
                   {/* Overview column */}
                   <div className="divide-y divide-border">
                     <div className="px-3 py-1.5 bg-bg-subtle/50">
@@ -2204,7 +2206,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Alerts & Providers',
               extra: (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <AlertTriangle
                     size={15}
                     className={cooldowns.length > 0 ? 'text-warning' : 'text-text-muted'}
@@ -2226,7 +2228,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content: (
-                <div className="h-56 flex flex-col overflow-hidden">
+                <div className="h-48 sm:h-56 flex flex-col overflow-hidden">
                   {cooldowns.length > 0 && (
                     <div className="divide-y divide-border border-b border-warning/30 bg-warning/5 max-h-30 overflow-y-auto">
                       {Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
@@ -2291,8 +2293,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Request Velocity (Last 5 Minutes)',
               extra: (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-secondary">Minute-over-minute delta</span>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className="hidden text-xs text-text-secondary sm:inline">
+                    Minute-over-minute delta
+                  </span>
                   <AnalyzeButton
                     cardType="velocity"
                     size="sm"
@@ -2305,11 +2309,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content:
                 velocitySeries.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-text-secondary">
+                  <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                     No velocity data available
                   </div>
                 ) : (
-                  <div className="h-56">
+                  <div className="h-48 sm:h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={velocitySeries}
@@ -2359,7 +2363,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Provider Pulse (5m)',
               extra: (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <span className="text-xs text-text-secondary">Top 8 providers</span>
                   <AnalyzeButton
                     cardType="provider"
@@ -2373,11 +2377,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content:
                 providerPulseRows.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-text-secondary">
+                  <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                     No provider traffic in the selected live window.
                   </div>
                 ) : (
-                  <div className="h-56">
+                  <div className="h-48 sm:h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={providerPulseRows.slice(0, 6)}
@@ -2425,7 +2429,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Model Pulse (5m)',
               extra: (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <span className="text-xs text-text-secondary">Top 8 models</span>
                   <AnalyzeButton
                     cardType="model"
@@ -2439,11 +2443,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content:
                 modelPulseRows.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-text-secondary">
+                  <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                     No model traffic in the selected live window.
                   </div>
                 ) : (
-                  <div className="h-56">
+                  <div className="h-48 sm:h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={modelPulseRows.slice(0, 6)}
@@ -2492,7 +2496,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Live Timeline',
               extra: (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <Clock size={16} className="text-primary" />
                   <AnalyzeButton
                     cardType="timeline"
@@ -2505,15 +2509,15 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               style: { cursor: 'pointer' },
               className: 'min-w-0 hover:shadow-lg hover:border-primary/30 transition-all',
               content: loading ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary">
+                <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                   Loading...
                 </div>
               ) : minuteSeries.length === 0 ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary">
+                <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                   No requests in the last {liveWindowMinutes} minutes
                 </div>
               ) : (
-                <div className="h-56">
+                <div className="h-48 sm:h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={minuteSeries}
@@ -2623,15 +2627,15 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               style: { cursor: 'pointer' },
               className: 'min-w-0 hover:shadow-lg hover:border-primary/30 transition-all',
               content: loading ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary">
+                <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                   Loading...
                 </div>
               ) : modelTimeline.series.length === 0 ? (
-                <div className="h-56 flex items-center justify-center text-text-secondary">
+                <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                   No model stack data in the last {liveWindowMinutes} minutes
                 </div>
               ) : (
-                <div className="h-56">
+                <div className="h-48 sm:h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
                       data={modelTimeline.data}
@@ -2734,8 +2738,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               extra: (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-text-secondary mr-1">Latest 20</span>
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  <span className="hidden text-xs text-text-secondary mr-1 sm:inline">
+                    Latest 20
+                  </span>
                   <Button
                     size="sm"
                     variant={streamFilter === 'all' ? 'primary' : 'secondary'}
@@ -2775,13 +2781,13 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               ),
               content:
                 filteredLiveRequests.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-text-secondary">
+                  <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                     {liveRequests.length === 0
                       ? 'No requests observed yet.'
                       : 'No requests match the current filter.'}
                   </div>
                 ) : (
-                  <div className="h-56 space-y-2 overflow-y-auto pr-1">
+                  <div className="h-48 sm:h-56 space-y-2 overflow-y-auto pr-1">
                     {filteredLiveRequests.slice(0, 20).map((request) => {
                       const requestTimeSeconds = Math.max(
                         0,
@@ -2851,8 +2857,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               id: cardId,
               title: 'Concurrency',
               extra: (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-muted">Auto-refresh: 10s</span>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className="text-xs text-text-muted">
+                    <span className="sm:hidden">10s</span>
+                    <span className="hidden sm:inline">Auto-refresh: 10s</span>
+                  </span>
                   <AnalyzeButton
                     cardType="concurrency"
                     size="sm"
@@ -2865,15 +2874,15 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content:
                 concurrencyLoading && concurrencyHistory.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
+                  <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary text-sm">
                     Loading concurrency data...
                   </div>
                 ) : concurrencyHistory.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-text-secondary text-sm">
+                  <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary text-sm">
                     Collecting concurrency data...
                   </div>
                 ) : (
-                  <div className="h-56">
+                  <div className="h-48 sm:h-56">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-text-muted">In-Flight by Provider</span>
                       <span className="text-sm font-semibold text-text tabular-nums">
@@ -2933,7 +2942,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               content: (
-                <div className="h-56 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto">
+                <div className="h-48 sm:h-56 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto">
                   <div className="space-y-2">
                     <h4 className="text-sm font-semibold text-text flex items-center gap-2">
                       <Server size={16} className="text-primary" />
@@ -3004,17 +3013,19 @@ export const LiveTab: React.FC<LiveTabProps> = ({
    *    or an embedded DetailedUsage page.
    */
   return (
-    <div className="p-6 transition-all duration-300">
+    <div className="overflow-x-clip px-3 py-4 transition-all duration-300 sm:p-6">
       {/* ------- Page Header ------- */}
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 sm:mb-8">
         <div className="header-left">
-          <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Live Metrics</h1>
+          <h1 className="font-heading text-xl sm:text-3xl font-bold text-text m-0 mb-2">
+            Live Metrics
+          </h1>
         </div>
 
         <Badge
           status={isConnected && !isStale ? 'connected' : 'warning'}
           secondaryText={'Window: last ' + liveWindowMinutes + 'm'}
-          style={{ minWidth: '210px' }}
+          className="w-full sm:w-auto sm:min-w-[210px]"
         >
           {isConnected
             ? isStale
@@ -3053,7 +3064,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="-mx-3 mb-4 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
         <Button
           size="sm"
           variant="secondary"
@@ -3079,7 +3090,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             </Button>
           );
         })}
-        <span className="text-xs text-text-secondary">|</span>
+        <span className="hidden text-xs text-text-secondary sm:inline">|</span>
         {LIVE_WINDOW_OPTIONS.map((option) => (
           <Button
             key={option.value}
@@ -3093,7 +3104,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             {option.label}
           </Button>
         ))}
-        <span className="text-xs text-text-muted">
+        <span className="hidden text-xs text-text-muted sm:inline">
           {isVisible ? 'Tab active' : 'Tab hidden'} - data refresh resumes on focus.
         </span>
       </div>
@@ -3115,9 +3126,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
         onDragCancel={handleDragCancel}
       >
         <SortableContext items={orderedCardIds}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div className="grid min-w-0 grid-cols-1 gap-4 mb-4 lg:grid-cols-2">
             {orderedCardIds.map((cardId, index) => (
-              <div key={cardId}>{renderDraggableCard(cardId, index)}</div>
+              <div key={cardId} className="min-w-0">
+                {renderDraggableCard(cardId, index)}
+              </div>
             ))}
           </div>
         </SortableContext>

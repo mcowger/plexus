@@ -37,14 +37,10 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-bg-deep">
+    <div className="min-h-screen flex items-center justify-center bg-bg-deep p-4 sm:p-6">
       {/* Background mesh */}
       <div className="fixed inset-0 pointer-events-none opacity-50" aria-hidden="true">
-        <svg
-          viewBox="0 0 800 600"
-          preserveAspectRatio="xMidYMid slice"
-          className="w-full h-full"
-        >
+        <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" className="w-full h-full">
           <g stroke="rgba(245,158,11,0.10)" strokeWidth="0.5" fill="none">
             <path d="M0 200 C 200 100, 600 300, 800 180" />
             <path d="M0 320 C 220 220, 580 420, 800 300" />
@@ -60,7 +56,7 @@ export const Login: React.FC = () => {
 
       <main className="relative w-full max-w-md">
         {/* Logo + wordmark */}
-        <div className="flex items-center justify-center gap-3 mb-8">
+        <div className="mb-6 flex flex-wrap items-center justify-center gap-3 sm:mb-8">
           <div className="animate-float">
             <PlexusMark size={44} />
           </div>
@@ -75,7 +71,7 @@ export const Login: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="glass-bg rounded-2xl p-7 sm:p-8 shadow-2xl">
+        <div className="glass-bg rounded-xl p-5 shadow-2xl sm:rounded-2xl sm:p-8">
           <div className="mb-6">
             <h1 className="font-heading text-2xl font-semibold tracking-tight mb-1.5">Sign in</h1>
             <p className="text-sm text-text-secondary leading-relaxed">
@@ -142,7 +138,7 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-white/5 flex items-center justify-between text-[11px] text-text-muted">
+          <div className="mt-6 flex flex-col gap-2 border-t border-white/5 pt-5 text-[11px] text-text-muted sm:flex-row sm:items-center sm:justify-between">
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck size={14} />
               End-to-end encrypted

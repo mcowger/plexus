@@ -164,7 +164,7 @@ export const SortableCard: React.FC<SortableCardProps> = ({ card, isOverlay = fa
       style={style}
       data-testid={`sortable-card-${card.id}`}
       data-dragging={isDragging ? 'true' : 'false'}
-      className={clsx('relative group', isDragging && 'opacity-50')}
+      className={clsx('relative group min-w-0 max-w-full', isDragging && 'opacity-50')}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -197,7 +197,7 @@ export const SortableCard: React.FC<SortableCardProps> = ({ card, isOverlay = fa
       <div
         data-testid="drag-handle"
         className={clsx(
-          'absolute left-2 top-1/2 -translate-y-1/2 z-10 p-1 rounded cursor-grab active:cursor-grabbing transition-opacity duration-200',
+          'absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 rounded p-1 cursor-grab transition-opacity duration-200 active:cursor-grabbing md:block',
           isHovered || isDragging ? 'opacity-100' : 'opacity-0'
         )}
         {...listeners}
@@ -217,7 +217,7 @@ export const SortableCard: React.FC<SortableCardProps> = ({ card, isOverlay = fa
        * The `pl-8` (padding-left: 2rem) creates space for the absolutely-positioned
        * grip handle so that card content does not overlap with it.
        */}
-      <div data-testid="sortable-card" className="pl-8">
+      <div data-testid="sortable-card" className="min-w-0 max-w-full md:pl-8">
         <Card
           title={card.title}
           extra={card.extra}

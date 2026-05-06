@@ -43,7 +43,7 @@ export function Tabs<V extends string = string>({
       role="tablist"
       aria-label={ariaLabel}
       className={clsx(
-        'flex items-center gap-1 overflow-x-auto',
+        'flex items-center gap-0.5 sm:gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
         variant === 'underline' && 'border-b border-border-glass',
         className
       )}
@@ -62,13 +62,13 @@ export function Tabs<V extends string = string>({
             onKeyDown={(e) => handleKeyDown(e, idx)}
             disabled={item.disabled}
             className={clsx(
-              'flex-shrink-0 inline-flex items-center gap-2 font-body text-sm font-medium transition-all duration-fast whitespace-nowrap focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
-              variant === 'underline' && 'px-4 py-2.5 border-b-2 -mb-px',
+              'flex-shrink-0 inline-flex items-center gap-1.5 sm:gap-2 font-body text-xs sm:text-sm font-medium transition-all duration-fast whitespace-nowrap focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
+              variant === 'underline' && 'px-3 py-2 sm:px-4 sm:py-2.5 border-b-2 -mb-px',
               variant === 'underline' && active && 'text-primary border-primary',
               variant === 'underline' &&
                 !active &&
                 'text-text-secondary border-transparent hover:text-text',
-              variant === 'pills' && 'px-3.5 py-1.5 rounded-md',
+              variant === 'pills' && 'px-3 py-1.5 sm:px-3.5 rounded-md',
               variant === 'pills' &&
                 active &&
                 'bg-bg-glass text-primary border border-border-glass',

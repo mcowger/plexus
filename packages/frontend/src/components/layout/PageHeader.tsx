@@ -23,18 +23,20 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <div
       className={clsx(
-        'px-4 sm:px-6 lg:px-8 py-4',
-        sticky && 'sticky top-0 z-20 glass-bg border-b border-white/5',
+        'px-3 py-3 sm:px-6 sm:py-4 lg:px-8',
+        // On mobile the AppBar (h-12, top-0, sticky) sits above the page content,
+        // so the page header has to start below it. On md+ the AppBar is hidden.
+        sticky && 'sticky top-12 md:top-0 z-20 bg-bg-card border-b border-border',
         className
       )}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <h1 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-text m-0 leading-tight">
+          <h1 className="font-heading text-lg sm:text-2xl font-semibold tracking-tight text-text m-0 leading-tight">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>
+            <p className="text-[11px] sm:text-xs text-text-secondary mt-0.5">{subtitle}</p>
           )}
         </div>
         {actions && (

@@ -38,9 +38,13 @@ export const QuotaProgressBar: React.FC<QuotaProgressBarProps> = ({
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className="text-text-secondary truncate">{label}</span>
-        {displayValue && <span className="text-text tabular-nums flex-shrink-0">{displayValue}</span>}
+        {displayValue && (
+          <span className="text-text tabular-nums flex-shrink-0">{displayValue}</span>
+        )}
       </div>
-      <div className={clsx('rounded-full bg-bg-subtle overflow-hidden border border-border/30', barH)}>
+      <div
+        className={clsx('rounded-full bg-bg-subtle overflow-hidden border border-border/30', barH)}
+      >
         <div
           className={clsx('h-full rounded-full transition-all duration-500', barColor(status))}
           style={{ width: `${pct}%` }}

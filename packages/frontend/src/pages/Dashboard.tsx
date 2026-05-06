@@ -78,14 +78,14 @@ export const Dashboard = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="sticky top-0 z-20 glass-bg border-b border-white/5">
-        <div className="px-4 sm:px-6 lg:px-8 pt-4">
-          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <div className="sticky top-12 md:top-0 z-20 bg-bg-card border-b border-border">
+        <div className="px-3 sm:px-6 lg:px-8 pt-3 sm:pt-4">
+          <div className="flex items-center justify-between gap-3 mb-2.5 sm:mb-3 flex-wrap">
             <div>
-              <h1 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight m-0">
+              <h1 className="font-heading text-lg sm:text-2xl font-semibold tracking-tight m-0 leading-tight">
                 Dashboard
               </h1>
-              <p className="text-xs text-text-secondary mt-0.5">
+              <p className="text-[11px] sm:text-xs text-text-secondary mt-0.5">
                 Real-time gateway traffic across all providers
               </p>
             </div>
@@ -95,12 +95,15 @@ export const Dashboard = () => {
             onChange={setTab}
             items={tabs}
             variant="underline"
+            className="-mx-3 px-3 sm:mx-0 sm:px-0"
             aria-label="Dashboard sections"
           />
         </div>
       </div>
 
-      <div className="flex-1 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-8">
+      {/* No padding here — each tab component (LiveTab/UsageTab/PerformanceTab/
+          OverallTab) provides its own page padding so we don't double-pad on mobile. */}
+      <div className="flex-1">
         {activeTab === 'overall' && isLimited && <OverallTab />}
         {activeTab === 'live' && (
           <LiveTab

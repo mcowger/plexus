@@ -9,6 +9,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const { isCollapsed, isMobileOpen, closeMobile } = useSidebar();
 
   return (
+    // No overflow-x-clip here — the AppBar lives in this wrapper as a sticky
+    // child, and clip-on-the-parent can break sticky positioning in some
+    // browsers. Horizontal overflow is contained one level down on <main>.
     <div className="min-h-screen bg-bg-deep">
       <AppBar />
 
@@ -22,7 +25,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       <main
         className={clsx(
-          'min-h-screen transition-[margin] duration-300',
+          // overflow-x: clip (NOT hidden) keeps wide children from blowing out
+          // the viewport on mobile WITHOUT turning <main> into a scroll
+          // container — overflow-x:hidden would have done that and broken
+          // every `position: sticky` page header inside.
+          'min-h-screen min-w-0 overflow-x-clip transition-[margin] duration-300',
           isCollapsed ? 'md:ml-[64px]' : 'md:ml-[220px]'
         )}
       >

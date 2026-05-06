@@ -16,7 +16,6 @@ import {
   Gauge,
   PlugZap,
   UserCircle2,
-  Search,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '../../lib/api';
@@ -47,28 +46,27 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, collapsed }) =
       end={to === '/'}
       className={({ isActive }) =>
         clsx(
-          'group relative flex items-center gap-2.5 py-2 px-2.5 rounded-md font-body text-[13px] font-medium text-text-secondary no-underline cursor-pointer transition-all duration-fast hover:bg-bg-hover hover:text-text',
+          'group relative flex items-center gap-2.5 py-2 px-2.5 rounded-md font-body text-[13px] font-medium no-underline cursor-pointer transition-all duration-fast',
+          'text-text-secondary hover:bg-bg-hover hover:text-text',
           collapsed && 'justify-center',
-          isActive && 'bg-amber-500/10 text-amber-300'
+          // Active state: amber tint + a left rail via :before pseudo-element
+          // (cleaner than a sibling <span> and avoids NavLink render-prop quirks).
+          isActive &&
+            !collapsed &&
+            'bg-amber-500/10 text-amber-300 before:content-[""] before:absolute before:-left-3 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-sm before:bg-gradient-to-b before:from-secondary before:to-primary',
+          isActive && collapsed && 'bg-amber-500/10 text-amber-300'
         )
       }
     >
-      {({ isActive }) => (
-        <>
-          {isActive && !collapsed && (
-            <span className="absolute -left-3 top-1.5 bottom-1.5 w-0.5 rounded-sm bg-gradient-to-b from-secondary to-primary" />
-          )}
-          <Icon size={16} className="flex-shrink-0" />
-          <span
-            className={clsx(
-              'transition-opacity duration-fast',
-              collapsed && 'opacity-0 w-0 overflow-hidden'
-            )}
-          >
-            {label}
-          </span>
-        </>
-      )}
+      <Icon size={16} className="flex-shrink-0" />
+      <span
+        className={clsx(
+          'transition-opacity duration-fast',
+          collapsed && 'opacity-0 w-0 overflow-hidden'
+        )}
+      >
+        {label}
+      </span>
     </NavLink>
   );
 
@@ -212,18 +210,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   const allowanceQuotas = quotas.filter((q) => q.meters.some((m) => m.kind === 'allowance'));
 
   const isDrawer = mode === 'drawer';
-  const initials = principal?.role === 'admin'
-    ? 'AD'
-    : (principal?.keyName || 'KU').slice(0, 2).toUpperCase();
+  const initials =
+    principal?.role === 'admin' ? 'AD' : (principal?.keyName || 'KU').slice(0, 2).toUpperCase();
 
   return (
     <aside
       data-collapsed={collapsed}
       className={clsx(
-        'glass-bg flex flex-col overflow-y-auto overflow-x-hidden',
+        // Solid background — glass-bg used to let the page content scroll
+        // through visibly. Sidebar must fully obscure what's underneath.
+        'bg-bg-card border-border flex flex-col overflow-y-auto overflow-x-hidden',
         isDrawer
           ? 'h-full w-full'
-          : 'hidden md:flex fixed left-0 top-0 h-screen z-sidebar transition-[width] duration-300',
+          : 'hidden md:flex fixed left-0 top-0 h-screen z-[200] border-r transition-[width] duration-300',
         !isDrawer && (collapsed ? 'w-[64px]' : 'w-[220px]')
       )}
     >
@@ -275,31 +274,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
         )}
       </div>
 
-      {/* Search button */}
-      {!collapsed && (
-        <div className="px-3 pt-1 pb-2">
-          <button
-            type="button"
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-slate-800/40 hover:bg-slate-700/50 text-xs text-slate-400 transition-colors border border-slate-800"
-          >
-            <Search size={14} />
-            <span>Search</span>
-            <span className="ml-auto font-mono text-[10px] px-1 py-px rounded bg-slate-900/80 border border-slate-700">
-              ⌘K
-            </span>
-          </button>
-        </div>
-      )}
-
       {/* Main nav */}
       <nav className="flex-1 px-3 pb-2 flex flex-col gap-0.5">
         <NavSection title="Main" collapsed={collapsed} />
         <NavItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
         <NavItem to="/logs" icon={ScrollText} label="Logs" collapsed={collapsed} />
         <NavItem to="/errors" icon={AlertTriangle} label="Errors" collapsed={collapsed} />
-        {isLimited && (
-          <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />
-        )}
+        {isLimited && <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />}
 
         {/* Balances widget */}
         {isAdmin && balanceQuotas.length > 0 && !collapsed && (
@@ -357,12 +338,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           )}
         </div>
         {isAdmin && (
-          <NavItem
-            to="/system-logs"
-            icon={Terminal}
-            label="System Logs"
-            collapsed={collapsed}
-          />
+          <NavItem to="/system-logs" icon={Terminal} label="System Logs" collapsed={collapsed} />
         )}
       </nav>
 

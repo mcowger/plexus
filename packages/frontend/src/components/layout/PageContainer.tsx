@@ -21,7 +21,9 @@ export const PageContainer: React.FC<PageContainerProps> = ({
   className,
 }) => {
   return (
-    <div className={clsx('p-4 sm:p-6 lg:p-8 mx-auto w-full', widthClasses[width], className)}>
+    <div
+      className={clsx('mx-auto w-full min-w-0 p-3 sm:p-6 lg:p-8', widthClasses[width], className)}
+    >
       {children}
     </div>
   );

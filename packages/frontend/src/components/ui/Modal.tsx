@@ -36,25 +36,25 @@ export const Modal: React.FC<ModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-modal flex items-center justify-center p-4 sm:p-5 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
-      onClick={onClose}
+      className="fixed inset-0 z-[410] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
         className={clsx(
-          'glass-bg rounded-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-[slideUp_0.3s_ease]',
+          'glass-bg w-full max-h-[92vh] overflow-hidden rounded-xl flex flex-col shadow-2xl animate-[slideUp_0.3s_ease] sm:max-h-[90vh] sm:rounded-2xl',
           {
             'max-w-md': size === 'sm',
             'max-w-xl': size === 'md',
             'max-w-3xl': size === 'lg',
           }
         )}
-        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 p-5 border-b border-white/5">
-          <h2 className="font-heading text-base font-semibold text-text m-0 truncate">{title}</h2>
+        <div className="flex items-center justify-between gap-3 p-4 border-b border-white/5 sm:p-5">
+          <h2 className="min-w-0 font-heading text-base font-semibold text-text m-0 truncate">
+            {title}
+          </h2>
           <button
             type="button"
             className="flex-shrink-0 bg-transparent border-0 text-text-secondary cursor-pointer rounded-md p-1.5 transition-colors duration-fast hover:text-text hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
@@ -64,9 +64,9 @@ export const Modal: React.FC<ModalProps> = ({
             <X size={16} />
           </button>
         </div>
-        <div className="p-5 overflow-y-auto flex-1">{children}</div>
+        <div className="p-4 overflow-y-auto flex-1 sm:p-5">{children}</div>
         {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-4 border-t border-white/5">
+          <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/5 sm:px-5 sm:py-4">
             {footer}
           </div>
         )}
