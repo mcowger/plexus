@@ -26,7 +26,12 @@ COPY . .
 # Build the frontend and compile everything into a single self-contained binary.
 # Frontend assets (HTML, JS, CSS, images) and migration SQL files are all embedded
 # inside the binary via `bun build --compile` — no runtime file copies needed.
-RUN bun run compile:linux
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        bun run compile:linux-arm64 && mv plexus-linux-arm64 plexus-linux; \
+    else \
+        bun run compile:linux; \
+    fi
 
 # Stage 2: Minimal production image — just the binary
 FROM debian:bookworm-slim

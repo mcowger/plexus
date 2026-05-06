@@ -3,7 +3,7 @@ services:
     build: .
     image: plexus:latest
     container_name: plexus
-    platform: linux/amd64
+    # Platform is auto-detected; override with linux/amd64 or linux/arm64 if needed
     restart: unless-stopped
     ports:
       - "4000:4000"
