@@ -41,19 +41,52 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes('--help') || args.includes('-h')) {
-    console.log('\n🚀 Plexus Release Script');
+    console.log('\nPlexus Release Script');
     console.log('--------------------------');
     console.log('\nUsage:');
     console.log(`  bun scripts/release.ts [options]`);
     console.log('\nOptions:');
-    console.log('  --help, -h  Show this help message');
+    console.log('  --help, -h        Show this help message');
+    console.log('  --remove <tag>    Delete tag locally, remotely, and its GitHub release');
     console.log(
       '\nUses CalVer (YYYY.MM.DD.N) format. Release notes are handled by GitHub Actions.\n'
     );
     process.exit(0);
   }
 
-  console.log('\n🚀 Plexus Release Process');
+  const removeIndex = args.indexOf('--remove');
+  if (removeIndex !== -1) {
+    const tag = args[removeIndex + 1];
+    if (!tag) {
+      console.error('--remove requires a tag argument');
+      process.exit(1);
+    }
+
+    console.log(`Removing tag and release: ${tag}`);
+
+    try {
+      execSync(`git tag -d ${tag}`, { stdio: 'inherit' });
+    } catch {
+      console.warn(`Local tag ${tag} not found, skipping`);
+    }
+
+    try {
+      execSync(`git push origin :refs/tags/${tag}`, { stdio: 'inherit' });
+    } catch {
+      console.warn(`Remote tag ${tag} not found, skipping`);
+    }
+
+    try {
+      execSync(`gh release delete ${tag} --yes`, { stdio: 'inherit' });
+    } catch {
+      console.warn(`GitHub release for ${tag} not found, skipping`);
+    }
+
+    console.log('Done.');
+    process.exit(0);
+  }
+
+  console.log('\nPlexus Release Process');
   console.log('--------------------------\n');
 
   // Get GitHub token
@@ -119,7 +152,7 @@ async function main() {
   const owner = 'mcowger';
   const repo = 'plexus';
 
-  console.log('\n📦 Creating tag on remote main...');
+  console.log('\nCreating tag on remote main...');
   try {
     // Get the latest commit SHA on main
     const { data: ref } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
@@ -129,7 +162,7 @@ async function main() {
     });
 
     const mainSha = ref.object.sha;
-    console.log(`📌 Target commit: ${mainSha.slice(0, 7)}`);
+    console.log(`Target commit: ${mainSha.slice(0, 7)}`);
 
     // Create the tag on the remote
     await octokit.request('POST /repos/{owner}/{repo}/git/refs', {
@@ -140,7 +173,7 @@ async function main() {
     });
 
     console.log(`✅ Created tag ${version} at origin/main\n`);
-    console.log('🎊 Release tag created! GitHub Actions will handle the rest.\n');
+    console.log('Release tag created! GitHub Actions will handle the rest.\n');
   } catch (e) {
     console.error('\n❌ GitHub API operation failed:', e);
     process.exit(1);
