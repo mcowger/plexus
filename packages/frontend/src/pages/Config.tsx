@@ -15,6 +15,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { formatMinutesToMinSec } from '@plexus/shared';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -592,21 +593,27 @@ export const Config = () => {
               </label>
               <p className="text-xs text-text-muted mb-2">
                 C₀ — the cooldown duration after the first failure. Subsequent failures double the
-                duration until the maximum is reached.
+                duration until the maximum is reached. Fractional values are supported (e.g. 0.5 = 30 seconds).
               </p>
-              <input
-                id="cooldownInitialMinutes"
-                type="number"
-                min={1}
-                value={cooldownPolicy.initialMinutes}
-                onChange={(e) =>
-                  setCooldownPolicy((prev) => ({
-                    ...prev,
-                    initialMinutes: Math.max(1, Number(e.target.value) || 1),
-                  }))
-                }
-                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  id="cooldownInitialMinutes"
+                  type="number"
+                  min={0.5}
+                  step={0.5}
+                  value={cooldownPolicy.initialMinutes}
+                  onChange={(e) =>
+                    setCooldownPolicy((prev) => ({
+                      ...prev,
+                      initialMinutes: Math.max(0.5, Number(e.target.value) || 0.5),
+                    }))
+                  }
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <span className="text-xs text-text-muted tabular-nums min-w-[60px]">
+                  = {formatMinutesToMinSec(cooldownPolicy.initialMinutes)}
+                </span>
+              </div>
             </div>
 
             {/* Max Minutes */}
@@ -619,21 +626,27 @@ export const Config = () => {
               </label>
               <p className="text-xs text-text-muted mb-2">
                 C_max — the upper limit for any cooldown duration, regardless of how many
-                consecutive failures have occurred.
+                consecutive failures have occurred. Fractional values are supported (e.g. 0.5 = 30 seconds).
               </p>
-              <input
-                id="cooldownMaxMinutes"
-                type="number"
-                min={1}
-                value={cooldownPolicy.maxMinutes}
-                onChange={(e) =>
-                  setCooldownPolicy((prev) => ({
-                    ...prev,
-                    maxMinutes: Math.max(1, Number(e.target.value) || 1),
-                  }))
-                }
-                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  id="cooldownMaxMinutes"
+                  type="number"
+                  min={0.5}
+                  step={0.5}
+                  value={cooldownPolicy.maxMinutes}
+                  onChange={(e) =>
+                    setCooldownPolicy((prev) => ({
+                      ...prev,
+                      maxMinutes: Math.max(0.5, Number(e.target.value) || 0.5),
+                    }))
+                  }
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <span className="text-xs text-text-muted tabular-nums min-w-[60px]">
+                  = {formatMinutesToMinSec(cooldownPolicy.maxMinutes)}
+                </span>
+              </div>
             </div>
           </div>
         </Disclosure>

@@ -422,11 +422,20 @@ export async function registerConfigRoutes(
       const current = await configService.getRepository().getCooldownPolicy();
       const merged = { ...current, ...body };
 
+      // Validate cooldown values (minimum 0.5 minutes / 30 seconds)
       if (body.initialMinutes !== undefined) {
-        await configService.setSetting('cooldown.initialMinutes', merged.initialMinutes);
+        const val = Number(merged.initialMinutes);
+        if (!Number.isFinite(val) || val < 0.5) {
+          return reply.code(400).send({ error: 'initialMinutes must be at least 0.5' });
+        }
+        await configService.setSetting('cooldown.initialMinutes', val);
       }
       if (body.maxMinutes !== undefined) {
-        await configService.setSetting('cooldown.maxMinutes', merged.maxMinutes);
+        const val = Number(merged.maxMinutes);
+        if (!Number.isFinite(val) || val < 0.5) {
+          return reply.code(400).send({ error: 'maxMinutes must be at least 0.5' });
+        }
+        await configService.setSetting('cooldown.maxMinutes', val);
       }
 
       // Return the final merged state

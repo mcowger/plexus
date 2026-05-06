@@ -2,6 +2,7 @@ import React from 'react';
 import { Card } from '../ui/Card';
 import { AlertTriangle } from 'lucide-react';
 import type { Cooldown } from '../../lib/api';
+import { formatMsToMinSec } from '@plexus/shared';
 
 interface ServiceAlertsCardProps {
   cooldowns: Cooldown[];
@@ -46,17 +47,17 @@ export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns,
           const [provider, model] = key.split(':');
           const hasAccountId = modelCooldowns.some((c) => c.accountId);
           const maxTime = Math.max(...modelCooldowns.map((c) => c.timeRemainingMs));
-          const minutes = Math.ceil(maxTime / 60000);
+          const timeDisplay = formatMsToMinSec(maxTime);
 
           let statusText: string;
           const modelDisplay = model || 'all models';
 
           if (hasAccountId && modelCooldowns.length > 1) {
-            statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown for up to ${minutes} minutes`;
+            statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown for up to ${timeDisplay}`;
           } else if (hasAccountId && modelCooldowns.length === 1) {
-            statusText = `${modelDisplay} has 1 account on cooldown for ${minutes} minutes`;
+            statusText = `${modelDisplay} has 1 account on cooldown for ${timeDisplay}`;
           } else {
-            statusText = `${modelDisplay} is on cooldown for ${minutes} minutes`;
+            statusText = `${modelDisplay} is on cooldown for ${timeDisplay}`;
           }
 
           return (

@@ -39,3 +39,6 @@ export type {
   ModelParamsWithDtype,
   ModelArchitecture,
 } from './model-params';
+
+// Cooldown time formatting utilities
+export { formatMinutesToMinSec, formatMsToMinSec } from './format-time';
