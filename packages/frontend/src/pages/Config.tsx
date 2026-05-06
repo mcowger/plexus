@@ -17,6 +17,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Switch } from '../components/ui/Switch';
+import { Disclosure } from '../components/ui/Disclosure';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import type { CardLayout } from '../types/card';
@@ -326,9 +327,63 @@ export const Config = () => {
       />
 
       <div className="flex flex-col gap-6">
-        {/* ─── Failover Settings ──────────────────────────────────── */}
         <Card
+          title="Configuration Export"
+          flush
+          extra={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadConfig}
+                leftIcon={<RotateCcw size={14} />}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRestart}
+                isLoading={isRestarting}
+                leftIcon={<RefreshCw size={14} />}
+              >
+                Restart
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleExportConfig}
+                disabled={!isConfigLoaded}
+                leftIcon={<Download size={14} />}
+              >
+                Export JSON
+              </Button>
+            </div>
+          }
+        >
+          <div className="h-[400px] sm:h-[500px] lg:h-[600px] rounded-sm overflow-hidden">
+            <EditorErrorBoundary>
+              <Editor
+                height="100%"
+                defaultLanguage="json"
+                value={config}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  fontFamily: '"Fira Code", "Fira Mono", monospace',
+                }}
+              />
+            </EditorErrorBoundary>
+          </div>
+        </Card>
+
+        {/* ─── Failover Settings ──────────────────────────────────── */}
+        <Disclosure
           title="Failover Settings"
+          defaultOpen={false}
           extra={
             <Button
               variant="primary"
@@ -403,60 +458,7 @@ export const Config = () => {
               />
             </div>
           </div>
-        </Card>
-
-        <Card
-          title="Configuration Export"
-          flush
-          extra={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={loadConfig}
-                leftIcon={<RotateCcw size={14} />}
-              >
-                Refresh
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleRestart}
-                isLoading={isRestarting}
-                leftIcon={<RefreshCw size={14} />}
-              >
-                Restart
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleExportConfig}
-                disabled={!isConfigLoaded}
-                leftIcon={<Download size={14} />}
-              >
-                Export JSON
-              </Button>
-            </div>
-          }
-        >
-          <div className="h-[400px] sm:h-[500px] lg:h-[600px] rounded-sm overflow-hidden">
-            <EditorErrorBoundary>
-              <Editor
-                height="100%"
-                defaultLanguage="json"
-                value={config}
-                theme="vs-dark"
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 13,
-                  fontFamily: '"Fira Code", "Fira Mono", monospace',
-                }}
-              />
-            </EditorErrorBoundary>
-          </div>
-        </Card>
+        </Disclosure>
 
         <Card
           title="Backup & Restore"
