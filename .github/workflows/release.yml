@@ -31,7 +31,6 @@ jobs:
     with:
       tag: ${{ needs.setup.outputs.tag }}
     secrets: inherit
-    continue-on-error: true
 
   build-binaries:
     name: Build Binaries
