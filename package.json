@@ -28,7 +28,7 @@
     "release": "bun run scripts/release.ts",
     "populate-dev": "bun run scripts/populate-dev.ts",
     "clear-dev": "bun run scripts/clear-dev.ts",
-    "prepare": "if command -v lefthook >/dev/null 2>&1; then lefthook install; fi",
+    "prepare": "if [ -z \"$CI\" ]; then lefthook install; fi",
     "format": "bunx biome format --write .",
     "format:check": "bunx biome format .",
     "lint": "bunx biome lint --write .",
