@@ -439,6 +439,66 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── Exploration Rate ─────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/exploration-rate', async (_request, reply) => {
+    try {
+      const performanceExplorationRate = await configService.getSetting<number>(
+        'performanceExplorationRate',
+        0.05
+      );
+      const latencyExplorationRate = await configService.getSetting<number>(
+        'latencyExplorationRate',
+        0.05
+      );
+      return reply.send({ performanceExplorationRate, latencyExplorationRate });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/exploration-rate', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      if (body.performanceExplorationRate !== undefined) {
+        const value = Number(body.performanceExplorationRate);
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+          return reply
+            .code(400)
+            .send({ error: 'performanceExplorationRate must be a number between 0 and 1' });
+        }
+        await configService.setSetting('performanceExplorationRate', value);
+      }
+      if (body.latencyExplorationRate !== undefined) {
+        const value = Number(body.latencyExplorationRate);
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+          return reply
+            .code(400)
+            .send({ error: 'latencyExplorationRate must be a number between 0 and 1' });
+        }
+        await configService.setSetting('latencyExplorationRate', value);
+      }
+
+      const performanceExplorationRate = await configService.getSetting<number>(
+        'performanceExplorationRate',
+        0.05
+      );
+      const latencyExplorationRate = await configService.getSetting<number>(
+        'latencyExplorationRate',
+        0.05
+      );
+      logger.debug('Exploration rate settings updated via API');
+      return reply.send({ performanceExplorationRate, latencyExplorationRate });
+    } catch (e: any) {
+      logger.error('Failed to patch exploration rate config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Vision Fallthrough ───────────────────────────────────────────
 
   fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {

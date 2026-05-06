@@ -12,6 +12,7 @@ import {
   Shield,
   Save,
   Timer,
+  Compass,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
@@ -62,6 +63,16 @@ interface CooldownPolicy {
   maxMinutes: number;
 }
 
+interface ExplorationRates {
+  performanceExplorationRate: number;
+  latencyExplorationRate: number;
+}
+
+const DEFAULT_EXPLORATION_RATES: ExplorationRates = {
+  performanceExplorationRate: 0.05,
+  latencyExplorationRate: 0.05,
+};
+
 const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
   enabled: true,
   retryableStatusCodes: [],
@@ -95,6 +106,12 @@ export const Config = () => {
   const [cooldownLoaded, setCooldownLoaded] = useState(false);
   const [cooldownSaving, setCooldownSaving] = useState(false);
 
+  // Exploration rate settings state
+  const [explorationRates, setExplorationRates] =
+    useState<ExplorationRates>(DEFAULT_EXPLORATION_RATES);
+  const [explorationLoaded, setExplorationLoaded] = useState(false);
+  const [explorationSaving, setExplorationSaving] = useState(false);
+
   const loadFailoverPolicy = useCallback(async () => {
     try {
       const policy = await api.getFailoverPolicy();
@@ -116,6 +133,17 @@ export const Config = () => {
     } catch (e) {
       console.error('Failed to load cooldown policy:', e);
       toast.error('Failed to load cooldown settings');
+    }
+  }, [toast]);
+
+  const loadExplorationRates = useCallback(async () => {
+    try {
+      const rates = await api.getExplorationRates();
+      setExplorationRates(rates);
+      setExplorationLoaded(true);
+    } catch (e) {
+      console.error('Failed to load exploration rates:', e);
+      toast.error('Failed to load exploration rate settings');
     }
   }, [toast]);
 
@@ -170,6 +198,23 @@ export const Config = () => {
     }
   };
 
+  const handleSaveExplorationRates = async () => {
+    setExplorationSaving(true);
+    try {
+      const updated = await api.patchExplorationRates({
+        performanceExplorationRate: explorationRates.performanceExplorationRate,
+        latencyExplorationRate: explorationRates.latencyExplorationRate,
+      });
+
+      setExplorationRates(updated);
+      toast.success('Exploration rate settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save exploration rate settings');
+    } finally {
+      setExplorationSaving(false);
+    }
+  };
+
   const loadConfig = async () => {
     try {
       const data = await api.getConfigExport();
@@ -186,6 +231,7 @@ export const Config = () => {
     loadConfig();
     loadFailoverPolicy();
     loadCooldownPolicy();
+    loadExplorationRates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -584,6 +630,100 @@ export const Config = () => {
                   setCooldownPolicy((prev) => ({
                     ...prev,
                     maxMinutes: Math.max(1, Number(e.target.value) || 1),
+                  }))
+                }
+                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
+        </Disclosure>
+
+        {/* ─── Exploration Rate Settings ────────────────────────────── */}
+        <Disclosure
+          title="Exploration Rate Settings"
+          defaultOpen={false}
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveExplorationRates}
+              isLoading={explorationSaving}
+              disabled={!explorationLoaded}
+              leftIcon={<Save size={14} />}
+            >
+              Save
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5">
+            {/* Exploration Rate description */}
+            <div className="flex items-center gap-2">
+              <Compass size={16} className="text-primary" />
+              <div>
+                <p className="text-sm font-medium text-text">Provider Exploration</p>
+                <p className="text-xs text-text-muted">
+                  Exploration rate controls how often the selector picks a non-optimal provider to
+                  discover better options. A value of 0 always selects the best-known provider; a
+                  value of 1 picks randomly. Applies to performance and latency selectors.
+                </p>
+              </div>
+            </div>
+
+            {/* Performance Exploration Rate */}
+            <div>
+              <label
+                htmlFor="performanceExplorationRate"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Performance Exploration Rate
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                The probability of exploring a non-optimal provider when using the performance
+                selector. Default: 0.05 (5%).
+              </p>
+              <input
+                id="performanceExplorationRate"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={explorationRates.performanceExplorationRate}
+                onChange={(e) =>
+                  setExplorationRates((prev) => ({
+                    ...prev,
+                    performanceExplorationRate: Math.min(
+                      1,
+                      Math.max(0, Number(e.target.value) || 0)
+                    ),
+                  }))
+                }
+                className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            {/* Latency Exploration Rate */}
+            <div>
+              <label
+                htmlFor="latencyExplorationRate"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Latency Exploration Rate
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                The probability of exploring a non-optimal provider when using the latency selector.
+                Defaults to the Performance Exploration Rate if not explicitly set.
+              </p>
+              <input
+                id="latencyExplorationRate"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={explorationRates.latencyExplorationRate}
+                onChange={(e) =>
+                  setExplorationRates((prev) => ({
+                    ...prev,
+                    latencyExplorationRate: Math.min(1, Math.max(0, Number(e.target.value) || 0)),
                   }))
                 }
                 className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"

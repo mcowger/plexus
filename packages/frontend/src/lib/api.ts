@@ -3085,4 +3085,33 @@ export const api = {
     if (!res.ok) throw new Error('Failed to update cooldown policy');
     return res.json();
   },
+
+  // ─── Exploration Rate Settings ─────────────────────────────────────
+
+  /** Fetch current exploration rate settings. */
+  getExplorationRates: async (): Promise<{
+    performanceExplorationRate: number;
+    latencyExplorationRate: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/exploration-rate`);
+    if (!res.ok) throw new Error('Failed to fetch exploration rate settings');
+    return res.json();
+  },
+
+  /** Patch exploration rate settings. */
+  patchExplorationRates: async (updates: {
+    performanceExplorationRate?: number;
+    latencyExplorationRate?: number;
+  }): Promise<{
+    performanceExplorationRate: number;
+    latencyExplorationRate: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/exploration-rate`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update exploration rate settings');
+    return res.json();
+  },
 };
