@@ -1,5 +1,6 @@
 [tools]
 act = "latest"
+actionlint = "latest"
 bun = "latest"
 
 [env]
