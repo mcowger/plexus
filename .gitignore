@@ -69,3 +69,7 @@ packages/backend/.test-db.sqlite-wal
 .test-db.sqlite-wal
 .pi-lens
 docs/openapi.yaml
+
+# Compiled binaries
+plexus-
+plexus

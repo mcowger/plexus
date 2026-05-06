@@ -30,6 +30,12 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -63,9 +69,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ inputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Smoke test Docker image
-        timeout-minutes: 1
+        timeout-minutes: 2
         run: |
           echo "Starting smoke test for Docker image..."
           TEST_ADMIN_KEY="test-admin-key-$(openssl rand -hex 8)"
