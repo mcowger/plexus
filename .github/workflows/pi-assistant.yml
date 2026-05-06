@@ -9,6 +9,8 @@ jobs:
   pi-agent:
     if: contains(github.event.comment.body, '/pi')
     runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.job }}
     permissions:
       contents: write
       issues: write
@@ -16,6 +18,9 @@ jobs:
       actions: read
 
     steps:
+      - name: Mask API key
+        run: echo "::add-mask::$LLM_API_KEY"
+
       - name: Check commenter permission
         id: permission
         uses: actions/github-script@v9
@@ -72,7 +77,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
           model: ${{ vars.LLM_MODEL_ID }}
-          token: ${{ secrets.LLM_API_KEY }}
+          token: ${{ env.LLM_API_KEY }}
           base_url: ${{ secrets.LLM_API_HOST }}
           trigger: /pi
           load_builtin_extensions: true

@@ -15,6 +15,8 @@ jobs:
   generate-notes:
     name: Generate Release Notes
     runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.job }}
     permissions:
       contents: read
       pull-requests: read
@@ -22,6 +24,9 @@ jobs:
       notes: ${{ steps.read_notes.outputs.notes }}
 
     steps:
+      - name: Mask API key
+        run: echo "::add-mask::$LLM_API_KEY"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
@@ -164,7 +169,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
           model: ${{ vars.LLM_MODEL_ID }}
-          token: ${{ secrets.LLM_API_KEY }}
+          token: ${{ env.LLM_API_KEY }}
           base_url: ${{ secrets.LLM_API_HOST }}
           trigger: generate-release-notes
           load_builtin_extensions: true
