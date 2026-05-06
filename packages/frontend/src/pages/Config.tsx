@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
 import {
@@ -9,11 +9,14 @@ import {
   RefreshCw,
   HardDrive,
   Archive,
+  Save,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Switch } from '../components/ui/Switch';
+import { TagSelect } from '../components/ui/TagSelect';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import type { CardLayout } from '../types/card';
@@ -46,6 +49,16 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   }
 }
 
+// Default failover values — must match backend defaults in config-repository.ts
+const DEFAULT_RETRYABLE_STATUS_CODES = Array.from({ length: 500 }, (_, i) => i + 100).filter(
+  (c) => !(c >= 200 && c <= 299) && c !== 413 && c !== 422
+);
+
+const DEFAULT_RETRYABLE_ERRORS = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'];
+
+// Common HTTP status codes that users might want to toggle
+const COMMON_STATUS_CODES = ['401', '403', '408', '429', '500', '502', '503', '504'];
+
 export const Config = () => {
   const toast = useToast();
   const [config, setConfig] = useState('');
@@ -54,7 +67,15 @@ export const Config = () => {
   const [isBackupLoading, setIsBackupLoading] = useState(false);
   const [isFullBackupLoading, setIsFullBackupLoading] = useState(false);
   const [isRestoreLoading, setIsRestoreLoading] = useState(false);
+  const [isSavingFailover, setIsSavingFailover] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  // Failover policy state
+  const [failoverEnabled, setFailoverEnabled] = useState(true);
+  const [retryableStatusCodes, setRetryableStatusCodes] = useState<string[]>(
+    DEFAULT_RETRYABLE_STATUS_CODES.map(String)
+  );
+  const [retryableErrors, setRetryableErrors] = useState<string[]>(DEFAULT_RETRYABLE_ERRORS);
 
   const loadConfig = async () => {
     try {
@@ -68,8 +89,27 @@ export const Config = () => {
     }
   };
 
+  const loadFailoverSettings = useCallback(async () => {
+    try {
+      const settings = await api.getSystemSettings();
+      if (settings['failover.enabled'] !== undefined) {
+        setFailoverEnabled(settings['failover.enabled'] as boolean);
+      }
+      if (settings['failover.retryableStatusCodes'] !== undefined) {
+        const codes = settings['failover.retryableStatusCodes'] as number[];
+        setRetryableStatusCodes(codes.map(String));
+      }
+      if (settings['failover.retryableErrors'] !== undefined) {
+        setRetryableErrors(settings['failover.retryableErrors'] as string[]);
+      }
+    } catch (e) {
+      console.error('Failed to load failover settings:', e);
+    }
+  }, []);
+
   useEffect(() => {
     loadConfig();
+    loadFailoverSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -248,11 +288,32 @@ export const Config = () => {
     }
   };
 
+  const handleSaveFailoverSettings = async () => {
+    setIsSavingFailover(true);
+    try {
+      const statusCodes = retryableStatusCodes
+        .map((s) => parseInt(s, 10))
+        .filter((n) => !isNaN(n) && n >= 100 && n <= 599);
+      await api.patchSystemSettings({
+        'failover.enabled': failoverEnabled,
+        'failover.retryableStatusCodes': statusCodes,
+        'failover.retryableErrors': retryableErrors,
+      });
+      toast.success('Failover settings saved');
+      // Reload config export to reflect changes
+      await loadConfig();
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save failover settings');
+    } finally {
+      setIsSavingFailover(false);
+    }
+  };
+
   return (
     <PageContainer>
       <PageHeader
         title="Configuration"
-        subtitle="View current system configuration (read-only). Use the Providers, Models, and Keys pages to make changes."
+        subtitle="Manage system settings, failover policy, and import/export configuration."
       />
 
       <div className="flex flex-col gap-6">
@@ -306,6 +367,87 @@ export const Config = () => {
                 }}
               />
             </EditorErrorBoundary>
+          </div>
+        </Card>
+
+        <Card
+          title="Failover Policy"
+          extra={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveFailoverSettings}
+                isLoading={isSavingFailover}
+                leftIcon={<Save size={14} />}
+              >
+                Save
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-sm text-text-secondary mb-4">
+            Configure how Plexus handles provider failures and retries. When failover is enabled,
+            failed requests are automatically retried on the next available provider.
+          </p>
+
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Failover Enabled
+                </label>
+                <p className="text-xs text-text-muted mt-0.5">
+                  When disabled, only the first matching provider is used with no retries.
+                </p>
+              </div>
+              <Switch
+                checked={failoverEnabled}
+                onChange={setFailoverEnabled}
+                aria-label="Toggle failover on/off"
+              />
+            </div>
+
+            <div>
+              <TagSelect
+                label="Retryable Status Codes"
+                placeholder="Add HTTP status codes (e.g. 429, 502)…"
+                options={COMMON_STATUS_CODES}
+                selected={retryableStatusCodes}
+                onChange={setRetryableStatusCodes}
+                allowCustom
+              />
+              <p className="text-xs text-text-muted mt-1.5">
+                HTTP status codes that trigger a retry on the next provider. Type a number and press
+                Enter to add.
+                {retryableStatusCodes.length > 0 && (
+                  <span className="ml-1 text-text-muted/70">
+                    ({retryableStatusCodes.length} codes configured)
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div>
+              <TagSelect
+                label="Retryable Network Errors"
+                placeholder="Add error codes (e.g. ECONNREFUSED)…"
+                options={[
+                  'ECONNREFUSED',
+                  'ETIMEDOUT',
+                  'ENOTFOUND',
+                  'ECONNRESET',
+                  'EPIPE',
+                  'ENETUNREACH',
+                ]}
+                selected={retryableErrors}
+                onChange={setRetryableErrors}
+                allowCustom
+              />
+              <p className="text-xs text-text-muted mt-1.5">
+                Network error codes that trigger a retry. Type a code and press Enter to add.
+              </p>
+            </div>
           </div>
         </Card>
 

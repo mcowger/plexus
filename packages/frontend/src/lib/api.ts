@@ -3024,4 +3024,24 @@ export const api = {
     }
     return res.json();
   },
+
+  // ─── System Settings ────────────────────────────────────────────
+
+  /** Fetch all system settings (including failover policy). */
+  getSystemSettings: async (): Promise<Record<string, unknown>> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`);
+    if (!res.ok) throw new Error('Failed to fetch system settings');
+    return res.json();
+  },
+
+  /** Patch system settings (partial update, merges into existing). */
+  patchSystemSettings: async (settings: Record<string, unknown>): Promise<{ success: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) throw new Error('Failed to update system settings');
+    return res.json();
+  },
 };
