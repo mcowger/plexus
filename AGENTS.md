@@ -148,7 +148,7 @@ Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `D
 ## Pi Assistant (AI Agent Workflow)
 
 The `/pi` trigger in issue and PR comments is handled by `.github/workflows/pi-assistant.yml`,
-which invokes `mcowger/pi-coding-agent-action`.
+which invokes `mcowger/pi-action`.
 
 ### Prompt file
 

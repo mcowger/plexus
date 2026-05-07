@@ -164,7 +164,7 @@ jobs:
 
       - name: Run release notes agent
         id: release_notes_agent
-        uses: mcowger/pi-coding-agent-action@main
+        uses: mcowger/pi-action@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
