@@ -9,6 +9,8 @@ jobs:
   pi-agent:
     if: contains(github.event.comment.body, '/pi')
     runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.job }}
     permissions:
       contents: write
       issues: write
@@ -16,6 +18,9 @@ jobs:
       actions: read
 
     steps:
+      - name: Mask API key
+        run: echo "::add-mask::$LLM_API_KEY"
+
       - name: Check commenter permission
         id: permission
         uses: actions/github-script@v9
@@ -41,7 +46,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.issue.number,
-              body: '🤔 **Pi is working on it...**\n\nAnalyzing your request and planning next steps.',
+              body: '🤖 **Pi is working on it...**\n\nAnalyzing your request and planning next steps.',
             });
             core.setOutput('comment_id', comment.id);
             core.info(`Posted progress comment: ${comment.id}`);
@@ -49,6 +54,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Configure Git identity
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -62,52 +72,47 @@ jobs:
 
       - name: Run Pi agent
         id: pi
-        uses: mcowger/pi-coding-agent-action@main
+        uses: mcowger/pi-action@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
           model: ${{ vars.LLM_MODEL_ID }}
-          token: ${{ secrets.LLM_API_KEY }}
+          token: ${{ env.LLM_API_KEY }}
           base_url: ${{ secrets.LLM_API_HOST }}
           trigger: /pi
           load_builtin_extensions: true
           suppress_final_comment: true
+          suppress_bun_install: true
           export_session_html: true
-          prompt: |
-            You are a coding assistant for the Plexus repository.
+          prompt_file: .github/prompts/pi-assistant.md
+        env:
+          INITIAL_COMMENT_ID: ${{ steps.initial_comment.outputs.comment_id }}
 
-            ## CRITICAL: Post your TODO list FIRST, then investigate
-            1. FIRST: Update the initial progress comment with your plan checklist
-            2. THEN: Do your investigation/coding
-            3. Update the TODO list after EVERY tool call if there's progress or plan changes
-
-            ## Progress comment
-            A progress comment has already been posted for you: comment ID **${{ steps.initial_comment.outputs.comment_id }}**.
-            Use `update_comment` on that ID for ALL updates — do NOT use `add_issue_comment`.
-
-            **Protocol:**
-            1. First update — replace "🤔 Pi is working on it..." with your TODO checklist:
-               ```
-               update_comment({
-                 comment_id: ${{ steps.initial_comment.outputs.comment_id }},
-                 body: "## Working on it...\n- [ ] Step 1\n- [ ] Step 2"
-               })
-               ```
-            2. Check off items as you complete them (update_comment with updated body)
-            3. When done, update_comment to replace the TODO with your final response
-
-            ## Planning & Efficiency
-            - Think ahead about your plan before executing — consider what files you'll need to read and what commands you'll need to run
-            - Batch multiple reads and bash calls together where they don't depend on each other's results
-            - Minimize round-trips by combining independent operations in a single response
-
-            ## Response style
-            - Be concise. Use headings and bullets. No filler text.
-
-            ## When coding is required
-            - Use the `create_pull_request` tool to open a PR — it handles branching, committing, and PR creation automatically
-            - Keep changes minimal and focused on the request — do not refactor unrelated code
-            - NEVER close the issue — leave it open for the user to close after reviewing the PR
+      - name: Post failure comment if agent did not complete
+        if: always() && (steps.pi.outputs.success != 'true' || steps.pi.outputs.response == '')
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ steps.initial_comment.outputs.comment_id }},
+              body: [
+                '❌ **Pi did not complete successfully.**',
+                '',
+                '| | |',
+                '|---|---|',
+                `| Success | \`${{ steps.pi.outputs.success }}\` |`,
+                `| Duration | ${{ steps.pi.outputs.duration_seconds }}s |`,
+                `| Input tokens | ${{ steps.pi.outputs.input_tokens }} |`,
+                `| Output tokens | ${{ steps.pi.outputs.output_tokens }} |`,
+                '',
+                `[View Actions run](${runUrl}) for details.`,
+                '',
+                'Reply with `/pi` to try again.',
+              ].join('\n'),
+            });
 
       - name: Log agent summary
         if: always()

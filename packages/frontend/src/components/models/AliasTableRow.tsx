@@ -3,6 +3,7 @@ import { Edit2, Trash2, Clock, Play, Loader2, CheckCircle, XCircle } from 'lucid
 import { Switch } from '../ui/Switch';
 import { Alias, Provider, Cooldown } from '../../lib/api';
 import { ModelTypeBadge } from './ModelTypeBadge';
+import { formatMsToMinSec } from '@plexus/shared';
 
 interface AliasTableRowProps {
   alias: Alias;
@@ -103,7 +104,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
               (c) => c.provider === t.provider && c.model === t.model && !c.accountId
             );
             const isCoolingDown = !!cooldown;
-            const cooldownMinutes = cooldown ? Math.ceil(cooldown.timeRemainingMs / 60000) : 0;
+            const cooldownDisplay = cooldown ? formatMsToMinSec(cooldown.timeRemainingMs) : '';
 
             return (
               <div
@@ -115,10 +116,10 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                 {isCoolingDown && (
                   <div
                     className="flex items-center gap-1 text-warning font-medium text-[11px]"
-                    title={`On cooldown for ${cooldownMinutes}m`}
+                    title={`On cooldown for ${cooldownDisplay}`}
                   >
                     <Clock size={12} />
-                    <span>{cooldownMinutes}m</span>
+                    <span>{cooldownDisplay}</span>
                   </div>
                 )}
                 <div

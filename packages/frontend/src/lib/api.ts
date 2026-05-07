@@ -3024,4 +3024,94 @@ export const api = {
     }
     return res.json();
   },
+
+  // ─── Failover Settings ────────────────────────────────────────────
+
+  /** Fetch current failover policy. */
+  getFailoverPolicy: async (): Promise<{
+    enabled: boolean;
+    retryableStatusCodes: number[];
+    retryableErrors: string[];
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/failover`);
+    if (!res.ok) throw new Error('Failed to fetch failover policy');
+    return res.json();
+  },
+
+  /** Patch failover policy fields. */
+  patchFailoverPolicy: async (updates: {
+    enabled?: boolean;
+    retryableStatusCodes?: number[];
+    retryableErrors?: string[];
+  }): Promise<{
+    enabled: boolean;
+    retryableStatusCodes: number[];
+    retryableErrors: string[];
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/failover`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update failover policy');
+    return res.json();
+  },
+
+  // ─── Cooldown Settings ──────────────────────────────────────────────
+
+  /** Fetch current cooldown policy. */
+  getCooldownPolicy: async (): Promise<{
+    initialMinutes: number;
+    maxMinutes: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/cooldown`);
+    if (!res.ok) throw new Error('Failed to fetch cooldown policy');
+    return res.json();
+  },
+
+  /** Patch cooldown policy fields. */
+  patchCooldownPolicy: async (updates: {
+    initialMinutes?: number;
+    maxMinutes?: number;
+  }): Promise<{
+    initialMinutes: number;
+    maxMinutes: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/cooldown`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update cooldown policy');
+    return res.json();
+  },
+
+  // ─── Exploration Rate Settings ─────────────────────────────────────
+
+  /** Fetch current exploration rate settings. */
+  getExplorationRates: async (): Promise<{
+    performanceExplorationRate: number;
+    latencyExplorationRate: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/exploration-rate`);
+    if (!res.ok) throw new Error('Failed to fetch exploration rate settings');
+    return res.json();
+  },
+
+  /** Patch exploration rate settings. */
+  patchExplorationRates: async (updates: {
+    performanceExplorationRate?: number;
+    latencyExplorationRate?: number;
+  }): Promise<{
+    performanceExplorationRate: number;
+    latencyExplorationRate: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/exploration-rate`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update exploration rate settings');
+    return res.json();
+  },
 };

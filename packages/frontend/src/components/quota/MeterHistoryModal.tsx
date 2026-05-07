@@ -160,12 +160,12 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-bg-card border border-border-glass rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border border-border-glass bg-bg-card shadow-2xl sm:max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-glass">
+        <div className="flex items-center justify-between gap-3 border-b border-border-glass px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0">
             <h2 className="font-heading text-h2 font-semibold text-text truncate">{meter.label}</h2>
             <p className="text-xs text-text-muted mt-0.5 truncate">
@@ -182,7 +182,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Time-range selector */}
-        <div className="flex items-center gap-1 px-5 py-3 border-b border-border-glass">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-border-glass px-4 py-3 sm:px-5">
           {TIME_RANGES.map((r) => (
             <button
               key={r.key}
@@ -200,10 +200,10 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5">
           {/* Stats row */}
           {stats && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 { label: 'Current', value: formatTooltip(stats.current) },
                 { label: 'Min', value: formatTooltip(stats.min) },
@@ -223,7 +223,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
           )}
 
           {/* Chart */}
-          <div className="h-52 w-full">
+          <div className="h-48 w-full sm:h-52">
             {error ? (
               <div className="h-full flex items-center justify-center text-sm text-danger">
                 {error}
@@ -300,7 +300,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-border-glass flex justify-end">
+        <div className="flex justify-end border-t border-border-glass px-4 py-3 sm:px-5">
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>

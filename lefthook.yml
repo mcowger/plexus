@@ -1,0 +1,58 @@
+pre-commit:
+  # Skip the entire hook in CI — GitHub Actions runs each check independently
+  # in dedicated workflow steps, making the hook redundant and harmful
+  # (failed hook = create_pull_request retries with a new branch each time).
+  skip:
+    - CI: "true"
+
+  commands:
+    # --- Block manually committed migration files ----------------------------
+    no-migrations:
+      skip:
+        - CI: "true"
+      run: |
+        if [ "${ALLOW_MIGRATIONS:-}" = "1" ]; then exit 0; fi
+        migration_files=$(git diff --cached --name-only -- \
+          'packages/backend/drizzle/migrations/' \
+          'packages/backend/drizzle/migrations_pg/' || true)
+        if [ -n "$migration_files" ]; then
+          echo ""
+          echo "[pre-commit] ERROR: Migration files should not be committed manually."
+          echo "Migrations are auto-generated on main by CI after schema changes merge."
+          echo ""
+          echo "Blocked files:"
+          echo "$migration_files" | sed 's/^/  /'
+          echo ""
+          echo "To remove them:  git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/"
+          echo "To bypass (maintainers only):  ALLOW_MIGRATIONS=1 git commit ..."
+          echo ""
+          exit 1
+        fi
+
+    # --- Validate changed GitHub Actions workflow YAML -----------------------
+    workflow-yaml:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: mise exec -- actionlint {staged_files}
+
+    # --- Biome: format staged source files in-place and re-stage -------------
+    biome-format:
+      glob: "*.{ts,tsx,js,jsx,json}"
+      run: bunx biome format --write {staged_files} && git add {staged_files}
+
+    # --- Biome: lint all sources ---------------------------------------------
+    biome-lint:
+      run: bunx biome lint .
+
+    # --- TypeScript type-check across all packages ---------------------------
+    typecheck:
+      run: bun run typecheck
+
+    # --- Frontend build (catches broken imports/exports) ---------------------
+    frontend-build:
+      glob: "packages/frontend/src/**"
+      run: bun run build:frontend
+
+    # --- Backend tests (only when backend source changes) --------------------
+    backend-tests:
+      glob: "packages/backend/src/**"
+      run: cd packages/backend && bun run test

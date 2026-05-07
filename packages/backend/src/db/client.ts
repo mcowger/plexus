@@ -34,7 +34,17 @@ function parseConnectionString(uri: string): {
   connectionString: string;
 } {
   if (uri.startsWith('sqlite://')) {
-    return { dialect: 'sqlite', connectionString: uri.replace('sqlite://', '') };
+    let connStr = uri.replace('sqlite://', '');
+    // Normalize :memory: path (handles sqlite://:memory: and sqlite://:memory:/)
+    if (
+      connStr === ':memory:' ||
+      connStr === 'memory:' ||
+      connStr === ':memory:/' ||
+      connStr === 'memory:/'
+    ) {
+      connStr = ':memory:';
+    }
+    return { dialect: 'sqlite', connectionString: connStr };
   } else if (uri.startsWith('postgres://') || uri.startsWith('postgresql://')) {
     return { dialect: 'postgres', connectionString: uri };
   }

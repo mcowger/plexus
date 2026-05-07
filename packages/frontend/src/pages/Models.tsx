@@ -13,6 +13,7 @@ import {
 } from '../lib/api';
 import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
+import { ModelTypeBadge } from '../components/models/ModelTypeBadge';
 import { MetadataOverrideForm } from '../components/models/MetadataOverrideForm';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -39,6 +40,7 @@ import {
   Eye,
   AlertTriangle,
   Cpu,
+  Play,
 } from 'lucide-react';
 
 export const Models = () => {
@@ -899,827 +901,1003 @@ export const Models = () => {
   );
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="Models"
-        subtitle={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-bg-glass border border-border-glass">
-              <Eye size={14} className="text-text-secondary" />
-              <span className="text-xs font-medium text-text-secondary">Vision Fall Through:</span>
-              <select
-                className="bg-transparent border-none text-xs text-text outline-none focus:ring-0 cursor-pointer max-w-[140px]"
-                value={globalDescriptorModel}
-                onChange={(e) => setGlobalDescriptorModel(e.target.value)}
-              >
-                <option value="">(None)</option>
-                {sortedAliases.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.id}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleSaveDescriptor}
-                disabled={isSavingDescriptor}
-                className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
-                title="Save descriptor model"
-                type="button"
-              >
-                {isSavingDescriptor ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-              </button>
-            </span>
-          </span>
-        }
+        subtitle="Aliases that map gateway models to upstream provider models"
         actions={
           <>
-            <div className="w-full sm:w-64">
-              <SearchInput placeholder="Search models..." value={search} onChange={setSearch} />
-            </div>
             <Button
               variant="danger"
-              leftIcon={<Trash2 size={16} />}
+              size="sm"
+              leftIcon={<Trash2 size={14} />}
               onClick={() => setIsDeleteAllModalOpen(true)}
               disabled={aliases.length === 0}
             >
               Delete All
             </Button>
-            <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
-              Add Model
+            <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
+              Add model
             </Button>
           </>
         }
-      />
-
-      <Card className="mb-6">
-        <div className="overflow-x-auto -mx-4 sm:-mx-5 md:-mx-6">
-          <table className="w-full border-collapse font-body text-[13px]">
-            <thead>
-              <tr>
-                <th
-                  className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                  style={{ paddingLeft: '24px' }}
-                >
-                  Alias
-                </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Aliases
-                </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Selector
-                </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Metadata
-                </th>
-                <th
-                  className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                  style={{ paddingRight: '24px' }}
-                >
-                  Targets
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAliases.map((alias) => (
-                <AliasTableRow
-                  key={alias.id}
-                  alias={alias}
-                  providers={providers}
-                  cooldowns={cooldowns}
-                  testStates={testStates}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  onToggleTarget={handleToggleTarget}
-                  onTestTarget={handleTestTarget}
-                />
-              ))}
-              {filteredAliases.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center text-text-muted p-12">
-                    No aliases found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={originalId ? 'Edit Model' : 'Add Model'}
-        size="lg"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} isLoading={isSaving}>
-              Save Changes
-            </Button>
-          </div>
-        }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px' }}>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Primary Name (ID)
-              </label>
-              <input
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                value={editingAlias.id}
-                onChange={(e) => setEditingAlias({ ...editingAlias, id: e.target.value })}
-                placeholder="e.g. gpt-4-turbo"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Model Type
-              </label>
-              <select
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                value={editingAlias.type || 'chat'}
-                onChange={(e) =>
-                  setEditingAlias({
-                    ...editingAlias,
-                    type: e.target.value as
-                      | 'chat'
-                      | 'embeddings'
-                      | 'transcriptions'
-                      | 'speech'
-                      | 'image'
-                      | 'responses',
-                  })
-                }
-              >
-                <option value="chat">Chat</option>
-                <option value="embeddings">Embeddings</option>
-                <option value="transcriptions">Transcriptions</option>
-                <option value="speech">Speech</option>
-                <option value="image">Image</option>
-                <option value="responses">Responses</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Selector Strategy
-              </label>
-              <select
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                value={editingAlias.selector || 'random'}
-                onChange={(e) => setEditingAlias({ ...editingAlias, selector: e.target.value })}
-              >
-                <option value="random">Random</option>
-                <option value="in_order">In Order</option>
-                <option value="cost">Lowest Cost</option>
-                <option value="latency">Lowest Latency</option>
-                <option value="usage">Usage Balanced</option>
-                <option value="performance">Best Performance</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Priority
-              </label>
-              <select
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                value={editingAlias.priority || 'selector'}
-                onChange={(e) =>
-                  setEditingAlias({ ...editingAlias, priority: e.target.value as any })
-                }
-              >
-                <option value="selector">Selector</option>
-                <option value="api_match">API Match</option>
-              </select>
-            </div>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch sm:items-center">
+          <div className="w-full sm:w-72">
+            <SearchInput
+              placeholder="Search by alias, upstream id, tag…"
+              value={search}
+              onChange={setSearch}
+            />
           </div>
-
-          <p className="text-xs text-text-muted" style={{ marginTop: '-4px' }}>
-            Priority: "Selector" uses the strategy above. "API Match" matches provider type to
-            incoming request format.
-          </p>
-
-          <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
-
-          {/* Model Architecture accordion */}
-          <div className="border border-border-glass rounded-sm overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsArchitectureOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+          <span className="inline-flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-slate-900/60 px-3 py-1.5 sm:w-auto">
+            <Eye size={14} className="text-text-secondary" />
+            <span className="text-xs font-medium text-text-secondary">Vision Fall Through:</span>
+            <select
+              className="min-w-0 flex-1 cursor-pointer border-none bg-transparent text-xs text-text outline-none focus:ring-0 sm:max-w-[140px]"
+              value={globalDescriptorModel}
+              onChange={(e) => setGlobalDescriptorModel(e.target.value)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Cpu size={13} className="text-text-muted" />
-                <span className="font-body text-[13px] font-medium text-text-secondary">
-                  Model Architecture
-                </span>
-                {editingAlias.model_architecture?.total_params && (
-                  <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
-                    {editingAlias.model_architecture.total_params}B params
-                  </span>
-                )}
-              </div>
-              {isArchitectureOpen ? (
-                <ChevronDown size={14} className="text-text-muted" />
+              <option value="">(None)</option>
+              {sortedAliases.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.id}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleSaveDescriptor}
+              disabled={isSavingDescriptor}
+              className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+              title="Save descriptor model"
+              type="button"
+            >
+              {isSavingDescriptor ? (
+                <Loader2 size={14} className="animate-spin" />
               ) : (
-                <ChevronRight size={14} className="text-text-muted" />
+                <Save size={14} />
               )}
             </button>
+          </span>
+        </div>
+      </PageHeader>
 
-            {isArchitectureOpen && (
-              <div
-                className="px-3 py-3 border-t border-border-glass"
-                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-              >
-                <p className="font-body text-[11px] text-text-muted">
-                  Fetch model architecture from Hugging Face or enter manually. These values are
-                  used for energy calculation.
-                </p>
-
-                {/* Display currently saved architecture values */}
-                {editingAlias.model_architecture?.total_params && (
-                  <div className="px-3 py-2 bg-bg-subtle border border-border-glass rounded-md">
-                    <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
-                      Currently Saved:
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text">
-                      {editingAlias.model_architecture.total_params && (
-                        <span>{editingAlias.model_architecture.total_params}B params</span>
-                      )}
-                      {editingAlias.model_architecture.active_params && (
-                        <span>({editingAlias.model_architecture.active_params}B active)</span>
-                      )}
-                      {editingAlias.model_architecture.layers && (
-                        <span>{editingAlias.model_architecture.layers} layers</span>
-                      )}
-                      {editingAlias.model_architecture.heads && (
-                        <span>{editingAlias.model_architecture.heads} heads</span>
-                      )}
-                      {editingAlias.model_architecture.dtype && (
-                        <span className="text-primary">
-                          {editingAlias.model_architecture.dtype.toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* HuggingFace Model ID input and fetch button */}
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Hugging Face Model ID
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      value={hfModelId}
-                      onChange={(e) => setHfModelId(e.target.value)}
-                      placeholder="e.g. meta-llama/Llama-3.1-70B-Instruct"
-                      onKeyDown={(e) => e.key === 'Enter' && fetchHfModelArchitecture()}
-                    />
-                  </div>
-                  <Button
-                    onClick={fetchHfModelArchitecture}
-                    isLoading={isFetchingHfModel}
-                    disabled={isFetchingHfModel}
-                    variant="secondary"
-                  >
-                    Fetch from HF
-                  </Button>
-                </div>
-
-                {hfFetchError && (
-                  <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
-                    {hfFetchError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Total Params (B)
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={editingAlias.model_architecture?.total_params || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            total_params: parseFloat(e.target.value) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 1.76"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Active Params (B)
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={editingAlias.model_architecture?.active_params || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            active_params: parseFloat(e.target.value) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 1.76"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Layers
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editingAlias.model_architecture?.layers || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            layers: parseInt(e.target.value, 10) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 120"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Heads
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editingAlias.model_architecture?.heads || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            heads: parseInt(e.target.value, 10) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 96"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      KV LoRA Rank
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editingAlias.model_architecture?.kv_lora_rank || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            kv_lora_rank: parseInt(e.target.value, 10) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 128"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      RoPE Head Dim
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editingAlias.model_architecture?.qk_rope_head_dim || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            qk_rope_head_dim: parseInt(e.target.value, 10) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 96"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Context Length
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editingAlias.model_architecture?.context_length || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            context_length: parseInt(e.target.value, 10) || undefined,
-                          },
-                        })
-                      }
-                      placeholder="e.g. 128000"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Data Type
-                    </label>
-                    <select
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      value={editingAlias.model_architecture?.dtype || ''}
-                      onChange={(e) =>
-                        setEditingAlias({
-                          ...editingAlias,
-                          model_architecture: {
-                            ...editingAlias.model_architecture,
-                            dtype: (e.target.value as any) || undefined,
-                          },
-                        })
-                      }
+      <PageContainer>
+        <Card className="mb-6">
+          <div className="space-y-3 md:hidden">
+            {filteredAliases.length === 0 ? (
+              <div className="py-10 text-center text-sm text-text-muted">No aliases found</div>
+            ) : (
+              filteredAliases.map((alias) => (
+                <article
+                  key={alias.id}
+                  className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(alias)}
+                      className="min-w-0 flex-1 text-left"
                     >
-                      <option value="">Default (FP16)</option>
-                      <option value="fp16">FP16</option>
-                      <option value="bf16">BF16</option>
-                      <option value="fp8">FP8</option>
-                      <option value="fp8_e4m3">FP8 E4M3</option>
-                      <option value="fp8_e5m2">FP8 E5M2</option>
-                      <option value="nvfp4">NVFP4</option>
-                      <option value="int4">INT4</option>
-                      <option value="int8">INT8</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Advanced accordion */}
-          <div className="border border-border-glass rounded-sm overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsAdvancedOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
-            >
-              <span className="font-body text-[13px] font-medium text-text-secondary">
-                Advanced
-              </span>
-              {isAdvancedOpen ? (
-                <ChevronDown size={14} className="text-text-muted" />
-              ) : (
-                <ChevronRight size={14} className="text-text-muted" />
-              )}
-            </button>
-
-            {isAdvancedOpen && (
-              <div
-                className="px-3 py-3 border-t border-border-glass"
-                style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-              >
-                {/* ── Behaviors ── */}
-                <div>
-                  <label
-                    className="font-body text-[13px] font-medium text-text-secondary"
-                    style={{ display: 'block', marginBottom: '6px' }}
-                  >
-                    Behaviors
-                  </label>
-                  <div className="flex items-center justify-between py-1">
-                    <div>
-                      <span className="font-body text-[13px] text-text">
-                        Strip Adaptive Thinking
-                      </span>
-                      <p className="font-body text-[11px] text-text-muted mt-0.5">
-                        On the <code className="text-primary">/v1/messages</code> path, remove{' '}
-                        <code className="text-primary">thinking</code> when set to{' '}
-                        <code className="text-primary">adaptive</code> so the provider uses its
-                        default behaviour.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={getBehavior('strip_adaptive_thinking')}
-                      onChange={(val) => setBehavior('strip_adaptive_thinking', val)}
-                      size="sm"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between py-1">
-                    <div>
-                      <span className="font-body text-[13px] text-text">Vision Fallthrough</span>
-                      <p className="font-body text-[11px] text-text-muted mt-0.5">
-                        If the request contains images and the target model is text-only, use the
-                        descriptor model to convert images to text.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={editingAlias.use_image_fallthrough || false}
-                      onChange={(val) =>
-                        setEditingAlias({ ...editingAlias, use_image_fallthrough: val })
-                      }
-                      size="sm"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between py-1">
-                    <div>
-                      <span className="font-body text-[13px] text-text">Enforce Limits</span>
-                      <p className="font-body text-[11px] text-text-muted mt-0.5">
-                        Reject oversized prompts locally (400 context_length_exceeded) before
-                        dispatch. Uses a fast heuristic estimator with a 10% safety margin, and
-                        reserves the smaller of max_tokens and the model's max completion for the
-                        response. Requires a known context_length in metadata (override or catalog).
-                      </p>
-                      {editingAlias.enforce_limits &&
-                        !editingAlias.metadata?.overrides?.context_length &&
-                        !editingAlias.metadata?.overrides?.top_provider?.context_length && (
-                          <p
-                            className="font-body text-[11px] mt-1 flex items-center gap-1"
-                            style={{ color: 'var(--color-warning)' }}
-                          >
-                            <AlertTriangle size={12} />
-                            No context_length found in metadata — this toggle will have no effect
-                            until a metadata source with a known context_length is configured.
-                          </p>
+                      <div className="truncate font-heading text-sm font-semibold text-text">
+                        {alias.id}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <ModelTypeBadge type={alias.type} />
+                        {alias.metadata && (
+                          <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                            {alias.metadata.source}
+                          </span>
                         )}
-                    </div>
-                    <Switch
-                      checked={editingAlias.enforce_limits || false}
-                      onChange={(val) => setEditingAlias({ ...editingAlias, enforce_limits: val })}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="h-px bg-border-glass"></div>
-
-                {/* ── Additional Aliases ── */}
-                <div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    <label
-                      className="font-body text-[13px] font-medium text-text-secondary"
-                      style={{ marginBottom: 0 }}
-                    >
-                      Additional Aliases
-                    </label>
+                      </div>
+                    </button>
                     <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={addAlias}
-                      leftIcon={<Plus size={14} />}
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteClick(alias)}
+                      className="text-danger"
+                      aria-label={`Delete ${alias.id}`}
                     >
-                      Add Alias
+                      <Trash2 size={14} />
                     </Button>
                   </div>
 
-                  {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
-                    <div className="text-text-muted italic text-center text-sm py-2">
-                      No additional aliases
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {editingAlias.aliases?.map((alias, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '8px' }}>
-                        <Input
-                          value={alias}
-                          onChange={(e) => updateAlias(idx, e.target.value)}
-                          placeholder="e.g. gpt4"
-                          style={{ flex: 1 }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAlias(idx)}
-                          style={{ color: 'var(--color-danger)' }}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                      <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                        Selector
                       </div>
-                    ))}
+                      <div className="truncate font-medium capitalize text-text-secondary">
+                        {alias.selector || 'random'} / {alias.priority || 'selector'}
+                      </div>
+                    </div>
+                    <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                      <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                        Aliases
+                      </div>
+                      <div className="truncate font-medium text-text-secondary">
+                        {alias.aliases?.length ? alias.aliases.join(', ') : '-'}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+
+                  <div className="mt-3">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                      Targets
+                    </div>
+                    {alias.targets.length === 0 ? (
+                      <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">
+                        No targets configured
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {alias.targets.map((t, i) => {
+                          const provider = providers.find((p) => p.id === t.provider);
+                          const isProviderDisabled = provider?.enabled === false;
+                          const isTargetDisabled = t.enabled === false;
+                          const isDisabled = isProviderDisabled || isTargetDisabled;
+                          const testKey = `${alias.id}-${i}`;
+                          const testState = testStates[testKey];
+                          const cooldown = cooldowns.find(
+                            (c) => c.provider === t.provider && c.model === t.model && !c.accountId
+                          );
+                          const cooldownMinutes = cooldown
+                            ? Math.ceil(cooldown.timeRemainingMs / 60000)
+                            : 0;
+
+                          return (
+                            <div
+                              key={`${t.provider}-${t.model}-${i}`}
+                              className={`rounded border border-border-glass bg-bg-glass px-2 py-2 ${
+                                isDisabled ? 'opacity-70' : ''
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className={`truncate text-xs font-medium ${
+                                      isDisabled
+                                        ? 'text-danger line-through'
+                                        : 'text-text-secondary'
+                                    }`}
+                                  >
+                                    {t.provider || 'No provider'}{' '}
+                                    <span className="text-text-muted">-&gt;</span>{' '}
+                                    {t.model || 'No model'}
+                                  </div>
+                                  {isProviderDisabled && (
+                                    <div className="mt-1 text-[11px] text-danger">
+                                      Provider disabled
+                                    </div>
+                                  )}
+                                  {cooldown && (
+                                    <div className="mt-1 text-[11px] font-medium text-warning">
+                                      Cooldown {cooldownMinutes}m
+                                    </div>
+                                  )}
+                                  {testState?.showResult && testState.message && (
+                                    <div
+                                      className={`mt-1 text-[11px] italic ${
+                                        testState.result === 'success'
+                                          ? 'text-success'
+                                          : 'text-danger'
+                                      }`}
+                                    >
+                                      {testState.message}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isDisabled) return;
+                                      let testApiTypes: string[] = ['chat'];
+                                      if (alias.type === 'embeddings')
+                                        testApiTypes = ['embeddings'];
+                                      else if (alias.type === 'image') testApiTypes = ['images'];
+                                      else if (alias.type === 'responses')
+                                        testApiTypes = ['responses'];
+
+                                      handleTestTarget(
+                                        alias.id,
+                                        i,
+                                        t.provider,
+                                        t.model,
+                                        testApiTypes
+                                      );
+                                    }}
+                                    disabled={isDisabled}
+                                    className="flex h-7 w-7 items-center justify-center rounded text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={`Test ${alias.id} target ${i + 1}`}
+                                  >
+                                    {testState?.loading ? (
+                                      <Loader2 size={14} className="animate-spin" />
+                                    ) : testState?.showResult && testState.result === 'success' ? (
+                                      <CheckCircle size={14} className="text-success" />
+                                    ) : testState?.showResult && testState.result === 'error' ? (
+                                      <AlertTriangle size={14} className="text-danger" />
+                                    ) : (
+                                      <Play size={14} />
+                                    )}
+                                  </button>
+                                  <Switch
+                                    checked={t.enabled !== false}
+                                    onChange={(val) => handleToggleTarget(alias, i, val)}
+                                    size="sm"
+                                    disabled={isProviderDisabled}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))
             )}
           </div>
 
-          <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
-
-          {/* Metadata accordion */}
-          <div className="border border-border-glass rounded-sm overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsMetadataOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <BookOpen size={13} className="text-text-muted" />
-                <span className="font-body text-[13px] font-medium text-text-secondary">
-                  Metadata
-                </span>
-                {editingAlias.metadata && (
-                  <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
-                    {editingAlias.metadata.source}
-                  </span>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full border-collapse font-body text-[13px]">
+              <thead>
+                <tr>
+                  <th
+                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ paddingLeft: '24px' }}
+                  >
+                    Alias
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Aliases
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Selector
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Metadata
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ paddingRight: '24px' }}
+                  >
+                    Targets
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAliases.map((alias) => (
+                  <AliasTableRow
+                    key={alias.id}
+                    alias={alias}
+                    providers={providers}
+                    cooldowns={cooldowns}
+                    testStates={testStates}
+                    onEdit={handleEdit}
+                    onDelete={handleDeleteClick}
+                    onToggleTarget={handleToggleTarget}
+                    onTestTarget={handleTestTarget}
+                  />
+                ))}
+                {filteredAliases.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-text-muted p-12">
+                      No aliases found
+                    </td>
+                  </tr>
                 )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={originalId ? 'Edit Model' : 'Add Model'}
+          size="lg"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} isLoading={isSaving}>
+                Save Changes
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px' }}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col gap-1">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Primary Name (ID)
+                </label>
+                <input
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  value={editingAlias.id}
+                  onChange={(e) => setEditingAlias({ ...editingAlias, id: e.target.value })}
+                  placeholder="e.g. gpt-4-turbo"
+                />
               </div>
-              {isMetadataOpen ? (
-                <ChevronDown size={14} className="text-text-muted" />
-              ) : (
-                <ChevronRight size={14} className="text-text-muted" />
-              )}
-            </button>
 
-            {isMetadataOpen && (
-              <div
-                className="px-3 py-3 border-t border-border-glass"
-                style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+              <div className="flex flex-col gap-1">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Model Type
+                </label>
+                <select
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  value={editingAlias.type || 'chat'}
+                  onChange={(e) =>
+                    setEditingAlias({
+                      ...editingAlias,
+                      type: e.target.value as
+                        | 'chat'
+                        | 'embeddings'
+                        | 'transcriptions'
+                        | 'speech'
+                        | 'image'
+                        | 'responses',
+                    })
+                  }
+                >
+                  <option value="chat">Chat</option>
+                  <option value="embeddings">Embeddings</option>
+                  <option value="transcriptions">Transcriptions</option>
+                  <option value="speech">Speech</option>
+                  <option value="image">Image</option>
+                  <option value="responses">Responses</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Selector Strategy
+                </label>
+                <select
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  value={editingAlias.selector || 'random'}
+                  onChange={(e) => setEditingAlias({ ...editingAlias, selector: e.target.value })}
+                >
+                  <option value="random">Random</option>
+                  <option value="in_order">In Order</option>
+                  <option value="cost">Lowest Cost</option>
+                  <option value="latency">Lowest Latency</option>
+                  <option value="usage">Usage Balanced</option>
+                  <option value="performance">Best Performance</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Priority
+                </label>
+                <select
+                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  value={editingAlias.priority || 'selector'}
+                  onChange={(e) =>
+                    setEditingAlias({ ...editingAlias, priority: e.target.value as any })
+                  }
+                >
+                  <option value="selector">Selector</option>
+                  <option value="api_match">API Match</option>
+                </select>
+              </div>
+            </div>
+
+            <p className="text-xs text-text-muted" style={{ marginTop: '-4px' }}>
+              Priority: "Selector" uses the strategy above. "API Match" matches provider type to
+              incoming request format.
+            </p>
+
+            <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+
+            {/* Model Architecture accordion */}
+            <div className="border border-border-glass rounded-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsArchitectureOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
               >
-                <p className="font-body text-[11px] text-text-muted">
-                  Link this alias to a model in an external catalog. When configured, Plexus
-                  includes enriched metadata (name, context length, pricing, supported parameters)
-                  in the <code className="text-primary">GET /v1/models</code> response.
-                </p>
-
-                {/* Source selector */}
-                <div>
-                  <label
-                    className="font-body text-[12px] font-medium text-text-secondary"
-                    style={{ display: 'block', marginBottom: '4px' }}
-                  >
-                    Source
-                  </label>
-                  <select
-                    className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                    style={{ padding: '5px 8px', height: '30px' }}
-                    value={editingAlias.metadata?.source ?? 'openrouter'}
-                    onChange={(e) => {
-                      const source = e.target.value as MetadataSource;
-                      const prevSource = editingAlias.metadata?.source;
-                      const existingOverrides = editingAlias.metadata?.overrides;
-                      const existingSourcePath = editingAlias.metadata?.source_path;
-                      // Different catalogs use different path formats (e.g.
-                      // openrouter's "openai/gpt-4.1-nano" ≠ models.dev's
-                      // "openai.gpt-4.1-nano"), so a path from the old catalog
-                      // is always wrong under a new one. Only carry the path
-                      // when the source is unchanged or switching to 'custom'
-                      // (where source_path is a free-form label).
-                      const carryPath = prevSource === source || source === 'custom';
-                      const carriedSourcePath = carryPath ? existingSourcePath : undefined;
-                      let next: AliasMetadata;
-                      if (source === 'custom') {
-                        // Seed defaults, then layer any existing overrides on top so
-                        // user-typed values take precedence while missing required
-                        // fields (e.g., name) still have a sensible default. Nested
-                        // objects (architecture/pricing/top_provider) are merged
-                        // field-by-field so a partial user override (e.g. only
-                        // input_modalities) doesn't wipe default sibling fields
-                        // (e.g. output_modalities).
-                        const defaults = buildCustomDefaults(editingAlias.id);
-                        const existing = existingOverrides ?? {};
-                        const mergedOverrides = {
-                          ...defaults,
-                          ...existing,
-                          ...(defaults.pricing || existing.pricing
-                            ? {
-                                pricing: {
-                                  ...(defaults.pricing ?? {}),
-                                  ...(existing.pricing ?? {}),
-                                },
-                              }
-                            : {}),
-                          ...(defaults.architecture || existing.architecture
-                            ? {
-                                architecture: {
-                                  ...(defaults.architecture ?? {}),
-                                  ...(existing.architecture ?? {}),
-                                },
-                              }
-                            : {}),
-                          ...(defaults.top_provider || existing.top_provider
-                            ? {
-                                top_provider: {
-                                  ...(defaults.top_provider ?? {}),
-                                  ...(existing.top_provider ?? {}),
-                                },
-                              }
-                            : {}),
-                        } as MetadataOverrides & { name: string };
-                        next = {
-                          source: 'custom',
-                          ...(carriedSourcePath ? { source_path: carriedSourcePath } : {}),
-                          overrides: mergedOverrides,
-                        };
-                        setIsOverrideOpen(true);
-                      } else {
-                        next = {
-                          source,
-                          source_path: carriedSourcePath ?? '',
-                          ...(existingOverrides ? { overrides: existingOverrides } : {}),
-                        };
-                      }
-                      setEditingAlias({ ...editingAlias, metadata: next });
-                      // Changing catalogs (or switching to custom) can leave
-                      // a pending debounced search from the prior source that
-                      // would overwrite `metadataResults` with stale data; kill
-                      // it before any conditional re-run below.
-                      if (prevSource !== source) {
-                        cancelMetadataDebounce();
-                        setMetadataResults([]);
-                        setShowMetadataDropdown(false);
-                        setIsMetadataSearching(false);
-                      }
-                      // When we dropped the path, also clear the visible model
-                      // query input so it doesn't show a stale value that no
-                      // longer matches metadata.source_path.
-                      if (!carryPath) setMetadataQuery('');
-                      // Re-run search only when we kept the query (same catalog).
-                      if (carryPath && source !== 'custom' && metadataQuery)
-                        handleMetadataSearch(metadataQuery, source);
-                    }}
-                  >
-                    <option value="openrouter">OpenRouter</option>
-                    <option value="models.dev">models.dev</option>
-                    <option value="catwalk">Catwalk (Charm)</option>
-                    <option value="custom">Custom (manual entry)</option>
-                  </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Cpu size={13} className="text-text-muted" />
+                  <span className="font-body text-[13px] font-medium text-text-secondary">
+                    Model Architecture
+                  </span>
+                  {editingAlias.model_architecture?.total_params && (
+                    <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
+                      {editingAlias.model_architecture.total_params}B params
+                    </span>
+                  )}
                 </div>
+                {isArchitectureOpen ? (
+                  <ChevronDown size={14} className="text-text-muted" />
+                ) : (
+                  <ChevronRight size={14} className="text-text-muted" />
+                )}
+              </button>
 
-                {/* Search / source_path — hidden for 'custom' (no catalog) */}
-                {editingAlias.metadata?.source !== 'custom' && (
-                  <div style={{ position: 'relative' }}>
+              {isArchitectureOpen && (
+                <div
+                  className="px-3 py-3 border-t border-border-glass"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                >
+                  <p className="font-body text-[11px] text-text-muted">
+                    Fetch model architecture from Hugging Face or enter manually. These values are
+                    used for energy calculation.
+                  </p>
+
+                  {/* Display currently saved architecture values */}
+                  {editingAlias.model_architecture?.total_params && (
+                    <div className="px-3 py-2 bg-bg-subtle border border-border-glass rounded-md">
+                      <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
+                        Currently Saved:
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text">
+                        {editingAlias.model_architecture.total_params && (
+                          <span>{editingAlias.model_architecture.total_params}B params</span>
+                        )}
+                        {editingAlias.model_architecture.active_params && (
+                          <span>({editingAlias.model_architecture.active_params}B active)</span>
+                        )}
+                        {editingAlias.model_architecture.layers && (
+                          <span>{editingAlias.model_architecture.layers} layers</span>
+                        )}
+                        {editingAlias.model_architecture.heads && (
+                          <span>{editingAlias.model_architecture.heads} heads</span>
+                        )}
+                        {editingAlias.model_architecture.dtype && (
+                          <span className="text-primary">
+                            {editingAlias.model_architecture.dtype.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* HuggingFace Model ID input and fetch button */}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1">
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Hugging Face Model ID
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        value={hfModelId}
+                        onChange={(e) => setHfModelId(e.target.value)}
+                        placeholder="e.g. meta-llama/Llama-3.1-70B-Instruct"
+                        onKeyDown={(e) => e.key === 'Enter' && fetchHfModelArchitecture()}
+                      />
+                    </div>
+                    <Button
+                      onClick={fetchHfModelArchitecture}
+                      isLoading={isFetchingHfModel}
+                      disabled={isFetchingHfModel}
+                      variant="secondary"
+                      className="w-full sm:w-auto"
+                    >
+                      Fetch from HF
+                    </Button>
+                  </div>
+
+                  {hfFetchError && (
+                    <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
+                      {hfFetchError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-2 p-3 border border-border-glass rounded-md bg-bg-subtle sm:grid-cols-2">
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Total Params (B)
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={editingAlias.model_architecture?.total_params || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              total_params: parseFloat(e.target.value) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 1.76"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Active Params (B)
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={editingAlias.model_architecture?.active_params || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              active_params: parseFloat(e.target.value) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 1.76"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Layers
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={editingAlias.model_architecture?.layers || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              layers: parseInt(e.target.value, 10) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 120"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Heads
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={editingAlias.model_architecture?.heads || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              heads: parseInt(e.target.value, 10) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 96"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        KV LoRA Rank
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={editingAlias.model_architecture?.kv_lora_rank || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              kv_lora_rank: parseInt(e.target.value, 10) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 128"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        RoPE Head Dim
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={editingAlias.model_architecture?.qk_rope_head_dim || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              qk_rope_head_dim: parseInt(e.target.value, 10) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 96"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Context Length
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={editingAlias.model_architecture?.context_length || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              context_length: parseInt(e.target.value, 10) || undefined,
+                            },
+                          })
+                        }
+                        placeholder="e.g. 128000"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Data Type
+                      </label>
+                      <select
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        value={editingAlias.model_architecture?.dtype || ''}
+                        onChange={(e) =>
+                          setEditingAlias({
+                            ...editingAlias,
+                            model_architecture: {
+                              ...editingAlias.model_architecture,
+                              dtype: (e.target.value as any) || undefined,
+                            },
+                          })
+                        }
+                      >
+                        <option value="">Default (FP16)</option>
+                        <option value="fp16">FP16</option>
+                        <option value="bf16">BF16</option>
+                        <option value="fp8">FP8</option>
+                        <option value="fp8_e4m3">FP8 E4M3</option>
+                        <option value="fp8_e5m2">FP8 E5M2</option>
+                        <option value="nvfp4">NVFP4</option>
+                        <option value="int4">INT4</option>
+                        <option value="int8">INT8</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Advanced accordion */}
+            <div className="border border-border-glass rounded-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsAdvancedOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+              >
+                <span className="font-body text-[13px] font-medium text-text-secondary">
+                  Advanced
+                </span>
+                {isAdvancedOpen ? (
+                  <ChevronDown size={14} className="text-text-muted" />
+                ) : (
+                  <ChevronRight size={14} className="text-text-muted" />
+                )}
+              </button>
+
+              {isAdvancedOpen && (
+                <div
+                  className="px-3 py-3 border-t border-border-glass"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+                >
+                  {/* ── Behaviors ── */}
+                  <div>
+                    <label
+                      className="font-body text-[13px] font-medium text-text-secondary"
+                      style={{ display: 'block', marginBottom: '6px' }}
+                    >
+                      Behaviors
+                    </label>
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <span className="font-body text-[13px] text-text">
+                          Strip Adaptive Thinking
+                        </span>
+                        <p className="font-body text-[11px] text-text-muted mt-0.5">
+                          On the <code className="text-primary">/v1/messages</code> path, remove{' '}
+                          <code className="text-primary">thinking</code> when set to{' '}
+                          <code className="text-primary">adaptive</code> so the provider uses its
+                          default behaviour.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={getBehavior('strip_adaptive_thinking')}
+                        onChange={(val) => setBehavior('strip_adaptive_thinking', val)}
+                        size="sm"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <span className="font-body text-[13px] text-text">Vision Fallthrough</span>
+                        <p className="font-body text-[11px] text-text-muted mt-0.5">
+                          If the request contains images and the target model is text-only, use the
+                          descriptor model to convert images to text.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={editingAlias.use_image_fallthrough || false}
+                        onChange={(val) =>
+                          setEditingAlias({ ...editingAlias, use_image_fallthrough: val })
+                        }
+                        size="sm"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <span className="font-body text-[13px] text-text">Enforce Limits</span>
+                        <p className="font-body text-[11px] text-text-muted mt-0.5">
+                          Reject oversized prompts locally (400 context_length_exceeded) before
+                          dispatch. Uses a fast heuristic estimator with a 10% safety margin, and
+                          reserves the smaller of max_tokens and the model's max completion for the
+                          response. Requires a known context_length in metadata (override or
+                          catalog).
+                        </p>
+                        {editingAlias.enforce_limits &&
+                          !editingAlias.metadata?.overrides?.context_length &&
+                          !editingAlias.metadata?.overrides?.top_provider?.context_length && (
+                            <p
+                              className="font-body text-[11px] mt-1 flex items-center gap-1"
+                              style={{ color: 'var(--color-warning)' }}
+                            >
+                              <AlertTriangle size={12} />
+                              No context_length found in metadata — this toggle will have no effect
+                              until a metadata source with a known context_length is configured.
+                            </p>
+                          )}
+                      </div>
+                      <Switch
+                        checked={editingAlias.enforce_limits || false}
+                        onChange={(val) =>
+                          setEditingAlias({ ...editingAlias, enforce_limits: val })
+                        }
+                        size="sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-border-glass"></div>
+
+                  {/* ── Additional Aliases ── */}
+                  <div>
+                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <label
+                        className="font-body text-[13px] font-medium text-text-secondary"
+                        style={{ marginBottom: 0 }}
+                      >
+                        Additional Aliases
+                      </label>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={addAlias}
+                        leftIcon={<Plus size={14} />}
+                      >
+                        Add Alias
+                      </Button>
+                    </div>
+
+                    {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
+                      <div className="text-text-muted italic text-center text-sm py-2">
+                        No additional aliases
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {editingAlias.aliases?.map((alias, idx) => (
+                        <div key={idx} className="flex gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              value={alias}
+                              onChange={(e) => updateAlias(idx, e.target.value)}
+                              placeholder="e.g. gpt4"
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAlias(idx)}
+                            style={{ color: 'var(--color-danger)' }}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+
+            {/* Metadata accordion */}
+            <div className="border border-border-glass rounded-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsMetadataOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BookOpen size={13} className="text-text-muted" />
+                  <span className="font-body text-[13px] font-medium text-text-secondary">
+                    Metadata
+                  </span>
+                  {editingAlias.metadata && (
+                    <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
+                      {editingAlias.metadata.source}
+                    </span>
+                  )}
+                </div>
+                {isMetadataOpen ? (
+                  <ChevronDown size={14} className="text-text-muted" />
+                ) : (
+                  <ChevronRight size={14} className="text-text-muted" />
+                )}
+              </button>
+
+              {isMetadataOpen && (
+                <div
+                  className="px-3 py-3 border-t border-border-glass"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+                >
+                  <p className="font-body text-[11px] text-text-muted">
+                    Link this alias to a model in an external catalog. When configured, Plexus
+                    includes enriched metadata (name, context length, pricing, supported parameters)
+                    in the <code className="text-primary">GET /v1/models</code> response.
+                  </p>
+
+                  {/* Source selector */}
+                  <div>
                     <label
                       className="font-body text-[12px] font-medium text-text-secondary"
                       style={{ display: 'block', marginBottom: '4px' }}
                     >
-                      Model
-                      {editingAlias.metadata?.source_path && (
-                        <span className="ml-2 font-normal text-text-muted">
-                          ({editingAlias.metadata.source_path})
-                        </span>
-                      )}
+                      Source
                     </label>
-                    <div style={{ position: 'relative', display: 'flex', gap: '4px' }}>
-                      <div ref={metadataInputWrapperRef} style={{ position: 'relative', flex: 1 }}>
-                        <Input
-                          value={metadataQuery}
-                          onChange={(e) => {
-                            const source = editingAlias.metadata?.source ?? 'openrouter';
-                            handleMetadataSearch(e.target.value, source);
-                            // Update rect so portal dropdown follows the input
-                            if (metadataInputWrapperRef.current) {
-                              const r = metadataInputWrapperRef.current.getBoundingClientRect();
-                              setDropdownRect({ top: r.bottom + 2, left: r.left, width: r.width });
-                            }
-                          }}
-                          onFocus={() => {
-                            if (metadataResults.length > 0) {
+                    <select
+                      className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                      style={{ padding: '5px 8px', height: '30px' }}
+                      value={editingAlias.metadata?.source ?? 'openrouter'}
+                      onChange={(e) => {
+                        const source = e.target.value as MetadataSource;
+                        const prevSource = editingAlias.metadata?.source;
+                        const existingOverrides = editingAlias.metadata?.overrides;
+                        const existingSourcePath = editingAlias.metadata?.source_path;
+                        // Different catalogs use different path formats (e.g.
+                        // openrouter's "openai/gpt-4.1-nano" ≠ models.dev's
+                        // "openai.gpt-4.1-nano"), so a path from the old catalog
+                        // is always wrong under a new one. Only carry the path
+                        // when the source is unchanged or switching to 'custom'
+                        // (where source_path is a free-form label).
+                        const carryPath = prevSource === source || source === 'custom';
+                        const carriedSourcePath = carryPath ? existingSourcePath : undefined;
+                        let next: AliasMetadata;
+                        if (source === 'custom') {
+                          // Seed defaults, then layer any existing overrides on top so
+                          // user-typed values take precedence while missing required
+                          // fields (e.g., name) still have a sensible default. Nested
+                          // objects (architecture/pricing/top_provider) are merged
+                          // field-by-field so a partial user override (e.g. only
+                          // input_modalities) doesn't wipe default sibling fields
+                          // (e.g. output_modalities).
+                          const defaults = buildCustomDefaults(editingAlias.id);
+                          const existing = existingOverrides ?? {};
+                          const mergedOverrides = {
+                            ...defaults,
+                            ...existing,
+                            ...(defaults.pricing || existing.pricing
+                              ? {
+                                  pricing: {
+                                    ...(defaults.pricing ?? {}),
+                                    ...(existing.pricing ?? {}),
+                                  },
+                                }
+                              : {}),
+                            ...(defaults.architecture || existing.architecture
+                              ? {
+                                  architecture: {
+                                    ...(defaults.architecture ?? {}),
+                                    ...(existing.architecture ?? {}),
+                                  },
+                                }
+                              : {}),
+                            ...(defaults.top_provider || existing.top_provider
+                              ? {
+                                  top_provider: {
+                                    ...(defaults.top_provider ?? {}),
+                                    ...(existing.top_provider ?? {}),
+                                  },
+                                }
+                              : {}),
+                          } as MetadataOverrides & { name: string };
+                          next = {
+                            source: 'custom',
+                            ...(carriedSourcePath ? { source_path: carriedSourcePath } : {}),
+                            overrides: mergedOverrides,
+                          };
+                          setIsOverrideOpen(true);
+                        } else {
+                          next = {
+                            source,
+                            source_path: carriedSourcePath ?? '',
+                            ...(existingOverrides ? { overrides: existingOverrides } : {}),
+                          };
+                        }
+                        setEditingAlias({ ...editingAlias, metadata: next });
+                        // Changing catalogs (or switching to custom) can leave
+                        // a pending debounced search from the prior source that
+                        // would overwrite `metadataResults` with stale data; kill
+                        // it before any conditional re-run below.
+                        if (prevSource !== source) {
+                          cancelMetadataDebounce();
+                          setMetadataResults([]);
+                          setShowMetadataDropdown(false);
+                          setIsMetadataSearching(false);
+                        }
+                        // When we dropped the path, also clear the visible model
+                        // query input so it doesn't show a stale value that no
+                        // longer matches metadata.source_path.
+                        if (!carryPath) setMetadataQuery('');
+                        // Re-run search only when we kept the query (same catalog).
+                        if (carryPath && source !== 'custom' && metadataQuery)
+                          handleMetadataSearch(metadataQuery, source);
+                      }}
+                    >
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="models.dev">models.dev</option>
+                      <option value="catwalk">Catwalk (Charm)</option>
+                      <option value="custom">Custom (manual entry)</option>
+                    </select>
+                  </div>
+
+                  {/* Search / source_path — hidden for 'custom' (no catalog) */}
+                  {editingAlias.metadata?.source !== 'custom' && (
+                    <div style={{ position: 'relative' }}>
+                      <label
+                        className="font-body text-[12px] font-medium text-text-secondary"
+                        style={{ display: 'block', marginBottom: '4px' }}
+                      >
+                        Model
+                        {editingAlias.metadata?.source_path && (
+                          <span className="ml-2 font-normal text-text-muted">
+                            ({editingAlias.metadata.source_path})
+                          </span>
+                        )}
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', gap: '4px' }}>
+                        <div
+                          ref={metadataInputWrapperRef}
+                          style={{ position: 'relative', flex: 1 }}
+                        >
+                          <Input
+                            value={metadataQuery}
+                            onChange={(e) => {
+                              const source = editingAlias.metadata?.source ?? 'openrouter';
+                              handleMetadataSearch(e.target.value, source);
+                              // Update rect so portal dropdown follows the input
                               if (metadataInputWrapperRef.current) {
                                 const r = metadataInputWrapperRef.current.getBoundingClientRect();
                                 setDropdownRect({
@@ -1728,688 +1906,702 @@ export const Models = () => {
                                   width: r.width,
                                 });
                               }
-                              setShowMetadataDropdown(true);
-                            }
-                          }}
-                          placeholder={`Search ${editingAlias.metadata?.source ?? 'openrouter'} catalog...`}
-                          style={{
-                            width: '100%',
-                            paddingRight: isMetadataSearching ? '28px' : undefined,
-                          }}
-                          onBlur={() => setShowMetadataDropdown(false)}
-                        />
-                        {isMetadataSearching && (
-                          <Loader2
-                            size={14}
-                            className="animate-spin text-text-muted"
-                            style={{
-                              position: 'absolute',
-                              right: '8px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
                             }}
+                            onFocus={() => {
+                              if (metadataResults.length > 0) {
+                                if (metadataInputWrapperRef.current) {
+                                  const r = metadataInputWrapperRef.current.getBoundingClientRect();
+                                  setDropdownRect({
+                                    top: r.bottom + 2,
+                                    left: r.left,
+                                    width: r.width,
+                                  });
+                                }
+                                setShowMetadataDropdown(true);
+                              }
+                            }}
+                            placeholder={`Search ${editingAlias.metadata?.source ?? 'openrouter'} catalog...`}
+                            style={{
+                              width: '100%',
+                              paddingRight: isMetadataSearching ? '28px' : undefined,
+                            }}
+                            onBlur={() => setShowMetadataDropdown(false)}
                           />
+                          {isMetadataSearching && (
+                            <Loader2
+                              size={14}
+                              className="animate-spin text-text-muted"
+                              style={{
+                                position: 'absolute',
+                                right: '8px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                              }}
+                            />
+                          )}
+                        </div>
+                        {editingAlias.metadata && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearMetadata}
+                            style={{
+                              color: 'var(--color-danger)',
+                              padding: '4px',
+                              minHeight: 'auto',
+                            }}
+                            title="Remove metadata"
+                          >
+                            <X size={14} />
+                          </Button>
                         )}
                       </div>
-                      {editingAlias.metadata && (
+                    </div>
+                  )}
+
+                  {/* Selected metadata preview */}
+                  {editingAlias.metadata &&
+                    (editingAlias.metadata.source === 'custom' ||
+                      editingAlias.metadata.source_path ||
+                      editingAlias.metadata.overrides) && (
+                      <div
+                        className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
+                        style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle size={12} className="text-success" />
+                          <span>
+                            {editingAlias.metadata.source === 'custom' ? (
+                              <>
+                                Custom metadata
+                                {editingAlias.metadata.source_path && (
+                                  <>
+                                    :{' '}
+                                    <code className="text-primary">
+                                      {editingAlias.metadata.source_path}
+                                    </code>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                Metadata assigned from{' '}
+                                <strong>{editingAlias.metadata.source}</strong>
+                                {editingAlias.metadata.source_path && (
+                                  <>
+                                    :{' '}
+                                    <code className="text-primary">
+                                      {editingAlias.metadata.source_path}
+                                    </code>
+                                  </>
+                                )}
+                              </>
+                            )}
+                            {countOverrides(editingAlias.metadata) > 0 && (
+                              <span className="ml-2 text-text-muted">
+                                + {countOverrides(editingAlias.metadata)} field
+                                {countOverrides(editingAlias.metadata) === 1 ? '' : 's'} overridden
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Override toggle + editable form */}
+                  {editingAlias.metadata && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {editingAlias.metadata.source !== 'custom' && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <label
+                            className="font-body text-[12px] font-medium text-text-secondary"
+                            style={{ marginBottom: 0 }}
+                          >
+                            Override catalog fields
+                          </label>
+                          <Switch
+                            checked={isOverrideOpen}
+                            onChange={(v) => {
+                              setIsOverrideOpen(v);
+                              if (!v) {
+                                // Flipping override off clears any existing overrides.
+                                const current = editingAlias.metadata;
+                                if (current) {
+                                  const { overrides: _o, ...rest } = current;
+                                  setEditingAlias({
+                                    ...editingAlias,
+                                    metadata: rest as AliasMetadata,
+                                  });
+                                }
+                              } else {
+                                // Flipping override on auto-populates the form with
+                                // the catalog's current values so the user sees what
+                                // they're overriding instead of a blank form.
+                                const cur = editingAlias.metadata;
+                                if (cur && cur.source !== 'custom' && cur.source_path) {
+                                  populateOverridesFromCatalog(cur.source, cur.source_path);
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {(isOverrideOpen || editingAlias.metadata.source === 'custom') && (
+                        <MetadataOverrideForm
+                          overrides={editingAlias.metadata.overrides ?? {}}
+                          isCustom={editingAlias.metadata.source === 'custom'}
+                          onSetField={setOverrideField}
+                          onSetPricing={setPricingField}
+                          onSetArchitecture={setArchitectureField}
+                          onSetTopProvider={setTopProviderField}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+
+            <div>
+              <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <label
+                  className="font-body text-[13px] font-medium text-text-secondary"
+                  style={{ marginBottom: 0 }}
+                >
+                  Targets
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleOpenAutoAdd}
+                    leftIcon={<Zap size={14} />}
+                  >
+                    Auto Add
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={addTarget}
+                    leftIcon={<Plus size={14} />}
+                  >
+                    Add Target
+                  </Button>
+                </div>
+              </div>
+
+              {editingAlias.targets.length === 0 && (
+                <div className="text-text-muted italic text-center text-sm py-2">
+                  No targets configured (Model will not work)
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {editingAlias.targets.map((target, idx) => {
+                  const isDragging = dragSourceIndex === idx;
+                  const isDragOver = dragOverIndex === idx && !isDragging;
+
+                  return (
+                    <div
+                      key={idx}
+                      draggable
+                      className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      style={{
+                        padding: '4px 8px',
+                        backgroundColor: isDragging
+                          ? 'transparent'
+                          : isDragOver
+                            ? 'rgba(245, 158, 11, 0.05)'
+                            : 'var(--color-bg-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: isDragging
+                          ? '1px dashed var(--color-border-glass)'
+                          : isDragOver
+                            ? '2px solid var(--color-primary)'
+                            : '1px solid var(--color-border-glass)',
+                        cursor: 'grab',
+                        opacity: isDragging ? 0.4 : 1,
+                        transform: isDragOver ? 'translateY(2px)' : 'none',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                      }}
+                      onDragStartCapture={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.cursor = 'grabbing';
+                      }}
+                      onDragEndCapture={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.cursor = 'grab';
+                      }}
+                    >
+                      {isDragOver && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: dragSourceIndex !== null && dragSourceIndex < idx ? 'auto' : -2,
+                            bottom: dragSourceIndex !== null && dragSourceIndex > idx ? 'auto' : -2,
+                            left: 0,
+                            right: 0,
+                            height: '2px',
+                            backgroundColor: 'var(--color-primary)',
+                            zIndex: 20,
+                          }}
+                        />
+                      )}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: 'var(--color-text-secondary)',
+                          opacity: 0.8,
+                          marginRight: '4px',
+                          visibility: isDragging ? 'hidden' : 'visible',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveTarget(idx, 'up');
+                          }}
+                          disabled={idx === 0}
+                          className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: idx === 0 ? 'default' : 'pointer',
+                          }}
+                          title="Move Up"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveTarget(idx, 'down');
+                          }}
+                          disabled={idx === editingAlias.targets.length - 1}
+                          className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: idx === editingAlias.targets.length - 1 ? 'default' : 'pointer',
+                          }}
+                          title="Move Down"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          cursor: 'grab',
+                          color: 'var(--color-text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          visibility: isDragging ? 'hidden' : 'visible',
+                        }}
+                      >
+                        <GripVertical size={16} />
+                      </div>
+                      <div
+                        className="w-full sm:w-[120px] sm:max-w-[120px] sm:flex-none"
+                        style={{
+                          visibility: isDragging ? 'hidden' : 'visible',
+                        }}
+                      >
+                        <select
+                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                          style={{ padding: '4px 8px', height: '28px' }}
+                          value={target.provider}
+                          onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
+                        >
+                          <option value="">Select Provider...</option>
+                          {providers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div
+                        className="w-full min-w-0 sm:flex-1"
+                        style={{ visibility: isDragging ? 'hidden' : 'visible' }}
+                      >
+                        <select
+                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                          style={{ padding: '4px 8px', height: '28px' }}
+                          value={target.model}
+                          onChange={(e) => updateTarget(idx, 'model', e.target.value)}
+                          disabled={!target.provider}
+                        >
+                          <option value="">Select Model...</option>
+                          {availableModels
+                            .filter((m) => m.providerId === target.provider)
+                            .map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
+                        <Switch
+                          checked={target.enabled !== false}
+                          onChange={(val) => updateTarget(idx, 'enabled', val)}
+                          size="sm"
+                        />
+                      </div>
+                      <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={clearMetadata}
+                          onClick={() => removeTarget(idx)}
                           style={{
                             color: 'var(--color-danger)',
                             padding: '4px',
                             minHeight: 'auto',
                           }}
-                          title="Remove metadata"
                         >
-                          <X size={14} />
+                          <Trash2 size={14} />
                         </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Selected metadata preview */}
-                {editingAlias.metadata &&
-                  (editingAlias.metadata.source === 'custom' ||
-                    editingAlias.metadata.source_path ||
-                    editingAlias.metadata.overrides) && (
-                    <div
-                      className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
-                      style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CheckCircle size={12} className="text-success" />
-                        <span>
-                          {editingAlias.metadata.source === 'custom' ? (
-                            <>
-                              Custom metadata
-                              {editingAlias.metadata.source_path && (
-                                <>
-                                  :{' '}
-                                  <code className="text-primary">
-                                    {editingAlias.metadata.source_path}
-                                  </code>
-                                </>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              Metadata assigned from <strong>{editingAlias.metadata.source}</strong>
-                              {editingAlias.metadata.source_path && (
-                                <>
-                                  :{' '}
-                                  <code className="text-primary">
-                                    {editingAlias.metadata.source_path}
-                                  </code>
-                                </>
-                              )}
-                            </>
-                          )}
-                          {countOverrides(editingAlias.metadata) > 0 && (
-                            <span className="ml-2 text-text-muted">
-                              + {countOverrides(editingAlias.metadata)} field
-                              {countOverrides(editingAlias.metadata) === 1 ? '' : 's'} overridden
-                            </span>
-                          )}
-                        </span>
                       </div>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Modal>
 
-                {/* Override toggle + editable form */}
-                {editingAlias.metadata && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {editingAlias.metadata.source !== 'custom' && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
+        <Modal
+          isOpen={isAutoAddModalOpen}
+          onClose={() => setIsAutoAddModalOpen(false)}
+          title="Auto Add Targets"
+          size="lg"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button variant="ghost" onClick={() => setIsAutoAddModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddSelectedModels} disabled={selectedModels.size === 0}>
+                Add {selectedModels.size} Target{selectedModels.size !== 1 ? 's' : ''}
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="min-w-0 flex-1">
+                <Input
+                  placeholder="Search models (e.g. 'gpt-4', 'claude')"
+                  value={substring}
+                  onChange={(e) => setSubstring(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchModels()}
+                />
+              </div>
+              <Button onClick={() => handleSearchModels()} className="w-full sm:w-auto">
+                Search
+              </Button>
+            </div>
+
+            {filteredModels.length > 0 ? (
+              <div
+                style={{
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  overflowX: 'auto',
+                  border: '1px solid var(--color-border-glass)',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <table className="w-full border-collapse font-body text-[13px]">
+                  <thead
+                    style={{
+                      position: 'sticky',
+                      top: 0,
+                      backgroundColor: 'var(--color-bg-hover)',
+                      zIndex: 10,
+                    }}
+                  >
+                    <tr>
+                      <th
+                        className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                        style={{ width: '40px' }}
                       >
-                        <label
-                          className="font-body text-[12px] font-medium text-text-secondary"
-                          style={{ marginBottom: 0 }}
-                        >
-                          Override catalog fields
-                        </label>
-                        <Switch
-                          checked={isOverrideOpen}
-                          onChange={(v) => {
-                            setIsOverrideOpen(v);
-                            if (!v) {
-                              // Flipping override off clears any existing overrides.
-                              const current = editingAlias.metadata;
-                              if (current) {
-                                const { overrides: _o, ...rest } = current;
-                                setEditingAlias({
-                                  ...editingAlias,
-                                  metadata: rest as AliasMetadata,
-                                });
-                              }
+                        <input
+                          type="checkbox"
+                          checked={
+                            filteredModels.length > 0 &&
+                            filteredModels.every(
+                              (m) =>
+                                selectedModels.has(`${m.provider.id}|${m.model.id}`) ||
+                                editingAlias.targets.some(
+                                  (t) => t.provider === m.provider.id && t.model === m.model.id
+                                )
+                            )
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const newSelection = new Set(selectedModels);
+                              filteredModels.forEach((m) => {
+                                const key = `${m.provider.id}|${m.model.id}`;
+                                if (
+                                  !editingAlias.targets.some(
+                                    (t) => t.provider === m.provider.id && t.model === m.model.id
+                                  )
+                                ) {
+                                  newSelection.add(key);
+                                }
+                              });
+                              setSelectedModels(newSelection);
                             } else {
-                              // Flipping override on auto-populates the form with
-                              // the catalog's current values so the user sees what
-                              // they're overriding instead of a blank form.
-                              const cur = editingAlias.metadata;
-                              if (cur && cur.source !== 'custom' && cur.source_path) {
-                                populateOverridesFromCatalog(cur.source, cur.source_path);
-                              }
+                              const newSelection = new Set(selectedModels);
+                              filteredModels.forEach((m) => {
+                                newSelection.delete(`${m.provider.id}|${m.model.id}`);
+                              });
+                              setSelectedModels(newSelection);
                             }
                           }}
                         />
-                      </div>
-                    )}
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Provider
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Model
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredModels.map(({ model, provider }) => {
+                      const key = `${provider.id}|${model.id}`;
+                      const alreadyExists = editingAlias.targets.some(
+                        (t) => t.provider === provider.id && t.model === model.id
+                      );
+                      const isSelected = selectedModels.has(key);
+                      const isDisabled = alreadyExists;
 
-                    {(isOverrideOpen || editingAlias.metadata.source === 'custom') && (
-                      <MetadataOverrideForm
-                        overrides={editingAlias.metadata.overrides ?? {}}
-                        isCustom={editingAlias.metadata.source === 'custom'}
-                        onSetField={setOverrideField}
-                        onSetPricing={setPricingField}
-                        onSetArchitecture={setArchitectureField}
-                        onSetTopProvider={setTopProviderField}
-                      />
-                    )}
-                  </div>
-                )}
+                      return (
+                        <tr
+                          key={key}
+                          className="hover:bg-bg-hover"
+                          style={{ opacity: isDisabled ? 0.5 : 1 }}
+                        >
+                          <td className="px-4 py-3 text-left text-text">
+                            <input
+                              type="checkbox"
+                              checked={isSelected || alreadyExists}
+                              disabled={isDisabled}
+                              onChange={() => handleToggleModelSelection(model.id, provider.id)}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-left text-text">{provider.name}</td>
+                          <td className="px-4 py-3 text-left text-text">
+                            {model.name}
+                            {alreadyExists && (
+                              <span
+                                style={{
+                                  marginLeft: '8px',
+                                  fontSize: '11px',
+                                  color: 'var(--color-text-secondary)',
+                                  fontStyle: 'italic',
+                                }}
+                              >
+                                (already added)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : substring ? (
+              <div className="text-text-muted italic text-center text-sm py-8">
+                No models found matching "{substring}"
+              </div>
+            ) : (
+              <div className="text-text-muted italic text-center text-sm py-8">
+                Enter a search term to find models
               </div>
             )}
           </div>
+        </Modal>
 
-          <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
-
-          <div>
+        <Modal
+          isOpen={isDeleteAllModalOpen}
+          onClose={() => setIsDeleteAllModalOpen(false)}
+          title="Delete All Models"
+          size="sm"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button
+                variant="ghost"
+                onClick={() => setIsDeleteAllModalOpen(false)}
+                disabled={isDeletingAll}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmDeleteAll} isLoading={isDeletingAll} variant="danger">
+                Delete All
+              </Button>
+            </div>
+          }
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '16px 0',
+            }}
+          >
             <div
               style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '4px',
+                justifyContent: 'center',
               }}
             >
-              <label
-                className="font-body text-[13px] font-medium text-text-secondary"
-                style={{ marginBottom: 0 }}
+              <Trash2 size={24} style={{ color: 'var(--color-danger)' }} />
+            </div>
+            <div>
+              <p className="text-text" style={{ marginBottom: '8px', fontWeight: 500 }}>
+                Are you sure you want to delete all configured models?
+              </p>
+              <p className="text-text-secondary" style={{ fontSize: '14px' }}>
+                This will permanently remove <strong>{aliases.length}</strong> model alias
+                {aliases.length !== 1 ? 'es' : ''} from the configuration.
+              </p>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          title="Delete Model Alias"
+          size="sm"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button
+                variant="ghost"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeleting}
               >
-                Targets
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleOpenAutoAdd}
-                  leftIcon={<Zap size={14} />}
-                >
-                  Auto Add
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={addTarget}
-                  leftIcon={<Plus size={14} />}
-                >
-                  Add Target
-                </Button>
-              </div>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmDelete} isLoading={isDeleting} variant="danger">
+                Delete
+              </Button>
             </div>
-
-            {editingAlias.targets.length === 0 && (
-              <div className="text-text-muted italic text-center text-sm py-2">
-                No targets configured (Model will not work)
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {editingAlias.targets.map((target, idx) => {
-                const isDragging = dragSourceIndex === idx;
-                const isDragOver = dragOverIndex === idx && !isDragging;
-
-                return (
-                  <div
-                    key={idx}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, idx)}
-                    onDragOver={(e) => handleDragOver(e, idx)}
-                    onDragEnd={handleDragEnd}
-                    onDrop={(e) => handleDrop(e, idx)}
-                    style={{
-                      display: 'flex',
-                      gap: '6px',
-                      alignItems: 'center',
-                      padding: '4px 8px',
-                      backgroundColor: isDragging
-                        ? 'transparent'
-                        : isDragOver
-                          ? 'rgba(245, 158, 11, 0.05)'
-                          : 'var(--color-bg-subtle)',
-                      borderRadius: 'var(--radius-sm)',
-                      border: isDragging
-                        ? '1px dashed var(--color-border-glass)'
-                        : isDragOver
-                          ? '2px solid var(--color-primary)'
-                          : '1px solid var(--color-border-glass)',
-                      cursor: 'grab',
-                      opacity: isDragging ? 0.4 : 1,
-                      transform: isDragOver ? 'translateY(2px)' : 'none',
-                      transition: 'all 0.2s ease',
-                      position: 'relative',
-                    }}
-                    onDragStartCapture={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.cursor = 'grabbing';
-                    }}
-                    onDragEndCapture={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.cursor = 'grab';
-                    }}
-                  >
-                    {isDragOver && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: dragSourceIndex !== null && dragSourceIndex < idx ? 'auto' : -2,
-                          bottom: dragSourceIndex !== null && dragSourceIndex > idx ? 'auto' : -2,
-                          left: 0,
-                          right: 0,
-                          height: '2px',
-                          backgroundColor: 'var(--color-primary)',
-                          zIndex: 20,
-                        }}
-                      />
-                    )}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        color: 'var(--color-text-secondary)',
-                        opacity: 0.8,
-                        marginRight: '4px',
-                        visibility: isDragging ? 'hidden' : 'visible',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveTarget(idx, 'up');
-                        }}
-                        disabled={idx === 0}
-                        className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px',
-                          cursor: idx === 0 ? 'default' : 'pointer',
-                        }}
-                        title="Move Up"
-                      >
-                        <ChevronUp size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveTarget(idx, 'down');
-                        }}
-                        disabled={idx === editingAlias.targets.length - 1}
-                        className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px',
-                          cursor: idx === editingAlias.targets.length - 1 ? 'default' : 'pointer',
-                        }}
-                        title="Move Down"
-                      >
-                        <ChevronDown size={16} />
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        cursor: 'grab',
-                        color: 'var(--color-text-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        visibility: isDragging ? 'hidden' : 'visible',
-                      }}
-                    >
-                      <GripVertical size={16} />
-                    </div>
-                    <div
-                      style={{
-                        flex: '0 0 120px',
-                        maxWidth: '120px',
-                        visibility: isDragging ? 'hidden' : 'visible',
-                      }}
-                    >
-                      <select
-                        className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                        style={{ padding: '4px 8px', height: '28px' }}
-                        value={target.provider}
-                        onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
-                      >
-                        <option value="">Select Provider...</option>
-                        {providers.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ flex: 1, visibility: isDragging ? 'hidden' : 'visible' }}>
-                      <select
-                        className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                        style={{ padding: '4px 8px', height: '28px' }}
-                        value={target.model}
-                        onChange={(e) => updateTarget(idx, 'model', e.target.value)}
-                        disabled={!target.provider}
-                      >
-                        <option value="">Select Model...</option>
-                        {availableModels
-                          .filter((m) => m.providerId === target.provider)
-                          .map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                    <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
-                      <Switch
-                        checked={target.enabled !== false}
-                        onChange={(val) => updateTarget(idx, 'enabled', val)}
-                        size="sm"
-                      />
-                    </div>
-                    <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeTarget(idx)}
-                        style={{ color: 'var(--color-danger)', padding: '4px', minHeight: 'auto' }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isAutoAddModalOpen}
-        onClose={() => setIsAutoAddModalOpen(false)}
-        title="Auto Add Targets"
-        size="lg"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <Button variant="ghost" onClick={() => setIsAutoAddModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddSelectedModels} disabled={selectedModels.size === 0}>
-              Add {selectedModels.size} Target{selectedModels.size !== 1 ? 's' : ''}
-            </Button>
-          </div>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Input
-              placeholder="Search models (e.g. 'gpt-4', 'claude')"
-              value={substring}
-              onChange={(e) => setSubstring(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearchModels()}
-              style={{ flex: 1 }}
-            />
-            <Button onClick={() => handleSearchModels()}>Search</Button>
-          </div>
-
-          {filteredModels.length > 0 ? (
+          }
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '16px 0',
+            }}
+          >
             <div
               style={{
-                maxHeight: '400px',
-                overflowY: 'auto',
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Trash2 size={24} style={{ color: 'var(--color-danger)' }} />
+            </div>
+            <div>
+              <p className="text-text" style={{ marginBottom: '8px', fontWeight: 500 }}>
+                Are you sure you want to delete this alias?
+              </p>
+              <p className="text-text-secondary" style={{ fontSize: '14px' }}>
+                <strong>{aliasToDelete?.id}</strong> will be permanently removed from the
+                configuration.
+              </p>
+            </div>
+          </div>
+        </Modal>
+        {/* Metadata autocomplete portal — rendered outside accordion to avoid overflow:hidden clipping */}
+        {showMetadataDropdown &&
+          metadataResults.length > 0 &&
+          dropdownRect &&
+          createPortal(
+            <div
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                position: 'fixed',
+                top: dropdownRect.top,
+                left: dropdownRect.left,
+                width: dropdownRect.width,
+                zIndex: 9999,
+                backgroundColor: '#1E293B',
                 border: '1px solid var(--color-border-glass)',
                 borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                maxHeight: '180px',
+                overflowY: 'auto',
               }}
             >
-              <table className="w-full border-collapse font-body text-[13px]">
-                <thead
-                  style={{
-                    position: 'sticky',
-                    top: 0,
-                    backgroundColor: 'var(--color-bg-hover)',
-                    zIndex: 10,
+              {metadataResults.map((result) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectMetadataResult(result);
                   }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '6px 10px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--color-border-glass)',
+                  }}
+                  className="hover:bg-bg-hover transition-colors"
                 >
-                  <tr>
-                    <th
-                      className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                      style={{ width: '40px' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={
-                          filteredModels.length > 0 &&
-                          filteredModels.every(
-                            (m) =>
-                              selectedModels.has(`${m.provider.id}|${m.model.id}`) ||
-                              editingAlias.targets.some(
-                                (t) => t.provider === m.provider.id && t.model === m.model.id
-                              )
-                          )
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const newSelection = new Set(selectedModels);
-                            filteredModels.forEach((m) => {
-                              const key = `${m.provider.id}|${m.model.id}`;
-                              if (
-                                !editingAlias.targets.some(
-                                  (t) => t.provider === m.provider.id && t.model === m.model.id
-                                )
-                              ) {
-                                newSelection.add(key);
-                              }
-                            });
-                            setSelectedModels(newSelection);
-                          } else {
-                            const newSelection = new Set(selectedModels);
-                            filteredModels.forEach((m) => {
-                              newSelection.delete(`${m.provider.id}|${m.model.id}`);
-                            });
-                            setSelectedModels(newSelection);
-                          }
-                        }}
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Provider
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Model
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredModels.map(({ model, provider }) => {
-                    const key = `${provider.id}|${model.id}`;
-                    const alreadyExists = editingAlias.targets.some(
-                      (t) => t.provider === provider.id && t.model === model.id
-                    );
-                    const isSelected = selectedModels.has(key);
-                    const isDisabled = alreadyExists;
-
-                    return (
-                      <tr
-                        key={key}
-                        className="hover:bg-bg-hover"
-                        style={{ opacity: isDisabled ? 0.5 : 1 }}
-                      >
-                        <td className="px-4 py-3 text-left text-text">
-                          <input
-                            type="checkbox"
-                            checked={isSelected || alreadyExists}
-                            disabled={isDisabled}
-                            onChange={() => handleToggleModelSelection(model.id, provider.id)}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-left text-text">{provider.name}</td>
-                        <td className="px-4 py-3 text-left text-text">
-                          {model.name}
-                          {alreadyExists && (
-                            <span
-                              style={{
-                                marginLeft: '8px',
-                                fontSize: '11px',
-                                color: 'var(--color-text-secondary)',
-                                fontStyle: 'italic',
-                              }}
-                            >
-                              (already added)
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : substring ? (
-            <div className="text-text-muted italic text-center text-sm py-8">
-              No models found matching "{substring}"
-            </div>
-          ) : (
-            <div className="text-text-muted italic text-center text-sm py-8">
-              Enter a search term to find models
-            </div>
+                  <div className="font-body text-[12px] font-medium text-text">{result.name}</div>
+                  <div className="font-body text-[10px] text-text-muted">{result.id}</div>
+                </button>
+              ))}
+            </div>,
+            document.body
           )}
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isDeleteAllModalOpen}
-        onClose={() => setIsDeleteAllModalOpen(false)}
-        title="Delete All Models"
-        size="sm"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <Button
-              variant="ghost"
-              onClick={() => setIsDeleteAllModalOpen(false)}
-              disabled={isDeletingAll}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmDeleteAll} isLoading={isDeletingAll} variant="danger">
-              Delete All
-            </Button>
-          </div>
-        }
-      >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            alignItems: 'center',
-            textAlign: 'center',
-            padding: '16px 0',
-          }}
-        >
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Trash2 size={24} style={{ color: 'var(--color-danger)' }} />
-          </div>
-          <div>
-            <p className="text-text" style={{ marginBottom: '8px', fontWeight: 500 }}>
-              Are you sure you want to delete all configured models?
-            </p>
-            <p className="text-text-secondary" style={{ fontSize: '14px' }}>
-              This will permanently remove <strong>{aliases.length}</strong> model alias
-              {aliases.length !== 1 ? 'es' : ''} from the configuration.
-            </p>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Delete Model Alias"
-        size="sm"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <Button
-              variant="ghost"
-              onClick={() => setIsDeleteModalOpen(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmDelete} isLoading={isDeleting} variant="danger">
-              Delete
-            </Button>
-          </div>
-        }
-      >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            alignItems: 'center',
-            textAlign: 'center',
-            padding: '16px 0',
-          }}
-        >
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Trash2 size={24} style={{ color: 'var(--color-danger)' }} />
-          </div>
-          <div>
-            <p className="text-text" style={{ marginBottom: '8px', fontWeight: 500 }}>
-              Are you sure you want to delete this alias?
-            </p>
-            <p className="text-text-secondary" style={{ fontSize: '14px' }}>
-              <strong>{aliasToDelete?.id}</strong> will be permanently removed from the
-              configuration.
-            </p>
-          </div>
-        </div>
-      </Modal>
-      {/* Metadata autocomplete portal — rendered outside accordion to avoid overflow:hidden clipping */}
-      {showMetadataDropdown &&
-        metadataResults.length > 0 &&
-        dropdownRect &&
-        createPortal(
-          <div
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              position: 'fixed',
-              top: dropdownRect.top,
-              left: dropdownRect.left,
-              width: dropdownRect.width,
-              zIndex: 9999,
-              backgroundColor: '#1E293B',
-              border: '1px solid var(--color-border-glass)',
-              borderRadius: 'var(--radius-sm)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              maxHeight: '180px',
-              overflowY: 'auto',
-            }}
-          >
-            {metadataResults.map((result) => (
-              <button
-                key={result.id}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  selectMetadataResult(result);
-                }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '6px 10px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid var(--color-border-glass)',
-                }}
-                className="hover:bg-bg-hover transition-colors"
-              >
-                <div className="font-body text-[12px] font-medium text-text">{result.name}</div>
-                <div className="font-body text-[10px] text-text-muted">{result.id}</div>
-              </button>
-            ))}
-          </div>,
-          document.body
-        )}
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

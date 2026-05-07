@@ -355,6 +355,159 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── Failover Policy ─────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/failover', async (_request, reply) => {
+    try {
+      const failover = await configService.getRepository().getFailoverPolicy();
+      return reply.send(failover);
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/failover', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      // Read current values, merge with updates, and write back
+      const current = await configService.getRepository().getFailoverPolicy();
+      const merged = { ...current, ...body };
+
+      if (body.enabled !== undefined) {
+        await configService.setSetting('failover.enabled', merged.enabled);
+      }
+      if (body.retryableStatusCodes !== undefined) {
+        await configService.setSetting(
+          'failover.retryableStatusCodes',
+          merged.retryableStatusCodes
+        );
+      }
+      if (body.retryableErrors !== undefined) {
+        await configService.setSetting('failover.retryableErrors', merged.retryableErrors);
+      }
+
+      // Return the final merged state
+      const updated = await configService.getRepository().getFailoverPolicy();
+      logger.debug('Failover policy updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch failover config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Cooldown Policy ──────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/cooldown', async (_request, reply) => {
+    try {
+      const cooldown = await configService.getRepository().getCooldownPolicy();
+      return reply.send(cooldown);
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/cooldown', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      // Read current values, merge with updates, and write back
+      const current = await configService.getRepository().getCooldownPolicy();
+      const merged = { ...current, ...body };
+
+      // Validate cooldown values (minimum 0.1 minutes / 6 seconds)
+      if (body.initialMinutes !== undefined) {
+        const val = Number(merged.initialMinutes);
+        if (!Number.isFinite(val) || val < 0.1) {
+          return reply.code(400).send({ error: 'initialMinutes must be at least 0.1' });
+        }
+        await configService.setSetting('cooldown.initialMinutes', val);
+      }
+      if (body.maxMinutes !== undefined) {
+        const val = Number(merged.maxMinutes);
+        if (!Number.isFinite(val) || val < 0.1) {
+          return reply.code(400).send({ error: 'maxMinutes must be at least 0.1' });
+        }
+        await configService.setSetting('cooldown.maxMinutes', val);
+      }
+
+      // Return the final merged state
+      const updated = await configService.getRepository().getCooldownPolicy();
+      logger.debug('Cooldown policy updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch cooldown config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Exploration Rate ─────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/exploration-rate', async (_request, reply) => {
+    try {
+      const performanceExplorationRate = await configService.getSetting<number>(
+        'performanceExplorationRate',
+        0.05
+      );
+      const latencyExplorationRate = await configService.getSetting<number>(
+        'latencyExplorationRate',
+        0.05
+      );
+      return reply.send({ performanceExplorationRate, latencyExplorationRate });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/exploration-rate', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      if (body.performanceExplorationRate !== undefined) {
+        const value = Number(body.performanceExplorationRate);
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+          return reply
+            .code(400)
+            .send({ error: 'performanceExplorationRate must be a number between 0 and 1' });
+        }
+        await configService.setSetting('performanceExplorationRate', value);
+      }
+      if (body.latencyExplorationRate !== undefined) {
+        const value = Number(body.latencyExplorationRate);
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+          return reply
+            .code(400)
+            .send({ error: 'latencyExplorationRate must be a number between 0 and 1' });
+        }
+        await configService.setSetting('latencyExplorationRate', value);
+      }
+
+      const performanceExplorationRate = await configService.getSetting<number>(
+        'performanceExplorationRate',
+        0.05
+      );
+      const latencyExplorationRate = await configService.getSetting<number>(
+        'latencyExplorationRate',
+        0.05
+      );
+      logger.debug('Exploration rate settings updated via API');
+      return reply.send({ performanceExplorationRate, latencyExplorationRate });
+    } catch (e: any) {
+      logger.error('Failed to patch exploration rate config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Vision Fallthrough ───────────────────────────────────────────
 
   fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {

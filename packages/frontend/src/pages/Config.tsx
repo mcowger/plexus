@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, useCallback } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
 import {
@@ -9,11 +9,18 @@ import {
   RefreshCw,
   HardDrive,
   Archive,
+  Shield,
+  Save,
+  Timer,
+  Compass,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { formatMinutesToMinSec } from '@plexus/shared';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Switch } from '../components/ui/Switch';
+import { Disclosure } from '../components/ui/Disclosure';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import type { CardLayout } from '../types/card';
@@ -46,6 +53,38 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   }
 }
 
+interface FailoverPolicy {
+  enabled: boolean;
+  retryableStatusCodes: number[];
+  retryableErrors: string[];
+}
+
+interface CooldownPolicy {
+  initialMinutes: number;
+  maxMinutes: number;
+}
+
+interface ExplorationRates {
+  performanceExplorationRate: number;
+  latencyExplorationRate: number;
+}
+
+const DEFAULT_EXPLORATION_RATES: ExplorationRates = {
+  performanceExplorationRate: 0.05,
+  latencyExplorationRate: 0.05,
+};
+
+const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
+  enabled: true,
+  retryableStatusCodes: [],
+  retryableErrors: [],
+};
+
+const DEFAULT_COOLDOWN_POLICY: CooldownPolicy = {
+  initialMinutes: 2,
+  maxMinutes: 300,
+};
+
 export const Config = () => {
   const toast = useToast();
   const [config, setConfig] = useState('');
@@ -55,6 +94,184 @@ export const Config = () => {
   const [isFullBackupLoading, setIsFullBackupLoading] = useState(false);
   const [isRestoreLoading, setIsRestoreLoading] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  // Failover settings state
+  const [failoverPolicy, setFailoverPolicy] = useState<FailoverPolicy>(DEFAULT_FAILOVER_POLICY);
+  const [failoverLoaded, setFailoverLoaded] = useState(false);
+  const [failoverSaving, setFailoverSaving] = useState(false);
+  const [statusCodesText, setStatusCodesText] = useState('');
+  const [errorsText, setErrorsText] = useState('');
+
+  // Cooldown settings state
+  const [cooldownPolicy, setCooldownPolicy] = useState<CooldownPolicy>(DEFAULT_COOLDOWN_POLICY);
+  const [cooldownLoaded, setCooldownLoaded] = useState(false);
+  const [cooldownSaving, setCooldownSaving] = useState(false);
+  // Raw input strings for cooldown fields (to allow natural typing)
+  const [cooldownInitialInput, setCooldownInitialInput] = useState('');
+  const [cooldownMaxInput, setCooldownMaxInput] = useState('');
+
+  // Validate cooldown input strings
+  const validateCooldownInput = (
+    raw: string
+  ): { valid: boolean; value?: number; error?: string } => {
+    if (raw === '') {
+      return { valid: false, error: 'Required' };
+    }
+    const num = Number(raw);
+    if (isNaN(num) || !isFinite(num)) {
+      return { valid: false, error: 'Invalid number' };
+    }
+    if (num < 0.1) {
+      return { valid: false, error: 'Must be at least 0.1' };
+    }
+    return { valid: true, value: num };
+  };
+
+  const initialValidation = validateCooldownInput(cooldownInitialInput);
+  const maxValidation = validateCooldownInput(cooldownMaxInput);
+  const isCooldownValid = cooldownLoaded && initialValidation.valid && maxValidation.valid;
+
+  // Exploration rate settings state (setter only needed, value derived from inputs)
+  const [, setExplorationRates] = useState<ExplorationRates>(DEFAULT_EXPLORATION_RATES);
+  const [explorationLoaded, setExplorationLoaded] = useState(false);
+  const [explorationSaving, setExplorationSaving] = useState(false);
+  // Raw input strings for exploration rate fields
+  const [explorationPerformanceInput, setExplorationPerformanceInput] = useState('');
+  const [explorationLatencyInput, setExplorationLatencyInput] = useState('');
+
+  // Validate exploration rate input (0 to 1)
+  const validateExplorationInput = (
+    raw: string
+  ): { valid: boolean; value?: number; error?: string } => {
+    if (raw === '') {
+      return { valid: false, error: 'Required' };
+    }
+    const num = Number(raw);
+    if (isNaN(num) || !isFinite(num)) {
+      return { valid: false, error: 'Invalid number' };
+    }
+    if (num < 0 || num > 1) {
+      return { valid: false, error: 'Must be between 0 and 1' };
+    }
+    return { valid: true, value: num };
+  };
+
+  const perfValidation = validateExplorationInput(explorationPerformanceInput);
+  const latValidation = validateExplorationInput(explorationLatencyInput);
+  const isExplorationValid = explorationLoaded && perfValidation.valid && latValidation.valid;
+
+  const loadFailoverPolicy = useCallback(async () => {
+    try {
+      const policy = await api.getFailoverPolicy();
+      setFailoverPolicy(policy);
+      setStatusCodesText(policy.retryableStatusCodes.join(', '));
+      setErrorsText(policy.retryableErrors.join(', '));
+      setFailoverLoaded(true);
+    } catch (e) {
+      console.error('Failed to load failover policy:', e);
+      toast.error('Failed to load failover settings');
+    }
+  }, [toast]);
+
+  const loadCooldownPolicy = useCallback(async () => {
+    try {
+      const policy = await api.getCooldownPolicy();
+      setCooldownPolicy(policy);
+      setCooldownInitialInput(String(policy.initialMinutes));
+      setCooldownMaxInput(String(policy.maxMinutes));
+      setCooldownLoaded(true);
+    } catch (e) {
+      console.error('Failed to load cooldown policy:', e);
+      toast.error('Failed to load cooldown settings');
+    }
+  }, [toast]);
+
+  const loadExplorationRates = useCallback(async () => {
+    try {
+      const rates = await api.getExplorationRates();
+      setExplorationRates(rates);
+      setExplorationPerformanceInput(String(rates.performanceExplorationRate));
+      setExplorationLatencyInput(String(rates.latencyExplorationRate));
+      setExplorationLoaded(true);
+    } catch (e) {
+      console.error('Failed to load exploration rates:', e);
+      toast.error('Failed to load exploration rate settings');
+    }
+  }, [toast]);
+
+  const handleSaveFailover = async () => {
+    setFailoverSaving(true);
+    try {
+      // Parse status codes
+      const statusCodes = statusCodesText
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n >= 100 && n <= 599);
+
+      // Parse error codes
+      const retryableErrors = errorsText
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const updated = await api.patchFailoverPolicy({
+        enabled: failoverPolicy.enabled,
+        retryableStatusCodes: statusCodes,
+        retryableErrors,
+      });
+
+      setFailoverPolicy(updated);
+      setStatusCodesText(updated.retryableStatusCodes.join(', '));
+      setErrorsText(updated.retryableErrors.join(', '));
+      toast.success('Failover settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save failover settings');
+    } finally {
+      setFailoverSaving(false);
+    }
+  };
+
+  const handleSaveCooldown = async () => {
+    if (!initialValidation.valid || !maxValidation.valid) return;
+    setCooldownSaving(true);
+    try {
+      const updated = await api.patchCooldownPolicy({
+        initialMinutes: initialValidation.value!,
+        maxMinutes: maxValidation.value!,
+      });
+
+      setCooldownPolicy(updated);
+      setCooldownInitialInput(String(updated.initialMinutes));
+      setCooldownMaxInput(String(updated.maxMinutes));
+      toast.success('Cooldown settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save cooldown settings');
+    } finally {
+      setCooldownSaving(false);
+    }
+  };
+
+  const handleSaveExplorationRates = async () => {
+    if (!perfValidation.valid || !latValidation.valid) return;
+    setExplorationSaving(true);
+    try {
+      const updated = await api.patchExplorationRates({
+        performanceExplorationRate: perfValidation.value!,
+        latencyExplorationRate: latValidation.value!,
+      });
+
+      setExplorationRates(updated);
+      setExplorationPerformanceInput(String(updated.performanceExplorationRate));
+      setExplorationLatencyInput(String(updated.latencyExplorationRate));
+      toast.success('Exploration rate settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save exploration rate settings');
+    } finally {
+      setExplorationSaving(false);
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -70,6 +287,9 @@ export const Config = () => {
 
   useEffect(() => {
     loadConfig();
+    loadFailoverPolicy();
+    loadCooldownPolicy();
+    loadExplorationRates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -308,6 +528,288 @@ export const Config = () => {
             </EditorErrorBoundary>
           </div>
         </Card>
+
+        {/* ─── Failover Settings ──────────────────────────────────── */}
+        <Disclosure
+          title="Failover Settings"
+          defaultOpen={false}
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveFailover}
+              isLoading={failoverSaving}
+              disabled={!failoverLoaded}
+              leftIcon={<Save size={14} />}
+            >
+              Save
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5">
+            {/* Enabled toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield size={16} className="text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-text">Enable Failover</p>
+                  <p className="text-xs text-text-muted">
+                    When enabled, failed requests are automatically retried on the next available
+                    provider.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={failoverPolicy.enabled}
+                onChange={(checked) => setFailoverPolicy((prev) => ({ ...prev, enabled: checked }))}
+                aria-label="Toggle failover on/off"
+              />
+            </div>
+
+            {/* Retryable Status Codes */}
+            <div>
+              <label
+                htmlFor="retryableStatusCodes"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Retryable Status Codes
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                HTTP status codes that trigger a retry on the next provider. Enter comma-separated
+                values (100–599). Defaults to all non-2xx codes except 413 and 422 when empty.
+              </p>
+              <textarea
+                id="retryableStatusCodes"
+                value={statusCodesText}
+                onChange={(e) => setStatusCodesText(e.target.value)}
+                placeholder="e.g. 429, 500, 502, 503"
+                rows={3}
+                className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
+              />
+            </div>
+
+            {/* Retryable Errors */}
+            <div>
+              <label htmlFor="retryableErrors" className="block text-sm font-medium text-text mb-1">
+                Retryable Network Errors
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                Network error codes that trigger a retry on the next provider. Enter comma-separated
+                values. Defaults to ECONNREFUSED, ETIMEDOUT, ENOTFOUND when empty.
+              </p>
+              <textarea
+                id="retryableErrors"
+                value={errorsText}
+                onChange={(e) => setErrorsText(e.target.value)}
+                placeholder="e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND"
+                rows={2}
+                className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
+              />
+            </div>
+          </div>
+        </Disclosure>
+
+        {/* ─── Cooldown Settings ──────────────────────────────────── */}
+        <Disclosure
+          title="Cooldown Settings"
+          defaultOpen={false}
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveCooldown}
+              isLoading={cooldownSaving}
+              disabled={!isCooldownValid}
+              leftIcon={<Save size={14} />}
+            >
+              Save
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5">
+            {/* Exponential Backoff description */}
+            <div className="flex items-center gap-2">
+              <Timer size={16} className="text-primary" />
+              <div>
+                <p className="text-sm font-medium text-text">Exponential Backoff</p>
+                <p className="text-xs text-text-muted">
+                  When a provider fails, it is placed on cooldown using exponential backoff:{' '}
+                  <code className="text-text-secondary">C(n) = min(C_max, C₀ × 2ⁿ)</code> where n is
+                  the consecutive failure count.
+                </p>
+              </div>
+            </div>
+
+            {/* Initial Minutes */}
+            <div>
+              <label
+                htmlFor="cooldownInitialMinutes"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Initial Cooldown (minutes)
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                C₀ — the cooldown duration after the first failure. Subsequent failures double the
+                duration until the maximum is reached. Fractional values are supported (e.g. 0.1 = 6
+                seconds).
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <input
+                    id="cooldownInitialMinutes"
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={cooldownInitialInput}
+                    onChange={(e) => setCooldownInitialInput(e.target.value)}
+                    className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  {!initialValidation.valid && cooldownInitialInput !== '' && (
+                    <span className="text-xs text-warning">{initialValidation.error}</span>
+                  )}
+                </div>
+                <span className="text-xs text-text-muted tabular-nums min-w-[60px]">
+                  ={' '}
+                  {initialValidation.valid && initialValidation.value !== undefined
+                    ? formatMinutesToMinSec(initialValidation.value)
+                    : cooldownLoaded
+                      ? formatMinutesToMinSec(cooldownPolicy.initialMinutes)
+                      : '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Max Minutes */}
+            <div>
+              <label
+                htmlFor="cooldownMaxMinutes"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Maximum Cooldown (minutes)
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                C_max — the upper limit for any cooldown duration, regardless of how many
+                consecutive failures have occurred. Fractional values are supported (e.g. 0.1 = 6
+                seconds).
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <input
+                    id="cooldownMaxMinutes"
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={cooldownMaxInput}
+                    onChange={(e) => setCooldownMaxInput(e.target.value)}
+                    className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  {!maxValidation.valid && cooldownMaxInput !== '' && (
+                    <span className="text-xs text-warning">{maxValidation.error}</span>
+                  )}
+                </div>
+                <span className="text-xs text-text-muted tabular-nums min-w-[60px]">
+                  ={' '}
+                  {maxValidation.valid && maxValidation.value !== undefined
+                    ? formatMinutesToMinSec(maxValidation.value)
+                    : cooldownLoaded
+                      ? formatMinutesToMinSec(cooldownPolicy.maxMinutes)
+                      : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Disclosure>
+
+        {/* ─── Exploration Rate Settings ────────────────────────────── */}
+        <Disclosure
+          title="Exploration Rate Settings"
+          defaultOpen={false}
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveExplorationRates}
+              isLoading={explorationSaving}
+              disabled={!isExplorationValid}
+              leftIcon={<Save size={14} />}
+            >
+              Save
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5">
+            {/* Exploration Rate description */}
+            <div className="flex items-center gap-2">
+              <Compass size={16} className="text-primary" />
+              <div>
+                <p className="text-sm font-medium text-text">Provider Exploration</p>
+                <p className="text-xs text-text-muted">
+                  Exploration rate controls how often the selector picks a non-optimal provider to
+                  discover better options. A value of 0 always selects the best-known provider; a
+                  value of 1 picks randomly. Applies to performance and latency selectors.
+                </p>
+              </div>
+            </div>
+
+            {/* Performance Exploration Rate */}
+            <div>
+              <label
+                htmlFor="performanceExplorationRate"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Performance Exploration Rate
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                The probability of exploring a non-optimal provider when using the performance
+                selector. Default: 0.05 (5%).
+              </p>
+              <div className="flex flex-col gap-1">
+                <input
+                  id="performanceExplorationRate"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={explorationPerformanceInput}
+                  onChange={(e) => setExplorationPerformanceInput(e.target.value)}
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                {!perfValidation.valid && explorationPerformanceInput !== '' && (
+                  <span className="text-xs text-warning">{perfValidation.error}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Latency Exploration Rate */}
+            <div>
+              <label
+                htmlFor="latencyExplorationRate"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                Latency Exploration Rate
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                The probability of exploring a non-optimal provider when using the latency selector.
+                Defaults to the Performance Exploration Rate if not explicitly set.
+              </p>
+              <div className="flex flex-col gap-1">
+                <input
+                  id="latencyExplorationRate"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={explorationLatencyInput}
+                  onChange={(e) => setExplorationLatencyInput(e.target.value)}
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                {!latValidation.valid && explorationLatencyInput !== '' && (
+                  <span className="text-xs text-warning">{latValidation.error}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </Disclosure>
 
         <Card
           title="Backup & Restore"

@@ -24,6 +24,14 @@ jobs:
     needs: setup
     uses: ./.github/workflows/release-quality-gates.yml
 
+  generate-release-notes:
+    name: Generate Release Notes
+    needs: setup
+    uses: ./.github/workflows/release-notes.yml
+    with:
+      tag: ${{ needs.setup.outputs.tag }}
+    secrets: inherit
+
   build-binaries:
     name: Build Binaries
     needs: [setup, quality-gates]
@@ -37,16 +45,11 @@ jobs:
     uses: ./.github/workflows/release-build-docker.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
 
   release:
     name: Create Release
-    needs: [setup, build-binaries, build-docker]
+    needs: [setup, build-binaries, build-docker, generate-release-notes]
     uses: ./.github/workflows/release-publish.yml
     with:
       tag: ${{ needs.setup.outputs.tag }}
-    permissions:
-      contents: write
+      release_notes: ${{ needs.generate-release-notes.outputs.notes }}

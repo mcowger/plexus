@@ -9,7 +9,7 @@
 ## Critical Requirements
 
 - **NEVER** commit or push without explicit request, unless running in CI (`CI=true`). In local/interactive sessions, every individual commit and push requires explicit user permission — even if permission was granted earlier in the same session. Do not assume continued consent. In GitHub Actions (CI), commits and pushes are expected as part of the workflow and do not require per-instance approval.
-- **NEVER** use --no-verify without user permission.
+- **NEVER** use --no-verify or LEFTHOOK=0 without user permission.
 - **AVOID** search library type definitions for documentation. Use search and context skills where available first.
 - **NEVER** produce implementation or summary documents unless specifically requested.
 - **NEVER** edit existing migration files or manually create SQL migrations. See [Migrations](#migrations) below.
@@ -142,6 +142,36 @@ Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `D
 - **Prefer `bun run test` (affected only) over `bun run test:force-all`.** The default test command uses `--changed HEAD` and runs only tests affected by uncommitted changes — use it unless you have a specific reason to run the full suite (e.g., verifying a cross-cutting refactor or diagnosing flakiness unrelated to your changes). Never reach for `test:force-all` out of habit.
 - If you must mock a module, implement its **full public interface**
 - Do not use `__mocks__` directories for node_modules mocks — they are not reliably loaded by Vitest with `pool: forks`
+
+---
+
+## Pi Assistant (AI Agent Workflow)
+
+The `/pi` trigger in issue and PR comments is handled by `.github/workflows/pi-assistant.yml`,
+which invokes `mcowger/pi-action`.
+
+### Prompt file
+
+The agent's system prompt lives at **`.github/prompts/pi-assistant.md`** — edit that file
+to change what the agent is instructed to do. Do not put prompt text inside the workflow YAML.
+
+The prompt file supports `{{dot.notation.path}}` placeholders resolved at runtime against
+two namespaces:
+
+| Namespace | Contents | Example |
+|-----------|----------|---------|
+| `context.*` | The full `@actions/github` context — event payload, actor, SHA, ref, repo, etc. | `{{context.payload.comment.body}}` |
+| `env.*` | All environment variables, including `GITHUB_*` / `RUNNER_*` runner vars and any values passed via the step's `env:` block | `{{env.INITIAL_COMMENT_ID}}` |
+
+Most GitHub context data is available automatically via `context.*`. The only value
+currently passed explicitly via `env:` is `INITIAL_COMMENT_ID`, because it is derived
+from a previous workflow step output and is not part of the event payload.
+
+### Workflow env: block
+
+If a new placeholder is needed that cannot be sourced from `context.*`, add it to the
+`env:` block on the **Run Pi agent** step in `pi-assistant.yml` and reference it as
+`{{env.YOUR_VAR_NAME}}` in the prompt file. Do not add it to any other step.
 
 ---
 

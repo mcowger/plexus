@@ -105,6 +105,21 @@ describe('CodexVersionService', () => {
     expect(service.getVersion()).toBe('0.125.0');
   });
 
+  it('handles rust-v prefix tag', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tag_name: 'rust-v0.128.0' }),
+      })
+    );
+
+    const service = CodexVersionService.getInstance();
+    await service.fetchVersion();
+
+    expect(service.getVersion()).toBe('0.128.0');
+  });
+
   it('ignores unexpected tag format', async () => {
     vi.stubGlobal(
       'fetch',

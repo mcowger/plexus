@@ -183,7 +183,6 @@ const EMPTY_PROVIDER: Provider = {
   disableCooldown: false,
   estimateTokens: false,
   useClaudeMasking: false,
-  geminiThinkingEnabled: false,
   apiBaseUrl: {},
   headers: {},
   extraBody: {},
@@ -1038,50 +1037,124 @@ export const Providers = () => {
     );
   };
 
+  const sortedProviders = [...providers].sort((a, b) => a.id.localeCompare(b.id));
+
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="Providers"
-        subtitle="Configure upstream inference providers, credentials, and quota checkers."
+        subtitle="Upstream LLM providers routed by the gateway"
         actions={
-          <Button leftIcon={<Plus size={16} />} onClick={handleAddNew}>
-            Add Provider
+          <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
+            Add provider
           </Button>
         }
       />
-      <Card flush>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse font-body text-[13px]">
-            <thead>
-              <tr>
-                <th
-                  className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                  style={{ paddingLeft: '24px' }}
-                >
-                  ID / Name
-                </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Status
-                </th>
+      <PageContainer>
+        <Card flush>
+          <div className="space-y-3 p-3 md:hidden">
+            {sortedProviders.length === 0 ? (
+              <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
+                No providers configured
+              </div>
+            ) : (
+              sortedProviders.map((p) => {
+                const modelCount = p.models
+                  ? Array.isArray(p.models)
+                    ? p.models.length
+                    : typeof p.models === 'object'
+                      ? Object.keys(p.models).length
+                      : 0
+                  : 0;
 
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Models
-                </th>
-                <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                  Quota/Balance
-                </th>
-                <th
-                  className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                  style={{ paddingRight: '24px', textAlign: 'right' }}
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...providers]
-                .sort((a, b) => a.id.localeCompare(b.id))
-                .map((p) => (
+                return (
+                  <article
+                    key={p.id}
+                    onClick={() => handleEdit(p)}
+                    className="rounded-lg border border-border-glass bg-bg-card p-3 transition-colors hover:border-primary/30 hover:bg-bg-hover"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Edit2 size={12} className="shrink-0 text-text-muted" />
+                          <h3 className="truncate text-sm font-semibold text-text">{p.id}</h3>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-text-secondary">{p.name}</p>
+                      </div>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={p.enabled !== false}
+                          onChange={(val) => handleToggleEnabled(p, val)}
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-md bg-bg-subtle p-2">
+                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Models
+                        </div>
+                        <div className="text-text">{modelCount}</div>
+                      </div>
+                      <div className="rounded-md bg-bg-subtle p-2">
+                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Quota/Balance
+                        </div>
+                        <div className="mt-1 min-h-5">{getQuotaDisplay(p) || '-'}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex justify-end border-t border-border-glass pt-3">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteModal(p);
+                        }}
+                        className="text-danger"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full border-collapse font-body text-[13px]">
+              <thead>
+                <tr>
+                  <th
+                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ paddingLeft: '24px' }}
+                  >
+                    ID / Name
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Status
+                  </th>
+
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Models
+                  </th>
+                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                    Quota/Balance
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ paddingRight: '24px', textAlign: 'right' }}
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedProviders.map((p) => (
                   <tr
                     key={p.id}
                     onClick={() => handleEdit(p)}
@@ -1142,2746 +1215,2704 @@ export const Providers = () => {
                     </td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={originalId ? `Edit Provider: ${originalId}` : 'Add Provider'}
-        size="lg"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} isLoading={isSaving} disabled={!!quotaValidationError}>
-              Save Provider
-            </Button>
+              </tbody>
+            </table>
           </div>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '-8px' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr auto',
-              gap: '12px',
-              alignItems: 'end',
-            }}
-          >
-            <Input
-              label="Unique ID"
-              value={editingProvider.id}
-              onChange={(e) => setEditingProvider({ ...editingProvider, id: e.target.value })}
-              placeholder="e.g. openai"
-              disabled={!!originalId}
-            />
-            <Input
-              label="Display Name"
-              value={editingProvider.name}
-              onChange={(e) => setEditingProvider({ ...editingProvider, name: e.target.value })}
-              placeholder="e.g. OpenAI Production"
-            />
-            <Input
-              label="API Key"
-              type="password"
-              value={editingProvider.apiKey}
-              onChange={(e) => setEditingProvider({ ...editingProvider, apiKey: e.target.value })}
-              placeholder="sk-..."
-              disabled={isOAuthMode}
-            />
-            <div className="flex flex-col gap-2">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Enabled
-              </label>
-              <div style={{ height: '38px', display: 'flex', alignItems: 'center' }}>
-                <Switch
-                  checked={editingProvider.enabled !== false}
-                  onChange={(checked) =>
-                    setEditingProvider({ ...editingProvider, enabled: checked })
-                  }
-                />
+        </Card>
+
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={originalId ? `Edit Provider: ${originalId}` : 'Add Provider'}
+          size="lg"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} isLoading={isSaving} disabled={!!quotaValidationError}>
+                Save Provider
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '-8px' }}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
+              <Input
+                label="Unique ID"
+                value={editingProvider.id}
+                onChange={(e) => setEditingProvider({ ...editingProvider, id: e.target.value })}
+                placeholder="e.g. openai"
+                disabled={!!originalId}
+              />
+              <Input
+                label="Display Name"
+                value={editingProvider.name}
+                onChange={(e) => setEditingProvider({ ...editingProvider, name: e.target.value })}
+                placeholder="e.g. OpenAI Production"
+              />
+              <Input
+                label="API Key"
+                type="password"
+                value={editingProvider.apiKey}
+                onChange={(e) => setEditingProvider({ ...editingProvider, apiKey: e.target.value })}
+                placeholder="sk-..."
+                disabled={isOAuthMode}
+              />
+              <div className="flex flex-col gap-2">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Enabled
+                </label>
+                <div style={{ height: '38px', display: 'flex', alignItems: 'center' }}>
+                  <Switch
+                    checked={editingProvider.enabled !== false}
+                    onChange={(checked) =>
+                      setEditingProvider({ ...editingProvider, enabled: checked })
+                    }
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Separator */}
-          <div
-            style={{ height: '1px', background: 'var(--color-border-glass)', margin: '4px 0' }}
-          />
+            {/* Separator */}
+            <div
+              style={{ height: '1px', background: 'var(--color-border-glass)', margin: '4px 0' }}
+            />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            {/* Left: APIs & Base URLs */}
-            <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
-              <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* Left: APIs & Base URLs */}
+              <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
+                <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
+                  <label className="font-body text-[13px] font-medium text-text-secondary">
+                    Connection Type
+                  </label>
+                  <select
+                    className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                    value={isOAuthMode ? 'oauth' : 'url'}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'oauth') {
+                        setEditingProvider({
+                          ...editingProvider,
+                          apiBaseUrl: 'oauth://',
+                          apiKey: 'oauth',
+                          oauthProvider: editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value,
+                          oauthAccount: editingProvider.oauthAccount || '',
+                          type: ['oauth'],
+                        });
+                      } else {
+                        setEditingProvider({
+                          ...editingProvider,
+                          apiBaseUrl: {},
+                          apiKey: '',
+                          oauthProvider: '',
+                          oauthAccount: '',
+                          type: [],
+                        });
+                      }
+                    }}
+                  >
+                    <option value="url">Custom API URL</option>
+                    <option value="oauth">OAuth (pi-ai)</option>
+                  </select>
+                </div>
                 <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Connection Type
+                  Supported APIs & Base URLs
                 </label>
-                <select
-                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                  value={isOAuthMode ? 'oauth' : 'url'}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === 'oauth') {
-                      setEditingProvider({
-                        ...editingProvider,
-                        apiBaseUrl: 'oauth://',
-                        apiKey: 'oauth',
-                        oauthProvider: editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value,
-                        oauthAccount: editingProvider.oauthAccount || '',
-                        type: ['oauth'],
-                      });
-                    } else {
-                      setEditingProvider({
-                        ...editingProvider,
-                        apiBaseUrl: {},
-                        apiKey: '',
-                        oauthProvider: '',
-                        oauthAccount: '',
-                        type: [],
-                      });
-                    }
-                  }}
-                >
-                  <option value="url">Custom API URL</option>
-                  <option value="oauth">OAuth (pi-ai)</option>
-                </select>
-              </div>
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Supported APIs & Base URLs
-              </label>
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: 'var(--color-text-secondary)',
-                  marginBottom: '4px',
-                  lineHeight: '1.5',
-                }}
-              >
-                <span style={{ fontStyle: 'italic' }}>API types determine the protocol:</span>
-                <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
-                  <li>
-                    <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints,
-                    including Ollama&apos;s{' '}
-                    <code
-                      style={{
-                        background: 'var(--color-bg-subtle)',
-                        padding: '1px 4px',
-                        borderRadius: '2px',
-                      }}
-                    >
-                      /v1
-                    </code>{' '}
-                    API
-                  </li>
-                  <li>
-                    <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the
-                    root URL (e.g.{' '}
-                    <code
-                      style={{
-                        background: 'var(--color-bg-subtle)',
-                        padding: '1px 4px',
-                        borderRadius: '2px',
-                      }}
-                    >
-                      http://localhost:11434
-                    </code>
-                    )
-                  </li>
-                </ul>
-              </div>
-              {isOAuthMode ? (
                 <div
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    background: 'var(--color-bg-subtle)',
-                    padding: '8px',
-                    borderRadius: 'var(--radius-md)',
+                    fontSize: '11px',
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: '4px',
+                    lineHeight: '1.5',
                   }}
                 >
-                  <div className="flex flex-col gap-1">
-                    <label className="font-body text-[13px] font-medium text-text-secondary">
-                      OAuth Provider
-                    </label>
-                    <select
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                      value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+                  <span style={{ fontStyle: 'italic' }}>API types determine the protocol:</span>
+                  <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                    <li>
+                      <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints,
+                      including Ollama&apos;s{' '}
+                      <code
+                        style={{
+                          background: 'var(--color-bg-subtle)',
+                          padding: '1px 4px',
+                          borderRadius: '2px',
+                        }}
+                      >
+                        /v1
+                      </code>{' '}
+                      API
+                    </li>
+                    <li>
+                      <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the
+                      root URL (e.g.{' '}
+                      <code
+                        style={{
+                          background: 'var(--color-bg-subtle)',
+                          padding: '1px 4px',
+                          borderRadius: '2px',
+                        }}
+                      >
+                        http://localhost:11434
+                      </code>
+                      )
+                    </li>
+                  </ul>
+                </div>
+                {isOAuthMode ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      background: 'var(--color-bg-subtle)',
+                      padding: '8px',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <label className="font-body text-[13px] font-medium text-text-secondary">
+                        OAuth Provider
+                      </label>
+                      <select
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+                        onChange={(e) =>
+                          setEditingProvider({
+                            ...editingProvider,
+                            oauthProvider: e.target.value,
+                          })
+                        }
+                      >
+                        {OAUTH_PROVIDERS.map((provider) => (
+                          <option key={provider.value} value={provider.value}>
+                            {provider.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Input
+                      label="OAuth Account"
+                      value={editingProvider.oauthAccount || ''}
                       onChange={(e) =>
                         setEditingProvider({
                           ...editingProvider,
-                          oauthProvider: e.target.value,
+                          oauthAccount: e.target.value,
                         })
                       }
-                    >
-                      {OAUTH_PROVIDERS.map((provider) => (
-                        <option key={provider.value} value={provider.value}>
-                          {provider.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <Input
-                    label="OAuth Account"
-                    value={editingProvider.oauthAccount || ''}
-                    onChange={(e) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        oauthAccount: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. work, personal, team-a"
-                  />
+                      placeholder="e.g. work, personal, team-a"
+                    />
 
-                  <div
-                    className="border border-border-glass rounded-md p-3 bg-bg-subtle"
-                    style={{ marginTop: '4px' }}
-                  >
                     <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px',
-                        marginBottom: '8px',
-                      }}
+                      className="border border-border-glass rounded-md p-3 bg-bg-subtle"
+                      style={{ marginTop: '4px' }}
                     >
-                      <div>
-                        <div className="font-body text-[13px] font-medium text-text">
-                          OAuth Authentication
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '12px',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <div>
+                          <div className="font-body text-[13px] font-medium text-text">
+                            OAuth Authentication
+                          </div>
+                          <div className="text-[11px] text-text-secondary">
+                            Tokens are saved to auth.json after login.
+                          </div>
                         </div>
-                        <div className="text-[11px] text-text-secondary">
-                          Tokens are saved to auth.json after login.
+                        <div className="flex items-center gap-2">
+                          <span
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '999px',
+                              background:
+                                oauthStatus === 'success' || (!oauthStatus && oauthCredentialReady)
+                                  ? 'var(--color-success)'
+                                  : oauthStatus === 'error' || oauthStatus === 'cancelled'
+                                    ? 'var(--color-danger)'
+                                    : 'var(--color-text-secondary)',
+                              opacity: oauthCredentialChecking ? 0.6 : 1,
+                            }}
+                          />
+                          <span
+                            className="text-[11px] font-medium text-text-secondary"
+                            style={{ textTransform: 'lowercase' }}
+                          >
+                            {oauthStatusLabel}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span
+
+                      {oauthError && (
+                        <div className="text-[11px] text-danger" style={{ marginBottom: '8px' }}>
+                          {oauthError}
+                        </div>
+                      )}
+
+                      {oauthSession?.authInfo && (
+                        <div
                           style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '999px',
-                            background:
-                              oauthStatus === 'success' || (!oauthStatus && oauthCredentialReady)
-                                ? 'var(--color-success)'
-                                : oauthStatus === 'error' || oauthStatus === 'cancelled'
-                                  ? 'var(--color-danger)'
-                                  : 'var(--color-text-secondary)',
-                            opacity: oauthCredentialChecking ? 0.6 : 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            marginBottom: '8px',
                           }}
-                        />
-                        <span
-                          className="text-[11px] font-medium text-text-secondary"
-                          style={{ textTransform: 'lowercase' }}
                         >
-                          {oauthStatusLabel}
-                        </span>
+                          <Input
+                            label="Authorization URL"
+                            value={oauthSession.authInfo.url}
+                            readOnly
+                          />
+                          {oauthSession.authInfo.instructions && (
+                            <div className="text-[11px] text-text-secondary flex items-center gap-1">
+                              <Info size={12} />
+                              <span>{oauthSession.authInfo.instructions}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {oauthSession?.prompt && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'flex-end',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <Input
+                              label={oauthSession.prompt.message}
+                              placeholder={oauthSession.prompt.placeholder}
+                              value={oauthPromptValue}
+                              onChange={(e) => setOauthPromptValue(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleSubmitPrompt}
+                            disabled={
+                              oauthBusy || (!oauthSession.prompt.allowEmpty && !oauthPromptValue)
+                            }
+                          >
+                            Submit
+                          </Button>
+                        </div>
+                      )}
+
+                      {oauthSession?.status === 'awaiting_manual_code' && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'flex-end',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <Input
+                              label="Paste redirect URL or code"
+                              value={oauthManualCode}
+                              onChange={(e) => setOauthManualCode(e.target.value)}
+                              placeholder="https://..."
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleSubmitManualCode}
+                            disabled={oauthBusy || !oauthManualCode}
+                          >
+                            Submit
+                          </Button>
+                        </div>
+                      )}
+
+                      {oauthSession?.progress && oauthSession.progress.length > 0 && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <div className="text-[11px] text-text-secondary">Progress</div>
+                          <div className="text-[11px] text-text" style={{ marginTop: '4px' }}>
+                            {(oauthSession?.progress ?? []).slice(-3).map((message, idx) => (
+                              <div key={`${message}-${idx}`}>{message}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {oauthStatus === 'success' && (
+                        <div className="text-[11px] text-success" style={{ marginBottom: '8px' }}>
+                          Authentication complete. Tokens saved to auth.json.
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={handleStartOAuth}
+                          isLoading={oauthBusy && !oauthSessionId}
+                          disabled={oauthBusy || (!!oauthSessionId && !oauthIsTerminal)}
+                        >
+                          {oauthSessionId && !oauthIsTerminal
+                            ? 'OAuth in progress'
+                            : oauthCredentialReady
+                              ? 'Restart OAuth'
+                              : 'Start OAuth'}
+                        </Button>
+                        {oauthSessionId && !oauthIsTerminal && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleCancelOAuth}
+                            disabled={oauthBusy}
+                          >
+                            Cancel
+                          </Button>
+                        )}
                       </div>
                     </div>
-
-                    {oauthError && (
-                      <div className="text-[11px] text-danger" style={{ marginBottom: '8px' }}>
-                        {oauthError}
-                      </div>
-                    )}
-
-                    {oauthSession?.authInfo && (
+                  </div>
+                ) : (
+                  <div className="border border-border-glass rounded-md overflow-hidden">
+                    <div
+                      className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                      onClick={() => setIsApiBaseUrlsOpen(!isApiBaseUrlsOpen)}
+                    >
+                      {isApiBaseUrlsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <label
+                        className="font-body text-[13px] font-medium text-text-secondary"
+                        style={{ marginBottom: 0, flex: 1 }}
+                      >
+                        Base URL Entries
+                      </label>
+                      <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                        {Object.keys(getApiBaseUrlMap()).length}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addApiBaseUrlEntry();
+                        }}
+                        disabled={Object.keys(getApiBaseUrlMap()).length >= KNOWN_APIS.length}
+                      >
+                        <Plus size={14} />
+                      </Button>
+                    </div>
+                    {isApiBaseUrlsOpen && (
                       <div
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '6px',
-                          marginBottom: '8px',
+                          padding: '8px',
+                          borderTop: '1px solid var(--color-border-glass)',
+                          background: 'var(--color-bg-subtle)',
                         }}
                       >
-                        <Input
-                          label="Authorization URL"
-                          value={oauthSession.authInfo.url}
-                          readOnly
-                        />
-                        {oauthSession.authInfo.instructions && (
-                          <div className="text-[11px] text-text-secondary flex items-center gap-1">
-                            <Info size={12} />
-                            <span>{oauthSession.authInfo.instructions}</span>
+                        {Object.entries(getApiBaseUrlMap()).length === 0 && (
+                          <div className="font-body text-[11px] text-text-secondary italic">
+                            No base URLs configured yet.
                           </div>
                         )}
+                        {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => {
+                          // Detect URL/API type mismatches based on endpoint-shape only
+                          const urlLower = typeof url === 'string' ? url.toLowerCase() : '';
+                          // Native Ollama API paths (not hostname-based, only path-based)
+                          const hasNativeOllamaPath =
+                            urlLower.includes('/api/chat') ||
+                            urlLower.includes('/api/generate') ||
+                            urlLower.includes('/api/embeddings') ||
+                            urlLower.includes('/api/tags');
+                          const hasV1Suffix = urlLower.includes('/v1');
+                          // Warn when native Ollama type is selected but URL has /v1 (OpenAI-compatible)
+                          const showOllamaV1Warning = apiType === 'ollama' && hasV1Suffix;
+                          // Warn when chat type is selected but URL looks like native Ollama (path-based, no /v1)
+                          const showChatOllamaWarning =
+                            apiType === 'chat' && hasNativeOllamaPath && !hasV1Suffix;
+
+                          return (
+                            <div
+                              key={apiType}
+                              className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto] sm:items-start"
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <select
+                                  className="w-full py-1.5 px-3 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                  value={apiType}
+                                  onChange={(e) =>
+                                    updateApiBaseUrlEntry(
+                                      apiType,
+                                      e.target.value,
+                                      typeof url === 'string' ? url : ''
+                                    )
+                                  }
+                                >
+                                  {KNOWN_APIS.map((knownType) => (
+                                    <option
+                                      key={knownType}
+                                      value={knownType}
+                                      className="bg-bg-surface text-text"
+                                    >
+                                      {knownType}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                  placeholder={
+                                    apiType === 'ollama'
+                                      ? 'http://localhost:11434'
+                                      : 'https://api.example.com/v1/...'
+                                  }
+                                  value={typeof url === 'string' ? url : ''}
+                                  onChange={(e) =>
+                                    updateApiBaseUrlEntry(apiType, apiType, e.target.value)
+                                  }
+                                />
+                                {showOllamaV1Warning && (
+                                  <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
+                                    <AlertTriangle
+                                      size={14}
+                                      className="text-warning shrink-0 mt-0.5"
+                                    />
+                                    <span className="text-[11px] text-warning">
+                                      <span style={{ fontWeight: 600 }}>native ollama</span> type
+                                      expects root URL (e.g.{' '}
+                                      <code
+                                        style={{
+                                          background: 'var(--color-bg-subtle)',
+                                          padding: '0 3px',
+                                          borderRadius: '2px',
+                                        }}
+                                      >
+                                        http://localhost:11434
+                                      </code>
+                                      ). URLs with{' '}
+                                      <code
+                                        style={{
+                                          background: 'var(--color-bg-subtle)',
+                                          padding: '0 3px',
+                                          borderRadius: '2px',
+                                        }}
+                                      >
+                                        /v1
+                                      </code>{' '}
+                                      are OpenAI-compatible — use{' '}
+                                      <span style={{ fontWeight: 600 }}>chat</span> type instead.
+                                    </span>
+                                  </div>
+                                )}
+                                {showChatOllamaWarning && (
+                                  <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
+                                    <AlertTriangle
+                                      size={14}
+                                      className="text-warning shrink-0 mt-0.5"
+                                    />
+                                    <span className="text-[11px] text-warning">
+                                      This URL contains{' '}
+                                      <code
+                                        style={{
+                                          background: 'var(--color-bg-subtle)',
+                                          padding: '0 3px',
+                                          borderRadius: '2px',
+                                        }}
+                                      >
+                                        /api/
+                                      </code>{' '}
+                                      paths typical of native Ollama. If this is a native Ollama
+                                      endpoint, use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
+                                      type instead.
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeApiBaseUrlEntry(apiType)}
+                                style={{ padding: '4px', marginTop: '4px' }}
+                              >
+                                <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
 
-                    {oauthSession?.prompt && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '8px',
-                          alignItems: 'flex-end',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <Input
-                            label={oauthSession.prompt.message}
-                            placeholder={oauthSession.prompt.placeholder}
-                            value={oauthPromptValue}
-                            onChange={(e) => setOauthPromptValue(e.target.value)}
-                          />
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={handleSubmitPrompt}
-                          disabled={
-                            oauthBusy || (!oauthSession.prompt.allowEmpty && !oauthPromptValue)
-                          }
-                        >
-                          Submit
-                        </Button>
-                      </div>
-                    )}
+              {/* Right: Quota Checker */}
+              <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Quota Checker
+                </label>
+                <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px] sm:items-end">
+                  <div className="flex flex-col gap-1">
+                    <label className="font-body text-[11px] font-medium text-text-secondary">
+                      Type
+                    </label>
+                    <select
+                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                      value={selectedQuotaCheckerType}
+                      onChange={(e) => {
+                        const quotaType = e.target.value;
+                        if (!quotaType) {
+                          setEditingProvider({ ...editingProvider, quotaChecker: undefined });
+                          return;
+                        }
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            type: quotaType,
+                            enabled: true,
+                            intervalMinutes: Math.max(
+                              1,
+                              editingProvider.quotaChecker?.intervalMinutes || 30
+                            ),
+                            options: editingProvider.quotaChecker?.options,
+                          },
+                        });
+                      }}
+                    >
+                      {<option value="">&lt;none&gt;</option>}
+                      {selectableQuotaCheckerTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="font-body text-[11px] font-medium text-text-secondary">
+                      Interval (min)
+                    </label>
+                    <input
+                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={editingProvider.quotaChecker?.intervalMinutes || 30}
+                      disabled={!selectedQuotaCheckerType}
+                      onChange={(e) => {
+                        const intervalMinutes = Math.max(1, parseInt(e.target.value, 10) || 30);
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            type: selectedQuotaCheckerType,
+                            enabled: selectedQuotaCheckerType
+                              ? editingProvider.quotaChecker?.enabled !== false
+                              : false,
+                            intervalMinutes,
+                          },
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--color-text-secondary)',
+                    marginTop: '4px',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {isOAuthMode && oauthCheckerType
+                    ? `Only the '${oauthCheckerType}' checker is available for this OAuth provider.`
+                    : isOAuthMode
+                      ? 'No quota checker is available for this OAuth provider type.'
+                      : selectedQuotaCheckerType
+                        ? 'Quota checker is active for this provider.'
+                        : 'Select <none> to disable provider quota checks.'}
+                </div>
 
-                    {oauthSession?.status === 'awaiting_manual_code' && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '8px',
-                          alignItems: 'flex-end',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <Input
-                            label="Paste redirect URL or code"
-                            value={oauthManualCode}
-                            onChange={(e) => setOauthManualCode(e.target.value)}
-                            placeholder="https://..."
-                          />
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={handleSubmitManualCode}
-                          disabled={oauthBusy || !oauthManualCode}
-                        >
-                          Submit
-                        </Button>
-                      </div>
-                    )}
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'naga' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <NagaQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
-                    {oauthSession?.progress && oauthSession.progress.length > 0 && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <div className="text-[11px] text-text-secondary">Progress</div>
-                        <div className="text-[11px] text-text" style={{ marginTop: '4px' }}>
-                          {(oauthSession?.progress ?? []).slice(-3).map((message, idx) => (
-                            <div key={`${message}-${idx}`}>{message}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'synthetic' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <SyntheticQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
-                    {oauthStatus === 'success' && (
-                      <div className="text-[11px] text-success" style={{ marginBottom: '8px' }}>
-                        Authentication complete. Tokens saved to auth.json.
-                      </div>
-                    )}
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'nanogpt' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <NanoGPTQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={handleStartOAuth}
-                        isLoading={oauthBusy && !oauthSessionId}
-                        disabled={oauthBusy || (!!oauthSessionId && !oauthIsTerminal)}
-                      >
-                        {oauthSessionId && !oauthIsTerminal
-                          ? 'OAuth in progress'
-                          : oauthCredentialReady
-                            ? 'Restart OAuth'
-                            : 'Start OAuth'}
-                      </Button>
-                      {oauthSessionId && !oauthIsTerminal && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleCancelOAuth}
-                          disabled={oauthBusy}
-                        >
-                          Cancel
-                        </Button>
-                      )}
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'zai' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <ZAIQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'moonshot' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <MoonshotQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'novita' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <NovitaQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'minimax' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <MiniMaxQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'minimax-coding' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <MiniMaxCodingQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'openrouter' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <OpenRouterQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kilo' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <KiloQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'poe' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <PoeQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'ollama' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <OllamaQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'wisdomgate' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <WisdomGateQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kimi-code' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <KimiCodeQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <ApertisQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'antigravity' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <AntigravityQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'gemini-cli' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <GeminiCliQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'neuralwatt' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <NeuralwattQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'zenmux' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <ZenmuxQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {quotaValidationError && (
+                  <div className="mt-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
+                    {quotaValidationError}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* GPU Profile section for inference energy calculation */}
+            <div className="flex flex-col gap-2">
+              <label className="font-body text-[13px] font-medium text-text-secondary">
+                GPU Profile
+              </label>
+              <div className="flex gap-3 items-end">
+                <select
+                  className="flex-1 py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  value={editingProvider.gpu_profile || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (!value) {
+                      // "Default (B200)" selected — resolve B200 preset
+                      const resolved = resolveGpuParams('B200');
+                      setEditingProvider({
+                        ...editingProvider,
+                        gpu_profile: undefined,
+                        gpu_ram_gb: resolved.ram_gb,
+                        gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                        gpu_flops_tflop: resolved.flops_tflop,
+                        gpu_power_draw_watts: resolved.power_draw_watts,
+                      });
+                    } else if (value === 'custom') {
+                      // Custom selected — merge any existing overrides with H100 defaults
+                      const resolved = resolveGpuParams('custom', {
+                        ram_gb: editingProvider.gpu_ram_gb,
+                        bandwidth_tb_s: editingProvider.gpu_bandwidth_tb_s,
+                        flops_tflop: editingProvider.gpu_flops_tflop,
+                        power_draw_watts: editingProvider.gpu_power_draw_watts,
+                      });
+                      setEditingProvider({
+                        ...editingProvider,
+                        gpu_profile: 'custom',
+                        gpu_ram_gb: resolved.ram_gb,
+                        gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                        gpu_flops_tflop: resolved.flops_tflop,
+                        gpu_power_draw_watts: resolved.power_draw_watts,
+                      });
+                    } else {
+                      // Named preset selected — resolve immediately to concrete params
+                      const resolved = resolveGpuParams(value);
+                      setEditingProvider({
+                        ...editingProvider,
+                        gpu_profile: value,
+                        gpu_ram_gb: resolved.ram_gb,
+                        gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                        gpu_flops_tflop: resolved.flops_tflop,
+                        gpu_power_draw_watts: resolved.power_draw_watts,
+                      });
+                    }
+                  }}
+                >
+                  <option value="">Default (B200)</option>
+                  {GPU_PROFILE_OPTIONS.map((profile) => (
+                    <option key={profile.value} value={profile.value}>
+                      {profile.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {editingProvider.gpu_profile === 'custom' && (
+                <div className="mt-2 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        RAM (GB)
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={editingProvider.gpu_ram_gb || ''}
+                        onChange={(e) =>
+                          setEditingProvider({
+                            ...editingProvider,
+                            gpu_ram_gb: parseFloat(e.target.value) || undefined,
+                          })
+                        }
+                        placeholder="e.g. 80"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Bandwidth (TB/s)
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={editingProvider.gpu_bandwidth_tb_s || ''}
+                        onChange={(e) =>
+                          setEditingProvider({
+                            ...editingProvider,
+                            gpu_bandwidth_tb_s: parseFloat(e.target.value) || undefined,
+                          })
+                        }
+                        placeholder="e.g. 3.35"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        FLOPS (TFLOPs)
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="100"
+                        min="1"
+                        value={editingProvider.gpu_flops_tflop || ''}
+                        onChange={(e) =>
+                          setEditingProvider({
+                            ...editingProvider,
+                            gpu_flops_tflop: parseFloat(e.target.value) || undefined,
+                          })
+                        }
+                        placeholder="e.g. 4000"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Power Draw (Watts)
+                      </label>
+                      <input
+                        className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="number"
+                        step="10"
+                        min="1"
+                        value={editingProvider.gpu_power_draw_watts || ''}
+                        onChange={(e) =>
+                          setEditingProvider({
+                            ...editingProvider,
+                            gpu_power_draw_watts: parseInt(e.target.value, 10) || undefined,
+                          })
+                        }
+                        placeholder="e.g. 700"
+                      />
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="border border-border-glass rounded-md overflow-hidden">
-                  <div
-                    className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
-                    onClick={() => setIsApiBaseUrlsOpen(!isApiBaseUrlsOpen)}
-                  >
-                    {isApiBaseUrlsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <label
-                      className="font-body text-[13px] font-medium text-text-secondary"
-                      style={{ marginBottom: 0, flex: 1 }}
-                    >
-                      Base URL Entries
-                    </label>
-                    <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                      {Object.keys(getApiBaseUrlMap()).length}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addApiBaseUrlEntry();
-                      }}
-                      disabled={Object.keys(getApiBaseUrlMap()).length >= KNOWN_APIS.length}
-                    >
-                      <Plus size={14} />
-                    </Button>
-                  </div>
-                  {isApiBaseUrlsOpen && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        padding: '8px',
-                        borderTop: '1px solid var(--color-border-glass)',
-                        background: 'var(--color-bg-subtle)',
-                      }}
-                    >
-                      {Object.entries(getApiBaseUrlMap()).length === 0 && (
-                        <div className="font-body text-[11px] text-text-secondary italic">
-                          No base URLs configured yet.
-                        </div>
-                      )}
-                      {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => {
-                        // Detect URL/API type mismatches based on endpoint-shape only
-                        const urlLower = typeof url === 'string' ? url.toLowerCase() : '';
-                        // Native Ollama API paths (not hostname-based, only path-based)
-                        const hasNativeOllamaPath =
-                          urlLower.includes('/api/chat') ||
-                          urlLower.includes('/api/generate') ||
-                          urlLower.includes('/api/embeddings') ||
-                          urlLower.includes('/api/tags');
-                        const hasV1Suffix = urlLower.includes('/v1');
-                        // Warn when native Ollama type is selected but URL has /v1 (OpenAI-compatible)
-                        const showOllamaV1Warning = apiType === 'ollama' && hasV1Suffix;
-                        // Warn when chat type is selected but URL looks like native Ollama (path-based, no /v1)
-                        const showChatOllamaWarning =
-                          apiType === 'chat' && hasNativeOllamaPath && !hasV1Suffix;
+              )}
+              <div className="text-[11px] text-text-muted">
+                Used for inference energy calculation. Select a preset or enter custom GPU specs.
+              </div>
+            </div>
 
-                        return (
-                          <div
-                            key={apiType}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '1fr auto',
-                              gap: '8px',
-                              alignItems: 'start',
-                            }}
-                          >
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <select
-                                className="w-full py-1.5 px-3 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                                value={apiType}
-                                onChange={(e) =>
-                                  updateApiBaseUrlEntry(
-                                    apiType,
-                                    e.target.value,
-                                    typeof url === 'string' ? url : ''
-                                  )
+            {/* Advanced accordion */}
+            <div className="border border-border-glass rounded-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsAdvancedOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+              >
+                <span className="font-body text-[13px] font-medium text-text-secondary">
+                  Advanced
+                </span>
+                {isAdvancedOpen ? (
+                  <ChevronDown size={14} className="text-text-muted" />
+                ) : (
+                  <ChevronRight size={14} className="text-text-muted" />
+                )}
+              </button>
+
+              {isAdvancedOpen && (
+                <div
+                  className="px-3 py-3 border-t border-border-glass"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                >
+                  {/* Discount */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px] sm:items-end">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-body text-[11px] font-medium text-text-secondary">
+                        Discount (%)
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          className="w-full py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                          type="number"
+                          step="1"
+                          min="0"
+                          max="100"
+                          value={Math.round((editingProvider.discount ?? 0) * 100)}
+                          onChange={(e) => {
+                            const percent = Number(e.target.value || '0');
+                            const clamped = Math.min(100, Math.max(0, percent));
+                            setEditingProvider({ ...editingProvider, discount: clamped / 100 });
+                          }}
+                        />
+                        <span
+                          className="font-body text-[12px] text-text-secondary"
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Custom Headers */}
+                  <div className="border border-border-glass rounded-md overflow-hidden">
+                    <div
+                      className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                      onClick={() => setIsHeadersOpen(!isHeadersOpen)}
+                    >
+                      {isHeadersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <label
+                        className="font-body text-[13px] font-medium text-text-secondary"
+                        style={{ marginBottom: 0, flex: 1 }}
+                      >
+                        Custom Headers
+                      </label>
+                      <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                        {Object.keys(editingProvider.headers || {}).length}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addKV('headers');
+                          setIsHeadersOpen(true);
+                        }}
+                      >
+                        <Plus size={14} />
+                      </Button>
+                    </div>
+                    {isHeadersOpen && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          padding: '8px',
+                          borderTop: '1px solid var(--color-border-glass)',
+                          background: 'var(--color-bg-deep)',
+                        }}
+                      >
+                        {Object.entries(editingProvider.headers || {}).length === 0 && (
+                          <div className="font-body text-[11px] text-text-secondary italic">
+                            No custom headers configured.
+                          </div>
+                        )}
+                        {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '6px' }}>
+                            <Input
+                              placeholder="Header Name"
+                              value={key}
+                              onChange={(e) => updateKV('headers', key, e.target.value, val)}
+                              style={{ flex: 1 }}
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={typeof val === 'object' ? JSON.stringify(val) : val}
+                              onChange={(e) => {
+                                const rawValue = e.target.value;
+                                let parsedValue;
+                                try {
+                                  parsedValue = JSON.parse(rawValue);
+                                } catch {
+                                  parsedValue = rawValue;
                                 }
-                              >
-                                {KNOWN_APIS.map((knownType) => (
-                                  <option
-                                    key={knownType}
-                                    value={knownType}
-                                    className="bg-bg-surface text-text"
-                                  >
-                                    {knownType}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                                placeholder={
-                                  apiType === 'ollama'
-                                    ? 'http://localhost:11434'
-                                    : 'https://api.example.com/v1/...'
-                                }
-                                value={typeof url === 'string' ? url : ''}
-                                onChange={(e) =>
-                                  updateApiBaseUrlEntry(apiType, apiType, e.target.value)
-                                }
-                              />
-                              {showOllamaV1Warning && (
-                                <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
-                                  <AlertTriangle
-                                    size={14}
-                                    className="text-warning shrink-0 mt-0.5"
-                                  />
-                                  <span className="text-[11px] text-warning">
-                                    <span style={{ fontWeight: 600 }}>native ollama</span> type
-                                    expects root URL (e.g.{' '}
-                                    <code
-                                      style={{
-                                        background: 'var(--color-bg-subtle)',
-                                        padding: '0 3px',
-                                        borderRadius: '2px',
-                                      }}
-                                    >
-                                      http://localhost:11434
-                                    </code>
-                                    ). URLs with{' '}
-                                    <code
-                                      style={{
-                                        background: 'var(--color-bg-subtle)',
-                                        padding: '0 3px',
-                                        borderRadius: '2px',
-                                      }}
-                                    >
-                                      /v1
-                                    </code>{' '}
-                                    are OpenAI-compatible — use{' '}
-                                    <span style={{ fontWeight: 600 }}>chat</span> type instead.
-                                  </span>
-                                </div>
-                              )}
-                              {showChatOllamaWarning && (
-                                <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
-                                  <AlertTriangle
-                                    size={14}
-                                    className="text-warning shrink-0 mt-0.5"
-                                  />
-                                  <span className="text-[11px] text-warning">
-                                    This URL contains{' '}
-                                    <code
-                                      style={{
-                                        background: 'var(--color-bg-subtle)',
-                                        padding: '0 3px',
-                                        borderRadius: '2px',
-                                      }}
-                                    >
-                                      /api/
-                                    </code>{' '}
-                                    paths typical of native Ollama. If this is a native Ollama
-                                    endpoint, use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
-                                    type instead.
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                                updateKV('headers', key, key, parsedValue);
+                              }}
+                              style={{ flex: 1 }}
+                            />
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => removeApiBaseUrlEntry(apiType)}
-                              style={{ padding: '4px', marginTop: '4px' }}
+                              onClick={() => removeKV('headers', key)}
+                              style={{ padding: '4px' }}
                             >
                               <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
                             </Button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Right: Quota Checker */}
-            <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Quota Checker
-              </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 120px',
-                  gap: '8px',
-                  alignItems: 'end',
-                  marginTop: '4px',
-                }}
-              >
-                <div className="flex flex-col gap-1">
-                  <label className="font-body text-[11px] font-medium text-text-secondary">
-                    Type
-                  </label>
-                  <select
-                    className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                    value={selectedQuotaCheckerType}
-                    onChange={(e) => {
-                      const quotaType = e.target.value;
-                      if (!quotaType) {
-                        setEditingProvider({ ...editingProvider, quotaChecker: undefined });
-                        return;
-                      }
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          type: quotaType,
-                          enabled: true,
-                          intervalMinutes: Math.max(
-                            1,
-                            editingProvider.quotaChecker?.intervalMinutes || 30
-                          ),
-                          options: editingProvider.quotaChecker?.options,
-                        },
-                      });
-                    }}
-                  >
-                    {<option value="">&lt;none&gt;</option>}
-                    {selectableQuotaCheckerTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-body text-[11px] font-medium text-text-secondary">
-                    Interval (min)
-                  </label>
-                  <input
-                    className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={editingProvider.quotaChecker?.intervalMinutes || 30}
-                    disabled={!selectedQuotaCheckerType}
-                    onChange={(e) => {
-                      const intervalMinutes = Math.max(1, parseInt(e.target.value, 10) || 30);
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          type: selectedQuotaCheckerType,
-                          enabled: selectedQuotaCheckerType
-                            ? editingProvider.quotaChecker?.enabled !== false
-                            : false,
-                          intervalMinutes,
-                        },
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: 'var(--color-text-secondary)',
-                  marginTop: '4px',
-                  fontStyle: 'italic',
-                }}
-              >
-                {isOAuthMode && oauthCheckerType
-                  ? `Only the '${oauthCheckerType}' checker is available for this OAuth provider.`
-                  : isOAuthMode
-                    ? 'No quota checker is available for this OAuth provider type.'
-                    : selectedQuotaCheckerType
-                      ? 'Quota checker is active for this provider.'
-                      : 'Select <none> to disable provider quota checks.'}
-              </div>
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'naga' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <NagaQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'synthetic' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <SyntheticQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'nanogpt' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <NanoGPTQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'zai' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <ZAIQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'moonshot' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <MoonshotQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'novita' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <NovitaQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'minimax' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <MiniMaxQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'minimax-coding' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <MiniMaxCodingQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'openrouter' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <OpenRouterQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kilo' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <KiloQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'poe' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <PoeQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'ollama' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <OllamaQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'wisdomgate' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-subtle">
-                  <WisdomGateQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'kimi-code' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <KimiCodeQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'apertis' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <ApertisQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'antigravity' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <AntigravityQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'gemini-cli' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <GeminiCliQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'neuralwatt' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <NeuralwattQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {selectedQuotaCheckerType && selectedQuotaCheckerType === 'zenmux' && (
-                <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                  <ZenmuxQuotaConfig
-                    options={editingProvider.quotaChecker?.options || {}}
-                    onChange={(options) =>
-                      setEditingProvider({
-                        ...editingProvider,
-                        quotaChecker: {
-                          ...editingProvider.quotaChecker,
-                          options,
-                        } as Provider['quotaChecker'],
-                      })
-                    }
-                  />
-                </div>
-              )}
-
-              {quotaValidationError && (
-                <div className="mt-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
-                  {quotaValidationError}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* GPU Profile section for inference energy calculation */}
-          <div className="flex flex-col gap-2">
-            <label className="font-body text-[13px] font-medium text-text-secondary">
-              GPU Profile
-            </label>
-            <div className="flex gap-3 items-end">
-              <select
-                className="flex-1 py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                value={editingProvider.gpu_profile || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (!value) {
-                    // "Default (B200)" selected — resolve B200 preset
-                    const resolved = resolveGpuParams('B200');
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_profile: undefined,
-                      gpu_ram_gb: resolved.ram_gb,
-                      gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
-                      gpu_flops_tflop: resolved.flops_tflop,
-                      gpu_power_draw_watts: resolved.power_draw_watts,
-                    });
-                  } else if (value === 'custom') {
-                    // Custom selected — merge any existing overrides with H100 defaults
-                    const resolved = resolveGpuParams('custom', {
-                      ram_gb: editingProvider.gpu_ram_gb,
-                      bandwidth_tb_s: editingProvider.gpu_bandwidth_tb_s,
-                      flops_tflop: editingProvider.gpu_flops_tflop,
-                      power_draw_watts: editingProvider.gpu_power_draw_watts,
-                    });
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_profile: 'custom',
-                      gpu_ram_gb: resolved.ram_gb,
-                      gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
-                      gpu_flops_tflop: resolved.flops_tflop,
-                      gpu_power_draw_watts: resolved.power_draw_watts,
-                    });
-                  } else {
-                    // Named preset selected — resolve immediately to concrete params
-                    const resolved = resolveGpuParams(value);
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_profile: value,
-                      gpu_ram_gb: resolved.ram_gb,
-                      gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
-                      gpu_flops_tflop: resolved.flops_tflop,
-                      gpu_power_draw_watts: resolved.power_draw_watts,
-                    });
-                  }
-                }}
-              >
-                <option value="">Default (B200)</option>
-                {GPU_PROFILE_OPTIONS.map((profile) => (
-                  <option key={profile.value} value={profile.value}>
-                    {profile.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {editingProvider.gpu_profile === 'custom' && (
-              <div className="mt-2 p-3 border border-border-glass rounded-md bg-bg-subtle">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      RAM (GB)
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="1"
-                      min="1"
-                      value={editingProvider.gpu_ram_gb || ''}
-                      onChange={(e) =>
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_ram_gb: parseFloat(e.target.value) || undefined,
-                        })
-                      }
-                      placeholder="e.g. 80"
-                    />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Bandwidth (TB/s)
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={editingProvider.gpu_bandwidth_tb_s || ''}
-                      onChange={(e) =>
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_bandwidth_tb_s: parseFloat(e.target.value) || undefined,
-                        })
-                      }
-                      placeholder="e.g. 3.35"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      FLOPS (TFLOPs)
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="100"
-                      min="1"
-                      value={editingProvider.gpu_flops_tflop || ''}
-                      onChange={(e) =>
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_flops_tflop: parseFloat(e.target.value) || undefined,
-                        })
-                      }
-                      placeholder="e.g. 4000"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Power Draw (Watts)
-                    </label>
-                    <input
-                      className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      type="number"
-                      step="10"
-                      min="1"
-                      value={editingProvider.gpu_power_draw_watts || ''}
-                      onChange={(e) =>
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_power_draw_watts: parseInt(e.target.value, 10) || undefined,
-                        })
-                      }
-                      placeholder="e.g. 700"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="text-[11px] text-text-muted">
-              Used for inference energy calculation. Select a preset or enter custom GPU specs.
-            </div>
-          </div>
 
-          {/* Advanced accordion */}
-          <div className="border border-border-glass rounded-sm overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsAdvancedOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
-            >
-              <span className="font-body text-[13px] font-medium text-text-secondary">
-                Advanced
-              </span>
-              {isAdvancedOpen ? (
-                <ChevronDown size={14} className="text-text-muted" />
-              ) : (
-                <ChevronRight size={14} className="text-text-muted" />
-              )}
-            </button>
-
-            {isAdvancedOpen && (
-              <div
-                className="px-3 py-3 border-t border-border-glass"
-                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-              >
-                {/* Discount */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '140px',
-                    gap: '12px',
-                    alignItems: 'end',
-                  }}
-                >
-                  <div className="flex flex-col gap-1">
-                    <label className="font-body text-[11px] font-medium text-text-secondary">
-                      Discount (%)
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        className="w-full py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                        type="number"
-                        step="1"
-                        min="0"
-                        max="100"
-                        value={Math.round((editingProvider.discount ?? 0) * 100)}
-                        onChange={(e) => {
-                          const percent = Number(e.target.value || '0');
-                          const clamped = Math.min(100, Math.max(0, percent));
-                          setEditingProvider({ ...editingProvider, discount: clamped / 100 });
-                        }}
-                      />
-                      <span
-                        className="font-body text-[12px] text-text-secondary"
-                        style={{
-                          position: 'absolute',
-                          right: '10px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          pointerEvents: 'none',
+                  {/* Extra Body Fields */}
+                  <div className="border border-border-glass rounded-md overflow-hidden">
+                    <div
+                      className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                      onClick={() => setIsExtraBodyOpen(!isExtraBodyOpen)}
+                    >
+                      {isExtraBodyOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <label
+                        className="font-body text-[13px] font-medium text-text-secondary"
+                        style={{ marginBottom: 0, flex: 1 }}
+                      >
+                        Extra Body Fields
+                      </label>
+                      <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                        {Object.keys(editingProvider.extraBody || {}).length}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addKV('extraBody');
+                          setIsExtraBodyOpen(true);
                         }}
                       >
-                        %
+                        <Plus size={14} />
+                      </Button>
+                    </div>
+                    {isExtraBodyOpen && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          padding: '8px',
+                          borderTop: '1px solid var(--color-border-glass)',
+                          background: 'var(--color-bg-deep)',
+                        }}
+                      >
+                        {Object.entries(editingProvider.extraBody || {}).length === 0 && (
+                          <div className="font-body text-[11px] text-text-secondary italic">
+                            No extra body fields configured.
+                          </div>
+                        )}
+                        {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '6px' }}>
+                            <Input
+                              placeholder="Field Name"
+                              value={key}
+                              onChange={(e) => updateKV('extraBody', key, e.target.value, val)}
+                              style={{ flex: 1 }}
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={typeof val === 'object' ? JSON.stringify(val) : val}
+                              onChange={(e) => {
+                                const rawValue = e.target.value;
+                                let parsedValue;
+                                try {
+                                  parsedValue = JSON.parse(rawValue);
+                                } catch {
+                                  parsedValue = rawValue;
+                                }
+                                updateKV('extraBody', key, key, parsedValue);
+                              }}
+                              style={{ flex: 1 }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeKV('extraBody', key)}
+                              style={{ padding: '4px' }}
+                            >
+                              <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Estimate Tokens */}
+                  <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                    <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+                      <Switch
+                        checked={editingProvider.estimateTokens || false}
+                        onChange={(checked) =>
+                          setEditingProvider({ ...editingProvider, estimateTokens: checked })
+                        }
+                      />
+                      <label
+                        className="font-body text-[13px] font-medium text-text"
+                        style={{ marginBottom: 0 }}
+                      >
+                        Estimate Tokens
+                      </label>
+                    </div>
+                    <div
+                      className="font-body text-[11px] text-text-secondary"
+                      style={{ lineHeight: 1.35, marginTop: '4px' }}
+                    >
+                      Enable token estimation only when a provider does not return usage data.
+                      <span className="text-warning" style={{ marginLeft: '6px' }}>
+                        Use sparingly—this is rarely needed.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Disable Cooldown */}
+                  <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                    <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+                      <Switch
+                        checked={editingProvider.disableCooldown || false}
+                        onChange={(checked) =>
+                          setEditingProvider({ ...editingProvider, disableCooldown: checked })
+                        }
+                      />
+                      <label
+                        className="font-body text-[13px] font-medium text-text"
+                        style={{ marginBottom: 0 }}
+                      >
+                        Disable Cooldowns
+                      </label>
+                    </div>
+                    <div
+                      className="font-body text-[11px] text-text-secondary"
+                      style={{ lineHeight: 1.35, marginTop: '4px' }}
+                    >
+                      When enabled, this provider will never be placed on cooldown due to errors —
+                      it will always remain eligible for routing regardless of consecutive failures.
+                      <span className="text-warning" style={{ marginLeft: '6px' }}>
+                        Use only for providers with reliable external rate-limit handling.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Use Claude Masking */}
+                  <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+                    <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+                      <Switch
+                        checked={editingProvider.useClaudeMasking || false}
+                        onChange={(checked) =>
+                          setEditingProvider({ ...editingProvider, useClaudeMasking: checked })
+                        }
+                      />
+                      <label
+                        className="font-body text-[13px] font-medium text-text"
+                        style={{ marginBottom: 0 }}
+                      >
+                        Use Claude Masking
+                      </label>
+                    </div>
+                    <div
+                      className="font-body text-[11px] text-text-secondary"
+                      style={{ lineHeight: 1.35, marginTop: '4px' }}
+                    >
+                      When enabled, requests to this Anthropic provider will be masked as Claude
+                      Code CLI sessions — tool names are prefixed to avoid conflicts with built-in
+                      tools, and Claude Code headers are injected. Applies regardless of API key
+                      type or OAuth.
+                      <span className="text-warning" style={{ marginLeft: '6px' }}>
+                        Only effective for Anthropic providers.
                       </span>
                     </div>
                   </div>
                 </div>
-
-                {/* Custom Headers */}
-                <div className="border border-border-glass rounded-md overflow-hidden">
-                  <div
-                    className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
-                    onClick={() => setIsHeadersOpen(!isHeadersOpen)}
-                  >
-                    {isHeadersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <label
-                      className="font-body text-[13px] font-medium text-text-secondary"
-                      style={{ marginBottom: 0, flex: 1 }}
-                    >
-                      Custom Headers
-                    </label>
-                    <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                      {Object.keys(editingProvider.headers || {}).length}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addKV('headers');
-                        setIsHeadersOpen(true);
-                      }}
-                    >
-                      <Plus size={14} />
-                    </Button>
-                  </div>
-                  {isHeadersOpen && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        padding: '8px',
-                        borderTop: '1px solid var(--color-border-glass)',
-                        background: 'var(--color-bg-deep)',
-                      }}
-                    >
-                      {Object.entries(editingProvider.headers || {}).length === 0 && (
-                        <div className="font-body text-[11px] text-text-secondary italic">
-                          No custom headers configured.
-                        </div>
-                      )}
-                      {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                          <Input
-                            placeholder="Header Name"
-                            value={key}
-                            onChange={(e) => updateKV('headers', key, e.target.value, val)}
-                            style={{ flex: 1 }}
-                          />
-                          <Input
-                            placeholder="Value"
-                            value={typeof val === 'object' ? JSON.stringify(val) : val}
-                            onChange={(e) => {
-                              const rawValue = e.target.value;
-                              let parsedValue;
-                              try {
-                                parsedValue = JSON.parse(rawValue);
-                              } catch {
-                                parsedValue = rawValue;
-                              }
-                              updateKV('headers', key, key, parsedValue);
-                            }}
-                            style={{ flex: 1 }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeKV('headers', key)}
-                            style={{ padding: '4px' }}
-                          >
-                            <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Extra Body Fields */}
-                <div className="border border-border-glass rounded-md overflow-hidden">
-                  <div
-                    className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
-                    onClick={() => setIsExtraBodyOpen(!isExtraBodyOpen)}
-                  >
-                    {isExtraBodyOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <label
-                      className="font-body text-[13px] font-medium text-text-secondary"
-                      style={{ marginBottom: 0, flex: 1 }}
-                    >
-                      Extra Body Fields
-                    </label>
-                    <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                      {Object.keys(editingProvider.extraBody || {}).length}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addKV('extraBody');
-                        setIsExtraBodyOpen(true);
-                      }}
-                    >
-                      <Plus size={14} />
-                    </Button>
-                  </div>
-                  {isExtraBodyOpen && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        padding: '8px',
-                        borderTop: '1px solid var(--color-border-glass)',
-                        background: 'var(--color-bg-deep)',
-                      }}
-                    >
-                      {Object.entries(editingProvider.extraBody || {}).length === 0 && (
-                        <div className="font-body text-[11px] text-text-secondary italic">
-                          No extra body fields configured.
-                        </div>
-                      )}
-                      {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                          <Input
-                            placeholder="Field Name"
-                            value={key}
-                            onChange={(e) => updateKV('extraBody', key, e.target.value, val)}
-                            style={{ flex: 1 }}
-                          />
-                          <Input
-                            placeholder="Value"
-                            value={typeof val === 'object' ? JSON.stringify(val) : val}
-                            onChange={(e) => {
-                              const rawValue = e.target.value;
-                              let parsedValue;
-                              try {
-                                parsedValue = JSON.parse(rawValue);
-                              } catch {
-                                parsedValue = rawValue;
-                              }
-                              updateKV('extraBody', key, key, parsedValue);
-                            }}
-                            style={{ flex: 1 }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeKV('extraBody', key)}
-                            style={{ padding: '4px' }}
-                          >
-                            <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Estimate Tokens */}
-                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-                  <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-                    <Switch
-                      checked={editingProvider.estimateTokens || false}
-                      onChange={(checked) =>
-                        setEditingProvider({ ...editingProvider, estimateTokens: checked })
-                      }
-                    />
-                    <label
-                      className="font-body text-[13px] font-medium text-text"
-                      style={{ marginBottom: 0 }}
-                    >
-                      Estimate Tokens
-                    </label>
-                  </div>
-                  <div
-                    className="font-body text-[11px] text-text-secondary"
-                    style={{ lineHeight: 1.35, marginTop: '4px' }}
-                  >
-                    Enable token estimation only when a provider does not return usage data.
-                    <span className="text-warning" style={{ marginLeft: '6px' }}>
-                      Use sparingly—this is rarely needed.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Disable Cooldown */}
-                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-                  <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-                    <Switch
-                      checked={editingProvider.disableCooldown || false}
-                      onChange={(checked) =>
-                        setEditingProvider({ ...editingProvider, disableCooldown: checked })
-                      }
-                    />
-                    <label
-                      className="font-body text-[13px] font-medium text-text"
-                      style={{ marginBottom: 0 }}
-                    >
-                      Disable Cooldowns
-                    </label>
-                  </div>
-                  <div
-                    className="font-body text-[11px] text-text-secondary"
-                    style={{ lineHeight: 1.35, marginTop: '4px' }}
-                  >
-                    When enabled, this provider will never be placed on cooldown due to errors — it
-                    will always remain eligible for routing regardless of consecutive failures.
-                    <span className="text-warning" style={{ marginLeft: '6px' }}>
-                      Use only for providers with reliable external rate-limit handling.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Use Claude Masking */}
-                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-                  <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-                    <Switch
-                      checked={editingProvider.useClaudeMasking || false}
-                      onChange={(checked) =>
-                        setEditingProvider({ ...editingProvider, useClaudeMasking: checked })
-                      }
-                    />
-                    <label
-                      className="font-body text-[13px] font-medium text-text"
-                      style={{ marginBottom: 0 }}
-                    >
-                      Use Claude Masking
-                    </label>
-                  </div>
-                  <div
-                    className="font-body text-[11px] text-text-secondary"
-                    style={{ lineHeight: 1.35, marginTop: '4px' }}
-                  >
-                    When enabled, requests to this Anthropic provider will be masked as Claude Code
-                    CLI sessions — tool names are prefixed to avoid conflicts with built-in tools,
-                    and Claude Code headers are injected. Applies regardless of API key type or
-                    OAuth.
-                    <span className="text-warning" style={{ marginLeft: '6px' }}>
-                      Only effective for Anthropic providers.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Gemini Thinking Replacement */}
-                <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-                  <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-                    <Switch
-                      checked={editingProvider.geminiThinkingEnabled || false}
-                      onChange={(checked) =>
-                        setEditingProvider({ ...editingProvider, geminiThinkingEnabled: checked })
-                      }
-                    />
-                    <label
-                      className="font-body text-[13px] font-medium text-text"
-                      style={{ marginBottom: 0 }}
-                    >
-                      Enable Gemini Thinking
-                    </label>
-                  </div>
-                  <div
-                    className="font-body text-[11px] text-text-secondary"
-                    style={{ lineHeight: 1.35, marginTop: '4px' }}
-                  >
-                    When enabled, converts incoming reasoning_effort to Gemini's thinkingConfig.
-                    Strips unsupported reasoning field from requests to Gemini's OpenAI-compatible
-                    endpoint.
-                    <span className="text-warning" style={{ marginLeft: '6px' }}>
-                      Only effective for Gemini providers.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Models Accordion */}
-          <div className="border border-border-glass rounded-md">
-            <div
-              className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
-              onClick={() => setIsModelsOpen(!isModelsOpen)}
-            >
-              {isModelsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>Provider Models</span>
-              <Badge status="connected">
-                {Object.keys(editingProvider.models || {}).length} Models
-              </Badge>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenFetchModels();
-                }}
-                leftIcon={<Download size={14} />}
-                style={{ marginLeft: '8px' }}
-              >
-                Fetch Models
-              </Button>
+              )}
             </div>
-            {isModelsOpen && (
+
+            {/* Models Accordion */}
+            <div className="border border-border-glass rounded-md">
               <div
-                style={{
-                  padding: '8px',
-                  borderTop: '1px solid var(--color-border-glass)',
-                  background: 'var(--color-bg-deep)',
-                }}
+                className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+                onClick={() => setIsModelsOpen(!isModelsOpen)}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {Object.entries(editingProvider.models || {}).map(
-                    ([mId, mCfg]: [string, any]) => (
-                      <div
-                        key={mId}
-                        style={{
-                          border: '1px solid var(--color-border-glass)',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--color-bg-surface)',
-                        }}
-                      >
+                {isModelsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>Provider Models</span>
+                <Badge status="connected">
+                  {Object.keys(editingProvider.models || {}).length} Models
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenFetchModels();
+                  }}
+                  leftIcon={<Download size={14} />}
+                  style={{ marginLeft: '8px' }}
+                >
+                  Fetch Models
+                </Button>
+              </div>
+              {isModelsOpen && (
+                <div
+                  style={{
+                    padding: '8px',
+                    borderTop: '1px solid var(--color-border-glass)',
+                    background: 'var(--color-bg-deep)',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {Object.entries(editingProvider.models || {}).map(
+                      ([mId, mCfg]: [string, any]) => (
                         <div
+                          key={mId}
                           style={{
-                            padding: '6px 8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            cursor: 'pointer',
+                            border: '1px solid var(--color-border-glass)',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--color-bg-surface)',
                           }}
-                          onClick={() => setOpenModelIdx(openModelIdx === mId ? null : mId)}
                         >
-                          {openModelIdx === mId ? (
-                            <ChevronDown size={12} />
-                          ) : (
-                            <ChevronRight size={12} />
-                          )}
-                          <span style={{ fontWeight: 600, fontSize: '12px', flex: 1 }}>{mId}</span>
-                          {(() => {
-                            const testKey = `${editingProvider.id}-${mId}`;
-                            const testState = testStates[testKey];
-                            return (
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTestModel(editingProvider.id, mId, mCfg.type);
-                                }}
-                                className="flex items-center cursor-pointer"
-                                title="Test this model"
-                              >
-                                {testState?.loading ? (
-                                  <Loader2 size={14} className="animate-spin text-text-secondary" />
-                                ) : testState?.showResult && testState.result === 'success' ? (
-                                  <CheckCircle size={14} className="text-success" />
-                                ) : testState?.showResult && testState.result === 'error' ? (
-                                  <XCircle size={14} className="text-danger" />
-                                ) : (
-                                  <Play size={14} className="text-primary opacity-60" />
-                                )}
-                              </div>
-                            );
-                          })()}
-                          {(() => {
-                            const testKey = `${editingProvider.id}-${mId}`;
-                            const testState = testStates[testKey];
-                            return testState?.showResult && testState.message ? (
-                              <span
-                                className={`text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
-                              >
-                                {testState.message}
-                              </span>
-                            ) : null;
-                          })()}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeModel(mId);
-                            }}
-                            style={{ color: 'var(--color-danger)', padding: '2px' }}
-                          >
-                            <X size={12} />
-                          </Button>
-                        </div>
-                        {openModelIdx === mId && (
                           <div
                             style={{
-                              padding: '8px',
-                              borderTop: '1px solid var(--color-border-glass)',
+                              padding: '6px 8px',
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
+                              alignItems: 'center',
+                              gap: '8px',
+                              cursor: 'pointer',
                             }}
+                            onClick={() => setOpenModelIdx(openModelIdx === mId ? null : mId)}
                           >
-                            <ModelIdInput modelId={mId} onCommit={updateModelId} />
-
-                            <div className="grid gap-4 grid-cols-3">
-                              <div className="flex flex-col gap-1">
-                                <label className="font-body text-[13px] font-medium text-text-secondary">
-                                  Model Type
-                                </label>
-                                <select
-                                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                                  value={mCfg.type || 'chat'}
-                                  onChange={(e) => {
-                                    const newType = e.target.value as
-                                      | 'chat'
-                                      | 'embeddings'
-                                      | 'transcriptions'
-                                      | 'speech'
-                                      | 'image'
-                                      | 'responses';
-                                    // If switching to embeddings, clear non-embeddings APIs from access_via
-                                    if (newType === 'embeddings') {
-                                      const filteredAccessVia = (mCfg.access_via || []).filter(
-                                        (api: string) => api === 'embeddings'
-                                      );
-                                      updateModelConfig(mId, {
-                                        type: newType,
-                                        access_via:
-                                          filteredAccessVia.length > 0
-                                            ? filteredAccessVia
-                                            : ['embeddings'],
-                                      });
-                                    } else if (newType === 'transcriptions') {
-                                      const filteredAccessVia = (mCfg.access_via || []).filter(
-                                        (api: string) => api === 'transcriptions'
-                                      );
-                                      updateModelConfig(mId, {
-                                        type: newType,
-                                        access_via:
-                                          filteredAccessVia.length > 0
-                                            ? filteredAccessVia
-                                            : ['transcriptions'],
-                                      });
-                                    } else if (newType === 'speech') {
-                                      const filteredAccessVia = (mCfg.access_via || []).filter(
-                                        (api: string) => api === 'speech'
-                                      );
-                                      updateModelConfig(mId, {
-                                        type: newType,
-                                        access_via:
-                                          filteredAccessVia.length > 0
-                                            ? filteredAccessVia
-                                            : ['speech'],
-                                      });
-                                    } else if (newType === 'image') {
-                                      const filteredAccessVia = (mCfg.access_via || []).filter(
-                                        (api: string) => api === 'images'
-                                      );
-                                      updateModelConfig(mId, {
-                                        type: newType,
-                                        access_via:
-                                          filteredAccessVia.length > 0
-                                            ? filteredAccessVia
-                                            : ['images'],
-                                      });
-                                    } else if (newType === 'responses') {
-                                      const filteredAccessVia = (mCfg.access_via || []).filter(
-                                        (api: string) => api === 'responses'
-                                      );
-                                      updateModelConfig(mId, {
-                                        type: newType,
-                                        access_via:
-                                          filteredAccessVia.length > 0
-                                            ? filteredAccessVia
-                                            : ['responses'],
-                                      });
-                                    } else {
-                                      updateModelConfig(mId, { type: newType });
-                                    }
+                            {openModelIdx === mId ? (
+                              <ChevronDown size={12} />
+                            ) : (
+                              <ChevronRight size={12} />
+                            )}
+                            <span style={{ fontWeight: 600, fontSize: '12px', flex: 1 }}>
+                              {mId}
+                            </span>
+                            {(() => {
+                              const testKey = `${editingProvider.id}-${mId}`;
+                              const testState = testStates[testKey];
+                              return (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTestModel(editingProvider.id, mId, mCfg.type);
                                   }}
+                                  className="flex items-center cursor-pointer"
+                                  title="Test this model"
                                 >
-                                  <option value="chat">Chat</option>
-                                  <option value="embeddings">Embeddings</option>
-                                  <option value="transcriptions">Transcriptions</option>
-                                  <option value="speech">Speech</option>
-                                  <option value="image">Image</option>
-                                  <option value="responses">Responses</option>
-                                </select>
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="font-body text-[13px] font-medium text-text-secondary">
-                                  Pricing Source
-                                </label>
-                                <select
-                                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                                  value={mCfg.pricing?.source || 'simple'}
-                                  onChange={(e) => {
-                                    const newSource = e.target.value;
-                                    let newPricing: any;
-
-                                    // Create a clean pricing object based on the selected source
-                                    if (newSource === 'simple') {
-                                      newPricing = {
-                                        source: 'simple',
-                                        input: mCfg.pricing?.input || 0,
-                                        output: mCfg.pricing?.output || 0,
-                                        cached: mCfg.pricing?.cached || 0,
-                                        cache_write: mCfg.pricing?.cache_write || 0,
-                                      };
-                                    } else if (newSource === 'openrouter') {
-                                      newPricing = {
-                                        source: 'openrouter',
-                                        slug: mCfg.pricing?.slug || '',
-                                        ...(mCfg.pricing?.discount !== undefined && {
-                                          discount: mCfg.pricing.discount,
-                                        }),
-                                      };
-                                    } else if (newSource === 'defined') {
-                                      newPricing = {
-                                        source: 'defined',
-                                        range: mCfg.pricing?.range || [],
-                                      };
-                                    } else if (newSource === 'per_request') {
-                                      newPricing = {
-                                        source: 'per_request',
-                                        amount: mCfg.pricing?.amount || 0,
-                                      };
-                                    }
-
-                                    updateModelConfig(mId, { pricing: newPricing });
-                                  }}
+                                  {testState?.loading ? (
+                                    <Loader2
+                                      size={14}
+                                      className="animate-spin text-text-secondary"
+                                    />
+                                  ) : testState?.showResult && testState.result === 'success' ? (
+                                    <CheckCircle size={14} className="text-success" />
+                                  ) : testState?.showResult && testState.result === 'error' ? (
+                                    <XCircle size={14} className="text-danger" />
+                                  ) : (
+                                    <Play size={14} className="text-primary opacity-60" />
+                                  )}
+                                </div>
+                              );
+                            })()}
+                            {(() => {
+                              const testKey = `${editingProvider.id}-${mId}`;
+                              const testState = testStates[testKey];
+                              return testState?.showResult && testState.message ? (
+                                <span
+                                  className={`text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
                                 >
-                                  <option value="simple">Simple</option>
-                                  <option value="openrouter">OpenRouter</option>
-                                  <option value="defined">Ranges (Complex)</option>
-                                  <option value="per_request">Per Request (Flat Fee)</option>
-                                </select>
-                              </div>
-                              {mCfg.type !== 'embeddings' &&
-                                mCfg.type !== 'transcriptions' &&
-                                mCfg.type !== 'speech' &&
-                                mCfg.type !== 'image' &&
-                                mCfg.type !== 'responses' && (
-                                  <div className="flex flex-col gap-1">
-                                    <label className="font-body text-[13px] font-medium text-text-secondary">
-                                      Access Via (APIs)
-                                    </label>
-                                    <div
-                                      style={{
-                                        fontSize: '11px',
-                                        color: 'var(--color-text-secondary)',
-                                        marginBottom: '4px',
-                                        lineHeight: '1.4',
-                                      }}
-                                    >
-                                      Choose which API protocols this model should use.{' '}
-                                      <span style={{ fontWeight: 600 }}>chat</span> works with most
-                                      providers. Use <span style={{ fontWeight: 600 }}>ollama</span>{' '}
-                                      only for native Ollama API.
-                                    </div>
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        gap: '6px',
-                                        flexWrap: 'wrap',
-                                        marginTop: '4px',
-                                      }}
-                                    >
-                                      {KNOWN_APIS.filter((apiType) => {
-                                        if (mCfg.type === 'chat') {
-                                          return [
-                                            'messages',
-                                            'chat',
-                                            'gemini',
-                                            'responses',
-                                            'ollama',
-                                          ].includes(apiType);
-                                        }
-                                        return true;
-                                      }).map((apiType) => {
-                                        const isEmbeddingsModel = mCfg.type === 'embeddings';
-                                        const isTranscriptionsModel =
-                                          mCfg.type === 'transcriptions';
-                                        const isSpeechModel = mCfg.type === 'speech';
-                                        const isImageModel = mCfg.type === 'image';
-                                        const isResponsesModel = mCfg.type === 'responses';
-                                        const isDisabled =
-                                          (isEmbeddingsModel && apiType !== 'embeddings') ||
-                                          (isTranscriptionsModel && apiType !== 'transcriptions') ||
-                                          (isSpeechModel && apiType !== 'speech') ||
-                                          (isImageModel && apiType !== 'images') ||
-                                          (isResponsesModel && apiType !== 'responses');
+                                  {testState.message}
+                                </span>
+                              ) : null;
+                            })()}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeModel(mId);
+                              }}
+                              style={{ color: 'var(--color-danger)', padding: '2px' }}
+                            >
+                              <X size={12} />
+                            </Button>
+                          </div>
+                          {openModelIdx === mId && (
+                            <div
+                              style={{
+                                padding: '8px',
+                                borderTop: '1px solid var(--color-border-glass)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                              }}
+                            >
+                              <ModelIdInput modelId={mId} onCommit={updateModelId} />
 
-                                        return (
-                                          <label
-                                            key={apiType}
-                                            style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '3px',
-                                              fontSize: '11px',
-                                              opacity: isDisabled ? 0.4 : 1,
-                                              cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                            }}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={(mCfg.access_via || []).includes(apiType)}
-                                              disabled={isDisabled}
-                                              onChange={() => {
-                                                const current = mCfg.access_via || [];
-                                                const next = current.includes(apiType)
-                                                  ? current.filter((a: string) => a !== apiType)
-                                                  : [...current, apiType];
-                                                updateModelConfig(mId, { access_via: next });
-                                              }}
-                                            />
-                                            <span
-                                              className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium"
-                                              style={{
-                                                ...getApiBadgeStyle(apiType),
-                                                fontSize: '10px',
-                                                padding: '2px 6px',
-                                                opacity: (mCfg.access_via || []).includes(apiType)
-                                                  ? 1
-                                                  : 0.5,
-                                              }}
-                                            >
-                                              {apiType}
-                                            </span>
-                                          </label>
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                                <div className="flex flex-col gap-1">
+                                  <label className="font-body text-[13px] font-medium text-text-secondary">
+                                    Model Type
+                                  </label>
+                                  <select
+                                    className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                    value={mCfg.type || 'chat'}
+                                    onChange={(e) => {
+                                      const newType = e.target.value as
+                                        | 'chat'
+                                        | 'embeddings'
+                                        | 'transcriptions'
+                                        | 'speech'
+                                        | 'image'
+                                        | 'responses';
+                                      // If switching to embeddings, clear non-embeddings APIs from access_via
+                                      if (newType === 'embeddings') {
+                                        const filteredAccessVia = (mCfg.access_via || []).filter(
+                                          (api: string) => api === 'embeddings'
                                         );
-                                      })}
-                                    </div>
-                                    {(!mCfg.access_via || mCfg.access_via.length === 0) && (
+                                        updateModelConfig(mId, {
+                                          type: newType,
+                                          access_via:
+                                            filteredAccessVia.length > 0
+                                              ? filteredAccessVia
+                                              : ['embeddings'],
+                                        });
+                                      } else if (newType === 'transcriptions') {
+                                        const filteredAccessVia = (mCfg.access_via || []).filter(
+                                          (api: string) => api === 'transcriptions'
+                                        );
+                                        updateModelConfig(mId, {
+                                          type: newType,
+                                          access_via:
+                                            filteredAccessVia.length > 0
+                                              ? filteredAccessVia
+                                              : ['transcriptions'],
+                                        });
+                                      } else if (newType === 'speech') {
+                                        const filteredAccessVia = (mCfg.access_via || []).filter(
+                                          (api: string) => api === 'speech'
+                                        );
+                                        updateModelConfig(mId, {
+                                          type: newType,
+                                          access_via:
+                                            filteredAccessVia.length > 0
+                                              ? filteredAccessVia
+                                              : ['speech'],
+                                        });
+                                      } else if (newType === 'image') {
+                                        const filteredAccessVia = (mCfg.access_via || []).filter(
+                                          (api: string) => api === 'images'
+                                        );
+                                        updateModelConfig(mId, {
+                                          type: newType,
+                                          access_via:
+                                            filteredAccessVia.length > 0
+                                              ? filteredAccessVia
+                                              : ['images'],
+                                        });
+                                      } else if (newType === 'responses') {
+                                        const filteredAccessVia = (mCfg.access_via || []).filter(
+                                          (api: string) => api === 'responses'
+                                        );
+                                        updateModelConfig(mId, {
+                                          type: newType,
+                                          access_via:
+                                            filteredAccessVia.length > 0
+                                              ? filteredAccessVia
+                                              : ['responses'],
+                                        });
+                                      } else {
+                                        updateModelConfig(mId, { type: newType });
+                                      }
+                                    }}
+                                  >
+                                    <option value="chat">Chat</option>
+                                    <option value="embeddings">Embeddings</option>
+                                    <option value="transcriptions">Transcriptions</option>
+                                    <option value="speech">Speech</option>
+                                    <option value="image">Image</option>
+                                    <option value="responses">Responses</option>
+                                  </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="font-body text-[13px] font-medium text-text-secondary">
+                                    Pricing Source
+                                  </label>
+                                  <select
+                                    className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                                    value={mCfg.pricing?.source || 'simple'}
+                                    onChange={(e) => {
+                                      const newSource = e.target.value;
+                                      let newPricing: any;
+
+                                      // Create a clean pricing object based on the selected source
+                                      if (newSource === 'simple') {
+                                        newPricing = {
+                                          source: 'simple',
+                                          input: mCfg.pricing?.input || 0,
+                                          output: mCfg.pricing?.output || 0,
+                                          cached: mCfg.pricing?.cached || 0,
+                                          cache_write: mCfg.pricing?.cache_write || 0,
+                                        };
+                                      } else if (newSource === 'openrouter') {
+                                        newPricing = {
+                                          source: 'openrouter',
+                                          slug: mCfg.pricing?.slug || '',
+                                          ...(mCfg.pricing?.discount !== undefined && {
+                                            discount: mCfg.pricing.discount,
+                                          }),
+                                        };
+                                      } else if (newSource === 'defined') {
+                                        newPricing = {
+                                          source: 'defined',
+                                          range: mCfg.pricing?.range || [],
+                                        };
+                                      } else if (newSource === 'per_request') {
+                                        newPricing = {
+                                          source: 'per_request',
+                                          amount: mCfg.pricing?.amount || 0,
+                                        };
+                                      }
+
+                                      updateModelConfig(mId, { pricing: newPricing });
+                                    }}
+                                  >
+                                    <option value="simple">Simple</option>
+                                    <option value="openrouter">OpenRouter</option>
+                                    <option value="defined">Ranges (Complex)</option>
+                                    <option value="per_request">Per Request (Flat Fee)</option>
+                                  </select>
+                                </div>
+                                {mCfg.type !== 'embeddings' &&
+                                  mCfg.type !== 'transcriptions' &&
+                                  mCfg.type !== 'speech' &&
+                                  mCfg.type !== 'image' &&
+                                  mCfg.type !== 'responses' && (
+                                    <div className="flex flex-col gap-1">
+                                      <label className="font-body text-[13px] font-medium text-text-secondary">
+                                        Access Via (APIs)
+                                      </label>
                                       <div
                                         style={{
                                           fontSize: '11px',
                                           color: 'var(--color-text-secondary)',
-                                          marginTop: '4px',
-                                          fontStyle: 'italic',
+                                          marginBottom: '4px',
+                                          lineHeight: '1.4',
                                         }}
                                       >
-                                        Empty selection — Plexus will use any API type configured
-                                        for this provider.
+                                        Choose which API protocols this model should use.{' '}
+                                        <span style={{ fontWeight: 600 }}>chat</span> works with
+                                        most providers. Use{' '}
+                                        <span style={{ fontWeight: 600 }}>ollama</span> only for
+                                        native Ollama API.
                                       </div>
-                                    )}
-                                    {(() => {
-                                      // Check if provider has an ollama base URL configured
-                                      const providerBaseUrlMap = getApiBaseUrlMap();
-                                      const hasOllamaBaseUrl = Object.entries(
-                                        providerBaseUrlMap
-                                      ).some(
-                                        ([type, url]) =>
-                                          type === 'ollama' && url && url.trim() !== ''
-                                      );
-                                      // Check if model is not opted into ollama access_via
-                                      const accessVia = mCfg.access_via || [];
-                                      const modelMissingOllamaAccess =
-                                        !accessVia.includes('ollama');
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: '6px',
+                                          flexWrap: 'wrap',
+                                          marginTop: '4px',
+                                        }}
+                                      >
+                                        {KNOWN_APIS.filter((apiType) => {
+                                          if (mCfg.type === 'chat') {
+                                            return [
+                                              'messages',
+                                              'chat',
+                                              'gemini',
+                                              'responses',
+                                              'ollama',
+                                            ].includes(apiType);
+                                          }
+                                          return true;
+                                        }).map((apiType) => {
+                                          const isEmbeddingsModel = mCfg.type === 'embeddings';
+                                          const isTranscriptionsModel =
+                                            mCfg.type === 'transcriptions';
+                                          const isSpeechModel = mCfg.type === 'speech';
+                                          const isImageModel = mCfg.type === 'image';
+                                          const isResponsesModel = mCfg.type === 'responses';
+                                          const isDisabled =
+                                            (isEmbeddingsModel && apiType !== 'embeddings') ||
+                                            (isTranscriptionsModel &&
+                                              apiType !== 'transcriptions') ||
+                                            (isSpeechModel && apiType !== 'speech') ||
+                                            (isImageModel && apiType !== 'images') ||
+                                            (isResponsesModel && apiType !== 'responses');
 
-                                      if (
-                                        hasOllamaBaseUrl &&
-                                        modelMissingOllamaAccess &&
-                                        mCfg.type !== 'embeddings' &&
-                                        mCfg.type !== 'transcriptions' &&
-                                        mCfg.type !== 'speech' &&
-                                        mCfg.type !== 'image' &&
-                                        mCfg.type !== 'responses'
-                                      ) {
-                                        return (
-                                          <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
-                                            <Info size={14} className="text-info shrink-0 mt-0.5" />
-                                            <span className="text-[11px] text-info">
-                                              Provider has a native Ollama URL. If you want this
-                                              model to use native Ollama, select{' '}
-                                              <span style={{ fontWeight: 600 }}>ollama</span> in
-                                              Access Via above.
-                                            </span>
-                                          </div>
+                                          return (
+                                            <label
+                                              key={apiType}
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '3px',
+                                                fontSize: '11px',
+                                                opacity: isDisabled ? 0.4 : 1,
+                                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                              }}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={(mCfg.access_via || []).includes(apiType)}
+                                                disabled={isDisabled}
+                                                onChange={() => {
+                                                  const current = mCfg.access_via || [];
+                                                  const next = current.includes(apiType)
+                                                    ? current.filter((a: string) => a !== apiType)
+                                                    : [...current, apiType];
+                                                  updateModelConfig(mId, { access_via: next });
+                                                }}
+                                              />
+                                              <span
+                                                className="inline-flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs font-medium"
+                                                style={{
+                                                  ...getApiBadgeStyle(apiType),
+                                                  fontSize: '10px',
+                                                  padding: '2px 6px',
+                                                  opacity: (mCfg.access_via || []).includes(apiType)
+                                                    ? 1
+                                                    : 0.5,
+                                                }}
+                                              >
+                                                {apiType}
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                      {(!mCfg.access_via || mCfg.access_via.length === 0) && (
+                                        <div
+                                          style={{
+                                            fontSize: '11px',
+                                            color: 'var(--color-text-secondary)',
+                                            marginTop: '4px',
+                                            fontStyle: 'italic',
+                                          }}
+                                        >
+                                          Empty selection — Plexus will use any API type configured
+                                          for this provider.
+                                        </div>
+                                      )}
+                                      {(() => {
+                                        // Check if provider has an ollama base URL configured
+                                        const providerBaseUrlMap = getApiBaseUrlMap();
+                                        const hasOllamaBaseUrl = Object.entries(
+                                          providerBaseUrlMap
+                                        ).some(
+                                          ([type, url]) =>
+                                            type === 'ollama' && url && url.trim() !== ''
                                         );
-                                      }
-                                      return null;
-                                    })()}
+                                        // Check if model is not opted into ollama access_via
+                                        const accessVia = mCfg.access_via || [];
+                                        const modelMissingOllamaAccess =
+                                          !accessVia.includes('ollama');
+
+                                        if (
+                                          hasOllamaBaseUrl &&
+                                          modelMissingOllamaAccess &&
+                                          mCfg.type !== 'embeddings' &&
+                                          mCfg.type !== 'transcriptions' &&
+                                          mCfg.type !== 'speech' &&
+                                          mCfg.type !== 'image' &&
+                                          mCfg.type !== 'responses'
+                                        ) {
+                                          return (
+                                            <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
+                                              <Info
+                                                size={14}
+                                                className="text-info shrink-0 mt-0.5"
+                                              />
+                                              <span className="text-[11px] text-info">
+                                                Provider has a native Ollama URL. If you want this
+                                                model to use native Ollama, select{' '}
+                                                <span style={{ fontWeight: 600 }}>ollama</span> in
+                                                Access Via above.
+                                              </span>
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
+                                    </div>
+                                  )}
+                                {mCfg.type === 'embeddings' && (
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginTop: '4px',
+                                        fontStyle: 'italic',
+                                        padding: '8px',
+                                        background: 'var(--color-bg-subtle)',
+                                        borderRadius: 'var(--radius-sm)',
+                                      }}
+                                    >
+                                      <Info className="inline w-3 h-3 mb-0.5 mr-1" />
+                                      Embeddings models automatically use the 'embeddings' API only.
+                                    </div>
                                   </div>
                                 )}
-                              {mCfg.type === 'embeddings' && (
-                                <div className="flex flex-col gap-1">
-                                  <div
-                                    style={{
-                                      fontSize: '11px',
-                                      color: 'var(--color-text-secondary)',
-                                      marginTop: '4px',
-                                      fontStyle: 'italic',
-                                      padding: '8px',
-                                      background: 'var(--color-bg-subtle)',
-                                      borderRadius: 'var(--radius-sm)',
-                                    }}
-                                  >
-                                    <Info className="inline w-3 h-3 mb-0.5 mr-1" />
-                                    Embeddings models automatically use the 'embeddings' API only.
+                                {mCfg.type === 'transcriptions' && (
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginTop: '4px',
+                                        fontStyle: 'italic',
+                                        padding: '8px',
+                                        background: 'var(--color-bg-subtle)',
+                                        borderRadius: 'var(--radius-sm)',
+                                      }}
+                                    >
+                                      <Info className="inline w-3 h-3 mb-0.5 mr-1" />
+                                      Transcriptions models automatically use the 'transcriptions'
+                                      API only.
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {mCfg.type === 'transcriptions' && (
-                                <div className="flex flex-col gap-1">
-                                  <div
-                                    style={{
-                                      fontSize: '11px',
-                                      color: 'var(--color-text-secondary)',
-                                      marginTop: '4px',
-                                      fontStyle: 'italic',
-                                      padding: '8px',
-                                      background: 'var(--color-bg-subtle)',
-                                      borderRadius: 'var(--radius-sm)',
-                                    }}
-                                  >
-                                    <Info className="inline w-3 h-3 mb-0.5 mr-1" />
-                                    Transcriptions models automatically use the 'transcriptions' API
-                                    only.
+                                )}
+                                {mCfg.type === 'speech' && (
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginTop: '4px',
+                                        fontStyle: 'italic',
+                                        padding: '8px',
+                                        background: 'var(--color-bg-subtle)',
+                                        borderRadius: 'var(--radius-sm)',
+                                      }}
+                                    >
+                                      <Info className="inline w-3 h-3 mb-0.5 mr-1" />
+                                      Speech models automatically use the 'speech' API only.
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {mCfg.type === 'speech' && (
-                                <div className="flex flex-col gap-1">
-                                  <div
-                                    style={{
-                                      fontSize: '11px',
-                                      color: 'var(--color-text-secondary)',
-                                      marginTop: '4px',
-                                      fontStyle: 'italic',
-                                      padding: '8px',
-                                      background: 'var(--color-bg-subtle)',
-                                      borderRadius: 'var(--radius-sm)',
-                                    }}
-                                  >
-                                    <Info className="inline w-3 h-3 mb-0.5 mr-1" />
-                                    Speech models automatically use the 'speech' API only.
+                                )}
+                                {mCfg.type === 'image' && (
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginTop: '4px',
+                                        fontStyle: 'italic',
+                                        padding: '8px',
+                                        background: 'var(--color-bg-subtle)',
+                                        borderRadius: 'var(--radius-sm)',
+                                      }}
+                                    >
+                                      <Info className="inline w-3 h-3 mb-0.5 mr-1" />
+                                      Image models automatically use the 'images' API only.
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {mCfg.type === 'image' && (
-                                <div className="flex flex-col gap-1">
-                                  <div
-                                    style={{
-                                      fontSize: '11px',
-                                      color: 'var(--color-text-secondary)',
-                                      marginTop: '4px',
-                                      fontStyle: 'italic',
-                                      padding: '8px',
-                                      background: 'var(--color-bg-subtle)',
-                                      borderRadius: 'var(--radius-sm)',
-                                    }}
-                                  >
-                                    <Info className="inline w-3 h-3 mb-0.5 mr-1" />
-                                    Image models automatically use the 'images' API only.
+                                )}
+                                {mCfg.type === 'responses' && (
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      style={{
+                                        fontSize: '11px',
+                                        color: 'var(--color-text-secondary)',
+                                        marginTop: '4px',
+                                        fontStyle: 'italic',
+                                        padding: '8px',
+                                        background: 'var(--color-bg-subtle)',
+                                        borderRadius: 'var(--radius-sm)',
+                                      }}
+                                    >
+                                      <Info className="inline w-3 h-3 mb-0.5 mr-1" />
+                                      Responses models automatically use the 'responses' API only.
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              {mCfg.type === 'responses' && (
-                                <div className="flex flex-col gap-1">
-                                  <div
-                                    style={{
-                                      fontSize: '11px',
-                                      color: 'var(--color-text-secondary)',
-                                      marginTop: '4px',
-                                      fontStyle: 'italic',
-                                      padding: '8px',
-                                      background: 'var(--color-bg-subtle)',
-                                      borderRadius: 'var(--radius-sm)',
-                                    }}
-                                  >
-                                    <Info className="inline w-3 h-3 mb-0.5 mr-1" />
-                                    Responses models automatically use the 'responses' API only.
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {mCfg.pricing?.source === 'simple' && (
-                              <div
-                                className="grid grid-cols-4 gap-4"
-                                style={{
-                                  background: 'var(--color-bg-subtle)',
-                                  padding: '12px',
-                                  borderRadius: 'var(--radius-sm)',
-                                }}
-                              >
-                                <Input
-                                  label="Input $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={mCfg.pricing.input || 0}
-                                  onChange={(e) =>
-                                    updateModelConfig(mId, {
-                                      pricing: {
-                                        ...mCfg.pricing,
-                                        input: parseFloat(e.target.value),
-                                      },
-                                    })
-                                  }
-                                />
-                                <Input
-                                  label="Output $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={mCfg.pricing.output || 0}
-                                  onChange={(e) =>
-                                    updateModelConfig(mId, {
-                                      pricing: {
-                                        ...mCfg.pricing,
-                                        output: parseFloat(e.target.value),
-                                      },
-                                    })
-                                  }
-                                />
-                                <Input
-                                  label="Cached $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={mCfg.pricing.cached || 0}
-                                  onChange={(e) =>
-                                    updateModelConfig(mId, {
-                                      pricing: {
-                                        ...mCfg.pricing,
-                                        cached: parseFloat(e.target.value),
-                                      },
-                                    })
-                                  }
-                                />
-                                <Input
-                                  label="Cache Write $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={mCfg.pricing.cache_write || 0}
-                                  onChange={(e) =>
-                                    updateModelConfig(mId, {
-                                      pricing: {
-                                        ...mCfg.pricing,
-                                        cache_write: parseFloat(e.target.value),
-                                      },
-                                    })
-                                  }
-                                />
+                                )}
                               </div>
-                            )}
 
-                            {mCfg.pricing?.source === 'openrouter' && (
-                              <div
-                                style={{
-                                  background: 'var(--color-bg-subtle)',
-                                  padding: '12px',
-                                  borderRadius: 'var(--radius-sm)',
-                                  display: 'flex',
-                                  gap: '12px',
-                                  alignItems: 'end',
-                                }}
-                              >
-                                <div style={{ flex: '1' }}>
-                                  <OpenRouterSlugInput
-                                    label="OpenRouter Model Slug"
-                                    placeholder="e.g. anthropic/claude-3.5-sonnet or just 'claude-sonnet'"
-                                    value={mCfg.pricing.slug || ''}
-                                    onChange={(value) =>
+                              {mCfg.pricing?.source === 'simple' && (
+                                <div
+                                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                                  style={{
+                                    background: 'var(--color-bg-subtle)',
+                                    padding: '12px',
+                                    borderRadius: 'var(--radius-sm)',
+                                  }}
+                                >
+                                  <Input
+                                    label="Input $/M"
+                                    type="number"
+                                    step="0.000001"
+                                    value={mCfg.pricing.input || 0}
+                                    onChange={(e) =>
                                       updateModelConfig(mId, {
-                                        pricing: { ...mCfg.pricing, slug: value },
+                                        pricing: {
+                                          ...mCfg.pricing,
+                                          input: parseFloat(e.target.value),
+                                        },
+                                      })
+                                    }
+                                  />
+                                  <Input
+                                    label="Output $/M"
+                                    type="number"
+                                    step="0.000001"
+                                    value={mCfg.pricing.output || 0}
+                                    onChange={(e) =>
+                                      updateModelConfig(mId, {
+                                        pricing: {
+                                          ...mCfg.pricing,
+                                          output: parseFloat(e.target.value),
+                                        },
+                                      })
+                                    }
+                                  />
+                                  <Input
+                                    label="Cached $/M"
+                                    type="number"
+                                    step="0.000001"
+                                    value={mCfg.pricing.cached || 0}
+                                    onChange={(e) =>
+                                      updateModelConfig(mId, {
+                                        pricing: {
+                                          ...mCfg.pricing,
+                                          cached: parseFloat(e.target.value),
+                                        },
+                                      })
+                                    }
+                                  />
+                                  <Input
+                                    label="Cache Write $/M"
+                                    type="number"
+                                    step="0.000001"
+                                    value={mCfg.pricing.cache_write || 0}
+                                    onChange={(e) =>
+                                      updateModelConfig(mId, {
+                                        pricing: {
+                                          ...mCfg.pricing,
+                                          cache_write: parseFloat(e.target.value),
+                                        },
                                       })
                                     }
                                   />
                                 </div>
-                                <div style={{ width: '10%', minWidth: '80px' }}>
-                                  <Input
-                                    label="Discount (0-1)"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="1"
-                                    placeholder=""
-                                    value={mCfg.pricing.discount ?? ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val === '') {
-                                        const { discount, ...rest } = mCfg.pricing;
-                                        updateModelConfig(mId, { pricing: rest });
-                                      } else {
-                                        updateModelConfig(mId, {
-                                          pricing: { ...mCfg.pricing, discount: parseFloat(val) },
-                                        });
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
+                              )}
 
-                            {mCfg.pricing?.source === 'defined' && (
-                              <div
-                                style={{
-                                  background: 'var(--color-bg-subtle)',
-                                  padding: '12px',
-                                  borderRadius: 'var(--radius-sm)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '12px',
-                                }}
-                              >
+                              {mCfg.pricing?.source === 'openrouter' && (
                                 <div
+                                  className="flex flex-col gap-3 sm:flex-row sm:items-end"
                                   style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
+                                    background: 'var(--color-bg-subtle)',
+                                    padding: '12px',
+                                    borderRadius: 'var(--radius-sm)',
                                   }}
                                 >
-                                  <label
-                                    className="font-body text-[13px] font-medium text-text-secondary"
-                                    style={{ marginBottom: 0 }}
+                                  <div className="min-w-0 flex-1">
+                                    <OpenRouterSlugInput
+                                      label="OpenRouter Model Slug"
+                                      placeholder="e.g. anthropic/claude-3.5-sonnet or just 'claude-sonnet'"
+                                      value={mCfg.pricing.slug || ''}
+                                      onChange={(value) =>
+                                        updateModelConfig(mId, {
+                                          pricing: { ...mCfg.pricing, slug: value },
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  <div className="w-full sm:w-24">
+                                    <Input
+                                      label="Discount (0-1)"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max="1"
+                                      placeholder=""
+                                      value={mCfg.pricing.discount ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === '') {
+                                          const { discount, ...rest } = mCfg.pricing;
+                                          updateModelConfig(mId, { pricing: rest });
+                                        } else {
+                                          updateModelConfig(mId, {
+                                            pricing: { ...mCfg.pricing, discount: parseFloat(val) },
+                                          });
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {mCfg.pricing?.source === 'defined' && (
+                                <div
+                                  style={{
+                                    background: 'var(--color-bg-subtle)',
+                                    padding: '12px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                    }}
                                   >
-                                    Pricing Ranges
-                                  </label>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => {
-                                      const currentRanges = mCfg.pricing.range || [];
+                                    <label
+                                      className="font-body text-[13px] font-medium text-text-secondary"
+                                      style={{ marginBottom: 0 }}
+                                    >
+                                      Pricing Ranges
+                                    </label>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => {
+                                        const currentRanges = mCfg.pricing.range || [];
+                                        updateModelConfig(mId, {
+                                          pricing: {
+                                            ...mCfg.pricing,
+                                            range: [
+                                              ...currentRanges,
+                                              {
+                                                lower_bound: 0,
+                                                upper_bound: 0,
+                                                input_per_m: 0,
+                                                output_per_m: 0,
+                                                cache_write_per_m: 0,
+                                              },
+                                            ],
+                                          },
+                                        });
+                                      }}
+                                      leftIcon={<Plus size={14} />}
+                                    >
+                                      Add Range
+                                    </Button>
+                                  </div>
+
+                                  {(mCfg.pricing.range || []).map((range: any, idx: number) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        border: '1px solid var(--color-border-glass)',
+                                        padding: '12px',
+                                        borderRadius: 'var(--radius-sm)',
+                                        position: 'relative',
+                                      }}
+                                    >
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '8px',
+                                          right: '8px',
+                                          color: 'var(--color-danger)',
+                                          padding: '4px',
+                                        }}
+                                        onClick={() => {
+                                          const newRanges = [...mCfg.pricing.range];
+                                          newRanges.splice(idx, 1);
+                                          updateModelConfig(mId, {
+                                            pricing: { ...mCfg.pricing, range: newRanges },
+                                          });
+                                        }}
+                                      >
+                                        <X size={14} />
+                                      </Button>
+
+                                      <div
+                                        className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                                        style={{ marginBottom: '8px' }}
+                                      >
+                                        <Input
+                                          label="Lower Bound"
+                                          type="number"
+                                          value={range.lower_bound}
+                                          onChange={(e) => {
+                                            const newRanges = [...mCfg.pricing.range];
+                                            newRanges[idx] = {
+                                              ...range,
+                                              lower_bound: parseFloat(e.target.value),
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: newRanges },
+                                            });
+                                          }}
+                                        />
+                                        <Input
+                                          label="Upper Bound (0 = Infinite)"
+                                          type="number"
+                                          value={
+                                            range.upper_bound === Infinity ? 0 : range.upper_bound
+                                          }
+                                          onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            const newRanges = [...mCfg.pricing.range];
+                                            newRanges[idx] = {
+                                              ...range,
+                                              upper_bound: val === 0 ? Infinity : val,
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: newRanges },
+                                            });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                        <Input
+                                          label="Input $/M"
+                                          type="number"
+                                          step="0.000001"
+                                          value={range.input_per_m}
+                                          onChange={(e) => {
+                                            const newRanges = [...mCfg.pricing.range];
+                                            newRanges[idx] = {
+                                              ...range,
+                                              input_per_m: parseFloat(e.target.value),
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: newRanges },
+                                            });
+                                          }}
+                                        />
+                                        <Input
+                                          label="Output $/M"
+                                          type="number"
+                                          step="0.000001"
+                                          value={range.output_per_m}
+                                          onChange={(e) => {
+                                            const newRanges = [...mCfg.pricing.range];
+                                            newRanges[idx] = {
+                                              ...range,
+                                              output_per_m: parseFloat(e.target.value),
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: newRanges },
+                                            });
+                                          }}
+                                        />
+                                        <Input
+                                          label="Cached $/M"
+                                          type="number"
+                                          step="0.000001"
+                                          value={range.cached_per_m || 0}
+                                          onChange={(e) => {
+                                            const newRanges = [...mCfg.pricing.range];
+                                            newRanges[idx] = {
+                                              ...range,
+                                              cached_per_m: parseFloat(e.target.value),
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: newRanges },
+                                            });
+                                          }}
+                                        />
+                                        <Input
+                                          label="Cache Write $/M"
+                                          type="number"
+                                          step="0.000001"
+                                          value={range.cache_write_per_m || 0}
+                                          onChange={(e) => {
+                                            const nextValue = Number(e.target.value);
+                                            const newRanges = [...mCfg.pricing.range];
+                                            newRanges[idx] = {
+                                              ...range,
+                                              cache_write_per_m: Number.isFinite(nextValue)
+                                                ? nextValue
+                                                : 0,
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: newRanges },
+                                            });
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
+                                    <div className="text-text-muted italic text-center text-sm p-4">
+                                      No ranges defined. Pricing will likely default to 0.
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {mCfg.pricing?.source === 'per_request' && (
+                                <div
+                                  className="grid grid-cols-1 gap-4"
+                                  style={{
+                                    background: 'var(--color-bg-subtle)',
+                                    padding: '12px',
+                                    borderRadius: 'var(--radius-sm)',
+                                  }}
+                                >
+                                  <Input
+                                    label="Cost Per Request ($)"
+                                    type="number"
+                                    step="0.000001"
+                                    min="0"
+                                    value={mCfg.pricing.amount || 0}
+                                    onChange={(e) =>
                                       updateModelConfig(mId, {
                                         pricing: {
                                           ...mCfg.pricing,
-                                          range: [
-                                            ...currentRanges,
-                                            {
-                                              lower_bound: 0,
-                                              upper_bound: 0,
-                                              input_per_m: 0,
-                                              output_per_m: 0,
-                                              cache_write_per_m: 0,
-                                            },
-                                          ],
+                                          amount: parseFloat(e.target.value) || 0,
                                         },
-                                      });
-                                    }}
-                                    leftIcon={<Plus size={14} />}
-                                  >
-                                    Add Range
-                                  </Button>
-                                </div>
-
-                                {(mCfg.pricing.range || []).map((range: any, idx: number) => (
+                                      })
+                                    }
+                                  />
                                   <div
-                                    key={idx}
-                                    style={{
-                                      border: '1px solid var(--color-border-glass)',
-                                      padding: '12px',
-                                      borderRadius: 'var(--radius-sm)',
-                                      position: 'relative',
-                                    }}
+                                    className="font-body text-[11px] text-text-secondary"
+                                    style={{ fontStyle: 'italic' }}
                                   >
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      style={{
-                                        position: 'absolute',
-                                        top: '8px',
-                                        right: '8px',
-                                        color: 'var(--color-danger)',
-                                        padding: '4px',
-                                      }}
-                                      onClick={() => {
-                                        const newRanges = [...mCfg.pricing.range];
-                                        newRanges.splice(idx, 1);
-                                        updateModelConfig(mId, {
-                                          pricing: { ...mCfg.pricing, range: newRanges },
-                                        });
-                                      }}
-                                    >
-                                      <X size={14} />
-                                    </Button>
-
-                                    <div
-                                      className="grid gap-4 grid-cols-2"
-                                      style={{ marginBottom: '8px' }}
-                                    >
-                                      <Input
-                                        label="Lower Bound"
-                                        type="number"
-                                        value={range.lower_bound}
-                                        onChange={(e) => {
-                                          const newRanges = [...mCfg.pricing.range];
-                                          newRanges[idx] = {
-                                            ...range,
-                                            lower_bound: parseFloat(e.target.value),
-                                          };
-                                          updateModelConfig(mId, {
-                                            pricing: { ...mCfg.pricing, range: newRanges },
-                                          });
-                                        }}
-                                      />
-                                      <Input
-                                        label="Upper Bound (0 = Infinite)"
-                                        type="number"
-                                        value={
-                                          range.upper_bound === Infinity ? 0 : range.upper_bound
-                                        }
-                                        onChange={(e) => {
-                                          const val = parseFloat(e.target.value);
-                                          const newRanges = [...mCfg.pricing.range];
-                                          newRanges[idx] = {
-                                            ...range,
-                                            upper_bound: val === 0 ? Infinity : val,
-                                          };
-                                          updateModelConfig(mId, {
-                                            pricing: { ...mCfg.pricing, range: newRanges },
-                                          });
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="grid grid-cols-4 gap-4">
-                                      <Input
-                                        label="Input $/M"
-                                        type="number"
-                                        step="0.000001"
-                                        value={range.input_per_m}
-                                        onChange={(e) => {
-                                          const newRanges = [...mCfg.pricing.range];
-                                          newRanges[idx] = {
-                                            ...range,
-                                            input_per_m: parseFloat(e.target.value),
-                                          };
-                                          updateModelConfig(mId, {
-                                            pricing: { ...mCfg.pricing, range: newRanges },
-                                          });
-                                        }}
-                                      />
-                                      <Input
-                                        label="Output $/M"
-                                        type="number"
-                                        step="0.000001"
-                                        value={range.output_per_m}
-                                        onChange={(e) => {
-                                          const newRanges = [...mCfg.pricing.range];
-                                          newRanges[idx] = {
-                                            ...range,
-                                            output_per_m: parseFloat(e.target.value),
-                                          };
-                                          updateModelConfig(mId, {
-                                            pricing: { ...mCfg.pricing, range: newRanges },
-                                          });
-                                        }}
-                                      />
-                                      <Input
-                                        label="Cached $/M"
-                                        type="number"
-                                        step="0.000001"
-                                        value={range.cached_per_m || 0}
-                                        onChange={(e) => {
-                                          const newRanges = [...mCfg.pricing.range];
-                                          newRanges[idx] = {
-                                            ...range,
-                                            cached_per_m: parseFloat(e.target.value),
-                                          };
-                                          updateModelConfig(mId, {
-                                            pricing: { ...mCfg.pricing, range: newRanges },
-                                          });
-                                        }}
-                                      />
-                                      <Input
-                                        label="Cache Write $/M"
-                                        type="number"
-                                        step="0.000001"
-                                        value={range.cache_write_per_m || 0}
-                                        onChange={(e) => {
-                                          const nextValue = Number(e.target.value);
-                                          const newRanges = [...mCfg.pricing.range];
-                                          newRanges[idx] = {
-                                            ...range,
-                                            cache_write_per_m: Number.isFinite(nextValue)
-                                              ? nextValue
-                                              : 0,
-                                          };
-                                          updateModelConfig(mId, {
-                                            pricing: { ...mCfg.pricing, range: newRanges },
-                                          });
-                                        }}
-                                      />
-                                    </div>
+                                    A flat fee charged per API call, regardless of token count. The
+                                    full amount is recorded as the request cost.
                                   </div>
-                                ))}
-                                {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
-                                  <div className="text-text-muted italic text-center text-sm p-4">
-                                    No ranges defined. Pricing will likely default to 0.
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {mCfg.pricing?.source === 'per_request' && (
-                              <div
-                                className="grid grid-cols-1 gap-4"
-                                style={{
-                                  background: 'var(--color-bg-subtle)',
-                                  padding: '12px',
-                                  borderRadius: 'var(--radius-sm)',
-                                }}
-                              >
-                                <Input
-                                  label="Cost Per Request ($)"
-                                  type="number"
-                                  step="0.000001"
-                                  min="0"
-                                  value={mCfg.pricing.amount || 0}
-                                  onChange={(e) =>
-                                    updateModelConfig(mId, {
-                                      pricing: {
-                                        ...mCfg.pricing,
-                                        amount: parseFloat(e.target.value) || 0,
-                                      },
-                                    })
-                                  }
-                                />
-                                <div
-                                  className="font-body text-[11px] text-text-secondary"
-                                  style={{ fontStyle: 'italic' }}
-                                >
-                                  A flat fee charged per API call, regardless of token count. The
-                                  full amount is recorded as the request cost.
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Per-Model Extra Body Fields */}
-                            <div
-                              className="border border-border-glass rounded-md p-3 bg-bg-subtle"
-                              style={{ marginTop: '12px' }}
-                            >
-                              <div
-                                className="flex items-center gap-2 cursor-pointer"
-                                style={{ minHeight: '38px' }}
-                                onClick={() =>
-                                  setIsModelExtraBodyOpen({
-                                    ...isModelExtraBodyOpen,
-                                    [mId]: !isModelExtraBodyOpen[mId],
-                                  })
-                                }
-                              >
-                                {isModelExtraBodyOpen[mId] ? (
-                                  <ChevronDown size={14} />
-                                ) : (
-                                  <ChevronRight size={14} />
-                                )}
-                                <label
-                                  className="font-body text-[13px] font-medium text-text-secondary"
-                                  style={{ marginBottom: 0, flex: 1, cursor: 'pointer' }}
-                                >
-                                  Extra Body Fields
-                                </label>
-                                <Badge
-                                  status="neutral"
-                                  style={{ fontSize: '10px', padding: '2px 8px' }}
-                                >
-                                  {Object.keys(mCfg.extraBody || {}).length}
-                                </Badge>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    addModelKV(mId);
-                                    setIsModelExtraBodyOpen({
-                                      ...isModelExtraBodyOpen,
-                                      [mId]: true,
-                                    });
-                                  }}
-                                >
-                                  <Plus size={14} />
-                                </Button>
-                              </div>
-                              {isModelExtraBodyOpen[mId] && (
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '4px',
-                                    padding: '8px',
-                                    borderTop: '1px solid var(--color-border-glass)',
-                                    background: 'var(--color-bg-deep)',
-                                  }}
-                                >
-                                  {Object.entries(mCfg.extraBody || {}).length === 0 && (
-                                    <div className="font-body text-[11px] text-text-secondary italic">
-                                      No extra body fields configured.
-                                    </div>
-                                  )}
-                                  {Object.entries(mCfg.extraBody || {}).map(([key, val], idx) => (
-                                    <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                                      <Input
-                                        placeholder="Field Name"
-                                        value={key}
-                                        onChange={(e) =>
-                                          updateModelKV(mId, key, e.target.value, val)
-                                        }
-                                        style={{ flex: 1 }}
-                                      />
-                                      <Input
-                                        placeholder="Value"
-                                        value={
-                                          typeof val === 'object'
-                                            ? JSON.stringify(val)
-                                            : String(val)
-                                        }
-                                        onChange={(e) => {
-                                          const rawValue = e.target.value;
-                                          let parsedValue;
-                                          try {
-                                            parsedValue = JSON.parse(rawValue);
-                                          } catch {
-                                            parsedValue = rawValue;
-                                          }
-                                          updateModelKV(mId, key, key, parsedValue);
-                                        }}
-                                        style={{ flex: 1 }}
-                                      />
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeModelKV(mId, key)}
-                                        style={{ padding: '4px' }}
-                                      >
-                                        <Trash2
-                                          size={14}
-                                          style={{ color: 'var(--color-danger)' }}
-                                        />
-                                      </Button>
-                                    </div>
-                                  ))}
                                 </div>
                               )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  )}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<Plus size={14} />}
-                    onClick={addModel}
-                  >
-                    Add Model Mapping
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </Modal>
 
-      {/* Fetch Models Modal */}
-      <Modal
-        isOpen={isFetchModelsModalOpen}
-        onClose={() => setIsFetchModelsModalOpen(false)}
-        title="Fetch Models from Provider"
-        size="md"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <Button variant="ghost" onClick={() => setIsFetchModelsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddSelectedModels} disabled={selectedModelIds.size === 0}>
-              Add {selectedModelIds.size} Model{selectedModelIds.size !== 1 ? 's' : ''}
-            </Button>
-          </div>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
-            <div style={{ flex: 1 }}>
-              <Input
-                label="Models Endpoint URL"
-                value={modelsUrl}
-                onChange={(e) => setModelsUrl(e.target.value)}
-                placeholder={
-                  isOAuthMode
-                    ? 'OAuth providers use built-in model lists'
-                    : 'https://api.example.com/v1/models'
-                }
-                disabled={isOAuthMode}
-              />
-            </div>
-            <Button
-              onClick={handleFetchModels}
-              isLoading={isFetchingModels}
-              leftIcon={<Download size={16} />}
-            >
-              Fetch
-            </Button>
-          </div>
-
-          {fetchError && (
-            <div
-              style={{
-                padding: '12px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: 'var(--radius-sm)',
-                color: 'var(--color-danger)',
-                fontSize: '13px',
-              }}
-            >
-              {fetchError}
-            </div>
-          )}
-
-          {fetchedModels.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Available Models ({fetchedModels.length})
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSelectedModelIds(new Set(fetchedModels.map((m) => m.id)))}
-                  >
-                    Select All
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedModelIds(new Set())}>
-                    Clear
-                  </Button>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                  border: '1px solid var(--color-border-glass)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--color-bg-deep)',
-                }}
-              >
-                {fetchedModels.map((model) => {
-                  const contextLengthK = model.context_length
-                    ? `${(model.context_length / 1000).toFixed(0)}K`
-                    : null;
-
-                  return (
-                    <div
-                      key={model.id}
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid var(--color-border-glass)',
-                        cursor: 'pointer',
-                        background: selectedModelIds.has(model.id)
-                          ? 'var(--color-bg-hover)'
-                          : 'transparent',
-                        transition: 'background 0.2s',
-                      }}
-                      onClick={() => toggleModelSelection(model.id)}
-                      className="hover:bg-bg-hover"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedModelIds.has(model.id)}
-                          onChange={() => toggleModelSelection(model.id)}
-                          style={{ marginTop: '2px', cursor: 'pointer' }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              marginBottom: '4px',
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                color: 'var(--color-text)',
-                              }}
-                            >
-                              {model.id}
-                            </span>
-                            {contextLengthK && (
-                              <Badge
-                                status="connected"
-                                style={{ fontSize: '10px', padding: '2px 6px' }}
+                              {/* Per-Model Extra Body Fields */}
+                              <div
+                                className="border border-border-glass rounded-md p-3 bg-bg-subtle"
+                                style={{ marginTop: '12px' }}
                               >
-                                {contextLengthK}
-                              </Badge>
-                            )}
-                          </div>
-                          {model.name && model.name !== model.id && (
-                            <div
-                              style={{
-                                fontSize: '12px',
-                                color: 'var(--color-text-secondary)',
-                                marginBottom: '2px',
-                              }}
-                            >
-                              {model.name}
-                            </div>
-                          )}
-                          {model.description && (
-                            <div
-                              style={{
-                                fontSize: '11px',
-                                color: 'var(--color-text-muted)',
-                                marginTop: '4px',
-                                lineHeight: '1.4',
-                              }}
-                            >
-                              {model.description.length > 150
-                                ? `${model.description.substring(0, 150)}...`
-                                : model.description}
+                                <div
+                                  className="flex items-center gap-2 cursor-pointer"
+                                  style={{ minHeight: '38px' }}
+                                  onClick={() =>
+                                    setIsModelExtraBodyOpen({
+                                      ...isModelExtraBodyOpen,
+                                      [mId]: !isModelExtraBodyOpen[mId],
+                                    })
+                                  }
+                                >
+                                  {isModelExtraBodyOpen[mId] ? (
+                                    <ChevronDown size={14} />
+                                  ) : (
+                                    <ChevronRight size={14} />
+                                  )}
+                                  <label
+                                    className="font-body text-[13px] font-medium text-text-secondary"
+                                    style={{ marginBottom: 0, flex: 1, cursor: 'pointer' }}
+                                  >
+                                    Extra Body Fields
+                                  </label>
+                                  <Badge
+                                    status="neutral"
+                                    style={{ fontSize: '10px', padding: '2px 8px' }}
+                                  >
+                                    {Object.keys(mCfg.extraBody || {}).length}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      addModelKV(mId);
+                                      setIsModelExtraBodyOpen({
+                                        ...isModelExtraBodyOpen,
+                                        [mId]: true,
+                                      });
+                                    }}
+                                  >
+                                    <Plus size={14} />
+                                  </Button>
+                                </div>
+                                {isModelExtraBodyOpen[mId] && (
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '4px',
+                                      padding: '8px',
+                                      borderTop: '1px solid var(--color-border-glass)',
+                                      background: 'var(--color-bg-deep)',
+                                    }}
+                                  >
+                                    {Object.entries(mCfg.extraBody || {}).length === 0 && (
+                                      <div className="font-body text-[11px] text-text-secondary italic">
+                                        No extra body fields configured.
+                                      </div>
+                                    )}
+                                    {Object.entries(mCfg.extraBody || {}).map(([key, val], idx) => (
+                                      <div key={idx} style={{ display: 'flex', gap: '6px' }}>
+                                        <Input
+                                          placeholder="Field Name"
+                                          value={key}
+                                          onChange={(e) =>
+                                            updateModelKV(mId, key, e.target.value, val)
+                                          }
+                                          style={{ flex: 1 }}
+                                        />
+                                        <Input
+                                          placeholder="Value"
+                                          value={
+                                            typeof val === 'object'
+                                              ? JSON.stringify(val)
+                                              : String(val)
+                                          }
+                                          onChange={(e) => {
+                                            const rawValue = e.target.value;
+                                            let parsedValue;
+                                            try {
+                                              parsedValue = JSON.parse(rawValue);
+                                            } catch {
+                                              parsedValue = rawValue;
+                                            }
+                                            updateModelKV(mId, key, key, parsedValue);
+                                          }}
+                                          style={{ flex: 1 }}
+                                        />
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeModelKV(mId, key)}
+                                          style={{ padding: '4px' }}
+                                        >
+                                          <Trash2
+                                            size={14}
+                                            style={{ color: 'var(--color-danger)' }}
+                                          />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {!isFetchingModels && fetchedModels.length === 0 && !fetchError && (
-            <div
-              style={{
-                padding: '32px',
-                textAlign: 'center',
-                color: 'var(--color-text-secondary)',
-                fontSize: '13px',
-                fontStyle: 'italic',
-              }}
-            >
-              {isOAuthMode
-                ? 'Click Fetch to load known OAuth models'
-                : 'Enter a URL and click Fetch to load available models'}
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={!!deleteModalProvider}
-        onClose={() => setDeleteModalProvider(null)}
-        title={`Delete Provider: ${deleteModalProvider?.name || deleteModalProvider?.id || ''}`}
-        size="lg"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-            Choose how to delete this provider. The action cannot be undone.
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div
-              style={{
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-danger)' }}>
-                Delete Provider (Cascade)
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                Removes this provider AND deletes all model alias targets that reference it.
-              </div>
-              {affectedAliases.length > 0 ? (
-                <div style={{ fontSize: '13px' }}>
-                  <div style={{ fontWeight: 500, marginBottom: '4px' }}>
-                    This will affect {affectedAliases.length} model alias(es):
+                      )
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Plus size={14} />}
+                      onClick={addModel}
+                    >
+                      Add Model Mapping
+                    </Button>
                   </div>
-                  <ul
-                    style={{
-                      margin: 0,
-                      paddingLeft: '16px',
-                      fontSize: '12px',
-                      color: 'var(--color-text-secondary)',
-                    }}
-                  >
-                    {affectedAliases.map((a) => (
-                      <li key={a.aliasId}>
-                        {a.aliasId} ({a.targetsCount} target(s))
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    fontSize: '12px',
-                    color: 'var(--color-text-secondary)',
-                    fontStyle: 'italic',
-                  }}
-                >
-                  No model aliases reference this provider.
                 </div>
               )}
+            </div>
+          </div>
+        </Modal>
+
+        {/* Fetch Models Modal */}
+        <Modal
+          isOpen={isFetchModelsModalOpen}
+          onClose={() => setIsFetchModelsModalOpen(false)}
+          title="Fetch Models from Provider"
+          size="md"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button variant="ghost" onClick={() => setIsFetchModelsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddSelectedModels} disabled={selectedModelIds.size === 0}>
+                Add {selectedModelIds.size} Model{selectedModelIds.size !== 1 ? 's' : ''}
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <Input
+                  label="Models Endpoint URL"
+                  value={modelsUrl}
+                  onChange={(e) => setModelsUrl(e.target.value)}
+                  placeholder={
+                    isOAuthMode
+                      ? 'OAuth providers use built-in model lists'
+                      : 'https://api.example.com/v1/models'
+                  }
+                  disabled={isOAuthMode}
+                />
+              </div>
               <Button
-                onClick={() => handleDelete(true)}
-                isLoading={deleteModalLoading}
+                onClick={handleFetchModels}
+                isLoading={isFetchingModels}
+                leftIcon={<Download size={16} />}
+                className="w-full sm:w-auto"
+              >
+                Fetch
+              </Button>
+            </div>
+
+            {fetchError && (
+              <div
                 style={{
-                  backgroundColor: 'var(--color-danger)',
-                  marginTop: 'auto',
+                  padding: '12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-danger)',
+                  fontSize: '13px',
                 }}
               >
-                Delete (Cascade)
-              </Button>
-            </div>
+                {fetchError}
+              </div>
+            )}
 
-            <div
-              style={{
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-text)' }}>
-                Delete (Retain Targets)
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                Removes only the provider. Model alias targets that reference this provider will
-                remain but may cause errors.
-              </div>
-              {affectedAliases.length > 0 && (
+            {fetchedModels.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div
-                  style={{ fontSize: '12px', color: 'var(--color-warning)', fontStyle: 'italic' }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  {affectedAliases.length} model alias(es) will have orphaned targets.
+                  <label className="font-body text-[13px] font-medium text-text-secondary">
+                    Available Models ({fetchedModels.length})
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedModelIds(new Set(fetchedModels.map((m) => m.id)))}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedModelIds(new Set())}
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 </div>
-              )}
-              <Button
-                variant="secondary"
-                onClick={() => handleDelete(false)}
-                isLoading={deleteModalLoading}
-                style={{ marginTop: 'auto' }}
+
+                <div
+                  style={{
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    border: '1px solid var(--color-border-glass)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-bg-deep)',
+                  }}
+                >
+                  {fetchedModels.map((model) => {
+                    const contextLengthK = model.context_length
+                      ? `${(model.context_length / 1000).toFixed(0)}K`
+                      : null;
+
+                    return (
+                      <div
+                        key={model.id}
+                        style={{
+                          padding: '12px',
+                          borderBottom: '1px solid var(--color-border-glass)',
+                          cursor: 'pointer',
+                          background: selectedModelIds.has(model.id)
+                            ? 'var(--color-bg-hover)'
+                            : 'transparent',
+                          transition: 'background 0.2s',
+                        }}
+                        onClick={() => toggleModelSelection(model.id)}
+                        className="hover:bg-bg-hover"
+                      >
+                        <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedModelIds.has(model.id)}
+                            onChange={() => toggleModelSelection(model.id)}
+                            style={{ marginTop: '2px', cursor: 'pointer' }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                marginBottom: '4px',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  fontSize: '13px',
+                                  color: 'var(--color-text)',
+                                }}
+                              >
+                                {model.id}
+                              </span>
+                              {contextLengthK && (
+                                <Badge
+                                  status="connected"
+                                  style={{ fontSize: '10px', padding: '2px 6px' }}
+                                >
+                                  {contextLengthK}
+                                </Badge>
+                              )}
+                            </div>
+                            {model.name && model.name !== model.id && (
+                              <div
+                                style={{
+                                  fontSize: '12px',
+                                  color: 'var(--color-text-secondary)',
+                                  marginBottom: '2px',
+                                }}
+                              >
+                                {model.name}
+                              </div>
+                            )}
+                            {model.description && (
+                              <div
+                                style={{
+                                  fontSize: '11px',
+                                  color: 'var(--color-text-muted)',
+                                  marginTop: '4px',
+                                  lineHeight: '1.4',
+                                }}
+                              >
+                                {model.description.length > 150
+                                  ? `${model.description.substring(0, 150)}...`
+                                  : model.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!isFetchingModels && fetchedModels.length === 0 && !fetchError && (
+              <div
+                style={{
+                  padding: '32px',
+                  textAlign: 'center',
+                  color: 'var(--color-text-secondary)',
+                  fontSize: '13px',
+                  fontStyle: 'italic',
+                }}
               >
-                Delete (Retain)
+                {isOAuthMode
+                  ? 'Click Fetch to load known OAuth models'
+                  : 'Enter a URL and click Fetch to load available models'}
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={!!deleteModalProvider}
+          onClose={() => setDeleteModalProvider(null)}
+          title={`Delete Provider: ${deleteModalProvider?.name || deleteModalProvider?.id || ''}`}
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+              Choose how to delete this provider. The action cannot be undone.
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div
+                style={{
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-danger)' }}>
+                  Delete Provider (Cascade)
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                  Removes this provider AND deletes all model alias targets that reference it.
+                </div>
+                {affectedAliases.length > 0 ? (
+                  <div style={{ fontSize: '13px' }}>
+                    <div style={{ fontWeight: 500, marginBottom: '4px' }}>
+                      This will affect {affectedAliases.length} model alias(es):
+                    </div>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: '16px',
+                        fontSize: '12px',
+                        color: 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {affectedAliases.map((a) => (
+                        <li key={a.aliasId}>
+                          {a.aliasId} ({a.targetsCount} target(s))
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'var(--color-text-secondary)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    No model aliases reference this provider.
+                  </div>
+                )}
+                <Button
+                  onClick={() => handleDelete(true)}
+                  isLoading={deleteModalLoading}
+                  style={{
+                    backgroundColor: 'var(--color-danger)',
+                    marginTop: 'auto',
+                  }}
+                >
+                  Delete (Cascade)
+                </Button>
+              </div>
+
+              <div
+                style={{
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-text)' }}>
+                  Delete (Retain Targets)
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                  Removes only the provider. Model alias targets that reference this provider will
+                  remain but may cause errors.
+                </div>
+                {affectedAliases.length > 0 && (
+                  <div
+                    style={{ fontSize: '12px', color: 'var(--color-warning)', fontStyle: 'italic' }}
+                  >
+                    {affectedAliases.length} model alias(es) will have orphaned targets.
+                  </div>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => handleDelete(false)}
+                  isLoading={deleteModalLoading}
+                  style={{ marginTop: 'auto' }}
+                >
+                  Delete (Retain)
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button variant="ghost" onClick={() => setDeleteModalProvider(null)}>
+                Cancel
               </Button>
             </div>
           </div>
-
-          <div className="flex justify-end">
-            <Button variant="ghost" onClick={() => setDeleteModalProvider(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </PageContainer>
+        </Modal>
+      </PageContainer>
+    </div>
   );
 };

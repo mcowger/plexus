@@ -11,7 +11,7 @@ updates:
     directory: "/"
     # Check the npm registry for updates every day (weekdays)
     schedule:
-      interval: "daily"
+      interval: "weekly"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"

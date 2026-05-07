@@ -97,7 +97,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={value}>
       {children}
       {createPortal(
-        <div className="fixed top-4 right-4 z-toast flex flex-col gap-2 max-w-[90vw] sm:max-w-sm pointer-events-none">
+        <div className="fixed top-4 right-4 z-[600] flex flex-col gap-2 max-w-[90vw] sm:max-w-sm pointer-events-none">
           {toasts.map((toast) => (
             <div
               key={toast.id}
@@ -131,7 +131,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {confirmState &&
         createPortal(
           <div
-            className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 z-[410] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
             onClick={() => resolveConfirm(false)}
             role="dialog"
             aria-modal="true"

@@ -3,7 +3,7 @@ import { clsx } from 'clsx';
 
 interface PageContainerProps {
   children: React.ReactNode;
-  /** Constrain content width. Defaults to wide. */
+  /** Constrain content width. Defaults to full. */
   width?: 'narrow' | 'standard' | 'wide' | 'full';
   className?: string;
 }
@@ -17,8 +17,14 @@ const widthClasses: Record<NonNullable<PageContainerProps['width']>, string> = {
 
 export const PageContainer: React.FC<PageContainerProps> = ({
   children,
-  width = 'wide',
+  width = 'full',
   className,
 }) => {
-  return <div className={clsx('mx-auto w-full', widthClasses[width], className)}>{children}</div>;
+  return (
+    <div
+      className={clsx('mx-auto w-full min-w-0 p-3 sm:p-6 lg:p-8', widthClasses[width], className)}
+    >
+      {children}
+    </div>
+  );
 };

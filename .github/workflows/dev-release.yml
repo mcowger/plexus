@@ -69,7 +69,8 @@ jobs:
         env:
           APP_VERSION: dev-${{ steps.sha.outputs.sha }}
         run: |
-          bun run compile:linux
+          bun run compile:linux-amd64
+          bun run compile:linux-arm64
           bun run compile:macos
           bun run compile:windows
 
@@ -102,7 +103,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            plexus-linux
+            plexus-linux-amd64
+            plexus-linux-arm64
             plexus-macos
             plexus.exe
           draft: false

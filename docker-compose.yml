@@ -3,7 +3,6 @@ services:
     build: .
     image: plexus:latest
     container_name: plexus
-    platform: linux/amd64
     restart: unless-stopped
     ports:
       - "4000:4000"

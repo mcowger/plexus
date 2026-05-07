@@ -8,7 +8,7 @@ cd plexus
 bun install
 ```
 
-Running `bun install` automatically configures git hooks (via the `prepare` script). No extra setup is needed.
+Running `bun install` automatically installs git hooks via [Lefthook](https://github.com/evilmartians/lefthook) (the `prepare` script runs `lefthook install`). No extra setup is needed.
 
 ## Database Schema Changes
 
@@ -40,6 +40,14 @@ git reset HEAD -- packages/backend/drizzle/migrations/ packages/backend/drizzle/
 
 Then commit again with only your schema `.ts` files.
 
+### Skipping hooks
+
+The hooks are skipped automatically when `CI=true` (GitHub Actions). To skip locally in exceptional circumstances:
+
+```bash
+LEFTHOOK=0 git commit -m "..."
+```
+
 ## Drizzle Config Files
 
 The project uses separate Drizzle ORM config files for each database dialect:
@@ -48,6 +56,24 @@ The project uses separate Drizzle ORM config files for each database dialect:
 - `drizzle.config.postgres.ts` -- PostgreSQL configuration
 
 When running Drizzle Kit commands, specify the appropriate config file with `--config`.
+
+## Pi Assistant Prompt
+
+The system prompt for the `/pi` AI agent lives at **`.github/prompts/pi-assistant.md`**.
+Edit that file directly — do not put prompt text inside the workflow YAML.
+
+The file supports `{{dot.notation.path}}` placeholders that are substituted at runtime:
+
+- `{{context.payload.comment.body}}` — the triggering comment's text
+- `{{context.payload.issue.number}}` — issue/PR number
+- `{{context.actor}}` — the GitHub actor who triggered the run
+- `{{env.GITHUB_SHA}}` — any `GITHUB_*` / `RUNNER_*` runner environment variable
+- `{{env.INITIAL_COMMENT_ID}}` — a value passed explicitly via the step's `env:` block
+
+Anything reachable from the [`@actions/github` context object](https://github.com/actions/toolkit/tree/main/packages/github)
+is available under `context.*` without any extra wiring. Values that come from
+previous step outputs (like `INITIAL_COMMENT_ID`) must be added to the `env:` block
+on the **Run Pi agent** step in `.github/workflows/pi-assistant.yml`.
 
 ## Code Style
 

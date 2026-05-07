@@ -62,25 +62,29 @@ export const MyKey: React.FC = () => {
 
   if (loading) {
     return (
-      <PageContainer width="standard">
+      <div className="flex flex-col min-h-full">
         <PageHeader title="My Key" subtitle="Loading your key details..." />
-        <div className="flex flex-col gap-4">
-          <Skeleton height={140} />
-          <Skeleton height={120} />
-          <Skeleton height={120} />
-        </div>
-      </PageContainer>
+        <PageContainer width="standard">
+          <div className="flex flex-col gap-4">
+            <Skeleton height={140} />
+            <Skeleton height={120} />
+            <Skeleton height={120} />
+          </div>
+        </PageContainer>
+      </div>
     );
   }
 
   if (!info || info.role !== 'limited') {
     return (
-      <PageContainer width="standard">
+      <div className="flex flex-col min-h-full">
         <PageHeader title="My Key" />
-        <Card>
-          <p className="text-danger">Unable to load key info.</p>
-        </Card>
-      </PageContainer>
+        <PageContainer width="standard">
+          <Card>
+            <p className="text-danger">Unable to load key info.</p>
+          </Card>
+        </PageContainer>
+      </div>
     );
   }
 
@@ -129,7 +133,7 @@ export const MyKey: React.FC = () => {
   const allowedModels = info.allowedModels ?? [];
 
   return (
-    <PageContainer width="standard">
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title="My Key"
         subtitle={
@@ -139,139 +143,148 @@ export const MyKey: React.FC = () => {
           </>
         }
       />
+      <PageContainer width="standard">
+        <div className="flex flex-col gap-4 sm:gap-6">
+          <Card title="Identity">
+            <dl className="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
+              <dt className="text-text-muted">Key name</dt>
+              <dd className="font-mono text-text break-all">{info.keyName}</dd>
+              <dt className="text-text-muted">Quota</dt>
+              <dd className="text-text">{info.quotaName || '—'}</dd>
+              <dt className="text-text-muted">Allowed providers</dt>
+              <dd className="text-text break-words">
+                {allowedProviders.length > 0 ? allowedProviders.join(', ') : 'Any (unrestricted)'}
+              </dd>
+              <dt className="text-text-muted">Allowed models</dt>
+              <dd className="text-text break-words">
+                {allowedModels.length > 0 ? allowedModels.join(', ') : 'Any (unrestricted)'}
+              </dd>
+            </dl>
+          </Card>
 
-      <div className="flex flex-col gap-4 sm:gap-6">
-        <Card title="Identity">
-          <dl className="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
-            <dt className="text-text-muted">Key name</dt>
-            <dd className="font-mono text-text break-all">{info.keyName}</dd>
-            <dt className="text-text-muted">Quota</dt>
-            <dd className="text-text">{info.quotaName || '—'}</dd>
-            <dt className="text-text-muted">Allowed providers</dt>
-            <dd className="text-text break-words">
-              {allowedProviders.length > 0 ? allowedProviders.join(', ') : 'Any (unrestricted)'}
-            </dd>
-            <dt className="text-text-muted">Allowed models</dt>
-            <dd className="text-text break-words">
-              {allowedModels.length > 0 ? allowedModels.join(', ') : 'Any (unrestricted)'}
-            </dd>
-          </dl>
-        </Card>
-
-        <Card title="Comment">
-          <div className="flex flex-col gap-3">
-            <Input
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Free-text note about this key (optional)"
-            />
-            <div className="flex justify-end">
-              <Button
-                onClick={handleSaveComment}
-                disabled={savingComment || (comment.trim() || null) === (info.comment ?? null)}
-                isLoading={savingComment}
-              >
-                Save
-              </Button>
+          <Card title="Comment">
+            <div className="flex flex-col gap-3">
+              <Input
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Free-text note about this key (optional)"
+              />
+              <div className="flex justify-stretch sm:justify-end">
+                <Button
+                  onClick={handleSaveComment}
+                  disabled={savingComment || (comment.trim() || null) === (info.comment ?? null)}
+                  isLoading={savingComment}
+                  className="w-full sm:w-auto"
+                >
+                  Save
+                </Button>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card title="Trace capture">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="min-w-0 flex-1">
+          <Card title="Trace capture">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-text">
+                  Capture full request/response payloads for this key only.
+                </p>
+                <p className="text-xs text-text-muted mt-1">
+                  {info.traceEnabledGlobal
+                    ? 'Global tracing is ON (admin) — all requests are captured regardless of this toggle.'
+                    : info.traceEnabled
+                      ? 'Currently capturing traces for this key.'
+                      : 'Tracing is off for this key.'}
+                </p>
+              </div>
+              <Switch
+                checked={!!info.traceEnabled}
+                onChange={handleToggleTrace}
+                disabled={togglingTrace || !!info.traceEnabledGlobal}
+                aria-label="Toggle trace capture"
+              />
+            </div>
+          </Card>
+
+          <Card title="Rotate secret">
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-text-secondary">
+                Generates a new secret for this key. The old secret stops working immediately. Your
+                historical logs, traces, and errors are preserved (they're indexed by key name, not
+                secret).
+              </p>
+              <div className="flex justify-stretch sm:justify-end">
+                <Button
+                  variant="danger"
+                  onClick={() => setShowRotate(true)}
+                  disabled={rotating}
+                  leftIcon={<RotateCw size={16} />}
+                  className="w-full sm:w-auto"
+                >
+                  Rotate secret
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <Modal
+          isOpen={showRotate}
+          onClose={() => {
+            setShowRotate(false);
+            setNewSecret(null);
+          }}
+          title={newSecret ? 'New secret generated' : 'Rotate secret?'}
+          footer={
+            newSecret ? (
+              <Button
+                onClick={() => {
+                  setShowRotate(false);
+                  setNewSecret(null);
+                }}
+              >
+                Done
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRotate(false)}
+                  disabled={rotating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleRotate}
+                  disabled={rotating}
+                  isLoading={rotating}
+                >
+                  Rotate now
+                </Button>
+              </>
+            )
+          }
+        >
+          {newSecret ? (
+            <div className="flex flex-col gap-3">
               <p className="text-sm text-text">
-                Capture full request/response payloads for this key only.
+                Copy this secret now — it will not be shown again.
               </p>
-              <p className="text-xs text-text-muted mt-1">
-                {info.traceEnabledGlobal
-                  ? 'Global tracing is ON (admin) — all requests are captured regardless of this toggle.'
-                  : info.traceEnabled
-                    ? 'Currently capturing traces for this key.'
-                    : 'Tracing is off for this key.'}
-              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <code className="flex-1 min-w-0 p-2 bg-bg-card border border-border rounded-md text-xs font-mono break-all">
+                  {newSecret}
+                </code>
+                <CopyButton value={newSecret} variant="icon" />
+              </div>
             </div>
-            <Switch
-              checked={!!info.traceEnabled}
-              onChange={handleToggleTrace}
-              disabled={togglingTrace || !!info.traceEnabledGlobal}
-              aria-label="Toggle trace capture"
-            />
-          </div>
-        </Card>
-
-        <Card title="Rotate secret">
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-text-secondary">
-              Generates a new secret for this key. The old secret stops working immediately. Your
-              historical logs, traces, and errors are preserved (they're indexed by key name, not
-              secret).
-            </p>
-            <div className="flex justify-end">
-              <Button
-                variant="danger"
-                onClick={() => setShowRotate(true)}
-                disabled={rotating}
-                leftIcon={<RotateCw size={16} />}
-              >
-                Rotate secret
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <Modal
-        isOpen={showRotate}
-        onClose={() => {
-          setShowRotate(false);
-          setNewSecret(null);
-        }}
-        title={newSecret ? 'New secret generated' : 'Rotate secret?'}
-        footer={
-          newSecret ? (
-            <Button
-              onClick={() => {
-                setShowRotate(false);
-                setNewSecret(null);
-              }}
-            >
-              Done
-            </Button>
           ) : (
-            <>
-              <Button variant="secondary" onClick={() => setShowRotate(false)} disabled={rotating}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={handleRotate}
-                disabled={rotating}
-                isLoading={rotating}
-              >
-                Rotate now
-              </Button>
-            </>
-          )
-        }
-      >
-        {newSecret ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-text">Copy this secret now — it will not be shown again.</p>
-            <div className="flex gap-2 items-center">
-              <code className="flex-1 min-w-0 p-2 bg-bg-card border border-border rounded-md text-xs font-mono break-all">
-                {newSecret}
-              </code>
-              <CopyButton value={newSecret} variant="icon" />
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-text-secondary">
-            The old secret will stop working immediately. Any clients using it will receive 401
-            errors until they are updated with the new secret.
-          </p>
-        )}
-      </Modal>
-    </PageContainer>
+            <p className="text-sm text-text-secondary">
+              The old secret will stop working immediately. Any clients using it will receive 401
+              errors until they are updated with the new secret.
+            </p>
+          )}
+        </Modal>
+      </PageContainer>
+    </div>
   );
 };

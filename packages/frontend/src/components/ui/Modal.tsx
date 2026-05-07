@@ -32,45 +32,41 @@ export const Modal: React.FC<ModalProps> = ({
     return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
-  const handleBackdropClick = () => {
-    // Don't close when clicking on the backdrop
-  };
-
   if (!isOpen) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-modal flex items-center justify-center p-4 sm:p-5 bg-black/70 backdrop-blur-md animate-[fadeIn_0.2s_ease]"
-      onClick={handleBackdropClick}
+      className="fixed inset-0 z-[410] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
         className={clsx(
-          'bg-bg-surface border border-border-glass rounded-xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-modal animate-[slideUp_0.3s_ease]',
+          'glass-bg w-full max-h-[92vh] overflow-hidden rounded-xl flex flex-col shadow-2xl animate-[slideUp_0.3s_ease] sm:max-h-[90vh] sm:rounded-2xl',
           {
-            'max-w-[420px]': size === 'sm',
-            'max-w-[640px]': size === 'md',
-            'max-w-[960px]': size === 'lg',
+            'max-w-md': size === 'sm',
+            'max-w-xl': size === 'md',
+            'max-w-3xl': size === 'lg',
           }
         )}
-        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 p-4 sm:p-5 md:p-6 border-b border-border-glass">
-          <h2 className="font-heading text-h2 font-semibold text-text m-0 truncate">{title}</h2>
+        <div className="flex items-center justify-between gap-3 p-4 border-b border-white/5 sm:p-5">
+          <h2 className="min-w-0 font-heading text-base font-semibold text-text m-0 truncate">
+            {title}
+          </h2>
           <button
             type="button"
-            className="flex-shrink-0 bg-transparent border-0 text-text-muted cursor-pointer rounded-md p-1 transition-colors duration-fast hover:text-text focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="flex-shrink-0 bg-transparent border-0 text-text-secondary cursor-pointer rounded-md p-1.5 transition-colors duration-fast hover:text-text hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
             onClick={onClose}
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
-        <div className="p-4 sm:p-5 md:p-6 lg:p-8 overflow-y-auto flex-1">{children}</div>
+        <div className="p-4 overflow-y-auto flex-1 sm:p-5">{children}</div>
         {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-4 sm:px-5 sm:py-5 md:px-6 border-t border-border-glass">
+          <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/5 sm:px-5 sm:py-4">
             {footer}
           </div>
         )}
