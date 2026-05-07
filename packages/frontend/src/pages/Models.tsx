@@ -2555,9 +2555,16 @@ export const Models = () => {
                           <td className="px-4 py-3 text-left text-text">
                             <div className="font-medium">{group.modelId}</div>
                             {group.existingAlias ? (
-                              <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
-                                Existing Alias
-                              </span>
+                              <>
+                                <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                                  Existing Alias
+                                </span>
+                                {group.matchReason && (
+                                  <div className="text-[11px] text-text-muted mt-0.5">
+                                    {group.matchReason}
+                                  </div>
+                                )}
+                              </>
                             ) : (
                               <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
                                 New Alias
@@ -2588,7 +2595,14 @@ export const Models = () => {
                                         setSelectedImports(next);
                                       }}
                                     />
-                                    <span className="text-text text-[13px]">{c.provider.name}</span>
+                                    <span className="text-text text-[13px]">
+                                      {c.provider.name}
+                                      {c.model.id !== group.modelId && (
+                                        <span className="text-text-muted ml-1 text-[11px]">
+                                          ({c.model.id})
+                                        </span>
+                                      )}
+                                    </span>
                                   </label>
                                 );
                               })}

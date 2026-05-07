@@ -4,7 +4,10 @@ import { useToast } from '../contexts/ToastContext';
 
 export interface OrphanGroup {
   modelId: string;
+  /** The alias this group will merge into or create. When set, imports add targets to this alias. */
   existingAlias?: Alias;
+  /** Human-readable reason when an existing alias was matched via fuzzy logic (e.g. "case-insensitive match" or "suffix match"). */
+  matchReason?: string;
   candidates: Array<{ provider: Provider; model: Model }>;
 }
 
@@ -187,6 +190,51 @@ export const useModels = () => {
 
   const filteredAliases = aliases.filter((a) => a.id.toLowerCase().includes(search.toLowerCase()));
 
+  /**
+   * Find an existing alias that matches a given model ID using fuzzy rules:
+   * 1. Exact case-insensitive match (e.g. "MiniMax-M2.7" → alias "minimax-m2.7")
+   * 2. Suffix match: the model ID after stripping a "provider/" prefix matches
+   *    an alias (e.g. "sonar-pro" → alias "perplexity/sonar-pro"), or vice versa
+   *    (e.g. "perplexity/sonar-pro" → alias "sonar-pro").
+   */
+  const findExistingAlias = useCallback(
+    (modelId: string, aliasList: Alias[]): { alias: Alias; reason?: string } | undefined => {
+      const lowerModel = modelId.toLowerCase();
+
+      // 1. Case-insensitive exact match
+      const ciMatch = aliasList.find((a) => a.id.toLowerCase() === lowerModel);
+      if (ciMatch && ciMatch.id !== modelId) {
+        return { alias: ciMatch, reason: `case-insensitive match: ${ciMatch.id}` };
+      }
+      if (ciMatch) {
+        return { alias: ciMatch };
+      }
+
+      // 2. Suffix match — strip provider-style prefix from either side
+      const modelSuffix = modelId.includes('/')
+        ? modelId.substring(modelId.lastIndexOf('/') + 1)
+        : modelId;
+      const modelSuffixLower = modelSuffix.toLowerCase();
+
+      for (const alias of aliasList) {
+        const aliasSuffix = alias.id.includes('/')
+          ? alias.id.substring(alias.id.lastIndexOf('/') + 1)
+          : alias.id;
+        const aliasSuffixLower = aliasSuffix.toLowerCase();
+
+        if (aliasSuffixLower === modelSuffixLower && alias.id !== modelId) {
+          return {
+            alias,
+            reason: `suffix match: ${alias.id}`,
+          };
+        }
+      }
+
+      return undefined;
+    },
+    []
+  );
+
   const handleOpenImport = useCallback(() => {
     // Build set of covered (provider, model) pairs from all alias targets
     const covered = new Set<string>();
@@ -196,25 +244,38 @@ export const useModels = () => {
       });
     });
 
-    // Find orphaned models and group by model.id
+    // Find orphaned models and group by lowercased model.id for case-insensitive grouping
     const orphanMap = new Map<string, Array<{ provider: Provider; model: Model }>>();
+    const canonicalIds = new Map<string, string>(); // lowercase → first-seen original casing
     availableModels.forEach((model) => {
       const key = `${model.providerId}|${model.id}`;
       if (covered.has(key)) return;
 
-      if (!orphanMap.has(model.id)) {
-        orphanMap.set(model.id, []);
+      // Group case-insensitively: use lowercase key but preserve first-seen casing
+      const groupKey = model.id.toLowerCase();
+      if (!canonicalIds.has(groupKey)) {
+        canonicalIds.set(groupKey, model.id);
+      }
+
+      if (!orphanMap.has(groupKey)) {
+        orphanMap.set(groupKey, []);
       }
       const provider = providers.find((p) => p.id === model.providerId);
       if (provider) {
-        orphanMap.get(model.id)!.push({ provider, model });
+        orphanMap.get(groupKey)!.push({ provider, model });
       }
     });
 
     const groups: OrphanGroup[] = [];
-    orphanMap.forEach((candidates, modelId) => {
-      const existingAlias = aliases.find((a) => a.id === modelId);
-      groups.push({ modelId, existingAlias, candidates });
+    orphanMap.forEach((candidates, groupKey) => {
+      const modelId = canonicalIds.get(groupKey) || groupKey;
+      const match = findExistingAlias(modelId, aliases);
+      groups.push({
+        modelId,
+        existingAlias: match?.alias,
+        matchReason: match?.reason,
+        candidates,
+      });
     });
     groups.sort((a, b) => a.modelId.localeCompare(b.modelId));
 
@@ -227,7 +288,7 @@ export const useModels = () => {
     setOrphanGroups(groups);
     setSelectedImports(selections);
     setIsImportModalOpen(true);
-  }, [aliases, availableModels, providers]);
+  }, [aliases, availableModels, providers, findExistingAlias]);
 
   const handleSaveImports = useCallback(async () => {
     setIsImporting(true);
