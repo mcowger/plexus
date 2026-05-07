@@ -513,7 +513,9 @@ const ModelMetadataSchema = z.discriminatedUnion('source', [
 ]);
 
 export const ModelConfigSchema = z.object({
-  selector: z.enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance']).optional(),
+  selector: z
+    .enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance', 'e2e_performance'])
+    .optional(),
   priority: z.enum(['selector', 'api_match']).default('selector'),
   targets: z.array(ModelTargetSchema),
   additional_aliases: z.array(z.string()).optional(),
@@ -589,6 +591,7 @@ const RawPlexusConfigSchema = z
     vision_fallthrough: VisionFallthroughConfigSchema.optional(),
     performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
+    e2ePerformanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
     user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
   })

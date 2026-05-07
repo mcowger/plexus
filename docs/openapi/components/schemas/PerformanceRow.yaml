@@ -22,13 +22,22 @@ properties:
     description: Maximum time to first token observed.
   avg_tokens_per_sec:
     type: number
-    description: Average output tokens per second (throughput).
+    description: Average post-TTFT throughput in tokens/sec (output tokens / streaming time).
   min_tokens_per_sec:
     type: number
-    description: Minimum throughput observed.
+    description: Minimum post-TTFT throughput observed.
   max_tokens_per_sec:
     type: number
-    description: Maximum throughput observed.
+    description: Maximum post-TTFT throughput observed.
+  avg_e2e_tokens_per_sec:
+    type: number
+    description: Average end-to-end throughput in tokens/sec (output tokens / total request time).
+  min_e2e_tokens_per_sec:
+    type: number
+    description: Minimum end-to-end throughput observed.
+  max_e2e_tokens_per_sec:
+    type: number
+    description: Maximum end-to-end throughput observed.
   sample_count:
     type: integer
     description: >

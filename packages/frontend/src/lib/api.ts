@@ -200,6 +200,9 @@ export interface ProviderPerformanceData {
   avg_tokens_per_sec: number;
   min_tokens_per_sec: number;
   max_tokens_per_sec: number;
+  avg_e2e_tokens_per_sec: number;
+  min_e2e_tokens_per_sec: number;
+  max_e2e_tokens_per_sec: number;
   sample_count: number;
   last_updated: number;
 }
@@ -1515,6 +1518,9 @@ export const api = {
         avg_tokens_per_sec: toNumber(row.avg_tokens_per_sec),
         min_tokens_per_sec: toNumber(row.min_tokens_per_sec),
         max_tokens_per_sec: toNumber(row.max_tokens_per_sec),
+        avg_e2e_tokens_per_sec: toNumber(row.avg_e2e_tokens_per_sec),
+        min_e2e_tokens_per_sec: toNumber(row.min_e2e_tokens_per_sec),
+        max_e2e_tokens_per_sec: toNumber(row.max_e2e_tokens_per_sec),
         sample_count: toNumber(row.sample_count),
         last_updated: toNumber(row.last_updated),
       }));
@@ -3092,6 +3098,7 @@ export const api = {
   getExplorationRates: async (): Promise<{
     performanceExplorationRate: number;
     latencyExplorationRate: number;
+    e2ePerformanceExplorationRate: number;
   }> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config/exploration-rate`);
     if (!res.ok) throw new Error('Failed to fetch exploration rate settings');
@@ -3102,9 +3109,11 @@ export const api = {
   patchExplorationRates: async (updates: {
     performanceExplorationRate?: number;
     latencyExplorationRate?: number;
+    e2ePerformanceExplorationRate?: number;
   }): Promise<{
     performanceExplorationRate: number;
     latencyExplorationRate: number;
+    e2ePerformanceExplorationRate: number;
   }> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config/exploration-rate`, {
       method: 'PATCH',

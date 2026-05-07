@@ -2,6 +2,7 @@ import { Selector } from './base';
 import { RandomSelector } from './random';
 import { CostSelector } from './cost';
 import { PerformanceSelector } from './performance';
+import { E2EPerformanceSelector } from './e2e-performance';
 import { LatencySelector } from './latency';
 import { InOrderSelector } from './in-order';
 import { UsageSelector } from './usage';
@@ -31,6 +32,13 @@ export class SelectorFactory {
           );
         }
         return new PerformanceSelector(this.usageStorage);
+      case 'e2e_performance':
+        if (!this.usageStorage) {
+          throw new Error(
+            'UsageStorageService not initialized in SelectorFactory. Call setUsageStorage first.'
+          );
+        }
+        return new E2EPerformanceSelector(this.usageStorage);
       case 'latency':
         if (!this.usageStorage) {
           throw new Error(

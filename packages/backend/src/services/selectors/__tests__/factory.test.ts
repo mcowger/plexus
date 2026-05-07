@@ -3,6 +3,7 @@ import { SelectorFactory } from '../factory';
 import { RandomSelector } from '../random';
 import { CostSelector } from '../cost';
 import { PerformanceSelector } from '../performance';
+import { E2EPerformanceSelector } from '../e2e-performance';
 import { LatencySelector } from '../latency';
 import { InOrderSelector } from '../in-order';
 import { UsageSelector } from '../usage';
@@ -49,6 +50,11 @@ describe('SelectorFactory', () => {
   it('should return LatencySelector for "latency"', () => {
     const selector = SelectorFactory.getSelector('latency');
     expect(selector).toBeInstanceOf(LatencySelector);
+  });
+
+  it('should return E2EPerformanceSelector for "e2e_performance"', () => {
+    const selector = SelectorFactory.getSelector('e2e_performance');
+    expect(selector).toBeInstanceOf(E2EPerformanceSelector);
   });
 
   it('should throw for unknown selector', () => {

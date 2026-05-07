@@ -175,11 +175,12 @@ A **model alias** is a virtual model name that clients use in requests. Each ali
 | `random` (default) | Distributes requests randomly across healthy targets |
 | `in_order` | Tries targets in order, skips unhealthy ones |
 | `cost` | Routes to cheapest provider (requires pricing) |
-| `performance` | Routes to highest tokens/sec (based on recent requests) |
+| `performance` | Routes to highest post-TTFT throughput (output tokens / streaming time) |
 | `latency` | Routes to lowest time-to-first-token |
 | `usage` | Routes to provider with least recent usage (last 24 hours) |
+| `e2e_performance` | Routes to highest end-to-end throughput (output tokens / total request time) |
 
-Use `performanceExplorationRate` (default 0.05) to occasionally explore other targets and prevent locking onto one provider. Applies to `performance` and `latency` selectors. `latencyExplorationRate` can be set separately for the latency selector (defaults to `performanceExplorationRate` if not specified).
+Use `performanceExplorationRate` (default 0.05) to occasionally explore other targets and prevent locking onto one provider. Applies to `performance`, `latency`, and `e2e_performance` selectors. `latencyExplorationRate` and `e2ePerformanceExplorationRate` can be set separately for their respective selectors (each defaults to `performanceExplorationRate` if not specified). Unlike `performance`, the `e2e_performance` selector explores across all candidates including the current best, ensuring end-to-end metrics stay fresh for every provider.
 
 ### Priority Modes
 
