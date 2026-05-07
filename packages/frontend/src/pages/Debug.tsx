@@ -265,14 +265,14 @@ export const Debug: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-8rem)] -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
-      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-3 shrink-0">
+    <div className="flex flex-col min-h-[calc(100vh-3rem)]">
+      <div className="shrink-0">
         <PageHeader
-          title="Debug Traces"
+          title="Traces"
           subtitle={
             principal?.role === 'limited' && principal.keyName
               ? `Traces for key "${principal.keyName}" only. Toggle capture in My Key.`
-              : 'Inspect full request/response lifecycles.'
+              : 'Distributed spans · OTLP'
           }
           actions={
             <>
@@ -297,7 +297,7 @@ export const Debug: React.FC = () => {
                   </Button>
 
                   {isFilterOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-bg-surface border border-border-glass rounded-lg shadow-lg z-50 p-4">
+                    <div className="absolute left-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-72 rounded-lg border border-border-glass bg-bg-surface p-4 shadow-lg sm:left-auto sm:right-0">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-text">Provider Filter</span>
                         {selectedProviders.length > 0 && (
@@ -401,10 +401,10 @@ export const Debug: React.FC = () => {
         />
       </div>
 
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden border-t border-border-glass">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border-glass md:flex-row">
         {/* Left Pane: Request List */}
-        <div className="w-full md:w-[320px] border-b md:border-b-0 md:border-r border-border-glass bg-bg-surface flex flex-col shrink-0 max-h-[40vh] md:max-h-none">
-          <div className="p-4 border-b border-border-glass">
+        <div className="flex max-h-[34vh] w-full shrink-0 flex-col border-b border-border-glass bg-bg-surface md:max-h-none md:w-[320px] md:border-b-0 md:border-r">
+          <div className="border-b border-border-glass p-3 sm:p-4">
             <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
               Recent Requests
             </span>
@@ -429,7 +429,7 @@ export const Debug: React.FC = () => {
                     </div>
                     <button
                       onClick={(e) => handleDelete(e, log.requestId)}
-                      className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0 transition-opacity"
+                      className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 md:opacity-0 md:group-hover:opacity-100"
                       title="Delete log"
                     >
                       <Trash2 size={12} />
@@ -450,15 +450,17 @@ export const Debug: React.FC = () => {
         </div>
 
         {/* Right Pane: Details */}
-        <div className="flex-1 bg-bg-deep overflow-y-auto flex flex-col relative">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg-deep">
           {selectedId && detail ? (
             <div className="flex flex-col">
-              <div className="sticky top-0 z-10 bg-bg-surface border-b border-border-glass px-4 py-3 flex items-center justify-between">
-                <div className="flex flex-col gap-1">
+              <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border-glass bg-bg-surface px-3 py-3 sm:px-4">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
                     Selected Trace
                   </span>
-                  <span className="text-xs font-mono text-text-secondary">{detail.requestId}</span>
+                  <span className="break-all text-xs font-mono text-text-secondary">
+                    {detail.requestId}
+                  </span>
                 </div>
               </div>
               <AccordionPanel
@@ -574,12 +576,12 @@ const AccordionPanel: React.FC<{
   return (
     <div className="border-b border-border-glass bg-bg-surface">
       <div
-        className="px-4 py-3 cursor-pointer flex justify-between items-center bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+        className="flex cursor-pointer items-center justify-between gap-3 bg-bg-hover px-3 py-3 transition-colors duration-200 select-none hover:bg-bg-glass sm:px-4"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <span className={clsx('text-[11px] font-bold uppercase tracking-wider', color)}>
+          <span className={clsx('truncate text-[11px] font-bold uppercase tracking-wider', color)}>
             {title}
           </span>
         </div>
@@ -597,7 +599,7 @@ const AccordionPanel: React.FC<{
           isOpen ? 'max-h-[500px]' : 'max-h-0'
         )}
       >
-        <div className="h-[400px] bg-[#1e1e1e]">
+        <div className="h-[280px] bg-[#1e1e1e] sm:h-[400px]">
           <Editor
             height="100%"
             defaultLanguage="json"

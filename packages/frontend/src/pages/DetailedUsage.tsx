@@ -1142,7 +1142,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           in the current time window. Each card shows a label, value, and icon.
           Errors are highlighted in red when count > 0.
       ------------------------------------------------------------------- */}
-      <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8">
         {stats.map((stat, i) => (
           <div key={i} className="glass-bg rounded-lg p-3 flex flex-col gap-1">
             <div className="flex justify-between items-start">
@@ -1170,7 +1170,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
              -- Only visible when groupBy='time' (categorical views use pie)
       ------------------------------------------------------------------- */}
       <Card className="mb-6" title="Chart Configuration">
-        <div className="flex flex-wrap gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:flex lg:flex-wrap">
           {/* --- Time Range Selector --- */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-text-muted uppercase">Time Range</span>
@@ -1191,7 +1191,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           {/* --- Group By Selector --- */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-text-muted uppercase">Group By</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {[
                 { k: 'time', l: 'Time' },
                 { k: 'provider', l: 'Provider' },
@@ -1213,7 +1213,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           {/* --- Chart Type Picker --- */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-text-muted uppercase">Chart Type</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {[
                 { k: 'area', i: LineChartIcon, l: 'Area' },
                 { k: 'line', i: LineChartIcon, l: 'Line' },
@@ -1238,7 +1238,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           {/* --- View Mode Toggle (Chart vs List) --- */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-text-muted uppercase">View</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant={viewMode === 'chart' ? 'primary' : 'secondary'}
@@ -1312,7 +1312,58 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           title="Raw Request Log"
           extra={<span className="text-xs text-text-secondary">{records.length} requests</span>}
         >
-          <div className="overflow-x-auto max-h-125 overflow-y-auto">
+          <div className="max-h-125 space-y-3 overflow-y-auto md:hidden">
+            {records.slice(0, 100).map((r, i) => (
+              <article key={i} className="rounded-md border border-border-glass bg-bg-subtle p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-text">
+                      {new Date(r.date).toLocaleString()}
+                    </div>
+                    <div className="mt-1 truncate text-xs text-text-muted">
+                      {r.provider || 'unknown'} /{' '}
+                      {r.incomingModelAlias || r.selectedModelName || 'unknown'}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 text-xs font-semibold ${
+                      r.responseStatus === 'success' ? 'text-green-500' : 'text-red-500'
+                    }`}
+                  >
+                    {r.responseStatus}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                      Tokens
+                    </div>
+                    <div className="font-medium text-text">
+                      {formatTokens((r.tokensInput || 0) + (r.tokensOutput || 0))}
+                    </div>
+                  </div>
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
+                    <div className="font-medium text-text">{formatCost(r.costTotal || 0, 4)}</div>
+                  </div>
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                      Duration
+                    </div>
+                    <div className="font-medium text-text">{formatMs(r.durationMs || 0)}</div>
+                  </div>
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">TPS</div>
+                    <div className="font-medium text-text">
+                      {formatNumber(r.tokensPerSec || 0, 1)}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden max-h-125 overflow-x-auto overflow-y-auto md:block">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-card">
                 <tr className="text-left border-b border-border-glass text-text-secondary">
@@ -1371,7 +1422,41 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       ------------------------------------------------------------------- */}
       {groupBy !== 'time' && aggregatedData.length > 0 && (
         <Card className="mt-6" title="Detailed Breakdown">
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {aggregatedData.map((row, i) => (
+              <article key={i} className="rounded-md border border-border-glass bg-bg-subtle p-3">
+                <div className="truncate font-heading text-sm font-semibold text-text">
+                  {row.name}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                      Requests
+                    </div>
+                    <div className="font-medium text-text">{formatNumber(row.requests, 0)}</div>
+                  </div>
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                      Success
+                    </div>
+                    <div className="font-medium text-green-500">{row.successRate.toFixed(1)}%</div>
+                  </div>
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                      Tokens
+                    </div>
+                    <div className="font-medium text-text">{formatTokens(row.tokens)}</div>
+                  </div>
+                  <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
+                    <div className="font-medium text-text">{formatCost(row.cost, 6)}</div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-border-glass text-text-secondary">

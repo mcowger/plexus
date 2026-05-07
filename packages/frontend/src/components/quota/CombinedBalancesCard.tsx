@@ -39,7 +39,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     return (
       <div
         key={quota.checkerId}
-        className="px-4 py-3 flex items-center justify-between hover:bg-bg-hover transition-colors"
+        className="flex flex-col gap-3 px-3 py-3 transition-colors hover:bg-bg-hover sm:flex-row sm:items-center sm:justify-between sm:px-4"
       >
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -52,7 +52,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col gap-0.5 px-4 min-w-0">
+        <div className="min-w-0 px-0 sm:px-4">
           {!quota.success ? (
             <div className="flex items-center gap-2 text-danger">
               <AlertTriangle size={14} />
@@ -77,7 +77,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
           )}
         </div>
 
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 self-end sm:self-auto">
           <Button
             size="sm"
             variant="ghost"

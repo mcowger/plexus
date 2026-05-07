@@ -185,186 +185,191 @@ export const SystemLogs: React.FC = () => {
   };
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
-            <Terminal size={24} className="text-primary" />
+            <Terminal size={20} className="text-primary" />
             System Logs
           </span>
         }
-        subtitle="Live stream of backend system logs."
+        subtitle="Live tail · stderr+stdout"
       />
-
-      <div className="flex flex-col gap-3 glass-bg rounded-lg overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-border-glass">
-          <h3 className="font-heading text-h3 font-semibold text-text m-0">Live Output</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-[120px]">
-              <Select
-                value={selectedLevel}
-                onChange={setSelectedLevel}
-                options={supportedLevels.map((l) => ({ value: l, label: l }))}
-                disabled={isUpdatingLevel}
-              />
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={applyLoggingLevel}
-              disabled={isUpdatingLevel || selectedLevel === currentLevel}
-            >
-              Apply
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={resetLoggingLevel}
-              disabled={isUpdatingLevel || currentLevel === startupLevel}
-              leftIcon={<RotateCcw size={14} />}
-            >
-              Reset
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setIsPaused(!isPaused)}
-              leftIcon={isPaused ? <Play size={14} /> : <Pause size={14} />}
-            >
-              {isPaused ? 'Resume' : 'Pause'}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={clearLogs}
-              leftIcon={<Trash2 size={14} />}
-            >
-              Clear
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-border-glass">
-          <div className="text-xs text-text-secondary">
-            Current level: <span className="text-text font-semibold">{currentLevel}</span> · Startup
-            default: <span className="text-text font-semibold">{startupLevel}</span> · Runtime
-            changes reset on restart.
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {moduleFilter.length > 0 ? (
-                moduleFilter.map((m) => (
-                  <span
-                    key={m}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary border border-primary/30"
-                  >
-                    {m}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const next = moduleFilter.filter((x) => x !== m);
-                        setModuleFilterState(next);
-                        try {
-                          if (next.length === 0) {
-                            await api.clearModuleFilter();
-                          } else {
-                            await api.setModuleFilter(next);
-                          }
-                        } catch {
-                          setModuleFilterState(moduleFilter);
-                        }
-                      }}
-                      className="bg-transparent border-0 p-0 cursor-pointer text-primary/60 hover:text-primary leading-none"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))
-              ) : (
-                <span className="text-xs text-text-muted italic">All modules</span>
-              )}
-            </div>
-            <input
-              type="text"
-              value={moduleInput}
-              onChange={(e) => setModuleInput(e.target.value)}
-              onKeyDown={async (e) => {
-                if (e.key === 'Enter' && moduleInput.trim()) {
-                  e.preventDefault();
-                  const mod = moduleInput.trim();
-                  if (!moduleFilter.includes(mod)) {
-                    const next = [...moduleFilter, mod];
-                    setModuleFilterState(next);
-                    setModuleInput('');
-                    try {
-                      await api.setModuleFilter(next);
-                    } catch {
-                      setModuleFilterState(moduleFilter);
-                    }
-                  } else {
-                    setModuleInput('');
-                  }
-                }
-              }}
-              placeholder="Add module..."
-              className="h-7 w-32 text-xs rounded-md border border-border-glass bg-bg px-2 text-text outline-none focus:border-primary transition-colors"
-              disabled={false}
-            />
-            {moduleFilter.length > 0 && (
-              <button
-                type="button"
-                onClick={async () => {
-                  setModuleFilterState([]);
-                  try {
-                    await api.clearModuleFilter();
-                  } catch {
-                    // ignore
-                  }
-                }}
-                className="text-xs text-text-secondary hover:text-danger transition-colors bg-transparent border-0 cursor-pointer"
+      <PageContainer>
+        <div className="flex flex-col gap-3 glass-bg rounded-lg overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-border-glass px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <h3 className="font-heading text-h3 font-semibold text-text m-0">Live Output</h3>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="w-full sm:min-w-[120px]">
+                <Select
+                  value={selectedLevel}
+                  onChange={setSelectedLevel}
+                  options={supportedLevels.map((l) => ({ value: l, label: l }))}
+                  disabled={isUpdatingLevel}
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={applyLoggingLevel}
+                disabled={isUpdatingLevel || selectedLevel === currentLevel}
+                className="w-full sm:w-auto"
+              >
+                Apply
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={resetLoggingLevel}
+                disabled={isUpdatingLevel || currentLevel === startupLevel}
+                leftIcon={<RotateCcw size={14} />}
+                className="w-full sm:w-auto"
+              >
+                Reset
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsPaused(!isPaused)}
+                leftIcon={isPaused ? <Play size={14} /> : <Pause size={14} />}
+                className="w-full sm:w-auto"
+              >
+                {isPaused ? 'Resume' : 'Pause'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={clearLogs}
+                leftIcon={<Trash2 size={14} />}
+                className="w-full sm:w-auto"
               >
                 Clear
-              </button>
-            )}
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-terminal-bg p-3 overflow-y-auto font-mono text-xs text-terminal-fg h-[60vh] min-h-[320px] max-h-[700px]">
-          {logs.length === 0 && (
-            <div className="text-text-muted italic text-center mt-8">Waiting for logs...</div>
-          )}
-          {logs.map((log, i) => (
-            <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">
-              <span className="text-text-muted mr-2">[{log.timestamp}]</span>
-              <span
-                className={clsx(
-                  'font-bold mr-2',
-                  LEVEL_CLASS[log.level?.toLowerCase()] ?? 'text-text-muted'
+          <div className="flex flex-col gap-3 border-b border-border-glass px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div className="text-xs text-text-secondary">
+              Current level: <span className="text-text font-semibold">{currentLevel}</span> ·
+              Startup default: <span className="text-text font-semibold">{startupLevel}</span> ·
+              Runtime changes reset on restart.
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {moduleFilter.length > 0 ? (
+                  moduleFilter.map((m) => (
+                    <span
+                      key={m}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary border border-primary/30"
+                    >
+                      {m}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = moduleFilter.filter((x) => x !== m);
+                          setModuleFilterState(next);
+                          try {
+                            if (next.length === 0) {
+                              await api.clearModuleFilter();
+                            } else {
+                              await api.setModuleFilter(next);
+                            }
+                          } catch {
+                            setModuleFilterState(moduleFilter);
+                          }
+                        }}
+                        className="bg-transparent border-0 p-0 cursor-pointer text-primary/60 hover:text-primary leading-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-text-muted italic">All modules</span>
                 )}
-              >
-                {log.level?.toUpperCase()}:
-              </span>
-              <span>{log.message}</span>
-              {Object.keys(log).filter((k) => !['level', 'message', 'timestamp'].includes(k))
-                .length > 0 && (
-                <pre className="text-text-muted text-[11px] ml-8 mt-1 whitespace-pre-wrap">
-                  {JSON.stringify(
-                    Object.fromEntries(
-                      Object.entries(log).filter(
-                        ([k]) => !['level', 'message', 'timestamp'].includes(k)
-                      )
-                    ),
-                    null,
-                    2
-                  )}
-                </pre>
+              </div>
+              <input
+                type="text"
+                value={moduleInput}
+                onChange={(e) => setModuleInput(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && moduleInput.trim()) {
+                    e.preventDefault();
+                    const mod = moduleInput.trim();
+                    if (!moduleFilter.includes(mod)) {
+                      const next = [...moduleFilter, mod];
+                      setModuleFilterState(next);
+                      setModuleInput('');
+                      try {
+                        await api.setModuleFilter(next);
+                      } catch {
+                        setModuleFilterState(moduleFilter);
+                      }
+                    } else {
+                      setModuleInput('');
+                    }
+                  }
+                }}
+                placeholder="Add module..."
+                className="h-8 w-full rounded-md border border-border-glass bg-bg px-2 text-xs text-text outline-none transition-colors focus:border-primary sm:h-7 sm:w-32"
+                disabled={false}
+              />
+              {moduleFilter.length > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setModuleFilterState([]);
+                    try {
+                      await api.clearModuleFilter();
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className="text-xs text-text-secondary hover:text-danger transition-colors bg-transparent border-0 cursor-pointer"
+                >
+                  Clear
+                </button>
               )}
             </div>
-          ))}
-          <div ref={logsEndRef} />
+          </div>
+
+          <div className="h-[55vh] min-h-[280px] max-h-[700px] overflow-y-auto bg-terminal-bg p-2 font-mono text-xs text-terminal-fg sm:h-[60vh] sm:min-h-[320px] sm:p-3">
+            {logs.length === 0 && (
+              <div className="text-text-muted italic text-center mt-8">Waiting for logs...</div>
+            )}
+            {logs.map((log, i) => (
+              <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">
+                <span className="text-text-muted mr-2">[{log.timestamp}]</span>
+                <span
+                  className={clsx(
+                    'font-bold mr-2',
+                    LEVEL_CLASS[log.level?.toLowerCase()] ?? 'text-text-muted'
+                  )}
+                >
+                  {log.level?.toUpperCase()}:
+                </span>
+                <span>{log.message}</span>
+                {Object.keys(log).filter((k) => !['level', 'message', 'timestamp'].includes(k))
+                  .length > 0 && (
+                  <pre className="text-text-muted text-[11px] ml-8 mt-1 whitespace-pre-wrap">
+                    {JSON.stringify(
+                      Object.fromEntries(
+                        Object.entries(log).filter(
+                          ([k]) => !['level', 'message', 'timestamp'].includes(k)
+                        )
+                      ),
+                      null,
+                      2
+                    )}
+                  </pre>
+                )}
+              </div>
+            ))}
+            <div ref={logsEndRef} />
+          </div>
         </div>
-      </div>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 };

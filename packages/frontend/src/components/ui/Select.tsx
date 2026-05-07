@@ -46,10 +46,11 @@ export function Select<V extends string = string>({
           onChange={(e) => onChange(e.target.value as V)}
           aria-invalid={!!error}
           className={clsx(
-            'w-full appearance-none py-2.5 pl-3.5 pr-10 font-body text-sm text-text bg-bg-glass border rounded-md outline-none transition-all duration-fast backdrop-blur-md cursor-pointer',
-            'focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25',
+            'w-full appearance-none py-2 pl-3 pr-9 font-body text-sm text-text bg-slate-900/60 border rounded-md outline-none transition-all duration-fast cursor-pointer',
+            'hover:border-border-2',
+            'focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.18)]',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            error ? 'border-danger' : 'border-border-glass',
+            error ? 'border-danger' : 'border-border',
             className
           )}
           {...rest}
@@ -66,7 +67,7 @@ export function Select<V extends string = string>({
           ))}
         </select>
         <ChevronDown
-          size={16}
+          size={14}
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"
         />
       </div>

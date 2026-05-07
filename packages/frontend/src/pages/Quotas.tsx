@@ -171,92 +171,38 @@ export const Quotas = () => {
   };
 
   return (
-    <PageContainer>
+    <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Quota Trackers"
-        subtitle="Monitor provider quotas and rate limits."
+        title="Quotas"
+        subtitle="Provider balances and rate-quota allowances"
         actions={
           <Button
             variant="secondary"
+            size="sm"
             onClick={fetchQuotas}
             disabled={loading}
-            leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}
+            leftIcon={<RefreshCw size={14} className={clsx(loading && 'animate-spin')} />}
           >
-            Refresh All
+            Refresh all
           </Button>
         }
       />
 
-      {legacyRowCount !== null && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-          <DatabaseZap size={16} className="mt-0.5 shrink-0 text-amber-400" />
-          <div className="flex-1">
-            <p className="font-medium text-amber-300">
-              Legacy quota data detected ({legacyRowCount.toLocaleString()} row
-              {legacyRowCount !== 1 ? 's' : ''} in{' '}
-              <code className="font-mono">quota_snapshots</code>)
-            </p>
-            <p className="mt-0.5 text-text-secondary">
-              Migrate this historical data into the new meter snapshots table to preserve it.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              size="sm"
-              variant="ghost"
-              isLoading={downloading === 'csv'}
-              disabled={downloading !== null}
-              onClick={() => handleDownloadBackup('csv')}
-              leftIcon={<Download size={13} />}
-            >
-              CSV
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              isLoading={downloading === 'sql'}
-              disabled={downloading !== null}
-              onClick={() => handleDownloadBackup('sql')}
-              leftIcon={<Download size={13} />}
-            >
-              SQL
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              isLoading={migrating}
-              onClick={handleMigrate}
-              leftIcon={<DatabaseZap size={13} />}
-            >
-              Migrate now
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {migrationResult !== null && (
-        <div className="flex items-start gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm">
-          <DatabaseZap size={16} className="mt-0.5 shrink-0 text-green-400" />
-          <div className="flex-1">
-            <p className="font-medium text-green-300">
-              Migration complete — {migrationResult.inserted.toLocaleString()} row
-              {migrationResult.inserted !== 1 ? 's' : ''} inserted
-              {migrationResult.skipped > 0
-                ? `, ${migrationResult.skipped.toLocaleString()} already existed`
-                : ''}
-              .
-            </p>
-            {!truncated && (
-              <p className="mt-0.5 text-text-secondary">
-                You can now truncate the old <code className="font-mono">quota_snapshots</code>{' '}
-                table to free up space.
+      <PageContainer>
+        {legacyRowCount !== null && (
+          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm sm:flex-row sm:items-start sm:px-4">
+            <DatabaseZap size={16} className="mt-0.5 shrink-0 text-amber-400" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-300">
+                Legacy quota data detected ({legacyRowCount.toLocaleString()} row
+                {legacyRowCount !== 1 ? 's' : ''} in{' '}
+                <code className="font-mono">quota_snapshots</code>)
               </p>
-            )}
-          </div>
-          {truncated ? (
-            <span className="text-xs text-text-muted self-center">quota_snapshots truncated</span>
-          ) : (
-            <div className="flex items-center gap-2 shrink-0">
+              <p className="mt-0.5 text-text-secondary">
+                Migrate this historical data into the new meter snapshots table to preserve it.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
               <Button
                 size="sm"
                 variant="ghost"
@@ -277,76 +223,133 @@ export const Quotas = () => {
               >
                 SQL
               </Button>
-              <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
-                Truncate quota_snapshots
+              <Button
+                size="sm"
+                variant="secondary"
+                isLoading={migrating}
+                onClick={handleMigrate}
+                leftIcon={<DatabaseZap size={13} />}
+              >
+                Migrate now
               </Button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {loading && quotas.length === 0 ? (
-        <div className="flex items-center justify-center h-64 gap-3">
-          <RefreshCw size={20} className="animate-spin text-primary" />
-          <span className="text-text-secondary">Loading quotas...</span>
-        </div>
-      ) : quotas.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<Gauge />}
-            title="No quota checkers configured"
-            description="Configure quota checkers in your provider settings to monitor usage."
-          />
-        </Card>
-      ) : (
-        <div className="flex flex-col gap-8">
-          {balanceQuotas.length > 0 && (
-            <section>
-              <CombinedBalancesCard
-                balanceQuotas={balanceQuotas}
-                onRefresh={handleRefresh}
-                refreshing={refreshing}
-              />
-            </section>
-          )}
-
-          {allowanceGroups.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border-glass">
-                <Cpu size={18} className="text-primary" />
-                <h2 className="font-heading text-h2 font-semibold text-text">Rate Limits</h2>
+        {migrationResult !== null && (
+          <div className="flex flex-col gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-3 text-sm sm:flex-row sm:items-start sm:px-4">
+            <DatabaseZap size={16} className="mt-0.5 shrink-0 text-green-400" />
+            <div className="flex-1">
+              <p className="font-medium text-green-300">
+                Migration complete — {migrationResult.inserted.toLocaleString()} row
+                {migrationResult.inserted !== 1 ? 's' : ''} inserted
+                {migrationResult.skipped > 0
+                  ? `, ${migrationResult.skipped.toLocaleString()} already existed`
+                  : ''}
+                .
+              </p>
+              {!truncated && (
+                <p className="mt-0.5 text-text-secondary">
+                  You can now truncate the old <code className="font-mono">quota_snapshots</code>{' '}
+                  table to free up space.
+                </p>
+              )}
+            </div>
+            {truncated ? (
+              <span className="text-xs text-text-muted self-center">quota_snapshots truncated</span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isLoading={downloading === 'csv'}
+                  disabled={downloading !== null}
+                  onClick={() => handleDownloadBackup('csv')}
+                  leftIcon={<Download size={13} />}
+                >
+                  CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isLoading={downloading === 'sql'}
+                  disabled={downloading !== null}
+                  onClick={() => handleDownloadBackup('sql')}
+                  leftIcon={<Download size={13} />}
+                >
+                  SQL
+                </Button>
+                <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
+                  Truncate quota_snapshots
+                </Button>
               </div>
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {allowanceGroups.map(([checkerType, quotasList]) => {
-                  const displayName = getCheckerDisplayName(
-                    checkerType,
-                    quotasList[0]?.checkerId ?? checkerType
-                  );
-                  return (
-                    <div key={checkerType} className="flex flex-col gap-3">
-                      <h3 className="font-heading text-xs font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border-glass pb-2">
-                        {displayName}
-                      </h3>
-                      <div className="flex flex-col gap-3">
-                        {quotasList.map((quota) => renderCheckerCard(quota, displayName))}
+            )}
+          </div>
+        )}
+
+        {loading && quotas.length === 0 ? (
+          <div className="flex items-center justify-center h-64 gap-3">
+            <RefreshCw size={20} className="animate-spin text-primary" />
+            <span className="text-text-secondary">Loading quotas...</span>
+          </div>
+        ) : quotas.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={<Gauge />}
+              title="No quota checkers configured"
+              description="Configure quota checkers in your provider settings to monitor usage."
+            />
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-8">
+            {balanceQuotas.length > 0 && (
+              <section>
+                <CombinedBalancesCard
+                  balanceQuotas={balanceQuotas}
+                  onRefresh={handleRefresh}
+                  refreshing={refreshing}
+                />
+              </section>
+            )}
+
+            {allowanceGroups.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border-glass">
+                  <Cpu size={18} className="text-primary" />
+                  <h2 className="font-heading text-h2 font-semibold text-text">Rate Limits</h2>
+                </div>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {allowanceGroups.map(([checkerType, quotasList]) => {
+                    const displayName = getCheckerDisplayName(
+                      checkerType,
+                      quotasList[0]?.checkerId ?? checkerType
+                    );
+                    return (
+                      <div key={checkerType} className="flex flex-col gap-3">
+                        <h3 className="font-heading text-xs font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border-glass pb-2">
+                          {displayName}
+                        </h3>
+                        <div className="flex flex-col gap-3">
+                          {quotasList.map((quota) => renderCheckerCard(quota, displayName))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </div>
-      )}
-      {historyTarget && (
-        <MeterHistoryModal
-          isOpen
-          onClose={() => setHistoryTarget(null)}
-          quota={historyTarget.quota}
-          meter={historyTarget.meter}
-          displayName={historyTarget.displayName}
-        />
-      )}
-    </PageContainer>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+        {historyTarget && (
+          <MeterHistoryModal
+            isOpen
+            onClose={() => setHistoryTarget(null)}
+            quota={historyTarget.quota}
+            meter={historyTarget.meter}
+            displayName={historyTarget.displayName}
+          />
+        )}
+      </PageContainer>
+    </div>
   );
 };

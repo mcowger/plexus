@@ -197,19 +197,21 @@ export const buildQueryString = (cardType: CardType, context?: AnalyzeContext): 
 
 /**
  * Get human-readable label for the analysis action based on card type.
- * Provides contextual messaging so users understand what they're navigating to.
+ * Returns [shortLabel, fullLabel] — the short label is shown on small screens
+ * so the button doesn't blow out the card on mobile, and the full descriptive
+ * label appears on `sm:` breakpoint and up.
  */
-const getAnalyzeLabel = (cardType: CardType): string => {
-  const labels: Record<CardType, string> = {
-    velocity: 'Analyze Velocity Trends',
-    provider: 'Analyze Provider Performance',
-    model: 'Analyze Model Usage',
-    modelstack: 'Analyze Model Stack',
-    timeline: 'Analyze Timeline',
-    requests: 'View Detailed Logs',
-    concurrency: 'Analyze Concurrency',
+const getAnalyzeLabel = (cardType: CardType): { short: string; full: string } => {
+  const labels: Record<CardType, { short: string; full: string }> = {
+    velocity: { short: 'Analyze', full: 'Analyze Velocity Trends' },
+    provider: { short: 'Analyze', full: 'Analyze Provider Performance' },
+    model: { short: 'Analyze', full: 'Analyze Model Usage' },
+    modelstack: { short: 'Analyze', full: 'Analyze Model Stack' },
+    timeline: { short: 'Analyze', full: 'Analyze Timeline' },
+    requests: { short: 'Logs', full: 'View Detailed Logs' },
+    concurrency: { short: 'Analyze', full: 'Analyze Concurrency' },
   };
-  return labels[cardType] || 'Analyze in Detail';
+  return labels[cardType] || { short: 'Analyze', full: 'Analyze in Detail' };
 };
 
 /**
@@ -251,16 +253,18 @@ export const AnalyzeButton: React.FC<AnalyzeButtonProps> = ({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const { short, full } = getAnalyzeLabel(cardType);
   return (
     <Button
       size={size}
       variant="primary"
       onClick={handleAnalyze}
-      className={`flex items-center gap-2 ${className}`}
+      className={`shrink-0 ${className}`}
     >
       <BarChart3 size={size === 'sm' ? 14 : 16} />
-      {getAnalyzeLabel(cardType)}
-      <ExternalLink size={size === 'sm' ? 12 : 14} className="ml-1 opacity-70" />
+      <span className="xl:hidden">{short}</span>
+      <span className="hidden xl:inline">{full}</span>
+      <ExternalLink size={size === 'sm' ? 12 : 14} className="hidden sm:block opacity-70" />
     </Button>
   );
 };

@@ -4,17 +4,17 @@ import {
   LayoutDashboard,
   Settings,
   Server,
-  Box,
-  FileText,
-  Database,
+  Boxes,
+  ScrollText,
+  Route,
+  Terminal,
   LogOut,
   AlertTriangle,
   Key,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronRight,
-  PieChart,
-  Plug,
+  Gauge,
+  PlugZap,
   UserCircle2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -26,17 +26,15 @@ import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
 import { CompactBalancesCard, CompactQuotasCard } from '../quota';
 import type { QuotaCheckerInfo } from '../../types/quota';
-
-import logo from '../../assets/plexus_logo_transparent.png';
+import { PlexusMark } from './PlexusMark';
 
 interface SidebarProps {
-  /** desktop = fixed aside with collapse rail; drawer = flush content rendered inside a Drawer. */
   mode?: 'desktop' | 'drawer';
 }
 
 interface NavItemProps {
   to: string;
-  icon: React.ComponentType<{ size: number }>;
+  icon: React.ComponentType<{ size: number; className?: string }>;
   label: string;
   collapsed: boolean;
 }
@@ -45,16 +43,22 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, collapsed }) =
   const navLink = (
     <NavLink
       to={to}
+      end={to === '/'}
       className={({ isActive }) =>
         clsx(
-          'flex items-center gap-3 py-1.5 px-2 rounded-md font-body text-sm font-medium text-text-secondary no-underline cursor-pointer transition-all duration-fast border border-transparent hover:bg-bg-hover hover:text-text',
+          'group relative flex items-center gap-2.5 py-2 px-2.5 rounded-md font-body text-[13px] font-medium no-underline cursor-pointer transition-all duration-fast',
+          'text-text-secondary hover:bg-bg-hover hover:text-text',
           collapsed && 'justify-center',
+          // Active state: amber tint + a left rail via :before pseudo-element
+          // (cleaner than a sibling <span> and avoids NavLink render-prop quirks).
           isActive &&
-            'bg-bg-glass text-primary border-border-glass backdrop-blur-md shadow-nav-active'
+            !collapsed &&
+            'bg-amber-500/10 text-amber-300 before:content-[""] before:absolute before:-left-3 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-sm before:bg-gradient-to-b before:from-secondary before:to-primary',
+          isActive && collapsed && 'bg-amber-500/10 text-amber-300'
         )
       }
     >
-      <Icon size={20} />
+      <Icon size={16} className="flex-shrink-0" />
       <span
         className={clsx(
           'transition-opacity duration-fast',
@@ -75,30 +79,31 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, collapsed }) =
   );
 };
 
+const NavSection: React.FC<{ title: string; collapsed: boolean }> = ({ title, collapsed }) => (
+  <div
+    className={clsx(
+      'px-2.5 pt-2 pb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-text-muted font-medium transition-opacity duration-fast',
+      collapsed && 'opacity-0 h-0 overflow-hidden pt-0 pb-0'
+    )}
+  >
+    {title}
+  </div>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   const appVersion: string =
     // @ts-expect-error — replaced at build time by build.ts
     process.env.APP_VERSION || 'dev';
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [mainExpanded, setMainExpanded] = useState(true);
-  const [balancesExpanded, setBalancesExpanded] = useState(true);
-  const [quotasExpanded, setQuotasExpanded] = useState(true);
-  const [configExpanded, setConfigExpanded] = useState(true);
-  const [devToolsExpanded, setDevToolsExpanded] = useState(false);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const { logout, isAdmin, isLimited, principal } = useAuth();
   const { isCollapsed, toggleSidebar, isMobileOpen, closeMobile } = useSidebar();
   const location = useLocation();
 
-  // Drawer mode always renders expanded; desktop respects user preference.
   const collapsed = mode === 'desktop' && isCollapsed;
 
-  // Auto-close drawer on navigation. Only fires on pathname *changes*, not on
-  // initial mount — otherwise opening the drawer would immediately close it,
-  // since the drawer-mode Sidebar mounts with location.pathname already set.
   const lastPathnameRef = useRef(location.pathname);
   useEffect(() => {
     const pathChanged = lastPathnameRef.current !== location.pathname;
@@ -122,24 +127,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Parse CalVer tag: YYYY.MM.DD.N or vX.Y.Z (legacy semver)
-  // Returns [year, month, day, counter] for CalVer, null for invalid
   const parseVersionTag = (tag: string): [number, number, number, number] | null => {
-    // Try CalVer: YYYY.MM.DD.N
     const calverMatch = tag.match(/^(\d{4})\.(\d{2})\.(\d{2})\.(\d+)$/);
     if (calverMatch) {
       return [
-        parseInt(calverMatch[1]!, 10), // year
-        parseInt(calverMatch[2]!, 10), // month
-        parseInt(calverMatch[3]!, 10), // day
-        parseInt(calverMatch[4]!, 10), // counter
+        parseInt(calverMatch[1]!, 10),
+        parseInt(calverMatch[2]!, 10),
+        parseInt(calverMatch[3]!, 10),
+        parseInt(calverMatch[4]!, 10),
       ];
     }
-    // Try legacy semver: vX.Y.Z (convert to CalVer-like for comparison)
     const semverMatch = tag.match(/^v(\d+)\.(\d+)\.(\d+)$/);
     if (semverMatch) {
-      // Treat as 0.0.0 with special counter for backward compatibility
-      // This ensures old semver tags always compare as older than CalVer
       return [0, 0, 0, parseInt(semverMatch[1] + semverMatch[2] + semverMatch[3]!, 10)];
     }
     return null;
@@ -149,7 +148,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
     const parsedA = parseVersionTag(a);
     const parsedB = parseVersionTag(b);
     if (!parsedA || !parsedB) return 0;
-    // Compare year, month, day, then counter
     for (let i = 0; i < 4; i++) {
       if (parsedA[i]! !== parsedB[i]!) {
         return parsedA[i]! - parsedB[i]!;
@@ -212,31 +210,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   const allowanceQuotas = quotas.filter((q) => q.meters.some((m) => m.kind === 'allowance'));
 
   const isDrawer = mode === 'drawer';
+  const initials =
+    principal?.role === 'admin' ? 'AD' : (principal?.keyName || 'KU').slice(0, 2).toUpperCase();
 
   return (
     <aside
       data-collapsed={collapsed}
       className={clsx(
-        'bg-bg-surface flex flex-col overflow-y-auto overflow-x-hidden border-r border-border',
+        // Solid background — glass-bg used to let the page content scroll
+        // through visibly. Sidebar must fully obscure what's underneath.
+        'bg-bg-card border-border flex flex-col overflow-y-auto overflow-x-hidden',
         isDrawer
-          ? 'h-full w-full border-r-0'
-          : 'hidden md:flex fixed left-0 top-0 h-screen z-sidebar transition-[width] duration-300',
-        !isDrawer && (collapsed ? 'w-[64px]' : 'w-[200px]')
+          ? 'h-full w-full'
+          : 'hidden md:flex fixed left-0 top-0 h-screen z-[200] border-r transition-[width] duration-300',
+        !isDrawer && (collapsed ? 'w-[64px]' : 'w-[220px]')
       )}
     >
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
+      {/* Brand header */}
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-2">
         <div
           className={clsx(
-            'flex items-center gap-2 min-w-0 transition-opacity duration-fast',
+            'flex items-center gap-2.5 min-w-0 transition-opacity duration-fast',
             collapsed && 'opacity-0 w-0 overflow-hidden'
           )}
         >
-          <img src={logo} alt="" className="w-6 h-6 flex-shrink-0" />
-          <div className="flex flex-col min-w-0">
-            <h1 className="font-heading text-lg font-bold m-0 bg-clip-text text-transparent bg-gradient-to-br from-primary to-secondary truncate">
+          <PlexusMark size={28} />
+          <div className="flex flex-col leading-tight min-w-0">
+            <span className="text-[1.05rem] font-semibold amber-grad-text font-heading tracking-tight truncate">
               Plexus
-            </h1>
-            <div className="flex items-center gap-1 text-[10px] leading-none text-text-muted">
+            </span>
+            <div className="flex items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-text-muted font-mono leading-none">
               <span>{appVersion}</span>
               {isOutdated && (
                 <Tooltip content={`Update available: ${latestVersion}`} position="bottom">
@@ -244,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                     className="inline-flex text-primary"
                     aria-label={`Outdated version. Latest is ${latestVersion}`}
                   >
-                    <AlertTriangle size={11} />
+                    <AlertTriangle size={10} />
                   </span>
                 </Tooltip>
               )}
@@ -257,273 +260,132 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
             className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0 focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
           </button>
         )}
         {isDrawer && (
           <button
             onClick={closeMobile}
-            className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0 focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0"
             aria-label="Close navigation"
           >
-            <PanelLeftClose size={18} />
+            <PanelLeftClose size={16} />
           </button>
         )}
       </div>
 
-      <nav className="flex-1 py-2 px-2 flex flex-col gap-1">
-        <div className="px-2">
-          <button
-            onClick={() => setMainExpanded(!mainExpanded)}
-            className="w-full flex items-center justify-between mb-1 group"
-          >
-            <h3
-              className={clsx(
-                'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-fast',
-                collapsed && 'opacity-0 h-0 overflow-hidden'
-              )}
-            >
-              Main
-            </h3>
-            {!collapsed && (
-              <ChevronRight
-                size={14}
-                className={clsx(
-                  'text-text-muted transition-transform duration-fast group-hover:text-text',
-                  mainExpanded && 'rotate-90'
-                )}
-              />
-            )}
-          </button>
-          {(mainExpanded || collapsed) && (
-            <>
-              <NavItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
-              <NavItem to="/logs" icon={FileText} label="Logs" collapsed={collapsed} />
-              {isAdmin && (
-                <NavItem to="/quotas" icon={PieChart} label="Quotas" collapsed={collapsed} />
-              )}
-              {isLimited && (
-                <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />
-              )}
-            </>
-          )}
-        </div>
+      {/* Main nav */}
+      <nav className="flex-1 px-3 pb-2 flex flex-col gap-0.5">
+        <NavSection title="Main" collapsed={collapsed} />
+        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
+        <NavItem to="/logs" icon={ScrollText} label="Logs" collapsed={collapsed} />
+        <NavItem to="/errors" icon={AlertTriangle} label="Errors" collapsed={collapsed} />
+        {isLimited && <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />}
 
-        {isAdmin && balanceQuotas.length > 0 && (
-          <div className="mt-4 px-2">
-            <button
-              onClick={() => setBalancesExpanded(!balancesExpanded)}
-              className="w-full flex items-center justify-between mb-1 group"
-            >
-              <h3
-                className={clsx(
-                  'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-fast',
-                  collapsed && 'opacity-0 h-0 overflow-hidden'
-                )}
-              >
+        {/* Balances widget */}
+        {isAdmin && balanceQuotas.length > 0 && !collapsed && (
+          <div className="mt-3 px-2.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
                 Balances
-              </h3>
-              {!collapsed && (
-                <ChevronRight
-                  size={14}
-                  className={clsx(
-                    'text-text-muted transition-transform duration-fast group-hover:text-text',
-                    balancesExpanded && 'rotate-90'
-                  )}
-                />
-              )}
-            </button>
-            {(balancesExpanded || collapsed) && (
-              <div
-                className={clsx(
-                  'rounded-md bg-bg-card border border-border overflow-hidden transition-opacity duration-fast',
-                  collapsed && 'opacity-0 h-0 overflow-hidden'
-                )}
-              >
-                <CompactBalancesCard balanceQuotas={balanceQuotas} />
-              </div>
-            )}
+              </span>
+            </div>
+            <CompactBalancesCard balanceQuotas={balanceQuotas} />
           </div>
         )}
 
-        {isAdmin && allowanceQuotas.length > 0 && (
-          <div className="mt-4 px-2">
-            <button
-              onClick={() => setQuotasExpanded(!quotasExpanded)}
-              className="w-full flex items-center justify-between mb-1 group"
-            >
-              <h3
-                className={clsx(
-                  'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-fast',
-                  collapsed && 'opacity-0 h-0 overflow-hidden'
-                )}
-              >
+        {/* Quotas widget */}
+        {isAdmin && allowanceQuotas.length > 0 && !collapsed && (
+          <div className="mt-2 px-2.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
                 Quotas
-              </h3>
-              {!collapsed && (
-                <ChevronRight
-                  size={14}
-                  className={clsx(
-                    'text-text-muted transition-transform duration-fast group-hover:text-text',
-                    quotasExpanded && 'rotate-90'
-                  )}
-                />
-              )}
-            </button>
-            {(quotasExpanded || collapsed) && (
-              <div
-                className={clsx(
-                  'rounded-md bg-bg-card border border-border overflow-hidden transition-opacity duration-fast',
-                  collapsed && 'opacity-0 h-0 overflow-hidden'
-                )}
-              >
-                <CompactQuotasCard allowanceQuotas={allowanceQuotas} />
-              </div>
-            )}
+              </span>
+            </div>
+            <CompactQuotasCard allowanceQuotas={allowanceQuotas} />
           </div>
         )}
 
         {isAdmin && (
-          <div className="mt-4 px-2">
-            <button
-              onClick={() => setConfigExpanded(!configExpanded)}
-              className="w-full flex items-center justify-between mb-1 group"
-            >
-              <h3
-                className={clsx(
-                  'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-fast',
-                  collapsed && 'opacity-0 h-0 overflow-hidden'
-                )}
-              >
-                Configuration
-              </h3>
-              {!collapsed && (
-                <ChevronRight
-                  size={14}
-                  className={clsx(
-                    'text-text-muted transition-transform duration-fast group-hover:text-text',
-                    configExpanded && 'rotate-90'
-                  )}
-                />
-              )}
-            </button>
-            {(configExpanded || collapsed) && (
-              <>
-                <NavItem to="/providers" icon={Server} label="Providers" collapsed={collapsed} />
-                <NavItem to="/models" icon={Box} label="Models" collapsed={collapsed} />
-                <NavItem to="/keys" icon={Key} label="Keys" collapsed={collapsed} />
-                <NavItem to="/mcp" icon={Plug} label="MCP" collapsed={collapsed} />
-                <NavItem to="/config" icon={Settings} label="Settings" collapsed={collapsed} />
-              </>
-            )}
-          </div>
+          <>
+            <NavSection title="Configuration" collapsed={collapsed} />
+            <NavItem to="/providers" icon={Server} label="Providers" collapsed={collapsed} />
+            <NavItem to="/models" icon={Boxes} label="Models" collapsed={collapsed} />
+            <NavItem to="/keys" icon={Key} label="Keys" collapsed={collapsed} />
+            <NavItem to="/quotas" icon={Gauge} label="Quotas" collapsed={collapsed} />
+            <NavItem to="/mcp" icon={PlugZap} label="MCP" collapsed={collapsed} />
+            <NavItem to="/config" icon={Settings} label="Settings" collapsed={collapsed} />
+          </>
         )}
 
-        <div className="mt-4 px-2 mt-auto">
-          <button
-            onClick={() => setDevToolsExpanded(!devToolsExpanded)}
-            className="w-full flex items-center justify-between mb-1 group"
-          >
-            <h3
+        <NavSection title="Dev Tools" collapsed={collapsed} />
+        <div className="flex items-center gap-1">
+          <div className="flex-1">
+            <NavItem to="/debug" icon={Route} label="Traces" collapsed={collapsed} />
+          </div>
+          {isAdmin && !collapsed && (
+            <button
+              onClick={handleToggleClick}
               className={clsx(
-                'font-heading text-[11px] font-semibold uppercase tracking-wider text-text-muted transition-opacity duration-fast',
-                collapsed && 'opacity-0 h-0 overflow-hidden'
+                'mr-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all duration-fast flex-shrink-0 font-mono',
+                debugMode
+                  ? 'bg-danger text-white hover:bg-red-700'
+                  : 'bg-slate-700/40 text-text-muted hover:bg-slate-700/60'
               )}
             >
-              Dev Tools
-            </h3>
-            {!collapsed && (
-              <ChevronRight
-                size={14}
-                className={clsx(
-                  'text-text-muted transition-transform duration-fast group-hover:text-text',
-                  devToolsExpanded && 'rotate-90'
-                )}
-              />
-            )}
-          </button>
-          {(devToolsExpanded || collapsed) && (
-            <>
-              <div className="flex items-center justify-between">
-                <NavItem to="/debug" icon={Database} label="Traces" collapsed={collapsed} />
-                {isAdmin && !collapsed && (
-                  <button
-                    onClick={handleToggleClick}
-                    className={clsx(
-                      'ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all duration-fast flex-shrink-0',
-                      debugMode
-                        ? 'bg-danger text-white hover:bg-danger/80'
-                        : 'bg-text-muted/20 text-text-muted hover:bg-text-muted/30'
-                    )}
-                  >
-                    {debugMode ? 'ON' : 'OFF'}
-                  </button>
-                )}
-              </div>
-              <NavItem to="/errors" icon={AlertTriangle} label="Errors" collapsed={collapsed} />
-              {isAdmin && (
-                <NavItem
-                  to="/system-logs"
-                  icon={FileText}
-                  label="System Logs"
-                  collapsed={collapsed}
-                />
-              )}
-            </>
+              {debugMode ? 'ON' : 'OFF'}
+            </button>
           )}
-          {principal && !collapsed && (
-            <div className="mt-3 mx-1 px-2 py-1.5 rounded-md bg-bg-card border border-border flex items-center gap-2">
-              <UserCircle2 size={16} className="text-text-muted flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-text truncate">
-                  {principal.role === 'admin' ? 'Admin' : principal.keyName}
-                </div>
-                <div
-                  className={clsx(
-                    'text-[10px] uppercase tracking-wider font-semibold',
-                    principal.role === 'admin' ? 'text-primary' : 'text-text-muted'
-                  )}
-                >
-                  {principal.role === 'admin' ? 'Full access' : 'Limited'}
-                </div>
+        </div>
+        {isAdmin && (
+          <NavItem to="/system-logs" icon={Terminal} label="System Logs" collapsed={collapsed} />
+        )}
+      </nav>
+
+      {/* User pill + logout */}
+      <div className="p-3 border-t border-slate-800/80 mt-auto space-y-2">
+        {principal && !collapsed && (
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800">
+            <div className="w-7 h-7 rounded-full amber-grad-bg grid place-items-center text-[11px] font-semibold text-amber-950 flex-shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-text truncate">
+                {principal.role === 'admin' ? 'Admin' : principal.keyName}
+              </div>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider font-mono">
+                {principal.role === 'admin' ? 'full access' : 'limited'}
               </div>
             </div>
-          )}
-          {(() => {
-            const logoutButton = (
+            <Tooltip content="Sign out" position="top">
               <button
                 onClick={handleLogout}
-                className={clsx(
-                  'flex items-center gap-3 py-2 px-2 rounded-md font-body text-sm font-medium text-danger cursor-pointer transition-all duration-fast border border-transparent w-full bg-transparent hover:text-danger hover:border-danger/30 hover:bg-red-500/10 mt-3',
-                  collapsed && 'justify-center'
-                )}
+                className="p-1 rounded text-text-secondary hover:text-danger hover:bg-red-500/10 transition-colors"
+                aria-label="Sign out"
               >
-                <LogOut size={20} />
-                <span
-                  className={clsx(
-                    'transition-opacity duration-fast',
-                    collapsed && 'opacity-0 w-0 overflow-hidden'
-                  )}
-                >
-                  Logout
-                </span>
+                <LogOut size={14} />
               </button>
-            );
-            return collapsed ? (
-              <Tooltip content="Logout" position="right">
-                {logoutButton}
-              </Tooltip>
-            ) : (
-              logoutButton
-            );
-          })()}
-        </div>
-      </nav>
+            </Tooltip>
+          </div>
+        )}
+        {collapsed && (
+          <Tooltip content="Sign out" position="right">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center py-2 rounded-md text-danger hover:bg-red-500/10 transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut size={16} />
+            </button>
+          </Tooltip>
+        )}
+      </div>
 
       <Modal
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
         title={debugMode ? 'Disable Debug Mode?' : 'Enable Debug Mode?'}
+        size="sm"
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowConfirm(false)}>
@@ -535,7 +397,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           </>
         }
       >
-        <p>
+        <p className="text-sm text-text-secondary">
           {debugMode
             ? 'Disabling debug mode will stop capturing full request/response payloads.'
             : 'Enabling debug mode will capture FULL raw request and response payloads, including personal data if present. This can consume significant storage.'}
