@@ -27,7 +27,7 @@
     "clsx": "^2.1.1",
     "human-format": "^1.2.1",
     "lucide-react": "^1.11.0",
-    "react": "^19.2.5",
+    "react": "^19.2.6",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
