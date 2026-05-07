@@ -223,10 +223,9 @@ async function followReleaseWorkflow(owner: string, repo: string, version: strin
   execSync(`gh run view ${runId} --repo ${owner}/${repo} --log`, { stdio: 'inherit' });
 
   // Get the final status
-  const result = execSync(
-    `gh run view ${runId} --repo ${owner}/${repo} --json status,conclusion`,
-    { encoding: 'utf-8' }
-  );
+  const result = execSync(`gh run view ${runId} --repo ${owner}/${repo} --json status,conclusion`, {
+    encoding: 'utf-8',
+  });
   const runInfo = JSON.parse(result);
 
   if (runInfo.conclusion === 'success') {
@@ -243,9 +242,13 @@ function sleep(ms: number): Promise<void> {
 
 async function watchWorkflowRun(owner: string, repo: string, runId: string): Promise<void> {
   return new Promise((resolve) => {
-    const child = spawn('gh', ['run', 'watch', runId, '--repo', `${owner}/${repo}`, '--exit-status'], {
-      stdio: 'inherit',
-    });
+    const child = spawn(
+      'gh',
+      ['run', 'watch', runId, '--repo', `${owner}/${repo}`, '--exit-status'],
+      {
+        stdio: 'inherit',
+      }
+    );
 
     child.on('close', (code) => {
       resolve();
