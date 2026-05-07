@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { api, Alias, Provider, Model, Cooldown } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 
+export interface OrphanGroup {
+  modelId: string;
+  existingAlias?: Alias;
+  candidates: Array<{ provider: Provider; model: Model }>;
+}
+
 const EMPTY_ALIAS: Alias = {
   id: '',
   aliases: [],
@@ -32,6 +38,12 @@ export const useModels = () => {
       { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
     >
   >({});
+
+  // Import Orphaned Models State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [orphanGroups, setOrphanGroups] = useState<OrphanGroup[]>([]);
+  const [selectedImports, setSelectedImports] = useState<Map<string, Set<string>>>(new Map());
+  const [isImporting, setIsImporting] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -175,6 +187,106 @@ export const useModels = () => {
 
   const filteredAliases = aliases.filter((a) => a.id.toLowerCase().includes(search.toLowerCase()));
 
+  const handleOpenImport = useCallback(() => {
+    // Build set of covered (provider, model) pairs from all alias targets
+    const covered = new Set<string>();
+    aliases.forEach((alias) => {
+      alias.targets.forEach((t) => {
+        covered.add(`${t.provider}|${t.model}`);
+      });
+    });
+
+    // Find orphaned models and group by model.id
+    const orphanMap = new Map<string, Array<{ provider: Provider; model: Model }>>();
+    availableModels.forEach((model) => {
+      const key = `${model.providerId}|${model.id}`;
+      if (covered.has(key)) return;
+
+      if (!orphanMap.has(model.id)) {
+        orphanMap.set(model.id, []);
+      }
+      const provider = providers.find((p) => p.id === model.providerId);
+      if (provider) {
+        orphanMap.get(model.id)!.push({ provider, model });
+      }
+    });
+
+    const groups: OrphanGroup[] = [];
+    orphanMap.forEach((candidates, modelId) => {
+      const existingAlias = aliases.find((a) => a.id === modelId);
+      groups.push({ modelId, existingAlias, candidates });
+    });
+    groups.sort((a, b) => a.modelId.localeCompare(b.modelId));
+
+    // Default: select all candidates
+    const selections = new Map<string, Set<string>>();
+    groups.forEach((group) => {
+      selections.set(group.modelId, new Set(group.candidates.map((c) => c.provider.id)));
+    });
+
+    setOrphanGroups(groups);
+    setSelectedImports(selections);
+    setIsImportModalOpen(true);
+  }, [aliases, availableModels, providers]);
+
+  const handleSaveImports = useCallback(async () => {
+    setIsImporting(true);
+    try {
+      for (const [modelId, providerIds] of selectedImports.entries()) {
+        if (providerIds.size === 0) continue;
+
+        const group = orphanGroups.find((g) => g.modelId === modelId);
+        if (!group) continue;
+
+        const selectedCandidates = group.candidates.filter((c) => providerIds.has(c.provider.id));
+
+        if (group.existingAlias) {
+          // Merge into existing alias
+          const updatedAlias = JSON.parse(JSON.stringify(group.existingAlias));
+          selectedCandidates.forEach((c) => {
+            const alreadyExists = updatedAlias.targets.some(
+              (t: { provider: string; model: string }) =>
+                t.provider === c.provider.id && t.model === c.model.id
+            );
+            if (!alreadyExists) {
+              updatedAlias.targets.push({
+                provider: c.provider.id,
+                model: c.model.id,
+                enabled: true,
+              });
+            }
+          });
+          await api.saveAlias(updatedAlias, group.existingAlias.id);
+        } else {
+          // Create new alias
+          const newAlias: Alias = {
+            ...EMPTY_ALIAS,
+            id: modelId,
+            targets: selectedCandidates.map((c) => ({
+              provider: c.provider.id,
+              model: c.model.id,
+              enabled: true,
+            })),
+          };
+          await api.saveAlias(newAlias, undefined);
+        }
+      }
+
+      await loadData();
+      toast.success('Imports saved successfully');
+      setIsImportModalOpen(false);
+      setSelectedImports(new Map());
+      setOrphanGroups([]);
+      return true;
+    } catch (e) {
+      console.error('Failed to save imports', e);
+      toast.error('Failed to save imports');
+      return false;
+    } finally {
+      setIsImporting(false);
+    }
+  }, [selectedImports, orphanGroups, loadData, toast]);
+
   return {
     aliases: filteredAliases,
     allAliases: aliases,
@@ -199,5 +311,14 @@ export const useModels = () => {
     handleToggleTarget,
     handleTestTarget,
     loadData,
+    isImportModalOpen,
+    setIsImportModalOpen,
+    orphanGroups,
+    setOrphanGroups,
+    selectedImports,
+    setSelectedImports,
+    isImporting,
+    handleOpenImport,
+    handleSaveImports,
   };
 };
