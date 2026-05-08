@@ -113,8 +113,8 @@ bun run dev
 This starts the backend (with file watching) and the frontend builder in parallel.
 
 The port is derived automatically from the worktree directory name, so two
-worktrees can run simultaneously without collision. The port is printed at
-startup:
+worktrees can run simultaneously without collision. The port and database are
+printed at startup:
 
 ```
 Starting Plexus Dev Stack...
@@ -128,6 +128,28 @@ Override any of these with environment variables:
 ```bash
 PORT=4000 ADMIN_KEY=mysecret bun run dev
 ```
+
+#### PGlite mode (no external database required)
+
+To run against an in-process PGlite database instead of SQLite — useful when
+testing Postgres-specific behaviour without running a real server:
+
+```bash
+bun run dev:pglite
+```
+
+The startup output shows the data directory instead of a database URL:
+
+```
+Starting Plexus Dev Stack...
+  PORT:         14641
+  DB Driver:    PGlite
+  DB Data Dir:  /tmp/plexus-browsertesting.pglite
+  ADMIN_KEY:    password
+```
+
+The data directory persists across restarts (same worktree isolation as SQLite).
+Override it with `PLEXUS_PGLITE_DATA_DIR=/path/to/dir bun run dev:pglite`.
 
 ### Seeding baseline data
 

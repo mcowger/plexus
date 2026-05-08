@@ -233,17 +233,27 @@ function stripOAuthProviders(config: any): { config: any; removed: string[] } {
 // ---------------------------------------------------------------------------
 
 async function clearDevData() {
-  const dbPath = join(tmpdir(), `plexus-${basename(process.cwd())}.db`);
-  const pidFile = join(tmpdir(), `plexus-${basename(process.cwd())}.pid`);
+  const dirName = basename(process.cwd());
+  const dbPath = join(tmpdir(), `plexus-${dirName}.db`);
+  const pgliteDir = join(tmpdir(), `plexus-${dirName}.pglite`);
+  const pidFile = join(tmpdir(), `plexus-${dirName}.pid`);
 
   console.log('Clearing local dev data...\n');
 
-  // Delete the database file
+  // Delete the SQLite database file
   if (existsSync(dbPath)) {
     unlinkSync(dbPath);
     console.log(`  ✓ Deleted database: ${dbPath}`);
   } else {
-    console.log('  ✓ No database file found (already clean)');
+    console.log('  ✓ No SQLite database file found');
+  }
+
+  // Delete the PGlite data directory
+  if (existsSync(pgliteDir)) {
+    rmSync(pgliteDir, { recursive: true, force: true });
+    console.log(`  ✓ Deleted PGlite data dir: ${pgliteDir}`);
+  } else {
+    console.log('  ✓ No PGlite data directory found');
   }
 
   // Delete the saved backup if it exists
