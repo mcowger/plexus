@@ -24,8 +24,7 @@ The default test command uses `--changed HEAD` and runs only tests affected by u
 ### Full Suite
 
 ```bash
-cd packages/backend
-bun run test:force-all
+bun run test:force
 ```
 
 ### Watch Mode
@@ -43,33 +42,57 @@ bun run test:watch
 2. Open the Dashboard at `http://localhost:4000`.
 3. Send requests to the API proxy at `http://localhost:4000/v1/...`.
 
-### Testing with Staging Data
+### Dev Data Management (`prep-dev`)
 
-You can pull real data from staging to your local dev environment for more realistic testing:
+The `prep-dev` script manages your local dev environment data. It combines the old `pull-staging`, `populate-dev`, and `clear-dev` scripts into one.
+
+**Basic usage:**
 
 ```bash
-# Full command with all options
+# Use saved local data (default)
+bun run prep-dev
+
+# Download from staging and save locally
+bun run prep-dev --save
+
+# Use staging data directly (one-off, no save)
+bun run prep-dev --live
+
+# Clear local dev data
+bun run prep-dev --clear
+```
+
+**Saving data from staging:**
+
+```bash
 PLEXUS_STAGING_URL=https://plexus.home.cowger.us \
 PLEXUS_STAGING_ADMIN_KEY=your_staging_key \
-PLEXUS_LOCAL_ADMIN_KEY=password \
-bun run pull-staging
+bun run prep-dev --save
 ```
+
+This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future calls to `bun run prep-dev` will use this saved file.
 
 **Environment variables:**
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PLEXUS_STAGING_URL` | Yes | URL of staging instance (e.g., `https://plexus.home.cowger.us`) |
-| `PLEXUS_STAGING_ADMIN_KEY` | Yes | Admin key for staging |
-| `PLEXUS_LOCAL_ADMIN_KEY` | Yes | Admin key for local (default: `password`) |
-| `PLEXUS_LOCAL_URL` | No | Override local URL base (default: `http://localhost`) |
-| `PLEXUS_LOCAL_PORT` | No | Override local port (auto-derived from directory name) |
-| `PLEXUS_EXCLUDE_OAUTH` | No | Set to `false` to include OAuth providers in restore (default: `true`) |
+| `PLEXUS_STAGING_URL` | For --save/--live | URL of staging instance |
+| `PLEXUS_STAGING_ADMIN_KEY` | For --save/--live | Admin key for staging |
+| `PLEXUS_DEV_DATA_PATH` | No | Path for saved data (default: `.dev-data/`) |
+| `PLEXUS_URL` | No | Local base URL (default: `http://localhost`) |
+| `PLEXUS_PORT` | No | Local port (auto-derived from cwd) |
+| `PLEXUS_ADMIN_KEY` | No | Admin key for local (default: `password`) |
+| `PLEXUS_EXCLUDE_OAUTH` | No | Exclude OAuth providers (default: `true`) |
+
+**Legacy aliases:**
+- `bun run populate-dev` → `bun run prep-dev`
+- `bun run clear-dev` → `bun run prep-dev --clear`
+- `bun run pull-staging` → `bun run prep-dev --save`
 
 **Notes:**
-- The local port is automatically derived from your directory name (matches `bun run dev` behavior) — no need to set it manually if you're in the right worktree.
-- OAuth providers are excluded by default to avoid credential conflicts. Set `PLEXUS_EXCLUDE_OAUTH=false` to include them.
-- After restore, restart the dev server if needed to pick up changes (`Ctrl+C` and run `bun run dev` again).
+- The local port is auto-derived from your directory name (matches `bun run dev`)
+- OAuth providers are excluded by default to avoid credential conflicts
+- After restore, restart the dev server if needed
 
 ## Test Architecture
 
