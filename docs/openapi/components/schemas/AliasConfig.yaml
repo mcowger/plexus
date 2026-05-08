@@ -56,6 +56,7 @@ properties:
       - latency
       - usage
       - performance
+      - e2e_performance
     description: >
       Target selection strategy when multiple targets are configured.
 
@@ -64,7 +65,8 @@ properties:
       - **cost** — Prefer the cheapest target based on pricing configuration.
       - **latency** — Prefer the lowest-latency target based on recent TTFT data.
       - **usage** — Distribute load proportionally across targets.
-      - **performance** — Prefer the target with the best throughput.
+      - **performance** — Prefer the target with the highest post-TTFT throughput (output tokens / streaming time).
+      - **e2e_performance** — Prefer the target with the best end-to-end throughput (output tokens / total request time).
   priority:
     type: string
     enum:

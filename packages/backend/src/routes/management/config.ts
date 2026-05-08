@@ -460,7 +460,15 @@ export async function registerConfigRoutes(
         'latencyExplorationRate',
         0.05
       );
-      return reply.send({ performanceExplorationRate, latencyExplorationRate });
+      const e2ePerformanceExplorationRate = await configService.getSetting<number>(
+        'e2ePerformanceExplorationRate',
+        0.05
+      );
+      return reply.send({
+        performanceExplorationRate,
+        latencyExplorationRate,
+        e2ePerformanceExplorationRate,
+      });
     } catch (e: any) {
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -491,6 +499,15 @@ export async function registerConfigRoutes(
         }
         await configService.setSetting('latencyExplorationRate', value);
       }
+      if (body.e2ePerformanceExplorationRate !== undefined) {
+        const value = Number(body.e2ePerformanceExplorationRate);
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+          return reply
+            .code(400)
+            .send({ error: 'e2ePerformanceExplorationRate must be a number between 0 and 1' });
+        }
+        await configService.setSetting('e2ePerformanceExplorationRate', value);
+      }
 
       const performanceExplorationRate = await configService.getSetting<number>(
         'performanceExplorationRate',
@@ -500,8 +517,16 @@ export async function registerConfigRoutes(
         'latencyExplorationRate',
         0.05
       );
+      const e2ePerformanceExplorationRate = await configService.getSetting<number>(
+        'e2ePerformanceExplorationRate',
+        0.05
+      );
       logger.debug('Exploration rate settings updated via API');
-      return reply.send({ performanceExplorationRate, latencyExplorationRate });
+      return reply.send({
+        performanceExplorationRate,
+        latencyExplorationRate,
+        e2ePerformanceExplorationRate,
+      });
     } catch (e: any) {
       logger.error('Failed to patch exploration rate config', e);
       return reply.code(500).send({ error: 'Internal server error' });

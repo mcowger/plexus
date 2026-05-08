@@ -5,11 +5,11 @@
  * This script replaces the old pull-staging, populate-dev, and clear-dev scripts.
  *
  * Usage:
- *   bun run prep-dev                      # Use saved local data (default)
- *   bun run prep-dev --save               # Download from staging & save locally
- *   bun run prep-dev --live               # Use staging data directly (one-off)
+ *   bun run prep-dev                      # Restore from saved local data (default)
+ *   bun run prep-dev --save               # Download from staging & save locally (no restore)
+ *   bun run prep-dev --live               # Download from staging & restore (no save)
  *   bun run prep-dev --save --live        # Download, save, and restore
- *   bun run prep-dev --clear              # Clear local dev data
+ *   bun run prep-dev --clear              # Clear local dev data + restore from saved backup
  *
  * Options:
  *   --save    Download staging data and save to local file
@@ -55,20 +55,22 @@ const HELP_MODE = args.includes('--help') || args.includes('-h');
 const SAVE_MODE = args.includes('--save');
 const LIVE_MODE = args.includes('--live');
 const CLEAR_MODE = args.includes('--clear');
+const RESET_MODE = args.includes('--reset');
 
 if (HELP_MODE) {
   console.log(`
 Usage (via npm scripts):
-  bun run prep-dev            # Load saved local data (default)
-  bun run prep-dev:save       # Download from staging & save locally
-  bun run prep-dev:live       # Use staging data directly (one-off)
-  bun run prep-dev:clear      # Clear local dev data
-  bun run prep-dev:reset      # Clear then load saved data
+  bun run prep-dev            # Restore from saved local data (default)
+  bun run prep-dev:save       # Download from staging & save locally (no restore)
+  bun run prep-dev:live       # Download from staging & restore (no save)
+  bun run prep-dev:clear      # Clear local dev data (stops/restarts server)
+  bun run prep-dev:reset      # Clear local dev data + restore from saved backup
 
 Options (for direct script usage):
-  --save    Download staging data and save to local file
-  --live    Use staging data directly (one-off)
-  --clear   Clear local dev data
+  --save    Download staging data and save locally (no restore)
+  --live    Download from staging & restore (no save)
+  --clear   Clear local dev data only (stops/restarts server)
+  --reset   Clear local dev data + restore from saved backup
   --help    Show this help message
 
 Environment variables:
@@ -232,6 +234,21 @@ function stripOAuthProviders(config: any): { config: any; removed: string[] } {
 // Actions
 // ---------------------------------------------------------------------------
 
+async function waitForServer(timeout = 30000): Promise<void> {
+  const url = LOCAL_URL.replace(/\/$/, '');
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      const res = await fetch(`${url}/health`);
+      if (res.ok) return;
+    } catch {
+      // not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Server did not become ready within ${timeout / 1000}s`);
+}
+
 async function clearDevData() {
   const dirName = basename(process.cwd());
   const dbPath = join(tmpdir(), `plexus-${dirName}.db`);
@@ -256,13 +273,7 @@ async function clearDevData() {
     console.log('  ✓ No PGlite data directory found');
   }
 
-  // Delete the saved backup if it exists
-  if (existsSync(SAVED_BACKUP_FILE)) {
-    unlinkSync(SAVED_BACKUP_FILE);
-    console.log(`  ✓ Deleted saved backup: ${SAVED_BACKUP_FILE}`);
-  } else {
-    console.log('  ✓ No saved backup found');
-  }
+  // Note: Do NOT delete the saved backup file - it's source data that persists
 
   // Try to restart the dev server
   try {
@@ -302,7 +313,7 @@ async function downloadFromStaging(): Promise<Buffer> {
   const stats = await Bun.file(tmpFile).stat();
   console.log(`Downloaded ${formatBytes(stats.size)} backup`);
 
-  let restoreBody: Buffer = (await Bun.file(tmpFile).arrayBuffer()) as unknown as Buffer;
+  let restoreBody: Buffer = Buffer.from(await Bun.file(tmpFile).arrayBuffer());
   let removedOAuthProviders: string[] = [];
 
   if (EXCLUDE_OAUTH) {
@@ -367,11 +378,12 @@ async function saveBackup(data: Buffer) {
   console.log(`✓ Saved backup to ${SAVED_BACKUP_FILE}`);
 }
 
-function getSavedBackup(): Buffer | null {
+async function getSavedBackup(): Promise<Buffer | null> {
   if (!existsSync(SAVED_BACKUP_FILE)) {
     return null;
   }
-  return Bun.file(SAVED_BACKUP_FILE).arrayBuffer() as unknown as Buffer;
+  const arr = await Bun.file(SAVED_BACKUP_FILE).arrayBuffer();
+  return Buffer.from(arr);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,12 +395,40 @@ async function main() {
   console.log('║       Plexus Dev Prepare Script        ║');
   console.log('╚════════════════════════════════════════╝\n');
 
-  // Handle --clear mode
+  // Handle --clear mode (clear only)
   if (CLEAR_MODE) {
     console.log(`  Mode: clear`);
     console.log(`  Target local:  ${LOCAL_URL}
 `);
     await clearDevData();
+    return;
+  }
+
+  // Handle --reset mode (clear + restore from saved backup)
+  if (RESET_MODE) {
+    console.log(`  Mode: reset`);
+    console.log(`  Target local:  ${LOCAL_URL}
+`);
+    await clearDevData();
+
+    if (!existsSync(SAVED_BACKUP_FILE)) {
+      console.error('No saved backup found. Run prep-dev:save first.');
+      process.exit(1);
+    }
+
+    console.log('Restoring from saved backup...');
+    console.log(`  Data path:     ${DEV_DATA_PATH}`);
+    console.log();
+
+    // Wait for server to restart
+    console.log('Waiting for server to restart...');
+    await waitForServer();
+    console.log('Server ready.');
+    console.log();
+
+    const backupData = await getSavedBackup();
+    await restoreToLocal(backupData!);
+    console.log('\n✓ Done. Local instance now has saved data.');
     return;
   }
 
@@ -416,12 +456,15 @@ async function main() {
     backupData = await downloadFromStaging();
 
     if (shouldSave) {
-      // Save locally for future use
+      // Save locally for future use (no restore)
       await saveBackup(backupData);
+      console.log('\n✓ Done. Saved backup to local file.');
+      console.log('  Run "bun run prep-dev" to restore it to your dev DB.');
+      return;
     }
   } else {
     // Try to use saved local data
-    backupData = getSavedBackup();
+    backupData = await getSavedBackup();
     if (!backupData) {
       console.error('No saved data found. Run with --save to download from staging first.');
       console.error(`  Or set PLEXUS_DEV_DATA_PATH if your data is elsewhere.`);
@@ -430,8 +473,8 @@ async function main() {
     console.log('Using saved local backup.');
   }
 
-  // Confirmation for staging restore
-  if (shouldUseLive) {
+  // Confirmation for staging restore (skip for save-only mode)
+  if (shouldUseLive && !SAVE_MODE) {
     console.log();
     console.log('WARNING: This will overwrite your local Plexus database with staging data.');
     const response = await ask('Continue? [y/N] ');
@@ -441,8 +484,13 @@ async function main() {
     }
   }
 
-  // Restore to local
-  await restoreToLocal(backupData);
+  // Restore to local (skip for save-only mode)
+  if (!SAVE_MODE) {
+    await restoreToLocal(backupData);
+    console.log();
+    console.log('✓ Done. Local instance now has staging data.');
+    console.log('  (Restart the dev server if needed to pick up changes)');
+  }
 
   console.log();
   console.log('✓ Done. Local instance now has staging data.');

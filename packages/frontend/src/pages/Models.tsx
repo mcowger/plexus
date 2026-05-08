@@ -1286,7 +1286,8 @@ export const Models = () => {
                   <option value="cost">Lowest Cost</option>
                   <option value="latency">Lowest Latency</option>
                   <option value="usage">Usage Balanced</option>
-                  <option value="performance">Best Performance</option>
+                  <option value="performance">Best Performance (post-TTFT)</option>
+                  <option value="e2e_performance">Best E2E Performance</option>
                 </select>
               </div>
 

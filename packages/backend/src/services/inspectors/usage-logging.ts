@@ -132,14 +132,11 @@ export class UsageInspector extends PassThrough {
       }
 
       this.usageRecord.durationMs = Date.now() - this.startTime;
-      if (
-        stats.outputTokens > 0 &&
-        this.usageRecord.durationMs &&
-        this.usageRecord.durationMs > 0
-      ) {
+      const totalOutputTokens = stats.outputTokens + stats.reasoningTokens;
+      if (totalOutputTokens > 0 && this.usageRecord.durationMs && this.usageRecord.durationMs > 0) {
         const timeToTokensMs = this.usageRecord.durationMs - (this.usageRecord.ttftMs || 0);
         this.usageRecord.tokensPerSec =
-          timeToTokensMs > 0 ? (stats.outputTokens / timeToTokensMs) * 1000 : 0;
+          timeToTokensMs > 0 ? (totalOutputTokens / timeToTokensMs) * 1000 : 0;
       }
 
       calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
@@ -200,7 +197,9 @@ export class UsageInspector extends PassThrough {
             this.usageRecord.selectedModelName,
             this.usageRecord.canonicalModelName ?? null,
             this.usageRecord.ttftMs || null,
-            stats.outputTokens > 0 ? stats.outputTokens : null,
+            stats.outputTokens + stats.reasoningTokens > 0
+              ? stats.outputTokens + stats.reasoningTokens
+              : null,
             this.usageRecord.durationMs,
             this.usageRecord.requestId!
           )
