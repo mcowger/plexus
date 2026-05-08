@@ -69,14 +69,15 @@ export default async function globalSetup() {
       import('../src/config'),
     ]);
 
-  const testConfig = `
-database:
-  connection_string: ${JSON.stringify(testDbUrl)}
-adminKey: test-key
-providers: {}
-models: {}
-keys: {}
-`;
+  const testConfig = JSON.stringify({
+    database: {
+      connection_string: testDbUrl,
+    },
+    adminKey: 'test-key',
+    providers: {},
+    models: {},
+    keys: {},
+  });
 
   configModule.setConfigForTesting(configModule.validateConfig(testConfig));
   initializeDatabase(testDbUrl);

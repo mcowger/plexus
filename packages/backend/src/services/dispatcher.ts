@@ -191,11 +191,7 @@ export class Dispatcher {
     this.usageStorage = storage;
   }
 
-  private saveIntermediateError(
-    requestId: string | undefined,
-    apiType: string,
-    error: any
-  ): void {
+  private saveIntermediateError(requestId: string | undefined, apiType: string, error: any): void {
     if (!this.usageStorage || !requestId) return;
     this.usageStorage.saveError(requestId, error, {
       apiType,
@@ -491,11 +487,7 @@ export class Dispatcher {
                 undefined,
                 this.formatFailureReason(error)
               );
-              this.saveIntermediateError(
-                currentRequest.requestId,
-                targetApiType || 'chat',
-                error
-              );
+              this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', error);
               logger.warn(
                 `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
               );

@@ -3,7 +3,7 @@ required:
   - targets
 description: >
   Model alias configuration. Maps a client-facing model name to one or
-  more provider targets. Corresponds to entries in `plexus.yaml` `models`
+  more provider targets. Stored in the database.
   section.
 properties:
   targets:

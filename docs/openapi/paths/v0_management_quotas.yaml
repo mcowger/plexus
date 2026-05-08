@@ -19,7 +19,7 @@ get:
 
     ## Which providers contribute data
 
-    Every provider with a `quota` configuration block in `plexus.yaml` has a
+    Every provider with a `quota` configuration block has a
     checker. The checker's `checkerType` matches the provider slug.
 
     ## Polling cadence

@@ -15,7 +15,7 @@ get:
 
     ## Excluded providers
 
-    Providers configured with `disable_cooldown: true` in `plexus.yaml`
+    Providers configured with `disable_cooldown: true`
     never appear in this list, regardless of failures.
 
     ## Admin-only

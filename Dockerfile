@@ -52,7 +52,6 @@ ENV PORT=4000
 ENV LOG_LEVEL=info
 ENV DATA_DIR=/app/data
 ENV DATABASE_URL=sqlite:///app/data/plexus.db
-ENV CONFIG_FILE=/app/config/plexus.yaml
 ENV APP_VERSION=${APP_VERSION}
 # ADMIN_KEY must be provided at runtime (no default for security)
 

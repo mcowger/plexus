@@ -74,11 +74,8 @@ export async function registerConfigRoutes(
 
   fastify.get('/v0/management/config/status', async (_request, reply) => {
     try {
-      // Check if ADMIN_KEY was loaded from YAML (deprecated, but kept for backward compatibility)
-      const adminKeyFromYaml = process.env.ADMIN_KEY_FROM_YAML === 'true';
-      return reply.send({
-        adminKeyFromYaml: adminKeyFromYaml,
-      });
+      // No longer relevant - Plexus no longer supports YAML config
+      return reply.send({});
     } catch (e: any) {
       return reply.code(500).send({ error: 'Internal server error' });
     }
@@ -617,13 +614,4 @@ export async function registerConfigRoutes(
       count: VALID_QUOTA_CHECKER_TYPES.length,
     });
   });
-
-  // Support YAML and Plain Text payloads for management API
-  fastify.addContentTypeParser(
-    ['text/plain', 'application/x-yaml', 'text/yaml'],
-    { parseAs: 'string' },
-    (req, body, done) => {
-      done(null, body);
-    }
-  );
 }

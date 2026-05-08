@@ -1,33 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import { validateConfig } from '../config';
 
-const makeConfigYaml = (quotaCheckerOptionsYaml: string): string => `
-providers:
-  minimax-provider:
-    api_base_url: "https://platform.minimax.io"
-    api_key: "test-api-key"
-    quota_checker:
-      type: minimax
-      options:
-${quotaCheckerOptionsYaml}
-models: {}
-keys: {}
-`;
+const makeConfigJson = (quotaCheckerOptions: Record<string, unknown>): string =>
+  JSON.stringify({
+    providers: {
+      'minimax-provider': {
+        api_base_url: 'https://platform.minimax.io',
+        api_key: 'test-api-key',
+        quota_checker: {
+          type: 'minimax',
+          options: quotaCheckerOptions,
+        },
+      },
+    },
+    models: {},
+    keys: {},
+  });
 
 describe('config quota checker validation', () => {
   it('accepts openai-codex quota checker type', () => {
-    const config = validateConfig(`
-providers:
-  codex-provider:
-    api_base_url: "oauth://"
-    api_key: "oauth"
-    oauth_provider: "openai-codex"
-    oauth_account: "test-account"
-    quota_checker:
-      type: openai-codex
-models: {}
-keys: {}
-`);
+    const config = validateConfig(
+      JSON.stringify({
+        providers: {
+          'codex-provider': {
+            api_base_url: 'oauth://',
+            api_key: 'oauth',
+            oauth_provider: 'openai-codex',
+            oauth_account: 'test-account',
+            quota_checker: {
+              type: 'openai-codex',
+            },
+          },
+        },
+        models: {},
+        keys: {},
+      })
+    );
 
     expect(config.quotas).toHaveLength(1);
     expect(config.quotas[0]).toMatchObject({
@@ -38,18 +46,23 @@ keys: {}
   });
 
   it('accepts claude-code quota checker type', () => {
-    const config = validateConfig(`
-providers:
-  claude-provider:
-    api_base_url: "oauth://"
-    api_key: "oauth"
-    oauth_provider: "anthropic"
-    oauth_account: "test-account"
-    quota_checker:
-      type: claude-code
-models: {}
-keys: {}
-`);
+    const config = validateConfig(
+      JSON.stringify({
+        providers: {
+          'claude-provider': {
+            api_base_url: 'oauth://',
+            api_key: 'oauth',
+            oauth_provider: 'anthropic',
+            oauth_account: 'test-account',
+            quota_checker: {
+              type: 'claude-code',
+            },
+          },
+        },
+        models: {},
+        keys: {},
+      })
+    );
 
     expect(config.quotas).toHaveLength(1);
     expect(config.quotas[0]).toMatchObject({
@@ -61,8 +74,10 @@ keys: {}
 
   it('accepts minimax quota checker when groupid and hertzSession are provided', () => {
     const config = validateConfig(
-      makeConfigYaml(`        groupid: "group-123"
-        hertzSession: "session-secret"`)
+      makeConfigJson({
+        groupid: 'group-123',
+        hertzSession: 'session-secret',
+      })
     );
 
     expect(config.quotas).toHaveLength(1);
@@ -78,13 +93,13 @@ keys: {}
   });
 
   it('rejects minimax quota checker when groupid is missing', () => {
-    expect(() => validateConfig(makeConfigYaml(`        hertzSession: "session-secret"`))).toThrow(
+    expect(() => validateConfig(makeConfigJson({ hertzSession: 'session-secret' }))).toThrow(
       '"groupid"'
     );
   });
 
   it('rejects minimax quota checker when hertzSession is missing', () => {
-    expect(() => validateConfig(makeConfigYaml(`        groupid: "group-123"`))).toThrow(
+    expect(() => validateConfig(makeConfigJson({ groupid: 'group-123' }))).toThrow(
       '"hertzSession"'
     );
   });
@@ -92,8 +107,10 @@ keys: {}
   it('rejects minimax quota checker when required fields are empty strings', () => {
     expect(() =>
       validateConfig(
-        makeConfigYaml(`        groupid: "   "
-        hertzSession: "   "`)
+        makeConfigJson({
+          groupid: '   ',
+          hertzSession: '   ',
+        })
       )
     ).toThrow('MiniMax groupid is required');
   });
@@ -124,19 +141,25 @@ keys: {}
   });
 
   it('accepts kilo quota checker with optional organizationId', () => {
-    const config = validateConfig(`
-providers:
-  kilo-provider:
-    api_base_url: "https://api.kilo.ai"
-    api_key: "kilo-api-key"
-    quota_checker:
-      type: kilo
-      options:
-        endpoint: "https://api.kilo.ai/api/profile/balance"
-        organizationId: "org-123"
-models: {}
-keys: {}
-`);
+    const config = validateConfig(
+      JSON.stringify({
+        providers: {
+          'kilo-provider': {
+            api_base_url: 'https://api.kilo.ai',
+            api_key: 'kilo-api-key',
+            quota_checker: {
+              type: 'kilo',
+              options: {
+                endpoint: 'https://api.kilo.ai/api/profile/balance',
+                organizationId: 'org-123',
+              },
+            },
+          },
+        },
+        models: {},
+        keys: {},
+      })
+    );
 
     expect(config.quotas).toHaveLength(1);
     expect(config.quotas[0]).toMatchObject({

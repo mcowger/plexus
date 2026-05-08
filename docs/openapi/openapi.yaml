@@ -124,7 +124,7 @@ info:
     | Variable | Purpose |
     |---|---|
     | `ADMIN_KEY` | Master admin key for management endpoints. |
-    | `CONFIG_FILE` | Path to the YAML configuration file. |
+    | `DATA_DIR` | Directory for SQLite database and data files. |
     | `LOG_LEVEL` | Runtime log level (`error`, `warn`, `info`, `debug`, `verbose`, `silly`). |
     | `DEBUG` | Set to `true` to enable debug log capture at startup. |
     | `PLEXUS_METRICS_CACHE_TTL_MS` | TTL for the Prometheus metrics cache in milliseconds. |
@@ -286,7 +286,7 @@ tags:
       ### Assignment vs enforcement separation
 
       - **Assignment**: A quota definition is linked to a key via the key's
-        `quota` field in `plexus.yaml` or via the keys API.
+        `quota` field or via the keys API.
       - **Enforcement**: The middleware evaluates the key's usage against its
         assigned quota definition at request time. If `quota_name` is null,
         the key has no quota and is unlimited.

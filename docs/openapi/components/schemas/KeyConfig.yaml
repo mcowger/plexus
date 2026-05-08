@@ -4,7 +4,7 @@ required:
 additionalProperties: true
 description: >
   API key configuration. Controls access to Plexus inference endpoints.
-  Corresponds to entries in `plexus.yaml` `keys` section.
+  Stored in the database.
 properties:
   secret:
     type: string

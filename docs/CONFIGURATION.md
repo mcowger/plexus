@@ -1,6 +1,6 @@
 # Configuration
 
-Plexus stores all configuration in the database and manages it via the **Admin UI** (recommended) or **Management API**. On first launch with an existing `plexus.yaml` file, Plexus imports it; afterward, use the UI or API to make changes.
+Plexus stores all configuration in the database and manages it via the **Admin UI** (recommended) or **Management API**.
 
 **Environment variables** control server-level settings. Everything else (providers, models, keys, quotas) is stored in the database.
 
@@ -418,48 +418,33 @@ Configure pricing to enable `cost` selector strategy, cost-based quotas, and usa
 
 ### Simple Pricing
 
-```yaml
-input: 3.00    # dollars per million input tokens
-output: 15.00  # dollars per million output tokens
-cached: 0.30   # cache read (optional)
-cache_write: 3.75  # cache write (optional)
-```
+Configure via Admin UI or API:
+- `input`: dollars per million input tokens (e.g., `3.00`)
+- `output`: dollars per million output tokens (e.g., `15.00`)
+- `cached`: cache read rate (optional)
+- `cache_write`: cache write rate (optional)
 
 ### OpenRouter Pricing
 
-Fetches live rates from OpenRouter. Set the model `slug` and optional `discount`:
-
-```yaml
-source: openrouter
-slug: anthropic/claude-3.5-sonnet
-discount: 0.1  # 10% off all rates
-```
+Fetches live rates from OpenRouter. Configure via Admin UI or API:
+- Set source to `openrouter`
+- Set model `slug` (e.g., `anthropic/claude-3.5-sonnet`)
+- Optional `discount` for percentage off all rates
 
 ### Tiered Pricing
 
-Useful for providers with volume discounts:
+Useful for providers with volume discounts. Configure tiers via Admin UI or API:
 
-```yaml
-source: defined
-range:
-  - lower_bound: 0
-    upper_bound: 200000
-    input_per_m: 3.00
-    output_per_m: 15.00
-  - lower_bound: 200001
-    upper_bound: .inf
-    input_per_m: 1.50
-    output_per_m: 7.50
-```
+| Lower Bound | Upper Bound | Input Rate | Output Rate |
+|-------------|-------------|------------|-------------|
+| 0 | 200,000 | $3.00/M | $15.00/M |
+| 200,001 | ∞ (infinity) | $1.50/M | $7.50/M |
 
 ### Per-Request Pricing
 
-Flat fee regardless of token count:
-
-```yaml
-source: per_request
-amount: 0.04
-```
+Flat fee regardless of token count. Configure via Admin UI or API:
+- Set source to `per_request`
+- Set `amount` (e.g., `0.04`)
 
 Full cost stored in `costInput`; output/cached fields are zero.
 

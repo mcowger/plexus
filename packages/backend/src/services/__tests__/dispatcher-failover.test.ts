@@ -582,9 +582,13 @@ describe('Dispatcher Failover', () => {
       throw new Error('expected dispatch to fail');
     } catch (error: any) {
       expect(error.routingContext?.providerResponseHeaders).toBeDefined();
-      expect(error.routingContext?.providerResponseHeaders['x-request-id']).toBe('provider-req-123');
+      expect(error.routingContext?.providerResponseHeaders['x-request-id']).toBe(
+        'provider-req-123'
+      );
       expect(error.routingContext?.providerResponseHeaders['x-custom-header']).toBe('custom-value');
-      expect(error.routingContext?.providerResponseHeaders['content-type']).toBe('application/json');
+      expect(error.routingContext?.providerResponseHeaders['content-type']).toBe(
+        'application/json'
+      );
     }
   });
 
@@ -601,7 +605,10 @@ describe('Dispatcher Failover', () => {
       .mockImplementationOnce(async () => successChatResponse('model-2'));
 
     const dispatcher = new Dispatcher();
-    const response = await dispatcher.dispatch({ ...makeChatRequest(), requestId: 'req-retry-hist' });
+    const response = await dispatcher.dispatch({
+      ...makeChatRequest(),
+      requestId: 'req-retry-hist',
+    });
     const meta = (response as any).plexus;
     const retryHistory = JSON.parse(meta?.retryHistory || '[]');
 

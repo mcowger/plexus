@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import yaml from 'yaml';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
@@ -690,15 +689,17 @@ function isOAuthProviderConfig(provider: {
 
 let currentConfig: PlexusConfig | null = null;
 
-export function validateConfig(yamlContent: string): PlexusConfig {
-  const parsed = yaml.parse(yamlContent);
+// Validates and parses configuration for testing purposes.
+// Accepts a JSON string (not YAML).
+export function validateConfig(configJson: string): PlexusConfig {
+  const parsed = JSON.parse(configJson);
   const { parsed: migrated } = migrateOAuthAccounts(parsed);
   const rawConfig = RawPlexusConfigSchema.parse(migrated);
   return hydrateConfig(rawConfig);
 }
 
 function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
-  // Resolve GPU profiles for providers loaded from YAML.
+  // Resolve GPU profiles for providers loaded from config.
   // If a provider has gpu_profile set but the numeric fields aren't populated,
   // resolve them now so the backend never needs to resolve at request time.
   const resolvedProviders: Record<string, ProviderConfig> = {};
