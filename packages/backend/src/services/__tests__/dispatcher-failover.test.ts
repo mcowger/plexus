@@ -560,4 +560,84 @@ describe('Dispatcher Failover', () => {
     expect(meta?.attemptCount).toBe(1);
     expect(meta?.finalAttemptProvider).toBe('p2');
   });
+
+  test('provider error captures all upstream response headers in routing context', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 1 }));
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ error: { message: 'boom' } }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-request-id': 'provider-req-123',
+            'X-Custom-Header': 'custom-value',
+          },
+        })
+    );
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch({ ...makeChatRequest(), requestId: 'req-headers-test' });
+      throw new Error('expected dispatch to fail');
+    } catch (error: any) {
+      expect(error.routingContext?.providerResponseHeaders).toBeDefined();
+      expect(error.routingContext?.providerResponseHeaders['x-request-id']).toBe('provider-req-123');
+      expect(error.routingContext?.providerResponseHeaders['x-custom-header']).toBe('custom-value');
+      expect(error.routingContext?.providerResponseHeaders['content-type']).toBe('application/json');
+    }
+  });
+
+  test('retry history includes provider response headers on failed attempts', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock
+      .mockImplementationOnce(
+        async () =>
+          new Response(JSON.stringify({ error: { message: 'first boom' } }), {
+            status: 500,
+            headers: { 'x-request-id': 'first-req-id' },
+          })
+      )
+      .mockImplementationOnce(async () => successChatResponse('model-2'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch({ ...makeChatRequest(), requestId: 'req-retry-hist' });
+    const meta = (response as any).plexus;
+    const retryHistory = JSON.parse(meta?.retryHistory || '[]');
+
+    expect(retryHistory).toHaveLength(2);
+    expect(retryHistory[0]?.status).toBe('failed');
+    expect(retryHistory[0]?.providerResponseHeaders?.['x-request-id']).toBe('first-req-id');
+    expect(retryHistory[1]?.status).toBe('success');
+  });
+
+  test('intermediate failures are saved during failover', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 2 }));
+    fetchMock
+      .mockImplementationOnce(async () => errorResponse(500, 'first failed'))
+      .mockImplementationOnce(async () => successChatResponse('model-2'));
+
+    const saveErrorSpy = vi.fn();
+    const dispatcher = new Dispatcher();
+    dispatcher.setUsageStorage({
+      saveError: saveErrorSpy,
+      recordFailedAttempt: vi.fn(),
+      recordSuccessfulAttempt: vi.fn(),
+    } as any);
+
+    const response = await dispatcher.dispatch({
+      ...makeChatRequest(),
+      requestId: 'req-intermediate',
+    });
+    const meta = (response as any).plexus;
+
+    expect(meta?.attemptCount).toBe(2);
+    // One call for the intermediate failure, one in the route handler doesn't happen
+    // here because dispatch succeeded overall.
+    expect(saveErrorSpy).toHaveBeenCalledTimes(1);
+    const [savedRequestId, savedError, savedDetails] = saveErrorSpy.mock.calls[0] as any[];
+    expect(savedRequestId).toBe('req-intermediate');
+    expect(savedError?.routingContext?.statusCode).toBe(500);
+    expect(savedDetails?.apiType).toBe('chat');
+  });
 });

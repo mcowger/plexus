@@ -64,6 +64,9 @@ export async function handleResponse(
   usageRecord.isStreamed = !!unifiedResponse.stream;
   usageRecord.isPassthrough = unifiedResponse.bypassTransformation;
 
+  // Always return Plexus request ID so callers can trace the full story
+  reply.header('x-request-id', usageRecord.requestId!);
+
   const pricing = unifiedResponse.plexus?.pricing;
   const providerDiscount = unifiedResponse.plexus?.providerDiscount;
   // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
