@@ -44,7 +44,6 @@ import mainJsPath from '../../frontend/dist/main.js' with { type: 'file' };
 // @ts-expect-error — CSS import with type:'file' resolved at build time
 import mainCssPath from '../../frontend/dist/main.css' with { type: 'file' };
 import fs from 'fs';
-import yaml from 'yaml';
 import { logger } from './utils/logger';
 import { getConfig } from './config';
 import { ConfigService } from './services/config-service';
@@ -79,91 +78,6 @@ import { isEncryptionEnabled } from './utils/encryption';
  */
 
 // --- Required Environment Variables ---
-// Check for ADMIN_KEY - if not set, try to read from plexus.yaml for backward compatibility
-export let adminKeyFromYaml: string | undefined = undefined;
-if (!process.env.ADMIN_KEY) {
-  // Try to read adminKey from plexus.yaml for backward compatibility
-  const configLocations = [
-    path.resolve(__dirname, '../../../config/plexus.yaml'),
-    path.resolve(__dirname, '../../config/plexus.yaml'),
-    path.resolve(process.cwd(), 'config/plexus.yaml'),
-    path.resolve(process.cwd(), '../../config/plexus.yaml'),
-  ];
-  const configPath = [
-    ...(process.env.CONFIG_FILE ? [process.env.CONFIG_FILE] : []),
-    ...configLocations,
-  ].find((p) => fs.existsSync(p));
-
-  if (configPath) {
-    try {
-      const yamlContent = fs.readFileSync(configPath, 'utf-8');
-      const parsed = yaml.parse(yamlContent);
-      if (parsed?.adminKey) {
-        adminKeyFromYaml = parsed.adminKey;
-        process.env.ADMIN_KEY = adminKeyFromYaml;
-        process.env.ADMIN_KEY_FROM_YAML = 'true';
-
-        // Print large ASCII banner warning
-        logger.error('');
-        logger.error(
-          '╔════════════════════════════════════════════════════════════════════════════════╗'
-        );
-        logger.error(
-          '║                                                                                ║'
-        );
-        logger.error(
-          '║   ⚠️  DEPRECATION WARNING: ADMIN_KEY FROM YAML FILE                            ║'
-        );
-        logger.error(
-          '║                                                                                ║'
-        );
-        logger.error(
-          '║   Plexus has migrated to database-backed configuration.                        ║'
-        );
-        logger.error(
-          '║   Your adminKey was read from plexus.yaml for backward compatibility.          ║'
-        );
-        logger.error(
-          '║                                                                                ║'
-        );
-        logger.error(
-          '║   ⚠️  ACTION REQUIRED:                                                         ║'
-        );
-        logger.error(
-          '║   Set ADMIN_KEY as an environment variable before the next restart:            ║'
-        );
-        logger.error(
-          '║                                                                                ║'
-        );
-        logger.error(
-          '║       export ADMIN_KEY="your-admin-key"                                        ║'
-        );
-        logger.error(
-          '║                                                                                ║'
-        );
-        logger.error(
-          '║   Note: The rest of your plexus.yaml configuration has been imported           ║'
-        );
-        logger.error(
-          '║   into the database and will NOT be re-read from the YAML file.                ║'
-        );
-        logger.error(
-          '║   Future changes must be made via the web UI or management API.                ║'
-        );
-        logger.error(
-          '║                                                                                ║'
-        );
-        logger.error(
-          '╚════════════════════════════════════════════════════════════════════════════════╝'
-        );
-        logger.error('');
-      }
-    } catch (e) {
-      // Ignore errors reading YAML file
-    }
-  }
-}
-
 if (!process.env.ADMIN_KEY) {
   logger.error(
     'ADMIN_KEY environment variable is required. Set it to a secure password for admin access.'
@@ -239,55 +153,8 @@ if (!isEncryptionEnabled()) {
 }
 
 // --- Configuration Initialization ---
-// Use ConfigService (database-backed) with auto-import from YAML on first launch
 try {
   const configService = ConfigService.getInstance();
-
-  if (await configService.isFirstLaunch()) {
-    logger.debug('First launch detected — checking for existing config files to import');
-
-    // Import from plexus.yaml if it exists
-    // Try CONFIG_FILE env var first, then check common locations
-    const configLocations = [
-      path.resolve(__dirname, '../../../config/plexus.yaml'), // from packages/backend/src or dist
-      path.resolve(__dirname, '../../config/plexus.yaml'), // alternate depth
-      path.resolve(process.cwd(), 'config/plexus.yaml'), // from repo root
-      path.resolve(process.cwd(), '../../config/plexus.yaml'), // from packages/backend
-    ];
-    const configPath = [process.env.CONFIG_FILE, ...configLocations].find(
-      (p): p is string => typeof p === 'string' && fs.existsSync(p)
-    );
-
-    try {
-      if (configPath && fs.existsSync(configPath)) {
-        const yamlContent = fs.readFileSync(configPath, 'utf-8');
-        await configService.importFromYaml(yamlContent);
-        logger.debug(`Imported configuration from ${configPath} into database`);
-      } else {
-        logger.debug('No plexus.yaml found — starting with empty configuration');
-      }
-
-      // Import from auth.json if it exists
-      const authJsonPath = process.env.AUTH_JSON || './auth.json';
-      if (fs.existsSync(authJsonPath)) {
-        const authContent = fs.readFileSync(authJsonPath, 'utf-8');
-        await configService.importFromAuthJson(authContent);
-        logger.debug(`Imported OAuth credentials from ${authJsonPath} into database`);
-      }
-
-      // Mark bootstrap as complete so a future restart (even with an empty
-      // providers table) does not re-import from the YAML file.
-      await configService.getRepository().markBootstrapped();
-      logger.debug('Bootstrap complete — marked database as bootstrapped');
-    } catch (importError) {
-      logger.error(
-        'Failed to import config — clearing partial data for clean retry on next launch',
-        importError
-      );
-      await configService.clearAllData();
-      throw importError;
-    }
-  }
 
   await configService.initialize();
   logger.debug('Configuration loaded from database');
