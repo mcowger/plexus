@@ -15,6 +15,7 @@
  *
  * Optional environment variables:
  *   PLEXUS_LOCAL_URL            URL of the local instance (default: http://localhost:4000)
+ *   PLEXUS_EXCLUDE_OAUTH        Exclude OAuth providers from restore (default: true)
  */
 
 import { createWriteStream, unlinkSync } from 'fs';
@@ -23,6 +24,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { pipeline } from 'stream/promises';
 import readline from 'readline';
+import { gzipSync, gunzipSync } from 'node:zlib';
 
 // ---------------------------------------------------------------------------
 // Config from environment
@@ -32,6 +34,7 @@ const STAGING_URL = process.env.PLEXUS_STAGING_URL;
 const STAGING_KEY = process.env.PLEXUS_STAGING_ADMIN_KEY;
 const LOCAL_URL = process.env.PLEXUS_LOCAL_URL ?? 'http://localhost:4000';
 const LOCAL_KEY = process.env.PLEXUS_LOCAL_ADMIN_KEY;
+const EXCLUDE_OAUTH = (process.env.PLEXUS_EXCLUDE_OAUTH ?? 'true').toLowerCase() !== 'false';
 
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
@@ -66,6 +69,102 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
+// ─── Minimal tar helpers (mirror BackupService format) ──────────────
+
+function buildTar(files: Map<string, Buffer>): Buffer {
+  const chunks: Buffer[] = [];
+  for (const [name, content] of files) {
+    const header = Buffer.alloc(512, 0);
+    const nameBytes = Buffer.from(name, 'utf8');
+    nameBytes.copy(header, 0, 0, Math.min(nameBytes.length, 100));
+    header.write('0000644\0', 100, 8, 'ascii');
+    header.write('0001750\0', 108, 8, 'ascii');
+    header.write('0001750\0', 116, 8, 'ascii');
+    const sizeStr = content.length.toString(8).padStart(11, '0') + '\0';
+    header.write(sizeStr, 124, 12, 'ascii');
+    header.write(
+      Math.floor(Date.now() / 1000)
+        .toString(8)
+        .padStart(11, '0') + '\0',
+      136,
+      12,
+      'ascii'
+    );
+    header.write('        ', 148, 8, 'ascii');
+    header.write('0', 156, 1, 'ascii');
+    header.write('ustar\0', 257, 6, 'ascii');
+    header.write('00', 263, 2, 'ascii');
+    let checksum = 0;
+    for (let i = 0; i < 512; i++) checksum += header[i]!;
+    header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
+    chunks.push(header);
+    chunks.push(content);
+    const remainder = content.length % 512;
+    if (remainder > 0) chunks.push(Buffer.alloc(512 - remainder, 0));
+  }
+  chunks.push(Buffer.alloc(1024, 0));
+  return Buffer.concat(chunks);
+}
+
+function parseTar(data: Buffer): Map<string, Buffer> {
+  const files = new Map<string, Buffer>();
+  let offset = 0;
+  while (offset + 512 <= data.length) {
+    let allZero = true;
+    for (let i = 0; i < 512; i++) {
+      if (data[offset + i] !== 0) {
+        allZero = false;
+        break;
+      }
+    }
+    if (allZero) break;
+    const name = data
+      .subarray(offset, offset + 100)
+      .toString('utf8')
+      .replace(/\0+$/, '');
+    const sizeStr = data
+      .subarray(offset + 124, offset + 136)
+      .toString('ascii')
+      .replace(/\0+$/, '')
+      .trim();
+    const size = parseInt(sizeStr, 8) || 0;
+    offset += 512;
+    if (size >= 0) {
+      const content = size > 0 ? data.subarray(offset, offset + size) : Buffer.alloc(0);
+      files.set(name, Buffer.from(content));
+    }
+    offset += size;
+    const remainder = size % 512;
+    if (remainder > 0) offset += 512 - remainder;
+  }
+  return files;
+}
+
+function stripOAuthProviders(config: any): { config: any; removed: string[] } {
+  const providers = config.providers as Record<string, any> | undefined;
+  if (!providers) return { config, removed: [] };
+
+  const removed: string[] = [];
+  const filtered: Record<string, any> = {};
+
+  for (const [slug, cfg] of Object.entries(providers)) {
+    if (cfg?.oauth_provider) {
+      removed.push(slug);
+    } else {
+      filtered[slug] = cfg;
+    }
+  }
+
+  return {
+    config: {
+      ...config,
+      providers: filtered,
+      oauth_credentials: [],
+    },
+    removed,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -96,9 +195,35 @@ async function main() {
   const stats = await Bun.file(tmpFile).stat();
   console.log(`Downloaded ${formatBytes(stats.size)} backup`);
 
+  // --- Optionally strip OAuth providers ---
+  let restoreBody: Buffer = (await Bun.file(tmpFile).arrayBuffer()) as unknown as Buffer;
+  let removedOAuthProviders: string[] = [];
+
+  if (EXCLUDE_OAUTH) {
+    console.log('Excluding OAuth providers from restore...');
+    const tarData = gunzipSync(restoreBody);
+    const files = parseTar(tarData);
+    const configBuf = files.get('config.json');
+    if (configBuf) {
+      const config = JSON.parse(configBuf.toString('utf8'));
+      const { config: stripped, removed } = stripOAuthProviders(config);
+      removedOAuthProviders = removed;
+      files.set('config.json', Buffer.from(JSON.stringify(stripped, null, 2), 'utf8'));
+      restoreBody = gzipSync(buildTar(files));
+      if (removed.length > 0) {
+        console.log(`  Excluded ${removed.length} OAuth provider(s): ${removed.join(', ')}`);
+      } else {
+        console.log('  No OAuth providers found in backup.');
+      }
+    }
+  }
+
   // --- Confirmation ---
   console.log();
   console.log('WARNING: This will overwrite your local Plexus database with staging data.');
+  if (removedOAuthProviders.length > 0) {
+    console.log(`  (${removedOAuthProviders.length} OAuth provider(s) will be excluded)`);
+  }
   const response = await ask('Continue? [y/N] ');
   if (!/^y$/i.test(response)) {
     console.log('Aborted.');
@@ -114,7 +239,7 @@ async function main() {
       Authorization: `Bearer ${localKey}`,
       'Content-Type': 'application/gzip',
     },
-    body: await Bun.file(tmpFile).arrayBuffer(),
+    body: restoreBody,
   });
 
   cleanup(tmpFile);
