@@ -43,6 +43,34 @@ bun run test:watch
 2. Open the Dashboard at `http://localhost:4000`.
 3. Send requests to the API proxy at `http://localhost:4000/v1/...`.
 
+### Testing with Staging Data
+
+You can pull real data from staging to your local dev environment for more realistic testing:
+
+```bash
+# Full command with all options
+PLEXUS_STAGING_URL=https://plexus.home.cowger.us \
+PLEXUS_STAGING_ADMIN_KEY=your_staging_key \
+PLEXUS_LOCAL_ADMIN_KEY=password \
+bun run pull-staging
+```
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PLEXUS_STAGING_URL` | Yes | URL of staging instance (e.g., `https://plexus.home.cowger.us`) |
+| `PLEXUS_STAGING_ADMIN_KEY` | Yes | Admin key for staging |
+| `PLEXUS_LOCAL_ADMIN_KEY` | Yes | Admin key for local (default: `password`) |
+| `PLEXUS_LOCAL_URL` | No | Override local URL base (default: `http://localhost`) |
+| `PLEXUS_LOCAL_PORT` | No | Override local port (auto-derived from directory name) |
+| `PLEXUS_EXCLUDE_OAUTH` | No | Set to `false` to include OAuth providers in restore (default: `true`) |
+
+**Notes:**
+- The local port is automatically derived from your directory name (matches `bun run dev` behavior) — no need to set it manually if you're in the right worktree.
+- OAuth providers are excluded by default to avoid credential conflicts. Set `PLEXUS_EXCLUDE_OAUTH=false` to include them.
+- After restore, restart the dev server if needed to pick up changes (`Ctrl+C` and run `bun run dev` again).
+
 ## Test Architecture
 
 Backend tests run on **Vitest** with three parallel projects defined in `packages/backend/vitest.config.ts`:

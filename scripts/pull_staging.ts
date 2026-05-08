@@ -18,10 +18,10 @@
  *   PLEXUS_EXCLUDE_OAUTH        Exclude OAuth providers from restore (default: true)
  */
 
-import { createWriteStream, unlinkSync } from 'fs';
+import { createWriteStream, unlinkSync, rmSync } from 'fs';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { pipeline } from 'stream/promises';
 import readline from 'readline';
 import { gzipSync, gunzipSync } from 'node:zlib';
@@ -30,11 +30,27 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 // Config from environment
 // ---------------------------------------------------------------------------
 
+// Mirrors the stable port derivation in scripts/dev.ts so this script targets
+// the correct worktree instance without any configuration.
+function deriveDevPort(): string {
+  const dirName = basename(process.cwd());
+  let hash = 5381;
+  for (let i = 0; i < dirName.length; i++) {
+    hash = (hash * 33) ^ dirName.charCodeAt(i);
+  }
+  return String(10000 + (Math.abs(hash) % 10000));
+}
+
 const STAGING_URL = process.env.PLEXUS_STAGING_URL;
 const STAGING_KEY = process.env.PLEXUS_STAGING_ADMIN_KEY;
-const LOCAL_URL = process.env.PLEXUS_LOCAL_URL ?? 'http://localhost:4000';
+const LOCAL_BASE_URL = process.env.PLEXUS_LOCAL_URL?.replace(/\/$/, '') ?? 'http://localhost';
+const LOCAL_PORT = process.env.PLEXUS_LOCAL_PORT ?? deriveDevPort();
+const LOCAL_URL = `${LOCAL_BASE_URL}:${LOCAL_PORT}`;
 const LOCAL_KEY = process.env.PLEXUS_LOCAL_ADMIN_KEY;
 const EXCLUDE_OAUTH = (process.env.PLEXUS_EXCLUDE_OAUTH ?? 'true').toLowerCase() !== 'false';
+
+// Track temp directory for cleanup
+let tmpDir: string;
 
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
@@ -173,15 +189,16 @@ async function main() {
   const stagingUrl = requireEnv('PLEXUS_STAGING_URL', STAGING_URL).replace(/\/$/, '');
   const stagingKey = requireEnv('PLEXUS_STAGING_ADMIN_KEY', STAGING_KEY);
   const localUrl = LOCAL_URL.replace(/\/$/, '');
+  console.log(`  Target local URL: ${localUrl}`);
   const localKey = requireEnv('PLEXUS_LOCAL_ADMIN_KEY', LOCAL_KEY);
 
-  const tmpDir = mkdtempSync(join(tmpdir(), 'plexus-staging-backup-'));
+  tmpDir = mkdtempSync(join(tmpdir(), 'plexus-staging-backup-'));
   const tmpFile = join(tmpDir, 'backup.tar.gz');
 
   // --- Download backup ---
   console.log('Downloading full backup from staging...');
   const backupRes = await fetch(`${stagingUrl}/v0/management/backup?full=true`, {
-    headers: { Authorization: `Bearer ${stagingKey}` },
+    headers: { 'x-admin-key': stagingKey },
   });
 
   if (!backupRes.ok || !backupRes.body) {
@@ -236,7 +253,7 @@ async function main() {
   const restoreRes = await fetch(`${localUrl}/v0/management/restore`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${localKey}`,
+      'x-admin-key': localKey,
       'Content-Type': 'application/gzip',
     },
     body: restoreBody,
@@ -250,12 +267,18 @@ async function main() {
   }
 
   console.log();
-  console.log('Done. Local instance is restarting with staging data.');
+  console.log('Done. Local instance now has staging data.');
+  console.log('  (Restart the dev server if needed to pick up changes)');
 }
 
 function cleanup(file: string) {
   try {
     unlinkSync(file);
+  } catch {
+    // ignore
+  }
+  try {
+    rmSync(tmpDir, { recursive: true, force: true });
   } catch {
     // ignore
   }
