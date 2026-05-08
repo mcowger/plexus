@@ -24,8 +24,7 @@ The default test command uses `--changed HEAD` and runs only tests affected by u
 ### Full Suite
 
 ```bash
-cd packages/backend
-bun run test:force-all
+bun run test:force
 ```
 
 ### Watch Mode
@@ -42,6 +41,47 @@ bun run test:watch
    ```
 2. Open the Dashboard at `http://localhost:4000`.
 3. Send requests to the API proxy at `http://localhost:4000/v1/...`.
+
+### Dev Data Management (`prep-dev`)
+
+The `prep-dev` script manages your local dev environment data. It combines the old `pull-staging`, `populate-dev`, and `clear-dev` scripts into one.
+
+**Basic usage:**
+
+```bash
+bun run prep-dev            # Load saved local data (default)
+bun run prep-dev:save       # Download from staging & save locally
+bun run prep-dev:live       # Use staging data directly (one-off)
+bun run prep-dev:clear      # Clear local dev data
+bun run prep-dev:reset      # Clear then load saved data
+```
+
+**Saving data from staging:**
+
+```bash
+PLEXUS_STAGING_URL=https://plexus.home.cowger.us \
+PLEXUS_STAGING_ADMIN_KEY=your_staging_key \
+bun run prep-dev:save
+```
+
+This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future calls to `bun run prep-dev` will use this saved file.
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PLEXUS_STAGING_URL` | For --save/--live | URL of staging instance |
+| `PLEXUS_STAGING_ADMIN_KEY` | For --save/--live | Admin key for staging |
+| `PLEXUS_DEV_DATA_PATH` | No | Path for saved data (default: `.dev-data/`) |
+| `PLEXUS_URL` | No | Local base URL (default: `http://localhost`) |
+| `PLEXUS_PORT` | No | Local port (auto-derived from cwd) |
+| `PLEXUS_ADMIN_KEY` | No | Admin key for local (default: `password`) |
+| `PLEXUS_EXCLUDE_OAUTH` | No | Exclude OAuth providers (default: `true`) |
+
+**Notes:**
+- The local port is auto-derived from your directory name (matches `bun run dev`)
+- OAuth providers are excluded by default to avoid credential conflicts
+- After restore, restart the dev server if needed
 
 ## Test Architecture
 
