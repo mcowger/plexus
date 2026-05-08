@@ -24,6 +24,7 @@ export async function registerGeminiRoute(
    */
   fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
       requestId,

@@ -40,6 +40,7 @@ export async function registerSpeechRoute(
    */
   fastify.post('/v1/audio/speech', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
 
     let usageRecord: Partial<UsageRecord> = {

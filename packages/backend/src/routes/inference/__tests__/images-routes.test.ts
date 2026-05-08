@@ -31,6 +31,7 @@ type FakeRequest = {
 type FakeReply = {
   code: (statusCode: number) => FakeReply;
   send: (payload: unknown) => unknown;
+  header: (name: string, value: string) => FakeReply;
 };
 
 type EditsHandler = (request: FakeRequest, reply: FakeReply) => Promise<unknown>;
@@ -108,6 +109,7 @@ describe('Images route telemetry', () => {
         replyState.payload = payload;
         return payload;
       }),
+      header: vi.fn(() => reply),
     };
 
     const outcome = await Promise.race([
@@ -222,6 +224,7 @@ describe('Images route telemetry', () => {
         replyState.payload = payload;
         return payload;
       }),
+      header: vi.fn(() => reply),
     };
 
     await editsHandler!(request, reply);

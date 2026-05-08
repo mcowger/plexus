@@ -25,6 +25,7 @@ export async function registerChatRoute(
    */
   fastify.post('/v1/chat/completions', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
       requestId,

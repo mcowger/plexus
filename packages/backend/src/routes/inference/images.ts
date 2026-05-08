@@ -22,6 +22,7 @@ export async function registerImagesRoute(
    */
   fastify.post('/v1/images/generations', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
 
     let usageRecord: Partial<UsageRecord> = {
@@ -147,6 +148,7 @@ export async function registerImagesRoute(
    */
   fastify.post('/v1/images/edits', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
 
     let usageRecord: Partial<UsageRecord> = {

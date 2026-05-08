@@ -34,6 +34,7 @@ export async function registerResponsesRoute(
   // Handler for Responses API requests (shared between /v1/responses and /v1/codex/responses)
   const responsesHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
       requestId,
