@@ -51,9 +51,12 @@ describe('E2EPerformanceSelector', () => {
     setConfigForTesting(makeConfig(0));
 
     mockGetProviderPerformance.mockImplementation((provider) => {
-      if (provider === 'p1') return Promise.resolve([{ avg_e2e_tokens_per_sec: 15 }]);
-      if (provider === 'p2') return Promise.resolve([{ avg_e2e_tokens_per_sec: 40 }]); // Best
-      if (provider === 'p3') return Promise.resolve([{ avg_e2e_tokens_per_sec: 25 }]);
+      if (provider === 'p1')
+        return Promise.resolve([{ target_model: 'm1', avg_e2e_tokens_per_sec: 15 }]);
+      if (provider === 'p2')
+        return Promise.resolve([{ target_model: 'm2', avg_e2e_tokens_per_sec: 40 }]); // Best
+      if (provider === 'p3')
+        return Promise.resolve([{ target_model: 'm3', avg_e2e_tokens_per_sec: 25 }]);
       return Promise.resolve([]);
     });
 
@@ -69,7 +72,8 @@ describe('E2EPerformanceSelector', () => {
 
   it('should prefer target with data over target with no data', async () => {
     mockGetProviderPerformance.mockImplementation((provider) => {
-      if (provider === 'p1') return Promise.resolve([{ avg_e2e_tokens_per_sec: 20 }]);
+      if (provider === 'p1')
+        return Promise.resolve([{ target_model: 'm1', avg_e2e_tokens_per_sec: 20 }]);
       if (provider === 'p2') return Promise.resolve([]); // No data -> 0
       return Promise.resolve([]);
     });
@@ -100,8 +104,10 @@ describe('E2EPerformanceSelector', () => {
       setConfigForTesting(makeConfig(0, 0));
 
       mockGetProviderPerformance.mockImplementation((provider) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_e2e_tokens_per_sec: 100 }]); // Best
-        if (provider === 'p2') return Promise.resolve([{ avg_e2e_tokens_per_sec: 50 }]);
+        if (provider === 'p1')
+          return Promise.resolve([{ target_model: 'm1', avg_e2e_tokens_per_sec: 100 }]); // Best
+        if (provider === 'p2')
+          return Promise.resolve([{ target_model: 'm2', avg_e2e_tokens_per_sec: 50 }]);
         return Promise.resolve([]);
       });
 
@@ -120,9 +126,12 @@ describe('E2EPerformanceSelector', () => {
       setConfigForTesting(makeConfig(0, 1));
 
       mockGetProviderPerformance.mockImplementation((provider) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_e2e_tokens_per_sec: 100 }]); // Best
-        if (provider === 'p2') return Promise.resolve([{ avg_e2e_tokens_per_sec: 50 }]);
-        if (provider === 'p3') return Promise.resolve([{ avg_e2e_tokens_per_sec: 25 }]);
+        if (provider === 'p1')
+          return Promise.resolve([{ target_model: 'm1', avg_e2e_tokens_per_sec: 100 }]); // Best
+        if (provider === 'p2')
+          return Promise.resolve([{ target_model: 'm2', avg_e2e_tokens_per_sec: 50 }]);
+        if (provider === 'p3')
+          return Promise.resolve([{ target_model: 'm3', avg_e2e_tokens_per_sec: 25 }]);
         return Promise.resolve([]);
       });
 
@@ -149,8 +158,10 @@ describe('E2EPerformanceSelector', () => {
       setConfigForTesting(makeConfig(1, 0));
 
       mockGetProviderPerformance.mockImplementation((provider) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_e2e_tokens_per_sec: 100 }]); // Best
-        if (provider === 'p2') return Promise.resolve([{ avg_e2e_tokens_per_sec: 50 }]);
+        if (provider === 'p1')
+          return Promise.resolve([{ target_model: 'm1', avg_e2e_tokens_per_sec: 100 }]); // Best
+        if (provider === 'p2')
+          return Promise.resolve([{ target_model: 'm2', avg_e2e_tokens_per_sec: 50 }]);
         return Promise.resolve([]);
       });
 
@@ -174,8 +185,10 @@ describe('E2EPerformanceSelector', () => {
       setConfigForTesting(config);
 
       mockGetProviderPerformance.mockImplementation((provider) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_e2e_tokens_per_sec: 100 }]); // Best
-        if (provider === 'p2') return Promise.resolve([{ avg_e2e_tokens_per_sec: 50 }]);
+        if (provider === 'p1')
+          return Promise.resolve([{ target_model: 'm1', avg_e2e_tokens_per_sec: 100 }]); // Best
+        if (provider === 'p2')
+          return Promise.resolve([{ target_model: 'm2', avg_e2e_tokens_per_sec: 50 }]);
         return Promise.resolve([]);
       });
 

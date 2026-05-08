@@ -1,4 +1,4 @@
-import { Selector } from './base';
+import { Selector, CandidateStats } from './base';
 import { ModelTarget } from '../../config';
 import { UsageStorageService } from '../usage-storage';
 import { logger } from '../../utils/logger';
@@ -25,21 +25,26 @@ export class LatencySelector extends Selector {
     // but the API is structured for per-provider/model queries.
 
     const candidates: { target: ModelTarget; avgTtft: number }[] = [];
+    const explorationStats: CandidateStats[] = [];
 
     for (const target of targets) {
       const stats = await this.storage.getProviderPerformance(target.provider, target.model);
+      const targetStats = stats[0];
 
       let avgTtft = Infinity; // Default to worst possible latency if no data
 
-      if (stats && stats.length > 0) {
-        // stats[0] contains the aggregated data for this provider/model
-        // If avg_ttft_ms is null (no data), it stays Infinity
-        if (stats[0].avg_ttft_ms !== null && stats[0].avg_ttft_ms !== undefined) {
-          avgTtft = stats[0].avg_ttft_ms;
+      if (targetStats) {
+        if (targetStats.avg_ttft_ms !== null && targetStats.avg_ttft_ms !== undefined) {
+          avgTtft = targetStats.avg_ttft_ms;
         }
       }
 
       candidates.push({ target, avgTtft });
+      explorationStats.push({
+        target,
+        sampleCount: targetStats?.sample_count ?? 0,
+        lastUpdated: targetStats?.last_updated ?? 0,
+      });
     }
 
     // Filter out candidates with no data (Infinity) if possible
@@ -55,12 +60,20 @@ export class LatencySelector extends Selector {
 
       // If exploration rate is set and we have multiple candidates, occasionally explore
       if (explorationRate > 0 && validCandidates.length > 1 && Math.random() < explorationRate) {
-        const explored = validCandidates[Math.floor(Math.random() * validCandidates.length)];
-        if (explored) {
-          logger.debug(
-            `LatencySelector: Exploring alternative provider ${explored.target.provider}/${explored.target.model} with ${explored.avgTtft.toFixed(2)}ms TTFT (rate: ${(explorationRate * 100).toFixed(1)}%)`
+        const explorationChoice = this.pickExplorationTarget(explorationStats);
+        if (explorationChoice) {
+          const choiceStats = candidates.find(
+            (c) =>
+              c.target.provider === explorationChoice.provider &&
+              c.target.model === explorationChoice.model
           );
-          return explored.target;
+          const ttft = choiceStats?.avgTtft;
+          logger.debug(
+            `LatencySelector: Exploring - selected ${explorationChoice.provider}/${explorationChoice.model} with ${
+              ttft !== undefined && ttft !== Infinity ? ttft.toFixed(2) : 'no'
+            } ms TTFT (rate: ${(explorationRate * 100).toFixed(1)}%)`
+          );
+          return explorationChoice;
         }
       }
 

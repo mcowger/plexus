@@ -851,16 +851,14 @@ export class UsageStorageService extends EventEmitter {
         conditions.push(eq(this.schema.providerPerformance.provider, provider));
       }
       if (model) {
-        conditions.push(
-          sql`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.requestUsage.canonicalModelName}, ${this.schema.providerPerformance.model}) = ${model}`
-        );
+        conditions.push(eq(this.schema.providerPerformance.model, model));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const perfRows = await this.db!.select({
         provider: this.schema.providerPerformance.provider,
-        model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.requestUsage.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+        model: this.schema.providerPerformance.model,
         targetModel: this.schema.providerPerformance.model,
         avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
         minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
@@ -882,12 +880,7 @@ export class UsageStorageService extends EventEmitter {
           eq(this.schema.providerPerformance.requestId, this.schema.requestUsage.requestId)
         )
         .where(whereClause)
-        .groupBy(
-          this.schema.providerPerformance.provider,
-          this.schema.providerPerformance.model,
-          this.schema.providerPerformance.canonicalModelName,
-          this.schema.requestUsage.canonicalModelName
-        )
+        .groupBy(this.schema.providerPerformance.provider, this.schema.providerPerformance.model)
         .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
 
       const mappedRows = perfRows.map((row: any) => ({
