@@ -84,11 +84,6 @@ This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future ca
 | `PLEXUS_ADMIN_KEY` | No | Admin key for local (default: `password`) |
 | `PLEXUS_EXCLUDE_OAUTH` | No | Exclude OAuth providers (default: `true`) |
 
-**Legacy aliases:**
-- `bun run populate-dev` → `bun run prep-dev`
-- `bun run clear-dev` → `bun run prep-dev --clear`
-- `bun run pull-staging` → `bun run prep-dev --save`
-
 **Notes:**
 - The local port is auto-derived from your directory name (matches `bun run dev`)
 - OAuth providers are excluded by default to avoid credential conflicts
