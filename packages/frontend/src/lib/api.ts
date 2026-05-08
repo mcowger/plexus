@@ -561,6 +561,7 @@ const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
   'ollama',
   'neuralwatt',
   'zenmux',
+  'devpass',
 ]);
 
 /**

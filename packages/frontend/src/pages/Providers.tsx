@@ -53,6 +53,7 @@ import { ApertisQuotaConfig } from '../components/quota/ApertisQuotaConfig';
 import { KimiCodeQuotaConfig } from '../components/quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../components/quota/PoeQuotaConfig';
 import { OllamaQuotaConfig } from '../components/quota/OllamaQuotaConfig';
+import { DevPassQuotaConfig } from '../components/quota/DevPassQuotaConfig';
 import { NeuralwattQuotaConfig } from '../components/quota/NeuralwattQuotaConfig';
 import { ZenmuxQuotaConfig } from '../components/quota/ZenmuxQuotaConfig';
 
@@ -100,6 +101,7 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'ollama',
   'neuralwatt',
   'zenmux',
+  'devpass',
 ] as const;
 
 /** Maps an oauth_provider value to the one checker type relevant for it, or null. */
@@ -320,6 +322,12 @@ export const Providers = () => {
     if (quotaType === 'wisdomgate') {
       if (!options.session || !(options.session as string).trim()) {
         return 'Session cookie is required for Wisdom Gate quota checker';
+      }
+    }
+
+    if (quotaType === 'devpass') {
+      if (!options.session || !(options.session as string).trim()) {
+        return 'Session cookie is required for DevPass quota checker';
       }
     }
 
@@ -2043,6 +2051,23 @@ export const Providers = () => {
                 {selectedQuotaCheckerType && selectedQuotaCheckerType === 'wisdomgate' && (
                   <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
                     <WisdomGateQuotaConfig
+                      options={editingProvider.quotaChecker?.options || {}}
+                      onChange={(options) =>
+                        setEditingProvider({
+                          ...editingProvider,
+                          quotaChecker: {
+                            ...editingProvider.quotaChecker,
+                            options,
+                          } as Provider['quotaChecker'],
+                        })
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedQuotaCheckerType && selectedQuotaCheckerType === 'devpass' && (
+                  <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+                    <DevPassQuotaConfig
                       options={editingProvider.quotaChecker?.options || {}}
                       onChange={(options) =>
                         setEditingProvider({

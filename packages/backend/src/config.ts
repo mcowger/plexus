@@ -196,6 +196,11 @@ const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const DevPassQuotaCheckerOptionsSchema = z.object({
+  session: z.string().trim().min(1, 'DevPass session cookie is required'),
+  endpoint: z.string().url().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -350,6 +355,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: ZenmuxQuotaCheckerOptionsSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('devpass'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: DevPassQuotaCheckerOptionsSchema.optional(),
   }),
 ]);
 
@@ -910,6 +922,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'ollama',
   'neuralwatt',
   'zenmux',
+  'devpass',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

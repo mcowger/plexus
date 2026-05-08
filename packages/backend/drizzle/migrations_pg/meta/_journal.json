@@ -302,6 +302,13 @@
       "when": 1778265432744,
       "tag": "0042_mean_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1778280149963,
+      "tag": "0043_spotty_spacker_dave",
+      "breakpoints": true
     }
   ]
 }
