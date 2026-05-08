@@ -49,17 +49,11 @@ The `prep-dev` script manages your local dev environment data. It combines the o
 **Basic usage:**
 
 ```bash
-# Use saved local data (default)
-bun run prep-dev
-
-# Download from staging and save locally
-bun run prep-dev --save
-
-# Use staging data directly (one-off, no save)
-bun run prep-dev --live
-
-# Clear local dev data
-bun run prep-dev --clear
+bun run prep-dev            # Load saved local data (default)
+bun run prep-dev:save       # Download from staging & save locally
+bun run prep-dev:live       # Use staging data directly (one-off)
+bun run prep-dev:clear      # Clear local dev data
+bun run prep-dev:reset      # Clear then load saved data
 ```
 
 **Saving data from staging:**
@@ -67,7 +61,7 @@ bun run prep-dev --clear
 ```bash
 PLEXUS_STAGING_URL=https://plexus.home.cowger.us \
 PLEXUS_STAGING_ADMIN_KEY=your_staging_key \
-bun run prep-dev --save
+bun run prep-dev:save
 ```
 
 This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future calls to `bun run prep-dev` will use this saved file.

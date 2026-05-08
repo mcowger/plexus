@@ -58,17 +58,17 @@ const CLEAR_MODE = args.includes('--clear');
 
 if (HELP_MODE) {
   console.log(`
-Usage:
-  bun run prep-dev                      # Use saved local data (default)
-  bun run prep-dev --save               # Download from staging & save locally
-  bun run prep-dev --live               # Use staging data directly (one-off)
-  bun run prep-dev --save --live        # Download, save, and restore
-  bun run prep-dev --clear              # Clear local dev data
+Usage (via npm scripts):
+  bun run prep-dev            # Load saved local data (default)
+  bun run prep-dev:save       # Download from staging & save locally
+  bun run prep-dev:live       # Use staging data directly (one-off)
+  bun run prep-dev:clear      # Clear local dev data
+  bun run prep-dev:reset      # Clear then load saved data
 
-Options:
+Options (for direct script usage):
   --save    Download staging data and save to local file
-  --live    Use staging data directly (implies --save for saving)
-  --clear   Clear/reset local dev database
+  --live    Use staging data directly (one-off)
+  --clear   Clear local dev data
   --help    Show this help message
 
 Environment variables:
