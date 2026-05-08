@@ -662,12 +662,17 @@ export class DebugLoggingInspector extends BaseInspector {
           if (chunkChoice.finish_reason) accChoice.finish_reason = chunkChoice.finish_reason;
 
           // B. Text Buffers (Concatenate strings, IGNORE nulls)
-          // Includes content, reasoning_content, refusal, etc.
-          ['content', 'reasoning_content', 'refusal'].forEach((key) => {
+          // Includes content, reasoning_content, reasoning (zenmux/kimi), refusal, etc.
+          ['content', 'reasoning', 'reasoning_content', 'refusal'].forEach((key) => {
             if (typeof delta[key] === 'string') {
               accChoice.delta[key] = (accChoice.delta[key] || '') + delta[key];
             }
           });
+
+          // C2. Per-choice usage (e.g. zenmux puts usage inside choices[0] on final chunk)
+          if (chunkChoice.usage && !result.usage) {
+            result.usage = chunkChoice.usage;
+          }
 
           // C. Tool Calls (Merged by tool index)
           if (delta.tool_calls) {
