@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, Loader2, CheckCircle, AlertTriangle, Play } from 'lucide-react';
+import { CopyButton } from '../ui/CopyButton';
 import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
 import { ModelTypeBadge } from './ModelTypeBadge';
@@ -81,8 +82,16 @@ export const AliasMobileCard: React.FC<Props> = ({
       </div>
 
       <div className="mt-3">
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-          Targets
+        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+          <span>Targets</span>
+          {alias.target_groups[0] && (
+            <>
+              <span className="opacity-40 normal-case">
+                direct/{alias.id}/{alias.target_groups[0].name}
+              </span>
+              <CopyButton value={`direct/${alias.id}/${alias.target_groups[0].name}`} size="sm" />
+            </>
+          )}
         </div>
         {alias.target_groups.length === 0 || alias.target_groups[0].targets.length === 0 ? (
           <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Edit2, Trash2, Clock, Play, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { CopyButton } from '../ui/CopyButton';
 import { Switch } from '../ui/Switch';
 import { Alias, Provider, Cooldown } from '../../lib/api';
 import { ModelTypeBadge } from './ModelTypeBadge';
@@ -116,6 +117,14 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                 <span>{group.name}</span>
                 <span className="opacity-50">·</span>
                 <span className="capitalize">{group.selector}</span>
+                <span className="opacity-40 ml-2 normal-case">
+                  direct/{alias.id}/{group.name}
+                </span>
+                <CopyButton
+                  value={`direct/${alias.id}/${group.name}`}
+                  size="sm"
+                  className="ml-0.5"
+                />
               </div>
               <div className="flex flex-col gap-1">
                 {group.targets.map((t, targetIdx) => {
