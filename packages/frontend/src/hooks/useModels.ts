@@ -4,9 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 
 export interface OrphanGroup {
   modelId: string;
-  /** The alias this group will merge into or create. When set, imports add targets to this alias. */
   existingAlias?: Alias;
-  /** Human-readable reason when an existing alias was matched via fuzzy logic (e.g. "case-insensitive match" or "suffix match"). */
   matchReason?: string;
   candidates: Array<{ provider: Provider; model: Model }>;
 }
@@ -14,9 +12,8 @@ export interface OrphanGroup {
 const EMPTY_ALIAS: Alias = {
   id: '',
   aliases: [],
-  selector: 'random',
   priority: 'selector',
-  targets: [],
+  target_groups: [{ name: 'default', selector: 'random', targets: [] }],
 };
 
 export const useModels = () => {
@@ -81,7 +78,7 @@ export const useModels = () => {
 
   const handleAddNew = () => {
     setOriginalId(null);
-    setEditingAlias({ ...EMPTY_ALIAS, targets: [] });
+    setEditingAlias(JSON.parse(JSON.stringify(EMPTY_ALIAS)) as Alias);
     setIsModalOpen(true);
   };
 
@@ -125,9 +122,16 @@ export const useModels = () => {
     }
   };
 
-  const handleToggleTarget = async (alias: Alias, targetIndex: number, newState: boolean) => {
-    const updatedAlias = JSON.parse(JSON.stringify(alias));
-    updatedAlias.targets[targetIndex].enabled = newState;
+  const handleToggleTarget = async (
+    alias: Alias,
+    groupIndex: number,
+    targetIndex: number,
+    newState: boolean
+  ) => {
+    const updatedAlias = JSON.parse(JSON.stringify(alias)) as Alias;
+    if (updatedAlias.target_groups[groupIndex]?.targets[targetIndex]) {
+      updatedAlias.target_groups[groupIndex].targets[targetIndex].enabled = newState;
+    }
 
     setAliases((prev) => prev.map((a) => (a.id === alias.id ? updatedAlias : a)));
 
@@ -141,13 +145,12 @@ export const useModels = () => {
   };
 
   const handleTestTarget = async (
-    aliasId: string,
-    targetIndex: number,
+    _aliasId: string,
+    testKey: string,
     provider: string,
     model: string,
     apiTypes: string[]
   ) => {
-    const testKey = `${aliasId}-${targetIndex}`;
     setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true } }));
 
     try {
@@ -190,13 +193,6 @@ export const useModels = () => {
 
   const filteredAliases = aliases.filter((a) => a.id.toLowerCase().includes(search.toLowerCase()));
 
-  /**
-   * Find an existing alias that matches a given model ID using fuzzy rules:
-   * 1. Exact case-insensitive match (e.g. "MiniMax-M2.7" → alias "minimax-m2.7")
-   * 2. Suffix match: the model ID after stripping a "provider/" prefix matches
-   *    an alias (e.g. "sonar-pro" → alias "perplexity/sonar-pro"), or vice versa
-   *    (e.g. "perplexity/sonar-pro" → alias "sonar-pro").
-   */
   const findExistingAlias = useCallback(
     (modelId: string, aliasList: Alias[]): { alias: Alias; reason?: string } | undefined => {
       const lowerModel = modelId.toLowerCase();
@@ -210,7 +206,7 @@ export const useModels = () => {
         return { alias: ciMatch };
       }
 
-      // 2. Suffix match — strip provider-style prefix from either side
+      // 2. Suffix match
       const modelSuffix = modelId.includes('/')
         ? modelId.substring(modelId.lastIndexOf('/') + 1)
         : modelId;
@@ -223,10 +219,7 @@ export const useModels = () => {
         const aliasSuffixLower = aliasSuffix.toLowerCase();
 
         if (aliasSuffixLower === modelSuffixLower && alias.id !== modelId) {
-          return {
-            alias,
-            reason: `suffix match: ${alias.id}`,
-          };
+          return { alias, reason: `suffix match: ${alias.id}` };
         }
       }
 
@@ -236,22 +229,21 @@ export const useModels = () => {
   );
 
   const handleOpenImport = useCallback(() => {
-    // Build set of covered (provider, model) pairs from all alias targets
     const covered = new Set<string>();
     aliases.forEach((alias) => {
-      alias.targets.forEach((t) => {
-        covered.add(`${t.provider}|${t.model}`);
+      alias.target_groups.forEach((g) => {
+        g.targets.forEach((t) => {
+          covered.add(`${t.provider}|${t.model}`);
+        });
       });
     });
 
-    // Find orphaned models and group by lowercased model.id for case-insensitive grouping
     const orphanMap = new Map<string, Array<{ provider: Provider; model: Model }>>();
-    const canonicalIds = new Map<string, string>(); // lowercase → first-seen original casing
+    const canonicalIds = new Map<string, string>();
     availableModels.forEach((model) => {
       const key = `${model.providerId}|${model.id}`;
       if (covered.has(key)) return;
 
-      // Group case-insensitively: use lowercase key but preserve first-seen casing
       const groupKey = model.id.toLowerCase();
       if (!canonicalIds.has(groupKey)) {
         canonicalIds.set(groupKey, model.id);
@@ -279,7 +271,6 @@ export const useModels = () => {
     });
     groups.sort((a, b) => a.modelId.localeCompare(b.modelId));
 
-    // Default: select all candidates
     const selections = new Map<string, Set<string>>();
     groups.forEach((group) => {
       selections.set(group.modelId, new Set(group.candidates.map((c) => c.provider.id)));
@@ -302,15 +293,14 @@ export const useModels = () => {
         const selectedCandidates = group.candidates.filter((c) => providerIds.has(c.provider.id));
 
         if (group.existingAlias) {
-          // Merge into existing alias
-          const updatedAlias = JSON.parse(JSON.stringify(group.existingAlias));
+          const updatedAlias = JSON.parse(JSON.stringify(group.existingAlias)) as Alias;
+          // Merge into the first group of the existing alias
           selectedCandidates.forEach((c) => {
-            const alreadyExists = updatedAlias.targets.some(
-              (t: { provider: string; model: string }) =>
-                t.provider === c.provider.id && t.model === c.model.id
+            const alreadyExists = updatedAlias.target_groups[0].targets.some(
+              (t) => t.provider === c.provider.id && t.model === c.model.id
             );
             if (!alreadyExists) {
-              updatedAlias.targets.push({
+              updatedAlias.target_groups[0].targets.push({
                 provider: c.provider.id,
                 model: c.model.id,
                 enabled: true,
@@ -319,15 +309,20 @@ export const useModels = () => {
           });
           await api.saveAlias(updatedAlias, group.existingAlias.id);
         } else {
-          // Create new alias
           const newAlias: Alias = {
             ...EMPTY_ALIAS,
             id: modelId,
-            targets: selectedCandidates.map((c) => ({
-              provider: c.provider.id,
-              model: c.model.id,
-              enabled: true,
-            })),
+            target_groups: [
+              {
+                name: 'default',
+                selector: 'random',
+                targets: selectedCandidates.map((c) => ({
+                  provider: c.provider.id,
+                  model: c.model.id,
+                  enabled: true,
+                })),
+              },
+            ],
           };
           await api.saveAlias(newAlias, undefined);
         }

@@ -13,6 +13,7 @@ import {
 } from '../lib/api';
 import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
+import { TargetGroupEditor } from '../components/models/TargetGroupEditor';
 import { ModelTypeBadge } from '../components/models/ModelTypeBadge';
 import { MetadataOverrideForm } from '../components/models/MetadataOverrideForm';
 import { Input } from '../components/ui/Input';
@@ -30,12 +31,10 @@ import {
   Loader2,
   Zap,
   ChevronDown,
-  ChevronUp,
   ChevronRight,
   BookOpen,
   X,
   CheckCircle,
-  GripVertical,
   Save,
   Eye,
   AlertTriangle,
@@ -117,10 +116,6 @@ export const Models = () => {
     []
   );
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
-
-  // Drag and Drop State
-  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Global Descriptor State
   const [globalDescriptorModel, setGlobalDescriptorModel] = useState('');
@@ -219,50 +214,6 @@ export const Models = () => {
     setIsDeletingAll(false);
   };
 
-  const updateTarget = (
-    index: number,
-    field: 'provider' | 'model' | 'enabled',
-    value: string | boolean
-  ) => {
-    const newTargets = [...editingAlias.targets];
-    // When provider changes, clear model
-    if (field === 'provider') {
-      newTargets[index] = {
-        provider: value as string,
-        model: '',
-        enabled: newTargets[index].enabled,
-      };
-    } else if (field === 'enabled') {
-      newTargets[index] = { ...newTargets[index], enabled: value as boolean };
-    } else if (field === 'model') {
-      newTargets[index] = { ...newTargets[index], model: value as string };
-    }
-    setEditingAlias({ ...editingAlias, targets: newTargets });
-  };
-
-  const moveTarget = (index: number, direction: 'up' | 'down') => {
-    const newTargets = [...editingAlias.targets];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= newTargets.length) return;
-
-    const [movedItem] = newTargets.splice(index, 1);
-    newTargets.splice(newIndex, 0, movedItem);
-    setEditingAlias({ ...editingAlias, targets: newTargets });
-  };
-
-  const addTarget = () => {
-    setEditingAlias({
-      ...editingAlias,
-      targets: [...editingAlias.targets, { provider: '', model: '', enabled: true }],
-    });
-  };
-
-  const removeTarget = (index: number) => {
-    const newTargets = [...editingAlias.targets];
-    newTargets.splice(index, 1);
-    setEditingAlias({ ...editingAlias, targets: newTargets });
-  };
-
   const handleSearchModels = (query?: string) => {
     const searchTerm = query !== undefined ? query : substring;
     if (!searchTerm.trim()) {
@@ -309,8 +260,6 @@ export const Models = () => {
   };
 
   const handleAddSelectedModels = () => {
-    const newTargets = [...editingAlias.targets];
-
     selectedModels.forEach((key) => {
       const separatorIndex = key.indexOf('|');
       const providerId = key.substring(0, separatorIndex);
@@ -319,20 +268,26 @@ export const Models = () => {
       const model = availableModels.find((m) => m.id === modelId && m.providerId === providerId);
 
       if (provider && model) {
-        const alreadyExists = editingAlias.targets.some(
-          (t) => t.provider === providerId && t.model === modelId
-        );
-        if (!alreadyExists) {
-          newTargets.push({
-            provider: providerId,
-            model: modelId,
-            enabled: true,
-          });
-        }
+        setEditingAlias((prev: Alias) => {
+          const groups = [...prev.target_groups];
+          const g0 = groups[0];
+          const alreadyExists = g0?.targets.some(
+            (t: any) => t.provider === providerId && t.model === modelId
+          );
+          if (!alreadyExists) {
+            groups[0] = {
+              ...g0,
+              targets: [
+                ...(g0?.targets ?? []),
+                { provider: providerId, model: modelId, enabled: true },
+              ],
+            };
+            return { ...prev, target_groups: groups };
+          }
+          return prev;
+        });
       }
     });
-
-    setEditingAlias({ ...editingAlias, targets: newTargets });
     setIsAutoAddModalOpen(false);
     setSubstring('');
     setFilteredModels([]);
@@ -868,41 +823,6 @@ export const Models = () => {
     }
   };
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', index.toString());
-    setDragSourceIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== index) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDragEnd = () => {
-    setDragSourceIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
-    e.preventDefault();
-    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-
-    setDragSourceIndex(null);
-    setDragOverIndex(null);
-
-    if (dragIndex === dropIndex) return;
-
-    const newTargets = [...editingAlias.targets];
-    const [draggedItem] = newTargets.splice(dragIndex, 1);
-    newTargets.splice(dropIndex, 0, draggedItem);
-
-    setEditingAlias({ ...editingAlias, targets: newTargets });
-  };
-
   const sortedAliases = [...aliases].sort((a, b) => a.id.localeCompare(b.id));
 
   const filteredAliases = sortedAliases.filter((a) =>
@@ -1025,7 +945,8 @@ export const Models = () => {
                         Selector
                       </div>
                       <div className="truncate font-medium capitalize text-text-secondary">
-                        {alias.selector || 'random'} / {alias.priority || 'selector'}
+                        {alias.target_groups.map((g) => `${g.name}: ${g.selector}`).join(', ')} /{' '}
+                        {alias.priority || 'selector'}
                       </div>
                     </div>
                     <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
@@ -1042,13 +963,14 @@ export const Models = () => {
                     <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                       Targets
                     </div>
-                    {alias.targets.length === 0 ? (
+                    {alias.target_groups.length === 0 ||
+                    alias.target_groups[0].targets.length === 0 ? (
                       <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">
                         No targets configured
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {alias.targets.map((t, i) => {
+                        {alias.target_groups[0].targets.map((t, i) => {
                           const provider = providers.find((p) => p.id === t.provider);
                           const isProviderDisabled = provider?.enabled === false;
                           const isTargetDisabled = t.enabled === false;
@@ -1118,7 +1040,7 @@ export const Models = () => {
 
                                       handleTestTarget(
                                         alias.id,
-                                        i,
+                                        `${alias.id}-mobile-${i}`,
                                         t.provider,
                                         t.model,
                                         testApiTypes
@@ -1140,7 +1062,7 @@ export const Models = () => {
                                   </button>
                                   <Switch
                                     checked={t.enabled !== false}
-                                    onChange={(val) => handleToggleTarget(alias, i, val)}
+                                    onChange={(val) => handleToggleTarget(alias, 0, i, val)}
                                     size="sm"
                                     disabled={isProviderDisabled}
                                   />
@@ -1269,25 +1191,6 @@ export const Models = () => {
                   <option value="speech">Speech</option>
                   <option value="image">Image</option>
                   <option value="responses">Responses</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Selector Strategy
-                </label>
-                <select
-                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                  value={editingAlias.selector || 'random'}
-                  onChange={(e) => setEditingAlias({ ...editingAlias, selector: e.target.value })}
-                >
-                  <option value="random">Random</option>
-                  <option value="in_order">In Order</option>
-                  <option value="cost">Lowest Cost</option>
-                  <option value="latency">Lowest Latency</option>
-                  <option value="usage">Usage Balanced</option>
-                  <option value="performance">Best Performance (post-TTFT)</option>
-                  <option value="e2e_performance">Best E2E Performance</option>
                 </select>
               </div>
 
@@ -2089,13 +1992,10 @@ export const Models = () => {
 
             <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
 
-            <div>
-              <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <label
-                  className="font-body text-[13px] font-medium text-text-secondary"
-                  style={{ marginBottom: 0 }}
-                >
-                  Targets
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Target Groups
                 </label>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -2106,202 +2006,15 @@ export const Models = () => {
                   >
                     Auto Add
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={addTarget}
-                    leftIcon={<Plus size={14} />}
-                  >
-                    Add Target
-                  </Button>
                 </div>
               </div>
 
-              {editingAlias.targets.length === 0 && (
-                <div className="text-text-muted italic text-center text-sm py-2">
-                  No targets configured (Model will not work)
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {editingAlias.targets.map((target, idx) => {
-                  const isDragging = dragSourceIndex === idx;
-                  const isDragOver = dragOverIndex === idx && !isDragging;
-
-                  return (
-                    <div
-                      key={idx}
-                      draggable
-                      className="flex flex-col gap-2 sm:flex-row sm:items-center"
-                      onDragStart={(e) => handleDragStart(e, idx)}
-                      onDragOver={(e) => handleDragOver(e, idx)}
-                      onDragEnd={handleDragEnd}
-                      onDrop={(e) => handleDrop(e, idx)}
-                      style={{
-                        padding: '4px 8px',
-                        backgroundColor: isDragging
-                          ? 'transparent'
-                          : isDragOver
-                            ? 'rgba(245, 158, 11, 0.05)'
-                            : 'var(--color-bg-subtle)',
-                        borderRadius: 'var(--radius-sm)',
-                        border: isDragging
-                          ? '1px dashed var(--color-border-glass)'
-                          : isDragOver
-                            ? '2px solid var(--color-primary)'
-                            : '1px solid var(--color-border-glass)',
-                        cursor: 'grab',
-                        opacity: isDragging ? 0.4 : 1,
-                        transform: isDragOver ? 'translateY(2px)' : 'none',
-                        transition: 'all 0.2s ease',
-                        position: 'relative',
-                      }}
-                      onDragStartCapture={(e) => {
-                        (e.currentTarget as HTMLDivElement).style.cursor = 'grabbing';
-                      }}
-                      onDragEndCapture={(e) => {
-                        (e.currentTarget as HTMLDivElement).style.cursor = 'grab';
-                      }}
-                    >
-                      {isDragOver && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: dragSourceIndex !== null && dragSourceIndex < idx ? 'auto' : -2,
-                            bottom: dragSourceIndex !== null && dragSourceIndex > idx ? 'auto' : -2,
-                            left: 0,
-                            right: 0,
-                            height: '2px',
-                            backgroundColor: 'var(--color-primary)',
-                            zIndex: 20,
-                          }}
-                        />
-                      )}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          color: 'var(--color-text-secondary)',
-                          opacity: 0.8,
-                          marginRight: '4px',
-                          visibility: isDragging ? 'hidden' : 'visible',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveTarget(idx, 'up');
-                          }}
-                          disabled={idx === 0}
-                          className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: '4px',
-                            cursor: idx === 0 ? 'default' : 'pointer',
-                          }}
-                          title="Move Up"
-                        >
-                          <ChevronUp size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveTarget(idx, 'down');
-                          }}
-                          disabled={idx === editingAlias.targets.length - 1}
-                          className="hover:scale-110 hover:text-primary disabled:opacity-30 disabled:hover:scale-100 transition-all duration-200"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: '4px',
-                            cursor: idx === editingAlias.targets.length - 1 ? 'default' : 'pointer',
-                          }}
-                          title="Move Down"
-                        >
-                          <ChevronDown size={16} />
-                        </button>
-                      </div>
-                      <div
-                        style={{
-                          cursor: 'grab',
-                          color: 'var(--color-text-secondary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          visibility: isDragging ? 'hidden' : 'visible',
-                        }}
-                      >
-                        <GripVertical size={16} />
-                      </div>
-                      <div
-                        className="w-full sm:w-[120px] sm:max-w-[120px] sm:flex-none"
-                        style={{
-                          visibility: isDragging ? 'hidden' : 'visible',
-                        }}
-                      >
-                        <select
-                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                          style={{ padding: '4px 8px', height: '28px' }}
-                          value={target.provider}
-                          onChange={(e) => updateTarget(idx, 'provider', e.target.value)}
-                        >
-                          <option value="">Select Provider...</option>
-                          {providers.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div
-                        className="w-full min-w-0 sm:flex-1"
-                        style={{ visibility: isDragging ? 'hidden' : 'visible' }}
-                      >
-                        <select
-                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
-                          style={{ padding: '4px 8px', height: '28px' }}
-                          value={target.model}
-                          onChange={(e) => updateTarget(idx, 'model', e.target.value)}
-                          disabled={!target.provider}
-                        >
-                          <option value="">Select Model...</option>
-                          {availableModels
-                            .filter((m) => m.providerId === target.provider)
-                            .map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
-                        <Switch
-                          checked={target.enabled !== false}
-                          onChange={(val) => updateTarget(idx, 'enabled', val)}
-                          size="sm"
-                        />
-                      </div>
-                      <div style={{ visibility: isDragging ? 'hidden' : 'visible' }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeTarget(idx)}
-                          style={{
-                            color: 'var(--color-danger)',
-                            padding: '4px',
-                            minHeight: 'auto',
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <TargetGroupEditor
+                groups={editingAlias.target_groups}
+                providers={providers}
+                availableModels={availableModels}
+                onChange={(groups) => setEditingAlias({ ...editingAlias, target_groups: groups })}
+              />
             </div>
           </div>
         </Modal>
@@ -2368,8 +2081,8 @@ export const Models = () => {
                             filteredModels.every(
                               (m) =>
                                 selectedModels.has(`${m.provider.id}|${m.model.id}`) ||
-                                editingAlias.targets.some(
-                                  (t) => t.provider === m.provider.id && t.model === m.model.id
+                                editingAlias.target_groups[0]?.targets.some(
+                                  (t: any) => t.provider === m.provider.id && t.model === m.model.id
                                 )
                             )
                           }
@@ -2379,8 +2092,9 @@ export const Models = () => {
                               filteredModels.forEach((m) => {
                                 const key = `${m.provider.id}|${m.model.id}`;
                                 if (
-                                  !editingAlias.targets.some(
-                                    (t) => t.provider === m.provider.id && t.model === m.model.id
+                                  !editingAlias.target_groups[0]?.targets.some(
+                                    (t: any) =>
+                                      t.provider === m.provider.id && t.model === m.model.id
                                   )
                                 ) {
                                   newSelection.add(key);
@@ -2408,8 +2122,8 @@ export const Models = () => {
                   <tbody>
                     {filteredModels.map(({ model, provider }) => {
                       const key = `${provider.id}|${model.id}`;
-                      const alreadyExists = editingAlias.targets.some(
-                        (t) => t.provider === provider.id && t.model === model.id
+                      const alreadyExists = editingAlias.target_groups[0]?.targets.some(
+                        (t: any) => t.provider === provider.id && t.model === model.id
                       );
                       const isSelected = selectedModels.has(key);
                       const isDisabled = alreadyExists;

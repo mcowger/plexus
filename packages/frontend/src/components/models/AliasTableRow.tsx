@@ -12,10 +12,15 @@ interface AliasTableRowProps {
   testStates: Record<string, any>;
   onEdit: (alias: Alias) => void;
   onDelete: (alias: Alias) => void;
-  onToggleTarget: (alias: Alias, targetIndex: number, newState: boolean) => void;
+  onToggleTarget: (
+    alias: Alias,
+    groupIndex: number,
+    targetIndex: number,
+    newState: boolean
+  ) => void;
   onTestTarget: (
     aliasId: string,
-    idx: number,
+    testKey: string,
     providerId: string,
     modelId: string,
     types: string[]
@@ -75,9 +80,17 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
         )}
       </td>
       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-        <span className="inline-flex items-center rounded px-2 py-1 text-xs font-medium border-border-glass text-text-secondary text-[11px] capitalize">
-          {alias.selector || 'random'} / {alias.priority || 'selector'}
-        </span>
+        <div className="flex flex-col gap-1">
+          {alias.target_groups.map((group) => (
+            <div
+              key={group.name}
+              className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium border border-border-glass text-text-secondary capitalize"
+              title={`Group: ${group.name}`}
+            >
+              {group.name}: {group.selector}
+            </div>
+          ))}
+        </div>
       </td>
       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
         {alias.metadata ? (
@@ -91,85 +104,101 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
         )}
       </td>
       <td className="px-4 py-3 text-left border-b border-border-glass text-text pr-6">
-        <div className="flex flex-col gap-1.5">
-          {alias.targets.map((t, i) => {
-            const provider = providers.find((p) => p.id === t.provider);
-            const isProviderDisabled = provider?.enabled === false;
-            const isTargetDisabled = t.enabled === false;
-            const isDisabled = isProviderDisabled || isTargetDisabled;
-            const testKey = `${alias.id}-${i}`;
-            const testState = testStates[testKey];
-
-            const cooldown = cooldowns.find(
-              (c) => c.provider === t.provider && c.model === t.model && !c.accountId
-            );
-            const isCoolingDown = !!cooldown;
-            const cooldownDisplay = cooldown ? formatMsToMinSec(cooldown.timeRemainingMs) : '';
-
-            return (
-              <div
-                key={i}
-                className={`flex items-center gap-2 text-xs transition-opacity ${
-                  isDisabled ? 'opacity-70 line-through text-danger' : 'text-text-secondary'
-                }`}
-              >
-                {isCoolingDown && (
-                  <div
-                    className="flex items-center gap-1 text-warning font-medium text-[11px]"
-                    title={`On cooldown for ${cooldownDisplay}`}
-                  >
-                    <Clock size={12} />
-                    <span>{cooldownDisplay}</span>
-                  </div>
-                )}
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isDisabled) {
-                      let testApiTypes: string[] = ['chat'];
-                      if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
-                      else if (alias.type === 'image') testApiTypes = ['images'];
-                      else if (alias.type === 'responses') testApiTypes = ['responses'];
-
-                      onTestTarget(alias.id, i, t.provider, t.model, testApiTypes);
-                    }
-                  }}
-                  className={`flex items-center cursor-pointer transition-opacity ${
-                    isDisabled ? 'cursor-not-allowed opacity-50' : 'opacity-100'
-                  } mr-4`}
-                >
-                  {testState?.loading ? (
-                    <Loader2 size={14} className="animate-spin text-text-secondary" />
-                  ) : testState?.showResult && testState.result === 'success' ? (
-                    <CheckCircle size={14} className="text-success" />
-                  ) : testState?.showResult && testState.result === 'error' ? (
-                    <XCircle size={14} className="text-danger" />
-                  ) : (
-                    <Play
-                      size={14}
-                      className={`text-primary ${isDisabled ? 'invisible' : 'opacity-60'}`}
-                    />
-                  )}
-                </div>
-                <Switch
-                  checked={t.enabled !== false}
-                  onChange={(val) => onToggleTarget(alias, i, val)}
-                  size="sm"
-                  disabled={isProviderDisabled}
-                />
-                <div className="flex-1 truncate">
-                  {t.provider} &rarr; {t.model}
-                  {testState?.showResult && testState.message && (
-                    <span
-                      className={`ml-2 text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
-                    >
-                      {testState.message}
-                    </span>
-                  )}
-                </div>
+        <div className="flex flex-col gap-2">
+          {alias.target_groups.map((group, groupIdx) => (
+            <div
+              key={group.name}
+              className="flex flex-col gap-1 rounded border border-border-glass/50 p-1.5 bg-bg-glass/30"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1">
+                <span>{group.name}</span>
+                <span className="opacity-50">·</span>
+                <span className="capitalize">{group.selector}</span>
               </div>
-            );
-          })}
+              <div className="flex flex-col gap-1">
+                {group.targets.map((t, targetIdx) => {
+                  const provider = providers.find((p) => p.id === t.provider);
+                  const isProviderDisabled = provider?.enabled === false;
+                  const isTargetDisabled = t.enabled === false;
+                  const isDisabled = isProviderDisabled || isTargetDisabled;
+                  const testKey = `${alias.id}-${groupIdx}-${targetIdx}`;
+                  const testState = testStates[testKey];
+
+                  const cooldown = cooldowns.find(
+                    (c) => c.provider === t.provider && c.model === t.model && !c.accountId
+                  );
+                  const isCoolingDown = !!cooldown;
+                  const cooldownDisplay = cooldown
+                    ? formatMsToMinSec(cooldown.timeRemainingMs)
+                    : '';
+
+                  return (
+                    <div
+                      key={`${t.provider}-${t.model}-${targetIdx}`}
+                      className={`flex items-center gap-2 text-xs transition-opacity ${
+                        isDisabled ? 'opacity-70 line-through text-danger' : 'text-text-secondary'
+                      }`}
+                    >
+                      {isCoolingDown && (
+                        <div
+                          className="flex items-center gap-1 text-warning font-medium text-[11px]"
+                          title={`On cooldown for ${cooldownDisplay}`}
+                        >
+                          <Clock size={12} />
+                          <span>{cooldownDisplay}</span>
+                        </div>
+                      )}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isDisabled) {
+                            let testApiTypes: string[] = ['chat'];
+                            if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
+                            else if (alias.type === 'image') testApiTypes = ['images'];
+                            else if (alias.type === 'responses') testApiTypes = ['responses'];
+
+                            onTestTarget(alias.id, testKey, t.provider, t.model, testApiTypes);
+                          }
+                        }}
+                        className={`flex items-center cursor-pointer transition-opacity ${
+                          isDisabled ? 'cursor-not-allowed opacity-50' : 'opacity-100'
+                        } mr-4`}
+                      >
+                        {testState?.loading ? (
+                          <Loader2 size={14} className="animate-spin text-text-secondary" />
+                        ) : testState?.showResult && testState.result === 'success' ? (
+                          <CheckCircle size={14} className="text-success" />
+                        ) : testState?.showResult && testState.result === 'error' ? (
+                          <XCircle size={14} className="text-danger" />
+                        ) : (
+                          <Play
+                            size={14}
+                            className={`text-primary ${isDisabled ? 'invisible' : 'opacity-60'}`}
+                          />
+                        )}
+                      </div>
+                      <Switch
+                        checked={t.enabled !== false}
+                        onChange={(val) => onToggleTarget(alias, groupIdx, targetIdx, val)}
+                        size="sm"
+                        disabled={isProviderDisabled}
+                      />
+                      <div className="flex-1 truncate">
+                        {t.provider} &rarr; {t.model}
+                        {testState?.showResult && testState.message && (
+                          <span
+                            className={`ml-2 text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
+                          >
+                            {testState.message}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </td>
     </tr>
