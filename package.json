@@ -12,6 +12,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run scripts/dev.ts",
+    "profile": "bun run dev --profile",
     "dev:pglite": "bun run scripts/dev.ts --pglite",
     "dev:full": "bun run scripts/dev.ts --full",
     "build:frontend": "cd packages/frontend && bun run build",

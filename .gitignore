@@ -74,3 +74,6 @@ docs/openapi.yaml
 # Compiled binaries
 plexus-
 plexus
+
+# Profiling output
+.prof/

@@ -18,11 +18,14 @@ function readOptionValue(args: string[], index: number, option: string) {
 }
 
 let fullMode = false;
+let profileMode = false;
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
 
-  if (arg === '--pglite') {
+  if (arg === '--profile') {
+    profileMode = true;
+  } else if (arg === '--pglite') {
     process.env.PLEXUS_POSTGRES_DRIVER = 'pglite';
   } else if (arg === '--full') {
     fullMode = true;
@@ -51,7 +54,7 @@ for (let i = 2; i < process.argv.length; i++) {
     console.error(`Unknown option: ${arg}`);
     console.error('Usage: bun run dev [DATABASE_URL=...] [PORT=...] [ADMIN_KEY=...]');
     console.error(
-      '   or: bun run dev [--database-url ...] [--port ...] [--admin-key ...] [--pglite] [--full]'
+      '   or: bun run dev [--database-url ...] [--port ...] [--admin-key ...] [--pglite] [--full] [--profile]'
     );
     process.exit(1);
   }
@@ -127,6 +130,45 @@ if (process.env.PLEXUS_POSTGRES_DRIVER === 'pglite') {
   console.log(`  DATABASE_URL: ${process.env.DATABASE_URL}`);
 }
 console.log(`  ADMIN_KEY:    ${process.env.ADMIN_KEY}`);
+
+// --- Profile mode: CPU profiling without watcher ---
+
+if (profileMode) {
+  const profDir = join(process.cwd(), '.prof');
+  console.log('\n--- PROFILE MODE: CPU profiling enabled ---');
+  console.log(`Profiles will be written to: ${profDir}`);
+  console.log('  - CPU profiling (100μs interval for higher precision)');
+  console.log('Press Ctrl+C to stop profiling.\n');
+
+  await new Promise<void>((resolve, reject) => {
+    const proc = nodeSpawn(
+      'bun',
+      [
+        'run',
+        '--cpu-prof',
+        '--cpu-prof-md',
+        '--cpu-prof-interval=100',
+        '--cpu-prof-dir',
+        profDir,
+        'src/index.ts',
+      ],
+      {
+        cwd: BACKEND_DIR,
+        env: { ...process.env },
+        stdio: 'inherit',
+      }
+    );
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Backend exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  }).catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+  process.exit(0);
+}
 
 // --- Process management ---
 //
