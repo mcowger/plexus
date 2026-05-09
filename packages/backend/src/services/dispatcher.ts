@@ -199,6 +199,21 @@ export class Dispatcher {
     });
   }
 
+  /**
+   * Emit an early routing update so the frontend shows provider/model immediately.
+   * The route handler emits a second update after dispatch, but for non-streaming
+   * requests that can be seconds later — this one fires as soon as routing is done.
+   */
+  private emitRoutingUpdate(requestId: string | undefined, route: RouteResult): void {
+    if (!requestId || !this.usageStorage) return;
+    this.usageStorage.emitUpdatedAsync({
+      requestId,
+      provider: route.provider,
+      selectedModelName: route.model,
+      canonicalModelName: route.canonicalModel,
+    });
+  }
+
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
     const config = getConfig();
     const failover = config.failover;
@@ -309,6 +324,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(currentRequest.requestId, route);
 
       try {
         // Determine Target API Type
@@ -2251,6 +2268,8 @@ export class Dispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
+      this.emitRoutingUpdate(request.requestId, route);
+
       try {
         const baseUrl = this.resolveBaseUrl(route, 'embeddings');
         const url = `${baseUrl}/embeddings`;
@@ -2445,6 +2464,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'transcriptions');
@@ -2649,6 +2670,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'speech');
@@ -2890,6 +2913,8 @@ export class Dispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
+      this.emitRoutingUpdate(request.requestId, route);
+
       try {
         const baseUrl = this.resolveBaseUrl(route, 'images');
         const url = `${baseUrl}/images/generations`;
@@ -3084,6 +3109,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'images');

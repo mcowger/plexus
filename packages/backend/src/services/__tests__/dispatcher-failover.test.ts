@@ -630,6 +630,7 @@ describe('Dispatcher Failover', () => {
       saveError: saveErrorSpy,
       recordFailedAttempt: vi.fn(),
       recordSuccessfulAttempt: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
     } as any);
 
     const response = await dispatcher.dispatch({
