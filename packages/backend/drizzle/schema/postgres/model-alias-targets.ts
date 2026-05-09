@@ -11,6 +11,7 @@ export const modelAliasTargets = pgTable(
     providerSlug: text('provider_slug').notNull(),
     modelName: text('model_name').notNull(),
     enabled: boolean('enabled').notNull().default(true),
+    groupName: text('group_name'), // target group label
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({

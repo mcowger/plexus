@@ -253,6 +253,13 @@
       "when": 1778265432515,
       "tag": "0035_secret_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1778283504796,
+      "tag": "0036_nasty_vengeance",
+      "breakpoints": true
     }
   ]
 }
