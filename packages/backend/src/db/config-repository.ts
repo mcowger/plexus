@@ -596,6 +596,55 @@ export class ConfigRepository {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  /**
+   * One-time startup migration: rewrite legacy aliases that have no targetGroups
+   * into the grouped format. Operates at raw row level so no application code
+   * needs to understand the legacy layout.
+   *
+   * TODO(#target-groups-cleanup): remove this whole method after migration period.
+   */
+  async migrateLegacyTargetGroups(): Promise<string[]> {
+    const schema = this.schema();
+
+    // Find aliases that have not yet been migrated
+    const legacyAliases = await this.db()
+      .select()
+      .from(schema.modelAliases)
+      .where(sql`${schema.modelAliases.targetGroups} IS NULL`);
+
+    const migrated: string[] = [];
+
+    for (const row of legacyAliases) {
+      const targets = await this.db()
+        .select()
+        .from(schema.modelAliasTargets)
+        .where(eq(schema.modelAliasTargets.aliasId, row.id));
+
+      const selector = row.selector ?? 'random';
+
+      // Write group definition to alias row
+      await this.db()
+        .update(schema.modelAliases)
+        .set({
+          targetGroups: toJson([{ name: 'default', selector }]),
+          updatedAt: now(),
+        })
+        .where(eq(schema.modelAliases.id, row.id));
+
+      // Tag all targets with the default group name
+      if (targets.length > 0) {
+        await this.db()
+          .update(schema.modelAliasTargets)
+          .set({ groupName: 'default' })
+          .where(eq(schema.modelAliasTargets.aliasId, row.id));
+      }
+
+      migrated.push(row.slug);
+    }
+
+    return migrated;
+  }
+
   async saveAlias(slug: string, config: ModelConfig): Promise<void> {
     const schema = this.schema();
     const timestamp = now();
@@ -613,6 +662,10 @@ export class ConfigRepository {
       // Model architecture override for inference energy calculation
       modelArchitecture: config.model_architecture ? toJson(config.model_architecture) : null,
       enforceLimits: fromBool(config.enforce_limits === true),
+      targetGroups:
+        config.target_groups && config.target_groups.length > 0
+          ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
+          : null,
       updatedAt: timestamp,
     };
 
@@ -646,15 +699,24 @@ export class ConfigRepository {
         .delete(schema.modelAliasTargets)
         .where(eq(schema.modelAliasTargets.aliasId, aliasId));
 
-      if (config.targets && config.targets.length > 0) {
-        const targetRows = config.targets.map((t, idx) => ({
-          aliasId,
-          providerSlug: t.provider,
-          modelName: t.model,
-          enabled: fromBool(t.enabled !== false),
-          sortOrder: idx,
-        }));
-        await tx.insert(schema.modelAliasTargets).values(targetRows);
+      if (config.target_groups && config.target_groups.length > 0) {
+        let sortIdx = 0;
+        const targetRows: any[] = [];
+        for (const group of config.target_groups) {
+          for (const t of group.targets) {
+            targetRows.push({
+              aliasId,
+              providerSlug: t.provider,
+              modelName: t.model,
+              enabled: fromBool(t.enabled !== false),
+              groupName: group.name,
+              sortOrder: sortIdx++,
+            });
+          }
+        }
+        if (targetRows.length > 0) {
+          await tx.insert(schema.modelAliasTargets).values(targetRows);
+        }
       }
 
       // Replace metadata overrides
@@ -705,14 +767,30 @@ export class ConfigRepository {
   }
 
   private rowToModelConfig(row: any, targetRows: any[], overrideRow?: any | null): ModelConfig {
-    const targets = targetRows.map((t: any) => ({
-      provider: t.providerSlug,
-      model: t.modelName,
-      enabled: toBool(t.enabled),
-    }));
+    const groupDefs = parseJson<Array<{ name: string; selector: string }>>(row.targetGroups);
+
+    // build target_groups from group definitions + target rows
+    const targetGroups: import('../config').ModelTargetGroup[] = [];
+    if (groupDefs && groupDefs.length > 0) {
+      for (const def of groupDefs) {
+        const groupTargets = targetRows
+          .filter((t: any) => t.groupName === def.name)
+          .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+          .map((t: any) => ({
+            provider: t.providerSlug,
+            model: t.modelName,
+            enabled: toBool(t.enabled),
+          }));
+        targetGroups.push({
+          name: def.name,
+          selector: def.selector as import('../config').SelectorType,
+          targets: groupTargets,
+        });
+      }
+    }
 
     const result: any = {
-      targets,
+      target_groups: targetGroups,
       priority: row.priority ?? 'selector',
       use_image_fallthrough: toBool(row.useImageFallthrough),
       enforce_limits: toBool(row.enforceLimits),

@@ -159,6 +159,10 @@ try {
   await configService.initialize();
   logger.debug('Configuration loaded from database');
 
+  // One-time migration of legacy flat-format aliases to target groups.
+  // TODO(#target-groups-cleanup): remove this after migration period.
+  await configService.migrateLegacyTargetGroups();
+
   // Eagerly initialize OAuth auth manager so auth.json schema migration
   // runs during startup (instead of waiting for first OAuth request).
   await OAuthAuthManager.getInstance().initialize();

@@ -413,6 +413,22 @@ const ModelTargetSchema = z.object({
   enabled: z.boolean().default(true).optional(),
 });
 
+const SelectorTypeSchema = z.enum([
+  'random',
+  'in_order',
+  'cost',
+  'latency',
+  'usage',
+  'performance',
+  'e2e_performance',
+]);
+
+const ModelTargetGroupSchema = z.object({
+  name: z.string().min(1),
+  selector: SelectorTypeSchema,
+  targets: z.array(ModelTargetSchema),
+});
+
 // Quota definition schemas for user quota enforcement
 export const QuotaDefinitionSchema = z.discriminatedUnion('type', [
   z.object({
@@ -523,34 +539,56 @@ const ModelMetadataSchema = z.discriminatedUnion('source', [
   }),
 ]);
 
-export const ModelConfigSchema = z.object({
-  selector: z
-    .enum(['random', 'in_order', 'cost', 'latency', 'usage', 'performance', 'e2e_performance'])
-    .optional(),
-  priority: z.enum(['selector', 'api_match']).default('selector'),
-  targets: z.array(ModelTargetSchema),
-  additional_aliases: z.array(z.string()).optional(),
-  use_image_fallthrough: z.boolean().default(false).optional(),
-  enforce_limits: z.boolean().default(false).optional(),
-  type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
-  advanced: z.array(ModelBehaviorSchema).optional(),
-  metadata: ModelMetadataSchema.optional(),
-  // Model architecture override for inference energy calculation
-  model_architecture: z
-    .object({
-      total_params: z.number().positive().optional(),
-      active_params: z.number().positive().optional(),
-      layers: z.number().int().positive().optional(),
-      heads: z.number().int().positive().optional(),
-      kv_lora_rank: z.number().int().positive().optional(),
-      qk_rope_head_dim: z.number().int().positive().optional(),
-      context_length: z.number().int().positive().optional(),
-      dtype: z
-        .enum(['fp16', 'bf16', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'nvfp4', 'int4', 'int8'])
-        .optional(),
-    })
-    .optional(),
-});
+export const ModelConfigSchema = z
+  .object({
+    // TODO(#target-groups-cleanup): Remove flat selector/targets after migration period.
+    // These are kept only so old API payloads still parse. They are immediately
+    // normalised to target_groups below so downstream code never sees them.
+    selector: SelectorTypeSchema.optional(),
+    priority: z.enum(['selector', 'api_match']).default('selector'),
+    targets: z.array(ModelTargetSchema).optional(),
+    target_groups: z.array(ModelTargetGroupSchema).optional(),
+    additional_aliases: z.array(z.string()).optional(),
+    use_image_fallthrough: z.boolean().default(false).optional(),
+    enforce_limits: z.boolean().default(false).optional(),
+    type: z
+      .enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image'])
+      .optional(),
+    advanced: z.array(ModelBehaviorSchema).optional(),
+    metadata: ModelMetadataSchema.optional(),
+    // Model architecture override for inference energy calculation
+    model_architecture: z
+      .object({
+        total_params: z.number().positive().optional(),
+        active_params: z.number().positive().optional(),
+        layers: z.number().int().positive().optional(),
+        heads: z.number().int().positive().optional(),
+        kv_lora_rank: z.number().int().positive().optional(),
+        qk_rope_head_dim: z.number().int().positive().optional(),
+        context_length: z.number().int().positive().optional(),
+        dtype: z
+          .enum(['fp16', 'bf16', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'nvfp4', 'int4', 'int8'])
+          .optional(),
+      })
+      .optional(),
+  })
+  .transform((data) => {
+    // Normalise legacy flat format to grouped format immediately.
+    // TODO(#target-groups-cleanup): Remove this branch after migration period.
+    if (!data.target_groups && data.targets) {
+      return {
+        ...data,
+        target_groups: [
+          {
+            name: 'default',
+            selector: data.selector ?? 'random',
+            targets: data.targets,
+          },
+        ],
+      };
+    }
+    return data;
+  });
 
 export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
 export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinkingBehaviorSchema>;
@@ -624,6 +662,8 @@ export type ModelProviderConfig = z.infer<typeof ModelProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
+export type ModelTargetGroup = z.infer<typeof ModelTargetGroupSchema>;
+export type SelectorType = z.infer<typeof SelectorTypeSchema>;
 export type QuotaConfig = z.infer<typeof QuotaConfigSchema>;
 export type QuotaDefinition = z.infer<typeof QuotaDefinitionSchema>;
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
@@ -878,14 +918,38 @@ export function getConfig(): PlexusConfig {
 }
 
 export function setConfigForTesting(config: PlexusConfig) {
-  currentConfig = config;
-  // Inject the config directly into ConfigService's cache so that getConfig()
-  // reliably returns it via the ConfigService path. Simply resetting the instance
-  // could leave a stale initialized instance (e.g. due to ESM/CJS module cache
-  // divergence on Linux) that shadows currentConfig with a DB-backed config.
+  // Normalise any legacy flat-format model configs to grouped format so tests
+  // bypass the Zod schema transform but still produce the shapes Router expects.
+  // TODO(#target-groups-cleanup): remove after migration period.
+  const normalised = { ...config };
+  if (normalised.models) {
+    normalised.models = Object.fromEntries(
+      Object.entries(normalised.models).map(([slug, modelCfg]) => {
+        const anyCfg = modelCfg as any;
+        if (anyCfg.targets && !anyCfg.target_groups) {
+          return [
+            slug,
+            {
+              ...anyCfg,
+              target_groups: [
+                {
+                  name: 'default',
+                  selector: anyCfg.selector ?? 'random',
+                  targets: anyCfg.targets,
+                },
+              ],
+            },
+          ];
+        }
+        return [slug, modelCfg];
+      })
+    );
+  }
+
+  currentConfig = normalised;
   try {
     const { ConfigService } = require('./services/config-service');
-    ConfigService.setInstanceForTesting(config);
+    ConfigService.setInstanceForTesting(normalised);
   } catch {
     // ConfigService may not be available in all test environments
   }

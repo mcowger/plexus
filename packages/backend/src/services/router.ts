@@ -5,6 +5,8 @@ import {
   ProviderConfig,
   ModelProviderConfig,
   getProviderTypes,
+  type ModelConfig,
+  type ModelTargetGroup,
 } from '../config';
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
@@ -12,13 +14,176 @@ import { EnrichedModelTarget } from './selectors/base';
 import type { ModelArchitecture } from '@plexus/shared';
 
 export interface RouteResult {
-  provider: string; // provider key in config
-  model: string; // model slug for that provider
-  config: ProviderConfig; // ProviderConfig
-  modelConfig?: ModelProviderConfig; // Per-provider, per-model config
-  modelArchitecture?: ModelArchitecture; // Alias-level model architecture override
-  incomingModelAlias?: string; // The alias requested by the user
-  canonicalModel?: string; // The canonical alias key in config
+  provider: string;
+  model: string;
+  config: ProviderConfig;
+  modelConfig?: ModelProviderConfig;
+  modelArchitecture?: ModelArchitecture;
+  incomingModelAlias?: string;
+  canonicalModel?: string;
+}
+
+function findAlias(config: ReturnType<typeof getConfig>, modelName: string) {
+  let alias = config.models?.[modelName];
+  let canonicalModel = modelName;
+
+  if (!alias && config.models) {
+    for (const [key, value] of Object.entries(config.models)) {
+      if (value.additional_aliases?.includes(modelName)) {
+        alias = value;
+        canonicalModel = key;
+        break;
+      }
+    }
+  }
+  return { alias, canonicalModel };
+}
+
+async function filterGroupTargets(
+  groupTargets: ModelTarget[],
+  config: ReturnType<typeof getConfig>,
+  alias: ModelConfig,
+  incomingApiType?: string,
+  logModelName?: string
+): Promise<EnrichedModelTarget[]> {
+  if (groupTargets.length === 0) return [];
+
+  // 1. Filter out disabled targets and disabled providers
+  const enabledTargets = groupTargets.filter((target) => {
+    if (target.enabled === false) return false;
+    const providerConfig = config.providers[target.provider];
+    return providerConfig && providerConfig.enabled !== false;
+  });
+
+  if (enabledTargets.length === 0) return [];
+
+  // 2. Cooldown filter
+  const cooldownExempt = enabledTargets.filter(
+    (t) => config.providers[t.provider]?.disable_cooldown === true
+  );
+  const cooldownEligible = enabledTargets.filter(
+    (t) => config.providers[t.provider]?.disable_cooldown !== true
+  );
+
+  const healthyEligible =
+    await CooldownManager.getInstance().filterHealthyTargets(cooldownEligible);
+
+  if (logModelName) {
+    if (healthyEligible.length < cooldownEligible.length) {
+      logger.warn(
+        `Router: ${cooldownEligible.length - healthyEligible.length} target(s) for '${logModelName}' were filtered out due to cooldowns.`
+      );
+    }
+    if (cooldownExempt.length > 0) {
+      logger.debug(
+        `Router: ${cooldownExempt.length} target(s) for '${logModelName}' bypassed cooldown check (disable_cooldown=true).`
+      );
+    }
+  }
+
+  let healthyTargets = [...healthyEligible, ...cooldownExempt];
+
+  if (healthyTargets.length === 0) return [];
+
+  // 3. Embeddings type filter
+  if (incomingApiType === 'embeddings') {
+    const embeddingsTargets = healthyTargets.filter((target) => {
+      const providerConfig = config.providers[target.provider];
+      if (!providerConfig) return false;
+
+      if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+        const modelConfig = providerConfig.models[target.model];
+        if (modelConfig?.type === 'embeddings') return true;
+        if (modelConfig?.type === 'chat') return false;
+      }
+
+      if (alias.type === 'embeddings') return true;
+      return getProviderTypes(providerConfig).includes('embeddings');
+    });
+
+    if (embeddingsTargets.length > 0) {
+      if (logModelName) {
+        logger.info(
+          `Router: Filtered to ${embeddingsTargets.length} embeddings-compatible targets (from ${healthyTargets.length} total).`
+        );
+      }
+      healthyTargets = embeddingsTargets;
+    } else if (logModelName) {
+      logger.warn(
+        `Router: No embeddings-compatible targets found for '${logModelName}'. Falling back to all healthy targets.`
+      );
+    }
+  }
+
+  // 4. API match filter
+  if (alias.priority === 'api_match' && incomingApiType) {
+    const normalizedIncoming = incomingApiType.toLowerCase();
+    const compatibleTargets = healthyTargets.filter((target) => {
+      const providerConfig = config.providers[target.provider];
+      if (!providerConfig) return false;
+
+      const providerTypes = getProviderTypes(providerConfig);
+      let modelSpecificTypes: string[] | undefined;
+      if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+        modelSpecificTypes = providerConfig.models[target.model]?.access_via;
+      }
+      const availableTypes = modelSpecificTypes || providerTypes;
+      return availableTypes.some((t) => t.toLowerCase() === normalizedIncoming);
+    });
+
+    if (compatibleTargets.length > 0) {
+      if (logModelName) {
+        logger.info(
+          `Router: 'api_match' priority active. Narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} API-compatible targets.`
+        );
+      }
+      healthyTargets = compatibleTargets;
+    } else if (logModelName) {
+      logger.info(
+        `Router: 'api_match' priority active, but no targets support '${incomingApiType}'. Falling back to all healthy targets.`
+      );
+    }
+  }
+
+  // 5. Enrich with modelConfig
+  return healthyTargets.map((target) => {
+    const providerConfig = config.providers[target.provider];
+    let modelConfig = undefined;
+    if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
+      modelConfig = providerConfig.models[target.model];
+    }
+    return { ...target, route: { modelConfig } };
+  });
+}
+
+async function selectOrderedTargets(
+  selectorType: string,
+  enrichedTargets: EnrichedModelTarget[]
+): Promise<ModelTarget[]> {
+  const selector = SelectorFactory.getSelector(selectorType);
+  const ordered: ModelTarget[] = [];
+  const remaining: EnrichedModelTarget[] = [...enrichedTargets];
+
+  while (remaining.length > 0) {
+    const selected = await selector.select(remaining);
+    if (!selected) break;
+    ordered.push(selected);
+
+    const idx = remaining.findIndex(
+      (t) => t.provider === selected.provider && t.model === selected.model
+    );
+    if (idx >= 0) {
+      remaining.splice(idx, 1);
+    } else {
+      remaining.shift();
+    }
+  }
+
+  for (const target of remaining) {
+    ordered.push(target);
+  }
+
+  return ordered;
 }
 
 export class Router {
@@ -27,193 +192,37 @@ export class Router {
     incomingApiType?: string
   ): Promise<RouteResult[]> {
     const config = getConfig();
+    const { alias, canonicalModel } = findAlias(config, modelName);
 
-    // Resolve canonical alias and additional aliases
-    let alias = config.models?.[modelName];
-    let canonicalModel = modelName;
-
-    if (!alias && config.models) {
-      for (const [key, value] of Object.entries(config.models)) {
-        if (value.additional_aliases?.includes(modelName)) {
-          alias = value;
-          canonicalModel = key;
-          break;
-        }
-      }
-    }
-
-    if (!alias || !alias.targets || alias.targets.length === 0) {
+    if (!alias || !alias.target_groups || alias.target_groups.length === 0) {
       return [];
     }
 
-    // Filter out disabled targets and disabled providers
-    const enabledTargets = alias.targets.filter((target) => {
-      if (target.enabled === false) {
-        return false;
-      }
-      const providerConfig = config.providers[target.provider];
-      return providerConfig && providerConfig.enabled !== false;
-    });
+    const orderedCandidates: RouteResult[] = [];
 
-    if (enabledTargets.length === 0) {
-      return [];
-    }
-
-    // Separate targets whose provider has cooldowns disabled (they always pass through)
-    const cooldownExemptTargets1 = enabledTargets.filter(
-      (t) => config.providers[t.provider]?.disable_cooldown === true
-    );
-    const cooldownEligibleTargets1 = enabledTargets.filter(
-      (t) => config.providers[t.provider]?.disable_cooldown !== true
-    );
-
-    const filteredEligible1 =
-      await CooldownManager.getInstance().filterHealthyTargets(cooldownEligibleTargets1);
-
-    if (filteredEligible1.length < cooldownEligibleTargets1.length) {
-      const filteredCount = cooldownEligibleTargets1.length - filteredEligible1.length;
-      logger.warn(
-        `Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`
+    for (const group of alias.target_groups) {
+      const enriched = await filterGroupTargets(
+        group.targets,
+        config,
+        alias,
+        incomingApiType,
+        modelName
       );
-    }
 
-    if (cooldownExemptTargets1.length > 0) {
-      logger.debug(
-        `Router: ${cooldownExemptTargets1.length} target(s) for '${modelName}' bypassed cooldown check (disable_cooldown=true).`
-      );
-    }
+      if (enriched.length === 0) continue;
 
-    let healthyTargets = [...filteredEligible1, ...cooldownExemptTargets1];
+      const ordered = await selectOrderedTargets(group.selector, enriched);
 
-    if (healthyTargets.length === 0) {
-      return [];
-    }
-
-    // Filter targets based on model type when incoming API is embeddings
-    if (incomingApiType === 'embeddings') {
-      const embeddingsTargets = healthyTargets.filter((target) => {
+      for (const target of ordered) {
         const providerConfig = config.providers[target.provider];
-        if (!providerConfig) return false;
-
-        // Check if this specific model is marked as embeddings type
-        if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-          const modelConfig = providerConfig.models[target.model];
-          if (modelConfig?.type === 'embeddings') {
-            return true;
-          }
-          // If model has explicit type set to 'chat', exclude it
-          if (modelConfig?.type === 'chat') {
-            return false;
-          }
-        }
-
-        // Check if alias is marked as embeddings type
-        if (alias.type === 'embeddings') {
-          return true;
-        }
-
-        // Check if provider supports embeddings via URL
-        const providerTypes = getProviderTypes(providerConfig);
-        return providerTypes.includes('embeddings');
-      });
-
-      if (embeddingsTargets.length > 0) {
-        logger.info(
-          `Router: Filtered to ${embeddingsTargets.length} embeddings-compatible targets (from ${healthyTargets.length} total).`
-        );
-        healthyTargets = embeddingsTargets;
-      } else {
-        logger.warn(
-          `Router: No embeddings-compatible targets found for '${modelName}'. Falling back to all healthy targets.`
-        );
-      }
-    }
-
-    // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
-    if (alias.priority === 'api_match' && incomingApiType) {
-      const normalizedIncoming = incomingApiType.toLowerCase();
-
-      const compatibleTargets = healthyTargets.filter((target) => {
-        const providerConfig = config.providers[target.provider];
-        if (!providerConfig) return false;
-
-        const providerTypes = getProviderTypes(providerConfig);
-
-        let modelSpecificTypes: string[] | undefined = undefined;
-        if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-          modelSpecificTypes = providerConfig.models[target.model]?.access_via;
-        }
-
-        const availableTypes = modelSpecificTypes || providerTypes;
-        return availableTypes.some((t) => t.toLowerCase() === normalizedIncoming);
-      });
-
-      if (compatibleTargets.length > 0) {
-        logger.info(
-          `Router: 'api_match' priority active. Narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} API-compatible targets.`
-        );
-        healthyTargets = compatibleTargets;
-      } else {
-        logger.info(
-          `Router: 'api_match' priority active, but no targets support '${incomingApiType}'. Falling back to all healthy targets.`
-        );
-      }
-    }
-
-    const enrichedTargets: EnrichedModelTarget[] = healthyTargets.map((target) => {
-      const providerConfig = config.providers[target.provider];
-      let modelConfig = undefined;
-      if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
-        modelConfig = providerConfig.models[target.model];
-      }
-      return { ...target, route: { modelConfig } };
-    });
-
-    const selectorStrategy = alias.selector || 'random';
-    const selector = SelectorFactory.getSelector(selectorStrategy);
-
-    // Order targets according to selector strategy by repeatedly selecting from remaining candidates.
-    // This preserves selector priority while returning all candidates.
-    const orderedTargets: ModelTarget[] = [];
-    const remainingTargets: EnrichedModelTarget[] = [...enrichedTargets];
-
-    while (remainingTargets.length > 0) {
-      const selected = await selector.select(remainingTargets);
-      if (!selected) {
-        break;
-      }
-
-      orderedTargets.push(selected);
-
-      const selectedIndex = remainingTargets.findIndex(
-        (t) => t.provider === selected.provider && t.model === selected.model
-      );
-      if (selectedIndex >= 0) {
-        remainingTargets.splice(selectedIndex, 1);
-      } else {
-        // Defensive fallback to avoid infinite loop if selector returns a non-member target
-        remainingTargets.shift();
-      }
-    }
-
-    // Fallback if selector returns null early
-    for (const target of remainingTargets) {
-      orderedTargets.push(target);
-    }
-
-    return orderedTargets
-      .map((target) => {
-        const providerConfig = config.providers[target.provider];
-        if (!providerConfig) {
-          return null;
-        }
+        if (!providerConfig) continue;
 
         let modelConfig = undefined;
         if (!Array.isArray(providerConfig.models) && providerConfig.models) {
           modelConfig = providerConfig.models[target.model];
         }
 
-        return {
+        orderedCandidates.push({
           provider: target.provider,
           model: target.model,
           config: providerConfig,
@@ -221,222 +230,35 @@ export class Router {
           modelArchitecture: config.models?.[modelName]?.model_architecture,
           incomingModelAlias: modelName,
           canonicalModel,
-        } as RouteResult;
-      })
-      .filter((result): result is RouteResult => result !== null);
+        });
+      }
+    }
+
+    return orderedCandidates;
   }
 
   static async resolve(modelName: string, incomingApiType?: string): Promise<RouteResult> {
     const config = getConfig();
 
-    // 0. Check for direct provider/model syntax (e.g., "direct/stima/gemini-2.5-flash")
-    // Requires "direct/" prefix to avoid conflicts with model names containing slashes
+    // Direct routing bypass
     if (modelName.startsWith('direct/')) {
-      const withoutPrefix = modelName.substring(7); // Remove "direct/" prefix
-      const firstSlashIndex = withoutPrefix.indexOf('/');
-
-      if (firstSlashIndex === -1) {
-        throw new Error(
-          `Direct routing failed: Invalid format '${modelName}'. Expected 'direct/provider/model'`
-        );
-      }
-
-      const providerId = withoutPrefix.substring(0, firstSlashIndex);
-      const providerModel = withoutPrefix.substring(firstSlashIndex + 1);
-
-      // Validate that the provider exists
-      const providerConfig = config.providers[providerId];
-      if (!providerConfig) {
-        throw new Error(
-          `Direct routing failed: Provider '${providerId}' not found in configuration`
-        );
-      }
-
-      if (providerConfig.enabled === false) {
-        throw new Error(`Direct routing failed: Provider '${providerId}' is disabled`);
-      }
-
-      // Extract model config if available
-      let modelConfig = undefined;
-      if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-        modelConfig = providerConfig.models[providerModel];
-      }
-
-      logger.info(
-        `Router: Direct routing to '${providerId}/${providerModel}' (bypassing selector)`
-      );
-
-      return {
-        provider: providerId,
-        model: providerModel,
-        config: providerConfig,
-        modelConfig,
-        incomingModelAlias: modelName,
-        canonicalModel: modelName,
-      };
+      return Router.resolveDirect(modelName, config);
     }
 
-    // 1. Check aliases
-    let alias = config.models?.[modelName];
-    let canonicalModel = modelName;
+    const { alias, canonicalModel } = findAlias(config, modelName);
 
-    if (!alias) {
-      // Check additional aliases
-      if (config.models) {
-        for (const [key, value] of Object.entries(config.models)) {
-          if (value.additional_aliases?.includes(modelName)) {
-            alias = value;
-            canonicalModel = key;
-            break;
-          }
-        }
-      }
-    }
+    if (alias && alias.target_groups && alias.target_groups.length > 0) {
+      for (const group of alias.target_groups) {
+        const enriched = await filterGroupTargets(group.targets, config, alias, incomingApiType);
 
-    if (alias) {
-      // Load balancing: pick target using selector
-      const targets = alias.targets;
-      if (targets && targets.length > 0) {
-        // Filter out disabled targets and disabled providers
-        const enabledTargets = targets.filter((target) => {
-          // First check if the target itself is disabled
-          if (target.enabled === false) {
-            return false;
-          }
-          // Then check if the provider is disabled
-          const providerConfig = config.providers[target.provider];
-          return providerConfig && providerConfig.enabled !== false;
-        });
+        if (enriched.length === 0) continue;
 
-        if (enabledTargets.length === 0) {
-          throw new Error(`All targets for model alias '${modelName}' are disabled.`);
-        }
+        const selector = SelectorFactory.getSelector(group.selector);
+        const target = await selector.select(enriched);
 
-        // Separate targets whose provider has cooldowns disabled (they always pass through)
-        const cooldownExemptTargets2 = enabledTargets.filter(
-          (t) => config.providers[t.provider]?.disable_cooldown === true
-        );
-        const cooldownEligibleTargets2 = enabledTargets.filter(
-          (t) => config.providers[t.provider]?.disable_cooldown !== true
-        );
+        if (!target) continue;
 
-        const filteredEligible2 =
-          await CooldownManager.getInstance().filterHealthyTargets(cooldownEligibleTargets2);
-
-        if (filteredEligible2.length < cooldownEligibleTargets2.length) {
-          const filteredCount = cooldownEligibleTargets2.length - filteredEligible2.length;
-          logger.warn(
-            `Router: ${filteredCount} target(s) for '${modelName}' were filtered out due to cooldowns.`
-          );
-        }
-
-        if (cooldownExemptTargets2.length > 0) {
-          logger.debug(
-            `Router: ${cooldownExemptTargets2.length} target(s) for '${modelName}' bypassed cooldown check (disable_cooldown=true).`
-          );
-        }
-
-        let healthyTargets = [...filteredEligible2, ...cooldownExemptTargets2];
-
-        if (healthyTargets.length === 0) {
-          throw new Error(
-            `All providers for model alias '${modelName}' are currently on cooldown.`
-          );
-        }
-
-        // Filter targets based on model type when incoming API is embeddings
-        if (incomingApiType === 'embeddings') {
-          const embeddingsTargets = healthyTargets.filter((target) => {
-            const providerConfig = config.providers[target.provider];
-            if (!providerConfig) return false;
-
-            // Check if this specific model is marked as embeddings type
-            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-              const modelConfig = providerConfig.models[target.model];
-              if (modelConfig?.type === 'embeddings') {
-                return true;
-              }
-              // If model has explicit type set to 'chat', exclude it
-              if (modelConfig?.type === 'chat') {
-                return false;
-              }
-            }
-
-            // Check if alias is marked as embeddings type
-            if (alias.type === 'embeddings') {
-              return true;
-            }
-
-            // Check if provider supports embeddings via URL
-            const providerTypes = getProviderTypes(providerConfig);
-            return providerTypes.includes('embeddings');
-          });
-
-          if (embeddingsTargets.length > 0) {
-            logger.info(
-              `Router: Filtered to ${embeddingsTargets.length} embeddings-compatible targets (from ${healthyTargets.length} total).`
-            );
-            healthyTargets = embeddingsTargets;
-          } else {
-            logger.warn(
-              `Router: No embeddings-compatible targets found for '${modelName}'. Falling back to all healthy targets.`
-            );
-          }
-        }
-
-        // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
-        // If priority is 'api_match', try to narrow down healthy targets to those that support the incoming API type
-        if (alias.priority === 'api_match' && incomingApiType) {
-          const normalizedIncoming = incomingApiType.toLowerCase();
-
-          const compatibleTargets = healthyTargets.filter((target) => {
-            const providerConfig = config.providers[target.provider];
-            if (!providerConfig) return false;
-
-            // Get supported types for the provider (inferred from api_base_url)
-            const providerTypes = getProviderTypes(providerConfig);
-
-            // Supported types for this specific model
-            let modelSpecificTypes: string[] | undefined = undefined;
-            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-              modelSpecificTypes = providerConfig.models[target.model]?.access_via;
-            }
-
-            const availableTypes = modelSpecificTypes || providerTypes;
-            return availableTypes.some((t) => t.toLowerCase() === normalizedIncoming);
-          });
-
-          if (compatibleTargets.length > 0) {
-            logger.info(
-              `Router: 'api_match' priority active. Narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} API-compatible targets.`
-            );
-            healthyTargets = compatibleTargets;
-          } else {
-            logger.info(
-              `Router: 'api_match' priority active, but no targets support '${incomingApiType}'. Falling back to all healthy targets.`
-            );
-          }
-        }
-
-        // Enrich targets with modelConfig for selectors that need pricing info
-        const enrichedTargets = healthyTargets.map((target) => {
-          const providerConfig = config.providers[target.provider];
-          let modelConfig = undefined;
-          if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
-            modelConfig = providerConfig.models[target.model];
-          }
-          return { ...target, route: { modelConfig } };
-        });
-
-        const selectorStrategy = alias.selector || 'random'; // Default to random
-        const selector = SelectorFactory.getSelector(selectorStrategy);
-        const target = await selector.select(enrichedTargets);
-
-        if (!target) {
-          throw new Error(`No target selected for alias '${modelName}'`);
-        }
         const providerConfig = config.providers[target.provider];
-
         if (!providerConfig) {
           throw new Error(
             `Provider '${target.provider}' configured for alias '${modelName}' not found`
@@ -444,17 +266,16 @@ export class Router {
         }
 
         logger.info(
-          `Router: Selected '${target.provider}/${target.model}' using strategy '${selectorStrategy}'.`
+          `Router: Selected '${target.provider}/${target.model}' using strategy '${group.selector}'.`
+        );
+        logger.info(
+          `Router resolving ${modelName} (canonical: ${canonicalModel}). Target provider: ${target.provider}, Target model: ${target.model}`
         );
 
         let modelConfig = undefined;
         if (!Array.isArray(providerConfig.models) && providerConfig.models) {
           modelConfig = providerConfig.models[target.model];
         }
-
-        logger.info(
-          `Router resolving ${modelName} (canonical: ${canonicalModel}). Target provider: ${target.provider}, Target model: ${target.model}`
-        );
 
         return {
           provider: target.provider,
@@ -465,8 +286,52 @@ export class Router {
           canonicalModel,
         };
       }
+
+      throw new Error(`No healthy target selected for alias '${modelName}'`);
     }
 
     throw new Error(`Model '${modelName}' not found in configuration`);
+  }
+
+  private static resolveDirect(
+    modelName: string,
+    config: ReturnType<typeof getConfig>
+  ): RouteResult {
+    const withoutPrefix = modelName.substring(7);
+    const firstSlashIndex = withoutPrefix.indexOf('/');
+
+    if (firstSlashIndex === -1) {
+      throw new Error(
+        `Direct routing failed: Invalid format '${modelName}'. Expected 'direct/provider/model'`
+      );
+    }
+
+    const providerId = withoutPrefix.substring(0, firstSlashIndex);
+    const providerModel = withoutPrefix.substring(firstSlashIndex + 1);
+
+    const providerConfig = config.providers[providerId];
+    if (!providerConfig) {
+      throw new Error(`Direct routing failed: Provider '${providerId}' not found in configuration`);
+    }
+
+    if (providerConfig.enabled === false) {
+      throw new Error(`Direct routing failed: Provider '${providerId}' is disabled`);
+    }
+
+    let modelConfig = undefined;
+    if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+      modelConfig = providerConfig.models[providerModel];
+    }
+
+    logger.info(`Router: Direct routing to '${providerId}/${providerModel}' (bypassing selector)`);
+
+    return {
+      provider: providerId,
+      model: providerModel,
+      config: providerConfig,
+      modelConfig,
+      incomingModelAlias: modelName,
+      canonicalModel: modelName,
+    };
   }
 }

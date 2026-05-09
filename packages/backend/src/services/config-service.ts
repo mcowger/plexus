@@ -68,6 +68,24 @@ export class ConfigService {
   }
 
   /**
+   * One-time startup migration that rewrites legacy flat-format aliases into
+   * the grouped target format. After this runs, every alias row has
+   * targetGroups populated and every target row has groupName set.
+   *
+   * TODO(#target-groups-cleanup): remove this method after migration period.
+   */
+  async migrateLegacyTargetGroups(): Promise<string[]> {
+    const migrated = await this.repo.migrateLegacyTargetGroups();
+    if (migrated.length > 0) {
+      logger.info(
+        `Migrated ${migrated.length} legacy aliases to target groups: ${migrated.join(', ')}`
+      );
+      await this.rebuildCache();
+    }
+    return migrated;
+  }
+
+  /**
    * Returns the cached PlexusConfig (same shape as the old getConfig()).
    * Throws if initialize() hasn't been called yet.
    */

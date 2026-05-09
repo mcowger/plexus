@@ -3,7 +3,7 @@ import { getDatabase, getSchema } from '../db/client';
 import { lt, eq, sql, and, desc } from 'drizzle-orm';
 import { getConfig } from '../config';
 
-interface Target {
+export interface Target {
   provider: string;
   model: string;
 }
