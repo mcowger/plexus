@@ -361,13 +361,18 @@ export type AliasMetadata =
       overrides: MetadataOverrides & { name: string };
     };
 
+export interface AliasTargetGroup {
+  name: string;
+  selector: string;
+  targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
+}
+
 export interface Alias {
   id: string;
   aliases?: string[];
-  selector?: string;
   priority?: 'selector' | 'api_match';
   type?: 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses';
-  targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
+  target_groups: AliasTargetGroup[];
   advanced?: AliasBehavior[];
   metadata?: AliasMetadata;
   use_image_fallthrough?: boolean;
@@ -1826,7 +1831,10 @@ export const api = {
       const affected: { aliasId: string; targetsCount: number }[] = [];
 
       for (const alias of aliases) {
-        const targetsCount = alias.targets.filter((t) => t.provider === providerId).length;
+        const targetsCount = alias.target_groups.reduce(
+          (sum, g) => sum + g.targets.filter((t) => t.provider === providerId).length,
+          0
+        );
         if (targetsCount > 0) {
           affected.push({ aliasId: alias.id, targetsCount });
         }
@@ -1841,7 +1849,6 @@ export const api = {
 
   saveAlias: async (alias: Alias, oldId?: string): Promise<void> => {
     const body: any = {
-      selector: alias.selector,
       priority: alias.priority || 'selector',
       additional_aliases: alias.aliases,
       use_image_fallthrough: alias.use_image_fallthrough || false,
@@ -1851,10 +1858,14 @@ export const api = {
       ...(alias.metadata && { metadata: alias.metadata }),
       // Model architecture override for inference energy calculation
       ...(alias.model_architecture && { model_architecture: alias.model_architecture }),
-      targets: alias.targets.map((t) => ({
-        provider: t.provider,
-        model: t.model,
-        ...(t.enabled === false && { enabled: false }),
+      target_groups: alias.target_groups.map((g) => ({
+        name: g.name,
+        selector: g.selector,
+        targets: g.targets.map((t) => ({
+          provider: t.provider,
+          model: t.model,
+          ...(t.enabled === false && { enabled: false }),
+        })),
       })),
     };
 
@@ -1929,42 +1940,40 @@ export const api = {
       const aliases: Alias[] = [];
 
       Object.entries(aliasMap).forEach(([key, val]) => {
-        const targets = (val.targets || []).map(
-          (t: { provider: string; model: string; enabled?: boolean }) => {
-            const providerConfig = providers[t.provider];
-
-            // Infer type from api_base_url if not explicitly provided
-            const inferredTypes =
-              providerConfig?.type || inferProviderTypes(providerConfig?.api_base_url);
-            let apiType: string | string[] = inferredTypes;
-
-            // Check for specific model config overrides (access_via)
-            if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
-              const modelConfig = providerConfig.models[t.model];
-              if (modelConfig && modelConfig.access_via && modelConfig.access_via.length > 0) {
-                apiType = modelConfig.access_via;
-              }
+        const readTarget = (t: any) => {
+          const providerConfig = providers[t.provider];
+          const inferredTypes =
+            providerConfig?.type || inferProviderTypes(providerConfig?.api_base_url);
+          let apiType: string | string[] = inferredTypes;
+          if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
+            const modelConfig = providerConfig.models[t.model];
+            if (modelConfig?.access_via?.length > 0) {
+              apiType = modelConfig.access_via;
             }
-
-            return {
-              provider: t.provider,
-              model: t.model,
-              apiType: Array.isArray(apiType) ? apiType : [apiType],
-              enabled: t.enabled !== false,
-            };
           }
-        );
+          return {
+            provider: t.provider,
+            model: t.model,
+            apiType: Array.isArray(apiType) ? apiType : [apiType],
+            enabled: t.enabled !== false,
+          };
+        };
+
+        const targetGroups: AliasTargetGroup[] = (val.target_groups || []).map((g: any) => ({
+          name: g.name || 'default',
+          selector: g.selector || 'random',
+          targets: (g.targets || []).map(readTarget),
+        }));
 
         aliases.push({
           id: key,
           aliases: val.additional_aliases || [],
-          selector: val.selector,
           priority: val.priority,
           type: val.type,
+          target_groups: targetGroups,
           use_image_fallthrough: val.use_image_fallthrough || false,
           enforce_limits: val.enforce_limits || false,
           advanced: val.advanced || [],
-          targets,
           metadata: val.metadata,
           model_architecture: val.model_architecture,
         });
