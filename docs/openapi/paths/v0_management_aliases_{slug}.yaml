@@ -37,9 +37,12 @@ put:
             summary: Chat model alias (with custom metadata)
             value:
               type: chat
-              targets:
-                - provider: openai
-                  model: gpt-4o
+              target_groups:
+                - name: default
+                  selector: random
+                  targets:
+                    - provider: openai
+                      model: gpt-4o
               input_price_per_million: 2.5
               output_price_per_million: 10
               metadata:
@@ -48,13 +51,38 @@ put:
                   name: GPT-4o
                   description: OpenAI GPT-4o flagship model
                   context_length: 128000
+          chat_alias_multi_group:
+            summary: Alias with multiple target groups
+            value:
+              type: chat
+              target_groups:
+                - name: subscription
+                  selector: e2e_performance
+                  targets:
+                    - provider: neuralwatt
+                      model: zai-org/GLM-5.1-FP8
+                    - provider: zenmux-sub
+                      model: z-ai/glm-5.1
+                - name: payg
+                  selector: cost
+                  targets:
+                    - provider: kilocode
+                      model: z-ai/glm-5.1
+                - name: backup
+                  selector: in_order
+                  targets:
+                    - provider: wisgate
+                      model: glm-5.1
           chat_alias_openrouter:
             summary: Chat model alias (OpenRouter catalog metadata)
             value:
               type: chat
-              targets:
-                - provider: openrouter
-                  model: openai/gpt-4o
+              target_groups:
+                - name: default
+                  selector: random
+                  targets:
+                    - provider: openrouter
+                      model: openai/gpt-4o
               metadata:
                 source: openrouter
                 source_path: openai/gpt-4o
@@ -62,9 +90,12 @@ put:
             summary: Embeddings model alias
             value:
               type: embeddings
-              targets:
-                - provider: openai
-                  model: text-embedding-3-small
+              target_groups:
+                - name: default
+                  selector: random
+                  targets:
+                    - provider: openai
+                      model: text-embedding-3-small
               input_price_per_million: 0.02
               output_price_per_million: 0
   responses:

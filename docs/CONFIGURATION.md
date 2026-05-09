@@ -163,16 +163,33 @@ A **model alias** is a virtual model name that clients use in requests. Each ali
 | **Slug** | Name clients send (e.g., `fast-model`) | Yes |
 | **Type** | `chat` (default), `embeddings`, `transcriptions`, `speech`, `image` | No |
 | **Additional Aliases** | Alternative names that also route here | No |
-| **Selector** | How to pick between targets | No |
 | **Priority** | Routing order: `selector` (default) or `api_match` | No |
-| **Targets** | List of provider/model pairs | Yes |
+| **Target Groups** | Ordered groups of targets, each with its own selector | Yes |
 | **Metadata** | External catalog for model info | No |
+
+### Target Groups
+
+Aliases contain one or more **target groups**. The dispatcher exhausts all healthy targets in group 1 before trying group 2, and so on. Each group has:
+
+- **Name** — Label for the group (e.g. `"subscription"`, `"payg"`, `"backup"`)
+- **Selector** — Strategy for ordering targets within this group
+- **Targets** — List of provider/model pairs in this group
+
+This allows you to organise targets by preference. For example:
+
+| Group | Name | Selector | Purpose |
+|-------|------|----------|---------|
+| 1 | `subscription` | `e2e_performance` | Use paid subscriptions first (sunk cost) |
+| 2 | `payg` | `cost` | Fall back to cheapest pay-as-you-go option |
+| 3 | `backup` | `in_order` | Last-resort backup target |
+
+If no groups are explicitly configured, all targets live in a single `default` group.
 
 ### Selector Strategies
 
 | Strategy | Behavior |
 |----------|----------|
-| `random` (default) | Distributes requests randomly across healthy targets |
+| `random` (default) | Distributes requests randomly across healthy targets in the group |
 | `in_order` | Tries targets in order, skips unhealthy ones |
 | `cost` | Routes to cheapest provider (requires pricing) |
 | `performance` | Routes to highest post-TTFT throughput (output tokens / streaming time) |
@@ -184,8 +201,8 @@ Use `performanceExplorationRate` (default 0.05) to occasionally explore other ta
 
 ### Priority Modes
 
-- **`selector` (default)**: Selector picks a provider first, then matches API format.
-- **`api_match`**: Filter for providers that natively support the incoming API format first, then apply selector. Best for tools requiring specific API features (e.g., Claude Code with Anthropic messages).
+- **`selector` (default)**: Selector picks a provider within each group first, then matches API format.
+- **`api_match`**: Filter targets to those whose provider supports the incoming API format first, then apply the group's selector. Best for tools requiring specific API features (e.g., Claude Code with Anthropic messages).
 
 ### Targets
 
