@@ -1,8 +1,7 @@
 type: object
 description: >
-  Full in-memory Plexus configuration. Mirrors the `plexus.yaml` file format
-  used for configuration. This is the authoritative reference for all runtime
-  settings.
+  Full in-memory Plexus configuration. This is the authoritative reference for all runtime
+  settings, stored in the database.
 additionalProperties: true
 properties:
   providers:

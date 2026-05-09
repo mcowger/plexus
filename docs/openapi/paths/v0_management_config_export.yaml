@@ -4,7 +4,7 @@ get:
   summary: Export the configuration as YAML (admin only)
   description: |
     Exports the full configuration as YAML — the same format used in
-    `plexus.yaml`.
+    the database.
 
     ## JSON vs YAML
 

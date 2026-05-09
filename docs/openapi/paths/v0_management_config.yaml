@@ -4,7 +4,7 @@ get:
   summary: Get the full in-memory configuration (admin only)
   description: |
     Returns the full Plexus configuration object as JSON. This is the
-    same structure that backs `plexus.yaml`.
+    same structure used by the database.
 
     ## JSON vs YAML
 

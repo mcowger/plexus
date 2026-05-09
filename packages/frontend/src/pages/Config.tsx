@@ -67,11 +67,13 @@ interface CooldownPolicy {
 interface ExplorationRates {
   performanceExplorationRate: number;
   latencyExplorationRate: number;
+  e2ePerformanceExplorationRate: number;
 }
 
 const DEFAULT_EXPLORATION_RATES: ExplorationRates = {
   performanceExplorationRate: 0.05,
   latencyExplorationRate: 0.05,
+  e2ePerformanceExplorationRate: 0.05,
 };
 
 const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
@@ -138,6 +140,7 @@ export const Config = () => {
   // Raw input strings for exploration rate fields
   const [explorationPerformanceInput, setExplorationPerformanceInput] = useState('');
   const [explorationLatencyInput, setExplorationLatencyInput] = useState('');
+  const [explorationE2EInput, setExplorationE2EInput] = useState('');
 
   // Validate exploration rate input (0 to 1)
   const validateExplorationInput = (
@@ -158,7 +161,9 @@ export const Config = () => {
 
   const perfValidation = validateExplorationInput(explorationPerformanceInput);
   const latValidation = validateExplorationInput(explorationLatencyInput);
-  const isExplorationValid = explorationLoaded && perfValidation.valid && latValidation.valid;
+  const e2eValidation = validateExplorationInput(explorationE2EInput);
+  const isExplorationValid =
+    explorationLoaded && perfValidation.valid && latValidation.valid && e2eValidation.valid;
 
   const loadFailoverPolicy = useCallback(async () => {
     try {
@@ -192,6 +197,7 @@ export const Config = () => {
       setExplorationRates(rates);
       setExplorationPerformanceInput(String(rates.performanceExplorationRate));
       setExplorationLatencyInput(String(rates.latencyExplorationRate));
+      setExplorationE2EInput(String(rates.e2ePerformanceExplorationRate));
       setExplorationLoaded(true);
     } catch (e) {
       console.error('Failed to load exploration rates:', e);
@@ -254,17 +260,19 @@ export const Config = () => {
   };
 
   const handleSaveExplorationRates = async () => {
-    if (!perfValidation.valid || !latValidation.valid) return;
+    if (!perfValidation.valid || !latValidation.valid || !e2eValidation.valid) return;
     setExplorationSaving(true);
     try {
       const updated = await api.patchExplorationRates({
         performanceExplorationRate: perfValidation.value!,
         latencyExplorationRate: latValidation.value!,
+        e2ePerformanceExplorationRate: e2eValidation.value!,
       });
 
       setExplorationRates(updated);
       setExplorationPerformanceInput(String(updated.performanceExplorationRate));
       setExplorationLatencyInput(String(updated.latencyExplorationRate));
+      setExplorationE2EInput(String(updated.e2ePerformanceExplorationRate));
       toast.success('Exploration rate settings saved');
     } catch (e) {
       toast.error((e as Error).message, 'Failed to save exploration rate settings');
@@ -746,7 +754,8 @@ export const Config = () => {
                 <p className="text-xs text-text-muted">
                   Exploration rate controls how often the selector picks a non-optimal provider to
                   discover better options. A value of 0 always selects the best-known provider; a
-                  value of 1 picks randomly. Applies to performance and latency selectors.
+                  value of 1 picks randomly. Applies to performance, latency, and e2e_performance
+                  selectors.
                 </p>
               </div>
             </div>
@@ -805,6 +814,37 @@ export const Config = () => {
                 />
                 {!latValidation.valid && explorationLatencyInput !== '' && (
                   <span className="text-xs text-warning">{latValidation.error}</span>
+                )}
+              </div>
+            </div>
+
+            {/* E2E Performance Exploration Rate */}
+            <div>
+              <label
+                htmlFor="e2ePerformanceExplorationRate"
+                className="block text-sm font-medium text-text mb-1"
+              >
+                E2E Performance Exploration Rate
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                The probability of exploring any provider when using the e2e_performance selector.
+                Unlike the performance selector, exploration includes all candidates (including the
+                current best) to keep end-to-end metrics fresh. Defaults to the Performance
+                Exploration Rate if not explicitly set.
+              </p>
+              <div className="flex flex-col gap-1">
+                <input
+                  id="e2ePerformanceExplorationRate"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={explorationE2EInput}
+                  onChange={(e) => setExplorationE2EInput(e.target.value)}
+                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                {!e2eValidation.valid && explorationE2EInput !== '' && (
+                  <span className="text-xs text-warning">{e2eValidation.error}</span>
                 )}
               </div>
             </div>

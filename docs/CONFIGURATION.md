@@ -1,6 +1,6 @@
 # Configuration
 
-Plexus stores all configuration in the database and manages it via the **Admin UI** (recommended) or **Management API**. On first launch with an existing `plexus.yaml` file, Plexus imports it; afterward, use the UI or API to make changes.
+Plexus stores all configuration in the database and manages it via the **Admin UI** (recommended) or **Management API**.
 
 **Environment variables** control server-level settings. Everything else (providers, models, keys, quotas) is stored in the database.
 
@@ -163,28 +163,46 @@ A **model alias** is a virtual model name that clients use in requests. Each ali
 | **Slug** | Name clients send (e.g., `fast-model`) | Yes |
 | **Type** | `chat` (default), `embeddings`, `transcriptions`, `speech`, `image` | No |
 | **Additional Aliases** | Alternative names that also route here | No |
-| **Selector** | How to pick between targets | No |
 | **Priority** | Routing order: `selector` (default) or `api_match` | No |
-| **Targets** | List of provider/model pairs | Yes |
+| **Target Groups** | Ordered groups of targets, each with its own selector | Yes |
 | **Metadata** | External catalog for model info | No |
+
+### Target Groups
+
+Aliases contain one or more **target groups**. The dispatcher exhausts all healthy targets in group 1 before trying group 2, and so on. Each group has:
+
+- **Name** — Label for the group (e.g. `"subscription"`, `"payg"`, `"backup"`)
+- **Selector** — Strategy for ordering targets within this group
+- **Targets** — List of provider/model pairs in this group
+
+This allows you to organise targets by preference. For example:
+
+| Group | Name | Selector | Purpose |
+|-------|------|----------|---------|
+| 1 | `subscription` | `e2e_performance` | Use paid subscriptions first (sunk cost) |
+| 2 | `payg` | `cost` | Fall back to cheapest pay-as-you-go option |
+| 3 | `backup` | `in_order` | Last-resort backup target |
+
+If no groups are explicitly configured, all targets live in a single `default` group.
 
 ### Selector Strategies
 
 | Strategy | Behavior |
 |----------|----------|
-| `random` (default) | Distributes requests randomly across healthy targets |
+| `random` (default) | Distributes requests randomly across healthy targets in the group |
 | `in_order` | Tries targets in order, skips unhealthy ones |
 | `cost` | Routes to cheapest provider (requires pricing) |
-| `performance` | Routes to highest tokens/sec (based on recent requests) |
+| `performance` | Routes to highest post-TTFT throughput (output tokens / streaming time) |
 | `latency` | Routes to lowest time-to-first-token |
 | `usage` | Routes to provider with least recent usage (last 24 hours) |
+| `e2e_performance` | Routes to highest end-to-end throughput (output tokens / total request time) |
 
-Use `performanceExplorationRate` (default 0.05) to occasionally explore other targets and prevent locking onto one provider. Applies to `performance` and `latency` selectors. `latencyExplorationRate` can be set separately for the latency selector (defaults to `performanceExplorationRate` if not specified).
+Use `performanceExplorationRate` (default 0.05) to occasionally explore other targets and prevent locking onto one provider. Applies to `performance`, `latency`, and `e2e_performance` selectors. `latencyExplorationRate` and `e2ePerformanceExplorationRate` can be set separately for their respective selectors (each defaults to `performanceExplorationRate` if not specified). Unlike `performance`, the `e2e_performance` selector explores across all candidates including the current best, ensuring end-to-end metrics stay fresh for every provider.
 
 ### Priority Modes
 
-- **`selector` (default)**: Selector picks a provider first, then matches API format.
-- **`api_match`**: Filter for providers that natively support the incoming API format first, then apply selector. Best for tools requiring specific API features (e.g., Claude Code with Anthropic messages).
+- **`selector` (default)**: Selector picks a provider within each group first, then matches API format.
+- **`api_match`**: Filter targets to those whose provider supports the incoming API format first, then apply the group's selector. Best for tools requiring specific API features (e.g., Claude Code with Anthropic messages).
 
 ### Targets
 
@@ -417,48 +435,33 @@ Configure pricing to enable `cost` selector strategy, cost-based quotas, and usa
 
 ### Simple Pricing
 
-```yaml
-input: 3.00    # dollars per million input tokens
-output: 15.00  # dollars per million output tokens
-cached: 0.30   # cache read (optional)
-cache_write: 3.75  # cache write (optional)
-```
+Configure via Admin UI or API:
+- `input`: dollars per million input tokens (e.g., `3.00`)
+- `output`: dollars per million output tokens (e.g., `15.00`)
+- `cached`: cache read rate (optional)
+- `cache_write`: cache write rate (optional)
 
 ### OpenRouter Pricing
 
-Fetches live rates from OpenRouter. Set the model `slug` and optional `discount`:
-
-```yaml
-source: openrouter
-slug: anthropic/claude-3.5-sonnet
-discount: 0.1  # 10% off all rates
-```
+Fetches live rates from OpenRouter. Configure via Admin UI or API:
+- Set source to `openrouter`
+- Set model `slug` (e.g., `anthropic/claude-3.5-sonnet`)
+- Optional `discount` for percentage off all rates
 
 ### Tiered Pricing
 
-Useful for providers with volume discounts:
+Useful for providers with volume discounts. Configure tiers via Admin UI or API:
 
-```yaml
-source: defined
-range:
-  - lower_bound: 0
-    upper_bound: 200000
-    input_per_m: 3.00
-    output_per_m: 15.00
-  - lower_bound: 200001
-    upper_bound: .inf
-    input_per_m: 1.50
-    output_per_m: 7.50
-```
+| Lower Bound | Upper Bound | Input Rate | Output Rate |
+|-------------|-------------|------------|-------------|
+| 0 | 200,000 | $3.00/M | $15.00/M |
+| 200,001 | ∞ (infinity) | $1.50/M | $7.50/M |
 
 ### Per-Request Pricing
 
-Flat fee regardless of token count:
-
-```yaml
-source: per_request
-amount: 0.04
-```
+Flat fee regardless of token count. Configure via Admin UI or API:
+- Set source to `per_request`
+- Set `amount` (e.g., `0.04`)
 
 Full cost stored in `costInput`; output/cached fields are zero.
 

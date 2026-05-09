@@ -55,6 +55,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create working branch
+        run: |
+          BRANCH="pi-agent/$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          echo "WORKING_BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
       - name: Configure Git identity
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

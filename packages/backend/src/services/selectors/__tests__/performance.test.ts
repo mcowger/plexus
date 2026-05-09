@@ -49,9 +49,12 @@ describe('PerformanceSelector', () => {
     setConfigForTesting(makeConfig(0));
 
     mockGetProviderPerformance.mockImplementation((provider, model) => {
-      if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 10 }]);
-      if (provider === 'p2') return Promise.resolve([{ avg_tokens_per_sec: 50 }]); // Fastest
-      if (provider === 'p3') return Promise.resolve([{ avg_tokens_per_sec: 20 }]);
+      if (provider === 'p1')
+        return Promise.resolve([{ target_model: 'm1', avg_tokens_per_sec: 10 }]);
+      if (provider === 'p2')
+        return Promise.resolve([{ target_model: 'm2', avg_tokens_per_sec: 50 }]); // Fastest
+      if (provider === 'p3')
+        return Promise.resolve([{ target_model: 'm3', avg_tokens_per_sec: 20 }]);
       return Promise.resolve([]);
     });
 
@@ -67,7 +70,8 @@ describe('PerformanceSelector', () => {
 
   it('should handle targets with no performance data (0 tps)', async () => {
     mockGetProviderPerformance.mockImplementation((provider, model) => {
-      if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 10 }]);
+      if (provider === 'p1')
+        return Promise.resolve([{ target_model: 'm1', avg_tokens_per_sec: 10 }]);
       if (provider === 'p2') return Promise.resolve([]); // No data -> 0
       return Promise.resolve([]);
     });
@@ -98,8 +102,10 @@ describe('PerformanceSelector', () => {
       setConfigForTesting(makeConfig(0));
 
       mockGetProviderPerformance.mockImplementation((provider, model) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 100 }]); // Fastest
-        if (provider === 'p2') return Promise.resolve([{ avg_tokens_per_sec: 50 }]);
+        if (provider === 'p1')
+          return Promise.resolve([{ target_model: 'm1', avg_tokens_per_sec: 100 }]); // Fastest
+        if (provider === 'p2')
+          return Promise.resolve([{ target_model: 'm2', avg_tokens_per_sec: 50 }]);
         return Promise.resolve([]);
       });
 
@@ -115,13 +121,20 @@ describe('PerformanceSelector', () => {
       }
     });
 
-    it('should explore non-best targets when exploration rate is 1', async () => {
+    it('should explore unseen targets first when exploration rate is 1', async () => {
       setConfigForTesting(makeConfig(1));
 
+      // p1 and p2 have data; p3 has no data yet
       mockGetProviderPerformance.mockImplementation((provider, model) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 100 }]); // Fastest
-        if (provider === 'p2') return Promise.resolve([{ avg_tokens_per_sec: 50 }]);
-        if (provider === 'p3') return Promise.resolve([{ avg_tokens_per_sec: 25 }]);
+        if (provider === 'p1')
+          return Promise.resolve([
+            { target_model: 'm1', avg_tokens_per_sec: 100, sample_count: 10, last_updated: 1000 },
+          ]);
+        if (provider === 'p2')
+          return Promise.resolve([
+            { target_model: 'm2', avg_tokens_per_sec: 50, sample_count: 10, last_updated: 2000 },
+          ]);
+        if (provider === 'p3') return Promise.resolve([]); // No data
         return Promise.resolve([]);
       });
 
@@ -131,11 +144,10 @@ describe('PerformanceSelector', () => {
         { provider: 'p3', model: 'm3' },
       ];
 
-      // With rate=1, should never select fastest (p1)
+      // With rate=1, exploration always fires; p3 has no data so it should always be picked
       for (let i = 0; i < 10; i++) {
         const selected = await selector.select(targets);
-        expect(selected).not.toEqual(targets[0]!); // Never selects p1
-        expect([targets[1]!, targets[2]!]).toContain(selected!); // Always selects p2 or p3
+        expect(selected).toEqual(targets[2]!); // p3 has no data, always explored first
       }
     });
 
@@ -146,9 +158,16 @@ describe('PerformanceSelector', () => {
       };
       setConfigForTesting(config);
 
+      // p1 has recent data; p2 has older data (stalest, should be explored)
       mockGetProviderPerformance.mockImplementation((provider, model) => {
-        if (provider === 'p1') return Promise.resolve([{ avg_tokens_per_sec: 100 }]); // Fastest
-        if (provider === 'p2') return Promise.resolve([{ avg_tokens_per_sec: 50 }]);
+        if (provider === 'p1')
+          return Promise.resolve([
+            { target_model: 'm1', avg_tokens_per_sec: 100, sample_count: 5, last_updated: 2000 },
+          ]); // Fastest
+        if (provider === 'p2')
+          return Promise.resolve([
+            { target_model: 'm2', avg_tokens_per_sec: 50, sample_count: 5, last_updated: 1000 },
+          ]); // Stalest
         return Promise.resolve([]);
       });
 
@@ -157,13 +176,12 @@ describe('PerformanceSelector', () => {
         { provider: 'p2', model: 'm2' },
       ];
 
-      // Deterministic assertions for default exploration behavior (0.05)
       const originalRandom = Math.random;
       try {
-        // Explore path: 0.01 < 0.05, should pick non-best target
+        // Explore path: 0.01 < 0.05, should pick stalest target (p2)
         Math.random = () => 0.01;
         const explored = await selector.select(targets);
-        expect(explored).toEqual(targets[1]!);
+        expect(explored).toEqual(targets[1]!); // p2 is stalest
 
         // Non-explore path: 0.99 >= 0.05, should pick best target
         Math.random = () => 0.99;

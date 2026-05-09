@@ -11,6 +11,7 @@ export const modelAliasTargets = sqliteTable(
     providerSlug: text('provider_slug').notNull(),
     modelName: text('model_name').notNull(),
     enabled: integer('enabled').notNull().default(1),
+    groupName: text('group_name'), // target group label
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({

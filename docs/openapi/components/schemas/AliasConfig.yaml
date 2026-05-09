@@ -1,32 +1,57 @@
 type: object
 required:
-  - targets
+  - target_groups
 description: >
   Model alias configuration. Maps a client-facing model name to one or
-  more provider targets. Corresponds to entries in `plexus.yaml` `models`
-  section.
+  more provider targets, organised into ordered target groups.
+  Stored in the database.
 properties:
-  targets:
+  target_groups:
     type: array
+    minItems: 1
     items:
       type: object
       required:
-        - provider
-        - model
+        - name
+        - selector
+        - targets
       properties:
-        provider:
+        name:
           type: string
-          description: Provider slug this target routes to.
-        model:
+          description: Group label (e.g. "subscription", "payg", "backup").
+        selector:
           type: string
-          description: Model ID to request from the provider.
-        enabled:
-          type: boolean
-          default: true
-          description: When false, this target is skipped during dispatch.
+          enum:
+            - random
+            - in_order
+            - cost
+            - latency
+            - usage
+            - performance
+            - e2e_performance
+          description: Selection strategy for this group.
+        targets:
+          type: array
+          items:
+            type: object
+            required:
+              - provider
+              - model
+            properties:
+              provider:
+                type: string
+                description: Provider slug this target routes to.
+              model:
+                type: string
+                description: Model ID to request from the provider.
+              enabled:
+                type: boolean
+                default: true
+                description: When false, this target is skipped during dispatch.
     description: >
-      Ordered list of provider/model targets. The dispatcher tries them in
-      order for failover. At least one target is required.
+      Ordered list of target groups. The dispatcher exhausts all healthy
+      targets in group N before trying group N+1. At least one group is
+      required.
   type:
     type: string
     enum:
@@ -47,24 +72,6 @@ properties:
       - **transcriptions** — OpenAI Audio Transcriptions.
       - **speech** — OpenAI Audio Speech.
       - **image** — OpenAI Images generation/edit.
-  selector:
-    type: string
-    enum:
-      - random
-      - in_order
-      - cost
-      - latency
-      - usage
-      - performance
-    description: >
-      Target selection strategy when multiple targets are configured.
-
-      - **random** — Pick a target at random.
-      - **in_order** — Try targets sequentially; first healthy one wins (default behaviour).
-      - **cost** — Prefer the cheapest target based on pricing configuration.
-      - **latency** — Prefer the lowest-latency target based on recent TTFT data.
-      - **usage** — Distribute load proportionally across targets.
-      - **performance** — Prefer the target with the best throughput.
   priority:
     type: string
     enum:
@@ -72,9 +79,9 @@ properties:
       - api_match
     default: selector
     description: >
-      Controls how the `selector` interacts with API-type matching.
+      Controls how selectors interact with API-type matching.
 
-      - **selector** — Apply the selector across all targets regardless of API type.
+      - **selector** — Apply each group's selector across its targets regardless of API type.
       - **api_match** — Filter targets to those whose provider supports the
         requested API type first, then apply the selector.
   additional_aliases:

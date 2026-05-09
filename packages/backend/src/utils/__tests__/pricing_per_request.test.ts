@@ -280,31 +280,36 @@ describe('handleResponse - per_request pricing', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Config schema validation tests — ensures the YAML/Zod schema accepts and
+// Config schema validation tests — ensures the Zod schema accepts and
 // rejects per_request pricing configs correctly.
 // ---------------------------------------------------------------------------
 
 describe('config schema - per_request pricing', () => {
-  const baseConfig = `
-providers:
-  test-provider:
-    api_base_url: https://api.example.com/v1/chat/completions
-    api_key: sk-test
-    models:
-      test-model:
-        pricing:
-          source: per_request
-          amount: 0.002
-        access_via: []
-models:
-  test-alias:
-    targets:
-      - provider: test-provider
-        model: test-model
-keys:
-  user1:
-    secret: sk-user1
-`;
+  const baseConfig = JSON.stringify({
+    providers: {
+      'test-provider': {
+        api_base_url: 'https://api.example.com/v1/chat/completions',
+        api_key: 'sk-test',
+        models: {
+          'test-model': {
+            pricing: {
+              source: 'per_request',
+              amount: 0.002,
+            },
+            access_via: [],
+          },
+        },
+      },
+    },
+    models: {
+      'test-alias': {
+        targets: [{ provider: 'test-provider', model: 'test-model' }],
+      },
+    },
+    keys: {
+      user1: { secret: 'sk-user1' },
+    },
+  });
 
   test('accepts a valid per_request pricing config', () => {
     expect(() => validateConfig(baseConfig)).not.toThrow();
@@ -318,17 +323,45 @@ keys:
   });
 
   test('rejects per_request pricing with negative amount', () => {
-    const badConfig = baseConfig.replace('amount: 0.002', 'amount: -1');
+    const badConfig = JSON.stringify({
+      ...JSON.parse(baseConfig),
+      providers: {
+        'test-provider': {
+          ...JSON.parse(baseConfig).providers['test-provider'],
+          models: {
+            'test-model': {
+              pricing: { source: 'per_request', amount: -1 },
+              access_via: [],
+            },
+          },
+        },
+      },
+    });
     expect(() => validateConfig(badConfig)).toThrow();
   });
 
   test('rejects per_request pricing with missing amount', () => {
-    const badConfig = baseConfig.replace('          amount: 0.002\n', '');
+    const badConfig = JSON.stringify({
+      ...JSON.parse(baseConfig),
+      providers: {
+        'test-provider': {
+          ...JSON.parse(baseConfig).providers['test-provider'],
+          models: {
+            'test-model': {
+              pricing: { source: 'per_request' },
+              access_via: [],
+            },
+          },
+        },
+      },
+    });
     expect(() => validateConfig(badConfig)).toThrow();
   });
 
   test('accepts a zero amount (free model)', () => {
-    const freeConfig = baseConfig.replace('amount: 0.002', 'amount: 0');
+    const parsed = JSON.parse(baseConfig);
+    parsed.providers['test-provider'].models['test-model'].pricing.amount = 0;
+    const freeConfig = JSON.stringify(parsed);
     expect(() => validateConfig(freeConfig)).not.toThrow();
   });
 });

@@ -6,7 +6,7 @@ get:
     Returns a map of all model aliases keyed by slug.
 
     Each entry contains:
-    - `targets` — Array of provider/model targets to route to
+    - `target_groups` — Ordered array of target groups; each group has a name, selector, and targets
     - `type` — Inference API type (chat, messages, responses, etc.)
     - `model_architecture` — Used for energy estimation (kWh calculation)
     - `metadata` — Optional enriched data from external catalogs

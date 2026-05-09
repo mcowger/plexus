@@ -80,6 +80,11 @@ function isSQLiteAlreadyExistsError(error: any): boolean {
   return error?.cause?.name === 'SQLiteError' && msg.includes('already exists');
 }
 
+function isSQLiteDuplicateColumnError(error: any): boolean {
+  const msg = (error?.cause?.message ?? '').toLowerCase();
+  return error?.cause?.name === 'SQLiteError' && msg.includes('duplicate column name');
+}
+
 function toIdempotentStatement(statement: string): string {
   if (
     /ALTER\s+TABLE[\s\S]+ADD\s+COLUMN/i.test(statement) &&
@@ -92,14 +97,24 @@ function toIdempotentStatement(statement: string): string {
 
 // Make a SQLite DDL statement idempotent by inserting IF NOT EXISTS guards.
 // Only handles CREATE TABLE and CREATE [UNIQUE] INDEX — ALTER TABLE ADD COLUMN
-// is left unchanged because ADD COLUMN IF NOT EXISTS requires SQLite 3.37.0+
-// and may not be available in all compiled binaries. Duplicate-column errors
-// from ALTER TABLE are instead caught and ignored in the caller.
+// is left unchanged because bun:sqlite doesn't support ADD COLUMN IF NOT EXISTS
+// (despite underlying SQLite supporting it). Duplicate-column errors are caught
+// and handled in the catch block via the repair function.
 function toIdempotentSQLiteStatement(statement: string): string {
   let s = statement;
   s = s.replace(/(CREATE\s+TABLE\s+)(`[\w]+`|\w+)/i, '$1IF NOT EXISTS $2');
   s = s.replace(/(CREATE\s+(?:UNIQUE\s+)?INDEX\s+)(`[\w]+`|\w+)/i, '$1IF NOT EXISTS $2');
   return s;
+}
+
+function isSQLiteDuplicateColumnName(cause: any): boolean {
+  const msg = (cause?.message ?? '').toLowerCase();
+  return cause?.name === 'SQLiteError' && msg.includes('duplicate column name');
+}
+
+function getSQLiteDuplicateColumnName(cause: any): string | null {
+  const match = (cause?.message ?? '').match(/duplicate column name:\s*[`']?(\w+)[`']?/i);
+  return match ? match[1]! : null;
 }
 
 function attemptSQLiteAlreadyExistsRepair(
@@ -148,7 +163,8 @@ function attemptSQLiteAlreadyExistsRepair(
     const alreadyApplied = sqlite
       .query(`SELECT id FROM ${DRIZZLE_MIGRATIONS_TABLE} WHERE hash = ?`)
       .get(migration.hash);
-    if (alreadyApplied) continue;
+    // Check id is not null - row exists with matching hash
+    if (alreadyApplied && alreadyApplied.id !== null) continue;
 
     logger.warn(
       `Detected SQLite "already exists" migration drift in ${entry.tag}; applying idempotent repair`
@@ -167,6 +183,79 @@ function attemptSQLiteAlreadyExistsRepair(
 
     // alreadyApplied check above ensures we only reach here when the migration
     // isn't tracked yet, so a plain INSERT is safe.
+    sqlite
+      .prepare(`INSERT INTO ${DRIZZLE_MIGRATIONS_TABLE} (hash, created_at) VALUES (?, ?)`)
+      .run(migration.hash, migration.folderMillis);
+
+    return true;
+  }
+
+  return false;
+}
+
+async function attemptSQLiteDuplicateColumnRepair(
+  db: any,
+  migrations: MigrationMeta[],
+  journal: Journal,
+  migrationError: any
+): Promise<boolean> {
+  const columnName = getSQLiteDuplicateColumnName(migrationError?.cause);
+  if (!columnName) return false;
+
+  // Reach the underlying Bun SQLite Database through the drizzle session
+  const sqlite = db?.session?.client;
+  if (!sqlite?.run) {
+    logger.warn(
+      'SQLite duplicate column repair skipped: could not access underlying Database client'
+    );
+    return false;
+  }
+
+  // Ensure migrations table exists
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS ${DRIZZLE_MIGRATIONS_TABLE} (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hash TEXT NOT NULL,
+      created_at INTEGER
+    )
+  `);
+
+  // Find the migration that adds this column
+  for (let i = 0; i < migrations.length; i++) {
+    const migration = migrations[i]!;
+    const statements = migration.sql.map((s) => s.trim()).filter((s) => s.length > 0);
+
+    // Check if this migration adds this column
+    const hasColumn = statements.some((s) => {
+      const lower = s.toLowerCase();
+      return lower.includes('add ') && lower.includes(`\`${columnName.toLowerCase()}\``);
+    });
+    if (!hasColumn) continue;
+
+    // This migration adds the column - now verify it uses ADD syntax (with or without COLUMN keyword)
+    const addColumnStmt = statements.find((s) => {
+      const lower = s.toLowerCase();
+      return (
+        (lower.replace(/\s+/g, ' ').includes('add column') || /\badd\b/i.test(s)) &&
+        lower.includes(`\`${columnName.toLowerCase()}\``)
+      );
+    });
+    if (!addColumnStmt) continue;
+
+    // Check if already recorded as applied
+    try {
+      const alreadyApplied = sqlite;
+      // Check id is not null - row exists with matching hash
+      if (alreadyApplied && alreadyApplied.id !== null) continue;
+    } catch {
+      // Table may not exist yet, ignore
+    }
+
+    logger.warn(
+      `Detected duplicate column "${columnName}" migration drift; marking migration as applied`
+    );
+
+    // Mark as applied
     sqlite
       .prepare(`INSERT INTO ${DRIZZLE_MIGRATIONS_TABLE} (hash, created_at) VALUES (?, ?)`)
       .run(migration.hash, migration.folderMillis);
@@ -273,10 +362,15 @@ export async function runMigrations() {
           migrationsFolder: '',
         });
       } catch (error: any) {
-        if (isSQLiteAlreadyExistsError(error)) {
-          const repaired = attemptSQLiteAlreadyExistsRepair(db, migrations, journal, error);
+        if (isSQLiteAlreadyExistsError(error) || isSQLiteDuplicateColumnError(error)) {
+          // Both "already exists" and "duplicate column name" indicate the schema
+          // has drifted (e.g. from a restored backup). Try to repair and retry.
+          let repaired = attemptSQLiteAlreadyExistsRepair(db, migrations, journal, error);
+          if (!repaired && isSQLiteDuplicateColumnError(error)) {
+            repaired = await attemptSQLiteDuplicateColumnRepair(db, migrations, journal, error);
+          }
           if (repaired) {
-            logger.warn('Retrying SQLite migrations after already-exists repair');
+            logger.warn('Retrying SQLite migrations after drift repair');
             (db as any).dialect.migrate(idempotentMigrations, (db as any).session, {
               migrationsFolder: '',
             });

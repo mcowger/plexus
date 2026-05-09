@@ -18,15 +18,15 @@ docker pull ghcr.io/mcowger/plexus:latest
 **Run the container:**
 ```bash
 docker run -p 4000:4000 \
-  -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
   -v plexus-data:/app/data \
+  -e ADMIN_KEY="your-admin-key" \
   -e DATABASE_URL=sqlite:///app/data/plexus.db \
   -e LOG_LEVEL=info \
   ghcr.io/mcowger/plexus:latest
 ```
 
--   Mount your configuration file to `/app/config/plexus.yaml`.
--   Mount a volume to `/app/data` to persist usage logs and other data.
+-   Mount a volume to `/app/data` to persist usage logs, configuration, and other data.
+-   `ADMIN_KEY` is required — set it to a secure password for accessing the admin dashboard and management API.
 -   `DATABASE_URL` is required — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string.
 -   Set `LOG_LEVEL` to control verbosity.
 
@@ -42,8 +42,8 @@ docker build -t plexus .
 **Run the container:**
 ```bash
 docker run -p 4000:4000 \
-  -v $(pwd)/config/plexus.yaml:/app/config/plexus.yaml \
   -v plexus-data:/app/data \
+  -e ADMIN_KEY="your-admin-key" \
   -e DATABASE_URL=sqlite:///app/data/plexus.db \
   -e LOG_LEVEL=info \
   plexus
@@ -108,13 +108,15 @@ plexus.exe
 
 3. **Start Development Stack**:
    ```bash
-   DATABASE_URL=sqlite://./data/plexus.db bun run dev
+   ADMIN_KEY="your-admin-key" DATABASE_URL=sqlite://./data/plexus.db bun run dev
    ```
 
 ## Environment Variables
 
 When running Plexus, you can use the following environment variables to control its behavior:
 
+- **`ADMIN_KEY`** (**Required**): Password for the admin dashboard and management API.
+    - Must be set before starting the server. Server will refuse to start without it.
 - **`DATABASE_URL`** (**Required**): Database connection string.
     - SQLite: `sqlite:///app/data/plexus.db` or `sqlite://./data/plexus.db`
     - PostgreSQL: `postgres://user:password@host:5432/dbname`
@@ -122,20 +124,19 @@ When running Plexus, you can use the following environment variables to control 
     - Generate with: `openssl rand -hex 32`
     - If not set, data is stored in plaintext. A warning is logged at startup.
     - See [Configuration: Encryption at Rest](CONFIGURATION.md#encryption-at-rest-optional) for details.
-- **`CONFIG_FILE`**: Path to the `plexus.yaml` configuration file.
-    - Default: `config/plexus.yaml` (relative to project root).
 - **`LOG_LEVEL`**: The verbosity of the server logs.
     - Supported values: `error`, `warn`, `info`, `debug`, `silly`.
     - Default: `info`.
     - Note: `silly` logs all request/response/transformations.
     - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
-- **`AUTH_JSON`** (Deprecated): Previously used to specify a path to OAuth credentials file. OAuth credentials are now stored in the database and managed through the Admin UI.
-    - This environment variable is no longer used and will be ignored.
+- **`PORT`** (Optional): HTTP server port. Default: `4000`
+- **`HOST`** (Optional): Address to bind to. Default: `0.0.0.0`
+- **`DATA_DIR`** (Optional): Directory for SQLite database. Default: `./data`
 
 ### Example Usage
 
 ```bash
-DATABASE_URL=sqlite://./data/plexus.db CONFIG_FILE=./my-config.yaml LOG_LEVEL=debug ./plexus
+ADMIN_KEY="your-secret" DATABASE_URL=sqlite://./data/plexus.db LOG_LEVEL=debug ./plexus
 ```
 
 ---

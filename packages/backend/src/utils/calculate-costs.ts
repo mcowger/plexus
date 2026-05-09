@@ -30,8 +30,20 @@ export function calculateCosts(
     cacheWriteCost = (cacheWriteTokens / 1_000_000) * (pricing.cache_write || 0);
     calculated = true;
 
+    const effectiveDiscount = pricing.discount ?? providerDiscount;
+    if (effectiveDiscount) {
+      const multiplier = 1 - effectiveDiscount;
+      inputCost *= multiplier;
+      outputCost *= multiplier;
+      cachedCost *= multiplier;
+      cacheWriteCost *= multiplier;
+    }
+
     usageRecord.costSource = 'simple';
-    usageRecord.costMetadata = JSON.stringify(pricing);
+    usageRecord.costMetadata = JSON.stringify({
+      ...pricing,
+      discount: effectiveDiscount,
+    });
   } else if (pricing.source === 'defined' && Array.isArray(pricing.range)) {
     const match = pricing.range.find((r: any) => {
       const lower = r.lower_bound ?? 0;
@@ -46,6 +58,15 @@ export function calculateCosts(
       cacheWriteCost = (cacheWriteTokens / 1_000_000) * (match.cache_write_per_m || 0);
       calculated = true;
 
+      const effectiveDiscount = pricing.discount ?? providerDiscount;
+      if (effectiveDiscount) {
+        const multiplier = 1 - effectiveDiscount;
+        inputCost *= multiplier;
+        outputCost *= multiplier;
+        cachedCost *= multiplier;
+        cacheWriteCost *= multiplier;
+      }
+
       usageRecord.costSource = 'defined';
       usageRecord.costMetadata = JSON.stringify({
         source: 'defined',
@@ -54,6 +75,7 @@ export function calculateCosts(
         cached: match.cached_per_m || 0,
         cache_write: match.cache_write_per_m || 0,
         range: match,
+        discount: effectiveDiscount,
       });
     }
   } else if (pricing.source === 'openrouter' && pricing.slug) {

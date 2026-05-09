@@ -41,6 +41,7 @@ interface RetryAttemptRecord {
   reason: string;
   statusCode?: number;
   retryable?: boolean;
+  providerResponseHeaders?: Record<string, string>;
 }
 
 interface ParseFailureContext {
@@ -190,6 +191,29 @@ export class Dispatcher {
     this.usageStorage = storage;
   }
 
+  private saveIntermediateError(requestId: string | undefined, apiType: string, error: any): void {
+    if (!this.usageStorage || !requestId) return;
+    this.usageStorage.saveError(requestId, error, {
+      apiType,
+      ...(error?.routingContext || {}),
+    });
+  }
+
+  /**
+   * Emit an early routing update so the frontend shows provider/model immediately.
+   * The route handler emits a second update after dispatch, but for non-streaming
+   * requests that can be seconds later — this one fires as soon as routing is done.
+   */
+  private emitRoutingUpdate(requestId: string | undefined, route: RouteResult): void {
+    if (!requestId || !this.usageStorage) return;
+    this.usageStorage.emitUpdatedAsync({
+      requestId,
+      provider: route.provider,
+      selectedModelName: route.model,
+      canonicalModelName: route.canonicalModel,
+    });
+  }
+
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
     const config = getConfig();
     const failover = config.failover;
@@ -301,6 +325,8 @@ export class Dispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
+      this.emitRoutingUpdate(currentRequest.requestId, route);
+
       try {
         // Determine Target API Type
         const { targetApiType, selectionReason } = this.selectTargetApiType(
@@ -372,6 +398,11 @@ export class Dispatcher {
                 visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
               await this.markOAuthProviderFailure(route, oauthError);
+              this.saveIntermediateError(
+                currentRequest.requestId,
+                targetApiType || 'chat',
+                oauthError
+              );
               logger.warn(
                 `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
               );
@@ -434,6 +465,7 @@ export class Dispatcher {
                   this.formatFailureReason(e, true)
                 );
               }
+              this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', e);
               logger.warn(
                 `Failover: retrying after HTTP ${response.status} from ${route.provider}/${route.model}`
               );
@@ -472,6 +504,7 @@ export class Dispatcher {
                 undefined,
                 this.formatFailureReason(error)
               );
+              this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', error);
               logger.warn(
                 `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
               );
@@ -563,6 +596,11 @@ export class Dispatcher {
         this.appendFailureAttempt(retryHistory, route, error, undefined, canRetryNetwork);
 
         if (canRetryNetwork) {
+          this.saveIntermediateError(
+            currentRequest.requestId,
+            error?.routingContext?.targetApiType || 'chat',
+            error
+          );
           logger.warn(
             `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
@@ -836,6 +874,7 @@ export class Dispatcher {
       reason,
       statusCode: typeof statusCode === 'number' ? statusCode : undefined,
       retryable,
+      providerResponseHeaders: error?.routingContext?.providerResponseHeaders,
     });
   }
 
@@ -2034,6 +2073,7 @@ export class Dispatcher {
       headers: this.sanitizeHeaders(headers || {}),
       statusCode: response.status,
       providerResponse: errorText,
+      providerResponseHeaders: this.extractResponseHeaders(response),
       cooldownTriggered: !isCallerError,
     };
 
@@ -2043,6 +2083,17 @@ export class Dispatcher {
     }
 
     throw error;
+  }
+
+  /**
+   * Extract all provider response headers from a fetch Response
+   */
+  private extractResponseHeaders(response: Response): Record<string, string> {
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    return headers;
   }
 
   /**
@@ -2217,6 +2268,8 @@ export class Dispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
+      this.emitRoutingUpdate(request.requestId, route);
+
       try {
         const baseUrl = this.resolveBaseUrl(route, 'embeddings');
         const url = `${baseUrl}/embeddings`;
@@ -2287,6 +2340,7 @@ export class Dispatcher {
                   this.formatFailureReason(e, true)
                 );
               }
+              this.saveIntermediateError(request.requestId, 'embeddings', e);
               logger.warn(
                 `Failover: retrying embeddings after HTTP ${response.status} from ${route.provider}/${route.model}`
               );
@@ -2348,6 +2402,7 @@ export class Dispatcher {
         this.appendFailureAttempt(retryHistory, route, error, 'embeddings', canRetryNetwork);
 
         if (canRetryNetwork) {
+          this.saveIntermediateError(request.requestId, 'embeddings', error);
           logger.warn(
             `Failover: retrying embeddings after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
@@ -2409,6 +2464,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'transcriptions');
@@ -2483,6 +2540,7 @@ export class Dispatcher {
                   this.formatFailureReason(e, true)
                 );
               }
+              this.saveIntermediateError(request.requestId, 'transcriptions', e);
               logger.warn(
                 `Failover: retrying transcription after HTTP ${response.status} from ${route.provider}/${route.model}`
               );
@@ -2551,6 +2609,7 @@ export class Dispatcher {
         this.appendFailureAttempt(retryHistory, route, error, 'transcriptions', canRetryNetwork);
 
         if (canRetryNetwork) {
+          this.saveIntermediateError(request.requestId, 'transcriptions', error);
           logger.warn(
             `Failover: retrying transcription after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
@@ -2611,6 +2670,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'speech');
@@ -2685,6 +2746,7 @@ export class Dispatcher {
                   this.formatFailureReason(e, true)
                 );
               }
+              this.saveIntermediateError(request.requestId, 'speech', e);
               logger.warn(
                 `Failover: retrying speech after HTTP ${response.status} from ${route.provider}/${route.model}`
               );
@@ -2718,6 +2780,7 @@ export class Dispatcher {
                 undefined,
                 error.message
               );
+              this.saveIntermediateError(request.requestId, 'speech', error);
               logger.warn(
                 `Failover: retrying speech stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
               );
@@ -2787,6 +2850,7 @@ export class Dispatcher {
         this.appendFailureAttempt(retryHistory, route, error, 'speech', canRetryNetwork);
 
         if (canRetryNetwork) {
+          this.saveIntermediateError(request.requestId, 'speech', error);
           logger.warn(
             `Failover: retrying speech after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
@@ -2848,6 +2912,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'images');
@@ -2921,6 +2987,7 @@ export class Dispatcher {
                   this.formatFailureReason(e, true)
                 );
               }
+              this.saveIntermediateError(request.requestId, 'images', e);
               logger.warn(
                 `Failover: retrying image generation after HTTP ${response.status} from ${route.provider}/${route.model}`
               );
@@ -2981,6 +3048,7 @@ export class Dispatcher {
         this.appendFailureAttempt(retryHistory, route, error, 'images', canRetryNetwork);
 
         if (canRetryNetwork) {
+          this.saveIntermediateError(request.requestId, 'images', error);
           logger.warn(
             `Failover: retrying image generation after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
@@ -3041,6 +3109,8 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      this.emitRoutingUpdate(request.requestId, route);
 
       try {
         const baseUrl = this.resolveBaseUrl(route, 'images');
@@ -3113,6 +3183,7 @@ export class Dispatcher {
                   this.formatFailureReason(e, true)
                 );
               }
+              this.saveIntermediateError(request.requestId, 'images', e);
               logger.warn(
                 `Failover: retrying image edit after HTTP ${response.status} from ${route.provider}/${route.model}`
               );
@@ -3173,6 +3244,7 @@ export class Dispatcher {
         this.appendFailureAttempt(retryHistory, route, error, 'images', canRetryNetwork);
 
         if (canRetryNetwork) {
+          this.saveIntermediateError(request.requestId, 'images', error);
           logger.warn(
             `Failover: retrying image edit after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );

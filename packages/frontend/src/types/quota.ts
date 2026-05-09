@@ -31,3 +31,18 @@ export interface QuotaCheckerInfo {
   oauthAccountId?: string;
   oauthProvider?: string;
 }
+
+export interface QuotaWindow {
+  windowLabel?: string;
+  used?: number;
+  limit?: number;
+  status?: MeterStatus;
+  unit?: string;
+  utilizationPercent?: Utilization;
+}
+
+export interface QuotaCheckResult {
+  success: boolean;
+  error?: string;
+  windows?: QuotaWindow[];
+}

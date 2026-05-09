@@ -6,7 +6,7 @@ import { ModelMetadataManager, mergeOverrides } from '../../services/model-metad
 export async function registerModelsRoute(fastify: FastifyInstance) {
   /**
    * GET /v1/models
-   * Returns a list of available model aliases configured in plexus.yaml,
+   * Returns a list of available model aliases configured in the database,
    * following the OpenRouter/OpenAI model list format.
    *
    * When an alias has a `metadata` block configured, the response includes

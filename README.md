@@ -148,7 +148,8 @@ Define model aliases backed by one or more providers. Choose how targets are sel
 | `in_order` | Try providers in order; fall back when one is unhealthy |
 | `cost` | Always route to the cheapest configured provider |
 | `performance` | Route to the highest tokens/sec provider (with exploration) |
-| `latency` | Route to the lowest time-to-first-token provider |
+| `latency` | Route to the lowest time-to-first-token provider (with exploration) |
+| `e2e_performance` | Route to the highest overall TPS *including* TTFT (with exploration) |
 
 Use `priority: api_match` to prefer providers that natively speak the incoming API format, enabling pass-through optimization.
 

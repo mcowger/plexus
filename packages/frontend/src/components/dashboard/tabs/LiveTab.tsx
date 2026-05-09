@@ -664,12 +664,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   const [loading, setLoading] = useState(true);
 
   // ---------------------------------------------------------------------------
-  // STATE -- Config migration warning
-  // ---------------------------------------------------------------------------
-  /** Whether adminKey was read from YAML (shows deprecation warning if true) */
-  const [showConfigWarning, setShowConfigWarning] = useState(false);
-
-  // ---------------------------------------------------------------------------
   // STATE -- Modal system
   // ---------------------------------------------------------------------------
   /** Whether the full-screen modal overlay is currently visible */
@@ -1024,22 +1018,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
-
-  /** Fetch config status to check if adminKey was read from YAML */
-  useEffect(() => {
-    const fetchConfigStatus = async () => {
-      try {
-        const response = await fetch('/v0/management/config/status');
-        if (response.ok) {
-          const data = await response.json();
-          setShowConfigWarning(data.adminKeyFromYaml === true);
-        }
-      } catch (e) {
-        // Silently ignore errors fetching config status
-      }
-    };
-    void fetchConfigStatus();
   }, []);
 
   /** Ticks every 10 seconds to update the "seconds since last update" counter for the stale indicator */
@@ -3034,35 +3012,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             : 'Live Polling Reconnecting'}
         </Badge>
       </div>
-
-      {/* ------- Deprecation Warning Banner ------- */}
-      {showConfigWarning && (
-        <div className="mb-6 p-4 border border-danger/30 rounded-lg bg-danger/10">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={20} className="text-danger shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-danger mb-1">
-                ADMIN_KEY Not Set as Environment Variable
-              </h3>
-              <p className="text-sm text-text-secondary mb-2">
-                Plexus started using the adminKey from plexus.yaml because the ADMIN_KEY environment
-                variable is not set.
-              </p>
-              <p className="text-sm text-text-secondary mb-2">
-                <strong>Action Required:</strong> Set ADMIN_KEY as an environment variable before
-                the next restart:
-              </p>
-              <p className="text-sm font-mono bg-bg-hover px-2 py-1 rounded mb-2">
-                export ADMIN_KEY="your-admin-key"
-              </p>
-              <p className="text-sm text-text-secondary">
-                Note: Your configuration has been imported to the database. The YAML file will not
-                be re-read. Future changes must be made via the web UI or management API.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="-mx-3 mb-4 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
         <Button

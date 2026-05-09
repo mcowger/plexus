@@ -712,9 +712,11 @@ export class UsageStorageService extends EventEmitter {
       const retentionLimit = this.getPerformanceRetentionLimit();
 
       let tokensPerSec: number | null = null;
+      let e2eTokensPerSec: number | null = null;
       if (success && outputTokens && durationMs > 0) {
         const streamingTimeMs = timeToFirstTokenMs ? durationMs - timeToFirstTokenMs : durationMs;
         tokensPerSec = streamingTimeMs > 0 ? (outputTokens / streamingTimeMs) * 1000 : null;
+        e2eTokensPerSec = (outputTokens / durationMs) * 1000;
       }
 
       await this.ensureDb()
@@ -728,6 +730,7 @@ export class UsageStorageService extends EventEmitter {
           totalTokens: success ? outputTokens : null,
           durationMs: success ? durationMs : null,
           tokensPerSec,
+          e2eTokensPerSec: success ? e2eTokensPerSec : null,
           successCount: success ? 1 : 0,
           failureCount: success ? 0 : 1,
           createdAt: Date.now(),
@@ -848,16 +851,14 @@ export class UsageStorageService extends EventEmitter {
         conditions.push(eq(this.schema.providerPerformance.provider, provider));
       }
       if (model) {
-        conditions.push(
-          sql`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.requestUsage.canonicalModelName}, ${this.schema.providerPerformance.model}) = ${model}`
-        );
+        conditions.push(eq(this.schema.providerPerformance.model, model));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const perfRows = await this.db!.select({
         provider: this.schema.providerPerformance.provider,
-        model: sql<string>`COALESCE(${this.schema.providerPerformance.canonicalModelName}, ${this.schema.requestUsage.canonicalModelName}, ${this.schema.providerPerformance.model})`,
+        model: this.schema.providerPerformance.model,
         targetModel: this.schema.providerPerformance.model,
         avgTtftMs: sql<number>`AVG(${this.schema.providerPerformance.timeToFirstTokenMs})`,
         minTtftMs: sql<number>`MIN(${this.schema.providerPerformance.timeToFirstTokenMs})`,
@@ -865,6 +866,9 @@ export class UsageStorageService extends EventEmitter {
         avgTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.tokensPerSec})`,
         minTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.tokensPerSec})`,
         maxTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.tokensPerSec})`,
+        avgE2eTokensPerSec: sql<number>`AVG(${this.schema.providerPerformance.e2eTokensPerSec})`,
+        minE2eTokensPerSec: sql<number>`MIN(${this.schema.providerPerformance.e2eTokensPerSec})`,
+        maxE2eTokensPerSec: sql<number>`MAX(${this.schema.providerPerformance.e2eTokensPerSec})`,
         sampleCount: sql<number>`COUNT(*)`,
         successCount: sql<number>`SUM(${this.schema.providerPerformance.successCount})`,
         failureCount: sql<number>`SUM(${this.schema.providerPerformance.failureCount})`,
@@ -876,12 +880,7 @@ export class UsageStorageService extends EventEmitter {
           eq(this.schema.providerPerformance.requestId, this.schema.requestUsage.requestId)
         )
         .where(whereClause)
-        .groupBy(
-          this.schema.providerPerformance.provider,
-          this.schema.providerPerformance.model,
-          this.schema.providerPerformance.canonicalModelName,
-          this.schema.requestUsage.canonicalModelName
-        )
+        .groupBy(this.schema.providerPerformance.provider, this.schema.providerPerformance.model)
         .orderBy(desc(sql`AVG(${this.schema.providerPerformance.tokensPerSec})`));
 
       const mappedRows = perfRows.map((row: any) => ({
@@ -894,6 +893,9 @@ export class UsageStorageService extends EventEmitter {
         avg_tokens_per_sec: row.avgTokensPerSec ?? 0,
         min_tokens_per_sec: row.minTokensPerSec ?? 0,
         max_tokens_per_sec: row.maxTokensPerSec ?? 0,
+        avg_e2e_tokens_per_sec: row.avgE2eTokensPerSec ?? 0,
+        min_e2e_tokens_per_sec: row.minE2eTokensPerSec ?? 0,
+        max_e2e_tokens_per_sec: row.maxE2eTokensPerSec ?? 0,
         sample_count: row.sampleCount ?? 0,
         success_count: row.successCount ?? 0,
         failure_count: row.failureCount ?? 0,
@@ -928,6 +930,9 @@ export class UsageStorageService extends EventEmitter {
               avg_tokens_per_sec: 0,
               min_tokens_per_sec: 0,
               max_tokens_per_sec: 0,
+              avg_e2e_tokens_per_sec: 0,
+              min_e2e_tokens_per_sec: 0,
+              max_e2e_tokens_per_sec: 0,
               sample_count: 0,
               success_count: 0,
               failure_count: 0,

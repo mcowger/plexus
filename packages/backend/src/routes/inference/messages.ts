@@ -23,6 +23,7 @@ export async function registerMessagesRoute(
    */
   fastify.post('/v1/messages', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
       requestId,

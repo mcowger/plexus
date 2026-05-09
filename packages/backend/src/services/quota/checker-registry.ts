@@ -196,4 +196,6 @@ export async function loadAllCheckers(): Promise<void> {
   await import('./checkers/ollama-checker');
   await import('./checkers/neuralwatt-checker');
   await import('./checkers/zenmux-checker');
+  await import('./checkers/devpass-checker');
+  await import('./checkers/wafer-checker');
 }

@@ -99,8 +99,14 @@ jobs:
 
             if (prevRelease) {
               prevTag = prevRelease.tag_name;
-              prevDate = await getTagDate(prevTag);
-              core.info(`Previous release ${prevTag} date: ${prevDate.toISOString()}`);
+              // Use published_at rather than the tag's commit committer date.
+              // The commit date can be a second or two before the PR's merged_at
+              // (a GitHub timing artifact), which causes the last PR of the
+              // previous release to slip through the > prevDate filter and
+              // appear in the current release as well.
+              // published_at is always >= every merged_at in that release.
+              prevDate = new Date(prevRelease.published_at);
+              core.info(`Previous release ${prevTag} published_at: ${prevDate.toISOString()}`);
             } else {
               core.info('No previous CalVer release found — this appears to be the first release');
             }

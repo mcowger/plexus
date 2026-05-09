@@ -37,6 +37,9 @@ pre-commit:
     # --- Biome: format staged source files in-place and re-stage -------------
     biome-format:
       glob: "*.{ts,tsx,js,jsx,json}"
+      exclude:
+        - "packages/backend/drizzle/migrations/**"
+        - "packages/backend/drizzle/migrations_pg/**"
       run: bunx biome format --write {staged_files} && git add {staged_files}
 
     # --- Biome: lint all sources ---------------------------------------------

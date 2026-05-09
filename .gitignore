@@ -41,6 +41,7 @@ config/*.sqlite
 
 # Local dev populate overrides (may contain real API keys)
 scripts/user-populate.json
+.dev-data/
 config/*.db*
 
 CLIProxyApi/
@@ -69,7 +70,13 @@ packages/backend/.test-db.sqlite-wal
 .test-db.sqlite-wal
 .pi-lens
 docs/openapi.yaml
+.githooks
+
+
 
 # Compiled binaries
 plexus-
 plexus
+
+# Profiling output
+.prof/

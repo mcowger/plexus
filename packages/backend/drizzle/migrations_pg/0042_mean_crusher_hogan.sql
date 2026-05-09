@@ -1,0 +1,1 @@
+ALTER TABLE "provider_performance" ADD COLUMN "e2e_tokens_per_sec" real;

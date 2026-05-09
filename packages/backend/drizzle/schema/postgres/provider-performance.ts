@@ -12,6 +12,7 @@ export const providerPerformance = pgTable(
     totalTokens: integer('total_tokens'),
     durationMs: real('duration_ms'),
     tokensPerSec: real('tokens_per_sec'),
+    e2eTokensPerSec: real('e2e_tokens_per_sec'),
     failureCount: integer('failure_count').notNull().default(0),
     successCount: integer('success_count').notNull().default(0),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),

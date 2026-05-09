@@ -295,6 +295,34 @@
       "when": 1778002108513,
       "tag": "0041_steady_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1778265432744,
+      "tag": "0042_mean_crusher_hogan",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1778280149963,
+      "tag": "0043_spotty_spacker_dave",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1778287061284,
+      "tag": "0044_spooky_mojo",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1778352747584,
+      "tag": "0045_clever_darkstar",
+      "breakpoints": true
     }
   ]
 }

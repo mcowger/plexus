@@ -2,12 +2,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { api, Alias, Provider, Model, Cooldown } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 
+export interface OrphanGroup {
+  modelId: string;
+  existingAlias?: Alias;
+  matchReason?: string;
+  candidates: Array<{ provider: Provider; model: Model }>;
+}
+
 const EMPTY_ALIAS: Alias = {
   id: '',
   aliases: [],
-  selector: 'random',
   priority: 'selector',
-  targets: [],
+  target_groups: [{ name: 'default', selector: 'random', targets: [] }],
 };
 
 export const useModels = () => {
@@ -29,9 +35,15 @@ export const useModels = () => {
   const [testStates, setTestStates] = useState<
     Record<
       string,
-      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
+      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
     >
   >({});
+
+  // Import Orphaned Models State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [orphanGroups, setOrphanGroups] = useState<OrphanGroup[]>([]);
+  const [selectedImports, setSelectedImports] = useState<Map<string, Set<string>>>(new Map());
+  const [isImporting, setIsImporting] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -66,7 +78,7 @@ export const useModels = () => {
 
   const handleAddNew = () => {
     setOriginalId(null);
-    setEditingAlias({ ...EMPTY_ALIAS, targets: [] });
+    setEditingAlias(JSON.parse(JSON.stringify(EMPTY_ALIAS)) as Alias);
     setIsModalOpen(true);
   };
 
@@ -110,9 +122,16 @@ export const useModels = () => {
     }
   };
 
-  const handleToggleTarget = async (alias: Alias, targetIndex: number, newState: boolean) => {
-    const updatedAlias = JSON.parse(JSON.stringify(alias));
-    updatedAlias.targets[targetIndex].enabled = newState;
+  const handleToggleTarget = async (
+    alias: Alias,
+    groupIndex: number,
+    targetIndex: number,
+    newState: boolean
+  ) => {
+    const updatedAlias = JSON.parse(JSON.stringify(alias)) as Alias;
+    if (updatedAlias.target_groups[groupIndex]?.targets[targetIndex]) {
+      updatedAlias.target_groups[groupIndex].targets[targetIndex].enabled = newState;
+    }
 
     setAliases((prev) => prev.map((a) => (a.id === alias.id ? updatedAlias : a)));
 
@@ -126,14 +145,13 @@ export const useModels = () => {
   };
 
   const handleTestTarget = async (
-    aliasId: string,
-    targetIndex: number,
+    _aliasId: string,
+    testKey: string,
     provider: string,
     model: string,
     apiTypes: string[]
   ) => {
-    const testKey = `${aliasId}-${targetIndex}`;
-    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true } }));
+    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true, showMessage: false } }));
 
     try {
       const results = await Promise.all(
@@ -154,26 +172,197 @@ export const useModels = () => {
             ? `Success (${avgDuration}ms avg, ${apiTypes.length} API${apiTypes.length > 1 ? 's' : ''})`
             : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
           showResult: true,
+          showMessage: true,
         },
       }));
+
+      setTimeout(() => {
+        setTestStates((prev) => ({
+          ...prev,
+          [testKey]: { ...prev[testKey], showResult: false },
+        }));
+      }, allSuccess ? 3000 : 1500);
 
       if (allSuccess) {
         setTimeout(() => {
           setTestStates((prev) => ({
             ...prev,
-            [testKey]: { ...prev[testKey], showResult: false },
+            [testKey]: { ...prev[testKey], showMessage: false },
           }));
         }, 3000);
       }
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
-        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true },
+        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true, showMessage: true },
       }));
+      setTimeout(() => {
+        setTestStates((prev) => ({
+          ...prev,
+          [testKey]: { ...prev[testKey], showResult: false },
+        }));
+      }, 1500);
     }
   };
 
+  const dismissTestMessage = (testKey: string) => {
+    setTestStates((prev) => ({
+      ...prev,
+      [testKey]: { ...prev[testKey], showMessage: false },
+    }));
+  };
+
   const filteredAliases = aliases.filter((a) => a.id.toLowerCase().includes(search.toLowerCase()));
+
+  const findExistingAlias = useCallback(
+    (modelId: string, aliasList: Alias[]): { alias: Alias; reason?: string } | undefined => {
+      const lowerModel = modelId.toLowerCase();
+
+      // 1. Case-insensitive exact match
+      const ciMatch = aliasList.find((a) => a.id.toLowerCase() === lowerModel);
+      if (ciMatch && ciMatch.id !== modelId) {
+        return { alias: ciMatch, reason: `case-insensitive match: ${ciMatch.id}` };
+      }
+      if (ciMatch) {
+        return { alias: ciMatch };
+      }
+
+      // 2. Suffix match
+      const modelSuffix = modelId.includes('/')
+        ? modelId.substring(modelId.lastIndexOf('/') + 1)
+        : modelId;
+      const modelSuffixLower = modelSuffix.toLowerCase();
+
+      for (const alias of aliasList) {
+        const aliasSuffix = alias.id.includes('/')
+          ? alias.id.substring(alias.id.lastIndexOf('/') + 1)
+          : alias.id;
+        const aliasSuffixLower = aliasSuffix.toLowerCase();
+
+        if (aliasSuffixLower === modelSuffixLower && alias.id !== modelId) {
+          return { alias, reason: `suffix match: ${alias.id}` };
+        }
+      }
+
+      return undefined;
+    },
+    []
+  );
+
+  const handleOpenImport = useCallback(() => {
+    const covered = new Set<string>();
+    aliases.forEach((alias) => {
+      alias.target_groups.forEach((g) => {
+        g.targets.forEach((t) => {
+          covered.add(`${t.provider}|${t.model}`);
+        });
+      });
+    });
+
+    const orphanMap = new Map<string, Array<{ provider: Provider; model: Model }>>();
+    const canonicalIds = new Map<string, string>();
+    availableModels.forEach((model) => {
+      const key = `${model.providerId}|${model.id}`;
+      if (covered.has(key)) return;
+
+      const groupKey = model.id.toLowerCase();
+      if (!canonicalIds.has(groupKey)) {
+        canonicalIds.set(groupKey, model.id);
+      }
+
+      if (!orphanMap.has(groupKey)) {
+        orphanMap.set(groupKey, []);
+      }
+      const provider = providers.find((p) => p.id === model.providerId);
+      if (provider) {
+        orphanMap.get(groupKey)!.push({ provider, model });
+      }
+    });
+
+    const groups: OrphanGroup[] = [];
+    orphanMap.forEach((candidates, groupKey) => {
+      const modelId = canonicalIds.get(groupKey) || groupKey;
+      const match = findExistingAlias(modelId, aliases);
+      groups.push({
+        modelId,
+        existingAlias: match?.alias,
+        matchReason: match?.reason,
+        candidates,
+      });
+    });
+    groups.sort((a, b) => a.modelId.localeCompare(b.modelId));
+
+    const selections = new Map<string, Set<string>>();
+    groups.forEach((group) => {
+      selections.set(group.modelId, new Set(group.candidates.map((c) => c.provider.id)));
+    });
+
+    setOrphanGroups(groups);
+    setSelectedImports(selections);
+    setIsImportModalOpen(true);
+  }, [aliases, availableModels, providers, findExistingAlias]);
+
+  const handleSaveImports = useCallback(async () => {
+    setIsImporting(true);
+    try {
+      for (const [modelId, providerIds] of selectedImports.entries()) {
+        if (providerIds.size === 0) continue;
+
+        const group = orphanGroups.find((g) => g.modelId === modelId);
+        if (!group) continue;
+
+        const selectedCandidates = group.candidates.filter((c) => providerIds.has(c.provider.id));
+
+        if (group.existingAlias) {
+          const updatedAlias = JSON.parse(JSON.stringify(group.existingAlias)) as Alias;
+          // Merge into the first group of the existing alias
+          selectedCandidates.forEach((c) => {
+            const alreadyExists = updatedAlias.target_groups[0].targets.some(
+              (t) => t.provider === c.provider.id && t.model === c.model.id
+            );
+            if (!alreadyExists) {
+              updatedAlias.target_groups[0].targets.push({
+                provider: c.provider.id,
+                model: c.model.id,
+                enabled: true,
+              });
+            }
+          });
+          await api.saveAlias(updatedAlias, group.existingAlias.id);
+        } else {
+          const newAlias: Alias = {
+            ...EMPTY_ALIAS,
+            id: modelId,
+            target_groups: [
+              {
+                name: 'default',
+                selector: 'random',
+                targets: selectedCandidates.map((c) => ({
+                  provider: c.provider.id,
+                  model: c.model.id,
+                  enabled: true,
+                })),
+              },
+            ],
+          };
+          await api.saveAlias(newAlias, undefined);
+        }
+      }
+
+      await loadData();
+      toast.success('Imports saved successfully');
+      setIsImportModalOpen(false);
+      setSelectedImports(new Map());
+      setOrphanGroups([]);
+      return true;
+    } catch (e) {
+      console.error('Failed to save imports', e);
+      toast.error('Failed to save imports');
+      return false;
+    } finally {
+      setIsImporting(false);
+    }
+  }, [selectedImports, orphanGroups, loadData, toast]);
 
   return {
     aliases: filteredAliases,
@@ -198,6 +387,16 @@ export const useModels = () => {
     handleDeleteAll,
     handleToggleTarget,
     handleTestTarget,
+    dismissTestMessage,
     loadData,
+    isImportModalOpen,
+    setIsImportModalOpen,
+    orphanGroups,
+    setOrphanGroups,
+    selectedImports,
+    setSelectedImports,
+    isImporting,
+    handleOpenImport,
+    handleSaveImports,
   };
 };

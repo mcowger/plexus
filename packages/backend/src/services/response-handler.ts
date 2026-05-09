@@ -64,6 +64,9 @@ export async function handleResponse(
   usageRecord.isStreamed = !!unifiedResponse.stream;
   usageRecord.isPassthrough = unifiedResponse.bypassTransformation;
 
+  // Always return Plexus request ID so callers can trace the full story
+  reply.header('x-request-id', usageRecord.requestId!);
+
   const pricing = unifiedResponse.plexus?.pricing;
   const providerDiscount = unifiedResponse.plexus?.providerDiscount;
   // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
@@ -277,9 +280,11 @@ async function finalizeUsage(
 
   // Populate performance metrics
   const outputTokens = usageRecord.tokensOutput || 0;
+  const reasoningTokens = usageRecord.tokensReasoning || 0;
+  const totalOutputTokens = outputTokens + reasoningTokens;
   usageRecord.ttftMs = usageRecord.durationMs; // For unary, TTFT equals full duration
-  if (outputTokens > 0 && usageRecord.durationMs > 0) {
-    usageRecord.tokensPerSec = (outputTokens / usageRecord.durationMs) * 1000;
+  if (totalOutputTokens > 0 && usageRecord.durationMs > 0) {
+    usageRecord.tokensPerSec = (totalOutputTokens / usageRecord.durationMs) * 1000;
   }
 
   // Use provider-reported energy if available, otherwise estimate
@@ -311,7 +316,7 @@ async function finalizeUsage(
       usageRecord.selectedModelName,
       usageRecord.canonicalModelName ?? null,
       usageRecord.durationMs,
-      outputTokens > 0 ? outputTokens : null,
+      totalOutputTokens > 0 ? totalOutputTokens : null,
       usageRecord.durationMs,
       usageRecord.requestId!
     );

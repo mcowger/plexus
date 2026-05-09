@@ -85,26 +85,6 @@ export async function registerBackupRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Trigger a graceful restart after a successful restore.
-  // Uses Fastify's onResponse hook so the reply is already sent.
-  // Skipped in test environments to avoid killing the test runner.
-  if (process.env.NODE_ENV !== 'test') {
-    fastify.addHook('onResponse', async (request, reply) => {
-      if (
-        request.method === 'POST' &&
-        request.url.startsWith('/v0/management/restore') &&
-        reply.statusCode >= 200 &&
-        reply.statusCode < 300
-      ) {
-        logger.info('[Backup] Restore successful — restarting server to apply changes');
-        setTimeout(async () => {
-          await fastify.close();
-          process.exit(1);
-        }, 100);
-      }
-    });
-  }
-
   // Allow binary body parsing for .tar.gz uploads
   fastify.addContentTypeParser(
     ['application/gzip', 'application/x-gzip', 'application/octet-stream'],

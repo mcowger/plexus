@@ -1,7 +1,7 @@
 type: object
 description: >
   Provider configuration. Used to define upstream LLM providers that Plexus
-  can route requests to. Corresponds to entries in `plexus.yaml`
+  can route requests to. Stored in the database.
   `providers` section.
 required:
   - api_base_url

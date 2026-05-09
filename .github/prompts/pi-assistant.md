@@ -54,3 +54,4 @@ Your VERY FIRST action — before writing your TODO list, before reading any fil
 ## When coding is required
 - Keep changes minimal and focused on the request — do not refactor unrelated code
 - NEVER close the issue or PR — leave it open for the user to close after reviewing
+- You are already checked out on a working branch (`{{env.WORKING_BRANCH}}`). Do NOT run `git checkout` or create a new branch manually. When you are ready to open a PR, use the `create_pull_request` tool — it will handle branching, committing, and pushing for you.

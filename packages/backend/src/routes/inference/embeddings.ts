@@ -21,6 +21,7 @@ export async function registerEmbeddingsRoute(
    */
   fastify.post('/v1/embeddings', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
     const startTime = Date.now();
 
     let usageRecord: Partial<UsageRecord> = {
