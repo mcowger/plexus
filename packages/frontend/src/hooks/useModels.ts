@@ -35,7 +35,7 @@ export const useModels = () => {
   const [testStates, setTestStates] = useState<
     Record<
       string,
-      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
+      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
     >
   >({});
 
@@ -151,7 +151,7 @@ export const useModels = () => {
     model: string,
     apiTypes: string[]
   ) => {
-    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true } }));
+    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true, showMessage: false } }));
 
     try {
       const results = await Promise.all(
@@ -172,23 +172,44 @@ export const useModels = () => {
             ? `Success (${avgDuration}ms avg, ${apiTypes.length} API${apiTypes.length > 1 ? 's' : ''})`
             : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
           showResult: true,
+          showMessage: true,
         },
       }));
+
+      setTimeout(() => {
+        setTestStates((prev) => ({
+          ...prev,
+          [testKey]: { ...prev[testKey], showResult: false },
+        }));
+      }, allSuccess ? 3000 : 1500);
 
       if (allSuccess) {
         setTimeout(() => {
           setTestStates((prev) => ({
             ...prev,
-            [testKey]: { ...prev[testKey], showResult: false },
+            [testKey]: { ...prev[testKey], showMessage: false },
           }));
         }, 3000);
       }
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
-        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true },
+        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true, showMessage: true },
       }));
+      setTimeout(() => {
+        setTestStates((prev) => ({
+          ...prev,
+          [testKey]: { ...prev[testKey], showResult: false },
+        }));
+      }, 1500);
     }
+  };
+
+  const dismissTestMessage = (testKey: string) => {
+    setTestStates((prev) => ({
+      ...prev,
+      [testKey]: { ...prev[testKey], showMessage: false },
+    }));
   };
 
   const filteredAliases = aliases.filter((a) => a.id.toLowerCase().includes(search.toLowerCase()));
@@ -366,6 +387,7 @@ export const useModels = () => {
     handleDeleteAll,
     handleToggleTarget,
     handleTestTarget,
+    dismissTestMessage,
     loadData,
     isImportModalOpen,
     setIsImportModalOpen,

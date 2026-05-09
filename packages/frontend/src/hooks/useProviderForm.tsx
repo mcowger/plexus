@@ -164,7 +164,7 @@ export function useProviderForm() {
   const [testStates, setTestStates] = useState<
     Record<
       string,
-      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
+      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
     >
   >({});
 
@@ -394,7 +394,7 @@ export function useProviderForm() {
 
   const handleTestModel = async (providerId: string, modelId: string, modelType?: string) => {
     const testKey = `${providerId}-${modelId}`;
-    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true } }));
+    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true, showMessage: false } }));
     let testApiTypes: string[] = ['chat'];
     if (modelType === 'embeddings') testApiTypes = ['embeddings'];
     else if (modelType === 'image') testApiTypes = ['images'];
@@ -418,6 +418,7 @@ export function useProviderForm() {
             ? `Success (${avgDuration}ms avg, ${testApiTypes.length} API${testApiTypes.length > 1 ? 's' : ''})`
             : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
           showResult: true,
+          showMessage: true,
         },
       }));
       setTimeout(() => {
@@ -425,19 +426,34 @@ export function useProviderForm() {
           ...prev,
           [testKey]: { ...prev[testKey], showResult: false },
         }));
-      }, allSuccess ? 3000 : 5000);
+      }, allSuccess ? 3000 : 1500);
+      if (allSuccess) {
+        setTimeout(() => {
+          setTestStates((prev) => ({
+            ...prev,
+            [testKey]: { ...prev[testKey], showMessage: false },
+          }));
+        }, 3000);
+      }
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
-        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true },
+        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true, showMessage: true },
       }));
       setTimeout(() => {
         setTestStates((prev) => ({
           ...prev,
           [testKey]: { ...prev[testKey], showResult: false },
         }));
-      }, 5000);
+      }, 1500);
     }
+  };
+
+  const dismissTestMessage = (testKey: string) => {
+    setTestStates((prev) => ({
+      ...prev,
+      [testKey]: { ...prev[testKey], showMessage: false },
+    }));
   };
 
   // OAuth handlers
@@ -877,6 +893,7 @@ export function useProviderForm() {
     affectedAliases,
     // Test
     testStates,
+    dismissTestMessage,
     // Handlers
     handleEdit,
     handleAddNew,

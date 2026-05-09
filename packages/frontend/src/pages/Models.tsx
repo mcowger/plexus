@@ -43,6 +43,7 @@ export const Models = () => {
     handleDeleteAll: hookDeleteAll,
     handleToggleTarget,
     handleTestTarget,
+    dismissTestMessage,
     isImportModalOpen,
     setIsImportModalOpen,
     orphanGroups,
@@ -190,6 +191,7 @@ export const Models = () => {
                   onDelete={handleDeleteClick}
                   onToggleTarget={handleToggleTarget}
                   onTestTarget={handleTestTarget}
+                  onDismissTestMessage={dismissTestMessage}
                 />
               ))
             )}
@@ -238,6 +240,7 @@ export const Models = () => {
                     onDelete={handleDeleteClick}
                     onToggleTarget={handleToggleTarget}
                     onTestTarget={handleTestTarget}
+                    onDismissTestMessage={dismissTestMessage}
                   />
                 ))}
                 {sortedAliases.length === 0 && (

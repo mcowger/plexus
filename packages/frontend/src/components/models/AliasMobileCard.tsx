@@ -25,6 +25,7 @@ interface Props {
     model: string,
     types: string[]
   ) => void;
+  onDismissTestMessage: (testKey: string) => void;
 }
 
 export const AliasMobileCard: React.FC<Props> = ({
@@ -36,6 +37,7 @@ export const AliasMobileCard: React.FC<Props> = ({
   onDelete,
   onToggleTarget,
   onTestTarget,
+  onDismissTestMessage,
 }) => {
   return (
     <article key={alias.id} className="rounded-md border border-border-glass bg-bg-subtle p-3">
@@ -175,6 +177,18 @@ export const AliasMobileCard: React.FC<Props> = ({
                       />
                     </div>
                   </div>
+                  {testState?.showMessage && testState.result === 'error' && testState.message && (
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDismissTestMessage(testKey);
+                      }}
+                      className="mt-2 cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
+                      title="Click to dismiss"
+                    >
+                      <span className="text-[11px] italic text-danger">{testState.message} [×]</span>
+                    </div>
+                  )}
                 </div>
               );
             })}

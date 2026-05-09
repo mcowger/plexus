@@ -197,6 +197,7 @@ export const Providers = () => {
               removeModelKV={f.removeModelKV}
               onOpenFetchModels={f.handleOpenFetchModels}
               onTestModel={f.handleTestModel}
+              onDismissTestMessage={f.dismissTestMessage}
               getApiBaseUrlMap={f.getApiBaseUrlMap}
             />
           </div>

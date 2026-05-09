@@ -25,6 +25,7 @@ interface AliasTableRowProps {
     modelId: string,
     types: string[]
   ) => void;
+  onDismissTestMessage: (testKey: string) => void;
 }
 
 export const AliasTableRow: React.FC<AliasTableRowProps> = ({
@@ -36,6 +37,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
   onDelete,
   onToggleTarget,
   onTestTarget,
+  onDismissTestMessage,
 }) => {
   return (
     <tr className="hover:bg-bg-hover">
@@ -185,15 +187,22 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                       />
                       <div className="flex-1 truncate">
                         {t.provider} &rarr; {t.model}
-                        {testState?.showResult && testState.message && (
-                          <span
-                            className={`ml-2 text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
-                          >
-                            {testState.message}
-                          </span>
-                        )}
                       </div>
                     </div>
+                    {testState?.showMessage && testState.result === 'error' && testState.message && (
+                      <div className="mt-1">
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDismissTestMessage(testKey);
+                          }}
+                          className="cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
+                          title="Click to dismiss"
+                        >
+                          <span className="text-[11px] italic text-danger">{testState.message} [×]</span>
+                        </div>
+                      </div>
+                    )}
                   );
                 })}
               </div>

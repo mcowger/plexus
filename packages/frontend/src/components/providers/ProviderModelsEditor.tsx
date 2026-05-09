@@ -98,8 +98,9 @@ interface Props {
   setIsModelExtraBodyOpen: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   testStates: Record<
     string,
-    { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean }
+    { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
   >;
+  onDismissTestMessage: (testKey: string) => void;
   addModel: () => void;
   updateModelId: (oldId: string, newId: string) => void;
   updateModelConfig: (modelId: string, updates: any) => void;
@@ -131,6 +132,7 @@ export function ProviderModelsEditor({
   removeModelKV,
   onOpenFetchModels,
   onTestModel,
+  onDismissTestMessage,
   getApiBaseUrlMap,
 }: Props) {
   return (
@@ -207,13 +209,6 @@ export function ProviderModelsEditor({
                         <Play size={14} className="text-primary opacity-60" />
                       )}
                     </div>
-                    {testState?.showResult && testState.message && (
-                      <span
-                        className={`text-[11px] italic ${testState.result === 'success' ? 'text-success' : 'text-danger'}`}
-                      >
-                        {testState.message}
-                      </span>
-                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -226,6 +221,20 @@ export function ProviderModelsEditor({
                       <X size={12} />
                     </Button>
                   </div>
+                  {testState?.showMessage && testState.result === 'error' && testState.message && (
+                    <div style={{ padding: '0 8px 6px 8px' }}>
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDismissTestMessage(testKey);
+                        }}
+                        className="cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
+                        title="Click to dismiss"
+                      >
+                        <span className="text-[11px] italic text-danger">{testState.message} [×]</span>
+                      </div>
+                    </div>
+                  )}
 
                   {openModelIdx === mId && (
                     <div
