@@ -153,6 +153,115 @@ describe('Router Direct Provider/Model Routing', () => {
   });
 });
 
+describe('Router Direct Alias/Target Group Routing', () => {
+  const mockConfig = {
+    providers: {
+      p1: {
+        type: 'openai',
+        api_base_url: 'https://p1.example.com/v1',
+        models: { m1: { pricing: { source: 'simple', input: 1, output: 1 } } },
+      },
+      p2: {
+        type: 'openai',
+        api_base_url: 'https://p2.example.com/v1',
+        models: { m2: { pricing: { source: 'simple', input: 2, output: 2 } } },
+      },
+      p3: {
+        type: 'openai',
+        api_base_url: 'https://p3.example.com/v1',
+        models: { m3: { pricing: { source: 'simple', input: 3, output: 3 } } },
+      },
+    },
+    models: {
+      'smart-model': {
+        target_groups: [
+          {
+            name: 'primary',
+            selector: 'in_order' as const,
+            targets: [
+              { provider: 'p1', model: 'm1' },
+              { provider: 'p2', model: 'm2' },
+            ],
+          },
+          {
+            name: 'fallback',
+            selector: 'in_order' as const,
+            targets: [{ provider: 'p3', model: 'm3' }],
+          },
+        ],
+      },
+    },
+    keys: {},
+  };
+
+  beforeEach(() => {
+    setConfigForTesting(mockConfig as any);
+  });
+
+  test('resolves direct alias/target_group syntax', async () => {
+    const result = await Router.resolve('direct/smart-model/primary');
+    expect(result.provider).toBe('p1');
+    expect(result.model).toBe('m1');
+    expect(result.incomingModelAlias).toBe('direct/smart-model/primary');
+    expect(result.canonicalModel).toBe('smart-model');
+  });
+
+  test('resolveCandidates returns only targets from specified group', async () => {
+    const result = await Router.resolveCandidates('direct/smart-model/primary');
+    expect(result).toHaveLength(2);
+    expect(result[0]?.provider).toBe('p1');
+    expect(result[1]?.provider).toBe('p2');
+  });
+
+  test('resolveCandidates returns empty array when group has no healthy targets', async () => {
+    const cooldownManager = CooldownManager.getInstance();
+    registerSpy(cooldownManager, 'filterHealthyTargets').mockResolvedValue([]);
+
+    const result = await Router.resolveCandidates('direct/smart-model/primary');
+    expect(result).toEqual([]);
+
+    registerSpy(cooldownManager, 'filterHealthyTargets').mockRestore();
+  });
+
+  test('throws 404 when alias does not exist for direct group routing', async () => {
+    await expect(Router.resolve('direct/nonexistent/group')).rejects.toThrow(
+      "Direct routing failed: Provider 'nonexistent' not found in configuration"
+    );
+  });
+
+  test('throws 404 when target group does not exist', async () => {
+    await expect(Router.resolve('direct/smart-model/nonexistent')).rejects.toThrow(
+      "Direct routing failed: Target group 'nonexistent' not found for alias 'smart-model'"
+    );
+  });
+
+  test('throws when all targets in group are unhealthy', async () => {
+    const cooldownManager = CooldownManager.getInstance();
+    registerSpy(cooldownManager, 'filterHealthyTargets').mockResolvedValue([]);
+
+    await expect(Router.resolve('direct/smart-model/fallback')).rejects.toThrow(
+      "No healthy targets in group 'fallback' for alias 'smart-model'"
+    );
+
+    registerSpy(cooldownManager, 'filterHealthyTargets').mockRestore();
+  });
+
+  test('does not fall back to other groups when direct group is exhausted', async () => {
+    const cooldownManager = CooldownManager.getInstance();
+    // Only p3 is healthy, but p3 is in fallback group — shouldn't be reached
+    registerSpy(cooldownManager, 'filterHealthyTargets').mockImplementation(
+      async (targets: any[]) => targets.filter((t) => t.provider === 'p3')
+    );
+
+    // primary group has p1, p2 — none are p3 so all filtered out
+    await expect(Router.resolve('direct/smart-model/primary')).rejects.toThrow(
+      "No healthy targets in group 'primary' for alias 'smart-model'"
+    );
+
+    registerSpy(cooldownManager, 'filterHealthyTargets').mockRestore();
+  });
+});
+
 describe('Router.resolveCandidates', () => {
   const cooldownManager = CooldownManager.getInstance();
 

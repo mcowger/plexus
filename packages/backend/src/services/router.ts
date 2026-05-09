@@ -23,6 +23,17 @@ export interface RouteResult {
   canonicalModel?: string;
 }
 
+function tryParseDirectGroup(modelName: string): { aliasName: string; groupName: string } | null {
+  if (!modelName.startsWith('direct/')) return null;
+  const withoutPrefix = modelName.substring(7);
+  const firstSlashIndex = withoutPrefix.indexOf('/');
+  if (firstSlashIndex === -1) return null;
+  return {
+    aliasName: withoutPrefix.substring(0, firstSlashIndex),
+    groupName: withoutPrefix.substring(firstSlashIndex + 1),
+  };
+}
+
 function findAlias(config: ReturnType<typeof getConfig>, modelName: string) {
   let alias = config.models?.[modelName];
   let canonicalModel = modelName;
@@ -192,6 +203,56 @@ export class Router {
     incomingApiType?: string
   ): Promise<RouteResult[]> {
     const config = getConfig();
+
+    // Direct target group routing: direct/alias/target_group
+    const parsed = tryParseDirectGroup(modelName);
+    if (parsed) {
+      const { aliasName, groupName } = parsed;
+      const { alias, canonicalModel } = findAlias(config, aliasName);
+
+      if (alias?.target_groups) {
+        const group = alias.target_groups.find((g) => g.name === groupName);
+        if (group) {
+          const enriched = await filterGroupTargets(
+            group.targets,
+            config,
+            alias,
+            incomingApiType,
+            modelName
+          );
+
+          if (enriched.length === 0) return [];
+
+          const ordered = await selectOrderedTargets(group.selector, enriched);
+
+          const results: RouteResult[] = [];
+          for (const target of ordered) {
+            const providerConfig = config.providers[target.provider];
+            if (!providerConfig) continue;
+
+            let modelConfig = undefined;
+            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+              modelConfig = providerConfig.models[target.model];
+            }
+
+            results.push({
+              provider: target.provider,
+              model: target.model,
+              config: providerConfig,
+              modelConfig,
+              modelArchitecture: config.models?.[canonicalModel]?.model_architecture,
+              incomingModelAlias: modelName,
+              canonicalModel,
+            });
+          }
+          return results;
+        }
+        // Alias exists but group doesn't → fall through to resolve() which throws 404
+        return [];
+      }
+      // Not an alias with target groups → fall through to resolveDirect
+    }
+
     const { alias, canonicalModel } = findAlias(config, modelName);
 
     if (!alias || !alias.target_groups || alias.target_groups.length === 0) {
@@ -242,6 +303,72 @@ export class Router {
 
     // Direct routing bypass
     if (modelName.startsWith('direct/')) {
+      const parsed = tryParseDirectGroup(modelName);
+      if (parsed) {
+        const { aliasName, groupName } = parsed;
+        const { alias, canonicalModel } = findAlias(config, aliasName);
+
+        if (alias?.target_groups) {
+          const group = alias.target_groups.find((g) => g.name === groupName);
+          if (group) {
+            const enriched = await filterGroupTargets(
+              group.targets,
+              config,
+              alias,
+              incomingApiType,
+              modelName
+            );
+
+            if (enriched.length === 0) {
+              throw new Error(
+                `No healthy targets in group '${groupName}' for alias '${aliasName}'`
+              );
+            }
+
+            const selector = SelectorFactory.getSelector(group.selector);
+            const target = await selector.select(enriched);
+
+            if (!target) {
+              throw new Error(
+                `No target selected in group '${groupName}' for alias '${aliasName}'`
+              );
+            }
+
+            const providerConfig = config.providers[target.provider];
+            if (!providerConfig) {
+              throw new Error(`Provider '${target.provider}' not found`);
+            }
+
+            let modelConfig = undefined;
+            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
+              modelConfig = providerConfig.models[target.model];
+            }
+
+            logger.info(
+              `Router: Direct group routing to '${target.provider}/${target.model}' from group '${groupName}' of alias '${aliasName}'`
+            );
+
+            return {
+              provider: target.provider,
+              model: target.model,
+              config: providerConfig,
+              modelConfig,
+              incomingModelAlias: modelName,
+              canonicalModel,
+            };
+          }
+
+          const error = new Error(
+            `Direct routing failed: Target group '${groupName}' not found for alias '${aliasName}'`
+          ) as any;
+          error.routingContext = { statusCode: 404 };
+          throw error;
+        }
+
+        // alias exists but has no target_groups → not an alias we can group-route.
+        // Fall through to resolveDirect (which will likely 404 as an unknown provider/model).
+      }
+
       return Router.resolveDirect(modelName, config);
     }
 
@@ -301,9 +428,11 @@ export class Router {
     const firstSlashIndex = withoutPrefix.indexOf('/');
 
     if (firstSlashIndex === -1) {
-      throw new Error(
+      const error = new Error(
         `Direct routing failed: Invalid format '${modelName}'. Expected 'direct/provider/model'`
-      );
+      ) as any;
+      error.routingContext = { statusCode: 400 };
+      throw error;
     }
 
     const providerId = withoutPrefix.substring(0, firstSlashIndex);
@@ -311,11 +440,17 @@ export class Router {
 
     const providerConfig = config.providers[providerId];
     if (!providerConfig) {
-      throw new Error(`Direct routing failed: Provider '${providerId}' not found in configuration`);
+      const error = new Error(
+        `Direct routing failed: Provider '${providerId}' not found in configuration`
+      ) as any;
+      error.routingContext = { statusCode: 404 };
+      throw error;
     }
 
     if (providerConfig.enabled === false) {
-      throw new Error(`Direct routing failed: Provider '${providerId}' is disabled`);
+      const error = new Error(`Direct routing failed: Provider '${providerId}' is disabled`) as any;
+      error.routingContext = { statusCode: 404 };
+      throw error;
     }
 
     let modelConfig = undefined;
