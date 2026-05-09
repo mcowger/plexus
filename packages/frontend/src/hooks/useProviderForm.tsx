@@ -420,19 +420,23 @@ export function useProviderForm() {
           showResult: true,
         },
       }));
-      if (allSuccess) {
-        setTimeout(() => {
-          setTestStates((prev) => ({
-            ...prev,
-            [testKey]: { ...prev[testKey], showResult: false },
-          }));
-        }, 3000);
-      }
+      setTimeout(() => {
+        setTestStates((prev) => ({
+          ...prev,
+          [testKey]: { ...prev[testKey], showResult: false },
+        }));
+      }, allSuccess ? 3000 : 5000);
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
         [testKey]: { loading: false, result: 'error', message: String(e), showResult: true },
       }));
+      setTimeout(() => {
+        setTestStates((prev) => ({
+          ...prev,
+          [testKey]: { ...prev[testKey], showResult: false },
+        }));
+      }, 5000);
     }
   };
 
