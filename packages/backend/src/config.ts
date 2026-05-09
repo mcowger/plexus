@@ -191,6 +191,10 @@ const ZenmuxQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const WaferQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
@@ -361,6 +365,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: DevPassQuotaCheckerOptionsSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('wafer'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: WaferQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 
@@ -988,6 +999,7 @@ export const VALID_QUOTA_CHECKER_TYPES = [
   'neuralwatt',
   'zenmux',
   'devpass',
+  'wafer',
 ] as const;
 
 export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

@@ -33,4 +33,5 @@ export const quotaCheckerTypeEnum = pgEnum('quota_checker_type', [
   'neuralwatt',
   'zenmux',
   'devpass',
+  'wafer',
 ]);
