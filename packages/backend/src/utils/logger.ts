@@ -21,18 +21,21 @@ export class StreamTransport extends Transport {
   }
 }
 
-// ─── Automatic Caller Detection ─────────────────────────────────────
+// ─── Automatic Caller Detection (with caching) ─────────────────────
 //
 // Injects [module] and [functionName] into every log entry by parsing
-// the call stack.  Skips frames from winston/logform internals and
-// from this file itself so the first user-code frame wins.  No per-
-// module configuration needed — it just works.
+// the call stack. Results are cached per source location for massive
+// performance improvement on repeated calls.
 //
+const callerCache = new Map<string, { module: string; functionName: string }>();
+
 const addCallerInfo = winston.format((info) => {
   const stack = new Error().stack;
   if (!stack) return info;
 
   const lines = stack.split('\n');
+  let cacheKey: string | null = null;
+
   // Walk up the stack, skipping frames that originate from:
   //   - winston / logform internals (node_modules)
   //   - this logger file itself
@@ -49,6 +52,22 @@ const addCallerInfo = winston.format((info) => {
       line.includes('Bun')
     ) {
       continue;
+    }
+
+    // Extract the key for caching (file:line)
+    const lineMatch = line.match(/(?:\/[^:]+)\.(ts|js)(?::\d+)/);
+    if (lineMatch) {
+      const matchIndex = lineMatch.index!;
+      const from = line.lastIndexOf(' ', matchIndex) + 1;
+      cacheKey = line.slice(from).replace(/^file:\/\//, '');
+
+      // Check cache first
+      const cached = callerCache.get(cacheKey);
+      if (cached) {
+        info.module = cached.module;
+        info.functionName = cached.functionName;
+        return info;
+      }
     }
 
     // Bun stack format: "at /path/file.ts:10:5"
@@ -76,6 +95,14 @@ const addCallerInfo = winston.format((info) => {
         if (fn !== '<anonymous>') {
           info.functionName = fn;
         }
+      }
+
+      // Cache the result for this location
+      if (cacheKey) {
+        callerCache.set(cacheKey, {
+          module: info.module as string,
+          functionName: info.functionName as string,
+        });
       }
       break;
     }

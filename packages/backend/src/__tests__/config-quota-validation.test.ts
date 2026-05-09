@@ -116,18 +116,24 @@ describe('config quota checker validation', () => {
   });
 
   it('accepts devpass quota checker with session cookie', () => {
-    const config = validateConfig(`
-providers:
-  devpass-provider:
-    api_base_url: "https://internal.llmgateway.io"
-    api_key: "devpass-api-key"
-    quota_checker:
-      type: devpass
-      options:
-        session: "my-session-token"
-models: {}
-keys: {}
-`);
+    const config = validateConfig(
+      JSON.stringify({
+        providers: {
+          'devpass-provider': {
+            api_base_url: 'https://internal.llmgateway.io',
+            api_key: 'devpass-api-key',
+            quota_checker: {
+              type: 'devpass',
+              options: {
+                session: 'my-session-token',
+              },
+            },
+          },
+        },
+        models: {},
+        keys: {},
+      })
+    );
 
     expect(config.quotas).toHaveLength(1);
     expect(config.quotas[0]).toMatchObject({
