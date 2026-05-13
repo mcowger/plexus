@@ -104,6 +104,16 @@ properties:
               type: object
               additionalProperties: true
               description: Extra fields merged into the request body for this model.
+          adapter:
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+              description: >
+                Adapter name(s) applied to this specific model. Appended after
+                any provider-level adapters. See the provider-level `adapter`
+                field for available values.
         description: >
           Map of model ID → per-model configuration. Allows per-model pricing
           overrides and access aliases.
@@ -161,3 +171,26 @@ properties:
   gpu_power_draw_watts:
     type: number
     description: GPU TDP in watts. Used for energy estimation.
+  adapter:
+    oneOf:
+      - type: string
+      - type: array
+        items:
+          type: string
+    description: >
+      Adapter name(s) applied to every model under this provider.
+      Adapters rewrite outbound request payloads (preDispatch) and inbound
+      provider responses (postDispatch) to fix provider-specific field-name
+      incompatibilities. Applied before model-level adapters.
+
+      Available adapters:
+
+      - `reasoning_content` — Renames `reasoning`/`thinking.content` →
+        `reasoning_content` on outbound assistant messages. Fixes Fireworks/
+        DeepSeek providers that reject the `reasoning` field name.
+
+      - `suppress_developer_role` — Rewrites the `developer` role to `system`
+        for providers that do not support the OpenAI `developer` role.
+
+      Pass-through optimisation is automatically disabled when any adapter
+      is active.

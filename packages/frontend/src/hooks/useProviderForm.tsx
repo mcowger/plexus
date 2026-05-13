@@ -69,6 +69,7 @@ export const EMPTY_PROVIDER: Provider = {
   headers: {},
   extraBody: {},
   models: {},
+  adapter: [],
 };
 
 export interface FetchedModel {

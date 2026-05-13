@@ -236,6 +236,7 @@ export interface Provider {
   gpu_bandwidth_tb_s?: number;
   gpu_flops_tflop?: number;
   gpu_power_draw_watts?: number;
+  adapter?: string[];
 }
 
 export interface McpServer {
@@ -1660,6 +1661,7 @@ export const api = {
               : {},
           models: normalizedModels,
           quotaChecker: normalizeProviderQuotaChecker(val.quota_checker),
+          adapter: val.adapter ? (Array.isArray(val.adapter) ? val.adapter : [val.adapter]) : [],
         };
       });
     } catch (e) {
@@ -1703,6 +1705,7 @@ export const api = {
       ...(provider.gpu_power_draw_watts != null
         ? { gpu_power_draw_watts: provider.gpu_power_draw_watts }
         : {}),
+      ...(provider.adapter && provider.adapter.length > 0 ? { adapter: provider.adapter } : {}),
     };
 
     const res = await fetchWithAuth(

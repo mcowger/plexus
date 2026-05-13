@@ -46,6 +46,7 @@ export const providers = pgTable(
     gpuBandwidthTbS: real('gpu_bandwidth_tb_s'), // Bandwidth in TB/s
     gpuFlopsTflop: real('gpu_flops_tflop'), // FLOPS in TFLOP
     gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Power draw in watts
+    adapter: jsonb('adapter'), // string[] — provider-level adapter names
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },

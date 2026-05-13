@@ -33,6 +33,7 @@ export const providers = sqliteTable(
     gpuBandwidthTbS: real('gpu_bandwidth_tb_s'), // Bandwidth in TB/s
     gpuFlopsTflop: real('gpu_flops_tflop'), // FLOPS in TFLOP
     gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Power draw in watts
+    adapter: text('adapter'), // JSON: string[] — provider-level adapter names
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

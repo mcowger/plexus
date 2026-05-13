@@ -6,6 +6,20 @@ import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import type { Provider } from '../../lib/api';
 
+export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
+  {
+    value: 'reasoning_content',
+    label: 'Reasoning Content',
+    description:
+      'Maps reasoning ↔ reasoning_content on messages and responses (e.g. Fireworks DeepSeek-R1).',
+  },
+  {
+    value: 'suppress_developer_role',
+    label: 'Suppress Developer Role',
+    description: 'Rewrites the "developer" role to "system" for providers that do not support it.',
+  },
+];
+
 interface Props {
   editingProvider: Provider;
   setEditingProvider: React.Dispatch<React.SetStateAction<Provider>>;
@@ -44,6 +58,63 @@ export function ProviderAdvancedEditor({
           className="px-3 py-3 border-t border-border-glass"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
         >
+          {/* Provider Adapters */}
+          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+            <label className="font-body text-[13px] font-medium text-text-secondary block mb-2">
+              Provider Adapters
+            </label>
+            <div
+              className="font-body text-[11px] text-text-secondary mb-3"
+              style={{ lineHeight: 1.4 }}
+            >
+              Adapters rewrite requests and responses to fix provider-specific field-name
+              incompatibilities. Applied to every model under this provider unless overridden
+              per-model.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {KNOWN_ADAPTERS.map((a) => {
+                const active = (editingProvider.adapter ?? []).includes(a.value);
+                return (
+                  <label
+                    key={a.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      padding: '6px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--color-border-glass)',
+                      background: active ? 'var(--color-bg-hover)' : 'var(--color-bg-deep)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      style={{ marginTop: '2px', flexShrink: 0 }}
+                      onChange={() => {
+                        const current = editingProvider.adapter ?? [];
+                        const next = active
+                          ? current.filter((v) => v !== a.value)
+                          : [...current, a.value];
+                        setEditingProvider({ ...editingProvider, adapter: next });
+                      }}
+                    />
+                    <div>
+                      <div className="font-body text-[12px] font-medium text-text">{a.label}</div>
+                      <div
+                        className="font-body text-[11px] text-text-secondary"
+                        style={{ lineHeight: 1.35 }}
+                      >
+                        {a.description}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Discount */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px] sm:items-end">
             <div className="flex flex-col gap-1">

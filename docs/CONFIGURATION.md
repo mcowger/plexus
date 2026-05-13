@@ -91,6 +91,7 @@ A **provider** represents an upstream AI service that Plexus routes requests to.
 | **Headers** | Custom HTTP headers sent with every request | No |
 | **Extra Body** | Additional fields merged into every request | No |
 | **Disable Cooldown** | Exclude from automatic cooldown on errors | No |
+| **Adapters** | Request/response rewrite hooks applied to every model under this provider (see [Provider Adapters](#provider-adapters)) | No |
 
 ### Multi-Protocol Providers
 
@@ -126,6 +127,40 @@ Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/pac
 - Set OAuth Provider if the provider key differs from pi-ai's expected ID
 
 Once configured, log in via the Admin UI to authorize Plexus. Tokens are stored encrypted (when `ENCRYPTION_KEY` is set) and auto-refreshed.
+
+### Provider Adapters
+
+Adapters rewrite request payloads outbound to a provider and raw response payloads inbound, fixing provider-specific field-name incompatibilities without modifying the core transformer pipeline.
+
+Adapters can be set at **provider level** (applied to every model under the provider) or at **model level** (appended after provider-level adapters for a specific model). Both accept a single name or a list.
+
+| Adapter | Description |
+|---------|-------------|
+| `reasoning_content` | Renames `reasoning` / `thinking.content` → `reasoning_content` on outbound assistant messages for providers that use Fireworks/DeepSeek field naming (e.g. Fireworks DeepSeek-R1). Fixes *"Extra inputs are not permitted, field: messages[N].reasoning"* errors. |
+| `suppress_developer_role` | Rewrites the `developer` role to `system` on outbound messages for providers that do not support the newer OpenAI `developer` role. |
+
+**Example — provider-level:**
+```json
+PUT /v0/management/providers/fireworks
+{
+  "api_base_url": "https://api.fireworks.ai/inference/v1",
+  "api_key": "fw_...",
+  "adapter": "reasoning_content"
+}
+```
+
+**Example — model-level override:**
+```json
+{
+  "models": {
+    "accounts/fireworks/models/deepseek-r1": {
+      "adapter": ["reasoning_content", "suppress_developer_role"]
+    }
+  }
+}
+```
+
+Adapters are applied in order on outbound (preDispatch) and in reverse on inbound (postDispatch). Pass-through optimisation is automatically disabled when any adapter is active.
 
 ### Provider Quota Checkers
 

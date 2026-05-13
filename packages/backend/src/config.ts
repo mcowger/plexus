@@ -61,6 +61,8 @@ const PricingSchema = z.discriminatedUnion('source', [
   }),
 ]);
 
+const AdapterConfigSchema = z.union([z.string(), z.array(z.string())]).optional();
+
 const ModelProviderConfigSchema = z.object({
   pricing: PricingSchema.default({
     source: 'simple',
@@ -70,6 +72,7 @@ const ModelProviderConfigSchema = z.object({
   access_via: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   extraBody: z.record(z.string(), z.any()).optional(),
+  adapter: AdapterConfigSchema,
 });
 
 const OAuthProviderSchema = z.enum([
@@ -420,6 +423,7 @@ export const ProviderConfigSchema = z
     gpu_flops_tflop: z.number().positive().optional(),
     gpu_power_draw_watts: z.number().positive().optional(),
     geminiThinkingEnabled: z.boolean().optional(),
+    adapter: AdapterConfigSchema,
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",

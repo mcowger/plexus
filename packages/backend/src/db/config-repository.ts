@@ -306,6 +306,10 @@ export class ConfigRepository {
       gpuBandwidthTbS: config.gpu_bandwidth_tb_s ?? null,
       gpuFlopsTflop: config.gpu_flops_tflop ?? null,
       gpuPowerDrawWatts: config.gpu_power_draw_watts ?? null,
+      adapter:
+        config.adapter && (Array.isArray(config.adapter) ? config.adapter.length > 0 : true)
+          ? toJson(Array.isArray(config.adapter) ? config.adapter : [config.adapter])
+          : null,
       updatedAt: timestamp,
     };
 
@@ -358,6 +362,10 @@ export class ConfigRepository {
           modelType: cfg.type ?? null,
           accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
           extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
+          adapter:
+            cfg.adapter && (Array.isArray(cfg.adapter) ? cfg.adapter.length > 0 : true)
+              ? toJson(Array.isArray(cfg.adapter) ? cfg.adapter : [cfg.adapter])
+              : null,
           sortOrder: idx,
         }));
         if (modelRows.length > 0) {
@@ -429,6 +437,7 @@ export class ConfigRepository {
             ...(m.modelType ? { type: m.modelType } : {}),
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
+            ...(m.adapter ? { adapter: parseJson(m.adapter) } : {}),
           };
         }
       } else {
@@ -470,6 +479,10 @@ export class ConfigRepository {
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
       ...(quota_checker ? { quota_checker } : {}),
+      ...(() => {
+        const adapterVal = parseJson<string[]>(row.adapter);
+        return Array.isArray(adapterVal) && adapterVal.length > 0 ? { adapter: adapterVal } : {};
+      })(),
       // GPU Profile settings — resolve named profiles to concrete values for
       // backward compatibility with existing DB rows that may only have gpuProfile
       // set without the numeric fields.

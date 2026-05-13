@@ -13,6 +13,7 @@ export const providerModels = sqliteTable(
     modelType: text('model_type'), // 'chat' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'responses'
     accessVia: text('access_via'), // JSON: string[]
     extraBody: text('extra_body'), // JSON: Record<string, any>
+    adapter: text('adapter'), // JSON: string[] — model-level adapter names
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({

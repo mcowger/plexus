@@ -330,6 +330,13 @@
       "when": 1778683598311,
       "tag": "0046_gifted_mandrill",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1778694222659,
+      "tag": "0047_cloudy_red_skull",
+      "breakpoints": true
     }
   ]
 }

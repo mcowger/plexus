@@ -18,6 +18,7 @@ import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import { OpenRouterSlugInput } from '../ui/OpenRouterSlugInput';
 import type { Provider } from '../../lib/api';
+import { KNOWN_ADAPTERS } from './ProviderAdvancedEditor';
 
 const KNOWN_APIS = [
   'chat',
@@ -801,6 +802,74 @@ export function ProviderModelsEditor({
                           </div>
                         </div>
                       )}
+
+                      {/* Per-Model Adapters */}
+                      <div
+                        className="border border-border-glass rounded-md p-3 bg-bg-subtle"
+                        style={{ marginTop: '12px' }}
+                      >
+                        <label className="font-body text-[13px] font-medium text-text-secondary block mb-1">
+                          Model Adapters
+                        </label>
+                        <div
+                          className="font-body text-[11px] text-text-secondary mb-2"
+                          style={{ lineHeight: 1.4 }}
+                        >
+                          Override or extend provider-level adapters for this specific model.
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {KNOWN_ADAPTERS.map((a) => {
+                            const modelAdapters: string[] = mCfg.adapter
+                              ? Array.isArray(mCfg.adapter)
+                                ? mCfg.adapter
+                                : [mCfg.adapter]
+                              : [];
+                            const active = modelAdapters.includes(a.value);
+                            return (
+                              <label
+                                key={a.value}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: '8px',
+                                  cursor: 'pointer',
+                                  padding: '5px 7px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: '1px solid var(--color-border-glass)',
+                                  background: active
+                                    ? 'var(--color-bg-hover)'
+                                    : 'var(--color-bg-deep)',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={active}
+                                  style={{ marginTop: '2px', flexShrink: 0 }}
+                                  onChange={() => {
+                                    const next = active
+                                      ? modelAdapters.filter((v) => v !== a.value)
+                                      : [...modelAdapters, a.value];
+                                    updateModelConfig(mId, {
+                                      adapter: next.length > 0 ? next : undefined,
+                                    });
+                                  }}
+                                />
+                                <div>
+                                  <div className="font-body text-[12px] font-medium text-text">
+                                    {a.label}
+                                  </div>
+                                  <div
+                                    className="font-body text-[11px] text-text-secondary"
+                                    style={{ lineHeight: 1.35 }}
+                                  >
+                                    {a.description}
+                                  </div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
 
                       {/* Per-Model Extra Body Fields */}
                       <div

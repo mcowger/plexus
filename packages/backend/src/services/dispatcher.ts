@@ -22,6 +22,8 @@ import { UsageStorageService } from './usage-storage';
 import { CooldownParserRegistry } from './cooldown-parsers';
 import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
+import { resolveAdapters } from './adapter-resolver';
+import type { ProviderAdapter } from '../types/provider-adapter';
 import { getModels } from '@mariozechner/pi-ai';
 import { VisionDescriptorService } from './vision-descriptor-service';
 import { ModelMetadataManager } from './model-metadata-manager';
@@ -345,12 +347,16 @@ export class Dispatcher {
         // 3. Transform Request
         const requestWithTargetModel = { ...currentRequest, model: route.model };
 
+        // Resolve adapters for this specific provider+model combination
+        const adapters = resolveAdapters(route);
+
         const { payload: providerPayload, bypassTransformation } =
           await this.transformRequestPayload(
             requestWithTargetModel,
             route,
             transformer,
-            targetApiType
+            targetApiType,
+            adapters
           );
 
         // Capture transformed request
@@ -519,7 +525,8 @@ export class Dispatcher {
             currentRequest,
             route,
             targetApiType,
-            bypassTransformation
+            bypassTransformation,
+            adapters
           );
           await this.recordAttemptMetric(route, currentRequest.requestId, true, {
             isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
@@ -544,7 +551,8 @@ export class Dispatcher {
           route,
           targetApiType,
           transformer,
-          bypassTransformation
+          bypassTransformation,
+          adapters
         );
         await this.recordAttemptMetric(route, currentRequest.requestId, true, {
           isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
@@ -1872,12 +1880,16 @@ export class Dispatcher {
     request: UnifiedChatRequest,
     route: RouteResult,
     transformer: any,
-    targetApiType: string
+    targetApiType: string,
+    adapters: ProviderAdapter[] = []
   ): Promise<{ payload: any; bypassTransformation: boolean }> {
     let providerPayload: any;
     let bypassTransformation = false;
 
-    if (this.shouldUsePassThrough(request, targetApiType, route)) {
+    // Adapters require full transformation — suppress pass-through when any are active
+    const hasAdapters = adapters.length > 0;
+
+    if (!hasAdapters && this.shouldUsePassThrough(request, targetApiType, route)) {
       logger.debug(
         `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
       );
@@ -1936,6 +1948,18 @@ export class Dispatcher {
           canonicalModel: route.canonicalModel,
         });
       }
+    }
+
+    // Apply provider/model adapters (preDispatch) in configured order
+    for (const adapter of adapters) {
+      providerPayload = adapter.preDispatch(providerPayload);
+    }
+
+    if (adapters.length > 0) {
+      logger.debug(
+        `Adapters applied (preDispatch): [${adapters.map((a) => a.name).join(', ')}] ` +
+          `for ${route.provider}/${route.model}`
+      );
     }
 
     return { payload: providerPayload, bypassTransformation };
@@ -2159,11 +2183,23 @@ export class Dispatcher {
     request: UnifiedChatRequest,
     route: RouteResult,
     targetApiType: string,
-    bypassTransformation: boolean
+    bypassTransformation: boolean,
+    adapters: ProviderAdapter[] = []
   ): UnifiedChatResponse {
     logger.debug('Streaming response detected');
 
-    const rawStream = response.body!;
+    let rawStream: ReadableStream = response.body!;
+
+    // If any adapter defines preDispatchStreamChunk, pipe the raw SSE stream
+    // through a rewrite transform before it reaches transformStream().
+    const streamAdapters = adapters.filter((a) => a.preDispatchStreamChunk);
+    if (streamAdapters.length > 0) {
+      rawStream = rawStream.pipeThrough(this.buildSseRewriteTransform(streamAdapters));
+      logger.debug(
+        `Stream adapters applied (preDispatchStreamChunk): [${streamAdapters.map((a) => a.name).join(', ')}] ` +
+          `for ${route.provider}/${route.model}`
+      );
+    }
 
     const streamResponse: UnifiedChatResponse = {
       id: 'stream-' + Date.now(),
@@ -2179,6 +2215,44 @@ export class Dispatcher {
   }
 
   /**
+   * Builds a TransformStream that rewrites raw SSE lines through the
+   * preDispatchStreamChunk hooks of the given adapters.
+   * Handles chunked delivery — lines may arrive split across multiple chunks.
+   */
+  private buildSseRewriteTransform(
+    adapters: ProviderAdapter[]
+  ): TransformStream<Uint8Array, Uint8Array> {
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    return new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep the last (possibly incomplete) segment in the buffer
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          let rewritten = line;
+          for (const adapter of adapters) {
+            rewritten = adapter.preDispatchStreamChunk!(rewritten);
+          }
+          controller.enqueue(encoder.encode(rewritten + '\n'));
+        }
+      },
+      flush(controller) {
+        if (buffer.length > 0) {
+          let rewritten = buffer;
+          for (const adapter of adapters) {
+            rewritten = adapter.preDispatchStreamChunk!(rewritten);
+          }
+          controller.enqueue(encoder.encode(rewritten));
+        }
+      },
+    });
+  }
+
+  /**
    * Handles non-streaming responses
    */
   private async handleNonStreamingResponse(
@@ -2187,15 +2261,29 @@ export class Dispatcher {
     route: RouteResult,
     targetApiType: string,
     transformer: any,
-    bypassTransformation: boolean
+    bypassTransformation: boolean,
+    adapters: ProviderAdapter[] = []
   ): Promise<UnifiedChatResponse> {
-    const responseBody = await this.parseJsonResponseBody(
+    let responseBody = await this.parseJsonResponseBody(
       response,
       request.requestId,
       route,
       targetApiType
     );
     logger.silly('Upstream Response Payload', responseBody);
+
+    // Apply provider/model adapters (postDispatch) in reverse order
+    if (adapters.length > 0) {
+      for (let i = adapters.length - 1; i >= 0; i--) {
+        responseBody = adapters[i]!.postDispatch(responseBody);
+      }
+      logger.debug(
+        `Adapters applied (postDispatch): [${[...adapters]
+          .reverse()
+          .map((a) => a.name)
+          .join(', ')}] ` + `for ${route.provider}/${route.model}`
+      );
+    }
 
     if (request.requestId) {
       DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
