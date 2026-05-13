@@ -537,79 +537,30 @@ const summaryRequestCache = new Map<
 const CONFIG_CACHE_TTL_MS = 20000;
 const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<any> }>();
 
-// Cache for quota checker types fetched from backend
-let quotaCheckerTypesCache: Set<string> | null = null;
-let quotaCheckerTypesCacheTime: number = 0;
-const QUOTA_TYPES_CACHE_TTL_MS = 60000; // 1 minute cache
-
-// Fallback types - will be used until fetched from server
-const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
-  'synthetic',
-  'naga',
-  'nanogpt',
-  'openai-codex',
-  'claude-code',
-  'zai',
-  'moonshot',
-  'novita',
-  'minimax',
-  'minimax-coding',
-  'kimi-code',
-  'openrouter',
-  'kilo',
-  'wisdomgate',
-  'apertis',
-  'copilot',
-  'poe',
-  'gemini-cli',
-  'antigravity',
-  'ollama',
-  'neuralwatt',
-  'zenmux',
-  'devpass',
-  'wafer',
-  'opencode-go',
-]);
-
-/**
- * Fetch valid quota checker types from the backend
- */
-async function fetchQuotaCheckerTypes(): Promise<Set<string>> {
-  const now = Date.now();
-  if (quotaCheckerTypesCache && now - quotaCheckerTypesCacheTime < QUOTA_TYPES_CACHE_TTL_MS) {
-    return quotaCheckerTypesCache;
-  }
-
-  try {
-    const response = await fetchWithAuth(`${API_BASE}/v0/management/quota-checker-types`);
-    if (response.ok) {
-      const data = await response.json();
-      if (Array.isArray(data.types)) {
-        quotaCheckerTypesCache = new Set(data.types);
-        quotaCheckerTypesCacheTime = now;
-        return quotaCheckerTypesCache;
-      }
-    }
-  } catch (error) {
-    // Silently fail and use fallback
-  }
-
-  return FALLBACK_QUOTA_CHECKER_TYPES;
+export interface QuotaCheckerType {
+  type: string;
+  displayName: string;
 }
 
-/**
- * Get valid quota checker types (sync version - returns fallback if not fetched)
- * Call fetchQuotaCheckerTypes() early to populate the cache
- */
-export function getQuotaCheckerTypes(): Set<string> {
-  return quotaCheckerTypesCache || FALLBACK_QUOTA_CHECKER_TYPES;
+export interface QuotaCheckersResponse {
+  knownTypes: QuotaCheckerType[];
+  configured: (QuotaCheckerInfo & { displayName: string; pending: boolean })[];
 }
 
-/**
- * Initialize quota checker types cache
- */
-export async function initQuotaCheckerTypes(): Promise<void> {
-  await fetchQuotaCheckerTypes();
+export async function fetchQuotaCheckers(): Promise<QuotaCheckersResponse> {
+  const response = await fetchWithAuth(`${API_BASE}/v0/management/quota-checkers`);
+  if (!response.ok) throw new Error('Failed to fetch quota checkers');
+  const data = await response.json();
+  return {
+    knownTypes: data.knownTypes ?? [],
+    configured: (data.configured ?? []).map(
+      (c: QuotaCheckerInfo & { displayName: string; pending: boolean }) => ({
+        ...normalizeQuotaCheckerInfo(c),
+        displayName: c.displayName,
+        pending: c.pending,
+      })
+    ),
+  };
 }
 
 // Re-export GpuProfileOption from shared package for use by other components
@@ -626,10 +577,9 @@ const normalizeProviderQuotaChecker = (checker?: {
   const type = checker.type?.trim();
   if (!type) return undefined;
 
-  const isValidType = getQuotaCheckerTypes().has(type);
   return {
     type,
-    enabled: isValidType ? checker.enabled !== false : false,
+    enabled: checker.enabled !== false,
     intervalMinutes: Math.max(1, Number(checker.intervalMinutes || 30)),
     options: checker.options,
   };

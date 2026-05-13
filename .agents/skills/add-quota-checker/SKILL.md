@@ -9,15 +9,47 @@ Every item in this checklist is required. The provider edit modal will not show 
 
 ## Backend
 
-### `packages/backend/src/config.ts`
-- Add the lowercase checker type string to `VALID_QUOTA_CHECKER_TYPES` array — this drives the `/v0/management/quota-checker-types` API endpoint.
+### 1. Create the checker file (`packages/backend/src/services/quota/checkers/{name}-checker.ts`)
 
-### `packages/backend/src/services/quota/checker-registry.ts`
-- Register the checker class in `CHECKER_REGISTRY`.
+Implement the checker using `defineChecker()`. The `type` and `displayName` fields on this object are the **sole source of truth** — they drive the API, the frontend dropdown, and all display labels automatically.
 
-### `packages/backend/drizzle/schema/postgres/enums.ts`
-- Add the type to `quotaCheckerTypeEnum`. (SQLite uses plain `text` and doesn't enforce enum values — Postgres deployments will reject inserts without this.)
-- After your PR merges, CI auto-generates the migration. Do **not** create or edit migration files manually.
+```ts
+import { defineChecker } from '../checker-registry';
+import { z } from 'zod';
+
+export default defineChecker({
+  type: 'my-checker',          // lowercase, kebab-case
+  displayName: 'My Checker',   // human-readable label shown in the UI
+  optionsSchema: z.object({
+    apiKey: z.string().min(1, 'API key is required'),
+    endpoint: z.string().url().optional(),
+  }),
+  async check(ctx) {
+    // ... fetch and return Meter[]
+  },
+});
+```
+
+### 2. Register the import in `packages/backend/src/services/quota/checker-registry.ts`
+
+Add one line to `loadAllCheckers()`:
+
+```ts
+await import('./checkers/my-checker');
+```
+
+### 3. Add the Zod schema to `packages/backend/src/config.ts`
+
+- Add a `{Name}QuotaCheckerOptionsSchema` const with the checker's options.
+- Add a `z.object({ type: z.literal('my-checker'), ... })` entry to `ProviderQuotaCheckerSchema` (the `z.discriminatedUnion`).
+
+### 4. Postgres enum (`packages/backend/drizzle/schema/postgres/enums.ts`)
+
+Add the type string to `quotaCheckerTypeEnum`. SQLite ignores enum enforcement — Postgres deployments will reject inserts without this.
+
+After your PR merges, CI auto-generates the migration. Do **not** create or edit migration files manually.
+
+---
 
 ## Frontend — Config component (`packages/frontend/src/components/quota/`)
 
@@ -26,54 +58,41 @@ Every item in this checklist is required. The provider edit modal will not show 
 - Do **not** add an `apiKey` field — it is auto-inherited from the provider config.
 - Call `onChange` whenever any option changes.
 
-## Frontend — ProviderQuotaEditor (`packages/frontend/src/components/providers/ProviderQuotaEditor.tsx`)
-
-1. Import the config component at the top.
-2. Add an entry to `QUOTA_CONFIG_MAP` mapping the lowercase type string to the component class.
-
-That's it — `ProviderQuotaEditor` handles rendering the config component and wiring up `onChange` generically via the map.
-
-## Frontend — useProviderForm (`packages/frontend/src/hooks/useProviderForm.tsx`)
-
-- Add the lowercase type string to `QUOTA_CHECKER_TYPES_FALLBACK`. This is used as initial state and as a fallback if the API hasn't responded yet.
-- If the checker has required options, add validation logic to `validateQuotaChecker()`.
-
-## Frontend — api.ts (`packages/frontend/src/lib/api.ts`)
-
-- Add the lowercase type string to `FALLBACK_QUOTA_CHECKER_TYPES`. This is returned by `getQuotaCheckerTypes()` when the backend API hasn't been fetched yet or fails to respond.
-
-## Frontend — Display name (`packages/frontend/src/components/quota/checker-presentation.ts`)
-
-- Add the type to `CHECKER_DISPLAY_NAMES` map (e.g. `'checker-name': 'Display Name'`).
-- This is used by `getCheckerDisplayName()` which is called from `Quotas.tsx`, `CompactQuotasCard`, `CombinedBalancesCard`, and the sidebar.
-
-## Frontend — QuotaDisplay component (optional)
-
-### `{Name}QuotaDisplay.tsx`
-- Props: `result: QuotaCheckResult`, `isCollapsed: boolean`
-- Rate-limit checkers → progress bar (`QuotaProgressBar`)
-- Balance checkers → `Wallet` icon + dollar/points display
-- Note: The current UI renders quota data generically via the meter system (`AllowanceMeterRow`, `BalanceMeterRow`). A `QuotaDisplay` component is only needed if the checker requires custom rendering beyond the generic meters. Most checkers do **not** need one.
-
 ### `index.ts`
-- Export the config component. Only export the display component if you created one.
+- Export the config component.
 
 ---
 
-## Hybrid Balance + Rate-Limit Checkers
+## Frontend — ProviderQuotaEditor (`packages/frontend/src/components/providers/ProviderQuotaEditor.tsx`)
 
-Some checkers (e.g. neuralwatt) return **both** a dollar balance and a rate-limit window (e.g. monthly kWh). These require extra steps:
+1. Import the config component at the top.
+2. Add an entry to `QUOTA_CONFIG_MAP` mapping the lowercase type string to the component.
 
-1. **Backend** — set `category: 'balance'` (the dollar balance window drives the category).
-2. **Display component** — render both the `Wallet`/dollar balance and a progress bar for the monthly window. Follow the `ApertisCodingPlanQuotaDisplay` pattern for the rate-limit part.
+---
+
+## Frontend — validation (`packages/frontend/src/hooks/useProviderForm.tsx`)
+
+If the checker has required options, add validation logic to `validateQuotaChecker()`.
+
+No fallback lists to update — the frontend fetches all known types from the backend at runtime.
+
+---
+
+## That's it
+
+The `type` and `displayName` you set in `defineChecker()` are automatically:
+- Returned by `GET /v0/management/quota-checker-types`
+- Returned by `GET /v0/management/quota-checkers` (knownTypes + configured)
+- Used in the provider edit modal dropdown
+- Used in Quotas page headings, sidebar cards, and all display labels
+
+There are **no frontend constant lists to update**.
 
 ---
 
 ## Common Mistakes
 
-- **Missing `VALID_QUOTA_CHECKER_TYPES` in `config.ts`**: The backend API will never return the type to the frontend, even if all frontend registrations are correct.
+- **Missing `loadAllCheckers()` import**: The checker will never be registered — the registry stays empty for that type.
 - **Missing Postgres enum**: SQLite ignores enum enforcement; Postgres deployments will reject inserts.
-- **Missing `QUOTA_CONFIG_MAP` entry**: The provider edit modal will show the dropdown type but no config form for the checker's options.
-- **Missing `CHECKER_DISPLAY_NAMES` entry**: The checker will display as its raw ID instead of a friendly name.
-- **Missing `QUOTA_CHECKER_TYPES_FALLBACK` in `useProviderForm.tsx`**: The type won't appear in the dropdown until the API responds (or at all if the API fails).
-- **Missing `FALLBACK_QUOTA_CHECKER_TYPES` in `api.ts`**: Same issue — `getQuotaCheckerTypes()` returns this set as a fallback when the cache is empty.
+- **Missing `QUOTA_CONFIG_MAP` entry in `ProviderQuotaEditor`**: The provider edit modal will show the dropdown type but no config form for the checker's options.
+- **Missing `ProviderQuotaCheckerSchema` entry in `config.ts`**: The backend Zod validation will reject configs using the new type.

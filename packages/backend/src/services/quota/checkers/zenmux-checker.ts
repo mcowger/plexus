@@ -42,6 +42,7 @@ interface ZenmuxQuotaResponse {
 
 export default defineChecker({
   type: 'zenmux',
+  displayName: 'Zenmux',
   optionsSchema: z.object({
     managementApiKey: z.string().min(1, 'Zenmux management API key is required'),
     endpoint: z.string().url().optional(),

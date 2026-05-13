@@ -59,6 +59,7 @@ function addMonths(dateStr: string, months: number): string {
 
 export default defineChecker({
   type: 'devpass',
+  displayName: 'DevPass',
   optionsSchema: z.object({
     session: z.string().trim().min(1, 'DevPass session cookie is required'),
     endpoint: z.string().url().optional(),

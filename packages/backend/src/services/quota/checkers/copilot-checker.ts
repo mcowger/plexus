@@ -55,6 +55,7 @@ async function resolveApiKey(
 
 export default defineChecker({
   type: 'copilot',
+  displayName: 'GitHub Copilot',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

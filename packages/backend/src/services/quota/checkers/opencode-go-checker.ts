@@ -43,6 +43,7 @@ function parseWindowUsage(html: string, field: string): OpenCodeGoWindow | null 
 
 export default defineChecker({
   type: 'opencode-go',
+  displayName: 'OpenCode Go',
   optionsSchema: z.object({
     workspaceId: z.string().min(1, 'OpenCode Go workspace ID is required'),
     authCookie: z.string().min(1, 'OpenCode Go auth cookie is required'),

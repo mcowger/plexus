@@ -8,6 +8,7 @@ interface NovitaBalanceResponse {
 
 export default defineChecker({
   type: 'novita',
+  displayName: 'Novita',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Novita API key is required'),
     endpoint: z.string().url().optional(),

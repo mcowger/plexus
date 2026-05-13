@@ -11,7 +11,7 @@ import type {
   CooldownPolicy,
   QuotaConfig,
 } from '../config';
-import { VALID_QUOTA_CHECKER_TYPES } from '../config';
+
 import { QuotaScheduler } from './quota/quota-scheduler';
 
 /**

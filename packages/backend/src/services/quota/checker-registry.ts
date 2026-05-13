@@ -45,6 +45,7 @@ interface AllowanceParams {
 
 export interface CheckerDefinition<TOptions extends z.ZodTypeAny = z.ZodTypeAny> {
   type: string;
+  displayName: string;
   optionsSchema: TOptions;
   check(ctx: MeterContext): Promise<Meter[]>;
 }
@@ -62,6 +63,10 @@ export function defineChecker<TOptions extends z.ZodTypeAny>(
 
 export function getCheckerTypes(): string[] {
   return Array.from(REGISTRY.keys());
+}
+
+export function getCheckerDefinitions(): CheckerDefinition[] {
+  return Array.from(REGISTRY.values());
 }
 
 export function getCheckerDefinition(type: string): CheckerDefinition | undefined {

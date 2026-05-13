@@ -26,6 +26,7 @@ function extractUsage(html: string, label: string): { percent: number; resetsAt?
 
 export default defineChecker({
   type: 'ollama',
+  displayName: 'Ollama',
   optionsSchema: z.object({
     sessionCookie: z.string().min(1, 'Ollama session cookie is required'),
     endpoint: z.string().url().optional(),

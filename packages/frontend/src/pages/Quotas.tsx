@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { RefreshCw, Cpu, Gauge, AlertTriangle, DatabaseZap, Download } from 'lucide-react';
 import { clsx } from 'clsx';
-import { api } from '../lib/api';
+import { api, fetchQuotaCheckers } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -14,7 +14,8 @@ import { MeterHistoryModal } from '../components/quota/MeterHistoryModal';
 import { getCheckerDisplayName } from '../components/quota/checker-presentation';
 
 export const Quotas = () => {
-  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [quotas, setQuotas] = useState<(QuotaCheckerInfo & { pending?: boolean })[]>([]);
+  const [displayNameMap, setDisplayNameMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [legacyRowCount, setLegacyRowCount] = useState<number | null>(null);
@@ -35,9 +36,13 @@ export const Quotas = () => {
 
   const fetchQuotas = async () => {
     setLoading(true);
-    const data = await api.getQuotas();
-    setQuotas(data);
-    setLoading(false);
+    try {
+      const data = await fetchQuotaCheckers();
+      setDisplayNameMap(new Map(data.knownTypes.map((t) => [t.type, t.displayName])));
+      setQuotas(data.configured);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -96,18 +101,18 @@ export const Quotas = () => {
   };
 
   const balanceQuotas = useMemo(
-    () => quotas.filter((q) => q.meters.some((m) => m.kind === 'balance')),
+    () => quotas.filter((q) => q.pending || q.meters.some((m) => m.kind === 'balance')),
     [quotas]
   );
 
   const allowanceQuotas = useMemo(
-    () => quotas.filter((q) => q.meters.some((m) => m.kind === 'allowance')),
+    () => quotas.filter((q) => q.pending || q.meters.some((m) => m.kind === 'allowance')),
     [quotas]
   );
 
   // Group allowance quotas by checkerType for display
   const allowanceGroups = useMemo(() => {
-    const groups: Record<string, QuotaCheckerInfo[]> = {};
+    const groups: Record<string, (QuotaCheckerInfo & { pending?: boolean })[]> = {};
     for (const quota of allowanceQuotas) {
       const key = quota.checkerType || quota.checkerId;
       if (!groups[key]) groups[key] = [];
@@ -116,7 +121,10 @@ export const Quotas = () => {
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [allowanceQuotas]);
 
-  const renderCheckerCard = (quota: QuotaCheckerInfo, _groupDisplayName: string) => {
+  const renderCheckerCard = (
+    quota: QuotaCheckerInfo & { pending?: boolean },
+    _groupDisplayName: string
+  ) => {
     const allowances = quota.meters.filter((m) => m.kind === 'allowance');
 
     return (
@@ -127,18 +135,20 @@ export const Quotas = () => {
         <button
           type="button"
           onClick={() => handleRefresh(quota.checkerId)}
-          disabled={refreshing.has(quota.checkerId)}
+          disabled={refreshing.has(quota.checkerId) || quota.pending}
           aria-label="Refresh"
           className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-bg-hover hover:text-text transition-colors duration-fast disabled:opacity-50"
         >
           <RefreshCw
             size={14}
-            className={clsx(refreshing.has(quota.checkerId) && 'animate-spin')}
+            className={clsx((refreshing.has(quota.checkerId) || quota.pending) && 'animate-spin')}
           />
         </button>
 
         <div className="pr-8">
-          {!quota.success ? (
+          {quota.pending ? (
+            <span className="text-xs text-text-muted">Pending first check...</span>
+          ) : !quota.success ? (
             <div className="flex items-center gap-2 text-danger">
               <AlertTriangle size={14} />
               <span className="text-xs">Check failed</span>
@@ -308,6 +318,7 @@ export const Quotas = () => {
                   balanceQuotas={balanceQuotas}
                   onRefresh={handleRefresh}
                   refreshing={refreshing}
+                  displayNameMap={displayNameMap}
                 />
               </section>
             )}
@@ -322,7 +333,8 @@ export const Quotas = () => {
                   {allowanceGroups.map(([checkerType, quotasList]) => {
                     const displayName = getCheckerDisplayName(
                       checkerType,
-                      quotasList[0]?.checkerId ?? checkerType
+                      quotasList[0]?.checkerId ?? checkerType,
+                      displayNameMap
                     );
                     return (
                       <div key={checkerType} className="flex flex-col gap-3">

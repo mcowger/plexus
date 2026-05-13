@@ -41,6 +41,7 @@ async function resolveApiKey(ctx: {
 
 export default defineChecker({
   type: 'claude-code',
+  displayName: 'Claude Code',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

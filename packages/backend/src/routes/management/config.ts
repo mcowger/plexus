@@ -1,13 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import {
-  VALID_QUOTA_CHECKER_TYPES,
   ProviderConfigSchema,
   ModelConfigSchema,
   KeyConfigSchema,
   McpServerConfigSchema,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
+import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
@@ -609,9 +609,10 @@ export async function registerConfigRoutes(
   // ─── Quota Checker Types ──────────────────────────────────────────
 
   fastify.get('/v0/management/quota-checker-types', async (_request, reply) => {
+    const defs = getCheckerDefinitions();
     return reply.send({
-      types: VALID_QUOTA_CHECKER_TYPES,
-      count: VALID_QUOTA_CHECKER_TYPES.length,
+      types: defs.map((d) => ({ type: d.type, displayName: d.displayName })),
+      count: defs.length,
     });
   });
 }

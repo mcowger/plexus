@@ -7,6 +7,7 @@ interface NagaBalanceResponse {
 
 export default defineChecker({
   type: 'naga',
+  displayName: 'Naga',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Naga provisioning key is required'),
     max: z.number().positive().optional(),

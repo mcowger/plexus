@@ -40,6 +40,7 @@ function normalizeApiKey(apiKey: string): string {
 
 export default defineChecker({
   type: 'nanogpt',
+  displayName: 'NanoGPT',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'NanoGPT API key is required'),
     endpoint: z.string().url().optional(),

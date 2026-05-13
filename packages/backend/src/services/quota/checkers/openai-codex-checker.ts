@@ -90,6 +90,7 @@ function buildMeterFromWindow(
 
 export default defineChecker({
   type: 'openai-codex',
+  displayName: 'OpenAI Codex',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

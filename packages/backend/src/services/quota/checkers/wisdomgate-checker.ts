@@ -10,6 +10,7 @@ interface WisdomGateUsageResponse {
 
 export default defineChecker({
   type: 'wisdomgate',
+  displayName: 'Wisdom Gate',
   optionsSchema: z.object({
     session: z.string().trim().min(1, 'Session cookie is required'),
     endpoint: z.string().url().optional(),

@@ -72,6 +72,7 @@ function extractBuckets(data: GeminiQuotaResponse): GeminiBucket[] {
 
 export default defineChecker({
   type: 'gemini-cli',
+  displayName: 'Gemini CLI',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

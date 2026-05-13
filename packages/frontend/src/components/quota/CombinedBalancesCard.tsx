@@ -12,12 +12,14 @@ interface CombinedBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
   onRefresh: (checkerId: string) => void;
   refreshing: Set<string>;
+  displayNameMap?: Map<string, string>;
 }
 
 export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   balanceQuotas,
   onRefresh,
   refreshing,
+  displayNameMap,
 }) => {
   const [historyTarget, setHistoryTarget] = useState<{
     quota: QuotaCheckerInfo;
@@ -33,7 +35,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
   const rightColumn = shouldSplit ? balanceQuotas.slice(midPoint) : [];
 
   const renderRow = (quota: QuotaCheckerInfo) => {
-    const displayName = getCheckerDisplayName(quota.checkerType, quota.checkerId);
+    const displayName = getCheckerDisplayName(quota.checkerType, quota.checkerId, displayNameMap);
     const balanceMeters = quota.meters.filter((m) => m.kind === 'balance');
 
     return (
@@ -67,7 +69,11 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
                   setHistoryTarget({
                     quota,
                     meter,
-                    displayName: getCheckerDisplayName(quota.checkerType, quota.checkerId),
+                    displayName: getCheckerDisplayName(
+                      quota.checkerType,
+                      quota.checkerId,
+                      displayNameMap
+                    ),
                   })
                 }
               />

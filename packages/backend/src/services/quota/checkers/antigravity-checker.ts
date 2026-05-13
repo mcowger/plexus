@@ -151,6 +151,7 @@ async function fetchModels(
 
 export default defineChecker({
   type: 'antigravity',
+  displayName: 'Antigravity',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

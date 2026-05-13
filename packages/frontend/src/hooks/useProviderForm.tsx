@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  api,
-  Provider,
-  OAuthSession,
-  initQuotaCheckerTypes,
-  getQuotaCheckerTypes,
-} from '../lib/api';
+import { api, Provider, OAuthSession, fetchQuotaCheckers } from '../lib/api';
 import type { QuotaCheckerInfo } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
@@ -31,34 +25,6 @@ export const OAUTH_PROVIDERS = [
   { value: 'google-antigravity', label: 'Antigravity (Gemini 3, Claude, GPT-OSS)' },
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' },
 ];
-
-const QUOTA_CHECKER_TYPES_FALLBACK = [
-  'synthetic',
-  'naga',
-  'nanogpt',
-  'openai-codex',
-  'claude-code',
-  'kimi-code',
-  'zai',
-  'moonshot',
-  'novita',
-  'minimax',
-  'minimax-coding',
-  'openrouter',
-  'kilo',
-  'wisdomgate',
-  'apertis',
-  'poe',
-  'copilot',
-  'gemini-cli',
-  'antigravity',
-  'ollama',
-  'neuralwatt',
-  'zenmux',
-  'devpass',
-  'wafer',
-  'opencode-go',
-] as const;
 
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
@@ -125,9 +91,7 @@ export function useProviderForm() {
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([
-    ...QUOTA_CHECKER_TYPES_FALLBACK,
-  ]);
+  const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([]);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [quotasLoading, setQuotasLoading] = useState(true);
 
@@ -215,9 +179,8 @@ export function useProviderForm() {
 
   // Effects
   useEffect(() => {
-    initQuotaCheckerTypes().then(() => {
-      const types = Array.from(getQuotaCheckerTypes());
-      setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
+    fetchQuotaCheckers().then((res) => {
+      setQuotaCheckerTypes(res.knownTypes.map((t) => t.type));
     });
   }, []);
 

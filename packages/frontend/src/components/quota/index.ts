@@ -8,4 +8,4 @@ export { CompactQuotasCard } from './CompactQuotasCard';
 export { BalanceMeterRow } from './BalanceMeterRow';
 export { AllowanceMeterRow } from './AllowanceMeterRow';
 export { MeterValue, formatMeterValue } from './MeterValue';
-export { getCheckerDisplayName, CHECKER_DISPLAY_NAMES } from './checker-presentation';
+export { getCheckerDisplayName } from './checker-presentation';

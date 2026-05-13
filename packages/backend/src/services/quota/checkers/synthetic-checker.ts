@@ -30,6 +30,7 @@ function parseCredits(val?: string): number | undefined {
 
 export default defineChecker({
   type: 'synthetic',
+  displayName: 'Synthetic',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     endpoint: z.string().url().optional(),

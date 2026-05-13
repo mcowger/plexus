@@ -37,6 +37,7 @@ function resolvePeriod(window: { duration: number; timeUnit: string }): {
 
 export default defineChecker({
   type: 'kimi-code',
+  displayName: 'Kimi Code',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Kimi Code API key is required'),
     endpoint: z.string().url().optional(),

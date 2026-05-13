@@ -13,6 +13,7 @@ interface WaferQuotaResponse {
 
 export default defineChecker({
   type: 'wafer',
+  displayName: 'Wafer',
   optionsSchema: z.object({
     endpoint: z.string().optional(),
     apiKey: z.string().min(1, 'Wafer API key is required'),

@@ -1,14 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toTitleCase } from '../../lib/format';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
+import { getCheckerDisplayName } from './checker-presentation';
 
 interface CompactBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
+  displayNameMap?: Map<string, string>;
 }
 
-export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({ balanceQuotas }) => {
+export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
+  balanceQuotas,
+  displayNameMap,
+}) => {
   const navigate = useNavigate();
 
   if (balanceQuotas.length === 0) return null;
@@ -27,7 +31,11 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({ balanc
       }}
     >
       {balanceQuotas.map((quota) => {
-        const displayName = toTitleCase(quota.checkerId);
+        const displayName = getCheckerDisplayName(
+          quota.checkerType,
+          quota.checkerId,
+          displayNameMap
+        );
         const balanceMeter = quota.meters.find((m) => m.kind === 'balance');
         const remaining = balanceMeter?.remaining;
         const formattedBalance =

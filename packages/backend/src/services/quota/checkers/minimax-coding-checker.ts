@@ -18,6 +18,7 @@ interface MiniMaxCodingResponse {
 
 export default defineChecker({
   type: 'minimax-coding',
+  displayName: 'MiniMax Coding',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'MiniMax Coding API key is required'),
     endpoint: z.string().url().optional(),

@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
+import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import {
   getLegacySnapshotStatus,
   migrateLegacySnapshots,
@@ -31,6 +32,48 @@ export async function registerQuotaRoutes(
   fastify: FastifyInstance,
   quotaScheduler: QuotaScheduler
 ) {
+  fastify.get('/v0/management/quota-checkers', async (_request, reply) => {
+    try {
+      const defs = getCheckerDefinitions();
+      const knownTypes = defs.map((d) => ({ type: d.type, displayName: d.displayName }));
+      const displayNameMap = new Map(defs.map((d) => [d.type, d.displayName]));
+
+      const configured = [];
+      for (const quota of getConfig().quotas ?? []) {
+        const checkerId = quota.id ?? quota.type;
+        try {
+          const latest = await quotaScheduler.getLatestQuota(checkerId);
+          configured.push({
+            ...getOAuthMetadata(checkerId),
+            checkerId,
+            checkerType: quota.type,
+            displayName: displayNameMap.get(quota.type) ?? quota.type,
+            pending: latest === null,
+            meters: latest?.meters ?? [],
+            success: latest?.success ?? false,
+            ...(latest?.error ? { error: latest.error } : {}),
+          });
+        } catch (error) {
+          configured.push({
+            ...getOAuthMetadata(checkerId),
+            checkerId,
+            checkerType: quota.type,
+            displayName: displayNameMap.get(quota.type) ?? quota.type,
+            pending: false,
+            meters: [],
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      return reply.send({ knownTypes, configured });
+    } catch (error) {
+      logger.error(`Failed to get quota checkers: ${error}`);
+      return reply.status(500).send({ error: 'Failed to retrieve quota checkers' });
+    }
+  });
+
   fastify.get('/v0/management/quotas', async (_request, reply) => {
     try {
       const checkerIds = quotaScheduler.getCheckerIds();

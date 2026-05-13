@@ -9,6 +9,7 @@ interface MiniMaxBalanceResponse {
 
 export default defineChecker({
   type: 'minimax',
+  displayName: 'MiniMax',
   optionsSchema: z.object({
     groupid: z.string().trim().min(1, 'MiniMax groupid is required'),
     hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),

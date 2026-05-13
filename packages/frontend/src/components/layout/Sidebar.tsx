@@ -18,7 +18,7 @@ import {
   UserCircle2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { api } from '../../lib/api';
+import { api, fetchQuotaCheckers } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { Modal } from '../ui/Modal';
@@ -97,7 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
+  const [quotas, setQuotas] = useState<(QuotaCheckerInfo & { pending?: boolean })[]>([]);
+  const [displayNameMap, setDisplayNameMap] = useState<Map<string, string>>(new Map());
   const { logout, isAdmin, isLimited, principal } = useAuth();
   const { isCollapsed, toggleSidebar, isMobileOpen, closeMobile } = useSidebar();
   const location = useLocation();
@@ -118,12 +119,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   }, []);
 
   useEffect(() => {
-    const fetchQuotas = async () => {
-      const data = await api.getQuotas();
-      setQuotas(data);
+    const loadQuotas = async () => {
+      const data = await fetchQuotaCheckers();
+      setDisplayNameMap(new Map(data.knownTypes.map((t) => [t.type, t.displayName])));
+      setQuotas(data.configured);
     };
-    fetchQuotas();
-    const interval = setInterval(fetchQuotas, 60000);
+    loadQuotas();
+    const interval = setInterval(loadQuotas, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -290,7 +292,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                 Balances
               </span>
             </div>
-            <CompactBalancesCard balanceQuotas={balanceQuotas} />
+            <CompactBalancesCard balanceQuotas={balanceQuotas} displayNameMap={displayNameMap} />
           </div>
         )}
 
@@ -302,7 +304,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                 Quotas
               </span>
             </div>
-            <CompactQuotasCard allowanceQuotas={allowanceQuotas} />
+            <CompactQuotasCard allowanceQuotas={allowanceQuotas} displayNameMap={displayNameMap} />
           </div>
         )}
 
