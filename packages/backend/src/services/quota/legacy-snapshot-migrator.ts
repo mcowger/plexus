@@ -6,8 +6,7 @@
 
 import { sql, SQL } from 'drizzle-orm';
 import { getDatabase, getCurrentDialect } from '../../db/client';
-import { meterSnapshots as sqliteMeterSnapshots } from '../../../drizzle/schema/sqlite/meter-snapshots';
-import { meterSnapshots as pgMeterSnapshots } from '../../../drizzle/schema/postgres/meter-snapshots';
+import { schema } from '../../db/schema';
 import { logger } from '../../utils/logger';
 
 // ─── Window-type helpers ──────────────────────────────────────────────────────
@@ -125,7 +124,7 @@ export interface MigrationResult {
 export async function migrateLegacySnapshots(): Promise<MigrationResult> {
   const db = getDatabase();
   const dialect = getCurrentDialect();
-  const meterSnapshots = dialect === 'sqlite' ? sqliteMeterSnapshots : pgMeterSnapshots;
+  const meterSnapshots = schema.meterSnapshots;
 
   logger.debug(`Starting migration. dialect=${dialect}`);
 

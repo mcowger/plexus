@@ -1,7 +1,6 @@
 import { logger } from '../../utils/logger';
 import { getDatabase, getCurrentDialect } from '../../db/client';
-import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
-import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
+import { schema } from '../../db/schema';
 import { desc, eq, sql, and, like } from 'drizzle-orm';
 import { toDbTimestamp } from '../../utils/normalize';
 
@@ -47,12 +46,10 @@ export class McpUsageStorageService {
   }
 
   private getMcpSchema() {
-    const dialect = getCurrentDialect();
-    if (dialect === 'sqlite') {
-      return sqliteMcp;
-    } else {
-      return pgMcp;
-    }
+    return {
+      mcpRequestUsage: schema.mcpRequestUsage,
+      mcpDebugLogs: schema.mcpDebugLogs,
+    };
   }
 
   async saveRequest(record: McpRequestUsageRecord) {

@@ -4,8 +4,7 @@ import { logger } from '../../utils/logger';
 import { getConfig, QuotaDefinition, KeyConfig } from '../../config';
 import { getDatabase, getCurrentDialect } from '../../db/client';
 import { toDbTimestampMs } from '../../utils/normalize';
-import * as sqliteSchema from '../../../drizzle/schema/sqlite';
-import * as postgresSchema from '../../../drizzle/schema/postgres';
+import { schema } from '../../db/schema';
 
 export interface QuotaCheckResult {
   allowed: boolean;
@@ -74,7 +73,6 @@ export class QuotaEnforcer {
       return null;
     }
 
-    const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
     const nowMs = Date.now();
     const nowDate = new Date(nowMs);
 
@@ -382,7 +380,6 @@ export class QuotaEnforcer {
         (usageRecord.tokensCacheWrite || 0);
     }
 
-    const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
     const nowMs = Date.now();
     const nowDate = new Date(nowMs);
 
@@ -515,7 +512,6 @@ export class QuotaEnforcer {
    * Admin method to reset quota to zero.
    */
   async clearQuota(keyName: string): Promise<void> {
-    const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
     const nowDate = new Date();
 
     await this.db
