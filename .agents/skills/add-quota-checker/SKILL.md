@@ -30,13 +30,13 @@ export default defineChecker({
 });
 ```
 
-### 2. Register the import in `packages/backend/src/services/quota/checker-registry.ts`
-
-Add one line to `loadAllCheckers()`:
+### 2. Add the import to `loadAllCheckers()` in `packages/backend/src/services/quota/checker-registry.ts`
 
 ```ts
 await import('./checkers/my-checker');
 ```
+
+> **Note:** this manual step exists because Bun does not yet support `import.meta.glob` (tracked in [oven-sh/bun#21459](https://github.com/oven-sh/bun/pull/21459)). When that ships, `loadAllCheckers()` will auto-discover checkers and this step will be removed.
 
 ### 3. Add the Zod schema to `packages/backend/src/config.ts`
 
@@ -92,7 +92,7 @@ There are **no frontend constant lists to update**.
 
 ## Common Mistakes
 
-- **Missing `loadAllCheckers()` import**: The checker will never be registered — the registry stays empty for that type.
+- **Missing `loadAllCheckers()` import in `checker-registry.ts`**: The checker will never be registered — the registry stays empty for that type, the type won't appear in the dropdown, and the `/v0/management/quota-checker-types` endpoint won't return it.
 - **Missing Postgres enum**: SQLite ignores enum enforcement; Postgres deployments will reject inserts.
 - **Missing `QUOTA_CONFIG_MAP` entry in `ProviderQuotaEditor`**: The provider edit modal will show the dropdown type but no config form for the checker's options.
 - **Missing `ProviderQuotaCheckerSchema` entry in `config.ts`**: The backend Zod validation will reject configs using the new type.
