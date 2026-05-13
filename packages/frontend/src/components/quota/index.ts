@@ -1,6 +1,7 @@
 export { QuotaProgressBar } from './QuotaProgressBar';
 export { WaferQuotaDisplay } from './WaferQuotaDisplay';
 export { WaferQuotaConfig } from './WaferQuotaConfig';
+export { OpenCodeGoQuotaConfig } from './OpenCodeGoQuotaConfig';
 export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';

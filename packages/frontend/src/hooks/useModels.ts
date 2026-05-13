@@ -35,7 +35,13 @@ export const useModels = () => {
   const [testStates, setTestStates] = useState<
     Record<
       string,
-      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
+      {
+        loading: boolean;
+        result?: 'success' | 'error';
+        message?: string;
+        showResult: boolean;
+        showMessage?: boolean;
+      }
     >
   >({});
 
@@ -151,7 +157,10 @@ export const useModels = () => {
     model: string,
     apiTypes: string[]
   ) => {
-    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true, showMessage: false } }));
+    setTestStates((prev) => ({
+      ...prev,
+      [testKey]: { loading: true, showResult: true, showMessage: false },
+    }));
 
     try {
       const results = await Promise.all(
@@ -176,12 +185,15 @@ export const useModels = () => {
         },
       }));
 
-      setTimeout(() => {
-        setTestStates((prev) => ({
-          ...prev,
-          [testKey]: { ...prev[testKey], showResult: false },
-        }));
-      }, allSuccess ? 3000 : 1500);
+      setTimeout(
+        () => {
+          setTestStates((prev) => ({
+            ...prev,
+            [testKey]: { ...prev[testKey], showResult: false },
+          }));
+        },
+        allSuccess ? 3000 : 1500
+      );
 
       if (allSuccess) {
         setTimeout(() => {
@@ -194,7 +206,13 @@ export const useModels = () => {
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
-        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true, showMessage: true },
+        [testKey]: {
+          loading: false,
+          result: 'error',
+          message: String(e),
+          showResult: true,
+          showMessage: true,
+        },
       }));
       setTimeout(() => {
         setTestStates((prev) => ({

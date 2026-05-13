@@ -56,6 +56,8 @@ const QUOTA_CHECKER_TYPES_FALLBACK = [
   'neuralwatt',
   'zenmux',
   'devpass',
+  'wafer',
+  'opencode-go',
 ] as const;
 
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
@@ -164,7 +166,13 @@ export function useProviderForm() {
   const [testStates, setTestStates] = useState<
     Record<
       string,
-      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
+      {
+        loading: boolean;
+        result?: 'success' | 'error';
+        message?: string;
+        showResult: boolean;
+        showMessage?: boolean;
+      }
     >
   >({});
 
@@ -394,7 +402,10 @@ export function useProviderForm() {
 
   const handleTestModel = async (providerId: string, modelId: string, modelType?: string) => {
     const testKey = `${providerId}-${modelId}`;
-    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true, showMessage: false } }));
+    setTestStates((prev) => ({
+      ...prev,
+      [testKey]: { loading: true, showResult: true, showMessage: false },
+    }));
     let testApiTypes: string[] = ['chat'];
     if (modelType === 'embeddings') testApiTypes = ['embeddings'];
     else if (modelType === 'image') testApiTypes = ['images'];
@@ -421,12 +432,15 @@ export function useProviderForm() {
           showMessage: true,
         },
       }));
-      setTimeout(() => {
-        setTestStates((prev) => ({
-          ...prev,
-          [testKey]: { ...prev[testKey], showResult: false },
-        }));
-      }, allSuccess ? 3000 : 1500);
+      setTimeout(
+        () => {
+          setTestStates((prev) => ({
+            ...prev,
+            [testKey]: { ...prev[testKey], showResult: false },
+          }));
+        },
+        allSuccess ? 3000 : 1500
+      );
       if (allSuccess) {
         setTimeout(() => {
           setTestStates((prev) => ({
@@ -438,7 +452,13 @@ export function useProviderForm() {
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
-        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true, showMessage: true },
+        [testKey]: {
+          loading: false,
+          result: 'error',
+          message: String(e),
+          showResult: true,
+          showMessage: true,
+        },
       }));
       setTimeout(() => {
         setTestStates((prev) => ({
@@ -780,6 +800,12 @@ export function useProviderForm() {
       return 'Session cookie is required for Wisdom Gate quota checker';
     if (quotaType === 'devpass' && (!options.session || !(options.session as string).trim()))
       return 'Session cookie is required for DevPass quota checker';
+    if (quotaType === 'opencode-go') {
+      if (!options.workspaceId || !(options.workspaceId as string).trim())
+        return 'Workspace ID is required for OpenCode Go quota checker';
+      if (!options.authCookie || !(options.authCookie as string).trim())
+        return 'Auth cookie is required for OpenCode Go quota checker';
+    }
     return null;
   };
 
