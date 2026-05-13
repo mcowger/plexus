@@ -58,41 +58,10 @@ export const OpenCodeGoQuotaConfig: React.FC<OpenCodeGoQuotaConfigProps> = ({
           onChange={(e) => handleChange('authCookie', e.target.value)}
           placeholder="Your OpenCode auth cookie value"
         />
-        <div className="text-[10px] text-text-muted space-y-1">
-          <p>
-            Required. Copy the <span className="font-mono">auth</span> cookie from opencode.ai:
-          </p>
-          <ol className="list-decimal list-inside space-y-0.5 pl-1">
-            <li>
-              Open{' '}
-              <a
-                href="https://opencode.ai"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                opencode.ai
-              </a>{' '}
-              in your browser and log in
-            </li>
-            <li>
-              <span className="font-medium text-text-secondary">Chrome/Edge:</span> DevTools
-              (&lt;F12&gt;) → Application → Cookies → opencode.ai → copy the{' '}
-              <span className="font-mono">auth</span> row's Value
-            </li>
-            <li>
-              <span className="font-medium text-text-secondary">Firefox:</span> DevTools
-              (&lt;F12&gt;) → Storage → Cookies → opencode.ai → copy the{' '}
-              <span className="font-mono">auth</span> row's Value
-            </li>
-            <li>
-              <span className="font-medium text-text-secondary">Safari:</span> DevTools
-              (&lt;F12&gt;) → Storage → Cookies → opencode.ai → copy the{' '}
-              <span className="font-mono">auth</span> row's Value
-            </li>
-            <li>Paste it above (the cookie is sensitive — treat it like a password)</li>
-          </ol>
-        </div>
+        <span className="text-[10px] text-text-muted">
+          Required. Open your browser's DevTools (F12) → Application/Storage → Cookies → opencode.ai
+          → copy the <span className="font-mono">auth</span> cookie value. Treat it like a password.
+        </span>
       </div>
 
       <div className="flex flex-col gap-1">
