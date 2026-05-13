@@ -337,6 +337,13 @@
       "when": 1778694222659,
       "tag": "0047_cloudy_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1778701041711,
+      "tag": "0048_previous_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

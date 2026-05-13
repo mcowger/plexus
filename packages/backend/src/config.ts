@@ -579,6 +579,11 @@ export const ModelConfigSchema = z
     additional_aliases: z.array(z.string()).optional(),
     use_image_fallthrough: z.boolean().default(false).optional(),
     enforce_limits: z.boolean().default(false).optional(),
+    // When true, multi-turn requests prefer the provider:model used on the
+    // previous turn of the same conversation (when still healthy and present
+    // in the alias targets). Tracked in-memory only; see
+    // services/sticky-session-manager.ts.
+    sticky_session: z.boolean().default(false).optional(),
     type: z
       .enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image'])
       .optional(),

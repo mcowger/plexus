@@ -240,4 +240,31 @@ describe('migrateLegacyTargetGroups', () => {
     expect(byGroup.get('primary')).toHaveLength(1);
     expect(byGroup.get('fallback')).toHaveLength(1);
   });
+
+  it('round-trips sticky_session through saveAlias and getAlias', async () => {
+    await repo.saveAlias('sticky-on', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p1', model: 'm1' }] },
+      ],
+      sticky_session: true,
+    } as any);
+
+    await repo.saveAlias('sticky-off', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p2', model: 'm2' }] },
+      ],
+      sticky_session: false,
+    } as any);
+
+    await repo.saveAlias('sticky-unset', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p3', model: 'm3' }] },
+      ],
+    } as any);
+
+    expect((await repo.getAlias('sticky-on'))!.sticky_session).toBe(true);
+    expect((await repo.getAlias('sticky-off'))!.sticky_session).toBe(false);
+    // Unset on input defaults to false in the DB column.
+    expect((await repo.getAlias('sticky-unset'))!.sticky_session).toBe(false);
+  });
 });

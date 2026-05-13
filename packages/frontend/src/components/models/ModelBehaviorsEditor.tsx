@@ -133,6 +133,22 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                 size="sm"
               />
             </div>
+
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <span className="font-body text-[13px] text-text">Sticky Session</span>
+                <p className="font-body text-[11px] text-text-muted mt-0.5">
+                  For multi-turn conversations, prefer the same provider/model used on the previous
+                  turn (when still healthy) for better prompt-cache hit rates and consistent model
+                  behaviour. Session continuity is tracked in memory only.
+                </p>
+              </div>
+              <Switch
+                checked={editingAlias.sticky_session || false}
+                onChange={(val) => setEditingAlias({ ...editingAlias, sticky_session: val })}
+                size="sm"
+              />
+            </div>
           </div>
 
           <div className="h-px bg-border-glass"></div>

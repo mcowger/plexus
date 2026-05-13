@@ -11,6 +11,7 @@ import {
 import { CooldownManager } from './cooldown-manager';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
+import { StickySessionManager } from './sticky-session-manager';
 import type { ModelArchitecture } from '@plexus/shared';
 
 export interface RouteResult {
@@ -200,7 +201,8 @@ async function selectOrderedTargets(
 export class Router {
   static async resolveCandidates(
     modelName: string,
-    incomingApiType?: string
+    incomingApiType?: string,
+    sessionKey?: string | null
   ): Promise<RouteResult[]> {
     const config = getConfig();
 
@@ -261,6 +263,15 @@ export class Router {
 
     const orderedCandidates: RouteResult[] = [];
 
+    // Sticky session: if enabled and we have a session key, look up the
+    // provider:model used last turn. We don't return early — we still build
+    // the full candidate list so failover works — but we hoist the sticky
+    // pick to position 0 if it's still a healthy candidate.
+    let stickyPick: { provider: string; model: string } | null = null;
+    if (alias.sticky_session && sessionKey) {
+      stickyPick = StickySessionManager.getInstance().get(canonicalModel, sessionKey);
+    }
+
     for (const group of alias.target_groups) {
       const enriched = await filterGroupTargets(
         group.targets,
@@ -292,6 +303,23 @@ export class Router {
           incomingModelAlias: modelName,
           canonicalModel,
         });
+      }
+    }
+
+    if (stickyPick) {
+      const idx = orderedCandidates.findIndex(
+        (c) => c.provider === stickyPick!.provider && c.model === stickyPick!.model
+      );
+      if (idx > 0) {
+        const [picked] = orderedCandidates.splice(idx, 1);
+        orderedCandidates.unshift(picked!);
+        logger.info(
+          `Router: sticky_session hoisted '${stickyPick.provider}/${stickyPick.model}' to front for alias '${modelName}'.`
+        );
+      } else if (idx === -1) {
+        logger.debug(
+          `Router: sticky_session pick '${stickyPick.provider}/${stickyPick.model}' for alias '${modelName}' is no longer a healthy candidate; using normal selection.`
+        );
       }
     }
 

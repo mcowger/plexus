@@ -675,6 +675,7 @@ export class ConfigRepository {
       // Model architecture override for inference energy calculation
       modelArchitecture: config.model_architecture ? toJson(config.model_architecture) : null,
       enforceLimits: fromBool(config.enforce_limits === true),
+      stickySession: fromBool(config.sticky_session === true),
       targetGroups:
         config.target_groups && config.target_groups.length > 0
           ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
@@ -807,6 +808,7 @@ export class ConfigRepository {
       priority: row.priority ?? 'selector',
       use_image_fallthrough: toBool(row.useImageFallthrough),
       enforce_limits: toBool(row.enforceLimits),
+      sticky_session: toBool(row.stickySession),
       ...(row.selector ? { selector: row.selector } : {}),
       ...(row.modelType ? { type: row.modelType } : {}),
       ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),

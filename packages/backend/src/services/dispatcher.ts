@@ -16,6 +16,7 @@ import { TransformerFactory } from './transformer-factory';
 import { logger } from '../utils/logger';
 import { QUOTA_ERROR_PATTERNS } from '../utils/constants';
 import { CooldownManager } from './cooldown-manager';
+import { StickySessionManager } from './sticky-session-manager';
 import { RouteResult } from './router';
 import { DebugManager } from './debug-manager';
 import { UsageStorageService } from './usage-storage';
@@ -216,13 +217,41 @@ export class Dispatcher {
     });
   }
 
+  /**
+   * Persist the (alias, sessionKey) → (provider, model) mapping after a
+   * successful dispatch so the next turn of this conversation can prefer the
+   * same target. No-op when stickiness doesn't apply (no session key, no
+   * canonical alias, or vision-descriptor sub-request).
+   */
+  private recordStickySession(
+    sessionKey: string | null,
+    route: RouteResult,
+    request: UnifiedChatRequest
+  ): void {
+    if (!sessionKey || !route.canonicalModel) return;
+    if ((request as any)._isVisionDescriptorRequest) return;
+    const aliasConfig = getConfig().models?.[route.canonicalModel];
+    if (!aliasConfig?.sticky_session) return;
+    StickySessionManager.getInstance().set(
+      route.canonicalModel,
+      sessionKey,
+      route.provider,
+      route.model
+    );
+  }
+
   async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
     const config = getConfig();
     const failover = config.failover;
     const failoverEnabled = failover?.enabled !== false;
 
     // 1. Route (ordered candidates)
-    let candidates = await Router.resolveCandidates(request.model, request.incomingApiType);
+    const sessionKey = StickySessionManager.computeSessionKey(request);
+    let candidates = await Router.resolveCandidates(
+      request.model,
+      request.incomingApiType,
+      sessionKey
+    );
 
     // Fallback for direct/provider/model syntax and legacy single-route behavior
     if (candidates.length === 0) {
@@ -534,6 +563,7 @@ export class Dispatcher {
             visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
           });
           CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
+          this.recordStickySession(sessionKey, route, currentRequest);
           this.appendSuccessAttempt(retryHistory, route, targetApiType);
           this.attachAttemptMetadata(
             streamResponse,
@@ -565,6 +595,7 @@ export class Dispatcher {
         }
 
         CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
+        this.recordStickySession(sessionKey, route, currentRequest);
         this.appendSuccessAttempt(retryHistory, route, targetApiType);
         this.attachAttemptMetadata(
           nonStreamingResponse,

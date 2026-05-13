@@ -389,6 +389,7 @@ export interface Alias {
     dtype?: 'fp16' | 'bf16' | 'fp8' | 'fp8_e4m3' | 'fp8_e5m2' | 'nvfp4' | 'int4' | 'int8';
   };
   enforce_limits?: boolean;
+  sticky_session?: boolean;
 }
 
 export interface InferenceError {
@@ -1808,6 +1809,7 @@ export const api = {
       additional_aliases: alias.aliases,
       use_image_fallthrough: alias.use_image_fallthrough || false,
       enforce_limits: alias.enforce_limits || false,
+      sticky_session: alias.sticky_session || false,
       ...(alias.type && { type: alias.type }),
       ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
       ...(alias.metadata && { metadata: alias.metadata }),
@@ -1928,6 +1930,7 @@ export const api = {
           target_groups: targetGroups,
           use_image_fallthrough: val.use_image_fallthrough || false,
           enforce_limits: val.enforce_limits || false,
+          sticky_session: val.sticky_session || false,
           advanced: val.advanced || [],
           metadata: val.metadata,
           model_architecture: val.model_architecture,
