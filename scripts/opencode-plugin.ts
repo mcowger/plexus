@@ -23,6 +23,46 @@ interface PlexusModel {
   }
 }
 
+interface PlexusAlias {
+  targets?: Array<{ provider: string; model: string; enabled?: boolean }>
+  selector?: string
+  priority?: string
+  use_image_fallthrough?: boolean
+  additional_aliases?: string[]
+  metadata?: {
+    source?: string
+    source_path?: string
+    overrides?: {
+      name?: string
+      description?: string
+      context_length?: number
+      pricing?: {
+        prompt?: string
+        completion?: string
+        input_cache_read?: string
+        input_cache_write?: string
+      }
+      architecture?: {
+        input_modalities?: string[]
+        output_modalities?: string[]
+        tokenizer?: string
+      }
+      supported_parameters?: string[]
+    }
+  }
+  type?: string
+  model_architecture?: {
+    total_params?: number
+    active_params?: number
+    layers?: number
+    heads?: number
+    kv_lora_rank?: number
+    qk_rope_head_dim?: number
+    context_length?: number
+    dtype?: string
+  }
+}
+
 interface PlexusModelsResponse {
   object: string
   data: PlexusModel[]
@@ -43,19 +83,34 @@ function findPlexusProvider(config: Record<string, unknown>): { name: string; cf
   return null
 }
 
+function resolveApiKey(cfg: ProviderConfig): string | undefined {
+  // Check options.apiKey first
+  const optionsKey = (cfg.options as Record<string, unknown> | undefined)?.apiKey
+  if (typeof optionsKey === "string" && optionsKey) return optionsKey
+
+  // Fall back to env vars listed in the provider config
+  if (cfg.env) {
+    for (const envVar of cfg.env) {
+      const val = process.env[envVar]
+      if (val) return val
+    }
+  }
+
+  return undefined
+}
+
 function parsePrice(value: string | undefined): number | undefined {
   if (!value) return undefined
   const n = parseFloat(value)
   return Number.isNaN(n) ? undefined : n
 }
 
-function mapModel(model: PlexusModel): Record<string, unknown> {
+function mapFromPublicModel(model: PlexusModel): Record<string, unknown> {
   const entry: Record<string, unknown> = {
     id: model.id,
     name: model.name ?? model.id,
   }
 
-  // Context and output limits
   const contextLength = model.context_length ?? model.top_provider?.context_length
   const maxOutput = model.top_provider?.max_completion_tokens ?? contextLength
   if (contextLength || maxOutput) {
@@ -65,7 +120,6 @@ function mapModel(model: PlexusModel): Record<string, unknown> {
     }
   }
 
-  // Input/output modalities
   const inputModalities = model.architecture?.input_modalities
   const outputModalities = model.architecture?.output_modalities
   if (inputModalities || outputModalities) {
@@ -75,12 +129,10 @@ function mapModel(model: PlexusModel): Record<string, unknown> {
     entry.modalities = modalities
   }
 
-  // Attachment support from multimodal input
   if (inputModalities?.some((m) => m === "image" || m === "pdf")) {
     entry.attachment = true
   }
 
-  // Pricing
   if (model.pricing) {
     const cost: Record<string, unknown> = {}
     const inputCost = parsePrice(model.pricing.prompt)
@@ -100,14 +152,81 @@ function mapModel(model: PlexusModel): Record<string, unknown> {
     if (Object.keys(cost).length > 0) entry.cost = cost
   }
 
-  // Capabilities derived from supported_parameters
   const params = model.supported_parameters ?? []
   if (params.includes("temperature")) entry.temperature = true
   if (params.includes("tools") || params.includes("tool_choice") || params.includes("function_calling")) {
     entry.tool_call = true
   }
 
-  // Thinking variants for models that support reasoning
+  const supportsThinking = params.some((p) => p === "thinking" || p === "reasoning" || p === "reasoning_effort")
+  if (supportsThinking) {
+    entry.variants = {
+      default: {},
+      thinking: { reasoning: true },
+    }
+  }
+
+  return entry
+}
+
+function mapFromAlias(aliasId: string, alias: PlexusAlias): Record<string, unknown> {
+  const meta = alias.metadata?.overrides
+  const entry: Record<string, unknown> = {
+    id: aliasId,
+    name: meta?.name ?? aliasId,
+  }
+
+  const contextLength = meta?.context_length ?? alias.model_architecture?.context_length
+  if (contextLength) {
+    entry.limit = { context: contextLength, output: contextLength }
+  }
+
+  const inputModalities = meta?.architecture?.input_modalities
+  const outputModalities = meta?.architecture?.output_modalities
+  if (inputModalities || outputModalities) {
+    const modalities: Record<string, string[]> = {}
+    if (inputModalities) modalities.input = inputModalities
+    if (outputModalities) modalities.output = outputModalities
+    entry.modalities = modalities
+  }
+
+  // Vision fallthrough means this alias effectively supports image input
+  if (alias.use_image_fallthrough) {
+    entry.attachment = true
+    if (inputModalities && !inputModalities.includes("image")) {
+      const modalities = (entry.modalities as Record<string, string[]> | undefined) ?? {}
+      modalities.input = [...(modalities.input ?? []), "image"]
+      entry.modalities = modalities
+    }
+  } else if (inputModalities?.some((m) => m === "image" || m === "pdf")) {
+    entry.attachment = true
+  }
+
+  if (meta?.pricing) {
+    const cost: Record<string, unknown> = {}
+    const inputCost = parsePrice(meta.pricing.prompt)
+    const outputCost = parsePrice(meta.pricing.completion)
+    if (inputCost !== undefined) cost.input = inputCost
+    if (outputCost !== undefined) cost.output = outputCost
+
+    const cacheRead = parsePrice(meta.pricing.input_cache_read)
+    const cacheWrite = parsePrice(meta.pricing.input_cache_write)
+    if (cacheRead !== undefined || cacheWrite !== undefined) {
+      cost.cache = {
+        ...(cacheRead !== undefined && { read: cacheRead }),
+        ...(cacheWrite !== undefined && { write: cacheWrite }),
+      }
+    }
+
+    if (Object.keys(cost).length > 0) entry.cost = cost
+  }
+
+  const params = meta?.supported_parameters ?? []
+  if (params.includes("temperature")) entry.temperature = true
+  if (params.includes("tools") || params.includes("tool_choice") || params.includes("function_calling")) {
+    entry.tool_call = true
+  }
+
   const supportsThinking = params.some((p) => p === "thinking" || p === "reasoning" || p === "reasoning_effort")
   if (supportsThinking) {
     entry.variants = {
@@ -153,38 +272,61 @@ export const PlexusPlugin: Plugin = async () => {
       }
 
       const { name: providerName, cfg, baseUrl } = provider
-      const modelsUrl = `${baseUrl}/models`
 
-      let res: Response
+      // Resolve an API key for management endpoints (x-admin-key header).
+      // The provider env vars or options.apiKey are checked; inference auth
+      // from auth.json is handled separately by the opencode runtime.
+      const apiKey = resolveApiKey(cfg)
+      const authHeaders: Record<string, string> = apiKey ? { "x-admin-key": apiKey } : {}
+
+      // ── Try the read-only management aliases endpoint first ────────────
+      // This endpoint (in the user's fork) only requires authenticate, not
+      // admin, and returns the full alias config including use_image_fallthrough.
+      let aliases: Record<string, PlexusAlias> | null = null
       try {
-        res = await fetch(modelsUrl)
-      } catch (err) {
-        console.warn(`${LOG} Could not reach ${modelsUrl} — skipping model sync (${(err as Error).message})`)
-        return
-      }
-
-      if (!res.ok) {
-        console.warn(`${LOG} GET ${modelsUrl} returned ${res.status} — skipping model sync`)
-        return
-      }
-
-      let body: PlexusModelsResponse
-      try {
-        body = (await res.json()) as PlexusModelsResponse
+        const res = await fetch(`${baseUrl.replace(/\/v1$/, "")}/v0/management/aliases`, {
+          headers: authHeaders,
+        })
+        if (res.ok) {
+          aliases = (await res.json()) as Record<string, PlexusAlias>
+        }
       } catch {
-        console.warn(`${LOG} Invalid JSON from ${modelsUrl} — skipping model sync`)
-        return
+        // fall through to public endpoint
       }
 
-      const models = body?.data ?? []
-      if (!models.length) {
-        console.warn(`${LOG} No models returned from ${modelsUrl} — skipping`)
-        return
-      }
+      let modelsConfig: Record<string, unknown>
 
-      const modelsConfig: Record<string, unknown> = {}
-      for (const m of models) {
-        modelsConfig[m.id] = mapModel(m)
+      if (aliases && Object.keys(aliases).length > 0) {
+        modelsConfig = {}
+        for (const [aliasId, alias] of Object.entries(aliases)) {
+          modelsConfig[aliasId] = mapFromAlias(aliasId, alias)
+        }
+      } else {
+        // ── Fall back to the public /v1/models endpoint ─────────────────
+        const res = await fetch(`${baseUrl}/models`).catch(() => null)
+        if (!res?.ok) {
+          console.warn(`${LOG} Could not reach ${baseUrl}/models — skipping model sync`)
+          return
+        }
+
+        let body: PlexusModelsResponse
+        try {
+          body = (await res.json()) as PlexusModelsResponse
+        } catch {
+          console.warn(`${LOG} Invalid JSON from ${baseUrl}/models — skipping model sync`)
+          return
+        }
+
+        const models = body?.data ?? []
+        if (!models.length) {
+          console.warn(`${LOG} No models returned from ${baseUrl}/models — skipping`)
+          return
+        }
+
+        modelsConfig = {}
+        for (const m of models) {
+          modelsConfig[m.id] = mapFromPublicModel(m)
+        }
       }
 
       const providers = (config.provider ?? {}) as Record<string, unknown>

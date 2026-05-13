@@ -64,6 +64,29 @@ async function recalculateEnergyIfChanged(
   }
 }
 
+/**
+ * Read-only config routes — any authenticated principal (admin or limited)
+ * can call these. Separated from registerConfigRoutes so they can be mounted
+ * under a less-restrictive hook chain.
+ */
+export async function registerReadOnlyConfigRoutes(fastify: FastifyInstance) {
+  const configService = ConfigService.getInstance();
+
+  // GET /v0/management/aliases
+  // Returns all model aliases. Previously admin-only; now available to any
+  // authenticated caller so external tools (e.g. opencode plugins) can inspect
+  // alias configuration including use_image_fallthrough without needing the
+  // full admin key.
+  fastify.get('/v0/management/aliases', async (_request, reply) => {
+    try {
+      const aliases = await configService.getRepository().getAllAliases();
+      return reply.send(aliases);
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+}
+
 export async function registerConfigRoutes(
   fastify: FastifyInstance,
   usageStorage?: UsageStorageService
@@ -188,15 +211,8 @@ export async function registerConfigRoutes(
   });
 
   // ─── Model Aliases ────────────────────────────────────────────────
-
-  fastify.get('/v0/management/aliases', async (_request, reply) => {
-    try {
-      const aliases = await configService.getRepository().getAllAliases();
-      return reply.send(aliases);
-    } catch (e: any) {
-      return reply.code(500).send({ error: 'Internal server error' });
-    }
-  });
+  // NOTE: GET /v0/management/aliases is registered in registerReadOnlyConfigRoutes
+  // so any authenticated user (not just admin) can read aliases.
 
   // PUT — full create-or-replace with Zod validation
   // Using wildcard to support slugs containing '/' (e.g. "provider/model")

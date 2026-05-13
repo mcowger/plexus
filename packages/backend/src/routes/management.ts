@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { UsageStorageService } from '../services/usage-storage';
-import { registerConfigRoutes } from './management/config';
+import { registerConfigRoutes, registerReadOnlyConfigRoutes } from './management/config';
 import { registerUsageRoutes } from './management/usage';
 import { registerCooldownRoutes } from './management/cooldowns';
 import { registerPerformanceRoutes } from './management/performance';
@@ -85,6 +85,10 @@ export async function registerManagementRoutes(
       await registerUsageRoutes(scoped, usageStorage);
       await registerDebugRoutes(scoped, usageStorage);
       await registerErrorRoutes(scoped, usageStorage);
+
+      // Read-only config routes: any authenticated user can inspect aliases,
+      // providers, etc. without needing the full admin key.
+      await registerReadOnlyConfigRoutes(scoped);
     });
 
     // Admin-only routes: mutating config, system-level controls, etc.
