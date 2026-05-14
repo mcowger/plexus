@@ -232,7 +232,34 @@ If no groups are explicitly configured, all targets live in a single `default` g
 | `usage` | Routes to provider with least recent usage (last 24 hours) |
 | `e2e_performance` | Routes to highest end-to-end throughput (output tokens / total request time) |
 
+#### Inline Exploration (default)
+
 Use `performanceExplorationRate` (default 0.05) to occasionally explore other targets and prevent locking onto one provider. Applies to `performance`, `latency`, and `e2e_performance` selectors. `latencyExplorationRate` and `e2ePerformanceExplorationRate` can be set separately for their respective selectors (each defaults to `performanceExplorationRate` if not specified). Unlike `performance`, the `e2e_performance` selector explores across all candidates including the current best, ensuring end-to-end metrics stay fresh for every provider.
+
+Inline exploration occurs on the live request path: a small fraction of incoming requests are intentionally routed to non-optimal targets so their performance data stays fresh. The trade-off is that those specific requests may be slower than necessary.
+
+#### Background Exploration
+
+To keep performance data fresh **without** ever diverting live requests, enable `backgroundExploration` instead. When enabled, the inline exploration above is suppressed for the three perf-based selectors, and Plexus instead fires small representative probe requests in the background against stale targets.
+
+```yaml
+backgroundExploration:
+  enabled: true                  # default: false
+  stalenessThresholdSeconds: 600 # default: 600 (10 minutes), minimum: 1
+  workerConcurrency: 2           # default: 2, range: 1–16
+```
+
+How it works:
+
+- Each live request to an alias whose selector is `latency`, `performance`, or `e2e_performance` checks the targets in its active group. Any target whose last probe is older than `stalenessThresholdSeconds` is enqueued for a background probe.
+- The live request itself is **never** redirected or delayed — it is served by the selector's best choice.
+- A worker pool (`workerConcurrency`) drains the queue. Per-target in-flight guards and the global cooldown manager prevent duplicate or unhealthy probes.
+- Each probe is a single canonical chat request (moderate input, two tool definitions, `max_tokens: 1000`, streaming). It exercises the same transformer + provider path as live traffic, so TTFT / TPS / E2E TPS are measured identically.
+- Probes route via `direct/<provider>/<target_model>` so they bypass alias resolution and failover, hitting exactly one target.
+- Probes appear in usage records with `apiKey = "probe"` and `attribution = "background"` (or `"manual"` for probes triggered from the management test endpoint). They are real requests and do consume provider quota / cost; budgets and rate caps are out of scope in v1.
+- On cold start, each target's `lastProbedAt` is initialised to the process start time — the first probe for a target fires at normal cadence once `stalenessThresholdSeconds` elapses, not eagerly on the first request.
+
+The inline `performanceExplorationRate` / `latencyExplorationRate` / `e2ePerformanceExplorationRate` settings are preserved and continue to take effect when `backgroundExploration.enabled` is `false` (the default). All four settings can be edited from the **Config** page in the admin UI.
 
 ### Priority Modes
 

@@ -3,14 +3,15 @@ post:
     - Management — Test
   summary: Synthetic test inference (admin only)
   description: |
-    Runs a short inference request directly against a (provider, model)
+    Runs a canonical probe request directly against a (provider, model)
     pair, bypassing alias resolution.
 
     ## Use case
 
     Used by the admin UI's "test" button next to each alias target. Allows
     testing a specific provider/model combination without going through
-    the normal routing pipeline.
+    the normal routing pipeline. Internally shares the same probe machinery
+    as background exploration.
 
     ## Direct bypass
 
@@ -20,18 +21,28 @@ post:
     - No retries, cooldowns, or quota checks applied
     - Short timeout (typically 30s)
 
+    ## Usage record attribution
+
+    Test requests appear in usage records with `apiKey = "probe"` and
+    `attribution = "manual"` (background exploration probes use
+    `attribution = "background"`). They are real requests that count
+    against provider quota.
+
     ## Response
 
-    Returns 200 even on failure (`success: false`). This is intentional —
-    the UI needs to render error messages from failed tests, not treat them
-    as HTTP errors.
+    Returns 200 with `success: false` for runtime errors (failed dispatch,
+    upstream errors). The UI needs to render error messages without
+    treating them as HTTP errors. Validation errors (missing fields,
+    unknown `apiType`, unsupported `transcriptions`) return 400.
 
     ## Request fields
 
     - `provider` — Provider slug (e.g. `openai`, `anthropic`)
     - `model` — Model name (e.g. `gpt-4o`, `claude-3-opus`)
     - `apiType` — API type (default: `chat`). Options: `chat`, `messages`,
-      `gemini`, `responses`, `embeddings`, `images`, `speech`, `oauth`
+      `gemini`, `responses`, `embeddings`, `images`, `speech`, `oauth`.
+      The `transcriptions` API requires a file upload and is not supported
+      by this endpoint.
 
     **Admin only** — limited principals receive 403.
   security:
@@ -103,6 +114,9 @@ post:
                 durationMs: 567
                 apiType: chat
                 error: "401 Unauthorized - invalid API key"
+    '400':
+      description: Validation error — missing required fields, unknown
+        `apiType`, or unsupported `transcriptions` apiType.
     '401':
       description: Authentication required or invalid credentials.
   operationId: postV0ManagementTest

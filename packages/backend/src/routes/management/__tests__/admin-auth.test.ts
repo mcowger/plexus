@@ -5,6 +5,7 @@ import { registerManagementRoutes } from '../../management';
 import { registerInferenceRoutes } from '../../inference';
 import { Dispatcher } from '../../../services/dispatcher';
 import { UsageStorageService } from '../../../services/usage-storage';
+import { ProbeService } from '../../../services/probe-service';
 import { DebugManager } from '../../../services/debug-manager';
 import { SelectorFactory } from '../../../services/selectors/factory';
 
@@ -71,7 +72,16 @@ function makeMockDeps() {
     })),
   } as unknown as Dispatcher;
 
-  return { mockUsageStorage, mockDispatcher };
+  const mockProbeService = {
+    runProbe: vi.fn(async () => ({
+      success: true,
+      durationMs: 0,
+      apiType: 'chat' as const,
+      response: 'ok',
+    })),
+  } as unknown as ProbeService;
+
+  return { mockUsageStorage, mockDispatcher, mockProbeService };
 }
 
 // ---------------------------------------------------------------------------
@@ -85,8 +95,8 @@ describe('GET /v0/management/auth/verify', () => {
     process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
-    const { mockUsageStorage, mockDispatcher } = makeMockDeps();
-    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
+    const { mockUsageStorage, mockDispatcher, mockProbeService } = makeMockDeps();
+    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher, mockProbeService);
     await fastify.ready();
   });
 
@@ -182,8 +192,8 @@ describe('Management route protection', () => {
     process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
-    const { mockUsageStorage, mockDispatcher } = makeMockDeps();
-    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
+    const { mockUsageStorage, mockDispatcher, mockProbeService } = makeMockDeps();
+    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher, mockProbeService);
     await fastify.ready();
   });
 
@@ -251,8 +261,8 @@ describe('Admin key env var change', () => {
     process.env.ADMIN_KEY = 'original-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
-    const { mockUsageStorage, mockDispatcher } = makeMockDeps();
-    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
+    const { mockUsageStorage, mockDispatcher, mockProbeService } = makeMockDeps();
+    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher, mockProbeService);
     await fastify.ready();
   });
 
@@ -299,13 +309,13 @@ describe('v1 inference routes are unaffected by admin key auth', () => {
     process.env.ADMIN_KEY = 'correct-admin-key';
     setConfigForTesting(BASE_CONFIG);
     fastify = Fastify();
-    const { mockUsageStorage, mockDispatcher } = makeMockDeps();
+    const { mockUsageStorage, mockDispatcher, mockProbeService } = makeMockDeps();
 
     DebugManager.getInstance().setStorage(mockUsageStorage);
     SelectorFactory.setUsageStorage(mockUsageStorage);
 
     await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
-    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
+    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher, mockProbeService);
     await fastify.ready();
   });
 

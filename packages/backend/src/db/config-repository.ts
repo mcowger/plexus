@@ -18,6 +18,7 @@ import type {
   McpServerConfig,
   FailoverPolicy,
   CooldownPolicy,
+  BackgroundExplorationConfig,
   MetadataOverrides,
 } from '../config';
 import { resolveGpuParams } from '@plexus/shared';
@@ -1204,6 +1205,19 @@ export class ConfigRepository {
     const initialMinutes = await this.getSetting<number>('cooldown.initialMinutes', 2);
     const maxMinutes = await this.getSetting<number>('cooldown.maxMinutes', 300);
     return { initialMinutes, maxMinutes };
+  }
+
+  async getBackgroundExplorationConfig(): Promise<BackgroundExplorationConfig> {
+    const enabled = await this.getSetting<boolean>('backgroundExploration.enabled', false);
+    const stalenessThresholdSeconds = await this.getSetting<number>(
+      'backgroundExploration.stalenessThresholdSeconds',
+      600
+    );
+    const workerConcurrency = await this.getSetting<number>(
+      'backgroundExploration.workerConcurrency',
+      2
+    );
+    return { enabled, stalenessThresholdSeconds, workerConcurrency };
   }
 
   // ─── OAuth Credentials ──────────────────────────────────────────

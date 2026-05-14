@@ -530,6 +530,59 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── Background Exploration ──────────────────────────────────────
+
+  fastify.get('/v0/management/config/background-exploration', async (_request, reply) => {
+    try {
+      const cfg = await configService.getRepository().getBackgroundExplorationConfig();
+      return reply.send(cfg);
+    } catch (e: any) {
+      logger.error('Failed to read background-exploration config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/background-exploration', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      if (body.enabled !== undefined) {
+        if (typeof body.enabled !== 'boolean') {
+          return reply.code(400).send({ error: 'enabled must be a boolean' });
+        }
+        await configService.setSetting('backgroundExploration.enabled', body.enabled);
+      }
+      if (body.stalenessThresholdSeconds !== undefined) {
+        const val = Number(body.stalenessThresholdSeconds);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1) {
+          return reply
+            .code(400)
+            .send({ error: 'stalenessThresholdSeconds must be an integer >= 1' });
+        }
+        await configService.setSetting('backgroundExploration.stalenessThresholdSeconds', val);
+      }
+      if (body.workerConcurrency !== undefined) {
+        const val = Number(body.workerConcurrency);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1 || val > 16) {
+          return reply
+            .code(400)
+            .send({ error: 'workerConcurrency must be an integer between 1 and 16' });
+        }
+        await configService.setSetting('backgroundExploration.workerConcurrency', val);
+      }
+
+      const updated = await configService.getRepository().getBackgroundExplorationConfig();
+      logger.debug('Background exploration config updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch background-exploration config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Vision Fallthrough ───────────────────────────────────────────
 
   fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {

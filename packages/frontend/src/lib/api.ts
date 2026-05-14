@@ -3088,4 +3088,36 @@ export const api = {
     if (!res.ok) throw new Error('Failed to update exploration rate settings');
     return res.json();
   },
+
+  // ─── Background Exploration Settings ──────────────────────────
+
+  /** Fetch current background exploration settings. */
+  getBackgroundExploration: async (): Promise<{
+    enabled: boolean;
+    stalenessThresholdSeconds: number;
+    workerConcurrency: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/background-exploration`);
+    if (!res.ok) throw new Error('Failed to fetch background exploration settings');
+    return res.json();
+  },
+
+  /** Patch background exploration settings. */
+  patchBackgroundExploration: async (updates: {
+    enabled?: boolean;
+    stalenessThresholdSeconds?: number;
+    workerConcurrency?: number;
+  }): Promise<{
+    enabled: boolean;
+    stalenessThresholdSeconds: number;
+    workerConcurrency: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/background-exploration`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update background exploration settings');
+    return res.json();
+  },
 };

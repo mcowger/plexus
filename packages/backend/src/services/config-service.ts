@@ -281,6 +281,7 @@ export class ConfigService {
     const mcpServers = await this.repo.getAllMcpServers();
     const failover = await this.repo.getFailoverPolicy();
     const cooldown = await this.repo.getCooldownPolicy();
+    const backgroundExploration = await this.repo.getBackgroundExplorationConfig();
     const allSettings = await this.repo.getAllSettings();
 
     // Spread all flat settings (non-dotted keys) onto the cache so new settings
@@ -299,6 +300,7 @@ export class ConfigService {
       keys,
       failover,
       cooldown,
+      backgroundExploration,
       quotas,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       mcp_servers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,

@@ -13,6 +13,7 @@ import {
   Save,
   Timer,
   Compass,
+  Radar,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatMinutesToMinSec } from '@plexus/shared';
@@ -74,6 +75,18 @@ const DEFAULT_EXPLORATION_RATES: ExplorationRates = {
   performanceExplorationRate: 0.05,
   latencyExplorationRate: 0.05,
   e2ePerformanceExplorationRate: 0.05,
+};
+
+interface BackgroundExplorationConfig {
+  enabled: boolean;
+  stalenessThresholdSeconds: number;
+  workerConcurrency: number;
+}
+
+const DEFAULT_BACKGROUND_EXPLORATION: BackgroundExplorationConfig = {
+  enabled: false,
+  stalenessThresholdSeconds: 600,
+  workerConcurrency: 2,
 };
 
 const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
@@ -162,8 +175,53 @@ export const Config = () => {
   const perfValidation = validateExplorationInput(explorationPerformanceInput);
   const latValidation = validateExplorationInput(explorationLatencyInput);
   const e2eValidation = validateExplorationInput(explorationE2EInput);
-  const isExplorationValid =
+  const inlineRatesValid =
     explorationLoaded && perfValidation.valid && latValidation.valid && e2eValidation.valid;
+
+  // Background exploration settings state
+  const [bgExploration, setBgExploration] = useState<BackgroundExplorationConfig>(
+    DEFAULT_BACKGROUND_EXPLORATION
+  );
+  const [bgExplorationLoaded, setBgExplorationLoaded] = useState(false);
+  const [bgExplorationSaving, setBgExplorationSaving] = useState(false);
+  const [bgStalenessInput, setBgStalenessInput] = useState('');
+  const [bgConcurrencyInput, setBgConcurrencyInput] = useState('');
+
+  const validateStalenessInput = (
+    raw: string
+  ): { valid: boolean; value?: number; error?: string } => {
+    if (raw === '') return { valid: false, error: 'Required' };
+    const num = Number(raw);
+    if (!Number.isFinite(num) || !Number.isInteger(num)) {
+      return { valid: false, error: 'Must be an integer (seconds)' };
+    }
+    if (num < 1) return { valid: false, error: 'Must be at least 1 second' };
+    return { valid: true, value: num };
+  };
+
+  const validateConcurrencyInput = (
+    raw: string
+  ): { valid: boolean; value?: number; error?: string } => {
+    if (raw === '') return { valid: false, error: 'Required' };
+    const num = Number(raw);
+    if (!Number.isFinite(num) || !Number.isInteger(num)) {
+      return { valid: false, error: 'Must be an integer' };
+    }
+    if (num < 1 || num > 16) return { valid: false, error: 'Must be between 1 and 16' };
+    return { valid: true, value: num };
+  };
+
+  const stalenessValidation = validateStalenessInput(bgStalenessInput);
+  const concurrencyValidation = validateConcurrencyInput(bgConcurrencyInput);
+  const bgFieldsValid =
+    bgExplorationLoaded && stalenessValidation.valid && concurrencyValidation.valid;
+
+  // When background exploration is enabled, inline rate inputs are ignored at
+  // runtime, so we don't gate Save on their validation. When disabled, the
+  // background tunables still need to be valid (they're just dormant).
+  const isExplorationValid = bgExploration.enabled
+    ? bgFieldsValid
+    : inlineRatesValid && bgFieldsValid;
 
   const loadFailoverPolicy = useCallback(async () => {
     try {
@@ -202,6 +260,19 @@ export const Config = () => {
     } catch (e) {
       console.error('Failed to load exploration rates:', e);
       toast.error('Failed to load exploration rate settings');
+    }
+  }, [toast]);
+
+  const loadBackgroundExploration = useCallback(async () => {
+    try {
+      const cfg = await api.getBackgroundExploration();
+      setBgExploration(cfg);
+      setBgStalenessInput(String(cfg.stalenessThresholdSeconds));
+      setBgConcurrencyInput(String(cfg.workerConcurrency));
+      setBgExplorationLoaded(true);
+    } catch (e) {
+      console.error('Failed to load background exploration settings:', e);
+      toast.error('Failed to load background exploration settings');
     }
   }, [toast]);
 
@@ -259,25 +330,61 @@ export const Config = () => {
     }
   };
 
-  const handleSaveExplorationRates = async () => {
-    if (!perfValidation.valid || !latValidation.valid || !e2eValidation.valid) return;
+  const handleSaveExploration = async () => {
+    if (!stalenessValidation.valid || !concurrencyValidation.valid) return;
+    // Inline rates only need to validate when background mode is off; when it
+    // is on, the rates aren't consulted at runtime.
+    if (
+      !bgExploration.enabled &&
+      (!perfValidation.valid || !latValidation.valid || !e2eValidation.valid)
+    ) {
+      return;
+    }
     setExplorationSaving(true);
+    setBgExplorationSaving(true);
     try {
-      const updated = await api.patchExplorationRates({
-        performanceExplorationRate: perfValidation.value!,
-        latencyExplorationRate: latValidation.value!,
-        e2ePerformanceExplorationRate: e2eValidation.value!,
-      });
+      const tasks: Promise<unknown>[] = [
+        api.patchBackgroundExploration({
+          enabled: bgExploration.enabled,
+          stalenessThresholdSeconds: stalenessValidation.value!,
+          workerConcurrency: concurrencyValidation.value!,
+        }),
+      ];
+      // Only persist inline rates when their inputs are valid. Skipping when
+      // background mode is on (and rates may be untouched) avoids overwriting
+      // stored values with stale strings.
+      if (perfValidation.valid && latValidation.valid && e2eValidation.valid) {
+        tasks.push(
+          api.patchExplorationRates({
+            performanceExplorationRate: perfValidation.value!,
+            latencyExplorationRate: latValidation.value!,
+            e2ePerformanceExplorationRate: e2eValidation.value!,
+          })
+        );
+      }
+      const results = await Promise.all(tasks);
+      const updatedBg = results[0] as Awaited<ReturnType<typeof api.patchBackgroundExploration>>;
+      const updatedRates = results[1] as
+        | Awaited<ReturnType<typeof api.patchExplorationRates>>
+        | undefined;
 
-      setExplorationRates(updated);
-      setExplorationPerformanceInput(String(updated.performanceExplorationRate));
-      setExplorationLatencyInput(String(updated.latencyExplorationRate));
-      setExplorationE2EInput(String(updated.e2ePerformanceExplorationRate));
-      toast.success('Exploration rate settings saved');
+      setBgExploration(updatedBg);
+      setBgStalenessInput(String(updatedBg.stalenessThresholdSeconds));
+      setBgConcurrencyInput(String(updatedBg.workerConcurrency));
+
+      if (updatedRates) {
+        setExplorationRates(updatedRates);
+        setExplorationPerformanceInput(String(updatedRates.performanceExplorationRate));
+        setExplorationLatencyInput(String(updatedRates.latencyExplorationRate));
+        setExplorationE2EInput(String(updatedRates.e2ePerformanceExplorationRate));
+      }
+
+      toast.success('Exploration settings saved');
     } catch (e) {
-      toast.error((e as Error).message, 'Failed to save exploration rate settings');
+      toast.error((e as Error).message, 'Failed to save exploration settings');
     } finally {
       setExplorationSaving(false);
+      setBgExplorationSaving(false);
     }
   };
 
@@ -298,6 +405,7 @@ export const Config = () => {
     loadFailoverPolicy();
     loadCooldownPolicy();
     loadExplorationRates();
+    loadBackgroundExploration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -728,16 +836,16 @@ export const Config = () => {
           </div>
         </Disclosure>
 
-        {/* ─── Exploration Rate Settings ────────────────────────────── */}
+        {/* ─── Exploration Settings (inline rates + background mode) ───── */}
         <Disclosure
-          title="Exploration Rate Settings"
+          title="Exploration Settings"
           defaultOpen={false}
           extra={
             <Button
               variant="primary"
               size="sm"
-              onClick={handleSaveExplorationRates}
-              isLoading={explorationSaving}
+              onClick={handleSaveExploration}
+              isLoading={explorationSaving || bgExplorationSaving}
               disabled={!isExplorationValid}
               leftIcon={<Save size={14} />}
             >
@@ -746,108 +854,192 @@ export const Config = () => {
           }
         >
           <div className="flex flex-col gap-5">
-            {/* Exploration Rate description */}
-            <div className="flex items-center gap-2">
-              <Compass size={16} className="text-primary" />
+            {/* Description */}
+            <div className="flex items-start gap-2">
+              <Compass size={16} className="text-primary mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-text">Provider Exploration</p>
                 <p className="text-xs text-text-muted">
-                  Exploration rate controls how often the selector picks a non-optimal provider to
-                  discover better options. A value of 0 always selects the best-known provider; a
-                  value of 1 picks randomly. Applies to performance, latency, and e2e_performance
-                  selectors.
+                  Exploration keeps performance, latency, and end-to-end TPS data fresh across
+                  targets. By default, inline exploration occasionally diverts a small fraction of
+                  live requests to non-optimal providers. Enable background exploration to suppress
+                  inline exploration and instead fire representative probe requests in the
+                  background — live traffic is never redirected. Both modes apply to the
+                  performance, latency, and e2e_performance selectors.
                 </p>
               </div>
             </div>
 
-            {/* Performance Exploration Rate */}
-            <div>
-              <label
-                htmlFor="performanceExplorationRate"
-                className="block text-sm font-medium text-text mb-1"
-              >
-                Performance Exploration Rate
-              </label>
-              <p className="text-xs text-text-muted mb-2">
-                The probability of exploring a non-optimal provider when using the performance
-                selector. Default: 0.05 (5%).
-              </p>
-              <div className="flex flex-col gap-1">
-                <input
-                  id="performanceExplorationRate"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={explorationPerformanceInput}
-                  onChange={(e) => setExplorationPerformanceInput(e.target.value)}
-                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-                {!perfValidation.valid && explorationPerformanceInput !== '' && (
-                  <span className="text-xs text-warning">{perfValidation.error}</span>
-                )}
+            {/* Background exploration: master toggle */}
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-bg-glass/40 p-3">
+              <div className="flex items-start gap-2">
+                <Radar size={16} className="text-primary mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text">Background Exploration</p>
+                  <p className="text-xs text-text-muted">
+                    When enabled, inline exploration is suppressed and Plexus fires small
+                    representative probe requests in the background. Probes appear in usage records
+                    with apiKey="probe" and attribution="background".
+                  </p>
+                </div>
               </div>
+              <Switch
+                checked={bgExploration.enabled}
+                onChange={(checked) => setBgExploration((prev) => ({ ...prev, enabled: checked }))}
+                aria-label="Toggle background exploration on/off"
+              />
             </div>
 
-            {/* Latency Exploration Rate */}
-            <div>
-              <label
-                htmlFor="latencyExplorationRate"
-                className="block text-sm font-medium text-text mb-1"
-              >
-                Latency Exploration Rate
-              </label>
-              <p className="text-xs text-text-muted mb-2">
-                The probability of exploring a non-optimal provider when using the latency selector.
-                Defaults to the Performance Exploration Rate if not explicitly set.
-              </p>
-              <div className="flex flex-col gap-1">
-                <input
-                  id="latencyExplorationRate"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={explorationLatencyInput}
-                  onChange={(e) => setExplorationLatencyInput(e.target.value)}
-                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-                {!latValidation.valid && explorationLatencyInput !== '' && (
-                  <span className="text-xs text-warning">{latValidation.error}</span>
-                )}
-              </div>
-            </div>
+            {/* Background tunables — only rendered when background mode is on */}
+            {bgExploration.enabled && (
+              <div className="flex flex-col gap-5">
+                <div>
+                  <label
+                    htmlFor="bgExplorationStaleness"
+                    className="block text-sm font-medium text-text mb-1"
+                  >
+                    Staleness Threshold (seconds)
+                  </label>
+                  <p className="text-xs text-text-muted mb-2">
+                    A target is re-probed only after this many seconds have elapsed since its last
+                    probe. Default: 600 (10 minutes). Minimum: 1.
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <input
+                      id="bgExplorationStaleness"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={bgStalenessInput}
+                      onChange={(e) => setBgStalenessInput(e.target.value)}
+                      className="w-full max-w-[240px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    {!stalenessValidation.valid && bgStalenessInput !== '' && (
+                      <span className="text-xs text-warning">{stalenessValidation.error}</span>
+                    )}
+                  </div>
+                </div>
 
-            {/* E2E Performance Exploration Rate */}
-            <div>
-              <label
-                htmlFor="e2ePerformanceExplorationRate"
-                className="block text-sm font-medium text-text mb-1"
-              >
-                E2E Performance Exploration Rate
-              </label>
-              <p className="text-xs text-text-muted mb-2">
-                The probability of exploring any provider when using the e2e_performance selector.
-                Unlike the performance selector, exploration includes all candidates (including the
-                current best) to keep end-to-end metrics fresh. Defaults to the Performance
-                Exploration Rate if not explicitly set.
-              </p>
-              <div className="flex flex-col gap-1">
-                <input
-                  id="e2ePerformanceExplorationRate"
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={explorationE2EInput}
-                  onChange={(e) => setExplorationE2EInput(e.target.value)}
-                  className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-                {!e2eValidation.valid && explorationE2EInput !== '' && (
-                  <span className="text-xs text-warning">{e2eValidation.error}</span>
-                )}
+                <div>
+                  <label
+                    htmlFor="bgExplorationConcurrency"
+                    className="block text-sm font-medium text-text mb-1"
+                  >
+                    Worker Concurrency
+                  </label>
+                  <p className="text-xs text-text-muted mb-2">
+                    Maximum number of background probes Plexus runs in parallel. Per-target probes
+                    are deduplicated separately. Default: 2. Range: 1–16.
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <input
+                      id="bgExplorationConcurrency"
+                      type="number"
+                      min={1}
+                      max={16}
+                      step={1}
+                      value={bgConcurrencyInput}
+                      onChange={(e) => setBgConcurrencyInput(e.target.value)}
+                      className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    {!concurrencyValidation.valid && bgConcurrencyInput !== '' && (
+                      <span className="text-xs text-warning">{concurrencyValidation.error}</span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Inline rate tunables — only rendered when background mode is off */}
+            {!bgExploration.enabled && (
+              <div className="flex flex-col gap-5">
+                <div>
+                  <label
+                    htmlFor="performanceExplorationRate"
+                    className="block text-sm font-medium text-text mb-1"
+                  >
+                    Performance Exploration Rate
+                  </label>
+                  <p className="text-xs text-text-muted mb-2">
+                    The probability of exploring a non-optimal provider when using the performance
+                    selector. Default: 0.05 (5%).
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <input
+                      id="performanceExplorationRate"
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={explorationPerformanceInput}
+                      onChange={(e) => setExplorationPerformanceInput(e.target.value)}
+                      className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    {!perfValidation.valid && explorationPerformanceInput !== '' && (
+                      <span className="text-xs text-warning">{perfValidation.error}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="latencyExplorationRate"
+                    className="block text-sm font-medium text-text mb-1"
+                  >
+                    Latency Exploration Rate
+                  </label>
+                  <p className="text-xs text-text-muted mb-2">
+                    The probability of exploring a non-optimal provider when using the latency
+                    selector. Defaults to the Performance Exploration Rate if not explicitly set.
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <input
+                      id="latencyExplorationRate"
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={explorationLatencyInput}
+                      onChange={(e) => setExplorationLatencyInput(e.target.value)}
+                      className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    {!latValidation.valid && explorationLatencyInput !== '' && (
+                      <span className="text-xs text-warning">{latValidation.error}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="e2ePerformanceExplorationRate"
+                    className="block text-sm font-medium text-text mb-1"
+                  >
+                    E2E Performance Exploration Rate
+                  </label>
+                  <p className="text-xs text-text-muted mb-2">
+                    The probability of exploring any provider when using the e2e_performance
+                    selector. Unlike the performance selector, exploration includes all candidates
+                    (including the current best) to keep end-to-end metrics fresh. Defaults to the
+                    Performance Exploration Rate if not explicitly set.
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <input
+                      id="e2ePerformanceExplorationRate"
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={explorationE2EInput}
+                      onChange={(e) => setExplorationE2EInput(e.target.value)}
+                      className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    {!e2eValidation.valid && explorationE2EInput !== '' && (
+                      <span className="text-xs text-warning">{e2eValidation.error}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Disclosure>
 
