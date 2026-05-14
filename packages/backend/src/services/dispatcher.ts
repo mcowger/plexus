@@ -25,7 +25,7 @@ import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
 import { resolveAdapters } from './adapter-resolver';
 import type { ProviderAdapter } from '../types/provider-adapter';
-import { getModels } from '@mariozechner/pi-ai';
+import { getModels } from '@earendil-works/pi-ai';
 import { VisionDescriptorService } from './vision-descriptor-service';
 import { ModelMetadataManager } from './model-metadata-manager';
 import { enforceContextLimit } from './enforce-limits';

@@ -87,7 +87,7 @@ const mockLogger = {
 };
 
 // ---------------------------------------------------------------------------
-// @mariozechner/pi-ai — single authoritative mock for the whole worker.
+// @earendil-works/pi-ai — single authoritative mock for the whole worker.
 //
 // With isolate: false every test file shares one module registry.  Letting
 // individual test files each register their own vi.mock factory creates a
@@ -105,7 +105,7 @@ const mockLogger = {
 //     dispatches on model.api and crashes with "No API provider registered"
 //     if it is missing.
 // ---------------------------------------------------------------------------
-vi.mock('@mariozechner/pi-ai', () => ({
+vi.mock('@earendil-works/pi-ai', () => ({
   getModels: (provider: string) => {
     if (provider === 'unknown-provider') return [];
     if (provider === 'openai-codex') {

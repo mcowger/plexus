@@ -1,4 +1,4 @@
-import { getOAuthProvider, getOAuthProviders } from '@mariozechner/pi-ai/oauth';
+import { getOAuthProvider, getOAuthProviders } from '@earendil-works/pi-ai/oauth';
 import type {
   OAuthAuthInfo,
   OAuthCredentials,
@@ -6,7 +6,7 @@ import type {
   OAuthPrompt,
   OAuthProviderId,
   OAuthProviderInterface,
-} from '@mariozechner/pi-ai/oauth';
+} from '@earendil-works/pi-ai/oauth';
 import { OAuthAuthManager } from './oauth-auth-manager';
 
 export type OAuthSessionStatus =

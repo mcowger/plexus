@@ -6,7 +6,7 @@ export class OAuthErrorHandler {
           error: {
             message:
               `OAuth provider '${provider}' not authenticated. ` +
-              `Please run: npx @mariozechner/pi-ai login ${provider}`,
+              `Please run: npx @earendil-works/pi-ai login ${provider}`,
             type: 'authentication_error',
             code: 'oauth_not_authenticated',
           },
@@ -24,7 +24,7 @@ export class OAuthErrorHandler {
           error: {
             message:
               `OAuth authentication expired for '${provider}'. ` +
-              `Please re-authenticate: npx @mariozechner/pi-ai login ${provider}`,
+              `Please re-authenticate: npx @earendil-works/pi-ai login ${provider}`,
             type: 'authentication_error',
             code: 'oauth_token_expired',
           },

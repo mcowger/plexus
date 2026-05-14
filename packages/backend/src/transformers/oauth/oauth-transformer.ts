@@ -4,8 +4,8 @@ import type {
   UnifiedChatResponse,
   UnifiedChatStreamChunk,
 } from '../../types/unified';
-import { getModel, stream, complete, type Model as PiAiModel } from '@mariozechner/pi-ai';
-import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
+import { getModel, stream, complete, type Model as PiAiModel } from '@earendil-works/pi-ai';
+import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import {
   applyClaudeCodeToolProxy,
   filterPiAiRequestOptions,

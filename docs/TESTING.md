@@ -111,7 +111,7 @@ The `DB_TEST_FILES` list in `vitest.db-tests.ts` determines which files run in t
 
 ### Per-File Setup
 
-`packages/backend/test/vitest.setup.ts` — runs once per test file. Installs the logger mock and the `@mariozechner/pi-ai` mock.
+`packages/backend/test/vitest.setup.ts` — runs once per test file. Installs the logger mock and the `@earendil-works/pi-ai` mock.
 
 ## Test File Organization
 
@@ -145,9 +145,9 @@ packages/backend/
 Registered in `vitest.setup.ts` — **do NOT re-mock in test files**:
 
 - `../src/utils/logger` — logger, logEmitter, level helpers
-- `@mariozechner/pi-ai` — getModels, getModel, complete (`vi.fn`), stream (`vi.fn`)
+- `@earendil-works/pi-ai` — getModels, getModel, complete (`vi.fn`), stream (`vi.fn`)
 
-### `@mariozechner/pi-ai` Specifics
+### `@earendil-works/pi-ai` Specifics
 
 - `getModels` covers all providers tests need including `openai-codex` and `anthropic`
 - `getModel` always returns the `api` field — `OAuthTransformer.executeRequest` dispatches on `model.api` and throws "No API provider registered" without it

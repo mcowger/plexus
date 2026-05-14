@@ -59,7 +59,7 @@ Use the **`vitest`** skill for full testing guidance. Key project-specific notes
 - Integration tests: `test/integration/`
 - Run tests: `bun run test` (not `bun test`)
 - Use `registerSpy` from `test/test-utils.ts` instead of raw `vi.spyOn`
-- Global mocks: `utils/logger` and `@mariozechner/pi-ai` (don't re-mock in test files)
+- Global mocks: `utils/logger` and `@earendil-works/pi-ai` (don't re-mock in test files)
 - Reset singletons via `resetForTesting()` methods in `beforeEach`
 
 ---

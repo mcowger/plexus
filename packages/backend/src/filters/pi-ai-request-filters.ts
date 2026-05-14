@@ -1,5 +1,5 @@
-import type { Context, Model as PiAiModel } from '@mariozechner/pi-ai';
-import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
+import type { Context, Model as PiAiModel } from '@earendil-works/pi-ai';
+import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import { PI_AI_REQUEST_FILTERS } from './pi-ai-request-filter-rules';
 
 export interface PiAiRequestFilterRule {

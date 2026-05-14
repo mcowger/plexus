@@ -110,7 +110,7 @@ When combined with `priority: api_match` on a model alias, Plexus prefers provid
 
 ### OAuth Providers
 
-Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai) library. These require authentication through the Admin UI.
+Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) library. These require authentication through the Admin UI.
 
 **Supported OAuth providers:**
 - Anthropic Claude

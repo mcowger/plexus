@@ -172,7 +172,7 @@ A request sent in Anthropic format can be routed to an OpenAI provider — Plexu
 
 ### OAuth Providers
 
-Use AI services you already have subscriptions to without managing API keys. Plexus integrates with [pi-ai](https://www.npmjs.com/package/@mariozechner/pi-ai) to support OAuth-backed providers:
+Use AI services you already have subscriptions to without managing API keys. Plexus integrates with [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) to support OAuth-backed providers:
 
 - Anthropic Claude
 - OpenAI Codex
