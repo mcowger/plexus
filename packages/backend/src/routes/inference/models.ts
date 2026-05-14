@@ -30,6 +30,9 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         object: 'model' as const,
         created,
         owned_by: 'plexus',
+        ...(modelConfig?.preferred_api !== undefined && {
+          preferred_api: modelConfig.preferred_api,
+        }),
       };
 
       if (!metaConfig) {

@@ -33,6 +33,7 @@ export const modelAliases = pgTable('model_aliases', {
   modelArchitecture: jsonb('model_architecture'), // override for total_params, active_params, layers, heads, kv_lora_rank, qk_rope_head_dim, context_length, dtype
   enforceLimits: boolean('enforce_limits').notNull().default(false),
   stickySession: boolean('sticky_session').notNull().default(false),
+  preferredApi: jsonb('preferred_api'), // ('chat_completions' | 'messages' | 'gemini' | 'responses')[]
   targetGroups: jsonb('target_groups'), // {name, selector}[]
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),

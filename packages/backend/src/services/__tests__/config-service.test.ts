@@ -33,6 +33,7 @@ function createMockRepo() {
     getAllMcpServers: vi.fn(() => Promise.resolve({})),
     getFailoverPolicy: vi.fn(() => Promise.resolve({ enabled: false })),
     getCooldownPolicy: vi.fn(() => Promise.resolve({ enabled: false })),
+    getBackgroundExplorationConfig: vi.fn(() => Promise.resolve({ enabled: false })),
     getAllSettings: vi.fn(() => Promise.resolve({})),
   };
 }

@@ -368,6 +368,8 @@ export interface AliasTargetGroup {
   targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
 }
 
+export type PreferredApiValue = 'chat_completions' | 'messages' | 'gemini' | 'responses';
+
 export interface Alias {
   id: string;
   aliases?: string[];
@@ -390,6 +392,7 @@ export interface Alias {
   };
   enforce_limits?: boolean;
   sticky_session?: boolean;
+  preferred_api?: Array<PreferredApiValue>;
 }
 
 export interface InferenceError {
@@ -1810,6 +1813,10 @@ export const api = {
       use_image_fallthrough: alias.use_image_fallthrough || false,
       enforce_limits: alias.enforce_limits || false,
       sticky_session: alias.sticky_session || false,
+      ...(alias.preferred_api &&
+        alias.preferred_api.length > 0 && {
+          preferred_api: alias.preferred_api,
+        }),
       ...(alias.type && { type: alias.type }),
       ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
       ...(alias.metadata && { metadata: alias.metadata }),
@@ -1934,6 +1941,7 @@ export const api = {
           advanced: val.advanced || [],
           metadata: val.metadata,
           model_architecture: val.model_architecture,
+          preferred_api: val.preferred_api || [],
         });
       });
       return aliases;

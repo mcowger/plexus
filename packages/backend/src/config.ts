@@ -584,6 +584,11 @@ export const ModelConfigSchema = z
     // in the alias targets). Tracked in-memory only; see
     // services/sticky-session-manager.ts.
     sticky_session: z.boolean().default(false).optional(),
+    // Advertised in GET /v1/models to inform clients of the preferred API surface(s)
+    // for this alias, even if plexus can translate between them.
+    preferred_api: z
+      .array(z.enum(['chat_completions', 'messages', 'gemini', 'responses']))
+      .optional(),
     type: z
       .enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image'])
       .optional(),
