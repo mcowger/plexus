@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import Editor from '@monaco-editor/react';
 import {
@@ -13,6 +13,8 @@ import {
   Download,
   Filter,
   X,
+  Minimize2,
+  Maximize2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
@@ -562,6 +564,8 @@ const AccordionPanel: React.FC<{
 }> = ({ title, content, color, defaultOpen = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
+  const [folded, setFolded] = useState(false);
+  const editorRef = useRef<any>(null);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -571,6 +575,25 @@ const AccordionPanel: React.FC<{
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleToggleFold = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (folded) {
+      editor.trigger('unfoldAll', 'editor.unfoldAll', null);
+    } else {
+      // Fold everything first
+      editor.trigger('foldAll', 'editor.foldAll', null);
+      // Then unfold the outermost object (line 1) to keep it visible
+      setTimeout(() => {
+        editor.setSelection({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 });
+        editor.trigger('unfold', 'editor.unfold', null);
+        editor.setSelection({ startLineNumber: 0, startColumn: 0, endLineNumber: 0, endColumn: 0 });
+      }, 50);
+    }
+    setFolded(!folded);
   };
 
   return (
@@ -584,6 +607,13 @@ const AccordionPanel: React.FC<{
           <span className={clsx('truncate text-[11px] font-bold uppercase tracking-wider', color)}>
             {title}
           </span>
+          <button
+            className="bg-transparent border-0 text-text-muted p-0.5 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
+            onClick={handleToggleFold}
+            title={folded ? 'Unfold all' : 'Fold all'}
+          >
+            {folded ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
+          </button>
         </div>
         <button
           className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
@@ -605,6 +635,9 @@ const AccordionPanel: React.FC<{
             defaultLanguage="json"
             theme="vs-dark"
             value={content}
+            onMount={(editor) => {
+              editorRef.current = editor;
+            }}
             options={{
               readOnly: true,
               minimap: { enabled: false },
