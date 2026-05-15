@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from 'react';
  * Each record represents a single (provider, model, timestamp) data point returned
  * from the `GET /v0/management/concurrency?timeRange=...` endpoint.
  */
+import { PieChart as PieChartIcon, BarChart3 } from 'lucide-react';
 import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
 import { formatNumber, formatTokens } from '../../../lib/format';
 import { Card } from '../../ui/Card';
@@ -334,18 +335,17 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   }, [concurrencyByModel, modelKeys]);
 
   // ---------------------------------------------------------------------------
-  // Pie chart helper (pre-existing)
+  // Chart toggle card component (replaces renderPieChart)
   // ---------------------------------------------------------------------------
 
-  /**
-   * Renders a reusable `<PieChart>` with a custom dark-themed tooltip and a
-   * percentage-annotated legend.
-   *
-   * @param dataKey - Which numeric field from `PieChartDataPoint` to visualize
-   *                  (`'requests'` or `'tokens'`).
-   * @param data    - Array of pie slices, each with a `name` and numeric values.
-   */
-  const renderPieChart = (dataKey: 'requests' | 'tokens', data: PieChartDataPoint[]) => {
+  const ChartToggleCard: React.FC<{
+    title: string;
+    dataKey: 'requests' | 'tokens';
+    data: PieChartDataPoint[];
+    className?: string;
+  }> = ({ title, dataKey, data, className }) => {
+    const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
+
     const CustomTooltip = ({ active, payload }: any) => {
       if (active && payload && payload.length) {
         const value = payload[0].value;
@@ -372,42 +372,94 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       return null;
     };
 
+    const sortedData = [...data].sort(
+      (a, b) => (b[dataKey] as number) - (a[dataKey] as number)
+    );
+
+    const toggleBtnStyle = (active: boolean): React.CSSProperties => ({
+      padding: '4px 6px',
+      borderRadius: '4px',
+      border: '1px solid var(--color-border)',
+      backgroundColor: active ? 'var(--color-bg-hover)' : 'transparent',
+      color: active ? 'var(--color-text)' : 'var(--color-text-muted)',
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+      transition: 'all 0.15s',
+    });
+
+    const extra = (
+      <div style={{ display: 'inline-flex', gap: '4px' }}>
+        <button style={toggleBtnStyle(chartType === 'pie')} onClick={() => setChartType('pie')}>
+          <PieChartIcon size={14} />
+        </button>
+        <button style={toggleBtnStyle(chartType === 'bar')} onClick={() => setChartType('bar')}>
+          <BarChart3 size={14} />
+        </button>
+      </div>
+    );
+
     return (
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="30%"
-            labelLine={false}
-            outerRadius={50}
-            fill="#8884d8"
-            dataKey={dataKey}
-            nameKey="name"
-          >
-            {data.map((_entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Legend
-            verticalAlign="bottom"
-            align="left"
-            height={36}
-            formatter={(value) => {
-              const item = data.find((d) => d.name === value);
-              if (!item) return value;
-              const itemValue = item[dataKey as keyof PieChartDataPoint] as number;
-              const total = data.reduce(
-                (sum, d) => sum + (d[dataKey as keyof PieChartDataPoint] as number),
-                0
-              );
-              const percent = total > 0 ? ((itemValue / total) * 100).toFixed(0) : 0;
-              return `${value} (${percent}%)`;
-            }}
-          />
-          <Tooltip content={<CustomTooltip />} />
-        </PieChart>
-      </ResponsiveContainer>
+      <Card className={className ?? 'min-w-0'} title={title} extra={extra}>
+        <div style={{ height: 300, marginTop: '12px' }}>
+          {chartType === 'pie' ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={sortedData}
+                  cx="50%"
+                  cy="30%"
+                  labelLine={false}
+                  outerRadius={50}
+                  fill="#8884d8"
+                  dataKey={dataKey}
+                  nameKey="name"
+                >
+                  {data.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Legend
+                  verticalAlign="bottom"
+                  align="left"
+                  height={36}
+                  formatter={(value) => {
+                    const item = sortedData.find((d) => d.name === value);
+                    if (!item) return value;
+                    const itemValue = item[dataKey as keyof PieChartDataPoint] as number;
+                    const total = sortedData.reduce(
+                      (sum, d) => sum + (d[dataKey as keyof PieChartDataPoint] as number),
+                      0
+                    );
+                    const percent = total > 0 ? ((itemValue / total) * 100).toFixed(0) : 0;
+                    return `${value} (${percent}%)`;
+                  }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sortedData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" />
+                <YAxis
+                  stroke="var(--color-text-secondary)"
+                  tickFormatter={(v) =>
+                    dataKey === 'requests' ? formatNumber(v) : formatTokens(v)
+                  }
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} activeBar={false}>
+                  {data.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </Card>
     );
   };
 
@@ -632,45 +684,12 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           </div>
         </Card>
 
-        {/* Model Distribution - Requests */}
-        <Card className="min-w-0" title="Usage by Model Alias (Requests)">
-          <div style={{ height: 300, marginTop: '12px' }}>
-            {renderPieChart('requests', modelData)}
-          </div>
-        </Card>
-
-        {/* Model Distribution - Tokens */}
-        <Card className="min-w-0" title="Usage by Model Alias (Tokens)">
-          <div style={{ height: 300, marginTop: '12px' }}>
-            {renderPieChart('tokens', modelData)}
-          </div>
-        </Card>
-
-        {/* Provider Distribution - Requests */}
-        <Card className="min-w-0" title="Usage by Provider (Requests)">
-          <div style={{ height: 300, marginTop: '12px' }}>
-            {renderPieChart('requests', providerData)}
-          </div>
-        </Card>
-
-        {/* Provider Distribution - Tokens */}
-        <Card className="min-w-0" title="Usage by Provider (Tokens)">
-          <div style={{ height: 300, marginTop: '12px' }}>
-            {renderPieChart('tokens', providerData)}
-          </div>
-        </Card>
-
-        {/* API Key Distribution - Requests */}
-        <Card className="min-w-0" title="Usage by API Key (Requests)">
-          <div style={{ height: 300, marginTop: '12px' }}>
-            {renderPieChart('requests', keyData)}
-          </div>
-        </Card>
-
-        {/* API Key Distribution - Tokens */}
-        <Card className="min-w-0" title="Usage by API Key (Tokens)">
-          <div style={{ height: 300, marginTop: '12px' }}>{renderPieChart('tokens', keyData)}</div>
-        </Card>
+        <ChartToggleCard title="Usage by Model Alias (Requests)" dataKey="requests" data={modelData} />
+        <ChartToggleCard title="Usage by Model Alias (Tokens)" dataKey="tokens" data={modelData} />
+        <ChartToggleCard title="Usage by Provider (Requests)" dataKey="requests" data={providerData} />
+        <ChartToggleCard title="Usage by Provider (Tokens)" dataKey="tokens" data={providerData} />
+        <ChartToggleCard title="Usage by API Key (Requests)" dataKey="requests" data={keyData} />
+        <ChartToggleCard title="Usage by API Key (Tokens)" dataKey="tokens" data={keyData} />
 
         <Card className="min-w-0" title="Energy Comparisons">
           <div style={{ marginTop: '12px', height: 300 }}>
