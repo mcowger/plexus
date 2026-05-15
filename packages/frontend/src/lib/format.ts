@@ -155,19 +155,34 @@ export function formatPercent(value: number, decimals: number = 1): string {
  * Handles ISO strings and epoch-millisecond numeric strings.
  */
 export function formatTimeLabel(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (!isNaN(date.getTime())) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const date = parseTimestamp(timestamp);
+  if (date) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return timestamp;
+}
+
+/**
+ * Format a timestamp string into a detailed date-time label for chart tooltips.
+ * Includes date and time (e.g., "2025/05/15 14:00").
+ */
+export function formatDateTimeLabel(timestamp: string): string {
+  const date = parseTimestamp(timestamp);
+  if (date) {
+    const dateStr = date.toLocaleDateString([], { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr} ${timeStr}`;
   }
-  // Try parsing as a numeric string (epoch ms)
+  return timestamp;
+}
+
+function parseTimestamp(timestamp: string): Date | null {
+  const date = new Date(timestamp);
+  if (!isNaN(date.getTime())) return date;
   const num = Number(timestamp);
   if (!isNaN(num)) {
     const dateFromNum = new Date(num);
-    if (!isNaN(dateFromNum.getTime())) {
-      return dateFromNum.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+    if (!isNaN(dateFromNum.getTime())) return dateFromNum;
   }
-  return timestamp;
+  return null;
 }
 
 /**

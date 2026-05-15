@@ -29,7 +29,7 @@ import { useEffect, useMemo, useState } from 'react';
  * from the `GET /v0/management/concurrency?timeRange=...` endpoint.
  */
 import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
-import { formatNumber, formatTokens } from '../../../lib/format';
+import { formatNumber, formatTokens, formatTimeLabel, formatDateTimeLabel } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { TotalEnergyComparison } from '../../TotalEnergyComparison';
 import { TimeRangeSelector } from '../TimeRangeSelector';
@@ -432,7 +432,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                <XAxis dataKey="timestamp" stroke="var(--color-text-secondary)" />
+                <XAxis dataKey="timestamp" stroke="var(--color-text-secondary)" tickFormatter={(v) => formatTimeLabel(String(v))} />
                 <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatNumber} />
                 <Tooltip
                   contentStyle={{
@@ -440,6 +440,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                     borderColor: 'var(--color-border)',
                     color: 'var(--color-text)',
                   }}
+                  labelFormatter={(label) => formatDateTimeLabel(String(label))}
                   formatter={(value) => formatNumber(value as number)}
                 />
                 <Area
@@ -576,7 +577,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                <XAxis dataKey="timestamp" stroke="var(--color-text-secondary)" />
+                <XAxis dataKey="timestamp" stroke="var(--color-text-secondary)" tickFormatter={(v) => formatTimeLabel(String(v))} />
                 <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatTokens} />
                 <Tooltip
                   contentStyle={{
@@ -584,6 +585,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                     borderColor: 'var(--color-border)',
                     color: 'var(--color-text)',
                   }}
+                  labelFormatter={(label) => formatDateTimeLabel(String(label))}
                   formatter={(value) => formatTokens(value as number)}
                 />
                 <Legend />
