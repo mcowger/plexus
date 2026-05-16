@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
+const mockScheduler = vi.hoisted(() => ({
+  getCheckerIds: vi.fn(() => []),
+  isInitialized: vi.fn(() => true),
+  reload: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('../quota/quota-scheduler', () => ({
   QuotaScheduler: {
-    getInstance: vi.fn(() => ({
-      getCheckerIds: vi.fn(() => []),
-      reload: vi.fn(),
-    })),
+    getInstance: vi.fn(() => mockScheduler),
   },
 }));
 
@@ -57,6 +60,9 @@ describe('ConfigService write coalescing', () => {
     ConfigService.resetInstance();
     rebuildCount = 0;
     mockRepo = createMockRepo();
+    mockScheduler.getCheckerIds.mockReturnValue([]);
+    mockScheduler.isInitialized.mockReturnValue(true);
+    mockScheduler.reload.mockClear();
 
     service = new ConfigService(mockRepo as any);
 
@@ -117,6 +123,25 @@ describe('ConfigService write coalescing', () => {
 
     await vi.advanceTimersByTimeAsync(150);
     expect(rebuildCount).toBe(2);
+
+    vi.useRealTimers();
+  });
+
+  it('reloads quota scheduler after first quota checker is saved when scheduler is initialized', async () => {
+    vi.useFakeTimers();
+
+    await service.saveProvider('routing-provider', {
+      api_base_url: 'https://api.routing.run',
+      api_key: 'routing-key',
+      quota_checker: {
+        type: 'routing-run',
+      },
+    } as any);
+
+    await service.flush();
+
+    expect(mockScheduler.isInitialized).toHaveBeenCalled();
+    expect(mockScheduler.reload).toHaveBeenCalled();
 
     vi.useRealTimers();
   });

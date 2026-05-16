@@ -411,7 +411,7 @@ export class ConfigService {
     // Only reload if the scheduler has already been initialized (has checkers registered);
     // on startup, index.ts calls quotaScheduler.initialize() explicitly after this.
     const scheduler = QuotaScheduler.getInstance();
-    if (scheduler.getCheckerIds().length > 0) {
+    if (scheduler.isInitialized()) {
       scheduler.reload(quotas).catch((err) => {
         logger.warn(`Failed to reload QuotaScheduler after config change: ${err}`);
       });

@@ -203,9 +203,7 @@ try {
 // Initialize quota checkers (requires DB to be ready)
 try {
   const config = getConfig();
-  if (config.quotas && config.quotas.length > 0) {
-    await quotaScheduler.initialize(config.quotas);
-  }
+  await quotaScheduler.initialize(config.quotas ?? []);
 } catch (e) {
   logger.error('Failed to initialize quota checkers', e);
 }
